@@ -34,7 +34,7 @@ export const launchVerdict = (program, args, guard = null) => {
     if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'a raw terminal create starts a terminal outside worker-start') };
     if (words[0] === 'worktree' && ORCA_WORKTREE_WRITES.has(words[1])) return { code: 'AGENT_ORCA_WORKTREE', command: [program, ...args].join(' ').slice(0, 200),
       reason: `orca worktree ${words[1]}: an agent never creates or removes a worktree - a removal without the runtime's link check follows node_modules junctions into the live tree (inc-c8fbf76aa499), and a tree outside the registry escapes its cap and GC`,
-      remedy: 'inspect with `node scripts/machine/worktrees.mjs counts`; worktrees are created and removed only by the runtime worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree, scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree); report a need you cannot meet as blocked environment' };
+      remedy: 'inspect with `starci machine worktrees counts`; worktrees are created and removed only by the runtime worktree API (scripts/machine/worktree-orca.mjs createOrcaWorktree / removeOrcaWorktree, scripts/kernel/workflow-worktree.mjs releaseWorkflowWorktree); report a need you cannot meet as blocked environment' };
     return null;
   }
   if (program === 'node' && /^uat\./.test(String(guard?.op ?? '')) && args.some((a) => TEST_WORLD_RUNNER.test(a))) return { code: 'UAT_TEST_WORLD', command: [program, ...args].join(' ').slice(0, 200),

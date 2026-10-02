@@ -228,7 +228,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   git(fx.repo,'add','-A','--',...ALL_DIRS.map(ownedPathspec));
   git(fx.repo,'commit','--quiet','-m','implement routes');
   const head=git(fx.repo,'rev-parse','HEAD');
-  // api report accepts the file only from inside the attempt's scratch dir (op_attempts.scratch_dir).
+  // starci kernel report accepts the file only from inside the attempt's scratch dir (op_attempts.scratch_dir).
   const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
   const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',

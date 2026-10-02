@@ -50,7 +50,7 @@ writes: 'Owner ruling 2026-09-28 ("Freeze the drawing rules"): the release point
   released set at dispatch, so it is the redo; an older never-dispatched duplicate of it (same cut
   group and owned paths, no live job --after it) is cancelled {verdict: dropped, reason:
   superseded-by-contract-release} with a job-dropped event. Running legs keep their admission
-  (status runningOpRevDrift; api nudge carries the notice). --dry-run writes nothing and reports the
+  (status runningOpRevDrift; starci kernel nudge carries the notice). --dry-run writes nothing and reports the
   same numbers'
 returns: "{ok:true, family, batch, dryRun, workflows:[{workflowId, changes[], alreadyReleased[],
   owedBefore, owedAfter, owed[], restamped[], dropped[], running[], released}]}"

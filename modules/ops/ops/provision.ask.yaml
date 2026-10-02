@@ -53,7 +53,7 @@ reads:
       en: Before any credential, host, account or CI secret/variable is named, read the stack declaration's
         services block with starci-starcistacks-check <app>. What it declares ownerAction none with
         custody present is the runtime's, not a provision - the asking operation uses the declared custody
-        and api report refuses the ask (ask-declared-in-stack).
+        and starci kernel report refuses the ask (ask-declared-in-stack).
 writes:
   - id: report
     path: evidence/manifest.yaml
@@ -106,7 +106,7 @@ steps:
         path also listed in question.assets; a choice whose outcome has no artifact yet says so in its
         label. The owner compares the artifacts themselves, never a text description or a bare hash;
         a free-text \"type your picks in the note\" instruction is not an answer schema. The ask is
-        delivered by filing this operation's report with outcome ask and that question (api report),
+        delivered by filing this operation's report with outcome ask and that question (starci kernel report),
         then ending the turn: the kernel serves it through serve-ask, which records the answer with
         a receipt, and re-enqueues this operation with the answer bound. Never ask through an Orca
         orchestration message, a terminal prompt or a chat, and never wait in-turn for a reply -
@@ -129,10 +129,10 @@ steps:
     writes: [report]
     action:
       en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"limit provision asks\"; modules/kernel/
-        driver-loop.yaml autopilot): mid-flow this op is not planned - api enqueue refuses it and a credential, real-
+        driver-loop.yaml autopilot): mid-flow this op is not planned - starci kernel enqueue refuses it and a credential, real-
         money or shared-system need is recorded deferred-to-handover while the build proceeds on sandbox, test stubs
         and placeholders. The one run under autopilot is the end-of-flow credential checklist (params.subject
-        handover-credentials): file outcome ask with the question `api autopilot --workflow <id> --checklist --json`
+        handover-credentials): file outcome ask with the question `starci kernel autopilot --workflow <id> --checklist --json`
         prints (.question), verbatim - one form for every deferred credential; never split it, never add a value, never
         invent one. A deferred ask this op filed earlier and that autopilot deferred is not asked again: the checklist
         carries it. Credential values are entered by the owner only, in the served form."

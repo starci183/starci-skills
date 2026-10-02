@@ -62,8 +62,8 @@ reads:
   - id: stack
     path: <app>/.starcistacks/<environment>/** + .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
-      en: "The stack the test world runs for real: the services and image versions of the app-root .starcistacks/<environment> the declaration names (Postgres, Redis, Keycloak with its realm, ...) and the environment record that owns them. The test world attaches the one warm stack (starci-test-stack) and isolates this checkout by its namespace; no other target is a proof surface."
-      vi: "Stack mà test world chạy thật: các dịch vụ và phiên bản image của .starcistacks/<environment> ở gốc app mà khai báo nêu (Postgres, Redis, Keycloak với realm của nó, ...) và bản ghi môi trường sở hữu chúng. Test world gắn vào một stack ấm duy nhất (starci-test-stack) và cô lập checkout này theo namespace; không đích nào khác là bề mặt chứng minh."
+      en: "The stack the test world runs for real: the services and image versions of the app-root .starcistacks/<environment> the declaration names (Postgres, Redis, Keycloak with its realm, ...) and the environment record that owns them. The test world attaches the one warm stack (starci app stack) and isolates this checkout by its namespace; no other target is a proof surface."
+      vi: "Stack mà test world chạy thật: các dịch vụ và phiên bản image của .starcistacks/<environment> ở gốc app mà khai báo nêu (Postgres, Redis, Keycloak với realm của nó, ...) và bản ghi môi trường sở hữu chúng. Test world gắn vào một stack ấm duy nhất (starci app stack) và cô lập checkout này theo namespace; không đích nào khác là bề mặt chứng minh."
   - id: checks
     path: selected request checks[] + <app>/<manifest-paths>
     purpose:
@@ -131,8 +131,8 @@ writes:
     path: STARCI_JOB_SCRATCH/read-digest.json
     schema: starci/read-digest@1
     content:
-      en: "The READ digest: the touched files, their slot map from hfs explain, and every pattern and example file read with its sha256."
-      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
+      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
     path: STARCI_JOB_SCRATCH/gate.json
     schema: starci/gate@1
@@ -149,18 +149,18 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run starci gate read --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map starci app explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy starci gate read --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà starci app explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - stack
     writes: [evidence]
     action:
-      en: "Environment pre-step, before any setup or walk. api dispatch already ran node
+      en: "Environment pre-step, before any setup or walk. starci kernel dispatch already ran node
         scripts/uat/env-health.mjs check --restart on the environments this flow's records reference and
         put the result in the packet (context.environment). Re-run it yourself - node
         scripts/uat/env-health.mjs check --repo <ledger repo> --paths <owned paths as JSON> --json - and
         record it in report.checks as name env-health with its exit code (0 ready, 3 not ready). A service
-        that is down is started ONLY through node scripts/uat/env-health.mjs serve --repo <ledger repo>
+        that is down is started ONLY through starci gate env-health serve --repo <ledger repo>
         --env <id> --service <name> --cwd <checkout> --url <probe> -- <start command>, which registers it so
         the next pre-step restarts it itself; never kill a process env-health reports as port-conflict. A
         probe-drift row means the declared probe path is stale while the service is up: walk, and name the
@@ -198,8 +198,8 @@ steps:
   - reads: [checks, stack, effects, suite]
     writes: [evidence, test-world-run]
     action:
-      en: "Run the e2e project through the runtime's test-world runner: node scripts/gates/test-world-run.mjs --root <app> --project e2e [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/test-world-run.json. It runs the listed npm run test:e2e verbatim on the preset's world runner (up to min(--maxWorkers, slots) files at once, each in a fresh process on its own data slot, the test world attaching the warm stack and resetting the slot's data per file) and records the harness, every spec's world form, the outage calls and the totals. Add no command, narrow no selection and skip no scenario; keep the command, cwd, tested tree/commit, exit code, counts and sanitized output, and every attempt when something was retried. A scenario that stays green with its dependencies cut is a defect of the spec, and deleting or skipping a scenario is never a route to a green run."
-      vi: "Chạy dự án e2e qua bộ chạy test-world của runtime: node scripts/gates/test-world-run.mjs --root <app> --project e2e [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/test-world-run.json. Nó chạy đúng lệnh npm run test:e2e được liệt kê trên world runner của preset (tối đa min(--maxWorkers, số slot) tệp cùng lúc, mỗi tệp trong tiến trình mới trên slot dữ liệu riêng, test world gắn stack ấm và đặt lại dữ liệu của slot theo từng tệp) và ghi bộ khung, dạng world của từng spec, các lần gọi outage và tổng số. Không thêm lệnh, không thu hẹp phạm vi, không bỏ kịch bản nào; giữ lệnh, cwd, cây/commit đã test, exit code, số đếm và đầu ra đã làm sạch, và mọi lần thử lại. Kịch bản vẫn xanh khi phụ thuộc bị cắt là lỗi của spec, và xóa hay bỏ qua kịch bản không bao giờ là đường tới lần chạy xanh."
+      en: "Run the e2e project through the runtime's test-world runner: starci gate test-world --root <app> --project e2e [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/test-world-run.json. It runs the listed npm run test:e2e verbatim on the preset's world runner (up to min(--maxWorkers, slots) files at once, each in a fresh process on its own data slot, the test world attaching the warm stack and resetting the slot's data per file) and records the harness, every spec's world form, the outage calls and the totals. Add no command, narrow no selection and skip no scenario; keep the command, cwd, tested tree/commit, exit code, counts and sanitized output, and every attempt when something was retried. A scenario that stays green with its dependencies cut is a defect of the spec, and deleting or skipping a scenario is never a route to a green run."
+      vi: "Chạy dự án e2e qua bộ chạy test-world của runtime: starci gate test-world --root <app> --project e2e [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/test-world-run.json. Nó chạy đúng lệnh npm run test:e2e được liệt kê trên world runner của preset (tối đa min(--maxWorkers, số slot) tệp cùng lúc, mỗi tệp trong tiến trình mới trên slot dữ liệu riêng, test world gắn stack ấm và đặt lại dữ liệu của slot theo từng tệp) và ghi bộ khung, dạng world của từng spec, các lần gọi outage và tổng số. Không thêm lệnh, không thu hẹp phạm vi, không bỏ kịch bản nào; giữ lệnh, cwd, cây/commit đã test, exit code, số đếm và đầu ra đã làm sạch, và mọi lần thử lại. Kịch bản vẫn xanh khi phụ thuộc bị cắt là lỗi của spec, và xóa hay bỏ qua kịch bản không bao giờ là đường tới lần chạy xanh."
   - reads: [stack, effects, suite, target]
     writes: [evidence]
     action:
@@ -224,12 +224,12 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run starci gate run --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy starci gate run --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:
-      en: "`starci validate` ran, and `starci validate --strict` ran on every record directory it
+      en: "`starci runtime validate` ran, and `starci runtime validate --strict` ran on every record directory it
         writes; every cited ID and path exists or is explicitly proposed, the input
         bindings are current, and an honest not-run or fail cannot earn done."
   - id: coverage
@@ -268,12 +268,12 @@ proofs:
       vi: "Mọi outage lần chạy gây ra đều được khôi phục, không trạng thái dùng chung nào ngoài namespace của world bị sửa, và mọi tài nguyên tạm còn lại được ghi kèm danh tính và lệnh dọn có thể chạy lại."
   - id: op-gate
     requirement:
-      en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
-      vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+      en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
+      vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
   - id: test-world
     requirement:
-      en: "api settle re-reads the attached test-world run summary (runtime check op-proof, proof test-world, project e2e): a done without it (op-test-world-proof-missing), with a hand-rolled world - no preset world runner, no defineTestWorld declaration, a spec outside the layer's form, docker, testcontainers, a DataSource, process.env or a sleep in a spec (op-test-world-hand-rolled) - or with a run that is not green, ran no test or skipped one (op-test-world-run-red) is refused."
-      vi: "api settle tự đọc lại tóm tắt lần chạy test-world đính kèm (check op-proof, proof test-world, dự án e2e): done thiếu nó (op-test-world-proof-missing), có world tự dựng - không có world runner của preset, không có khai báo defineTestWorld, spec sai dạng của tầng, docker, testcontainers, DataSource, process.env hoặc sleep trong spec (op-test-world-hand-rolled) - hoặc lần chạy không xanh, không chạy test nào hay bỏ qua test (op-test-world-run-red) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached test-world run summary (runtime check op-proof, proof test-world, project e2e): a done without it (op-test-world-proof-missing), with a hand-rolled world - no preset world runner, no defineTestWorld declaration, a spec outside the layer's form, docker, testcontainers, a DataSource, process.env or a sleep in a spec (op-test-world-hand-rolled) - or with a run that is not green, ran no test or skipped one (op-test-world-run-red) is refused."
+      vi: "starci kernel settle tự đọc lại tóm tắt lần chạy test-world đính kèm (check op-proof, proof test-world, dự án e2e): done thiếu nó (op-test-world-proof-missing), có world tự dựng - không có world runner của preset, không có khai báo defineTestWorld, spec sai dạng của tầng, docker, testcontainers, DataSource, process.env hoặc sleep trong spec (op-test-world-hand-rolled) - hoặc lần chạy không xanh, không chạy test nào hay bỏ qua test (op-test-world-run-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: ENVIRONMENT_NOT_READY

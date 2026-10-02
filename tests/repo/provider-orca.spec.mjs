@@ -177,7 +177,7 @@ test('calls.yaml declares the live agent-context guard the runner executes',()=>
 // The host index documents the calls StarCi issues; a call no scripts/api/orca
 // wrapper issues (worktree set/show, orchestration check/send, a rename before
 // release) is not documented as if it ran, and op titles use the spellings
-// api dispatch writes (modules/kernel/start-workflow.yaml orcaTree.titles).
+// starci kernel dispatch writes (modules/kernel/start-workflow.yaml orcaTree.titles).
 test('every call the Orca host index names is one a scripts/api/orca wrapper issues',()=>{
   const issued=new Set(fs.readdirSync(WRAPPERS_DIR).filter(f=>f.endsWith('.mjs'))
     .flatMap(f=>[...fs.readFileSync(path.join(WRAPPERS_DIR,f),'utf8').matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1])));

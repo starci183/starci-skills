@@ -75,20 +75,20 @@ workUnit: "Every op job is a try of exactly one work unit (scripts/kernel/units.
   latest try and failed, else retry-lineage-invalid; a job of another op or unit is
   retry-of-foreign), whatever shape the new try has. A unit whose latest try passed runs again only
   with --reopen <reason> (work_units.reopen_reason/by/at). No try passes work_units.try_budget
-  (default 5, Q13; only the owner or the Supervisor raises it: api unit --raise-budget). A new unit
+  (default 5, Q13; only the owner or the Supervisor raises it: starci kernel unit --raise-budget). A new unit
   over the owned paths or records of a FAILED unit of the same op is refused
   unit-overlaps-failed-unit (retry that unit instead). --derived-from <jobs> (graph-edit split,
   merge, wire, recut) makes a new unit inherit what is left of those units' budgets. owner_answers,
   prior_attempt_failures and the lineage route adjustments read the unit's own tries only"
 foundations: "--foundation <name> marks a leg that builds a shared foundation this workflow claimed
-  (api foundation --claim): payload.foundation, and status lists it first in frontier.queued -
+  (starci kernel foundation --claim): payload.foundation, and status lists it first in frontier.queued -
   foundation legs run first. Without it, a workflow with running peers that declared no foundation
   (owns / needs / none) is refused foundations-undeclared when it was created after the
   shared-foundation-planning contract change and its ledger plans foundations at all (a foundation
   or a declaration is recorded); an older workflow, or a ledger that registered none, is only
   advised (receipt foundationAdvisory, one stderr line) and never held."
 contractFollowUp: "--contract-change <id> --follow-up-of <jobId> records the follow-up leg a `reach:
-  follow-up` contract change owes an older leg (modules/kernel/contract-changes/; api status
+  follow-up` contract change owes an older leg (modules/kernel/contract-changes/; starci kernel status
   frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass --after <jobId> while
   the older leg still runs; it is never held for the change."
 reads: workflows.phase; existing jobs for {workflow_id, op_id}; the brief
@@ -134,11 +134,11 @@ refuses:
   - "workflow-finished | workflow-archived | workflow-not-accepting-work: only a queued or running
     workflow takes new work (paused, stopped, finished and archived do not; DBTREE
     jobs_enqueue_guard)"
-  - "unit-in-flight (field open): a try of this work unit is still open; edit it (api graph-edit
+  - "unit-in-flight (field open): a try of this work unit is still open; edit it (starci kernel graph-edit
     widen|params) or let it settle"
   - "unit-already-passed: the unit's latest try passed; a re-run needs --reopen <reason> (H5)"
   - "unit-try-budget-exhausted: the next try would pass work_units.try_budget; only the owner or the
-    Supervisor raises it (api unit --raise-budget, H3)"
+    Supervisor raises it (starci kernel unit --raise-budget, H3)"
   - "retry-lineage-invalid: --retry-of is not the unit's latest try, or that try did not fail (H4)"
   - "retry-of-foreign: --retry-of names no earlier job of this op in this workflow"
   - "unit-overlaps-failed-unit (field overlaps): a new unit over the owned paths or records of a
@@ -156,7 +156,7 @@ refuses:
   - "kernel-rev-stale: the Kernel's acked runtime rev is behind and this op's contract (its brief,
     _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or
     a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api
-    status kernelRev lists, api kernel-ack-rev, enqueue again; legs of other ops are unaffected"
+    status kernelRev lists, starci kernel kernel-ack-rev, enqueue again; legs of other ops are unaffected"
   - "grant-parent-missing: an owned path whose directory does not exist in its target repository
     (the path itself for a directory or glob grant, its parent for a file grant - e.g. src/app when
     the repository keeps its router at apps/app/src/app), so the worker could never satisfy the

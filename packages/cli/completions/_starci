@@ -4,14 +4,21 @@ _starci() {
   local -a groups
   groups=(
     'app:product application scaffolding, checks, managed output and local test infrastructure'
+    'connect:operate owner connectors and their delivery services'
     'debug:run a fixed read-only inspector against the StarCi runtime'
+    'gate:run repository, conformance, custody and verification gates'
     'guard:enforce StarCi tool, history and host-footprint safety guards'
     'harness:start, stop, inspect or open the local StarCi harness'
     'kernel:kernel ledger verbs (runtime internals; the Kernel agents door to the ledger)'
+    'machine:inspect and maintain host machine state'
+    'orca:call the runtime-owned Orca host boundary'
     'reconciler:control and inspect the host reconciler engine'
+    'release:prove, inspect and perform runtime release operations'
+    'route:resolve runtime operations from structured routing inputs'
     'runtime:install, update and check the StarCi runtime tree'
     'supervisor:inspect, start or stop the one StarCi Supervisor seat'
-    'work:Work records, drawing, brand, layout, grammar and example proof tools'
+    'uat:run assisted and slot-controlled user acceptance tests'
+    'work:design and UI proof tooling of the Work owner'
     'workflow:workflow lifecycle — define a goal, start its kernel, status, stop'
   )
   if (( CURRENT == 2 )); then
@@ -19,15 +26,22 @@ _starci() {
   elif (( CURRENT == 3 )); then
     case "$words[2]" in
             app) _values 'verbs' 'add[]' 'check[]' 'emit[]' 'explain[]' 'hygiene[]' 'lint[]' 'new[]' 'scaffold[]' 'secret[]' 'stack[]' 'sync[]' 'upgrade[]' ;;
-            debug) _values 'verbs' 'run[]' ;;
+            connect) _values 'verbs' 'ask-gateway[]' 'telegram[]' 'telegram-media[]' 'tunnel[]' ;;
+            debug) _values 'verbs' 'pass[]' 'run[]' ;;
+            gate) _values 'verbs' 'canon-scan[]' 'custody-exec[]' 'env-health[]' 'hfs-sync[]' 'read[]' 'repo-presentation[]' 'run[]' 'sonar[]' 'starcistacks[]' 'test-world[]' 'unit[]' ;;
             guard) _values 'verbs' 'command[]' 'footprint-scan[]' 'seat-tools[]' 'verify-commit[]' ;;
             harness) _values 'verbs' 'open[]' 'start[]' 'status[]' 'stop[]' ;;
             kernel) _values 'verbs' 'archive[]' 'artifacts[]' 'autopilot[]' 'consume-report[]' 'contract-release[]' 'coverage[]' 'cut-seam[]' 'decide[]' 'decisions[]' 'dispatch[]' 'dispatch-ready[]' 'enqueue[]' 'estimate[]' 'extensions[]' 'finish[]' 'foundation[]' 'foundations[]' 'graph-edit[]' 'hierarchy[]' 'inbox[]' 'incident[]' 'kernel-ack-rev[]' 'kernel-proposal[]' 'lifecycle[]' 'log[]' 'logs[]' 'messages[]' 'notify[]' 'nudge[]' 'observe[]' 'op-contract[]' 'op-override[]' 'peers[]' 'plan[]' 'provider-backoff[]' 'provider-health[]' 'questions[]' 'reconcile[]' 'record-change[]' 'record-checks[]' 'redesign[]' 'rename[]' 'reply[]' 'report[]' 'retire-ask[]' 'route[]' 'run-deferred-tests[]' 'serve-ask[]' 'settle[]' 'settle-tail[]' 'status[]' 'survey[]' 'unit[]' 'usage[]' 'verify-proofs[]' ;;
+            machine) _values 'verbs' 'decisions[]' 'kernel-watchdog[]' 'lessons[]' 'op-metrics[]' 'seam-policy[]' 'worktrees[]' ;;
+            orca) _values 'verbs' 'terminal-read[]' 'terminal-send[]' ;;
             reconciler) _values 'verbs' 'install-task[]' 'restart[]' 'start[]' 'status[]' 'stop[]' 'up[]' ;;
-            runtime) _values 'verbs' 'check[]' 'doctor[]' 'install[]' 'status[]' 'update[]' 'validate[]' 'version[]' ;;
-            supervisor) _values 'verbs' 'start[]' 'status[]' 'stop[]' ;;
-            work) _values 'verbs' 'asset-slot[]' 'brand-direction[]' ;;
-            workflow) _values 'verbs' 'define[]' 'start[]' 'status[]' 'stop[]' ;;
+            release) _values 'verbs' 'app-installs[]' 'check[]' 'clean-test[]' 'launch-smoke[]' 'proof[]' 'publish[]' 'sync-runtime[]' ;;
+            route) _values 'verbs' 'op[]' ;;
+            runtime) _values 'verbs' 'architecture[]' 'benchmark-snapshot[]' 'check[]' 'doctor[]' 'gen-ops[]' 'housekeeping[]' 'install[]' 'ledger-hygiene[]' 'machine-db[]' 'status[]' 'update[]' 'validate[]' 'version[]' ;;
+            supervisor) _values 'verbs' 'actions[]' 'bridge[]' 'gc[]' 'land[]' 'notify[]' 'owed[]' 'poll[]' 'push[]' 'ram-cap[]' 'report[]' 'start[]' 'status[]' 'stop[]' 'tell[]' ;;
+            uat) _values 'verbs' 'assisted-runner[]' 'slots[]' ;;
+            work) _values 'verbs' 'asset-slot[]' 'brand[]' 'brand-direction[]' 'brand-palette[]' 'compose-direction[]' 'draw-acceptance[]' 'draw-dna[]' 'draw-feedback[]' 'draw-gates[]' 'draw-grammar[]' 'draw-layer[]' 'draw-loop[]' 'draw-rationale[]' 'draw-render[]' 'draw-review[]' 'draw-source[]' 'draw-taste[]' 'example-critique[]' 'example-derive[]' 'example-evidence[]' 'example-verify[]' 'grammar-geometry[]' 'grammar-knowledge[]' 'grammar-proposal[]' 'grammar-registry-pin[]' 'graph[]' 'layout-tree[]' 'render-proof[]' 'shell-conformance[]' 'ui-proof-brief[]' ;;
+            workflow) _values 'verbs' 'assess[]' 'define[]' 'start[]' 'status[]' 'stop[]' ;;
     esac
   else
     _values 'flags' '--json' '--cwd' '--quiet' '--help' '--edition'

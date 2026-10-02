@@ -7,6 +7,6 @@ paths:
   - scripts/kernel/api-verbs/foundation.mjs
   - scripts/kernel/api-verbs/record-change.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/foundations.yaml
-  - modules/kernel/api-commands/foundation.yaml
-  - modules/kernel/api-commands/record-change.yaml
+  - modules/cli/commands/kernel/foundations.yaml
+  - modules/cli/commands/kernel/foundation.yaml
+  - modules/cli/commands/kernel/record-change.yaml

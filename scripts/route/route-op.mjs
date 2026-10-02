@@ -4,11 +4,11 @@
 // an agent must not need to read a whole op file to route.
 //
 // CLI:
-//   node scripts/route/route-op.mjs --kind <opKind>
-//       [--nodeKind <ui|business|architecture|...>]
+//   starci route op --kind <opKind>
+//       [--node-kind <ui|business|architecture|...>]
 //       [--phase <pre-implementation|implementation|...>]
 //       [--intent <token>[,<token>...]]   (repeatable)
-//       [--opsDir <dir>]                 (default: <skill>/modules/ops)
+//       [--ops-dir <dir>]                 (default: <skill>/modules/ops)
 //       [--json]
 //
 // Scoring (higher wins, ties broken by op id for determinism):
@@ -29,7 +29,7 @@ import { routeFields } from './route-fields.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 function usage(code) {
-  console.error('use: node scripts/route/route-op.mjs --kind <opKind> [--nodeKind <k>] [--phase <p>] [--intent <t>[,<t>...]] [--opsDir <dir>] [--json]');
+  console.error('use: starci route op --kind <opKind> [--node-kind <k>] [--phase <p>] [--intent <t>[,<t>...]] [--ops-dir <dir>] [--json]');
   process.exit(code);
 }
 
@@ -43,10 +43,10 @@ function parseArgs(argv) {
       return v;
     };
     if (a === '--kind') args.kind = take();
-    else if (a === '--nodeKind') args.nodeKind = take();
+    else if (a === '--node-kind') args.nodeKind = take();
     else if (a === '--phase') args.phase = take();
     else if (a === '--intent') args.intents.push(...take().split(','));
-    else if (a === '--opsDir') args.opsDir = take();
+    else if (a === '--ops-dir') args.opsDir = take();
     else if (a === '--json') args.json = true;
     else if (a === '--help' || a === '-h') usage(0);
     else usage(2);

@@ -12,8 +12,8 @@ params:
     max: 10
     setBy: owner
     doc:
-      en: "Rounds of FIX then hfs lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
-      vi: "Số vòng SỬA rồi chạy lại hfs lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
+      en: "Rounds of FIX then starci app lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
+      vi: "Số vòng SỬA rồi chạy lại starci app lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
 nodeKinds: [ui]
 completionProfile: ui
 sideEffects: [generated artwork files inside the owned asset paths of the bound repository]
@@ -34,7 +34,7 @@ reads:
         operation nothing to do; neither is a licence to decide what the screen should contain.
         The slots this operation owes are the drawing's placeholders (owner ruling 2026-09-27): each
         data-asset-slot=\"<id>\" in a render source under N/assets/** with its entry in the
-        asset-request.md beside it, listed by `node scripts/work/asset-slot.mjs list N` and by api status
+        asset-request.md beside it, listed by `starci work asset-slot list N` and by starci kernel status
         assetSlotsOwed[]; a slot is owed until its data-asset-sha256 names the bytes of its src."
   - id: design
     path: N/assets/*
@@ -92,7 +92,7 @@ writes:
         drawing's placeholder: in every render source that shows the slot, the data-asset-slot
         element's src becomes the produced file (relative to the source) and data-asset-sha256 its
         sha256 - nothing else in the source changes - so the settle records asset-slot-filled and
-        api status stops listing it in assetSlotsOwed."
+        starci kernel status stops listing it in assetSlotsOwed."
   - id: placeholder
     path: N/assets/**/*.html
     fields: [data-asset-slot element src, data-asset-sha256]
@@ -115,8 +115,8 @@ writes:
     path: STARCI_JOB_SCRATCH/lint.json
     schema: starci/lint@1
     content:
-      en: "The hfs lint report of the produced asset files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
-      vi: "Báo cáo hfs lint của các tệp tài sản đã tạo (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
+      en: "The starci app lint report of the produced asset files (starci app lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo starci app lint của các tệp tài sản đã tạo (starci app lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -167,7 +167,7 @@ steps:
         crop, misses its declared size or breaks a brand rule is regenerated or reported; it is
         never recorded as the slot's asset. Then fill the drawing's placeholder - set the data-asset-slot element's src to
         the produced file and data-asset-sha256 to its sha256 in every render source that shows the slot, so
-        `node scripts/work/asset-slot.mjs list N` reads it filled and the settle records asset-slot-filled.
+        `starci work asset-slot list N` reads it filled and the settle records asset-slot-filled.
   - reads:
       - target
       - design
@@ -184,8 +184,8 @@ steps:
   - reads: [repo, brand]
     writes: [lint, evidence]
     action:
-      en: "FORCE THE FE CANON over what the op produced: hfs lint --changed <every asset and binding file the op wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks (an asset off the brand palette or the declared format is a finding). FIX the produced files and run it again, at most params.gateRounds rounds. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
-      vi: "ÉP CHẠY CANON FE trên những gì op tạo ra: hfs lint --changed <mọi tài sản và tệp gắn kết mà op đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu (tài sản lệch bảng màu thương hiệu hoặc định dạng đã khai báo là một lỗi). SỬA các tệp đã tạo rồi chạy lại, tối đa params.gateRounds vòng. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
+      en: "FORCE THE FE CANON over what the op produced: starci app lint --changed <every asset and binding file the op wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks (an asset off the brand palette or the declared format is a finding). FIX the produced files and run it again, at most params.gateRounds rounds. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
+      vi: "ÉP CHẠY CANON FE trên những gì op tạo ra: starci app lint --changed <mọi tài sản và tệp gắn kết mà op đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu (tài sản lệch bảng màu thương hiệu hoặc định dạng đã khai báo là một lỗi). SỬA các tệp đã tạo rồi chạy lại, tối đa params.gateRounds vòng. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
 proofs:
   - id: slot-coverage
     requirement:
@@ -212,8 +212,8 @@ proofs:
         cannot earn done.
   - id: produced-lint
     requirement:
-      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
-      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
+      vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: BRAND_RULE_UNSATISFIABLE

@@ -1,0 +1,28 @@
+group: machine
+verb: lessons
+owner: runtime
+summary: inspect and update Supervisor learning records
+impl: {script: scripts/machine/lessons.mjs}
+positional:
+  - {name: action, enum: [list, match, tier, result, feedback, tick, export], required: true, variadic: false}
+flags:
+  - {name: signature, type: string}
+  - {name: text, type: string}
+  - {name: commit, type: list}
+  - {name: experiment, type: string}
+  - {name: outcome, type: enum, enum: [kept, reverted, did-not-work]}
+  - {name: reason, type: string}
+  - {name: via, type: enum, enum: [chat, telegram, draw-note]}
+  - {name: refs, type: list}
+  - {name: items, type: string}
+  - {name: write, type: boolean}
+exit: {"0": action completed, "1": action failed, "2": bad usage}
+json: flag
+examples:
+  - starci machine lessons list --json
+  - starci machine lessons feedback --text <text> --via chat
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/machine/lessons.mjs
+  - node .claude/scripts/machine/lessons.mjs

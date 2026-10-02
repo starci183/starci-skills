@@ -35,7 +35,7 @@ orchestration:
   # separate approvals engine or policy file.
   approvalMode: entry-skill-owner-ok
   dispatch: An entry skill claims a queued goal and spawns that workflow's one long-lived kernel agent
-    (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `api dispatch --spawn`
+    (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `starci kernel dispatch --spawn`
     launches one isolated agent per ready operation in the workflow's one worktree, using the first eligible target in
     that operation's chain. The kernel never implements, repairs or tests on behalf of an operation agent.
 defaults:

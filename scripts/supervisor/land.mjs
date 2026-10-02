@@ -23,7 +23,7 @@
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
-//      the FULL `starci check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
+//      the FULL `starci runtime check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -39,7 +39,7 @@
 //        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
 //        gates as main and as the candidate have them over the latest accepted leg of every live workflow
 //        (scripts/supervisor/gate-stability.mjs, read-only) and reports how many would flip - so the Supervisor
-//        decides when to api contract-release it.
+//        decides when to starci kernel contract-release it.
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
 //    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
@@ -543,7 +543,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
       if (!baseTree || baseHead !== base || !fs.existsSync(runner)) { checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, skipped: !baseTree ? 'no base tree' : baseHead !== base ? `base tree is at ${baseHead}, not ${base}` : 'no gate-stability.mjs in the candidate' }); continue; }
       const report = (gateStability ?? ((opts) => spawnGateStability(opts)))({ runner, base: baseTree, head: dir, family });
       checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, ...(report.error ? { error: report.error } : { legs: report.legs, flips: report.flips, newlyFailing: report.newlyFailing,
-        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (api contract-release --family ${family})`,
+        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (starci kernel contract-release --family ${family})`,
         perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
     }
   } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }

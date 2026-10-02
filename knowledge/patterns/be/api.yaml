@@ -251,9 +251,9 @@ rules:
       `object`, an unbound generic, a function or `Date`. `RefusalCode` is a closed union of string literals, or omitted for an
       operation that never refuses. The one route of the app takes `@Body() request: OperationRequest<Table>` and answers
       `Promise<OperationReply<Table>>` of the same table; the wire is `{ operation, requestId, input }` in and `{ operation, requestId,
-      outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `hfs emit-contracts`
+      outcome }` out, `outcome` being the canon Outcome `{ kind: "ok", value }` or `{ kind: "refused", code }`. `starci app emit`
       derives `be/contracts/<app>/openapi.json` (OpenAPI 3.1, `x-operation: "<name>@<version>"`, a oneOf over the operations) from the
-      table with the type checker, and the full `hfs check` fails when the committed file is stale.
+      table with the type checker, and the full `starci app check` fails when the committed file is stale.
     rationale: |-
       The operation set of an app is a contract the front end (`fe/`, through the root codegen) and other consumers generate a client from. A name-to-string registry with `unknown`
       bodies and results forces every client to hand-type the wire; one typed table gives the client generator, the route and the

@@ -32,8 +32,8 @@ const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.y
 
 // The fe-canon attempt-4 checks the kernel recorded, verbatim in shape.
 const CANON_CHECKS=[
-  {name:'canon-scan',command:'node .claude/scripts/gates/canon-scan.mjs --root ../todo-app-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
-  {name:'hfs-lint',command:'npx hfs lint --repo ../todo-app-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
+  {name:'canon-scan',command:'starci gate canon-scan --root ../todo-app-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
+  {name:'hfs-lint',command:'npx starci app lint --repo ../todo-app-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
   {name:'lint-check',command:'npm run lint:check (root ../todo-app-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
 ];
 const UAT_ROOT_CAUSE={node:'impl.login.todo-app-be.session-custody',self:false,category:'contract-gap',
@@ -116,9 +116,9 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:CANON_CHECKS},measurement:true}).class,'findings');
   assert.equal(measurementCheckClass(CANON_CHECKS[0]),'findings','canon-scan exit 1 is findings');
   assert.equal(measurementCheckClass({...CANON_CHECKS[0],exitCode:3}),'error','canon-scan exit 3: a machine could not run');
-  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository hfs lint with findings is measured');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../todo-app-fe',exitCode:1}),'findings','gate exit 1: new findings');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../todo-app-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
+  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository starci app lint with findings is measured');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../todo-app-fe',exitCode:1}),'findings','gate exit 1: new findings');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../todo-app-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:[{...CANON_CHECKS[0],exitCode:3}]},measurement:true}).class,'tool');
   // app-auth a1: the UAT names its owner as a Work record.
   assert.equal(classifyFailure({op:'uat.verify',report:{outcome:'failed',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test x',exitCode:1}]}}).class,'product');
@@ -183,7 +183,7 @@ test('a red UAT whose owner resolves to nothing stops for the owner with its cla
 test('an environment failure re-runs behind the pre-step; a tool error retries; only transient takes the same-op retry',t=>{
   const w=world(t,{legs:['uat.verify','docs.author']});
   w.job('u','uat.verify',{paths:['.starciwork/features/login/uat/x']});
-  w.report('u','failed',{checks:[{name:'env-health',command:'node scripts/uat/env-health.mjs check',exitCode:3}]});
+  w.report('u','failed',{checks:[{name:'env-health',command:'starci gate env-health check',exitCode:3}]});
   let next=w.api(['settle','--job','u','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-environment-runs-again-behind-the-pre-step','environment']);
   w.job('d','docs.author');w.report('d','failed',{head:'aaaaaaa',checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]});
@@ -333,7 +333,7 @@ test('env-health serve registers a server so the next pre-step restarts it itsel
   assert.notEqual(again.pid,served.pid,'the registry names the restarted server');
 });
 
-test('api dispatch runs the environment pre-step for a walk: a foreign hung port refuses environment-not-ready before any host call; a ready stack rides the packet',async t=>{
+test('starci kernel dispatch runs the environment pre-step for a walk: a foreign hung port refuses environment-not-ready before any host call; a ready stack rides the packet',async t=>{
   const {FAKE_ORCA}=await import('../helpers/fake-orca.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-gate-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));

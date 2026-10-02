@@ -2,7 +2,7 @@
 //
 // Keys:
 //   host:boot                     the boot order of DESIGN 7.7, once per HOST boot (schedules host/boot, MB-01) and when Orca comes back
-//                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
+//                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, starci kernel reconcile
 //                                 --orphan-kernel-jobs per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
@@ -18,7 +18,7 @@
 //                                 closes the old seat once, and a terminal Orca reads disconnected but still lists
 //                                 (a persisted tab) is no proof it is gone. The retry is close-verify.mjs --tree,
 //                                 proof is 'gone' or a listing without the handle, and on proof the incident is
-//                                 resolved --by supervisor through api incident. Retries back off (STALE_RETRY_MS
+//                                 resolved --by supervisor through starci kernel incident. Retries back off (STALE_RETRY_MS
 //                                 doubling to STALE_RETRY_MAX_MS); STALE_ESCALATE_TRIES failures -> one DI.
 //   seat:supervisor               scripts/supervisor/supervisor-watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
 //                                 Both seat kinds carry a TURN BUDGET (turnStep): busy in one turn (its spinner timer)

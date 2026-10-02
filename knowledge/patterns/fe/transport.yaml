@@ -77,7 +77,7 @@ rules:
     kind: mandatory
     hfsRules: [R52, R23]
     requirement: |-
-      The back end commits `be/contracts/<app>/schema.graphql` (or `openapi.json`), written by `hfs emit-contracts`
+      The back end commits `be/contracts/<app>/schema.graphql` (or `openapi.json`), written by `starci app emit`
       (`npm run contract:emit`). The front end reads it in place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no
       copy. The root `codegen` script (`scripts/codegen.mjs`) writes the ignored `modules/api/__generated__/` from it; `lint`,
       `typecheck`, `build:fe` and the op gate run `codegen` first. GraphQL documents live in `.graphql` files. A handwritten

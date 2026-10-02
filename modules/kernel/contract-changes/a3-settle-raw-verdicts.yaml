@@ -9,5 +9,5 @@ summary: >-
   and opens one runtime-defect Decision Item after tail.maxAttempts. An overdue settle is a v_blocking row.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/check.yaml
+  - modules/cli/commands/kernel/check.yaml
   - modules/kernel/contract-changes/a3-settle-raw-verdicts.yaml

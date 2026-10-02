@@ -17,7 +17,7 @@ import { gitResultOf } from '../../scripts/lib/git.mjs';
 const gitResult = (args, options) => gitResultOf(runGit(args, options));
 
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) drives the runtime's own
-// launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
+// launchers - startAgent (Supervisor, Kernel, the starci kernel dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
 // and draw-critic.mjs launchCriticWorker (the critic on its criticWorkspace placement) - against a fake Orca at the
 // wrapper level: Runs, worker-start --spec (it files the Task), worker-show (depth and creator Dispatch, the way Orca
 // reports them), worker-read, worker-stop, worker-release, task-update, and worktree list. Each fake agent does
@@ -343,7 +343,7 @@ test('the finish merges to main and leaves the worktree release-pending; the con
 test("the smoke's no-op files sit in slots a real app owns: the hfs repository check over the ecommerce example finds nothing new", (t) => {
   // The finish gate lints the whole branch; a file in an invented folder (HFS_SLOT_UNDECLARED) would refuse the finish and
   // hide a real finish failure. Measured on a copy of examples/ecommerce-app (its tracked files, never a node_modules), with the
-  // repository check hfs lint runs (scripts/hfs/check.mjs checkRepository; the preset and formatter passes need an
+  // repository check starci app lint runs (scripts/hfs/check.mjs checkRepository; the preset and formatter passes need an
   // installed app and are not this question).
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-slots-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));

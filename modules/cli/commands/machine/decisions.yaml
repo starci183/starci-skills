@@ -1,0 +1,30 @@
+group: machine
+verb: decisions
+owner: runtime
+summary: inspect and act on runtime and Supervisor decision items
+impl: {script: scripts/machine/decisions.mjs}
+positional:
+  - {name: action, enum: [ring, escalate-due, supervisor], required: true, variadic: false}
+flags:
+  - {name: repo, type: string}
+  - {name: workflow, type: string}
+  - {name: apply, type: boolean}
+  - {name: list, type: boolean}
+  - {name: all, type: boolean}
+  - {name: ring, type: boolean}
+  - {name: claim, type: string}
+  - {name: resolve, type: string}
+  - {name: by, type: string}
+  - {name: verb, type: string}
+  - {name: decision, type: string}
+  - {name: note, type: string}
+exit: {"0": action completed, "1": action failed, "2": bad usage}
+json: flag
+examples:
+  - starci machine decisions supervisor --list
+  - starci machine decisions ring --repo <path> --workflow <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/machine/decisions.mjs
+  - node .claude/scripts/machine/decisions.mjs

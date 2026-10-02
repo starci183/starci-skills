@@ -18,11 +18,11 @@
 // answers by replying (telegram-bridge.mjs, draw-feedback.mjs). Nothing else is sent: no op progress, no incidents,
 // no finish, and never from the supervisor.
 //
-//   node scripts/connectors/telegram.mjs notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id> [--repo <path>]
+//   starci connect telegram notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id> [--repo <path>]
 //       (re-)send the notice of one open ask (deduped: an ask with an open notice is not sent again)
-//   node scripts/connectors/telegram.mjs sweep          delete the notices of asks that closed, drop dead links
-//   node scripts/connectors/telegram.mjs discover-chat   getUpdates -> chat ids (id, type, name only)
-//   node scripts/connectors/telegram.mjs test            one test message to connectors.telegram.chatId
+//   starci connect telegram sweep          delete the notices of asks that closed, drop dead links
+//   starci connect telegram discover-chat   getUpdates -> chat ids (id, type, name only)
+//   starci connect telegram test            one test message to connectors.telegram.chatId
 //
 // Messages are plain text in config.yaml `language` (vi, else en). The link a
 // served form gets is its nonce path on the public tunnel host
@@ -607,7 +607,7 @@ async function main() {
     const result = await sendMessage({ token, chatId: telegram.chatId, text: textFor(config.language).test, apiBase });
     out(result); if (!result.ok) process.exitCode = 1; return;
   }
-  console.error('usage: telegram.mjs notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
+  console.error('usage: starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
   process.exit(2);
 }
 

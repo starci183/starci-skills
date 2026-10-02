@@ -1,4 +1,4 @@
-# The contract of `api artifacts` (scripts/kernel/verbs/artifacts.mjs). One file per extension verb
+# The contract of `starci kernel artifacts` (scripts/kernel/verbs/artifacts.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.artifacts (lane slim-04).
 group: kernel
 verb: artifacts

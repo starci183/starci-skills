@@ -70,7 +70,7 @@ test('the sentence is the unit: a prohibition in the next sentence does not excu
 
 test('allowed commands are never findings, whatever the sentence', async () => {
   for (const text of [
-    'Land with `node scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`.',
+    'Land with `starci supervisor land --commit <sha> --lane <lane> --specs touching --json`.',
     'Remove one junction with `cmd /c rmdir <path>` and one file with `rm <file>`.',
     'Start it with `orca orchestration worker-start --agent claude --worktree path:<dir> --spec "<brief>"`.',
     'Run `node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>`, then end only your own PID (`taskkill /PID <pid>`).',

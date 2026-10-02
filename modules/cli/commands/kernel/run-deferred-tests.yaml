@@ -1,7 +1,7 @@
 group: kernel
 verb: run-deferred-tests
 owner: runtime
-summary: re-queue the test legs the owner's config.yaml specs switches deferred (api status testsDeferred)
+summary: re-queue the test legs the owner's specs switch deferred (see status testsDeferred)
 impl:
   script: scripts/kernel/cli.mjs
   args:
@@ -33,12 +33,12 @@ since: 1.0.0-alpha.4
 removed:
   - starci api run-deferred-tests
   - node scripts/kernel/cli.mjs run-deferred-tests
-reads: the workflow's jobs whose result verdict is deferred (api status testsDeferred); the owner
+reads: the workflow's jobs whose result verdict is deferred (starci kernel status testsDeferred); the owner
   config.yaml specs switches
 writes: "The owner's \"test later\" (owner 2026-09-28 \"speed up development; test later when
   asked\"). The owner config.yaml root `specs: {unit?, e2e?}` switches product testing off per
   class; an op whose brief policy.specsToggle.<class> is defer-leg (test.author, e2e.verify) is then
-  never dispatched: api enqueue, api route and api dispatch settle its queued job status succeeded
+  never dispatched: starci kernel enqueue, starci kernel route and starci kernel dispatch settle its queued job status succeeded
   with result {verdict: deferred, deferred: {kind, reason: specs.<class>=false, at, via}} and one
   tests-deferred event - no lease, no dispatch, no attempt spent - and the legs behind it proceed.
   This command re-queues every such job of the workflow (only --kind's class when given) in one

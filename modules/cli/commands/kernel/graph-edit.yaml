@@ -1,5 +1,5 @@
-# The contract of `api graph-edit` (scripts/kernel/verbs/graph-edit.mjs): the Kernel's LIGHT unit edits
-# (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is api redesign).
+# The contract of `starci kernel graph-edit` (scripts/kernel/verbs/graph-edit.mjs): the Kernel's LIGHT unit edits
+# (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is starci kernel redesign).
 group: kernel
 verb: graph-edit
 owner: runtime
@@ -88,7 +88,7 @@ guardrails:
   - added paths stay in the unit's repository, never kernel custody, never .claude, inside the op's
     write families, and never overlap another workflow's open unit or lease
     (path-held-by-other-workflow)
-  - every new unit goes through api enqueue (its autopilot, foundation and family refusals hold)
+  - every new unit goes through starci kernel enqueue (its autopilot, foundation and family refusals hold)
   - a retry or widen that reproduces a shape that already failed for a shape cause is refused
     (shape-already-failed)
   - every edit is a kernel-graph-edit event holding its inverse; --edit undo --undo <edit> reverts it (a dropped unit comes back as a NEW try of its unit, resume_of the cancelled job: cancelled is terminal)

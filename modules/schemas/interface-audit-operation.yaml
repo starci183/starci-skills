@@ -2,7 +2,7 @@ schema: starci/schema@1
 describes: starci/interface-audit-operation@1
 module: modules/ops/ops/interface.audit.yaml
 purpose: |-
-  The verdict one interface.audit attempt files as <STARCI_JOB_SCRATCH>/interface-audit.json (api report --attach):
+  The verdict one interface.audit attempt files as <STARCI_JOB_SCRATCH>/interface-audit.json (starci kernel report --attach):
   the api writes it as the audit's interface_audits row in the project ledger (alpha.3: operations/ is agent data,
   never a .starciwork record); its evidence is the attempt's attachments/evidence/** artifacts.
 shape:

@@ -10,7 +10,7 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/product-worktrees-deps.yaml
-  - modules/kernel/api-commands/product-deps.yaml
+  - modules/cli/commands/kernel/product-deps.yaml
   - modules/kernel/product-land.yaml
   - scripts/kernel/api-verbs/product-deps.mjs
   - scripts/kernel/product-worktree.mjs

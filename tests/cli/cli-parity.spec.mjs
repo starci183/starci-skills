@@ -138,6 +138,21 @@ test('a catalog verb with no handler is a finding', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('a direct kernel-owned script outside the kernel group needs no cli.mjs switch case', () => {
+  const root = fixture((t, put) => {
+    put('scripts/kernel/watchdog.mjs', '#!/usr/bin/env node\nconsole.log("ok");\n');
+    put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n');
+    put('modules/cli/commands/machine/watchdog.yaml', verbYaml('watchdog', [])
+      .replace('group: kernel', 'group: machine')
+      .replace('impl: {script: scripts/kernel/cli.mjs, args: [watchdog]}', 'impl: {script: scripts/kernel/watchdog.mjs}')
+      .replace('starci kernel watchdog', 'starci machine watchdog'));
+  });
+  try {
+    const report = checkCliParity(root);
+    assert.equal(report.ok, true, JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('an entry script needs either a catalog route or an internal declaration', () => {
   const root = fixture((t, put) => put('scripts/private.mjs', '#!/usr/bin/env node\nconsole.log("fixture");\n'));
   try {

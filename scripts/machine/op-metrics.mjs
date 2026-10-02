@@ -38,8 +38,8 @@
 // counts); `trendLine` compares the newest with the one closest to trendMs earlier and the owner digest
 // (stall-alert.mjs ownerDigest) carries that one line.
 //
-//   node scripts/machine/op-metrics.mjs [--repo <path>]... [--window-ms <ms>] [--by op|workflow] [--json]
-//   node scripts/machine/op-metrics.mjs --trend [--json]      the newest snapshots and the trend line
+//   starci machine op-metrics [--repo <path>]... [--window-ms <ms>] [--by op|workflow] [--json]
+//   starci machine op-metrics --trend [--json]      the newest snapshots and the trend line
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';

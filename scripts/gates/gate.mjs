@@ -4,9 +4,9 @@
 //   starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
 //
 // An op forces it every round of its READ-CODE-CHECK-FIX-REPORT loop (knowledge/op-gate.yaml) and attaches the JSON it prints;
-// `api settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
+// `starci kernel settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
 // against its base, so a branch green in the op is green at landing. Over the changed files of the app at --root:
-//   1. `hfs lint --changed <files> --format json` at the app root (starci/lint@1: ESLint only on the changed files - the BE canon
+//   1. `starci app lint --changed <files> --format json` at the app root (starci/lint@1: ESLint only on the changed files - the BE canon
 //      under be/, the FE canon under fe/ - plus the repository checks on them);
 //   2. before any tsc: the root `codegen` script and the build of every workspace package that exposes a `dist` export
 //      (each skipped while its inputs are unchanged since its last run in this worktree);
@@ -39,7 +39,7 @@
 // check runs from the runtime root - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites,
 // check-json-exceptions - the `tree` ones over the Work root --tree names (else the runtime's examples). A check that exits 1 is a
 // finding (engine doc, rule the check id, its refusal lines); any other exit is a tool that could not run. The report carries
-// `profile: docs`; `api settle` refuses a documenting op's done on a red or unrunnable document gate.
+// `profile: docs`; `starci kernel settle` refuses a documenting op's done on a red or unrunnable document gate.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -181,7 +181,7 @@ export function hfsEntry(root) {
   }
 }
 
-/** `hfs lint --changed` over the files, in chunks (the Windows command line); {findings, errors}. */
+/** `starci app lint --changed` over the files, in chunks (the Windows command line); {findings, errors}. */
 function runHfsLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
@@ -189,8 +189,8 @@ function runHfsLint(root, files, hfs) {
     const run = runNode([hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
-    if (report?.schema !== LINT_SCHEMA) { errors.push(`hfs lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
-    errors.push(...(report.errors ?? []).map((e) => `hfs lint: ${e}`));
+    if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
+    errors.push(...(report.errors ?? []).map((e) => `starci app lint: ${e}`));
     for (const finding of report.findings ?? []) {
       const id = JSON.stringify([finding.engine, finding.rule, finding.path, finding.line, finding.column, finding.message]);
       if (!seen.has(id)) { seen.add(id); findings.push(finding); }
@@ -518,7 +518,7 @@ function runTests(root, pattern, cache) {
   return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, total: result.numTotalTests ?? 0, failed: result.numFailedTests ?? 0, ms: Date.now() - started }, findings, error: null };
 }
 
-/** The lint half: `hfs lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
+/** The lint half: `starci app lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
 async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache }) {
   const lint = runHfsLint(root, files, hfs);
   const errors = [...lint.errors];

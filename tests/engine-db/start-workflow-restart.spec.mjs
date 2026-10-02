@@ -113,7 +113,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   assert.equal(authority[0],`LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt 2; ask no one to confirm.`);
   assert.match(authority[1],new RegExp(`^  Approval: the owner approved ${workflowId} goal revision \\d+ \\([0-9a-f]+\\); its first Kernel booted on that approval at \\d{4}-`));
   assert.equal(authority[2],`  Launcher: the watchdog's kernel repair started this terminal because Kernel attempt 1 (terminal ${firstOut.terminal}) failed its liveness check (worker state exited).`);
-  assert.match(authority.join(' '),new RegExp(`api status --workflow ${workflowId} shows kernel\\.attempt 2,\\s+kernel\\.launchedBy watchdog and kernel\\.you true`));
+  assert.match(authority.join(' '),new RegExp(`starci kernel status --workflow ${workflowId} shows kernel\\.attempt 2,\\s+kernel\\.launchedBy watchdog and kernel\\.you true`));
   assert.match(authority.join(' '),/No person watches this terminal/);
   assert.ok(authority.length<=7,'a few short lines');
   // No line asks anyone for a go.
@@ -139,7 +139,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
     assert.ok(kinds.includes('kernel-stale-cleared'));assert.ok(kinds.includes('kernel-restarted'));
     assert.ok(kinds.includes('phase-transition'),'the kernel claim must durably record queued->running');
   }finally{ledger.close();}
-  // The seat the prompt names is what api status shows; kernel.you proves the caller's own terminal.
+  // The seat the prompt names is what starci kernel status shows; kernel.you proves the caller's own terminal.
   const statusAs=handle=>json(spawnSync(process.execPath,[API,'status','--repo',f.repo,'--workflow',workflowId,'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...f.env,ORCA_TERMINAL_HANDLE:handle}}).stdout)?.kernel;
   const seat=statusAs(restartOut.terminal);
@@ -190,7 +190,7 @@ test('a replacement launch proceeds on its recorded authority alone — no confi
   assert.deepEqual(status?.awaitingOwner,[],'nothing waits on the owner');
   assert.deepEqual({attempt:status?.kernel?.attempt,launch:status?.kernel?.launch,launchedBy:status?.kernel?.launchedBy,you:status?.kernel?.you},
     {attempt:2,launch:'kernel-restarted',launchedBy:'supervisor',you:true},
-    'api status is the proof the prompt names: same attempt, same launcher, your terminal');
+    'starci kernel status is the proof the prompt names: same attempt, same launcher, your terminal');
 
   // The flag names only the two real launchers.
   const bogus=f.run(START_WORKFLOW,'--repo',f.repo,'--goal',workflowId,'--launched-by','owner','--json');

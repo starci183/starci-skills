@@ -1,4 +1,4 @@
-// api archive: the owner's stop for a workflow that will not finish. It sets workflows.archived_at,
+// starci kernel archive: the owner's stop for a workflow that will not finish. It sets workflows.archived_at,
 // retires the open asks, drops every unsettled operation (leases, worker, Task), releases the Kernel
 // seat and closes the Kernel terminal; a second archive writes nothing. The Kernel watchdog ends on an
 // archived workflow instead of replacing its Kernel, and finish keeps refusing where it refused.

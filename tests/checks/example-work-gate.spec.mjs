@@ -837,7 +837,7 @@ test('work/node@1 and @2 are each refused at the tree walk', () => {
   }
 });
 
-// R07 HFS_AGENT_DATA_TRACKED: `starci validate` on a .starciwork refuses known agent data and admits product records.
+// R07 HFS_AGENT_DATA_TRACKED: `starci runtime validate` on a .starciwork refuses known agent data and admits product records.
 test('work-validate refuses TRACKED agent data inside .starciwork as HFS_AGENT_DATA_TRACKED', () => {
   const workRoot = tracked(tree({
     'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\ndescription: d\n',

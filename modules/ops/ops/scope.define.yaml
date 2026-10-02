@@ -44,8 +44,8 @@ reads:
   - id: standard
     path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
-      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
+      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (starci app explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: N/index.yaml
@@ -101,8 +101,8 @@ steps:
   - reads: [standard, request]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every node the scope names lands where the standard puts it: the record family of knowledge/patterns/repo/starciwork.yaml and, for each owned path, the app-relative hfs slot (be/..., fe/..., .starciwork/..., .starcistacks/... at the app root) - a path no slot admits is a reported gap. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi nút phạm vi nêu ra nằm đúng chỗ chuẩn đặt: họ bản ghi của knowledge/patterns/repo/starciwork.yaml và, với mỗi đường dẫn sở hữu, slot hfs tương đối theo app (be/..., fe/..., .starciwork/..., .starcistacks/... ở gốc app) - đường dẫn không slot nào nhận là khoảng trống được báo. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every node the scope names lands where the standard puts it: the record family of knowledge/patterns/repo/starciwork.yaml and, for each owned path, the app-relative hfs slot (be/..., fe/..., .starciwork/..., .starcistacks/... at the app root) - a path no slot admits is a reported gap. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/patterns/repo/folder.yaml knowledge/hfs/slots.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi nút phạm vi nêu ra nằm đúng chỗ chuẩn đặt: họ bản ghi của knowledge/patterns/repo/starciwork.yaml và, với mỗi đường dẫn sở hữu, slot hfs tương đối theo app (be/..., fe/..., .starciwork/..., .starcistacks/... ở gốc app) - đường dẫn không slot nào nhận là khoảng trống được báo. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - request
       - intake
@@ -149,13 +149,13 @@ steps:
     action:
       en: "Draw the work graph v0 from the scope record and existing architecture records, coarse - domains
         and journeys only: every node declares ownedPaths, reads and rollbackTo, no two slices own the same
-        path, and each slice carries a size estimate within `api estimate` bounds. Record it as v0."
+        path, and each slice carries a size estimate within `starci kernel estimate` bounds. Record it as v0."
   - reads:
       - request
       - records
     writes: [node, scope, evidence]
     action:
-      en: Run the record-class validator `starci validate` over the authored scope record and confirm
+      en: Run the record-class validator `starci runtime validate` over the authored scope record and confirm
         every cited id exists or is explicitly proposed, every dep is a real declared node id, and
         no exclusion is dropped. Report done once with the scope record id; defining the scope
         performs no effect the scope names.
@@ -180,7 +180,7 @@ proofs:
         evidence bundle and the work graph v0.
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: checkpointed
@@ -191,8 +191,8 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
-      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
-      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: INTENT_UNRESOLVED

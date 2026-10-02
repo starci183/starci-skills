@@ -119,7 +119,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(spawned[0].env.STARCI_RECONCILER_EPOCH, '3');
   assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'todo-app-be']);
   const journal = st.db.db.prepare('SELECT state, epoch, verb FROM engine_actions ORDER BY started_at').all();
-  assert.deepEqual(journal.map((a) => [a.state, a.epoch, a.verb]), [['done', 3, 'api settle']]);
+  assert.deepEqual(journal.map((a) => [a.state, a.epoch, a.verb]), [['done', 3, 'starci kernel settle']]);
   current = false;
   const fenced = await active.api('todo-app-be', 'settle', ['--job', 'j2']);
   assert.equal(fenced.fenced, true, 'a lost epoch runs nothing');

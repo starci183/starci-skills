@@ -1,4 +1,4 @@
-# The contract of `api lifecycle` (scripts/kernel/verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
+# The contract of `starci kernel lifecycle` (scripts/kernel/verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
 group: kernel
 verb: lifecycle
 owner: runtime
@@ -41,8 +41,8 @@ removed:
   - starci api lifecycle
   - node scripts/kernel/cli.mjs lifecycle
 purpose: The one verb that pauses, stops and resumes a workflow (DBTREE workflow_transitions +
-  lifecycle_changes). A paused or stopped workflow takes no new job (api enqueue refuses
-  workflow-not-accepting-work) and launches none (api dispatch refuses); an op already running
+  lifecycle_changes). A paused or stopped workflow takes no new job (starci kernel enqueue refuses
+  workflow-not-accepting-work) and launches none (starci kernel dispatch refuses); an op already running
   finishes and settles. Paused is a hold the owner, the Supervisor or the Kernel may set and the
   owner or the Supervisor lifts; stopped is the owner's (or the Supervisor's) stop and only the
   OWNER resumes it (stopped -> queued, then the Kernel seat starts again). No controller ever moves

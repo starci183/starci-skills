@@ -25,10 +25,10 @@ about:
     the kernel to believe it — and when the agent says 'something here is
     wrong', where does that doubt go?"
   businessAnswer: >-
-    One typed report — filed as a durable reports row via `api report`,
+    One typed report — filed as a durable reports row via `starci kernel report`,
     signal second — bound to the exact dispatch that produced it. The agent
-    claims an outcome; the kernel consumes it (`api consume-report`) and
-    re-proves it (`api check`) before `api settle`. Doubt is a first-class
+    claims an outcome; the kernel consumes it (`starci kernel consume-report`) and
+    re-proves it (`starci kernel record-checks`) before `starci kernel settle`. Doubt is a first-class
     field, not a side-channel: suspicion text becomes a backward edge to the
     boundary that owns the wrongness.
   sources:
@@ -91,7 +91,7 @@ returns:
       refuses report.files outside the job's owned_paths
       (scripts/kernel/report-envelope.mjs), and the byte-level checks above
       run as the op's declared checks re-executed by the kernel via
-      `api check` (scripts/work/validate/check-work-artifacts.mjs). A claim of
+      `starci kernel record-checks` (scripts/work/validate/check-work-artifacts.mjs). A claim of
       bytes that differ on disk is ASSET_DIGEST — rejected.
 
   suspicion:
@@ -124,7 +124,7 @@ returns:
 
 # ============================================================================
 # 2 — THE REPORT ENVELOPE. starci/op-report@1 (validated when the worker
-#    files `api report`; re-validated at `api settle`). The reports ROW is
+#    files `starci kernel report`; re-validated at `starci kernel settle`). The reports ROW is
 #    the durable verdict, the file is the bound artifact, the Orca message
 #    is the wake-up signal.
 # ============================================================================
@@ -141,8 +141,8 @@ envelope:
     blocker: "blocked only: {kind <- BLOCKER_KINDS, detail}"
     rootCause: "optional: {node (op, op#instance, or a Work record id such as impl.<feature>.<repo>.<name>), self?, category, claim<=600ch, evidence[]<=400ch each, counterCheck?, expectedFix?, recheck?, op? (the build op owning the fix), files?[] (the paths it repairs)} (scripts/kernel/report-envelope.mjs rootCauseProblems); a product or findings failure whose owner resolves to a build op queues a repair of that op and the op again behind it; another non-build node queues a read-only root verify of it before the op runs again (api.yaml settle failureClass)"
     failureClass: "optional on outcome failed: environment|tool|findings|product|deterministic|transient (scripts/kernel/verify-failure.mjs). The api derives the class from the evidence and keys failed routes on it (modules/models/kinds.yaml vocabularies.failureClasses); only transient and tool re-run the same op as-is. A walk on a stack that is not up is outcome blocked with blocker kind environment, never failed"
-    claims: "optional: [{paths?[], frs?[], cases?[], shapes?[], specs?[]}] — what the job's proof files verify (a claim without paths covers every file); indexed per artifact at settle (scripts/kernel/proof-integrity.mjs claimsProblems) and read by api coverage"
-    seamAssumptions: "optional: [{symbol, assumption, file?}] - what a cut sibling that ran on a stub (packet context.cut.seamStub) assumed of its unlanded seam; the Kernel re-verifies the slice against the landed seam (cut-seam-reconcile, api cut-seam --reconcile; scripts/kernel/seam-policy.mjs)"
+    claims: "optional: [{paths?[], frs?[], cases?[], shapes?[], specs?[]}] — what the job's proof files verify (a claim without paths covers every file); indexed per artifact at settle (scripts/kernel/proof-integrity.mjs claimsProblems) and read by starci kernel coverage"
+    seamAssumptions: "optional: [{symbol, assumption, file?}] - what a cut sibling that ran on a stub (packet context.cut.seamStub) assumed of its unlanded seam; the Kernel re-verifies the slice against the landed seam (cut-seam-reconcile, starci kernel cut-seam --reconcile; scripts/kernel/seam-policy.mjs)"
     owedToWire: "optional, canon slices (code.refactor params.canonFamilies): [{path, finding, file?, ruleId?}] - each residual canon finding only the cut's canon-wire leg can land (path = the shared-root, config, public-entry or consumer file outside the slice); its cut-slice-postcondition is green when every residual canon-scan finding is listed here, and settle adds each path to the queued canon-wire leg"
     head: "the commit the op's checks ran on (git rev-parse HEAD; no op commits, the runtime is the only committer, scripts/kernel/workflow-checkpoint.mjs); required of review.verify: the finish lands only the head its settle checkpoint recorded and its report named (reviewVerifiedOf, workflow-finish-verify-stale)"
     signal: "the Orca wake-up type must match the outcome (SIGNALS: done/partial->worker_done, failed->worker_done(failed), ask->question, blocked->escalation)"
@@ -150,12 +150,12 @@ envelope:
     Identity fields (run, task, dispatch, from) bind the report to the exact
     dispatch; UNIQUE(workflow_id, dispatch_id) on the reports table means one
     dispatch produces exactly one report (engine/db/ledger.mjs /
-    engine/db/migrations/runtime/0001-init.sql reports DDL). Filing is `api report --job <id>
+    engine/db/migrations/runtime/0001-init.sql reports DDL). Filing is `starci kernel report --job <id>
     --report <file>` — the file is a starci/op-report@1 JSON envelope the api
     validates (identity fields run/task/dispatch/from are stamped from the
     job row, never the worker's claim); an upsert on that key, so a re-filed
     report replaces itself rather than doubling; consumed_at marks the
-    report the kernel already integrated (`api consume-report`).
+    report the kernel already integrated (`starci kernel consume-report`).
 
 retryAccounting:
   identity: >-
@@ -171,7 +171,7 @@ retryAccounting:
     its try (the same job row, no new try_no: a leased -> ready move) while
     consuming the separately bounded infrastructure restart allowance.
   ownerWait: >-
-    An ask is a wait on the owner, not a failure. `api settle --verdict
+    An ask is a wait on the owner, not a failure. `starci kernel settle --verdict
     blocked` on a filed `ask` report records result_json.verdict
     `awaiting-owner` (kernelVerdict `blocked`, askDispatchId the ask's
     dispatch) and moves jobs.status to `awaiting_owner`, never `failed`: a
@@ -181,12 +181,12 @@ retryAccounting:
     neither a business retry (engine/admission.mjs retryDisposition, retryClass
     `owner-answer`) nor a try of its unit's budget (admission spentTries; the
     jobs_enqueue_guard trigger subtracts awaiting_owner tries); its unit parks
-    `deciding`. `api status` counts the job under `failures.awaitingOwner`,
+    `deciding`. `starci kernel status` counts the job under `failures.awaitingOwner`,
     lists the open wait in `awaitingOwner[]` and marks its leg
     `awaitingOwner: true` (yellow), never under failures or red. No job
     settled `blocked` on an `ask` report reads as one any other way.
   peerWait: >-
-    A repo-wide gate red on a peer's change is the peer's, not the op's. `api check` attributes a
+    A repo-wide gate red on a peer's change is the peer's, not the op's. `starci kernel record-checks` attributes a
     red check that names its `failing` files (modules/kernel/api.yaml commands.check peerBlocked);
     a settle whose only red checks are peerBlocked records result_json.peerBlocked and spends no
     business retry (retryDisposition retryClass `peer-blocked`); the Kernel hands the red to the
@@ -216,15 +216,15 @@ accepts:
       can persist against a mismatched job identity.
   - layer: kernel-consumed
     rule: >-
-      `api consume-report` marks the reports row integrated (consumed_at)
-      BEFORE the checks re-run; `api settle` enforces consumption — it sets
+      `starci kernel consume-report` marks the reports row integrated (consumed_at)
+      BEFORE the checks re-run; `starci kernel settle` enforces consumption — it sets
       consumed_at itself if the kernel did not — so a report is never
       settled unconsumed and consumption is never a side-effect of last
       words.
   - layer: kernel-reproduced
     rule: >-
       `done` is accepted only after the kernel re-runs the op's checks itself
-      — the re-run results are recorded on the checks row via `api check`
+      — the re-run results are recorded on the checks row via `starci kernel record-checks`
       (keyed workflow_id/op_id/attempt, one row per attempt) — and the filed
       envelope's outcome normally agrees with the verdict. A red checks row
       is the one admissible contradiction: it may overrule a `done` claim to
@@ -240,7 +240,7 @@ accepts:
       The closing pass is the one that leaves no other ordinal open (every
       other ordinal's latest job settled succeeded), whichever ordinal settles
       last - never ordinal === total, because ordinals settle out of order
-      once the seam passes. `api settle` enforces it and
+      once the seam passes. `starci kernel settle` enforces it and
       appends `cut-set-closed`; the set counts done only there. No generic
       operation may reinterpret a red check this way.
   - layer: boundary-correct
@@ -279,7 +279,7 @@ rejects:
       ask/blocked — never for done: 'done' owes checks no lost worker ran.
       Falls back to outcome failed so the ordinary acceptance path judges it
       (the api's last-words recovery via scripts/agent/lib.mjs). A live screen
-      tail read via `api observe` is the same class
+      tail read via `starci kernel observe` is the same class
       (driver-loop.yaml boundary.opTerminalObservation).
   - id: done-outside-leases
     rule: >-
@@ -288,10 +288,10 @@ rejects:
       checkpoint, and workflow-foreign-change while the workflow worktree has
       a change under no live op's leases. Only the runtime commits: the pass
       commits exactly the op's owned paths as the workflow's checkpoint.
-    citation: "scripts/kernel/workflow-checkpoint.mjs checkpointOp, run by api settle (modules/cli/commands/kernel/settle.yaml checkpoint)"
+    citation: "scripts/kernel/workflow-checkpoint.mjs checkpointOp, run by starci kernel settle (modules/cli/commands/kernel/settle.yaml checkpoint)"
   - id: out-of-scope-files
     rule: "report.files outside the allowlist -> rejected, per-file named"
-    citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at api report and when settle files a --report"
+    citation: "validateOpReport ownedPaths check (scripts/kernel/report-envelope.mjs), run at starci kernel report and when settle files a --report"
   - id: stale-lease-settle
     rule: >-
       A lease row that cannot match the job's identity cannot be written at

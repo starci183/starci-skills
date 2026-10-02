@@ -1,0 +1,21 @@
+group: orca
+verb: terminal-send
+owner: runtime
+summary: send text or Enter to an Orca terminal
+impl: {script: scripts/api/orca/terminal-send.mjs}
+flags:
+  - {name: terminal, type: string, required: true}
+  - {name: text, type: string}
+  - {name: text-file, type: string}
+  - {name: no-enter, type: boolean}
+  - {name: wait-submit, type: number}
+exit: {"0": input accepted, "1": Orca call failed, "2": bad usage}
+json: always
+examples:
+  - starci orca terminal-send --terminal <handle> --text <text>
+  - starci orca terminal-send --terminal <handle> --text-file <file> --no-enter
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/api/orca/terminal-send.mjs
+  - node .claude/scripts/api/orca/terminal-send.mjs

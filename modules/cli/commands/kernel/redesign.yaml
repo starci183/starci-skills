@@ -1,4 +1,4 @@
-# The contract of `api redesign` (scripts/kernel/verbs/redesign.mjs): the heavy path.
+# The contract of `starci kernel redesign` (scripts/kernel/verbs/redesign.mjs): the heavy path.
 group: kernel
 verb: redesign
 owner: runtime
@@ -41,7 +41,7 @@ purpose: "When the RCA says the cut, the scope or the leg plan is wrong, dispatc
   runtimes.yaml allocation.redesign routes it as routeAs (implementation.plan: Opus, then Sol) at >=
   minDifficulty whatever its usual order."
 writes:
-  - through api enqueue
+  - through starci kernel enqueue
   - jobs payload.redesign/difficulty/kernelOverride of the new job
   - events kernel-redesign
 refusals:

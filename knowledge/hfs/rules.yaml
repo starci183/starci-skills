@@ -19,13 +19,13 @@
 schema: starci/hfs-rules@2
 version: 2.0.0
 gates:
-  pre-commit: the managed .husky/pre-commit at the app root - hfs work-hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
-  pre-push: typecheck, lint (hfs lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
-  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
+  pre-commit: the managed .husky/pre-commit at the app root - starci app hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
+  pre-push: typecheck, lint (starci app lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
+  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, starci app lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at starci kernel settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
-  ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
+  ci: GitHub Actions runs the same pinned starci app lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the services' coverage at 100
-  runtime: "`starci check` (npm run check) of the StarCi runtime repository itself: scripts/checks/check-runtime.mjs runs node --check, scripts/hfs/runtime-check.mjs with knowledge/hfs/runtime-slots.yaml, and the retained self-checks"
+  runtime: "`starci runtime check` (npm run check) of the StarCi runtime repository itself: scripts/checks/check-runtime.mjs runs node --check, scripts/hfs/runtime-check.mjs with knowledge/hfs/runtime-slots.yaml, and the retained self-checks"
 enforcerKinds:
   eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
   eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
@@ -144,7 +144,7 @@ rules:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
-    law: "CI runs the pinned `hfs lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
+    law: "CI runs the pinned `starci app lint` (`npm run lint`); pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
@@ -1307,7 +1307,7 @@ rules:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
   - id: R144
     code: "HFS_MONO_FE_WORKSPACE"
-    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
+    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: starci app lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_MONO_FE_WORKSPACE"]
@@ -1485,7 +1485,7 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R166
     code: "HFS_EVENT_CONTRACT"
-    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `starci app emit` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]
@@ -1589,7 +1589,7 @@ rules:
       - {kind: eslint-be, id: context-platform-tables}
   - id: R179
     code: "BE_KIND_DECLARATION"
-    law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `hfs add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
+    law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `starci app add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["BE_KIND_DECLARATION"]
@@ -1693,7 +1693,7 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R197
     code: "RT_RETIRED_CLI_CALL"
-    law: "No tracked file invokes a command the unified CLI removed: `starci api <verb>`, `node scripts/kernel/cli.mjs`, `node bin/starci.mjs`, `hfs <verb>`, `npx hfs`, `starci-test-stack`, and the top-level `starci init|update|doctor|version|validate|check|start|goal`; the catalog `removed` lists, changelogs and contract-change history are exempt."
+    law: "No tracked file invokes a command the unified CLI removed: `starci starci kernel <verb>`, `starci kernel`, `node bin/starci.mjs`, `hfs <verb>`, `npx hfs`, `starci app stack`, and the top-level `starci runtime install|update|doctor|version|validate|check|start|goal`; the catalog `removed` lists, changelogs and contract-change history are exempt."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_RETIRED_CLI_CALL"]
@@ -1717,7 +1717,7 @@ rules:
       - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
   - id: R200
     code: "RT_CLI_APP_ONLY_TEMPLATES"
-    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and starci-test-stack commands, and any other starci group, are forbidden there."
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and starci app stack commands, and any other starci group, are forbidden there."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]

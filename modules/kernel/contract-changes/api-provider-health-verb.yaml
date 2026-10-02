@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/provider-health.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/provider-health.yaml
+  - modules/cli/commands/kernel/provider-health.yaml

@@ -6,34 +6,48 @@ _starci() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     group="${COMP_WORDS[1]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "app debug guard harness kernel reconciler runtime supervisor work workflow help completion" -- "$cur") )
+        COMPREPLY=( $(compgen -W "app connect debug gate guard harness kernel machine orca reconciler release route runtime supervisor uat work workflow help completion" -- "$cur") )
         return 0
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
         app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
-        debug) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
+        connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
+        debug) COMPREPLY=( $(compgen -W "pass run" -- "$cur") );;
+        gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync read repo-presentation run sonar starcistacks test-world unit" -- "$cur") );;
         guard) COMPREPLY=( $(compgen -W "command footprint-scan seat-tools verify-commit" -- "$cur") );;
         harness) COMPREPLY=( $(compgen -W "open start status stop" -- "$cur") );;
         kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report contract-release coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
+        machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees" -- "$cur") );;
+        orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
         reconciler) COMPREPLY=( $(compgen -W "install-task restart start status stop up" -- "$cur") );;
-        runtime) COMPREPLY=( $(compgen -W "check doctor install status update validate version" -- "$cur") );;
-        supervisor) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
-        work) COMPREPLY=( $(compgen -W "asset-slot brand-direction" -- "$cur") );;
-        workflow) COMPREPLY=( $(compgen -W "define start status stop" -- "$cur") );;
+        release) COMPREPLY=( $(compgen -W "app-installs check clean-test launch-smoke proof publish sync-runtime" -- "$cur") );;
+        route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
+        runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check doctor gen-ops housekeeping install ledger-hygiene machine-db status update validate version" -- "$cur") );;
+        supervisor) COMPREPLY=( $(compgen -W "actions bridge gc land notify owed poll push ram-cap report start status stop tell" -- "$cur") );;
+        uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
+        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        workflow) COMPREPLY=( $(compgen -W "assess define start status stop" -- "$cur") );;
             *) COMPREPLY=();;
         esac
         return 0
     fi
     case "$group" in
             app) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            connect) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             debug) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            gate) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             guard) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             harness) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             kernel) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            machine) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            orca) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             reconciler) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            release) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            route) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             runtime) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             supervisor) COMPREPLY=( $(compgen -W "" -- "$cur") );;
+            uat) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             work) COMPREPLY=( $(compgen -W "" -- "$cur") );;
             workflow) COMPREPLY=( $(compgen -W "" -- "$cur") );;
     esac

@@ -1,0 +1,19 @@
+group: orca
+verb: terminal-read
+owner: runtime
+summary: read an Orca terminal screen and staged draft
+impl: {script: scripts/api/orca/terminal-read.mjs}
+flags:
+  - {name: terminal, type: string, required: true}
+  - {name: tail, type: boolean}
+  - {name: limit, type: number}
+exit: {"0": terminal read, "1": Orca call failed, "2": bad usage}
+json: always
+examples:
+  - starci orca terminal-read --terminal <handle>
+  - starci orca terminal-read --terminal <handle> --tail --limit 100
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/api/orca/terminal-read.mjs
+  - node .claude/scripts/api/orca/terminal-read.mjs

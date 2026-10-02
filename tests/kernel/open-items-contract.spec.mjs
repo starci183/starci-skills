@@ -16,7 +16,7 @@ test('the shared op contract separates open items from environment and later-leg
   const text = JSON.stringify(common);
   assert.match(text, /Open items are unfinished work/);
   assert.doesNotMatch(text, /inc-[0-9a-f]{12}/, 'the contract states the rule, never a product incident id (legacy purge)');
-  assert.match(text, /whole-repository hfs lint\s+that cannot run beside a gate\.json with exit 0/, 'a whole-repository lint that cannot run beside a green gate is a note');
+  assert.match(text, /whole-repository starci app lint\s+that cannot run beside a gate\.json with exit 0/, 'a whole-repository lint that cannot run beside a green gate is a note');
   assert.match(text, /e2e\.verify/, 'a proof another leg owns is cited with its op');
   assert.match(text, /sonar-local\.mjs[\s\S]*401 means run it\s+again/, 'Sonar 401 is a rerun, never an open item');
   assert.match(text, /backend\.implement's scoped unit gate for its selected operations/, "the op's own required proofs stay its own");

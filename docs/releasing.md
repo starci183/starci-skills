@@ -15,7 +15,7 @@ Review source changes and test failures. Do not weaken validators to produce a g
 ## Example apps: CI and the local Sonar dashboard
 
 The root `.github/workflows/examples.yml` runs every example app (the matrix is derived from `examples/*/hfs.json` of kind app,
-`scripts/checks/check-examples-ci.mjs`): typecheck, `hfs lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
+`scripts/checks/check-examples-ci.mjs`): typecheck, `starci app lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
 `codecov.yml`, one flag per app, 100 on the project and the patch), the front-end build and the Sonar gate on push and pull request;
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
 only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
@@ -23,8 +23,8 @@ Actions); each product monorepo adds its own for its app-repository `codecov.yml
 per example app against the local SonarQube after `npm test` and a project scan:
 
 ```sh
-node scripts/gates/sonar-local.mjs scan --cwd examples/<app> --project-gate --wait
-node scripts/gates/sonar-local.mjs dashboard --cwd examples/<app>
+starci gate sonar scan --cwd examples/<app> --project-gate --wait
+starci gate sonar dashboard --cwd examples/<app>
 ```
 
 It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every service is at 100 coverage.
@@ -34,7 +34,7 @@ It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is re
 Before the owner runs a workflow on a new runtime release, run the launch smoke once on the live host, from a plain Orca shell (or the owner's chat), never from an agent:
 
 ```sh
-node scripts/kernel/launch-smoke.mjs --app-repo <scratch app main checkout> --out /absolute/launch-smoke.json
+starci release launch-smoke --app-repo <scratch app main checkout> --out /absolute/launch-smoke.json
 ```
 
 It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml` pins, all through `orchestration worker-start`, and proves the depth Orca reports for each nesting path: `[Supervisor]` (1) -> `[Worker]` (2), and `[Kernel]` (1) -> `[Op]` (2) -> draw critic (3). It also proves the workflow worktree on the scratch app: the Kernel's worktree in `orca worktree list`, a be op and an fe op in parallel in it, a failing op preserved and reset to its checkpoint, and a finish that fast-forwards main and marks the worktree release-pending, after which the host-side controller removes it, with main byte-identical but for the two green files. Run it with the reconciler running, since its controller removes the worktree. The scratch app must be registered in Orca, and its main receives those two files and is pushed. It always stops and releases every agent it started and prints one `starci/launch-smoke@2` JSON result; exit 0 means all three paths are `ok`. Orca's Settings -> Orchestration -> Nested worker depth must be at least 3. No check or spec runs it: it starts real agents. See [host contract](host-contract.md#pre-workflow-launch-smoke) and the contract change `launch-smoke`.
@@ -51,7 +51,7 @@ Test the **archive**, not only the source checkout:
 
 ```sh
 npx --yes --package=/absolute/release-output/<archive>.tgz starci --help
-npx --yes --package=/absolute/release-output/<archive>.tgz starci init --dir /absolute/isolated-host
+npx --yes --package=/absolute/release-output/<archive>.tgz starci runtime install --dir /absolute/isolated-host
 node /absolute/isolated-host/.claude/bin/starci.mjs doctor --dir /absolute/isolated-host --quick
 ```
 

@@ -1,5 +1,5 @@
 // settle-session-release.spec.mjs — per-op session release at settle
-// (host housekeeping, STORAGE-PROMPT item 8): when `api settle` closes an op,
+// (host housekeeping, STORAGE-PROMPT item 8): when `starci kernel settle` closes an op,
 // the op's own agent session files move to the archive root — never the live
 // kernel's session, never a session whose terminal is still open, and settle
 // still succeeds when no session file exists.

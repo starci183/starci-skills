@@ -1,4 +1,4 @@
-# The contract of `api retire-ask` (scripts/kernel/verbs/retire-ask.mjs). One file per extension verb
+# The contract of `starci kernel retire-ask` (scripts/kernel/verbs/retire-ask.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.retire-ask (lane slim-api).
 group: kernel
 verb: retire-ask

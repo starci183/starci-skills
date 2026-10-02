@@ -31,7 +31,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    most 48 characters (e.g. `Nivo · Sign-in & authentication`), and pass it as
    `--display-name`; without one the planner derives it from the goal text and
    the product name (it shows as `name:`). The name is a label only — the
-   `workflowId` stays the key, and `api rename` changes the name later.
+   `workflowId` stays the key, and `starci kernel rename` changes the name later.
    `--project <name>` selects which bound project's runtime ledger
    receives the goal; `--repo <path>` is single-repo mode where the named
    repository owns the ledger. The two flags are mutually exclusive.
@@ -52,7 +52,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 3. **Assess BEFORE drafting** — cold-scan the bound app (its root, `be/` and `fe/`):
 
    ```
-   node .claude/scripts/goal/assess.mjs --repo <project-repos> --json
+   starci workflow assess --repo <project-repos> --json
    ```
 
    Fold the findings (stack, existing coverage, debt, affected areas) into the goal
@@ -60,7 +60,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 4. Run the planner preview — writes nothing:
 
    ```
-   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --plan
+   starci workflow define --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --plan
    ```
 
 5. Show the owner what `--plan` printed, under the labels it prints:
@@ -100,7 +100,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `routing_bias` in the goal payload:
 
    ```
-   node .claude/scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --routing-bias '<json from step 2>' --json
+   starci workflow define --project <name> --text "<owner prompt>" --title "<slug>" --display-name "<Product> · <what>" --routing-bias '<json from step 2>' --json
    ```
 
 8. Report the printed `workflowId` (the goal ID), `goalIdentity`, `opChain`, `queued`.
@@ -110,13 +110,13 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 - All state lives in the project's runtime ledger (`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`) — never
   answer "what's queued" from memory; query `inbox`/`goals`/`jobs`. The ledger
   is written ONLY by the executables above (and at runtime by
-  `node .claude/scripts/kernel/cli.mjs <cmd>`, the kernel agent's single
+  `starci kernel <cmd>`, the kernel agent's single
   mutation surface). Never open or edit the sqlite file by hand.
 - The op chain is derived by `route-plan.mjs` — underivable chains are shown as such,
   never guessed.
 - Do NOT start the workflow here. Starting is the `start-kernel` skill, which
   starts ONE long-lived `[Kernel]` worker; each op it runs is one ephemeral
   `[Op]` worker (`orchestration worker-start`, in the workflow's one worktree
-  that Orca created at Kernel start) that `api dispatch` starts and `api
+  that Orca created at Kernel start) that `starci kernel dispatch` starts and `api
   settle` releases — a settled job never leaves a live worker behind, and the
   worktree is released only after the workflow's finish.

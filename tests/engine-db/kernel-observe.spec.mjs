@@ -12,7 +12,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 
-// `api observe` is the kernel's READ-ONLY window onto its own job's exact op
+// `starci kernel observe` is the kernel's READ-ONLY window onto its own job's exact op
 // terminal — context for reasoning, never evidence. These specs pin:
 //   - the worker's output tail, read by Dispatch (worker-read --source auto, deep map T1), plus a typed
 //     turnState classified from the rendered frame (turn-idle and active)
@@ -56,7 +56,7 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{f
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
 const json=v=>JSON.stringify(v??null);
 const seedWorkflow=(repo,workflowId)=>seed(repo,ledger=>seedLedgerWorkflow(ledger,{id:workflowId,state:{phase:'running',job:'observe spec'}}));
-// A running op exactly as `api dispatch` leaves it: worker_id is the exact
+// A running op exactly as `starci kernel dispatch` leaves it: worker_id is the exact
 // terminal handle, payload.orca/hierarchy carry the same binding, and the
 // contracts row names the Dispatch it was written for.
 const seedRunningOp=(repo,{workflowId,jobId,handle,dispatchId})=>seed(repo,ledger=>{
@@ -86,7 +86,7 @@ test('observe on a running op returns the worker output by Dispatch and a typed 
   }));
   const before=counts();
   const r=fx.run('observe','--repo',fx.repo,'--job',jobId,'--json');
-  assert.equal(r.status,0,`api observe failed: ${r.stderr||r.stdout}`);
+  assert.equal(r.status,0,`starci kernel observe failed: ${r.stderr||r.stdout}`);
   const body=out(r);
   assert.equal(body?.ok,true);
   assert.equal(body?.job,jobId);

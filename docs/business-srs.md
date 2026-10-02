@@ -114,6 +114,6 @@ features/chat/
 
 ## Validation and completion
 
-Run `node bin/starci.mjs validate <work-root>`. The validator checks each record against the schema its own `schema:` const names, the flat family layout, id uniqueness, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
+Run `starci runtime validate <work-root>`. The validator checks each record against the schema its own `schema:` const names, the flat family layout, id uniqueness, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
 
 Draft and blocked records cannot earn completed Work. A reviewed record is authored as `todo` and remains the current product contract for downstream design, UI, implementation and UAT. `todo + activity: idle` means defined but not currently being worked; `todo + activity: investigating|implementing|verifying` means in progress. Only final reconciliation may author `done`, after current business, design, code, test/E2E and UAT evidence bind the same delivery revision and every required assertion passes. Missing, stale or mismatched evidence leaves the record `todo` and the workflow partial or blocked. Moving or renaming a record changes its semantic ancestry; preserve old proof and establish fresh evidence for changed content.

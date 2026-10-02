@@ -28,7 +28,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (api op-contract)
+    path: packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (starci kernel op-contract)
     mustExist: true
     purpose:
       en: Read the selected audit scope - exact route/state/viewport/theme matrix, assertion IDs, dependencies -
@@ -143,7 +143,7 @@ writes:
     content:
       en: The audit's verdict for this attempt, id operation.<feature>.<audit> (modules/schemas/interface-audit-operation.yaml),
         verdict pass | fail | partial, findings and routeTo interface.implement | interface.draw. File it with
-        `api report --attach <scratch>/interface-audit.json`; the api writes it as the audit's interface_audits row.
+        `starci kernel report --attach <scratch>/interface-audit.json`; the api writes it as the audit's interface_audits row.
         Never a record under .starciwork. Completion says the selected matrix has no actionable drift; it never
         completes UI, implementation, UAT or review nodes.
   - id: evidence
@@ -184,8 +184,8 @@ writes:
     path: STARCI_JOB_SCRATCH/lint.json
     schema: starci/lint@1
     content:
-      en: "The hfs lint report of the audited fe/ files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
-      vi: "Báo cáo hfs lint của các tệp fe/ được audit (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
+      en: "The starci app lint report of the audited fe/ files (starci app lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo starci app lint của các tệp fe/ được audit (starci app lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -258,7 +258,7 @@ steps:
     writes: [evidence]
     action:
       en: "Apply the layout lens in both directions and record it in shell.json. Direction versus layout
-        tree: run `node scripts/work/ui/shell-conformance.mjs` on every ui record directory in the accepted
+        tree: run `starci work shell-conformance` on every ui record directory in the accepted
         lineage - route in the tree, surface/direction/routed/host consistent, ancestors settled and bound
         at their current revs, composites built on the exact current layout capture (or host composite)
         for their breakpoint and theme and re-deriving to the same pixels, routed overlays drawn in both
@@ -372,8 +372,8 @@ steps:
   - reads: [repo, grammar, brand-assets]
     writes: [lint, evidence]
     action:
-      en: "Run the FE canon over the audited implementation: hfs lint --changed <the fe/ files of the audited slice> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon (eslint-canon-fe), stylelint and the brand grammar's checks. Every finding under fe/ is actionable drift of the implementation and maps like any other (boundedImplementationDrift, route interface.implement, failed), cited by rule, path and line; a lint that could not run is a not-run measurement, never a clean one. The audit repairs nothing it finds. REPORT with lint.json attached."
-      vi: "Chạy canon FE trên phần triển khai được audit: hfs lint --changed <các tệp fe/ của slice được audit> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE (eslint-canon-fe), stylelint và các kiểm tra của ngữ pháp thương hiệu. Mọi lỗi dưới fe/ là độ lệch có thể xử lý của phần triển khai và được ánh xạ như mọi độ lệch khác (boundedImplementationDrift, route interface.implement, failed), dẫn theo luật, đường dẫn và dòng; lint không chạy được là phép đo chưa chạy, không bao giờ là sạch. Bản audit không sửa gì nó tìm thấy. BÁO CÁO kèm lint.json."
+      en: "Run the FE canon over the audited implementation: starci app lint --changed <the fe/ files of the audited slice> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon (eslint-canon-fe), stylelint and the brand grammar's checks. Every finding under fe/ is actionable drift of the implementation and maps like any other (boundedImplementationDrift, route interface.implement, failed), cited by rule, path and line; a lint that could not run is a not-run measurement, never a clean one. The audit repairs nothing it finds. REPORT with lint.json attached."
+      vi: "Chạy canon FE trên phần triển khai được audit: starci app lint --changed <các tệp fe/ của slice được audit> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE (eslint-canon-fe), stylelint và các kiểm tra của ngữ pháp thương hiệu. Mọi lỗi dưới fe/ là độ lệch có thể xử lý của phần triển khai và được ánh xạ như mọi độ lệch khác (boundedImplementationDrift, route interface.implement, failed), dẫn theo luật, đường dẫn và dòng; lint không chạy được là phép đo chưa chạy, không bao giờ là sạch. Bản audit không sửa gì nó tìm thấy. BÁO CÁO kèm lint.json."
 proofs:
   - id: accepted-draw-lineage
     requirement:
@@ -422,7 +422,7 @@ proofs:
         childish or interchangeable imagery remains actionable drift.
   - id: shell-conformance
     requirement:
-      en: "`node scripts/work/ui/shell-conformance.mjs` ran on every audited ui record directory and on the
+      en: "`starci work shell-conformance` ran on every audited ui record directory and on the
         implementation record directory, and its output is retained in shell.json. Every direction is a
         reproducible composite in the current layout chain of its route and every delivered route has its
         App Router files where the layout tree says; every capture shows the layouts' chrome, lockup,
@@ -456,12 +456,12 @@ proofs:
         independent."
   - id: binding
     requirement:
-      en: "`starci validate` passes, `starci validate --strict` passes on every record directory it
+      en: "`starci runtime validate` passes, `starci runtime validate --strict` passes on every record directory it
         writes, and evidence hashes, served versions, Grammar, codeRefs and lineage agree."
   - id: fe-lint
     requirement:
-      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof fe-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with a finding under fe/ (op-lint-findings) is refused."
-      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof fe-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có lỗi dưới fe/ (op-lint-findings) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof fe-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with a finding under fe/ (op-lint-findings) is refused."
+      vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof fe-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có lỗi dưới fe/ (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: PRODUCT_DEFECT_OWNER

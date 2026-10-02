@@ -115,7 +115,7 @@ export function findOwnedPathLeaseConflicts(db,requests,{excludeJobId=null,canon
  * the LOWER of them admits: the owner's `budgets.maxOps` (per workflow) and `maxParallelOps` from
  * modules/models/runtimes.yaml (fleet-wide). A null, absent or non-positive value is unbounded, so
  * a workflow with no owner budget still meets the fleet ceiling. A parallelism gear raises what
- * `api estimate` requests and never raises either of these.
+ * `starci kernel estimate` requests and never raises either of these.
  */
 export function opSlotCeiling({maxOps=null,maxParallelOps=null}={}){
   const positive=value=>{const n=Number(value);return Number.isInteger(n)&&n>0?n:null;};
@@ -176,7 +176,7 @@ export const RETRY_CLASS_ENVIRONMENT='environment';
  * explicitly proves `effectState: none`; unknown or partial effects consume the ordinary business budget.
  * An attempt settled `awaiting-owner` asked a question and did not fail: its successor is a new durable
  * attempt (the ask attempt ran) that spends no business retry. Nor does one settled `peerBlocked`
- * (api settle: every red check was a peer's change, scripts/kernel/gate-attribution.mjs), nor one settled
+ * (starci kernel settle: every red check was a peer's change, scripts/kernel/gate-attribution.mjs), nor one settled
  * with retryClass environment (RETRY_CLASS_ENVIRONMENT).
  */
 export function retryDisposition(job){
@@ -196,7 +196,7 @@ export function retryDisposition(job){
 }
 
 /**
- * A row retired while still queued - `api reconcile --drop` (result.verdict `dropped`) or a goal revision
+ * A row retired while still queued - `starci kernel reconcile --drop` (result.verdict `dropped`) or a goal revision
  * that superseded it (result.reason `goal-revision-superseded`) - with no dispatch binding in its payload.
  * It ran nothing, so it is no attempt: never a retry predecessor, never a cut seam, never the latest job
  * of its ordinal (inc-5005d003825a: a retry chained to a dropped ordinal-1 row as business attempt 2 and
@@ -270,13 +270,13 @@ export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
     return {tryNo:1,retryOf:null,resumeOf:null,retryClass:null,reopen:null};
   }
   const open=ordered.filter(job=>OPEN_TRY.includes(job.status));
-  if(open.length)throw refuseUnit(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (api graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
+  if(open.length)throw refuseUnit(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (starci kernel graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
   if(retryOf&&retryOf!==last.job_id)throw refuseUnit(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
   const done=unit.state==='done'||last.status==='succeeded';
   if(done&&!(reopen?.reason&&reopen?.by))throw refuseUnit(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
   if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuseUnit(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
   const tryNo=Number(last.try_no)+1;
-  if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (api unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
+  if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (starci kernel unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
   if(done)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopen.reason),by:String(reopen.by)}};
   const disposition=RETRYABLE_JOB_STATUSES.includes(last.status)?retryDisposition(last):null;
   const resume=last.status==='cancelled';

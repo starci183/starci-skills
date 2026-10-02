@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `hfs lint` (the published CLI over its
+// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `starci app lint` (the published CLI over its
 // runtime copy, THE lint of an app: ESLint over be/ and fe/ with the two canons, which judge the architecture machine's source
-// findings, stylelint over fe/ and `hfs check`) on every examples/<name> app that has an hfs.json, prints per example the
+// findings, stylelint over fe/ and `starci app check`) on every examples/<name> app that has an hfs.json, prints per example the
 // findings by code (the catalog code a finding carries, else its rule) and fails when any example has a finding or a tool that
-// could not run. `hfs check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
-// ...) sit on the lint surface (scripts/hfs/architecture/surface.mjs) and reach an app only through `hfs lint`.
+// could not run. `starci app check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
+// ...) sit on the lint surface (scripts/hfs/architecture/surface.mjs) and reach an app only through `starci app lint`.
 //
 //   starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]
 //

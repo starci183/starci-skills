@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/reconcile.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/reconcile.yaml
+  - modules/cli/commands/kernel/reconcile.yaml

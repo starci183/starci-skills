@@ -1,4 +1,4 @@
-# The contract of `api op-override` (scripts/kernel/verbs/op-override.mjs): a per-workflow local op variant.
+# The contract of `starci kernel op-override` (scripts/kernel/verbs/op-override.mjs): a per-workflow local op variant.
 group: kernel
 verb: op-override
 owner: runtime
@@ -33,7 +33,7 @@ removed:
   - starci api op-override
   - node scripts/kernel/cli.mjs op-override
 purpose: Store an additive override of one op for THIS workflow (notes, commandTimeoutMs,
-  difficulty, model, effort); api dispatch renders it into every later packet of that op
+  difficulty, model, effort); starci kernel dispatch renders it into every later packet of that op
   (context.kernel_override). The shared manifest is never touched - a shared fix is a
   kernel-proposal.
 refusals:

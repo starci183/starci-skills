@@ -733,7 +733,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     // The live owners of a lane: Orca's active workers over every Run (null when Orca is down or answers for one Run).
     const laneWorkers = (deps.activeWorkers ?? (() => activeWorkersAllRuns()))();
     // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
-    // (node scripts/machine/worktrees.mjs resume): the same stop mark as the worktree GC.
+    // (starci machine worktrees resume): the same stop mark as the worktree GC.
     const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
     const cursor = (deps.laneCursor ?? readLaneCursor)(env);
     const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, workers: laneWorkers, cursor, clock: deps.clock ?? Date.now });

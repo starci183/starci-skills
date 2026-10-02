@@ -20,7 +20,7 @@ sections:
       - "Every evidence file, draw prompt (.prompt.txt), visual review (visual-review.md), assets JSON and recorded command
         you file under .starciwork is written with repo-relative paths. A path outside the repository is written as a
         placeholder: <worktree>, <runtime>, <tmp> or <home>; a command is recorded as the command line you wrote
-        (bash -c ..., never the host path of its shell). api settle refuses a pass (EVIDENCE_HOST_PATH) while any of
+        (bash -c ..., never the host path of its shell). starci kernel settle refuses a pass (EVIDENCE_HOST_PATH) while any of
         those files holds a drive path, a user-profile path or an expanded AppData path, and names the file and line; rewrite
         the file and settle again. scripts/lib/host-path.mjs normalizeHostPaths does the rewrite."
   - title: Product UI copy follows the shell record's productLocale (default - the brand record's voice.locales default), not owner_language
@@ -101,7 +101,7 @@ sections:
         procedural confirmations and raises no repetitive command, worktree, retry, integration or
         technical-review questions; a changed goal, widened scope/authority, missing credential,
         unresolved business alternative, safety block, reserved checkpoint or partial/unknown
-        effect returns to the owner as an api incident or an owner ask. While the packet carries
+        effect returns to the owner as an starci kernel incident or an owner ask. While the packet carries
         owner_delegation, an answer receipt whose answeredBy is that delegate, inside its window and
         outside its excluded classes, is the owner's answer and binds like one; the receipt carries
         the delegate's reason. The handover approval is never delegated: a workflow is done only
@@ -116,12 +116,12 @@ sections:
         <dir> --job <id>`) is never auto-accepted either - every drawing is the owner's to accept
         (owner ruling 2026-09-27, draw-content-owner-gate); drawOwnerRulingOf still reads from ledger
         lineage whether the owner asked for it. Every operation reaches the owner the same one way: it files its
-        report with outcome ask and the question (api report) and ends its turn; the kernel serves
+        report with outcome ask and the question (starci kernel report) and ends its turn; the kernel serves
         it through serve-ask and re-enqueues the operation with the answer bound. No operation asks
         through an Orca orchestration message, a terminal prompt or a chat, or waits in-turn for a
         reply - nothing answers those channels and nothing records what they say. An operation never
-        sends worker_done itself: api report, from the operation's own pane, sends exactly one after the
-        report row committed (the operation passes api report its Dispatch capability, the --dispatch-capability value of its Orca preamble) (succeeded for done/partial, failed for failed/blocked, none for ask), so
+        sends worker_done itself: starci kernel report, from the operation's own pane, sends exactly one after the
+        report row committed (the operation passes starci kernel report its Dispatch capability, the --dispatch-capability value of its Orca preamble) (succeeded for done/partial, failed for failed/blocked, none for ask), so
         Orca settles the operation's Task and Dispatch and settle only releases the worker."
       - Every selected workflow finishes through the kernel's gate/finish contract
         (modules/kernel/api.yaml `finish`), and that gate requires the owner's approval of the
@@ -140,7 +140,7 @@ sections:
         renewed user approval.
       - Technical pass is not done until every accepted completion criterion is verified. When the
         accepted brief delegates technical acceptance, the kernel records that bounded technical
-        acceptance at `api settle`, updates only selected Work nodes, validates their completion
+        acceptance at `starci kernel settle`, updates only selected Work nodes, validates their completion
         proof and reports the result without another formal question. A reserved exit checkpoint,
         changed envelope or undeclared external effect still requires the user. Parent completion
         is derived.
@@ -206,7 +206,7 @@ sections:
         resource/files within the existing graph, but may not attach new consumers.
       - "The work graph (domains, slices, nodes and edges; modules/schemas/work-graph.schema.yaml) changes
         only through an op whose brief sets graphPolicy.workGraph: write the whole candidate to
-        evidence/work-graph.json and record it with `node scripts/work/work-graph.mjs propose --repo <target-repo>
+        evidence/work-graph.json and record it with `starci work graph propose --repo <target-repo>
         --job <job-id> --file evidence/work-graph.json --reason <why>` (a cut adds `--slice <slice-id>`). A refusal
         lists the validator findings to fix; the report names the recorded version. An op without the
         permission reports a graph change it needs as a finding, never edits the graph."
@@ -215,20 +215,20 @@ sections:
       - "STARCI_JOB_SCRATCH names this job attempt's private OS-temp directory outside every repository;
         your prompt gives its absolute path (it is not an environment variable). Put raw command stdout/stderr, full checker JSON, patches, browser traces,
         videos, DOM snapshots and other operational outputs there. File the transient report JSON
-        from that directory with `api report --report <scratch/report.json> --attach <absolute-scratch-file>`
+        from that directory with `starci kernel report --report <scratch/report.json> --attach <absolute-scratch-file>`
         for each raw file the job needs retained. The API stores the report in the ledger and the
         attachments as content-addressed blobs, then removes scratch. `report.files` names authored
         owned paths, not scratch attachments. Never put operational output in `.starciwork`."
       - "`evidence/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/evidence/`), never a
         folder in `.starciwork` (ARCHITECTURE-DB §5.1: evidence/ is agent data). Write the proof manifest and its assets
-        there and file them with `api report --attach <scratch>/evidence` (a directory attaches every file under it); each
+        there and file them with `starci kernel report --attach <scratch>/evidence` (a directory attaches every file under it); each
         becomes the artifact `attachments/evidence/<path>` of this attempt (blob + job_artifacts). The same holds for a
         UAT run (`<scratch>/runs/<runId>/**`, artifacts role uat-run with the run id), app and render captures
         (`<scratch>/captures/**`, role capture/dom) and an interface.audit verdict (`<scratch>/interface-audit.json`,
         the ledger's interface_audits row). The record's sibling evidence.yaml cites each file by sha256 (and its
-        artifact name) - `{artifact?, sha256, role?, label?}` - never by a path; api report returns every artifact
+        artifact name) - `{artifact?, sha256, role?, label?}` - never by a path; starci kernel report returns every artifact
         {id, name, sha256}, and the settle binds the citations (work_citations). A read of another op's `evidence/<file>`
-        reads that attempt's artifact `attachments/evidence/<file>` (`api artifacts --workflow <wf> --job <job>`)."
+        reads that attempt's artifact `attachments/evidence/<file>` (`starci kernel artifacts --workflow <wf> --job <job>`)."
       - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,
         `<name>`, resource slugs and repository IDs from the selected workspace. Never persist
         literal angle-bracket placeholders or guess a path by similar name. `N` means the selected
@@ -277,7 +277,7 @@ sections:
         actual final bytes. |"
       - "| `evidence/*` | Indispensable Work-record proof and cited assets required by work-layout.yaml |
         Keep the proof needed by the selected record, not raw operation output. Send full logs and
-        machine output through STARCI_JOB_SCRATCH and api report --attach. Do not overwrite a sealed
+        machine output through STARCI_JOB_SCRATCH and starci kernel report --attach. Do not overwrite a sealed
         Work-proof bundle. Keep failures needed to explain current defects.
         |"
       - "| Product repository paths | The selected op's actual discovered/planned source write
@@ -326,8 +326,8 @@ sections:
         carry the request-frozen contract the kernel stores as `starci/staged-job-result@1` /
         `starci/staged-op-response@1`. Repository-side artifacts (source, tests, documents)
         carry no YAML const of their own but land exactly at the declared ceiling path."
-      - "Every operation's checks include the record-class validator `starci validate` for the
-        .starciwork artifacts it writes, and `starci validate --strict <record-dir>` on every record
+      - "Every operation's checks include the record-class validator `starci runtime validate` for the
+        .starciwork artifacts it writes, and `starci runtime validate --strict <record-dir>` on every record
         directory it writes: strict mode compiles each record against the JSON schema its `schema:`
         const names (closed objects, slug/timestamp patterns) and refuses every violation. Strict is
         scoped to what the op wrote because live trees still carry older records the schemas now
@@ -345,7 +345,7 @@ sections:
         how GitHub CI gets them (ci.wiring) and ownerAction. Before an operation names, asks for or
         wires any credential, host or CI secret/variable it runs `starci-starcistacks-check <repo>`
         (scripts/gates/starcistacks.mjs) and uses what the block declares. A service declared
-        `ownerAction: none` with its custody present is never asked of the owner - api report
+        `ownerAction: none` with its custody present is never asked of the owner - starci kernel report
         refuses such an ask (ask-declared-in-stack); a custody or server gap is repaired in the stack
         and CI wiring marked optional-follow-up is a Kernel's follow-up, not an owner provision. A
         repository whose declaration lacks the block gets suspects and the planned follow-up
@@ -354,9 +354,9 @@ sections:
       - "The layout covers the whole .starciwork tree. Workflow run state is the runtime.sqlite
         ledger — goals/jobs/inbox/reports/contracts/checks ROWS transacted through `api` verbs.
         An operation never opens, queries or copies that file: it reads its contract with `api
-        op-contract` and files `api report` for its own job, and the api refuses every kernel verb
+        op-contract` and files `starci kernel report` for its own job, and the api refuses every kernel verb
         from an op terminal (modules/kernel/api.yaml conventions.callerBoundary).
-        Messages between workflows (`api peers`, `notify`, `inbox`) are kernel verbs too: work
+        Messages between workflows (`starci kernel peers`, `notify`, `inbox`) are kernel verbs too: work
         that belongs to another workflow is named in the op's report, and the kernel routes it.
         An operation's produced
         records (intake.json, a goal revision) travel as report evidence under its declared write
@@ -372,7 +372,7 @@ sections:
         `gap` and `event` records - each carrying its own `work/<family>@1` const. The root
         `brand/index.yaml` with `brand/assets/**`, and `_resources/<category>/<slug>/resource.yaml`
         complete the tree. Every record class carries its schema const and is covered by
-        `starci validate`; writing outside the declared layout fails checks."
+        `starci runtime validate`; writing outside the declared layout fails checks."
   - title: Evidence, completion and commits
     blocks:
       - "Before executing, establish the selected node's current `inputDigest` using the read-only
@@ -560,7 +560,7 @@ sections:
         op can finish. These are never open items and never turn `done` into `partial` once every
         check this op's brief requires ran green; they are recorded as checks with their evidence
         and named in the summary: (a) a gate whose tool answers `unavailable` for a reason outside
-        the grant while this op's own gate run over its changed files passed - a whole-repository hfs lint
+        the grant while this op's own gate run over its changed files passed - a whole-repository starci app lint
         that cannot run beside a gate.json with exit 0 (its preexisting count is debt already there at
         the base that code.refactor owes); (b) a proof the dispatch
         contract or this op's brief assigns to another leg - UAT to uat.verify, journey E2E to
@@ -571,7 +571,7 @@ sections:
         gate.mjs run passes - an op on the shared tree (modules/kernel/product-land.yaml isolation exceptions) shares
         its checkout with other ops: record that check with `failing`
         naming each failing file and the source file it points at (`path[:line]`), never a
-        shared-change blocker and never a repair outside owned paths; the Kernel's api check
+        shared-change blocker and never a repair outside owned paths; the Kernel's starci kernel record-checks
         attributes it to the peer whose change it is. A proof this op's own brief requires
         (backend.implement's scoped unit gate for its selected operations - backend E2E is e2e.verify's, run manually - its
         commit) is never another leg's. A required gate that no run inside the grant can execute is
@@ -592,7 +592,7 @@ sections:
     blocks:
       - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
         runs ONLY those - the specs of the changed or added source plus the specs that import it - through the op gate
-        (scripts/gates/gate.mjs --tests, beside hfs lint --changed, codegen and tsc). It never runs the app's whole unit suite:
+        (scripts/gates/gate.mjs --tests, beside starci app lint --changed, codegen and tsc). It never runs the app's whole unit suite:
         unit.verify runs it (npm test at the app root), dispatched only when the goal or the owner explicitly asks for the full
         unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime
@@ -610,10 +610,10 @@ sections:
         legs behind it proceed. skip - the op runs without writing or running that class of test and demands
         no coverage of it; Sonar still runs (sonar-local reads specs.unit and reports coverage NOT MEASURED in owner mode, never green), so
         bugs, smells and security findings still gate. not-counted - a review or handover gate does not count an absent test or coverage of that class
-        (api coverage drops that requiresProof kind from must-haves). The dispatch prompt prints a `specs:`
+        (starci kernel coverage drops that requiresProof kind from must-haves). The dispatch prompt prints a `specs:`
         line naming the classes that are off; it overrides every test, coverage and e2e step, proof and
         blocker of the brief, and a skipped gate is recorded as a check named specs.unit or specs.e2e with
         exitCode 0 - never partial, blocked or a test-gap."
-      - "Every deferral is a tests-deferred event and a row of api status testsDeferred; `api run-deferred-tests
+      - "Every deferral is a tests-deferred event and a row of starci kernel status testsDeferred; `starci kernel run-deferred-tests
         --workflow <id> [--kind unit|e2e|integration]` re-queues them on their same attempt, and they then run their whole
         brief even while the switch is still off."

@@ -32,13 +32,13 @@ reads: the job row; the exact operation terminal handle resolved from the dispat
 writes: "one events row kind 'op-observed' {opId, attempt, terminal, turnState, screenBytes} — a
   compact receipt only; the screen bytes never enter the ledger. No
   jobs/contracts/reports/checks/leases row is touched: observation is READ-ONLY reasoning context,
-  never evidence — an op's screen is never proof; only `api report` plus kernel-run `api check` rows
+  never evidence — an op's screen is never proof; only `starci kernel report` plus kernel-run `starci kernel record-checks` rows
   settle a verdict"
 returns: "{ok:true, job, jobId, opId, attempt, ledgerStatus,
   terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines
   lines, default 80, null when unreadable>,
   turnState:active|staged-input|turn-idle|disconnected|unreadable|unknown, observedAt} —
-  staged-input is an unsubmitted paste (status workers.liveness); api nudge submits it"
+  staged-input is an unsubmitted paste (status workers.liveness); starci kernel nudge submits it"
 refuses:
   - job-not-found: no jobs row for --job
   - job-not-operation: only an operation job has an observable worker terminal

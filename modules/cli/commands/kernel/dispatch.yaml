@@ -53,7 +53,7 @@ kernelBias: --prefer/--avoid are unknown options and refused (unknown-option; co
   kernelBias); dispatch launches the persisted route
 leaseTtl: modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or
   payload.leaseTtlMs overrides it
-reads: the job row + its workflow — including the PERSISTED `api route` decision on
+reads: the job row + its workflow — including the PERSISTED `starci kernel route` decision on
   jobs.payload_json (model/modelId/effort; dispatch launches what route wrote, it does not
   re-decide); resources/leases/budgets for admission; the op brief modules/ops/ops/<op>.yaml; in the
   target repository, the records its `mustExist` reads resolve to and the bound records
@@ -65,11 +65,11 @@ attempt: "alpha.3: a queued or ready job launches (ready: a launch refused befor
   one op_attempts row (dispatch_seq, scratch_dir = the job scratch, terminal, run, task, pool) and
   its contracts row (keyed by attempt_id) are written in one transaction that also moves a queued
   workflow to running; the op's prompt names that job scratch (STARCI_JOB_SCRATCH in op contracts),
-  the scratch api report reads its report from. A refused launch ends that attempt in the refusal's
+  the scratch starci kernel report reads its report from. A refused launch ends that attempt in the refusal's
   own transaction (end_state requeued, or effect-unknown when the effect is unknown; a requeued
   attempt is also settled_at/settled_by kernel with no verdict, released_at set, its Orca Task
   closed, task_closed_at set, and work_units.dispatches gives the slot back) and keeps it as
-  history: it is never open, never running in api status or the UI, never a try. settle_json.message
+  history: it is never open, never running in starci kernel status or the UI, never a try. settle_json.message
   says what step refused it and why."
 writes: "admission FIRST, launch second: one `path:<owned_path>` lease row per owned_path, spelled
   app-relative in a bound app (scripts/kernel/lease-canon.mjs: be/<path>, fe/<path>,
@@ -83,9 +83,9 @@ writes: "admission FIRST, launch second: one `path:<owned_path>` lease row per o
   worktree, else the app root), declared}; the worker starts at that app checkout, so the prompt
   shows every owned path bare, the same spelling gate.mjs --root <app> --changed and every finding
   use, under a `writes_in` line naming the root; unbound, a path stays {path} verbatim (an explicit
-  payload repository or an absolute path roots it). api report accepts `files` app-relative or
+  payload repository or an absolute path roots it). starci kernel report accepts `files` app-relative or
   rooted; contracts row = the rendered packet markdown keyed (workflow_id,op_id,attempt) with the
-  dispatch_id — the worker's dispatch authority, read back via `api op-contract`, written BEFORE the
+  dispatch_id — the worker's dispatch authority, read back via `starci kernel op-contract`, written BEFORE the
   job may stand running — whose context_json.inputs {schema:starci/input-digests@1, digests:[{path,
   digest, kind}]} records the sha256 of every input the op binds - kind source: each `knowledge/**`
   and `modules/schemas/**` path (and modules/models/code-patterns.yaml) named by the manifest's
@@ -168,7 +168,7 @@ refuses:
     exits 1; nothing is reserved. detail reads \"<op> reads <path> (reads.<id>, mustExist) and it
     does not exist | implementation record <r> proves ui record <ui> whose interface.draw has not
     settled pass (DESIGN_NOT_SETTLED). Produce the missing record or finish the dependency through
-    the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record,
+    the op that owns it, then run starci kernel dispatch --job <id> again; if the job binds the wrong record,
     enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing
     was reserved or launched.\""
   - 'foundation-wait (field `reason`): an interface.draw whose record has layouts above it that are
@@ -177,7 +177,7 @@ refuses:
     drafting a second shell (scripts/kernel/shell-foundation.mjs). The first draw that finds parents
     to draw claims the foundation itself and draws the shell, ancestor layouts and lockup in its own
     op; settle lands it when the tree is settled. Past allocation.drawLoop.shellFoundationStallMs
-    the refusal opens a Supervisor Decision Item (kind cross-workflow). api status shows
+    the refusal opens a Supervisor Decision Item (kind cross-workflow). starci kernel status shows
     queuedBecause foundation-wait. Prints {ok:false, jobId, op, reason:"foundation-wait",
     foundation, owner, detail, decision?} and exits 1; the job stays queued'
   - 'peer-wait (field `reason`): an open peer-wait incident holds the job. Checked right after
@@ -194,7 +194,7 @@ refuses:
     status leased and this dispatch's lease token (H9); when an archive, drop or reconcile took the
     job while its worker started, the started worker is stopped, the early contract row removed, a
     dispatch-abandoned event appended, and the dispatch exits 1"
-  - job-live-worker: queued row still has a connected+writable exact worker; api reconcile must reattach
+  - job-live-worker: queued row still has a connected+writable exact worker; starci kernel reconcile must reattach
       it before any new dispatch
   - job-no-op: the job row carries no op identity to dispatch
   - model-unknown: no model profile at modules/models/profiles/<target>.yaml
@@ -211,7 +211,7 @@ refuses:
     the unrouted default) lacks a host tool the op's route.riskHints requires. Checked before leases
     and before any Orca call; prints {ok:false, jobId, op, reason:\"tool-unavailable\", tools,
     model, detail} and exits 1, the job stays queued. detail reads \"<pool> (agent <provider>) lacks
-    host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only
+    host tool <tool> that <op> requires (...). Re-run starci kernel route --job <id> — it now selects only
     agents whose card lists the tool — then dispatch again. The job stays queued.\" A dry run does
     not refuse; it carries `toolUnavailable`"
   - "path-lease (field `reason`, `waiting: true`): a LIVE capacity-1 `path:<owned_path>` lease of
@@ -221,7 +221,7 @@ refuses:
     holder), so nothing is reserved or launched and NO dispatch-rejected event is written. Prints
     {ok:false, jobId, op, reason:\"path-lease\", waiting:true, queuedBecause:\"path-lease\",
     holders:[{jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}], conflicts, detail}
-    and exits 1; the job stays queued, api status reports it queuedBecause path-lease naming the
+    and exits 1; the job stays queued, starci kernel status reports it queuedBecause path-lease naming the
     holder and its lease expiry, and once the holder settles (releasing its rows) it reads ready,
     the frontier turns actionable and the next wake dispatches it. Never re-dispatch it by hand
     while it waits. An EXPIRED or orphaned overlapping row is no wait: reserve still refuses it as
@@ -243,7 +243,7 @@ refuses:
     so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false,
     jobId, op, reason:\"host-resources-low\", waiting:true, queuedBecause:\"host-resources-low\",
     resources:{drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, detail} and exits 1;
-    the job stays queued, api status reports it queuedBecause host-resources-low naming the drive
+    the job stays queued, starci kernel status reports it queuedBecause host-resources-low naming the drive
     and its free space, the watchdog runs housekeeping once against the shortage and stall-alert
     tells the owner with an approval-class alert naming the drive. Kernels wait for it — never a
     failure, never re-dispatched by hand; once the host is back over the thresholds the job reads
@@ -269,6 +269,6 @@ refuses:
       a provider strike (modules/models/runtimes.yaml allocation.providerStrikes), and the strike
       that reaches the limit opens the typed provider circuit"
 layoutPreflight: "the owned-path legality preflight dispatch.yaml describes is the KERNEL's step
-  before enqueue, not an api refusal: api dispatch does not read the target repo's layout/lint
+  before enqueue, not an api refusal: starci kernel dispatch does not read the target repo's layout/lint
   contracts"
 usedBy: drive.dispatch — only jobs whose owned_paths are disjoint and whose capacity is free

@@ -77,7 +77,7 @@ const listOf = (props, key) => String(props[key] ?? '').split(',').map((glob) =>
  * The coverage scope of a sonar-project.properties map (readProperties), as Sonar computes it: SonarQube has no coverage
  * inclusions, so the files it measures coverage on are the source files of `sonar.sources` that neither `sonar.exclusions`,
  * `sonar.coverage.exclusions` nor the test patterns (`sonar.test.inclusions`) take. The managed properties render
- * sonar.coverage.exclusions as the complement of the services (hfs sync coverageExclusions), so what is left is the services.
+ * sonar.coverage.exclusions as the complement of the services (starci app sync coverageExclusions), so what is left is the services.
  * Returns {exclusions, sources, excluded, tests}; `exclusions` empty means the repository declares no coverage scope.
  */
 export function coverageScopeOf(props = {}) {

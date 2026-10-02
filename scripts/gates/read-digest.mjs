@@ -4,13 +4,13 @@
 //   starci gate read --root <app> --touch <file>... [--read <file>...] [--knowledge <file>...] [--out <file>]
 //
 // For the files a slice will touch it prints, and records with their sha256, exactly what the slice must read before coding:
-//   - the slot map: `hfs explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
+//   - the slot map: `starci app explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
 //   - the pattern files (knowledge/patterns/...) of each file kind, from op-gate.yaml `kinds` (family `always` plus the longest
 //     listed slot prefix);
 //   - the example files of the same slots in the example app (op-gate.yaml `examples`), matched by the slot's explain pattern.
 // `--read` adds any other file the slice read (app-relative); `--knowledge` adds runtime knowledge files (knowledge/..., a
 // deciding or authoring op's READ: the patterns, catalogs and rules its decision cites), role `knowledge`. A deciding op that
-// writes no file yet may give --knowledge alone. The op attaches the digest to its report; `api settle` re-reads it
+// writes no file yet may give --knowledge alone. The op attaches the digest to its report; `starci kernel settle` re-reads it
 // (scripts/kernel/gate-settle.mjs) and refuses a done whose digest is missing or names no pattern file for a touched kind.
 // Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
 import fs from 'node:fs';
@@ -104,8 +104,8 @@ export function judgeKnowledgeDigest(digest) {
 }
 
 /**
- * `hfs explain` of each path through the app's own hfs: in-process through its hfs-check library when it loads, else one
- * `hfs explain <path> --json` per path. A path hfs cannot explain answers {path, status: 'unexplained'} (slot null).
+ * `starci app explain` of each path through the app's own hfs: in-process through its hfs-check library when it loads, else one
+ * `starci app explain <path> --json` per path. A path hfs cannot explain answers {path, status: 'unexplained'} (slot null).
  */
 export async function explainPaths(root, files, hfs = hfsEntry(root)) {
   let explainPath = null;

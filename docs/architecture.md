@@ -17,7 +17,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
                    ▼
    runtime.sqlite (one per project)  ◄── engine/db/ledger.mjs (the only writer)
                    ▲                                   │
-   op agents ──────┘ api report / log / op-contract    │ blobs put first, then the row
+   op agents ──────┘ starci kernel report / log / op-contract    │ blobs put first, then the row
                                                        ▼
                                   ~/.starci/artifacts/<sha[0:2]>/<sha256>
                                                        ▲
@@ -60,7 +60,7 @@ The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/cli.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
-| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
+| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`starci kernel op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `starci kernel log`, files one `starci kernel report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and fleet digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
 | Harness UI | One process | Serves the read-only views of both databases and `GET /api/blob/<sha>`. | Never writes, never calls an API verb, never talks to Orca for a closed terminal. |
@@ -88,7 +88,7 @@ awaiting-approval ──► queued ──► running ──► finished ──�
         ▼               ▼          │
       stopped ◄─────────┴──────────┘ (from queued, running or paused)
         │
-        ├──► queued      (owner only: api lifecycle --resume)
+        ├──► queued      (owner only: starci kernel lifecycle --resume)
         └──► archived
 ```
 
@@ -103,7 +103,7 @@ awaiting-approval ──► queued ──► running ──► finished ──�
 ## The Kernel API: `scripts/kernel/cli.mjs`
 
 ```text
-node scripts/kernel/cli.mjs <verb> --repo <path> [...]
+starci kernel <verb> --repo <path> [...]
 ```
 
 `modules/kernel/api.yaml` and `modules/cli/commands/kernel/<verb>.yaml` name every verb with its
@@ -115,7 +115,7 @@ appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed 
 `modules/models/agents/<agent>.yaml`; every other agent (Kernel, Supervisor, workers) starts through
 `worker-start` too, and no runtime code creates a terminal for an agent ([host contract](host-contract.md)).
 
-The op lifecycle is `enqueue → route → dispatch → api report → api check → api settle`, and every
+The op lifecycle is `enqueue → route → dispatch → starci kernel report → starci kernel record-checks → starci kernel settle`, and every
 step is a column of the attempt row (`routed_at`, `dispatched_at`, `reported_at`, `checked_at`,
 `settled_at`, `released_at`). The op's own claim (`report_outcome`) and the runtime's verdict
 (`verdict`) are separate columns; a check's raw exit code (`exit_code`) is separate from the one the
@@ -156,14 +156,14 @@ truncated. SLA breaches are `sla_episodes` (append-only); invariant breaches are
 
 **Decision Items** are the durable messages between controllers and deciders
 (`decision_items` in a ledger, `sup_decision_items` in machine). Only
-`scripts/machine/decisions.mjs` writes them, through `api decisions`. A Kernel item overdue twice
+`scripts/machine/decisions.mjs` writes them, through `starci kernel decisions`. A Kernel item overdue twice
 escalates to the Supervisor. The doorbell (`[decide] N items waiting …` typed into an idle seat) is
 only a reminder; every delivery attempt is a `deliveries` row, and a seat that refuses input
 repeatedly is replaced.
 
 ### Start
 
-`node scripts/reconciler/start.mjs` (skill `start`, the one start skill; `boot.mjs --restart` is the engine-only lever) runs, in order: preflight (Node bundles
+`starci reconciler up` (skill `start`, the one start skill; `boot.mjs --restart` is the engine-only lever) runs, in order: preflight (Node bundles
 SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);

@@ -124,7 +124,7 @@ test('a Claude Code star spinner with a timer is active; its idle prompt is not'
 // worker-nudge-ready and the nudges landed as queued messages.
 test('any Claude spinner row and a still-executing tool call are active; finished scrollback is not',()=>{
   const chrome=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
-  const pre=['● Bash(node scripts/kernel/cli.mjs op-contract --job op-provision.ask-9a2c8f0c8d)',
+  const pre=['● Bash(starci kernel op-contract --job op-provision.ask-9a2c8f0c8d)',
     '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
   assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
@@ -166,14 +166,14 @@ test('watchdog wake transfers cadence ownership outside the Kernel model turn',(
   assert.doesNotMatch(prompt,/Runtime wake for Kernel attempt/,'no seat attempt known, no identity');
 });
 
-test('watchdog wake names the Kernel seat it is for, checkable with api status, and claims no approval',()=>{
+test('watchdog wake names the Kernel seat it is for, checkable with starci kernel status, and claims no approval',()=>{
   const prompt=buildWakePrompt('wf-example',2);
   assert.match(prompt,/^Watchdog liveness wake for wf-example: .*act on it now\./);
-  assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: api status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
+  assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: starci kernel status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
   assert.doesNotMatch(prompt,/already approved|needs no confirmation/);
   const src=fs.readFileSync(new URL('../../scripts/kernel/kernel-watchdog.mjs',import.meta.url),'utf8');
-  assert.match(src,/text: wakePromptOf\(workflowId, status\.value\)/,'the liveness wake is built from api status');
-  assert.match(src,/buildWakePrompt\(workflow, statusValue\?\.kernel\?\.attempt \?\? null, /,'it takes the attempt (and the runtime rev) from api status');
+  assert.match(src,/text: wakePromptOf\(workflowId, status\.value\)/,'the liveness wake is built from starci kernel status');
+  assert.match(src,/buildWakePrompt\(workflow, statusValue\?\.kernel\?\.attempt \?\? null, /,'it takes the attempt (and the runtime rev) from starci kernel status');
   assert.match(src,/'--launched-by', 'watchdog'/,'a repair names its launcher');
 });
 

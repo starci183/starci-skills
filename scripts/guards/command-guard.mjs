@@ -23,7 +23,7 @@
 //    main's packages/grammar/node_modules). Guard file or not. With a guard, also an npm clean install while another
 //    workflow's job is leased on the ledger (peerLeasedJobs).
 //  - the Kernel's mailbox: `orca orchestration check` from a guard of role kernel (KERNEL_ORCA_CHECK): its --ack
-//    consumes deliveries before the ledger records them; the Kernel reads through `api messages` / `api questions`
+//    consumes deliveries before the ledger records them; the Kernel reads through `starci kernel messages` / `starci kernel questions`
 //    and the runtime drains. Ops and [Worker]s keep it: Orca's worker protocol (modules/host/orca/api.yaml
 //    operationAgent) has them check their own Run's deliveries, which no ledger record depends on.
 //  - the environment: a command that writes the whole environment to output (env, printenv, bare set, export -p, declare -x,

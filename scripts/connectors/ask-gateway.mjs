@@ -2,9 +2,9 @@
 // ask-gateway.mjs — one local HTTP front for every serve-ask form, so one
 // Cloudflare tunnel can publish them all (docs/connectors.md).
 //
-//   node scripts/connectors/ask-gateway.mjs start     launch detached (records the connectors row 'gateway' in machine.sqlite)
-//   node scripts/connectors/ask-gateway.mjs run       run in the foreground
-//   node scripts/connectors/ask-gateway.mjs status | stop
+//   starci connect ask-gateway start     launch detached (records the connectors row 'gateway' in machine.sqlite)
+//   starci connect ask-gateway run       run in the foreground
+//   starci connect ask-gateway status | stop
 //       [--port <n>]   default config.yaml connectors.gateway.port
 //       [--repo <path>]...  extra ledger-owner repos beyond connectors.repos
 //
@@ -163,7 +163,7 @@ function main() {
     console.log(JSON.stringify({ ok: true, launched: pid, gateway: `http://127.0.0.1:${port}` })); return;
   }
   if (verb === 'run') return run(args);
-  console.error('usage: ask-gateway.mjs start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
+  console.error('usage: starci connect ask-gateway start|run|status|stop [--port <n>] [--repo <path>]...'); process.exit(2);
 }
 
 if (isMain(import.meta.url)) main();

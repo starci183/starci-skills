@@ -17,7 +17,7 @@ paths:
   - modules/kernel/owner-rulings.yaml
   - modules/kernel/driver-loop.yaml
   - modules/kernel/kernel-prompt.md
-  - modules/kernel/api-commands/settle-tail.yaml
+  - modules/cli/commands/kernel/settle-tail.yaml
   - modules/models/runtimes.yaml
   - scripts/reconcile/job-settle.mjs
   - scripts/kernel/api.mjs

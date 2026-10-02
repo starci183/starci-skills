@@ -1,0 +1,21 @@
+group: route
+verb: op
+owner: runtime
+summary: resolve the operation that serves a structured routing request
+impl: {script: scripts/route/route-op.mjs}
+flags:
+  - {name: kind, type: string}
+  - {name: node-kind, type: string}
+  - {name: phase, type: string}
+  - {name: intent, type: list}
+  - {name: ops-dir, type: string}
+exit: {"0": operation resolved, "1": no operation matched, "2": bad usage}
+json: flag
+examples:
+  - starci route op --kind backend.implement --json
+  - starci route op --node-kind ui --intent implement
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/route/route-op.mjs
+  - node .claude/scripts/route/route-op.mjs

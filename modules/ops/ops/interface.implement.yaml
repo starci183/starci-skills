@@ -183,14 +183,14 @@ writes:
     path: <STARCI_JOB_SCRATCH>/captures/<name>.png
     content:
       en: The inspected screenshot of the implemented surface as actually served - agent data, kept in
-        scratch (never under the impl node's assets/) and filed by api report (captures/ is attached by
+        scratch (never under the impl node's assets/) and filed by starci kernel report (captures/ is attached by
         itself). The impl record's assets[] cites each {artifact, name, role, sha256} from the artifacts
-        api report returns.
+        starci kernel report returns.
   - id: runningMarkup
     path: <STARCI_JOB_SCRATCH>/captures/<name>.html
     content:
       en: The markup rendered by that same inspected surface - agent data, kept in scratch (never under
-        the impl node's assets/) and filed by api report with captures/.
+        the impl node's assets/) and filed by starci kernel report with captures/.
   - id: evidence
     path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -216,7 +216,7 @@ writes:
         lint - a note, never an open item, and never refactored outside the grant. Run Sonar only
         through `node <Source>/.claude/scripts/gates/sonar-local.mjs scan --cwd <app> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
-        comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` attach both files at api report
+        comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` attach both files at starci kernel report
         (the specs of the changed or added source and the specs that import it - never the app's whole unit suite, owner 2026-09-29; the front end itself has no tests) in this same attempt: it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
@@ -280,8 +280,8 @@ writes:
     path: STARCI_JOB_SCRATCH/read-digest.json
     schema: starci/read-digest@1
     content:
-      en: "The READ digest: the touched files, their slot map from hfs explain, and every pattern and example file read with its sha256."
-      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
+      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
     path: STARCI_JOB_SCRATCH/gate.json
     schema: starci/gate@1
@@ -292,8 +292,8 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run starci gate read --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map starci app explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy starci gate read --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà starci app explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - application-stacks
       - repo
@@ -303,7 +303,7 @@ steps:
         modules/kernel/driver-loop.yaml enqueue.cutExecution seamContractFirst). As ordinal 1 of a cut of
         more than one you are the seam: before anything else author its interface - types,
         DTOs, ports/contracts and a stub implementation inside your owned paths - then publish it with
-        `api cut-seam --publish-interface --job <your job> --files <interface files>` so every
+        `starci kernel cut-seam --publish-interface --job <your job> --files <interface files>` so every
         sibling ordinal starts on it at once; then finish the seam and keep the published signatures
         stable (a change after publishing owes the siblings a reconcile). As a sibling (ordinal > 1)
         whose packet carries context.cut.seamStub the seam has not landed: never wait for it and never
@@ -533,12 +533,12 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run starci gate run --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy starci gate run --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: commit
@@ -580,7 +580,7 @@ proofs:
         block. Reuse existing authorization and keep secrets outside evidence.
   - id: shell-layout
     requirement:
-      en: "`node scripts/work/ui/shell-conformance.mjs <impl-record-dir>` exits 0 for the written
+      en: "`starci work shell-conformance <impl-record-dir>` exits 0 for the written
         implementation record: re-scanning the real frontend app/, every routed ui record it builds has
         its files at the matching path - layout.tsx, page.tsx, loading/error/not-found, and for a routed
         overlay the full page plus an @slot/(.)segment intercept presenting it. A recorded layout file this
@@ -590,7 +590,7 @@ proofs:
         token; PRIMARY_ABSENT when it stands in for the primary; scripts/work/brand/brand-palette.mjs); the
         output is retained in evidence. A brand colour token that declares a valueSource is written into
         the app theme under its brand token name with its brand value (and any utility class the brand
-        names for it), so `node scripts/work/brand/brand.mjs <work-root> --source <repository-root> --stage
+        names for it), so `starci work brand <work-root> --source <repository-root> --stage
         verify` binds it to the app source rather than to the reference render."
     check: scripts/work/ui/shell-conformance.mjs
   - id: asset-coverage
@@ -609,8 +609,8 @@ proofs:
         modules/schemas/realization-check.schema.yaml declares."
   - id: op-gate
     requirement:
-      en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
-      vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+      en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
+      vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:

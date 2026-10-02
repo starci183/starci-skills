@@ -3,7 +3,7 @@
 //
 // Owner ruling 2026-09-28 ("Freeze the drawing rules"): a gate or checker change of a frozen op family
 // (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
-// decides (api contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
+// decides (starci kernel contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
 // land touches the family's gatePaths or registers a change that adds checks/codes for it: the family's gates, as
 // the BASE tree and as the CANDIDATE tree have them, over the latest accepted leg (newest succeeded)
 // of the family op in every live workflow of every ledger on this host's registry - read-only. A flip is a leg the

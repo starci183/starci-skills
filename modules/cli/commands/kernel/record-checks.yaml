@@ -37,7 +37,7 @@ inputShape: "{checks:[{name:<non-empty string>, exitCode:<integer>, command?:<st
   and the source file it points at, `path[:line]`)."
 rawExit: "H8: a verdict reads only the RAW exit a runtime runner observed, never an exit a caller
   declared. A check whose command the runtime can re-run (scripts/kernel/settle/job-settle.mjs
-  classifyCheck: a runtime check script, argv, no shell, no mutating flag) is re-run by api check in
+  classifyCheck: a runtime check script, argv, no shell, no mutating flag) is re-run by starci kernel record-checks in
   the repository; its raw exit replaces exitCode and the caller's value is kept as declaredExitCode
   (authority runtime). A command the runtime cannot re-run is recorded authority declared: its red
   counts failed, its green never counts passed (checkEvidence.declared), so a pass needs at least

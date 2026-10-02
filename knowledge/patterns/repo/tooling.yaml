@@ -3,7 +3,7 @@ id: repo.tooling
 title: Repository tooling
 purpose: |
   Given a tool configuration in an app (ESLint, TypeScript, Jest, stylelint, Prettier, husky, CI, Sonar), who owns its content? `.claude` owns it. The
-  app root and each side (`be/`, `fe/`) hold a thin call into a `.claude` package, or a file that `hfs sync` (run at the app root)
+  app root and each side (`be/`, `fe/`) hold a thin call into a `.claude` package, or a file that `starci app sync` (run at the app root)
   generates and hash-checks.
 appliesTo:
   - backend
@@ -34,7 +34,7 @@ rules:
       `be/src/tests/tsconfig.json` extends `be/tsconfig.json` and `@starci/tsconfig/e2e.json`. `be/jest.config.js` calls
       `starciJestConfig()` of `@starci/jest-preset`, `fe/stylelint.config.mjs`
       `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })` of `@starci/stylelint-canon`, and the root `.prettierrc`
-      is the string `@starci/prettier-config`. All of these are rendered by `hfs sync` and compared by `hfs check` (R05, R17, R22);
+      is the string `@starci/prettier-config`. All of these are rendered by `starci app sync` and compared by `starci app check` (R05, R17, R22);
       only `fe/turbo.json` is the app's own. The app root holds no tsconfig, eslint, stylelint or jest configuration. An app
       defines no local rule, plugin, override, disabled rule or architecture script, keeps no tool configuration key in a
       `package.json`, and copies no canon config.
@@ -55,23 +55,23 @@ rules:
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-2
-    title: Generated files come from hfs sync
+    title: Generated files come from starci app sync
     kind: mandatory
     hfsRules: [R04, R05, R11]
     requirement: |
-      Files that cannot extend a package are rendered by `hfs sync --write` at the app root from the templates in
+      Files that cannot extend a package are rendered by `starci app sync --write` at the app root from the templates in
       `packages/hfs/templates/` and hash-checked: the root `.husky/{pre-commit,pre-push}`, `.github/workflows/ci.yml` (and the
       optional `e2e.yml`), the managed block of `.gitignore`, `sonar-project.properties`, `.prettierrc`, `.prettierignore` and
       the `scripts` block of `package.json`, plus each side's tool configuration (REPO-TOOLING-1). The managed list is the
-      `managedBy` slots of `slots.yaml`. `.sops.yaml`, `.starcistacks/application-stacks.yaml` and `be/nest-cli.json` are written once by `hfs scaffold app` and are
-      the app's own afterwards. Any difference from the render is a finding; the fix is to run `hfs sync --write`, never to
+      `managedBy` slots of `slots.yaml`. `.sops.yaml`, `.starcistacks/application-stacks.yaml` and `be/nest-cli.json` are written once by `starci app scaffold` and are
+      the app's own afterwards. Any difference from the render is a finding; the fix is to run `starci app sync --write`, never to
       edit the file. A template change is a change in `.claude`, after which each app moves to the new `@starci/hfs` pin.
     rationale: |
       A hand-edited hook or workflow drifts, and drift is how a gate stops running.
     cases:
       - id: case-1
         when: A workflow must change
-        write: Change the template in .claude, publish @starci/hfs at a new pin, then run hfs sync --write in each app.
+        write: Change the template in .claude, publish @starci/hfs at a new pin, then run starci app sync --write in each app.
     verification:
       automated:
         - HFS_MANAGED_FILE_DRIFT
@@ -84,9 +84,9 @@ rules:
     kind: mandatory
     hfsRules: [R13, R24]
     requirement: |
-      Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`, which runs `hfs lint --changed` at the app root), the
+      Pre-commit, pre-push, the op gate (`scripts/gates/gate.mjs`, which runs `starci app lint --changed` at the app root), the
       Kernel's landing and CI run the same `@starci/hfs` at the version pinned in `canon-pins.yaml`. CI runs `npm run lint`
-      (`hfs lint`, which includes the app check); pre-push runs `typecheck`, `lint` and `format:check`. There is no rule only
+      (`starci app lint`, which includes the app check); pre-push runs `typecheck`, `lint` and `format:check`. There is no rule only
       agents can run. Every `@starci/*` package is installed from the npm registry at the pinned version.
     rationale: |
       An app that is green under an old rule while the agent grades it under a new rule wastes every cycle.

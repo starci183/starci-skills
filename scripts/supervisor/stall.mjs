@@ -10,7 +10,7 @@
 //
 // This module is a read-only projection over one or more ledgers (every read
 // goes through the handle it is given; open it with inspectLedger). The
-// frontier (actionable, queuedBecause, worker liveness) is `api status --json`,
+// frontier (actionable, queuedBecause, worker liveness) is `starci kernel status --json`,
 // the same projection the watchdog reads each tick; it is asked for only when a
 // workflow has been idle past the threshold or holds a queued job that old.
 //
@@ -26,18 +26,18 @@
 //                                                  jobs it names settled
 //   UNREAD-PEER <wf> <key> from <peer> ...         a peer message still pending on a gated or waiting
 //                                                  workflow that releases nothing by itself: its
-//                                                  Kernel reads api inbox (not alerted)
+//                                                  Kernel reads starci kernel inbox (not alerted)
 //   GATE <wf> <incident> [<kind>] ... justified    the gate still has its reason (not alerted)
 //   STALE-WAIT <wf> <job> (<op>) <cause>: ...      a queued job waiting on a blocker that settled
-//   PEER-WAIT <wf> <incident> on <peer> justified   a typed peer-wait (api incident --kind peer-wait) whose
+//   PEER-WAIT <wf> <incident> on <peer> justified   a typed peer-wait (starci kernel incident --kind peer-wait) whose
 //                                                  peer is running and still moving (not alerted); a
 //                                                  workflow whose frontier is peer-wait on justified
 //                                                  waits is not alerted STALLED either
 //                                                  A gate or wait that names a job whose report was
 //                                                  consumed but not settled holds that settle like a
-//                                                  queued job ("defers the settle of <job>"; api status
+//                                                  queued job ("defers the settle of <job>"; starci kernel status
 //                                                  heldSettleJobs)
-//   STATUS-UNREADABLE <wf> idle <min>m: ...        idle past the threshold but api status could not be read:
+//   STATUS-UNREADABLE <wf> idle <min>m: ...        idle past the threshold but starci kernel status could not be read:
 //                                                  the stall is not judged (never STALLED, not alerted); the
 //                                                  line names the read error and the jobs running in the ledger
 //   STALE-PEER-WAIT <wf> <incident> on <peer> ...  the peer finished or left running, its message or
@@ -132,7 +132,7 @@ export function ownerGates(db, workflowId) {
 
 /**
  * Open peer-wait incidents: {incidentId, peer, holds, text, untilMessage, refs, raisedAt} - the
- * incident-raised payload `api incident --kind peer-wait --peer` writes.
+ * incident-raised payload `starci kernel incident --kind peer-wait --peer` writes.
  */
 export function peerWaits(db, workflowId) {
   return db.prepare("SELECT incident_id, op_id, last_progress, updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
@@ -155,9 +155,9 @@ export const queuedJobs = (db, workflowId) => db.prepare(
   "SELECT job_id, op_id, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='queued' ORDER BY created_at, job_id").all(workflowId);
 
 /**
- * Jobs of one workflow whose report the Kernel consumed but never settled (api status
+ * Jobs of one workflow whose report the Kernel consumed but never settled (starci kernel status
  * settleReadyJobs, before any wait holds them). An open gate or peer-wait naming one defers that
- * settle deliberately, and holds it the way it holds a queued job (api status heldSettleJobs).
+ * settle deliberately, and holds it the way it holds a queued job (starci kernel status heldSettleJobs).
  */
 export const settleOwedJobs = (db, workflowId) => db.prepare(
   `SELECT j.job_id, j.op_id, j.status, j.payload_json, j.created_at, j.updated_at FROM jobs j
@@ -343,7 +343,7 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
   const peerIdleMs = now - peerProgress.at;
   // A quiet ledger is not an idle peer while a turn of it is running: nivo AUTH inc-9f2e1e7ff1f6 read
   // STALE-PEER-WAIT while its peer's op-backend.implement-82b3110067 worker (Devin) was mid-turn.
-  // busyOf is asked only once the ledger says idle (it reads api status and the Kernel frame).
+  // busyOf is asked only once the ledger says idle (it reads starci kernel status and the Kernel frame).
   let peerBusy = null;
   if (running && peerIdleMs > thresholdMs) {
     peerBusy = busyOf(wait.peer) ?? null;
@@ -364,7 +364,7 @@ const jsonFrom = (stdout) => {
 };
 
 /**
- * `api status --json` for one workflow — the frontier the watchdog reads every tick (a read
+ * `starci kernel status --json` for one workflow — the frontier the watchdog reads every tick (a read
  * projection: it writes nothing). {ok, frontier, workers} or {ok:false, error}.
  */
 export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
@@ -414,7 +414,7 @@ export const ledgerLookup = ({ repo = null, db, ledgers = [] }) => (wf) => {
 };
 
 /**
- * Why a workflow whose ledger is quiet is still working: a worker mid-turn (its `api status` workers) or
+ * Why a workflow whose ledger is quiet is still working: a worker mid-turn (its `starci kernel status` workers) or
  * its Kernel mid-turn (`kernelTurn`, a thunk read only when no worker is); null when neither. The one
  * judgement for a peer (judgePeerWait's busyOf) and for the workflow itself (STALLED): a Kernel mid-turn
  * is moving, so an actionable frontier is not "the Kernel has not moved" (nivo
@@ -428,14 +428,14 @@ export function busyWhy(status, kernelTurn = () => null) {
   return WORKING_LIVENESS.includes(kernelTurn()) ? 'its Kernel is mid-turn' : null;
 }
 
-/** The frontier lists naming a worker api status judged not working (dead, wedged, at its prompt, asking). */
+/** The frontier lists naming a worker starci kernel status judged not working (dead, wedged, at its prompt, asking). */
 const NOT_WORKING_LISTS = ['deadWorkerJobs', 'wedgedJobs', 'nudgeReadyJobs', 'workerQuestionJobs'];
-/** The runtime's activeStaleMs (runtimes.yaml liveness), the age past which api status stops trusting an active frame. */
+/** The runtime's activeStaleMs (runtimes.yaml liveness), the age past which starci kernel status stops trusting an active frame. */
 const activeStaleMsOf = () => { try { return allocationMs('liveness.activeStaleMs'); } catch { return null; } };
 /**
- * The workers of one `api status` read that are mid-turn: liveness active / active-unclassified, or - whatever
+ * The workers of one `starci kernel status` read that are mid-turn: liveness active / active-unclassified, or - whatever
  * the frame classified as - terminal output or a dispatch heartbeat fresher than activeStaleMs on a worker the
- * frontier does not list as dead, wedged, nudge-ready or asking. The ages are api status's own
+ * frontier does not list as dead, wedged, nudge-ready or asking. The ages are starci kernel status's own
  * (terminal-liveness.mjs outputAgeOf; heartbeatAgeMs), never re-read here: nivo inc-3a0e90528cbc,
  * op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with commands running while status read
  * a liveness outside active and stall alerted STALLED idle 94m on a frontier that was only waiting for it.
@@ -493,7 +493,7 @@ export function stallFindings(db, {
     let idleMs = now - progress.at;
     const queued = queuedJobs(db, wf);
     // A consumed-but-unsettled job a gate or wait names is held like a queued one: the Kernel
-    // deferred its settle behind the recorded wait (api status heldSettleJobs).
+    // deferred its settle behind the recorded wait (starci kernel status heldSettleJobs).
     const settleOwed = settleOwedJobs(db, wf);
     const gates = ownerGates(db, wf).map((gate) => ({ gate, held: queued.filter((j) => heldBy(gate, j)), heldSettle: settleOwed.filter((j) => heldBy(gate, j)), verdict: judgeGate({ db, workflowId: wf, gate, repo, dbOf, now, graceMs }) }));
 
@@ -504,7 +504,7 @@ export function stallFindings(db, {
       const label = `${wait.incidentId} [${PEER_WAIT_KIND}] on ${wait.peer ?? '?'}${held.length ? ` holds ${held.length} queued job(s)` : heldSettle.length ? '' : wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${settleLabel(heldSettle, held.length > 0)}`;
       if (verdict.stale) {
         out.push({ type: 'STALE-PEER-WAIT', key: `STALE-PEER-WAIT|${wf}|${wait.incidentId}`, workflowId: wf, repo, incidentId: wait.incidentId, peer: wait.peer, alert: true,
-          reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (api incident --resolve), or the peer's Kernel to move` });
+          reasons: verdict.reasons, line: `STALE-PEER-WAIT ${wf} ${label} for ${minutes(now - wait.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to re-check the prerequisite and resolve the wait (starci kernel incident --resolve), or the peer's Kernel to move` });
       } else {
         const waitsOn = verdict.until ? `until ${verdict.until.results.map((r) => `${r.condition} (${r.met ? 'met' : clipLine(r.evidence, 80)})`).join(', ')}` : clipLine(wait.text, 120);
         const why = verdict.young ? `raised ${minutes(now - wait.raisedAt)}m ago (inside the grace window)`
@@ -523,14 +523,14 @@ export function stallFindings(db, {
     for (const { wait, verdict } of waits) for (const m of verdict.unread ?? []) unread.set(m.key, { m, by: [...(unread.get(m.key)?.by ?? []), wait.incidentId] });
     for (const { m, by } of unread.values()) {
       out.push({ type: 'UNREAD-PEER', key: `UNREAD-PEER|${wf}|${m.key}`, workflowId: wf, repo, peerMessage: m.key, from: m.from ?? null, pendingSince: m.at, alert: false,
-        line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clipLine(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read api inbox and act on it` });
+        line: `UNREAD-PEER ${wf} ${m.key} from ${m.from} [${m.kind ?? 'message'}] ${clipLine(m.subject, 60)}: pending since ${clock(m.at)} (${minutes(now - m.at)}m); ${by.join(', ')} may concern it and still holds; tell its Kernel to read starci kernel inbox and act on it` });
     }
 
     for (const { gate, held, heldSettle, verdict } of gates) {
       const label = `${gateLabel(gate, held.length)}${settleLabel(heldSettle, true)}`;
       if (verdict.stale) {
         out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, gateKind: gate.kind, raisedAt: gate.raisedAt, alert: true,
-          reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; ${gate.kind === 'supervisor-gate' ? 'the Supervisor resolves it --by supervisor' : 'tell its Kernel to resolve it (api incident --resolve) with this evidence'}` });
+          reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; ${gate.kind === 'supervisor-gate' ? 'the Supervisor resolves it --by supervisor' : 'tell its Kernel to resolve it (starci kernel incident --resolve) with this evidence'}` });
       } else {
         const why = verdict.young ? `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`
           : `justified: ${[...verdict.asks.map((a) => `ask ${a.dispatchId} open in ${a.workflowId}`), ...verdict.waits.map((w) => `waits: ${w}`)].join(', ')
@@ -566,7 +566,7 @@ export function stallFindings(db, {
     }
 
     if (idleMs <= thresholdMs) continue;
-    // An unreadable api status is no evidence of a stall (sdi-94355e8e, sdi-76a8404d, sdi-2f13ab61: 'frontier
+    // An unreadable starci kernel status is no evidence of a stall (sdi-94355e8e, sdi-76a8404d, sdi-2f13ab61: 'frontier
     // unreadable (status unreadable)' escalated while an interface.draw op ran; a read minutes later answered in
     // 3-5 s). Without a frontier the stall is unjudged: one STATUS-UNREADABLE line naming the error and the jobs
     // the ledger holds running, never alerted; the Workflow controller retries and owns the runtime defect.
@@ -574,13 +574,13 @@ export function stallFindings(db, {
       const running = runningJobs(db, wf);
       out.push({ type: 'STATUS-UNREADABLE', key: `STATUS-UNREADABLE|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), idleSince: progress.at,
         error: status?.error ?? 'no status', runningJobs: running.map((j) => j.job_id), alert: false,
-        line: `STATUS-UNREADABLE ${wf} idle ${minutes(idleMs)}m: api status unreadable (${status?.error ?? 'no status'}); stall not judged${running.length ? `; running ${running.map((j) => `${j.job_id} (${j.op_id ?? '-'})`).join(', ')}` : ''}; last progress ${progress.kind} ${clock(progress.at)}` });
+        line: `STATUS-UNREADABLE ${wf} idle ${minutes(idleMs)}m: starci kernel status unreadable (${status?.error ?? 'no status'}); stall not judged${running.length ? `; running ${running.map((j) => `${j.job_id} (${j.op_id ?? '-'})`).join(', ')}` : ''}; last progress ${progress.kind} ${clock(progress.at)}` });
       continue;
     }
     // A worker or the Kernel itself mid-turn is the workflow moving (busyWhy, the same judgement a peer gets).
     if (busyWhy(status, () => kernelTurnOf(db, wf))) continue;
     // This is the Supervisor's pending repair. The Kernel cannot clear a supervisor-gate, and
-    // api status has already checked that no unheld frontier move remains.
+    // starci kernel status has already checked that no unheld frontier move remains.
     if (frontier?.state === 'supervisor-wait' && !frontier.actionable && gates.some(({ gate }) => gate.kind === 'supervisor-gate')) {
       const incidents = gates.filter(({ gate }) => gate.kind === 'supervisor-gate').map(({ gate }) => gate.incidentId);
       out.push({ type: 'SUPERVISOR-WAIT', key: `SUPERVISOR-WAIT|${wf}`, workflowId: wf, repo, incidentIds: incidents, alert: false,
@@ -602,9 +602,9 @@ export function stallFindings(db, {
     // PEER-WAIT lines explain it and a STALE-PEER-WAIT alerts the moment one stops holding.
     const peerParked = frontier?.state === PEER_WAIT_KIND && !frontier.actionable && waits.length > 0 && waits.every((w) => !w.verdict.stale);
     // The same for a frontier parked on the owner (an open ask, or owner gates that all still hold,
-    // settles they defer included - api status heldSettleJobs): the owner's to move, not a stall.
+    // settles they defer included - starci kernel status heldSettleJobs): the owner's to move, not a stall.
     const ownerParked = frontier?.state === 'awaiting-owner' && !frontier.actionable && gates.every((g) => !g.verdict.stale);
-    // Parked on credential asks alone (api status frontier.credentialAskDispatches): they wait under the
+    // Parked on credential asks alone (starci kernel status frontier.credentialAskDispatches): they wait under the
     // owner's Telegram /creds and are never pushed; the owner digest only counts them.
     const credentialAsks = frontier?.credentialAskDispatches ?? [];
     const pendingAsks = (status?.awaitingOwner ?? []).filter((item) => item.answer === 'pending').map((item) => item.dispatchId);

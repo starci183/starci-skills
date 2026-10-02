@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { checkExamples, exampleDirs, formatResults, main } from '../../scripts/checks/check-example-architecture.mjs';
 
-// The examples gate runs `hfs lint --repo <example> --format json` per example app and reads the one lint report (starci/lint@1).
+// The examples gate runs `starci app lint --repo <example> --format json` per example app and reads the one lint report (starci/lint@1).
 // A real lint of an app takes a TypeScript program per side, so these specs hand the gate a stub CLI that answers the report a
 // real run would print for each example by name; the gate's own job - which directories are examples, how a report becomes
 // a verdict and a count per code, when the run is not a pass - is what is judged here.

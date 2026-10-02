@@ -29,7 +29,7 @@ process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
 const codex = loadAdapter('codex').card;
-const PREAMBLE = 'Orca Task preamble: you are the operation agent for op-interface.draw. Read the contract with api op-contract.';
+const PREAMBLE = 'Orca Task preamble: you are the operation agent for op-interface.draw. Read the contract with starci kernel op-contract.';
 const HEADER = ['╭──────────────────────────────╮', '│ >_ OpenAI Codex (v0.155.1)   │', '╰──────────────────────────────╯',
   '  Tip: This is GPT-6, a new generation of intelligence.'];
 const IDLE = [...HEADER, '› Ask Codex to do anything', `  gpt-6-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
@@ -102,7 +102,7 @@ test('awaitSubmission reads the input-box draft: a paste Orca lifted out of a ba
   assert.deepEqual(json(fs.readFileSync(stateFile, 'utf8')).terminals['fake-terminal-1'].submitted, [PREAMBLE]);
 });
 
-/* ------------------------------------------------------------ api dispatch */
+/* ------------------------------------------------------------ starci kernel dispatch */
 
 const opFixture = (t, extra = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-prompt-stalled-'));

@@ -28,7 +28,7 @@ if (process.argv.includes('--check')) {
     if (!fs.existsSync(copy)) problems.push('missing ' + bundle + '/' + f);
     else if (fs.readFileSync(copy, 'utf8') !== fs.readFileSync(path.join(root, f), 'utf8')) problems.push('stale ' + bundle + '/' + f);
   }
-  for (const p of problems) process.stderr.write('runtime copy drift: ' + p + ' (run node scripts/hfs/sync-runtime.mjs)\\n');
+  for (const p of problems) process.stderr.write('runtime copy drift: ' + p + ' (run starci release sync-runtime)\\n');
   if (!problems.length) process.stdout.write('OK: 1 runtime copies match the runtime\\n');
   process.exitCode = problems.length ? 1 : 0;
 }
@@ -79,7 +79,7 @@ test('a candidate changing a mirrored file without the mirror is refused with th
   assert.equal(r.ok, false);
   assert.equal(check.hint, MIRROR_FIX);
   assert.deepEqual(check.touches, ['src/a.mjs']);
-  assert.deepEqual(check.newFindings, ['runtime copy drift: stale mirror/src/a.mjs (run node scripts/hfs/sync-runtime.mjs)']);
+  assert.deepEqual(check.newFindings, ['runtime copy drift: stale mirror/src/a.mjs (run starci release sync-runtime)']);
 });
 
 test('the same change carrying the refreshed mirror passes', (t) => {

@@ -10,7 +10,7 @@ params:
     default: select
     setBy: kernel
     doc:
-      en: The execution mode this dispatch runs; api dispatch binds that mode's reads into the input
+      en: The execution mode this dispatch runs; starci kernel dispatch binds that mode's reads into the input
         digests. select leaves the choice to the request.
   lintRole:
     type: enum
@@ -62,8 +62,8 @@ reads:
   - id: review-gate
     path: knowledge/op-gate.yaml + scripts/gates/gate.mjs + <app>/<reviewed range>
     purpose:
-      en: "The gate the review runs over the reviewed range and the classes its defects take: gate.mjs (the installed canon, the merge guard over base..HEAD, hfs lint, tsc and the slice's specs, measured against the range's base read-only from git objects) and op-gate.yaml proofs.review-gate and review-defects (starci/review-defects@1)."
-      vi: "Cổng mà bản review chạy trên dải được review và các loại mà lỗi của nó mang: gate.mjs (canon đã cài, merge guard trên base..HEAD, hfs lint, tsc và các spec của slice, đo so với base của dải ở chế độ chỉ đọc từ đối tượng git) cùng proofs.review-gate và review-defects của op-gate.yaml (starci/review-defects@1)."
+      en: "The gate the review runs over the reviewed range and the classes its defects take: gate.mjs (the installed canon, the merge guard over base..HEAD, starci app lint, tsc and the slice's specs, measured against the range's base read-only from git objects) and op-gate.yaml proofs.review-gate and review-defects (starci/review-defects@1)."
+      vi: "Cổng mà bản review chạy trên dải được review và các loại mà lỗi của nó mang: gate.mjs (canon đã cài, merge guard trên base..HEAD, starci app lint, tsc và các spec của slice, đo so với base của dải ở chế độ chỉ đọc từ đối tượng git) cùng proofs.review-gate và review-defects của op-gate.yaml (starci/review-defects@1)."
 writes:
   - id: node
     path: N/index.yaml
@@ -116,8 +116,8 @@ steps:
   - reads: [review-gate, target, selection]
     writes: [gate-proof, evidence]
     action:
-      en: "In the code modes (delivery, workflow, api, and select when it picks one of them) run the gate READ-ONLY over the reviewed range: node scripts/gates/gate.mjs --root <app> --base <the first reviewed commit>^ [--main <the main ref>] --out $STARCI_JOB_SCRATCH/gate.json. It changes nothing in the checkout: the base is measured from git objects, and its MERGE GUARD recomputes every merge in the range with git merge-tree, so a merge that kept the lane side over a main change is a finding merge/dropped-main-change. A new finding, a dropped main change or a tool that could not run is the review's own result - the review never passes a range the gate finds red or could not judge, and it repairs nothing. REPORT with gate.json attached."
-      vi: "Ở các chế độ mã (delivery, workflow, api, và select khi nó chọn một trong số đó) chạy cổng CHỈ ĐỌC trên dải được review: node scripts/gates/gate.mjs --root <app> --base <commit đầu tiên được review>^ [--main <ref main>] --out $STARCI_JOB_SCRATCH/gate.json. Nó không thay đổi gì trong checkout: base được đo từ đối tượng git, và MERGE GUARD của nó tính lại mọi merge trong dải bằng git merge-tree, nên merge giữ bản của lane thay cho thay đổi của main là lỗi merge/dropped-main-change. Lỗi mới, thay đổi của main bị mất hoặc công cụ không chạy được là kết quả của chính bản review - review không bao giờ cho qua một dải mà cổng thấy đỏ hoặc không chấm được, và không sửa gì. BÁO CÁO kèm gate.json."
+      en: "In the code modes (delivery, workflow, api, and select when it picks one of them) run the gate READ-ONLY over the reviewed range: starci gate run --root <app> --base <the first reviewed commit>^ [--main <the main ref>] --out $STARCI_JOB_SCRATCH/gate.json. It changes nothing in the checkout: the base is measured from git objects, and its MERGE GUARD recomputes every merge in the range with git merge-tree, so a merge that kept the lane side over a main change is a finding merge/dropped-main-change. A new finding, a dropped main change or a tool that could not run is the review's own result - the review never passes a range the gate finds red or could not judge, and it repairs nothing. REPORT with gate.json attached."
+      vi: "Ở các chế độ mã (delivery, workflow, api, và select khi nó chọn một trong số đó) chạy cổng CHỈ ĐỌC trên dải được review: starci gate run --root <app> --base <commit đầu tiên được review>^ [--main <ref main>] --out $STARCI_JOB_SCRATCH/gate.json. Nó không thay đổi gì trong checkout: base được đo từ đối tượng git, và MERGE GUARD của nó tính lại mọi merge trong dải bằng git merge-tree, nên merge giữ bản của lane thay cho thay đổi của main là lỗi merge/dropped-main-change. Lỗi mới, thay đổi của main bị mất hoặc công cụ không chạy được là kết quả của chính bản review - review không bao giờ cho qua một dải mà cổng thấy đỏ hoặc không chấm được, và không sửa gì. BÁO CÁO kèm gate.json."
   - reads: [review-gate, target]
     writes: [review-defects, evidence]
     action:
@@ -130,13 +130,13 @@ proofs:
         delivery.
   - id: review-gate
     requirement:
-      en: "In the code modes api settle re-reads the attached gate.json (runtime check op-proof, proof review-gate): a done without it (op-gate-proof-missing), with a tool that could not run (op-gate-tool-failed) or over a range with a new finding or a dropped main change (op-gate-new-findings) is refused."
-      vi: "Ở các chế độ mã api settle tự đọc lại gate.json đính kèm (check op-proof, proof review-gate): done thiếu nó (op-gate-proof-missing), có công cụ không chạy được (op-gate-tool-failed) hoặc trên một dải có lỗi mới hay thay đổi của main bị mất (op-gate-new-findings) đều bị từ chối."
+      en: "In the code modes starci kernel settle re-reads the attached gate.json (runtime check op-proof, proof review-gate): a done without it (op-gate-proof-missing), with a tool that could not run (op-gate-tool-failed) or over a range with a new finding or a dropped main change (op-gate-new-findings) is refused."
+      vi: "Ở các chế độ mã starci kernel settle tự đọc lại gate.json đính kèm (check op-proof, proof review-gate): done thiếu nó (op-gate-proof-missing), có công cụ không chạy được (op-gate-tool-failed) hoặc trên một dải có lỗi mới hay thay đổi của main bị mất (op-gate-new-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
   - id: review-defects
     requirement:
-      en: "In every mode but lint api settle re-reads the attached review-defects.json (runtime check op-proof, proof review-defects): a done without it (op-review-defects-missing), with a defect not classified business or non-business (op-review-defect-unclassified) or with a non-business defect no check caught and no missingCheck recorded (op-review-missing-check-unrecorded) is refused."
-      vi: "Ở mọi chế độ trừ lint api settle tự đọc lại review-defects.json đính kèm (check op-proof, proof review-defects): done thiếu nó (op-review-defects-missing), có lỗi chưa phân loại business hay non-business (op-review-defect-unclassified) hoặc có lỗi non-business không check nào bắt mà không ghi missingCheck (op-review-missing-check-unrecorded) đều bị từ chối."
+      en: "In every mode but lint starci kernel settle re-reads the attached review-defects.json (runtime check op-proof, proof review-defects): a done without it (op-review-defects-missing), with a defect not classified business or non-business (op-review-defect-unclassified) or with a non-business defect no check caught and no missingCheck recorded (op-review-missing-check-unrecorded) is refused."
+      vi: "Ở mọi chế độ trừ lint starci kernel settle tự đọc lại review-defects.json đính kèm (check op-proof, proof review-defects): done thiếu nó (op-review-defects-missing), có lỗi chưa phân loại business hay non-business (op-review-defect-unclassified) hoặc có lỗi non-business không check nào bắt mà không ghi missingCheck (op-review-missing-check-unrecorded) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
   - id: verified-head
     requirement:
@@ -248,7 +248,7 @@ policy:
               (starci/gate@1 from scripts/gates/gate.mjs over the slice's changed files against its
               base) with exit 0 for the tested revision - only the slice's NEW findings gate it, and its
               preexisting count is repository debt already there at base - record it as code.refactor's
-              note, never a finding against the slice; this op's own whole-repository hfs lint still
+              note, never a finding against the slice; this op's own whole-repository starci app lint still
               measures the repository. Issues located only outside the slice are not the slice's.
               Missing, stale, skipped or failing proof returns a finding
               to the owning implement op. Record per-required-criterion pass/fail/not-run and
@@ -405,7 +405,7 @@ policy:
       proofs:
         - id: binding
           requirement:
-            en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+            en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
               proposed, required assertions are covered, input bindings are current, and an honest
               not-run/fail cannot earn done.
         - id: reconciliation
@@ -644,7 +644,7 @@ policy:
             en: Measure applicable contrast, computed layout, focus/keyboard behavior and motion/reduced-motion
               with actual tool observations. Label subjective design judgement separately from
               numeric measurements. When the brand record declares a colour token with a valueSource
-              (planned from a reference render), run `node scripts/work/brand/brand.mjs <work-root> --source
+              (planned from a reference render), run `starci work brand <work-root> --source
               <repository-root> --stage verify` and retain its output; a planned token the app source
               still does not declare (planned-source-missing) is a failed assertion routed to
               interface.implement, never accepted on its reference.
@@ -847,7 +847,7 @@ policy:
           fields: [commands, exitCodes, runtimeDigest, inputBindings, reports, coverage, limitations]
           content:
             en: Store selected checker commands, identities and summaries in the Work proof, preserving
-              violations and unknown coverage; attach raw checker outputs from STARCI_JOB_SCRATCH through api report.
+              violations and unknown coverage; attach raw checker outputs from STARCI_JOB_SCRATCH through starci kernel report.
       steps:
         - reads:
             - request
@@ -855,18 +855,18 @@ policy:
             - inputs
           writes: [evidence]
           action:
-            en: Execute the whole-repository hfs lint (hfs lint --repo ROOT --format json, the app's own install) for every selected
+            en: Execute the whole-repository starci app lint (starci app lint --repo ROOT --format json, the app's own install) for every selected
               FE/BE source repository with the actual project bindings. This one lint runs the canon's
               per-file and project-graph rules and the repository checks with exact rule/file coverage;
-              a repository's other package lint cannot substitute for it. Execute starci validate for
+              a repository's other package lint cannot substitute for it. Execute starci runtime validate for
               selected canonical Work and starci-stacks-check for selected materialized stack
               profiles. Inspect each repository's real package scripts and run its additional
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
               a checking command. When the goal carries a code.refactor
-              leg with params.canonFamilies, also execute node scripts/gates/canon-scan.mjs --root
+              leg with params.canonFamilies, also execute starci gate canon-scan --root
               ROOT --families <that value> --json for each selected repository - the repository's own
               lint config against this runtime's canon source plus the architecture check - and
-              keep its raw report under STARCI_JOB_SCRATCH and attach it at api report; the conformance gate is its status ok.
+              keep its raw report under STARCI_JOB_SCRATCH and attach it at starci kernel report; the conformance gate is its status ok.
               MEASUREMENT versus GATE - a lint leg with no build leg settled before it (the first
               review.verify#lint of a canon-conformance chain, params.lintRole measurement or auto) is a MEASUREMENT - its
               findings and slices are the input the code.refactor cut executes, so it files outcome done
@@ -878,7 +878,7 @@ policy:
               owns them (node code.refactor, backend.implement or interface.implement, files the paths),
               and the kernel routes one repair of that op - never a re-run of the same measurement at an
               unchanged HEAD.
-              Capture each original report and exit code. This whole-repository hfs lint is the repository measurement, while a
+              Capture each original report and exit code. This whole-repository starci app lint is the repository measurement, while a
               delivery slice is judged by its own gate.json (new findings only). Do not run fix flags, hide files, lower rules or replace machine output with
               prose. An unavailable required checker or unresolved target fails the gate. Route
               measured findings to separately authorized owners; static pass never proves runtime
@@ -887,7 +887,7 @@ policy:
         - id: executed-checks
           requirement:
             en: Every requested static check actually executes with declared coverage. A read-only lint
-              measurement completes (outcome done) with typed violations retained as findings - api check
+              measurement completes (outcome done) with typed violations retained as findings - starci kernel record-checks
               marks a measurement leg's findings exits as measured and settle refuses to fail it on them
               (measurement-findings-are-the-result); a
               delivery/static-conformance gate passes only when every required exit code is zero.

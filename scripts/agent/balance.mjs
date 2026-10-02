@@ -3,7 +3,7 @@
 // balanced), and the author an audit leg reviews (cross-family audit).
 //
 // A dispatch is an op job whose payload names a routed pool (payload.model, set
-// by `api route`) created inside the window. Routed-but-queued and running jobs
+// by `starci kernel route`) created inside the window. Routed-but-queued and running jobs
 // count, so consecutive routes of one fan-out see the fleet filling. The counts
 // cover this repo's ledger plus every other product ledger the machine arbiter
 // (machine.sqlite `ledgers`) registered. A registered ledger counts only while its

@@ -44,4 +44,4 @@ returns: "{ok:true, workflowId, bridged, closed, deliveries, pending:[{messageId
 refuses:
   - workflow-unknown
 usedBy: "drive.wait when status frontier is worker-question: bridge, read each question, then answer
-  with api reply"
+  with starci kernel reply"

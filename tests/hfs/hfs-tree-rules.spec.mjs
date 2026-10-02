@@ -1,4 +1,4 @@
-// The tree checks of `hfs check` that read file content or configuration (scripts/hfs/rules): R06 plaintext secrets, R10 the
+// The tree checks of `starci app check` that read file content or configuration (scripts/hfs/rules): R06 plaintext secrets, R10 the
 // .starcistacks shape, R13 the canon steps of CI and pre-push, R14 dependency version skew, R23 the contract snapshot, R47 the
 // test topology, and R52 / R59 / R60 the front-end wire, i18n placement and catalog. Each has a violating and a passing tree
 // and the finding names its rule's code; the clean app of tests/helpers/hfs-cli-fixture.mjs, checked at its root, is the passing one.

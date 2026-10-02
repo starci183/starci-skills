@@ -1,4 +1,4 @@
-# The contract of `api logs` (scripts/kernel/verbs/logs.mjs). One file per extension verb
+# The contract of `starci kernel logs` (scripts/kernel/verbs/logs.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.logs (lane slim-04).
 group: kernel
 verb: logs
@@ -42,7 +42,7 @@ reads: "the ledger's logs table, after syncing it: the ledger events past the lo
   job's patch (from <patch>.json, diffRef <patch>.json#<path>) and one render / video / trace per
   indexed image / video / Playwright trace with its subkind). An op job that settles without its own
   step.start, step.end and a cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING
-  (WARN, never a refusal; api status logTypedMissing)"
+  (WARN, never a refusal; starci kernel status logTypedMissing)"
 writes: the logs and log_cursors tables only (the derived and ingested rows, idempotent by src),
   through the buffered log writer; no other ledger table
 returns:

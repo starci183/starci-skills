@@ -1,0 +1,23 @@
+group: connect
+verb: telegram
+owner: runtime
+summary: deliver and maintain owner Telegram notifications
+impl: {script: scripts/connectors/telegram.mjs}
+positional:
+  - {name: action, enum: [notify, sweep, discover-chat, test], required: true, variadic: false}
+flags:
+  - {name: discover-chat, type: boolean}
+  - {name: ledger, type: string}
+  - {name: repo, type: string}
+  - {name: workflow, type: string}
+  - {name: dispatch, type: string}
+exit: {"0": action completed, "1": Telegram delivery failed, "2": bad usage or configuration}
+json: always
+examples:
+  - starci connect telegram discover-chat
+  - starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/connectors/telegram.mjs
+  - node .claude/scripts/connectors/telegram.mjs

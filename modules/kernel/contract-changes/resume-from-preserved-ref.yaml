@@ -26,7 +26,7 @@ paths:
   - modules/ops/ops/code.refactor.yaml
   - modules/ops/registry.yaml
   - modules/kernel/driver-loop.yaml
-  - modules/kernel/api-commands/graph-edit.yaml
+  - modules/cli/commands/kernel/graph-edit.yaml
   - modules/kernel/failure-codes.yaml
   - tests/kernel/canon-slice-wire.spec.mjs
   - tests/kernel/cut-seam-stub.spec.mjs

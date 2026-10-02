@@ -7,24 +7,24 @@ packages, declared exports, re-export barrels, static `import()` calls, and
 string-literal `require()` calls. It reports architectural evidence; it does
 not promote current code into the standard.
 
-It runs inside `hfs lint` (the ESLint canon's project-graph rules and `hfs check`), which the op gate runs over a
+It runs inside `starci app lint` (the ESLint canon's project-graph rules and `starci app check`), which the op gate runs over a
 slice's changed files:
 
 ```sh
-node scripts/gates/gate.mjs --root <app> --changed <files...>
+starci gate run --root <app> --changed <files...>
 ```
 
 on its own:
 
 ```sh
-node scripts/hfs/architecture.mjs <app>/be [--base <commit>]
-node scripts/hfs/architecture.mjs <app>/fe [--base <commit>]
+starci runtime architecture <app>/be [--base <commit>]
+starci runtime architecture <app>/fe [--base <commit>]
 ```
 
 and programmatically via `checkArchitecture({ repositoryRoot, base })`
 from `scripts/hfs/architecture.mjs`.
 
-The checker is the HFS architecture machine: it is driven by the app root's `hfs.json` (the side's view of it) and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/hfs/slots.mjs`). An app carries only `hfs.json`; owners, roots and tiers are derived from slots, and a side imports nothing of the app outside itself except the declared `sides.fe.reads` (`ARCH_INTERNAL_IMPORT_OUTSIDE`). `hfs check` runs it over each side folder. See the HFS machine section below.
+The checker is the HFS architecture machine: it is driven by the app root's `hfs.json` (the side's view of it) and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/hfs/slots.mjs`). An app carries only `hfs.json`; owners, roots and tiers are derived from slots, and a side imports nothing of the app outside itself except the declared `sides.fe.reads` (`ARCH_INTERNAL_IMPORT_OUTSIDE`). `starci app check` runs it over each side folder. See the HFS machine section below.
 
 The check produces one `starci/architecture-check@1` JSON object. Exit code
 `0` means `ok: true`; exit code `1` means the record contains violations or
@@ -136,7 +136,7 @@ The front-end checks (`scripts/hfs/architecture/{transport-owner,route-files-thi
 24. **Package shape** (`FE_PACKAGE_SHAPE`, R63, `package-shape`): the manifest of every package owner has `scripts.build`, an explicit `exports` map (no `*` or folder subpath) and every export target, `main`, `module`, `types` and `typings` inside `./dist/`. `export *` in the entry, dead exports and package tiers are judged by `ARCH_OWNER_EXPORT_STAR`, `HFS_UNUSED_EXPORT` and the eslint tier rules.
 25. **Client reaches server** (`FE_CLIENT_REACHES_SERVER`, R55, `client-reaches-server`): from every module whose first statement is `"use client"`, over runtime imports (a type-only import vanishes at build and is not followed), no reachable module, the entry included, imports `server-only`, `next/headers`, `next/server`, `next-intl/server`, `node:*` or a Node built-in; the finding sits on the client entry and names the import chain.
 26. **Cross-app duplicate** (`FE_CROSS_APP_DUPLICATE`, R21, `cross-app-duplicate`): two `.ts`/`.tsx` files under different apps whose token-normalised content is equal (comments and whitespace dropped, identifiers kept), of any size and route-tree files included, are one file copied instead of moved to a `packages/<pkg>` slot. A file made only of import and export statements (the thin per-app adapter that re-exports a package symbol) is exempt; JSON catalogs and other non-source files are not judged. `HFS_DUPLICATE_CODE` says "move it to a package" when its two copies sit in different apps.
-27. **Slot file role** (`FE_SLOT_FILE_ROLE`, R94, `fe-slot-allows`): every tracked file of a front-end slot that owns a directory and names `allows` (`fe.route`, `fe.feature`, `fe.components`, `fe.hooks`, `fe.modules.api`) matches a `requires` or `allows` entry of that slot, and a file that sits where the slot expects a folder (`hooks/useX.ts`) is refused; a file no slot owns is `HFS_PATH_NO_SLOT` of `hfs check`.
+27. **Slot file role** (`FE_SLOT_FILE_ROLE`, R94, `fe-slot-allows`): every tracked file of a front-end slot that owns a directory and names `allows` (`fe.route`, `fe.feature`, `fe.components`, `fe.hooks`, `fe.modules.api`) matches a `requires` or `allows` entry of that slot, and a file that sits where the slot expects a folder (`hooks/useX.ts`) is refused; a file no slot owns is `HFS_PATH_NO_SLOT` of `starci app check`.
 28. **Document language** (`HFS_DOC_NOT_ENGLISH`, R96, `doc-language`): every Markdown and YAML document under a side's `docs/`, `src/` and `apps/` (and the runtime's `knowledge/` and `docs/`) is English, code fences included; detection is structural on characters (`scripts/lib/language.mjs`: Vietnamese letters and tone marks, folded to NFC), never a word list. The only exception is YAML data in a slot that carries localized text (a message-catalog slot or an i18n fixtures slot); Markdown is never exempt. The runtime repository runs the same law over its own documents in `npm run check` (`scripts/checks/check-doc-language.mjs`), with declared field-level exceptions (`DECLARED_VIETNAMESE_FIELDS` in `scripts/lib/language.mjs`): the Vietnamese operator fields of `modules/kernel/failure-codes.yaml`, the `vi` field of the `{ vi, en }` op-label catalogue `modules/ops/_labels.yaml`, and the phrase-list keys of the Vietnamese lexicons in `modules/goal/archetypes.yaml`; a Vietnamese value under any other key of those files is still a finding.
 
 

@@ -5,7 +5,7 @@
 // finishes a workflow: settles and worker recovery are the Job controller's, quota probes the Resource controller's,
 // housekeeping the GC controller's, the footprint scan the Host controller's own step.
 //
-//   node scripts/kernel/kernel-watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
+//   starci machine kernel-watchdog --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
 //
 // --once without --repair is the read-only probe: it reports restart-needed / wake-needed and acts on nothing.
 // --repair continues an approved workflow; it never creates one or widens its authority. It reads canonical
@@ -481,7 +481,7 @@ const print = result => {
 
 if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
-    console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
+    console.error('use: starci machine kernel-watchdog --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
   const result = await watchdogTick();

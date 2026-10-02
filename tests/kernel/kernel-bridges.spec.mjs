@@ -72,7 +72,7 @@ const world = (t, { orca = false } = {}) => {
   return { root, repo, api, apiAsync, seed, read, workflow, unit, settleTo, writeOrca };
 };
 
-test('api messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
+test('starci kernel messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
   const w = world(t, { orca: true });
   w.workflow('wf-msg');
   w.seed((l) => {

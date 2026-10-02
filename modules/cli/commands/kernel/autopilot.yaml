@@ -85,7 +85,7 @@ reads: modules/models/runtimes.yaml allocation.autopilot; the workflow's asks, i
 writes: "Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-rulings.yaml). Only
   autopilot-* events, autopilot answer receipts (starci/ask-answer@1, answeredBy autopilot - never
   owner) and supervisor-gate incidents. Without a mode it prints the status autopilot block. --sweep
-  runs what every api status runs (autopilot.mjs autopilotSweep): each pending ask is answered
+  runs what every starci kernel status runs (autopilot.mjs autopilotSweep): each pending ask is answered
   provisionally (draw-review / brand-direction-review whose machine gates pass:
   autopilot-provisional + ask-answered with provisional:true and acceptance {provisional, by:
   autopilot, receipt: <gate evidence>}), answered redraw/revise with the gate findings
@@ -97,7 +97,7 @@ writes: "Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-r
   supervisorGateTimeoutMs defers what it holds (autopilot-deferred); a spent budget opens one
   supervisor-gate holding ['*']; the owner's handover credential checklist answer supersedes the
   credential asks it supplied (autopilot-credentials-supplied). --bundle prints the final review
-  bundle (starci/autopilot-bundle@1, \"backlog awaiting the owner's review\"; also in api survey
+  bundle (starci/autopilot-bundle@1, \"backlog awaiting the owner's review\"; also in starci kernel survey
   --deliveries .autopilot). --checklist prints the ONE end-of-flow credential question
   (provision.ask subject handover-credentials). --set records a per-workflow override
   (autopilot-configured). --defer-to-handover records an owner-only need without an ask. --release
@@ -115,4 +115,4 @@ refuses:
   - "deferral-unknown: --release names no open deferred-to-handover item"
   - "owner-claim-unproven: --reopen needs a handover ask the owner answered"
 usedBy: the Supervisor (fixes, decisions, budgets) and the Kernel (--checklist,
-  --defer-to-handover); api status runs the sweep on every read
+  --defer-to-handover); starci kernel status runs the sweep on every read

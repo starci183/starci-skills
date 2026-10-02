@@ -338,7 +338,7 @@ schemas:
     business:
       question: "Which cells did this audit round inspect, against which accepted draw, and what did it settle?"
       whenNeeded: Every interface.audit leg reads and settles one.
-      whenNot: Not a work/ record; starci validate walks past it as an op payload.
+      whenNot: Not a work/ record; starci runtime validate walks past it as an op payload.
       selectedBy: interface.audit's target.
 
   - id: work/gap@1
@@ -415,7 +415,7 @@ schemas:
     dialect: prose-contract
     subsystem: kernel
     governs: "The api `plan --file` document: {legs:[{op, paths?, notes?}]} — the kernel's derived op chain diffed structurally against the approved goals.json.opChain.legs."
-    binds: "the --file JSON a kernel agent hands to `api plan`"
+    binds: "the --file JSON a kernel agent hands to `starci kernel plan`"
     usedBy: [scripts/kernel/cli.mjs (cmdPlan legs check + plan-derived event), modules/kernel/api.yaml commands.plan]
     business:
       question: "Is the derived plan still the approved op chain — or did it diverge?"
@@ -515,7 +515,7 @@ schemas:
     dialect: prose-contract
     subsystem: kernel
     governs: "The durable Workflow -> Kernel -> Op ownership tree, including stable node ids, semantic edges and distinct agent/provider/model/profile/runtimePool plus Orca Run/Task/Dispatch/terminal runtime references."
-    binds: "the read-only document emitted by `node scripts/kernel/cli.mjs hierarchy --workflow <id>`"
+    binds: "the read-only document emitted by `starci kernel hierarchy --workflow <id>`"
     usedBy:
       - scripts/kernel/cli.mjs (cmdHierarchy projection)
       - modules/kernel/api.yaml (commands.hierarchy)
@@ -711,9 +711,9 @@ schemas:
     usedBy: [scripts/hfs/rules/peer-integrations.mjs]
     business:
       question: "Which runtime peer must an app declare for a driver integration it uses?"
-      whenNeeded: Judging an app root package.json in hfs check (R111), or adding a pair after a boot failure of the same kind.
-      whenNot: Not a pin list and not a statement that an app boots; it names the peer, hfs check proves the declaration.
-      selectedBy: hfs check reads it through scripts/hfs/rules/peer-integrations.mjs.
+      whenNeeded: Judging an app root package.json in starci app check (R111), or adding a pair after a boot failure of the same kind.
+      whenNot: Not a pin list and not a statement that an app boots; it names the peer, starci app check proves the declaration.
+      selectedBy: starci app check reads it through scripts/hfs/rules/peer-integrations.mjs.
 
   - id: starci/canon-pins@1
     file: modules/schemas/canon-pins.schema.yaml
@@ -881,7 +881,7 @@ moduleLocalDocumentKinds:
     governs: "Claim a queued goal, spawn its kernel."
     files: [modules/kernel/start-workflow.yaml]
   - id: starci/module-kernel-verdict@1
-    governs: "What `api settle` accepts and rejects."
+    governs: "What `starci kernel settle` accepts and rejects."
     files: [modules/kernel/verdict-contract.yaml]
 
   - id: starci/supervisor@1
@@ -997,7 +997,7 @@ moduleLocalDocumentKinds:
     files: [modules/host/codex/index.yaml]
 
 gaps:
-  - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
+  - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `starci kernel enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
   - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file;"
 
 coverage:

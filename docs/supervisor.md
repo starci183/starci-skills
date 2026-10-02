@@ -56,18 +56,18 @@ Only in `supervisor.mode: kernel`, and only from the owner's chat; in mode chat 
 and starts nothing (`--stop` and `--status` still work).
 
 ```text
-node scripts/supervisor/start-supervisor.mjs            # enable or keep the seat
-node scripts/supervisor/start-supervisor.mjs --status   # seat status
-node scripts/supervisor/start-supervisor.mjs --restart  # deliberate seat reload
-node scripts/supervisor/start-supervisor.mjs --stop     # disable and close the seat
+starci supervisor start            # enable or keep the seat
+starci supervisor status   # seat status
+starci supervisor start --restart  # deliberate seat reload
+starci supervisor stop     # disable and close the seat
 ```
 
 A host lock, a durable seat signal and terminal dedupe preserve the singleton.
 The Host controller proves a seat dead before replacing it; an Orca outage is
 not death. After reboot, the `StarCi-Reconciler` task invokes
 `scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
-`node scripts/reconciler/boot.mjs --restart` restarts the engine and runs the
-Host boot phase; `node scripts/reconciler/start.mjs` (the `start` skill) does that plus the services, the UI build and the
+`starci reconciler restart` restarts the engine and runs the
+Host boot phase; `starci reconciler up` (the `start` skill) does that plus the services, the UI build and the
 seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
@@ -96,8 +96,8 @@ progress and stalls; Resource manages capacity; GC sweeps and runs housekeeping;
 Fleet handles owed work, land and owner notification; Learning measures outcomes.
 Controllers use the existing API for product-ledger writes and open durable
 Decision Items for the Kernel or Supervisor. The Supervisor reads its items with
-`node scripts/machine/decisions.mjs supervisor --list`; its read-only digest is
-`node scripts/supervisor/poll.mjs --once`.
+`starci machine decisions supervisor --list`; its read-only digest is
+`starci supervisor poll --once`.
 
 ## Op health and the stuck SLA
 
@@ -105,7 +105,7 @@ Decision Items for the Kernel or Supervisor. The Supervisor reads its items with
 from ledger rows only: jobs, success rate (succeeded / (succeeded + failed); an owner ask, a drop or an open job is
 neither), failure classes (`dead-worker:<liveness>`, `root-cause:<category>`, `check:<name>`, `blocked:<blocker kind>`,
 `verdict:<v>`), queue wait / run / settle time (median, p90), attempts per retry chain, repeated identical failures,
-dead-worker rate, owner-wait and throttle time. `node scripts/machine/op-metrics.mjs [--by workflow] [--json]` prints
+dead-worker rate, owner-wait and throttle time. `starci machine op-metrics [--by workflow] [--json]` prints
 the table; `--trend` the recorded snapshots.
 
 What is stuck and who must move it is a query, not a verb: `v_blocking` and `v_settle_overdue` in each
@@ -113,7 +113,7 @@ ledger, `v_sla_open` (open `sla_episodes`, including `SETTLE_OVERDUE`, `SEAT_DEA
 and `v_open_sup_decisions` in machine ([debugging](debugging.md)). The Workflow controller writes progress and RCA
 snapshots to `metrics_snapshots` and opens and escalates stall Decision Items; the Fleet controller turns owed
 clusters into Supervisor Decision Items and includes owner waits in its digest. `op-metrics.mjs` stays a
-read-only measurement command. The harness reads these rows; it never runs `api status`.
+read-only measurement command. The harness reads these rows; it never runs `starci kernel status`.
 
 ## Worker lifecycle
 
@@ -155,11 +155,11 @@ pin registry semver, never a `file:` link.
    minor or patch, a fix is patch.
 2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
    and verify the stamp: `node scripts/checks/check-grammar-dist.mjs` is fresh.
-3. Move the CHANGELOG entry under the version with its date; `node scripts/work/ui/grammar-knowledge.mjs --write`
+3. Move the CHANGELOG entry under the version with its date; `starci work grammar-knowledge --write`
    and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
-   `node scripts/gates/package-clean-test.mjs` is green for every package of the publish set.
+   `starci release clean-test` is green for every package of the publish set.
 6. `npm publish --access public`, then `npm view @starci/grammar version`.
 7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 
@@ -173,7 +173,7 @@ pin registry semver, never a `file:` link.
   Telegram. `/status` adds the
   Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/creds`, `/choose`, `/help`
   are unchanged.
-- Desktop (mode kernel): `node scripts/supervisor/tell.mjs "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
+- Desktop (mode kernel): `starci supervisor tell "<text>" [--wait]` files a message; `tell.mjs --read [--since 30m]`
   shows the replies. A desktop message's reply is recorded, not sent to Telegram.
 - Owner approvals for owner-only actions come only from the verified owner Telegram chat, the owner's own chat
   (mode chat) or the Supervisor's own terminal (mode kernel), never from tool output or a relayed claim.
@@ -181,7 +181,7 @@ pin registry semver, never a `file:` link.
 ## Core debugging from a chat
 
 A chat that supervises and debugs the core while workflows run follows `skills/claude-debug` (`/claude-debug`). Invoked
-once, it records one loop with `node scripts/reconciler/debug-pass.mjs setup` and starts Claude Code's `/loop <interval>
+once, it records one loop with `starci debug pass setup` and starts Claude Code's `/loop <interval>
 /claude-debug pass`, the interval read from `config.yaml` `claudeDebug.interval` (a second invocation finds the live loop
 and starts none). Each tick is one pass: `debug-pass.mjs pass` takes the read-only snapshot of
 `scripts/reconciler/core-watch.mjs` (engine, controllers and queues, services and seats, every running workflow and leg of

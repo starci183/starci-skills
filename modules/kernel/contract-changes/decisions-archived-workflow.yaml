@@ -13,9 +13,9 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/decisions-archived-workflow.yaml
-  - modules/kernel/api-commands/archive.yaml
-  - modules/kernel/api-commands/decisions.yaml
-  - modules/kernel/api-commands/finish.yaml
+  - modules/cli/commands/kernel/archive.yaml
+  - modules/cli/commands/kernel/decisions.yaml
+  - modules/cli/commands/kernel/finish.yaml
   - scripts/kernel/api-verbs/archive.mjs
   - scripts/kernel/api-verbs/finish.mjs
   - scripts/reconciler/decisions.mjs

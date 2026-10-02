@@ -205,15 +205,15 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   assert.equal(r.action,'kernel-woken');
   assert.equal(r.delivered,true);
   assert.deepEqual(sends[0],{terminal:'term_k',text,enter:true});
-  // A seated Kernel job: the wake ends with the seat's identity, which api status (kernel.attempt, kernel.you) proves.
+  // A seated Kernel job: the wake ends with the seat's identity, which starci kernel status (kernel.attempt, kernel.you) proves.
   ledger.enqueueJob({jobId:`kernel-${WF}`,workflowId:WF,kind:'kernel',role:'kernel',status:'running',payload:{hierarchy:{attempt:2}},createdAt:NOW});
   ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_k',`kernel-${WF}`);
   sends.length=0;
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
   // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acked a rev, so it is asked for one full re-read.
   assert.ok(sends[0].text.startsWith(`${text} Runtime rev `),sends[0].text);
-  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then api kernel-ack-rev /);
-  assert.ok(sends[0].text.endsWith(` Runtime wake for Kernel attempt 2 of ${WF}: api status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`));
+  assert.match(sends[0].text,/ Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then starci kernel kernel-ack-rev /);
+  assert.ok(sends[0].text.endsWith(` Runtime wake for Kernel attempt 2 of ${WF}: starci kernel status --workflow ${WF} shows kernel.attempt 2 and kernel.you true on your terminal.`));
 }));
 
 test('the supervisor digest prints the stall findings, one line each, under the workflow lines',async t=>{
@@ -271,7 +271,7 @@ test('a gate naming a record is not released by a peer heads-up while the record
   assert.match(found.find(f=>f.type==='GATE').line,/justified: waits: \.starciwork\/brand\/index\.yaml is absent/);
   const unread=found.find(f=>f.type==='UNREAD-PEER');
   assert.equal(unread.alert,false);
-  assert.match(unread.line,/^UNREAD-PEER wf-todo-app-base-repos-mud7kk5c pm-a34aec2c6891 from wf-todo-app-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read api inbox/);
+  assert.match(unread.line,/^UNREAD-PEER wf-todo-app-base-repos-mud7kk5c pm-a34aec2c6891 from wf-todo-app-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read starci kernel inbox/);
 
   // Acked, the message is no finding at all; the record landing (settled) is what releases the gate.
   ledger.db.prepare("UPDATE inbox SET status='applied',applied_at=? WHERE key='pm-a34aec2c6891'").run(NOW-10*MIN);

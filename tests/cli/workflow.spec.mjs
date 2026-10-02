@@ -18,3 +18,14 @@ test('workflow validation refuses missing required and unknown flags', () => {
   assert.match(err, /missing required option --workflow/);
   assert.equal(main(['workflow', 'start', '--replace'], { catalog, stderr: () => {}, runScript: () => 0 }), 2);
 });
+
+test('workflow assess dispatches repeated repositories through the runtime seam', () => {
+  let call;
+  const code = main(['workflow', 'assess', '--repo', 'one', '--repo', 'two', '--json'], {
+    catalog,
+    runScript: (script, args) => { call = { script, args }; return 0; },
+  });
+  assert.equal(code, 0);
+  assert.match(call.script, /scripts[\\/]goal[\\/]assess\.mjs$/);
+  assert.deepEqual(call.args, ['--repo', 'one', '--repo', 'two', '--json']);
+});

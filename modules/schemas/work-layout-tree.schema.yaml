@@ -353,7 +353,7 @@ $defs:
       - kind
     description: One real render of the layout chain down to this layout, at one breakpoint and theme, with
       the page slot emptied and filled with the key colour (#FF00FF) so its rectangle is measured from the
-      image (`node scripts/work/layout-tree.mjs slot <png>`). A composite places page content into exactly
+      image (`starci work layout-tree slot <png>`). A composite places page content into exactly
       this rectangle of exactly these bytes.
     properties:
       breakpoint:

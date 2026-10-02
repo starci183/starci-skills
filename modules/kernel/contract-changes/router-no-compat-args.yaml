@@ -13,10 +13,10 @@ paths:
   - scripts/kernel/migrate-plan-edges.mjs
   - tests/migrate-plan-edges.spec.mjs
   - scripts/goal/define-goal.mjs
-  - modules/kernel/api-commands/route.yaml
-  - modules/kernel/api-commands/dispatch.yaml
-  - modules/kernel/api-commands/incident.yaml
-  - modules/kernel/api-commands/plan.yaml
+  - modules/cli/commands/kernel/route.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/incident.yaml
+  - modules/cli/commands/kernel/plan.yaml
   - modules/kernel/driver-loop.yaml
   - modules/schemas/goal-plan.yaml
   - tests/plan-edges.spec.mjs

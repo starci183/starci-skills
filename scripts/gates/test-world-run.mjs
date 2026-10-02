@@ -4,7 +4,7 @@
 //
 //   starci gate test-world --root <app> --project e2e|integration|contract [--tests <path pattern>] [--out <file>]
 //
-// Over the app at --root it records, and `api settle` re-reads (scripts/kernel/gate-settle.mjs):
+// Over the app at --root it records, and `starci kernel settle` re-reads (scripts/kernel/gate-settle.mjs):
 //   harness  the be jest config is @starci/jest-preset's starciJestConfig() (its world projects run on the preset's world
 //            runner: up to min(--maxWorkers, slots) files at once, each in a fresh process on its own data slot) and the world
 //            declaration be/src/tests/world/test-world.config.ts

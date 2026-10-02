@@ -1,5 +1,5 @@
 // The op loop (knowledge/op-gate.yaml, contract change op-gate-loop): every code-writing op READs (read-digest.mjs), CODEs, forces
-// scripts/gates/gate.mjs, FIXes up to params.gateRounds and REPORTs with gate.json and read-digest.json attached; `api settle`
+// scripts/gates/gate.mjs, FIXes up to params.gateRounds and REPORTs with gate.json and read-digest.json attached; `starci kernel settle`
 // re-reads both (scripts/kernel/gate-settle.mjs) and refuses a done that is red, could not run a tool, or skipped READ. The gate
 // blocks only findings the op's base does not have, measured read-only, and its MERGE GUARD refuses a merge that took the lane
 // side over main (merge 9958cce38).
@@ -34,7 +34,7 @@ function hfsStub(t, findings = []) {
 }
 
 /**
- * An app in the monorepo shape `hfs scaffold app` makes (built by hand: the scaffold is not on main yet) - one root
+ * An app in the monorepo shape `starci app scaffold` makes (built by hand: the scaffold is not on main yet) - one root
  * package.json and hfs.json of kind app, a be/ side and an fe/ app - committed on main, with a lane branch checked out. The
  * published canons are installed under node_modules (ignored), as the registry installs them; the gate judges that install.
  */
@@ -280,7 +280,7 @@ function seedOp(t, { label, gate, digest, op = 'test.author' }) {
 const settle = (repo, jobId) => { const r = spawnSync(process.execPath, [API, 'settle', '--repo', repo, '--job', jobId, '--verdict', 'pass', '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 }); let body = null; try { body = JSON.parse(r.stdout); } catch { /* judged below */ } return { r, body }; };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
 
-test('api settle refuses a done on a new lint finding, a new tsc error or a skipped READ; accepts findings that only pre-exist on base', (t) => {
+test('starci kernel settle refuses a done on a new lint finding, a new tsc error or a skipped READ; accepts findings that only pre-exist on base', (t) => {
   const cases = [
     ['lint', gateDoc(LINT_NEW), digestDoc(), 'op-gate-new-findings'],
     ['tsc', gateDoc(TSC_NEW), digestDoc(), 'op-gate-new-findings'],

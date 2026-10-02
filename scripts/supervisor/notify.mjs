@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // starci supervisor notify — the [Supervisor]'s notice to one workflow's Kernel (a ruling, a "fixed by <sha>, resolve inc-...",
 // a disposition). Since lane rc-decisions (reconciler DESIGN §10.2) the notice is a durable Decision Item, never text
-// typed into the Kernel terminal: it opens a `supervisor-ruling` DI in the product ledger through `api decisions --open
+// typed into the Kernel terminal: it opens a `supervisor-ruling` DI in the product ledger through `starci kernel decisions --open
 // --by supervisor` (text = the notice; it supersedes the Kernel's live DIs on the same entity) and rings the doorbell
 // (scripts/machine/decisions.mjs ringDoorbell: one fixed line, only when the seat reads turn-idle).
 //

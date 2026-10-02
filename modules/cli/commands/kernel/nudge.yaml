@@ -83,7 +83,7 @@ returns: "{ok:true,jobId,nudged:true|false,action?:wake|submit-staged-input|answ
   the job with reconcile --dead-worker."
 refuses:
   - "agent-exited (field `reason`, exit 1): the worker's agent exited - before the send (nothing
-    typed) or under it (typed:true, a shell received the text); run api reconcile --job <id>
+    typed) or under it (typed:true, a shell received the text); run starci kernel reconcile --job <id>
     --dead-worker"
   - job-unknown: no jobs row for --job
   - job-not-operation: only an operation job has a worker terminal to wake
@@ -94,10 +94,10 @@ refuses:
       allowlisted host dialog is answered instead (action answer-gate)
   - worker-state-unknown: liveness is neither turn-idle nor live-idle — weak observation never authorizes input
   - worker-wedged: the worker's turn ran past the wedge threshold on one command with no output; a wake
-      would land behind a turn that never ends - run api reconcile --job <id> --dead-worker
+      would land behind a turn that never ends - run starci kernel reconcile --job <id> --dead-worker
       --settle-failed
   - worker-gate-loop: the host dialog the runtime answered maxPerAttempt times on this attempt is back
-      (liveness gate-loop); another answer is an endless continue - run api reconcile --job <id>
+      (liveness gate-loop); another answer is an endless continue - run starci kernel reconcile --job <id>
       --dead-worker --settle-failed (Esc closes the dialog before the agent is quit), and a repeat
       on the retry reads as a retry-loop finding
   - foreign-input: the input row (or the input box draft Orca reports, inputSource draft) holds

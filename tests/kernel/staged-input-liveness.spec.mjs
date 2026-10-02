@@ -14,7 +14,7 @@ import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../../script
 // command-terminal worker (a backend.scaffold cut) sat 13+ minutes with its pasted contract text still in the input row and no
 // work. The contract says "Running", "Working" and "esc to interrupt", so the whole-screen activity test
 // read the frame `active`: dispatch's awaitSubmission called the paste submitted, status said active, and
-// `api nudge` skipped it as worker-active. A staged, unsubmitted paste is never `active`: the classifier
+// `starci kernel nudge` skipped it as worker-active. A staged, unsubmitted paste is never `active`: the classifier
 // finds the input region by the text the runtime sent and only the rows above it can prove a turn, and
 // nudge submits a staged paste with one Enter-only send.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -30,7 +30,7 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const PREAMBLE=[
   '[Op] code.refactor - dispatched Task preamble and operation contract.',
   'Running the declared checks yourself is part of this contract.',
-  '• Working rules: file exactly one api report and end your turn.',
+  '• Working rules: file exactly one starci kernel report and end your turn.',
   'Never press esc to interrupt a long check; report the tokens you spent.',
 ].join('\n');
 const INLINE_PASTE=['Devin','',`> ${PREAMBLE.split('\n')[0]}`,...PREAMBLE.split('\n').slice(1).map(l=>`  ${l}`)].join('\n');

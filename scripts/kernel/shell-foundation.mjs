@@ -55,7 +55,7 @@ export function layoutChainVerdicts(repo, bindings) {
       if (typeof ui?.route !== 'string') { verdicts.push({ record, unknown: 'the ui record declares no route' }); continue; }
       const shell = readShellRecord(workRoot);
       if (!shell || shell.error) { verdicts.push({ record, unknown: 'no readable shell record' }); continue; }
-      if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - node scripts/work/layout-tree.mjs convert --work <.starciwork> --write`] }] }); continue; }
+      if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - starci work layout-tree scan --work <.starciwork> --write`] }] }); continue; }
       const resolved = appOfUi(shell.record, ui);
       if (resolved.error) { verdicts.push({ record, unknown: `${resolved.error.code}: ${resolved.error.message}` }); continue; }
       const tree = resolved.tree;

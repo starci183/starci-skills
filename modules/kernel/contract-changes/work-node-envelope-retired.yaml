@@ -22,8 +22,8 @@ paths:
   - modules/schemas
   - modules/models/kinds.yaml
   - modules/ops/ops/review.verify.yaml
-  - modules/kernel/api-commands/dispatch.yaml
-  - modules/kernel/api-commands/settle.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/settle.yaml
   - scripts/kernel/prerequisites.mjs
   - scripts/kernel/verify-failure.mjs
   - modules/kernel/contract-changes/work-node-envelope-retired.yaml

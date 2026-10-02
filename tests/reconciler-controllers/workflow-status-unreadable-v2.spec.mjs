@@ -9,7 +9,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 // Follow-up of 11a66bc49. Seen live on a product repo:
 // 1) the runtime-defect:<wf>:status-unreadable DI (decider supervisor) was opened in the PRODUCT ledger,
 //    so `decisions.mjs supervisor --list` never showed it; it belongs in the supervisor ledger.
-// 2) ctx.status mapped every failed spawn to null: the finding said 'no value (api status timed out, exited non-zero or
+// 2) ctx.status mapped every failed spawn to null: the finding said 'no value (starci kernel status timed out, exited non-zero or
 //    printed no JSON)'. The real cause: cli.mjs status REFUSED plan-edges-missing on two product workflows -
 //    exit 1, its {ok:false,error} JSON on STDERR, stdout empty. The read now names it.
 
@@ -27,7 +27,7 @@ function seed(ledger) {
 const settings = (over = {}) => ({ resyncMs: 120_000, concurrency: 2, routes: [], decisionDueMs: 15 * MIN, askRepark: { liveness: new Set(), minIntervalMs: 0 },
   graceMs: 5 * MIN, supervisorGraceMs: 30 * MIN, orphanedFrontierMs: 30 * MIN, revAckMs: 30 * MIN, goalMs: 0, supervisorGateMs: 360 * MIN, stuckSla: {}, statusUnreadablePasses: 3, ...over });
 
-/** A real createCtx (the read path under test) whose api status child is `spawn`; decisions and logs recorded. */
+/** A real createCtx (the read path under test) whose starci kernel status child is `spawn`; decisions and logs recorded. */
 function realCtx({ repoRoot, ledgerFile, spawn }) {
   const stateFile = path.join(path.dirname(repoRoot), 'machine.sqlite');
   const env = { ...process.env, STARCI_SUPERVISOR_HOME: path.join(path.dirname(repoRoot), 'sup'), [TEST_REGISTRY_ENV]: stateFile };
@@ -42,12 +42,12 @@ function realCtx({ repoRoot, ledgerFile, spawn }) {
   return { ctx, rec };
 }
 
-test('statusFailureOf names the cause of a failed api status spawn: refusal on stderr, timeout, exit code, no JSON', () => {
+test('statusFailureOf names the cause of a failed starci kernel status spawn: refusal on stderr, timeout, exit code, no JSON', () => {
   const refused = statusFailureOf(refusedSpawn());
   assert.equal(refused.cause, 'refused');
   assert.equal(refused.code, 1);
   assert.equal(refused.refusal, 'plan-edges-missing');
-  assert.match(refused.error, /^api status refused \(exit 1\): plan-edges-missing/);
+  assert.match(refused.error, /^starci kernel status refused \(exit 1\): plan-edges-missing/);
 
   const timedOut = statusFailureOf({ ok: false, code: null, value: null, stdout: '', stderr: '', timedOut: true }, { timeoutMs: 120_000 });
   assert.equal(timedOut.cause, 'timeout');

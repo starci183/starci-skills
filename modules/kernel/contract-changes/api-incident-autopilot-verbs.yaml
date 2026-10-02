@@ -6,5 +6,5 @@ paths:
   - scripts/kernel/api-verbs/incident.mjs
   - scripts/kernel/api-verbs/autopilot.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/incident.yaml
-  - modules/kernel/api-commands/autopilot.yaml
+  - modules/cli/commands/kernel/incident.yaml
+  - modules/cli/commands/kernel/autopilot.yaml

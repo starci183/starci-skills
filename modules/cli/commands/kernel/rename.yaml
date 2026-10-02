@@ -1,4 +1,4 @@
-# The contract of `api rename` (scripts/kernel/verbs/rename.mjs). One file per extension verb
+# The contract of `starci kernel rename` (scripts/kernel/verbs/rename.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.rename (lane slim-api).
 group: kernel
 verb: rename
@@ -45,7 +45,7 @@ writes: "The human name of a workflow (owner request 2026-09-27); the owner or t
   characters) and appends one workflow-renamed event {from, to, slug, by, at}; workflow_id and the
   goal slug in workflows.title never change, so every key, job id, peer message and ledger reader is
   unaffected. The name reads everywhere a person sees the workflow (scripts/lib/display-names.mjs):
-  the [Kernel] tab title, the [Op] worker titles `<op label> · <what> · <name>`, api status title,
+  the [Kernel] tab title, the [Op] worker titles `<op label> · <what> · <name>`, starci kernel status title,
   the supervisor digest and progress report, Telegram notices and the harness UI. After the write,
   unless --no-terminals or the workflow is finished or archived, the live tabs are renamed best
   effort through the host terminal-rename call: the Kernel terminal to `[Kernel] <name>` and each

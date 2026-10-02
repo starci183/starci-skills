@@ -39,7 +39,7 @@ src/
     platform/<capability>/          # composition, config, errors, logging, clock, cqrs, database, ... each with its port and injector
     integrations/<provider>/        # index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
   tests/{world,fixtures,integration,e2e,contract}/   # world/ (the only infrastructure: global-setup, useTestWorld, fakes/<provider>/), integration/<capability>/, e2e/<area>/, contract/<provider>/
-contracts/<app>/schema.graphql      # opt-in committed contract (hfs emit-contracts); the front end reads it in place
+contracts/<app>/schema.graphql      # opt-in committed contract (starci app emit); the front end reads it in place
 ```
 
 Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` folder exists under `src/modules` or `src/features`. Within a capability create only what it owns: one `index.ts` at the root, `<c>.module.ts` and `<c>.module-definition.ts` when it registers providers, `<c>.config.ts` and `<c>.options.ts` when it is configured, `<c>.decorators.ts` for its injectors, `<c>.log-events.ts`, `errors/`, `messages/`, `persistence/`, services, policies, contracts and colocated service specs.
@@ -129,6 +129,6 @@ Configuration, startup, readiness, liveness and deployment ownership follow [run
 
 ## What enforcement proves
 
-`node scripts/hfs/architecture.mjs <repository>` resolves actual imports and checks the tier direction matrix, feature isolation, acyclic owners, thin app source roles, declared package exports, feature composition, transport placement and mechanically decidable filename and declaration forms. Unknown roles and dynamic decorator or name expressions are unavailable coverage rather than accepted exceptions. The eslint canon (`@starci/eslint-canon-be`) is type-aware: it identifies a receiver by its declared type and the slot of its declaration, never by a variable name or a path pattern. These are separate results, not a combined certificate of correctness.
+`starci runtime architecture <repository>` resolves actual imports and checks the tier direction matrix, feature isolation, acyclic owners, thin app source roles, declared package exports, feature composition, transport placement and mechanically decidable filename and declaration forms. Unknown roles and dynamic decorator or name expressions are unavailable coverage rather than accepted exceptions. The eslint canon (`@starci/eslint-canon-be`) is type-aware: it identifies a receiver by its declared type and the slot of its declaration, never by a variable name or a path pattern. These are separate results, not a combined certificate of correctness.
 
 Static analysis cannot prove cohesive ownership, complete public API design, DI identity, resource authorization, transaction isolation, idempotency, crash recovery or remote fencing. Those require the e2e world, contract tests, database-concurrency tests and failure-injection tests with evidence against the exact source and contract revision. Do not create all test categories for a pure helper; select them from actual effects and invariants. Missing proof is an explicit finding, not an inferred pass. Consuming this standard changes runtime guidance; it neither rewrites existing approvals nor marks stale product evidence current.

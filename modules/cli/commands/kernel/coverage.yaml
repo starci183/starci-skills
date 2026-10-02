@@ -1,4 +1,4 @@
-# The contract of `api coverage` (scripts/kernel/verbs/coverage.mjs). One file per extension verb
+# The contract of `starci kernel coverage` (scripts/kernel/verbs/coverage.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.coverage (lane slim-04).
 group: kernel
 verb: coverage
@@ -42,5 +42,5 @@ returns:
   errors: "[{record, error}] — a ui record whose proof cases could not be listed"
 refusals:
   workflow-unknown: no workflows row for --workflow
-usedBy: handover.review (its package lists what is not proven) and api report, which refuses a
+usedBy: handover.review (its package lists what is not proven) and starci kernel report, which refuses a
   handover ask while a must-have is missing or stale; the ui reads it

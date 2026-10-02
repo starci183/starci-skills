@@ -2,7 +2,7 @@
 // starci debug run core-watch — one READ-ONLY snapshot of the StarCi core: every fact, every open alert, then exit.
 //
 //   starci debug run core-watch [--json]
-//     [--child-timeout <sec>]    timeout of every child call (api status, services --list), default 90
+//     [--child-timeout <sec>]    timeout of every child call (starci kernel status, services --list), default 90
 //     [--token-window <min>]     llm_usage window for the token-spike fact, default 10
 //     [--token-spike <n>]        input+output tokens in that window that raise TOKENS, default 3000000 (0 disables)
 //
@@ -11,7 +11,7 @@
 //   SERVICE   harness-ui local and public /healthz, harness-tunnel, ask-gateway, ask-tunnel, telegram-bridge, orca, every seat
 //   WORKFLOW  per non-finished workflow of EVERY registered active ledger (no hard-coded ids): phase, legs turning
 //             failed/blocked/cancelled, wedged / dead-worker / stale-operation / stuck jobs, open owner asks
-//   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `api usage` verb)
+//   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `starci kernel usage` verb)
 //   LEDGER    a registered ledger whose state directory or every source root is gone (hk-orphan-ledgers)
 //   WORKTREE  per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`: more than
 //             claudeDebug.worktreeLimit worktrees, a tree whose directory is gone, or a tree carrying the runtime's
@@ -162,7 +162,7 @@ async function workflowFacts(o) {
     let r = await ask();
     let j = parse(r);
     if (!j) { r = await ask(); j = parse(r); }
-    if (!j) { facts.set(`${k}:status`, `api status failed 2x (${r.error ?? 'no json'})`); return; }
+    if (!j) { facts.set(`${k}:status`, `starci kernel status failed 2x (${r.error ?? 'no json'})`); return; }
     facts.set(`${k}:status`, null);
     const f = j.frontier ?? {};
     for (const leg of j.legs ?? []) {

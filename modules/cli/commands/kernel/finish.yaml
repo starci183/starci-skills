@@ -44,7 +44,7 @@ handoverGate: "A workflow is done only when the owner approved its handover. Bef
   (scripts/kernel/handover.mjs handoverGateOf). A chain approved before handover.review existed is
   held to the same gate: the kernel appends the leg (driver-loop.yaml handoverLoop). The one
   existing exit without an approval is a workflow the owner archived (workflows.archived_at, set
-  only by api archive); no flag bypasses the gate. finished_json and the workflow-finished event
+  only by starci kernel archive); no flag bypasses the gate. finished_json and the workflow-finished event
   carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
   finished finishes again idempotently without the gate."
 returns: "{ok:true, workflowId, phase:finished, inboxClosed:<n>, incidentsClosed:<n>,

@@ -81,7 +81,7 @@ AGENT_ORCA_WORKTREE:
   causes_vi:
     - "Op workspace.manage hoặc runtime.operate tự gọi lệnh xoá worktree của Orca để dọn một worktree"
     - "Agent tự tạo worktree Orca để làm việc riêng"
-  nextStep_vi: "Lệnh không được chạy; xem worktree bằng node scripts/machine/worktrees.mjs counts, việc tạo và xoá đi qua API worktree của runtime; nhu cầu không tự đáp được thì báo blocked environment."
+  nextStep_vi: "Lệnh không được chạy; xem worktree bằng starci machine worktrees counts, việc tạo và xoá đi qua API worktree của runtime; nhu cầu không tự đáp được thì báo blocked environment."
   owner: op-retry
   kind: verb-refusal
 
@@ -215,7 +215,7 @@ ARCH_KNOWLEDGE_UNAVAILABLE:
   meaning_vi: "Bộ kiểm kiến trúc cần một tệp tri thức đi kèm (danh sách tệp gốc do framework ghim) nhưng không đọc được hoặc sai khuôn, nên không phán xét bằng hợp đồng khác."
   causes_vi:
     - "Bản đóng gói của `hfs` thiếu hoặc hỏng tệp tri thức, hoặc tệp tri thức trong runtime bị sửa sai khuôn."
-  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node scripts/hfs/sync-runtime.mjs`."
+  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `starci release sync-runtime`."
   owner: runtime-core
   kind: check-finding
 
@@ -1980,7 +1980,7 @@ EFFECT_UNKNOWN_STUCK:
   causes_vi:
     - "Tiến trình chết đúng lúc đang ghi hoặc đẩy thay đổi"
     - "Hệ thống bên ngoài không phản hồi nên chưa xác nhận được"
-  nextStep_vi: "Runtime tự chạy đối soát (api reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
+  nextStep_vi: "Runtime tự chạy đối soát (starci kernel reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
 
@@ -3134,7 +3134,7 @@ KERNEL_ORCA_CHECK:
   meaning_vi: "Lệnh orca orchestration check từ cửa sổ Kernel bị chặn: cờ --ack sẽ xác nhận và tiêu thụ tin nhắn trước khi sổ ghi kịp lưu lại, nên tin nhắn có thể mất."
   causes_vi:
     - "Kernel làm theo thông báo của Orca bảo chạy orca orchestration check"
-  nextStep_vi: "Lệnh không được chạy; Kernel đọc tin nhắn bằng api messages và câu hỏi bằng api questions, runtime tự xử lý hộp thư."
+  nextStep_vi: "Lệnh không được chạy; Kernel đọc tin nhắn bằng starci kernel messages và câu hỏi bằng starci kernel questions, runtime tự xử lý hộp thư."
   owner: op-retry
   kind: verb-refusal
 
@@ -3299,7 +3299,7 @@ LEASE_STUCK:
   causes_vi:
     - "Worker chưa khởi động được"
     - "Tiến trình nhận việc bị chết sau khi nhận"
-  nextStep_vi: "Bộ điều phối tự chạy api reconcile để dọn công việc kẹt và đưa nó về hàng chờ."
+  nextStep_vi: "Bộ điều phối tự chạy starci kernel reconcile để dọn công việc kẹt và đưa nó về hàng chờ."
   owner: runtime-core
   kind: runtime-fault
 
@@ -3321,7 +3321,7 @@ LEDGER_LEGACY_WORK_SQLITE:
   causes_vi:
     - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
     - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (node scripts/housekeeping/ledger-hygiene.mjs, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (starci runtime ledger-hygiene, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
   owner: owner
   kind: check-finding
 
@@ -3332,7 +3332,7 @@ LEDGER_ORPHAN_STATE_ROOT:
   causes_vi:
     - "Một probe hoặc script debug tạo repo dùng một lần dưới thư mục tạm mà không đặt STARCI_LOCAL_ROOT trước khi đăng ký sổ ledger"
     - "Repo nguồn của sổ ledger đã bị xóa hoặc di chuyển mà không retire sổ ledger tương ứng"
-  nextStep_vi: "node scripts/housekeeping/ledger-hygiene.mjs --apply (hoặc node scripts/housekeeping/housekeeping.mjs --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
+  nextStep_vi: "starci runtime ledger-hygiene --apply (hoặc starci runtime housekeeping --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
   owner: owner
   kind: check-finding
 
@@ -3663,7 +3663,7 @@ PACKAGE_INSTALL_RED:
   causes_vi:
     - "package.json và package-lock.json của gói lệch nhau, npm ci từ chối"
     - "Một phụ thuộc khai báo không tồn tại hoặc không phân giải được trên npm registry"
-  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại node scripts/gates/package-clean-test.mjs."
+  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại starci release clean-test."
   owner: runtime-core
   kind: check-finding
 
@@ -3686,7 +3686,7 @@ PACKAGE_PROOF_UNRUN:
     - "Không gọi được npm, hoặc mạng không tới được npm registry"
     - "Thư mục tạm nằm dưới một thư mục có node_modules, nên bản cài không còn sạch"
     - "Hết thời gian cài hoặc chạy bài kiểm tra"
-  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại node scripts/gates/package-clean-test.mjs."
+  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại starci release clean-test."
   owner: runtime-core
   kind: check-finding
 
@@ -4633,7 +4633,7 @@ RT_GENERATED_DRIFT:
   causes_vi:
     - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
     - "Sửa tay một tệp trong thư mục runtime/ của gói"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
+  nextStep_vi: "Người giám sát chạy starci release sync-runtime rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
   owner: supervisor
   kind: check-finding
 
@@ -6339,7 +6339,7 @@ WORKER_START_STUCK:
   causes_vi:
     - "Terminal hoặc agent không mở được"
     - "Máy quá tải nên khởi động chậm"
-  nextStep_vi: "Bộ điều phối coi worker đã chết và chạy api reconcile --dead-worker để bỏ lượt khởi chạy rồi dựng lại."
+  nextStep_vi: "Bộ điều phối coi worker đã chết và chạy starci kernel reconcile --dead-worker để bỏ lượt khởi chạy rồi dựng lại."
   owner: runtime-core
   kind: runtime-fault
 
@@ -6451,7 +6451,7 @@ agent-exited:
   causes_vi:
     - "Agent bị lỗi hoặc bị đóng"
     - "Agent tự thoát sau khi hết lượt"
-  nextStep_vi: "Không gõ gì vào terminal; trạng thái báo worker chết và api reconcile --dead-worker sẽ khôi phục việc."
+  nextStep_vi: "Không gõ gì vào terminal; trạng thái báo worker chết và starci kernel reconcile --dead-worker sẽ khôi phục việc."
   owner: runtime-core
   kind: verb-refusal
 agent-unknown:
@@ -6648,7 +6648,7 @@ autopilot-provision-deferred:
   meaning_vi: "Chế độ tự lái không mở câu hỏi cấp phát giữa chừng nên việc này bị hoãn tới lúc bàn giao."
   causes_vi:
     - "Op cần thông tin hoặc khóa từ chủ sở hữu ngay giữa quy trình"
-  nextStep_vi: "Enqueue bị từ chối; tiếp tục bằng đường sandbox hoặc stub và ghi nhu cầu bằng api autopilot --defer-to-handover."
+  nextStep_vi: "Enqueue bị từ chối; tiếp tục bằng đường sandbox hoặc stub và ghi nhu cầu bằng starci kernel autopilot --defer-to-handover."
   owner: op-retry
   kind: dispatch-refusal
 bad-attempt:
@@ -6697,7 +6697,7 @@ budget-exhausted:
   causes_vi:
     - "Đã dùng hết số lượt, token hoặc thời gian được cấp"
     - "Nhiều việc cùng giữ chỗ ngân sách"
-  nextStep_vi: "Việc mới không được giữ chỗ; Supervisor hoặc chủ sở hữu quyết định nới ngân sách (api autopilot --extend-budget)."
+  nextStep_vi: "Việc mới không được giữ chỗ; Supervisor hoặc chủ sở hữu quyết định nới ngân sách (starci kernel autopilot --extend-budget)."
   owner: supervisor
   kind: blocker
 budget-invalid:
@@ -6743,7 +6743,7 @@ canon-slice-no-fix-target:
   meaning_vi: "Các thay đổi của lát cắt canon này đang được giữ ở nơi khác nên không có chỗ để sửa."
   causes_vi:
     - "Kế hoạch canon đã đổi sau khi cắt"
-  nextStep_vi: "Enqueue bị từ chối; cắt lại lát cắt bằng api graph-edit --edit scan rồi cắt lại."
+  nextStep_vi: "Enqueue bị từ chối; cắt lại lát cắt bằng starci kernel graph-edit --edit scan rồi cắt lại."
   owner: supervisor
   kind: dispatch-refusal
 canon-slice-unknown:
@@ -6854,7 +6854,7 @@ check-run-missing:
   title_vi: "Check đã khai chưa có lần chạy được lưu"
   meaning_vi: "Số check worker khai không khớp với số lần chạy check đã được lưu."
   causes_vi:
-    - "Chưa gọi api check cho đủ các check"
+    - "Chưa gọi starci kernel record-checks cho đủ các check"
     - "Có check bị bỏ sót"
   nextStep_vi: "Bộ chốt không chốt được; ghi đủ check còn thiếu rồi chốt lại."
   owner: op-retry
@@ -6922,7 +6922,7 @@ checks-needed:
   meaning_vi: "Việc đã có báo cáo nhưng chưa có kết quả kiểm tra hợp lệ nên chưa thể chốt."
   causes_vi:
     - "Worker nộp báo cáo mà chưa chạy hoặc chưa ghi check"
-  nextStep_vi: "Bộ điều phối mở mục quyết định; ghi check cho việc (api check) rồi chốt lại."
+  nextStep_vi: "Bộ điều phối mở mục quyết định; ghi check cho việc (starci kernel record-checks) rồi chốt lại."
   owner: supervisor
   kind: blocker
 checks-not-green:
@@ -8080,7 +8080,7 @@ job-not-dispatched:
   meaning_vi: "Việc chưa từng chạy nên không có lượt làm nào để chốt."
   causes_vi:
     - "cố chốt một việc còn đang xếp hàng"
-  nextStep_vi: "Lệnh settle bị từ chối; nếu không cần việc này thì bỏ nó bằng api reconcile --drop."
+  nextStep_vi: "Lệnh settle bị từ chối; nếu không cần việc này thì bỏ nó bằng starci kernel reconcile --drop."
   owner: supervisor
   kind: verb-refusal
 job-not-editable:
@@ -8359,7 +8359,7 @@ link-stuck:
   causes_vi:
     - "Một tiến trình còn giữ thư mục liên kết"
     - "Quyền truy cập trên Windows chặn việc gỡ"
-  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
+  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy starci machine worktrees gc."
   owner: runtime-core
   kind: runtime-fault
 live-not-on-main:
@@ -8488,7 +8488,7 @@ main-checkout-damaged:
   causes_vi:
     - "Một liên kết trong worktree trỏ vào checkout chính và bị đi xuyên qua"
     - "Có người sửa checkout chính đúng lúc GC chạy"
-  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy node scripts/machine/worktrees.mjs resume."
+  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy starci machine worktrees resume."
   owner: supervisor
   kind: runtime-fault
 main-moving:
@@ -8584,11 +8584,11 @@ no-hooks-path:
 no-dispatch:
   title: "The observed op holds no Orca Dispatch, so its output cannot be read"
   title_vi: "Việc được quan sát không giữ Dispatch Orca nào nên không đọc được đầu ra"
-  meaning_vi: "api observe đọc đầu ra của thợ theo Dispatch (worker-read); việc này chỉ có cửa sổ mà không có Dispatch nên phần output để trống, trạng thái lượt vẫn được báo."
+  meaning_vi: "starci kernel observe đọc đầu ra của thợ theo Dispatch (worker-read); việc này chỉ có cửa sổ mà không có Dispatch nên phần output để trống, trạng thái lượt vẫn được báo."
   causes_vi:
     - "việc được khởi chạy trước khi có Dispatch Orca"
     - "payload của việc mất định danh Dispatch"
-  nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng api status hoặc đợi báo cáo của việc."
+  nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng starci kernel status hoặc đợi báo cáo của việc."
   owner: supervisor
   kind: runtime-fault
 no-job:
@@ -8675,7 +8675,7 @@ orca-worktree-rm-failed:
   causes_vi:
     - "Orca chưa chạy hoặc đang khởi động lại"
     - "Một tiến trình còn giữ thư mục của cây"
-  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
+  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy starci machine worktrees gc."
   owner: runtime-core
   kind: runtime-fault
 no-typescript:
@@ -8757,7 +8757,7 @@ orchestration-check-failed:
   causes_vi:
     - "Orca đang khởi động lại hoặc đang tự cập nhật (runtime_unavailable)"
     - "Lệnh xác nhận (--ack) sau khi ghi sổ không tới được Orca"
-  nextStep_vi: "Không cần làm gì: lần api status, api questions hoặc api messages kế tiếp đọc lại lô đó và không ghi trùng. Nếu lỗi kéo dài, kiểm tra Orca có đang chạy không."
+  nextStep_vi: "Không cần làm gì: lần starci kernel status, starci kernel questions hoặc starci kernel messages kế tiếp đọc lại lô đó và không ghi trùng. Nếu lỗi kéo dài, kiểm tra Orca có đang chạy không."
   owner: runtime-core
   kind: runtime-fault
 orchestration-consumer-fenced:
@@ -8767,7 +8767,7 @@ orchestration-consumer-fenced:
   causes_vi:
     - "Kernel đã được thay bằng terminal mới và việc gắn lại Run bị từ chối"
     - "Một Run cũ của workflow nay thuộc về coordinator khác"
-  nextStep_vi: "Xem api status: nếu Kernel vừa được thay, lần đọc sau sẽ gắn lại Run của nó; nếu đó là Run cũ, tin trên Run đó cần người có quyền coordinator đọc."
+  nextStep_vi: "Xem starci kernel status: nếu Kernel vừa được thay, lần đọc sau sẽ gắn lại Run của nó; nếu đó là Run cũ, tin trên Run đó cần người có quyền coordinator đọc."
   owner: runtime-core
   kind: runtime-fault
 orchestration-no-kernel-terminal:
@@ -9071,7 +9071,7 @@ path-held-by-other-workflow:
   meaning_vi: "Đường dẫn muốn thêm đang thuộc phạm vi của một luồng công việc khác nên bị từ chối."
   causes_vi:
     - "Hai luồng cùng nhắm vào một file"
-  nextStep_vi: "Không thêm đường dẫn. Nhắn luồng kia (api notify) hoặc chờ nó xong, không được lấy đường dẫn của nó."
+  nextStep_vi: "Không thêm đường dẫn. Nhắn luồng kia (starci kernel notify) hoặc chờ nó xong, không được lấy đường dẫn của nó."
   owner: supervisor
   kind: verb-refusal
 grant-parent-missing:
@@ -9195,7 +9195,7 @@ peer-message-unknown:
   causes_vi:
     - "Sai mã tin nhắn"
     - "Tin thuộc luồng khác"
-  nextStep_vi: "Không có gì thay đổi. Kiểm tra lại mã tin trong hộp thư (api inbox) rồi thử lại."
+  nextStep_vi: "Không có gì thay đổi. Kiểm tra lại mã tin trong hộp thư (starci kernel inbox) rồi thử lại."
   owner: supervisor
   kind: verb-refusal
 peer-not-running:
@@ -9341,9 +9341,9 @@ progress-unreadable:
   title_vi: "Không đọc được khối tiến độ"
   meaning_vi: "Lệnh giao việc hàng loạt không lấy được số liệu tiến độ nên không biết còn chỗ giao bao nhiêu job."
   causes_vi:
-    - "api status không trả về khối progress"
+    - "starci kernel status không trả về khối progress"
     - "Lỗi hoặc quá thời gian khi gọi status"
-  nextStep_vi: "Lệnh bị từ chối, không giao gì. Thử lại sau; nếu lặp lại thì cần xem lại api status."
+  nextStep_vi: "Lệnh bị từ chối, không giao gì. Thử lại sau; nếu lặp lại thì cần xem lại starci kernel status."
   owner: runtime-core
   kind: runtime-fault
 prompt-stuck:
@@ -9910,7 +9910,7 @@ scan-not-canon:
   meaning_vi: "Lệnh cắt lại theo bản quét chỉ dùng cho lát canon, nhưng lát này không có canonFamilies."
   causes_vi:
     - "Nhầm sang lát của loại việc khác"
-  nextStep_vi: "Lệnh bị từ chối; cắt lại phải đi qua op work.author bằng api redesign."
+  nextStep_vi: "Lệnh bị từ chối; cắt lại phải đi qua op work.author bằng starci kernel redesign."
   owner: other-op:work.author
   kind: verb-refusal
 scan-root-unknown:
@@ -10029,7 +10029,7 @@ settle-backlog:
   causes_vi:
     - "Kernel bỏ qua các job đã báo cáo"
     - "Job chờ quá lâu chưa ai quyết"
-  nextStep_vi: "Kernel phải chốt các job đó trước (api settle hoặc chạy lại kiểm tra) rồi mới làm tiếp."
+  nextStep_vi: "Kernel phải chốt các job đó trước (starci kernel settle hoặc chạy lại kiểm tra) rồi mới làm tiếp."
   owner: op-retry
   kind: verb-refusal
 settle-nongreen:
@@ -10185,7 +10185,7 @@ tests-deferred:
   meaning_vi: "Job kiểm thử bị huỷ vì chủ dự án đã tắt loại kiểm thử này trong cấu hình."
   causes_vi:
     - "config.yaml đặt specs unit hoặc e2e là false"
-  nextStep_vi: "Job được ghi là hoãn, các bước sau vẫn chạy; sau này api run-deferred-tests xếp lại."
+  nextStep_vi: "Job được ghi là hoãn, các bước sau vẫn chạy; sau này starci kernel run-deferred-tests xếp lại."
   owner: owner
   kind: settle-reason
 tick-items:
@@ -10204,7 +10204,7 @@ tool-unavailable:
   causes_vi:
     - "Chọn tay model thiếu công cụ"
     - "Tuyến chọn cũ"
-  nextStep_vi: "Lệnh giao bị từ chối, job vẫn chờ; chạy api route lại để chọn agent có công cụ rồi giao lại."
+  nextStep_vi: "Lệnh giao bị từ chối, job vẫn chờ; chạy starci kernel route lại để chọn agent có công cụ rồi giao lại."
   owner: op-retry
   kind: dispatch-refusal
 tree-update-failed:
@@ -10279,7 +10279,7 @@ unit-overlaps-failed-unit:
   meaning_vi: "Việc mới trùng phạm vi với đơn vị đã thất bại nên sẽ làm ngân sách thử bị làm mới."
   causes_vi:
     - "Tạo job mới thay vì thử lại đơn vị cũ"
-  nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua api graph-edit."
+  nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua starci kernel graph-edit."
   owner: op-retry
   kind: verb-refusal
 unit-unknown:
@@ -10523,7 +10523,7 @@ managed-unproven:
   causes_vi:
     - "worker-release bị Orca từ chối hoặc không trả lời lần đầu và lần lặp lại"
     - "Dispatch vẫn do Orca giữ (retained)"
-  nextStep_vi: "Job giữ nguyên trạng thái settled; api reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
+  nextStep_vi: "Job giữ nguyên trạng thái settled; starci kernel reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
   owner: runtime-core
   kind: settle-reason
 worker-died-no-report:
@@ -10567,8 +10567,8 @@ worker-question:
   owner: op-retry
   kind: blocker
 worker-done-unsent:
-  title: "api report could not send the op's worker_done"
-  title_vi: "api report không gửi được worker_done của op"
+  title: "starci kernel report could not send the op's worker_done"
+  title_vi: "starci kernel report không gửi được worker_done của op"
   meaning_vi: "Báo cáo của op đã được ghi vào ledger, nhưng lệnh Orca gửi worker_done từ terminal của op bị từ chối hoặc không có kết quả, nên Orca chưa đóng Task và Dispatch của op."
   causes_vi:
     - "Orca không phản hồi hoặc từ chối người gửi không phải terminal được giao Dispatch"
@@ -10665,7 +10665,7 @@ workflow-checkpoint-failed:
 workflow-finish-dirty:
   title: "The workflow worktree has work no checkpoint carries"
   title_vi: "Worktree còn phần việc chưa có checkpoint"
-  meaning_vi: "api finish không đưa workflow vào main khi worktree còn tệp chưa nằm trong checkpoint nào."
+  meaning_vi: "starci kernel finish không đưa workflow vào main khi worktree còn tệp chưa nằm trong checkpoint nào."
   causes_vi:
     - "Một op chưa chốt"
     - "Có tệp được sửa tay trong worktree"
@@ -10929,7 +10929,7 @@ workflow-work-record-not-owner:
   meaning_vi: "Settle từ chối vì op đã sửa một hồ sơ .starciwork mà một workflow khác đang sống sở hữu; chỉ workflow chủ được commit hồ sơ (trên nhánh workflow của nó), các workflow khác thấy hồ sơ khi chủ đưa vào main."
   causes_vi:
     - "Op viết vào hồ sơ dùng chung của một foundation, scope hoặc cut thuộc workflow khác"
-  nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng api notify --kind request."
+  nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng starci kernel notify --kind request."
   owner: op-retry
   kind: settle-reason
 workflow-worktree-missing:
@@ -12478,7 +12478,7 @@ sonar-proof-missing:
   causes_vi:
     - "Op chưa chạy sonar-local scan"
     - "Quét không dùng --wait nên chỉ mới gửi đi"
-    - "Tệp sonar.json không được đính kèm vào api report"
+    - "Tệp sonar.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy sonar-local scan --wait trên phần code đã sửa và đính kèm sonar.json khi nộp report."
   owner: op-retry
   kind: settle-reason
@@ -12489,8 +12489,8 @@ op-gate-proof-missing:
   meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/gates/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
   causes_vi:
     - "Op chưa chạy gate.mjs sau khi viết code"
-    - "Tệp gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
+    - "Tệp gate.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
   owner: op-retry
   kind: settle-reason
 
@@ -12524,7 +12524,7 @@ op-read-digest-missing:
   meaning_vi: "Report không đính kèm bản tóm tắt ĐỌC (read-digest.json, schema starci/read-digest@1): không có bằng chứng op đã đọc tệp pattern, ví dụ và bản đồ slot trước khi viết code."
   causes_vi:
     - "Op viết code ngay mà không chạy scripts/gates/read-digest.mjs"
-    - "Tệp read-digest.json không được đính kèm vào api report"
+    - "Tệp read-digest.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy read-digest.mjs --touch <tệp> --out read-digest.json, đọc đúng các tệp nó liệt kê, kiểm lại code theo đó rồi nộp lại kèm read-digest.json."
   owner: op-retry
   kind: settle-reason
@@ -12532,7 +12532,7 @@ op-read-digest-missing:
 op-read-digest-no-pattern:
   title: "The READ digest names no pattern for a touched file kind"
   title_vi: "Bản tóm tắt ĐỌC thiếu tệp pattern cho loại tệp đã sửa"
-  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà hfs explain trả về)."
+  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà starci app explain trả về)."
   causes_vi:
     - "Op sửa thêm tệp ngoài danh sách --touch lúc đọc"
     - "Bản tóm tắt được tạo cho slice khác"
@@ -12557,8 +12557,8 @@ op-doc-gate-missing:
   meaning_vi: "Op viết tài liệu, knowledge hoặc bản ghi Work nhưng report không đính kèm gate.json hồ sơ docs (gate.mjs --profile docs), nên runtime không chấm được tài liệu."
   causes_vi:
     - "Op chưa chạy gate.mjs --profile docs sau khi viết"
-    - "Tệp doc-gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
+    - "Tệp doc-gate.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
   owner: op-retry
   kind: settle-reason
 
@@ -12590,8 +12590,8 @@ op-test-world-proof-missing:
   meaning_vi: "Op e2e hoặc integration không đính kèm test-world-run.json (schema starci/test-world-run@1), nên runtime không biết bộ test đã chạy trên test world thật hay chưa."
   causes_vi:
     - "Op chạy jest trực tiếp mà không qua scripts/gates/test-world-run.mjs"
-    - "Tệp test-world-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/test-world-run.mjs --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
+    - "Tệp test-world-run.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate test-world --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -12623,8 +12623,8 @@ op-unit-proof-missing:
   meaning_vi: "unit.verify không đính kèm unit-run.json (schema starci/unit-run@1), nên runtime không chấm được độ phủ từng service và cách dựng spec."
   causes_vi:
     - "Op chạy npm test trực tiếp mà không qua scripts/gates/unit-run.mjs"
-    - "Tệp unit-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/unit-run.mjs --root <app> --out unit-run.json và đính kèm khi nộp."
+    - "Tệp unit-run.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate unit --root <app> --out unit-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -12667,7 +12667,7 @@ op-lint-proof-missing:
   meaning_vi: "Op bảo mật hoặc giao diện không đính kèm lint.json (schema starci/lint@1) do starci app lint --format json in ra, nên runtime không chấm được các luật canon."
   causes_vi:
     - "Op chưa chạy starci app lint ở gốc app"
-    - "Tệp lint.json không được đính kèm vào api report"
+    - "Tệp lint.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy starci app lint --format json ở gốc app, lưu lint.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
@@ -12700,7 +12700,7 @@ op-security-findings-missing:
   meaning_vi: "security.verify đính kèm lint.json nhưng không đính kèm security-findings.json (schema starci/security-findings@1) liệt kê từng lỗi theo luật; danh sách rỗng khi không có lỗi."
   causes_vi:
     - "Op chỉ viết kết luận dạng văn bản"
-    - "Tệp security-findings.json không được đính kèm vào api report"
+    - "Tệp security-findings.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op ghi security-findings.json với từng lỗi (rule, code, path, line, severity, reachability) rồi nộp lại."
   owner: op-retry
   kind: settle-reason
@@ -12722,7 +12722,7 @@ op-review-defects-missing:
   meaning_vi: "review.verify không đính kèm review-defects.json (schema starci/review-defects@1) liệt kê mọi lỗi tìm thấy kèm loại business hay non-business; danh sách rỗng khi không có lỗi."
   causes_vi:
     - "Op chỉ viết kết luận dạng văn bản"
-    - "Tệp review-defects.json không được đính kèm vào api report"
+    - "Tệp review-defects.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op ghi review-defects.json với từng lỗi, loại và check đã bắt được (hoặc missingCheck) rồi nộp lại."
   owner: op-retry
   kind: settle-reason
@@ -12754,8 +12754,8 @@ op-release-proof-missing:
   meaning_vi: "release.deliver publish hoặc deploy không đính kèm release-proof.json (schema starci/release-proof@1) do scripts/gates/release-proof.mjs in ra."
   causes_vi:
     - "Op phát hành mà không chạy release-proof.mjs"
-    - "Tệp release-proof.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/release-proof.mjs --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
+    - "Tệp release-proof.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci release proof --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -13943,7 +13943,7 @@ HFS_DOCKER_SECRETS:
 RT_RETIRED_CLI_CALL:
   title: "A removed CLI command is still invoked"
   title_vi: "Một lệnh CLI đã bị gỡ vẫn được gọi"
-  meaning_vi: "Một file được theo dõi gọi lệnh đã bị CLI thống nhất gỡ (starci api, node scripts/kernel/cli.mjs, hfs, starci-test-stack, starci init/update/doctor/version/validate/check/start/goal ở cấp cao nhất); chỉ được gọi starci <group> <verb> mới."
+  meaning_vi: "Một file được theo dõi gọi lệnh đã bị CLI thống nhất gỡ (starci api, starci kernel, hfs, starci app stack, starci runtime install/update/doctor/version/validate/check/start/goal ở cấp cao nhất); chỉ được gọi starci <group> <verb> mới."
   causes_vi:
     - "Vi phạm luật R197: tài liệu, prompt hoặc code còn chép cách gọi cũ."
   nextStep_vi: "Đổi lời gọi sang lệnh thay thế mà bộ kiểm tra in ra (dòng use starci <group> <verb>) rồi chạy lại kiểm tra."
@@ -13985,7 +13985,7 @@ RT_CLI_VERB_PARITY:
 RT_CLI_APP_ONLY_TEMPLATES:
   title: "Managed app template invokes the wrong CLI"
   title_vi: "Template ứng dụng gọi sai bề mặt CLI"
-  meaning_vi: "Template do StarCi quản lý hoặc bản sao runtime đã sinh gọi lệnh hfs cũ, starci-test-stack, hoặc một nhóm starci không phải app; repository sản phẩm chỉ được gọi starci app <verb>."
+  meaning_vi: "Template do StarCi quản lý hoặc bản sao runtime đã sinh gọi lệnh hfs cũ, starci app stack, hoặc một nhóm starci không phải app; repository sản phẩm chỉ được gọi starci app <verb>."
   causes_vi:
     - "Vi phạm luật R200: mọi hành động sản phẩm trong template phải đi qua CLI thống nhất starci app."
   nextStep_vi: "Đổi lời gọi thành starci app <verb>, sinh lại các bản sao runtime và chạy lại kiểm tra."

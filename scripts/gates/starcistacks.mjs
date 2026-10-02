@@ -14,7 +14,7 @@
 //
 //   --new          the repository is being created by this leg (interface.scaffold, backend.scaffold,
 //                  package.scaffold): a missing declaration or services block is refused, not a suspect
-//   --admitted-at  the leg's admission (api op-contract --json admission.admittedAt): finding codes a
+//   --admitted-at  the leg's admission (starci kernel op-contract --json admission.admittedAt): finding codes a
 //                  contract change added after it are suspects for that leg (modules/kernel/contract-changes.yaml)
 //
 // Refusals: an unknown or ambiguous service declaration, custody that is missing where it is declared,
@@ -502,7 +502,7 @@ const USAGE = 'Usage: starci gate starcistacks <repo-root> [--new] [--admitted-a
 
 export async function checkStarciStacksMain(argv = []) {
   const admitted = await admittedCodes(argv);
-  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (api op-contract --json admission.admittedAt)\n' };
+  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (starci kernel op-contract --json admission.admittedAt)\n' };
   const rest = argv.filter((_, index) => !admitted.drop.includes(index));
   const args = rest.filter((arg) => !['--json', '--new'].includes(arg));
   if (args.includes('--help') || args.includes('-h')) return { exitCode: 0, text: USAGE };

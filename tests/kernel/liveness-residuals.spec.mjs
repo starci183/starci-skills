@@ -15,7 +15,7 @@ test('a Codex status row with its tree detail, or a held message, is a running t
   // A captured Codex op blocked in `orca orchestration ask`.
   const waiting = ['• Ran node shell-conformance.mjs .starciwork/features/sales/ui/workbench', '  └   REFUSED ui.sales.workbench binds no shell',
     '• Waiting for background terminal (2m 30s • esc to interrupt) · 3 background terminals running · /ps to view · /stop to…',
-    '  └ orca orchestration ask --from term_7427743e --question "L\u1ec7nh api op-contract cho job op…', ...CODEX_FOOT];
+    '  └ orca orchestration ask --from term_7427743e --question "L\u1ec7nh starci kernel op-contract cho job op…', ...CODEX_FOOT];
   assert.equal(classifyAgentScreen(waiting.join('\n')).state, 'active');
   assert.equal(classifyAgentScreen(['• Waiting for background terminal (18m 10s • esc to interrupt) · 1 background terminal running', '  └ npm run test:e2e', ...CODEX_FOOT].join('\n')).state, 'active');
   const held = ['• Working (4m 47s • esc to interrupt) · 2 background terminals running', '',
@@ -32,8 +32,8 @@ test('a Claude spinner above a wrapped tip, a folded todo list, a long todo list
   assert.equal(classifyAgentScreen(folded.join('\n')).state, 'active', 'a todo list folded into "… +3 pending"');
   const long = ['✽ Reading owned records… (2m · ↓ 3k tokens)', '  ⎿  ☒ step 0', ...Array.from({ length: 11 }, (_, i) => `     ☐ step ${i + 1}`), ...CLAUDE_CHROME];
   assert.equal(classifyAgentScreen(long.join('\n')).state, 'active', 'the spinner above a todo list longer than the 14-row window');
-  const queued = ['✢ Concocting… (running PostToolUse hook · 2m 57s)', '', '> Wake: re-read the exact contract with api op-contract, continue only inside its',
-    '  existing authority, and file exactly one api report.', '', '────────', '❯ ', '────────', '  Press up to edit queued messages'];
+  const queued = ['✢ Concocting… (running PostToolUse hook · 2m 57s)', '', '> Wake: re-read the exact contract with starci kernel op-contract, continue only inside its',
+    '  existing authority, and file exactly one starci kernel report.', '', '────────', '❯ ', '────────', '  Press up to edit queued messages'];
   assert.equal(classifyAgentScreen(queued.join('\n')).state, 'active', 'a wake queued behind the turn');
   assert.equal(classifyAgentScreen(['✻ Manifesting… (15s · ↓ 677 tokens)', '', ...CLAUDE_CHROME].join('\n')).state, 'active');
 });

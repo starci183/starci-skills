@@ -25,7 +25,7 @@ removed:
   - node scripts/kernel/cli.mjs consume-report
 reads: the reports row for the job's dispatch_id
 writes: reports.consumed_at = now — the kernel has read and integrated the report into its view of
-  the frontier. The kernel consumes BEFORE it re-runs checks and settles; `api settle` enforces
+  the frontier. The kernel consumes BEFORE it re-runs checks and settles; `starci kernel settle` enforces
   consumption at the latest by marking the row itself — a report that never gets consumed is a
   dispatch that never settled.
 returns: "{ok:true, jobId, workflowId, dispatchId, consumed} — consumed:false when no unconsumed

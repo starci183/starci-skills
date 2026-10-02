@@ -1,6 +1,6 @@
 // architecture.mjs — the architecture check (docs/architecture-check.md).
 //
-//   node scripts/hfs/architecture.mjs <repo-root> [--base <commit>]
+//   starci runtime architecture <repo-root> [--base <commit>]
 //
 // Prints one starci/architecture-check@1 record. Exit 0: ok. Exit 1: violations or errors (a check that
 // cannot run is an error, never a pass). Exit 2: bad arguments.
@@ -11,7 +11,7 @@ import { isMain } from '../lib/is-main.mjs';
 
 export {checkArchitecture};
 
-const USAGE = 'usage: architecture.mjs <repo-root> [--base <commit>]';
+const USAGE = 'usage: starci runtime architecture <repo-root> [--base <commit>]';
 
 export function parseArchitectureArgs(argv) {
   let root = null, base;

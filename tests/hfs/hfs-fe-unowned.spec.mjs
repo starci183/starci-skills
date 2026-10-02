@@ -5,7 +5,7 @@ import path from 'node:path';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
 import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
-// Every front-end file is owned by a slot and named by it: a file no slot owns is HFS_SLOT_UNDECLARED (`hfs check`), a file its
+// Every front-end file is owned by a slot and named by it: a file no slot owns is HFS_SLOT_UNDECLARED (`starci app check`), a file its
 // slot does not name is FE_SLOT_FILE_ROLE (the machine), a retired name is HFS_FORBIDDEN_PRESENT. All are errors. The app is checked
 // at its root, so every path is app-relative (fe/...).
 const made = [];

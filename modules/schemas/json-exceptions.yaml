@@ -16,10 +16,10 @@ directories:
       (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
   - path: examples/ecommerce-app/be/contracts/billing
     reason: >
-      The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
+      The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
   - path: examples/ecommerce-app/be/contracts/order
     reason: >
-      The vendored async contract of the order service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
+      The vendored async contract of the order service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
   - path: examples/ecommerce-app/fe/packages/ecommerce-api
     reason: >
       npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
@@ -103,7 +103,7 @@ exceptions:
       npm package manifest of the ecommerce-app root; the npm toolchain requires JSON.
   - path: examples/ecommerce-app/turbo.json
     reason: >
-      The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+      The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
   - path: examples/shape-slot/apps/shape-slot/package.json
     reason: npm package manifest for the shape-slot example app; the npm toolchain requires JSON.
   - path: examples/shape-slot/apps/shape-slot/src/modules/i18n/messages/vi.json

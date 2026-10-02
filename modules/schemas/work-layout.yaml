@@ -60,7 +60,7 @@ shape:
     whose `proves` names a record that is not itself `state: done` is refused (PROVES_TARGET_NOT_DONE) -
     proof cannot outrun what it proves."
   uat: features/<feature>/uat/<name>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql} - see uatFlow
-    below; a run is agent data (uat.verify files it with api report, the flow's evidence.yaml cites it).
+    below; a run is agent data (uat.verify files it with starci kernel report, the flow's evidence.yaml cites it).
   contract: features/<feature>/contract/<name>/index.yaml, schema work/contract@1 - a synchronous
     request/response surface between a provider feature and a consumer feature; provenBy.provider/consumer
     each name the implementation(s) that proved their half.
@@ -119,7 +119,7 @@ shape:
     - uat/<flow>/runs/<runId>/**, ui/<screen>/assets/**/draw-loop/** rounds, features/<feature>/operations/**
     - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/
     - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (a workflow's one worktree is created and owned by Orca outside the app checkout)
-    - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
+    - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with starci kernel report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
       the implementation record's assets[] cites {artifact?, name, role, sha256}; layout captures and lockups are blobs

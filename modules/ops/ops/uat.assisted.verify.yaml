@@ -126,12 +126,12 @@ steps:
       - environment
     writes: [evidence]
     action:
-      en: "Environment pre-step, before any setup or walk. api dispatch already ran node
+      en: "Environment pre-step, before any setup or walk. starci kernel dispatch already ran node
         scripts/uat/env-health.mjs check --restart on the environments this flow's records reference and
         put the result in the packet (context.environment). Re-run it yourself - node
         scripts/uat/env-health.mjs check --repo <ledger repo> --paths <owned paths as JSON> --json - and
         record it in report.checks as name env-health with its exit code (0 ready, 3 not ready). A service
-        that is down is started ONLY through node scripts/uat/env-health.mjs serve --repo <ledger repo>
+        that is down is started ONLY through starci gate env-health serve --repo <ledger repo>
         --env <id> --service <name> --cwd <checkout> --url <probe> -- <start command>, which registers it so
         the next pre-step restarts it itself; never kill a process env-health reports as port-conflict. A
         probe-drift row means the declared probe path is stale while the service is up: walk, and name the
@@ -229,7 +229,7 @@ steps:
         cleanup. Pass requires all of them; human ok contributes nothing to the predicate. Run
         validators, file the standard op report and stop. Keep canonical Work todo and unchanged for
         the later full-chain final reconciliation; do not call automatic uat.verify, self-dispatch a
-        repair or write ledger SQL. The operation files its evidence through api report and signals
+        repair or write ledger SQL. The operation files its evidence through starci kernel report and signals
         second; it never writes runtime.sqlite or accepts runner/human output as the kernel verdict.
   - reads: [environment, scripts]
     writes: [evidence]

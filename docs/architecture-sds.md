@@ -88,7 +88,7 @@ delivery. It does not prescribe controllers, handlers, repositories, method name
 
 ## Review and completion
 
-Validate with `node bin/starci.mjs validate <work-root>`. Structural validity proves only internal
+Validate with `starci runtime validate <work-root>`. Structural validity proves only internal
 shape and traceability. Review checks that significant business branches reach logical components and
 observable outcomes, contract and data ownership is unambiguous and material edge cases have selected
 mechanisms. Implementation separately maps actual source to these ids and proves conformance.

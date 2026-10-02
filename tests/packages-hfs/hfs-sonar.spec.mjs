@@ -186,7 +186,7 @@ const scratch = () => {
   return dir;
 };
 
-test('the superseded Sonar commands are gone, not aliased: hfs check --sonar and hfs report are refused', async () => {
+test('the superseded Sonar commands are gone, not aliased: starci app check --sonar and hfs report are refused', async () => {
   const out = scratch();
   const violating = repo(APP, (dir) => fs.appendFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.host.url=https://sonar.example.org\n'));
   assert.equal((await cli(['check', '--cwd', violating, '--sonar', path.join(out, 'x.json')], PRESETS)).code, 2, 'app check --sonar is gone');

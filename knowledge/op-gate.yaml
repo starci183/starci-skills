@@ -5,12 +5,12 @@ schema: starci/op-gate@1
 #   scripts/gates/gate.mjs          the one gate the op forces every round (its base is the workflow's previous checkpoint,
 #                                    the merge-base with main for the first op) and the workflow's finish runs over the
 #                                    whole branch against main's merge-base
-#   scripts/kernel/gate-settle.mjs   re-reads the attached gate JSON and READ digest at `api settle` and refuses a done that
+#   scripts/kernel/gate-settle.mjs   re-reads the attached gate JSON and READ digest at `starci kernel settle` and refuses a done that
 #                                    is red, could not run, or skipped READ
 # The round bound is each op's `params.gateRounds`; nothing here restates it.
 purpose: >-
   The loop an op runs: READ only what the slice needs (the pattern files of the file kinds it will touch, the example files of
-  the same slots, the slot map of its folders from `hfs explain`), CODE, FORCE THE CHECKS with gate.mjs, FIX and repeat up to
+  the same slots, the slot map of its folders from `starci app explain`), CODE, FORCE THE CHECKS with gate.mjs, FIX and repeat up to
   params.gateRounds rounds, REPORT with the gate JSON and the READ digest attached. Still red after the last round is
   `blocked` with the exact findings; `done` while red is refused at settle. The op works in its workflow's one worktree
   (serially with the other ops of its side, in parallel with the other side); the gate's base is the previous
@@ -39,11 +39,11 @@ digest:
   schema: starci/read-digest@1
   attach: read-digest.json
 # The example app whose files show each slot done right, per side. A slot's example files are the files of the example side
-# that its `hfs explain` pattern matches.
+# that its `starci app explain` pattern matches.
 examples:
   be: examples/ecommerce-app/be
   fe: examples/ecommerce-app/fe
-# File kind -> pattern files. A touched file's kind is the slot `hfs explain` names; its family is the slot id's first
+# File kind -> pattern files. A touched file's kind is the slot `starci app explain` names; its family is the slot id's first
 # segment. It owes the family's `always` files plus those of the longest dotted slot prefix listed under `slots`.
 # Paths are relative to knowledge/patterns/.
 kinds:
@@ -125,7 +125,7 @@ kinds:
       app.sops: [repo/secrets.yaml]
       app.plaintext-env: [repo/secrets.yaml]
 # The mechanism proofs of the ops beyond the code loop (contract change op-mechanism-proofs, owner 2026-10-01). Every op named
-# under opProofs runs the mechanism its job touches and attaches the document it prints; `api settle` re-reads each document
+# under opProofs runs the mechanism its job touches and attaches the document it prints; `starci kernel settle` re-reads each document
 # itself (scripts/kernel/gate-settle.mjs judgeProofs) and records the runtime check op-proof. An op under both enforcedOps and
 # opProofs owes the code loop AND its proofs. A proof listed with `modes` is owed only by a dispatch whose params.mode is one of
 # them (`select` included, since the request may pick any mode). A test-world proof lists the `projects` whose summary must be
@@ -169,7 +169,7 @@ proofs:
     attach: lint.json
     findings: starci/security-findings@1
     purpose: >-
-      `hfs lint --format json` at the app root plus the op's security-findings.json (starci/security-findings@1, every finding
+      `starci app lint --format json` at the app root plus the op's security-findings.json (starci/security-findings@1, every finding
       by rule): a lint that could not run is never a pass, and every finding of a securityCodes code or securityRules rule must
       appear in the report's findings by rule and path. The verdict may carry findings (they go to a separate repair); it may
       never drop one.
@@ -177,13 +177,13 @@ proofs:
     schema: starci/lint@1
     attach: lint.json
     purpose: >-
-      `hfs lint --format json` at the app root (the FE canon, stylelint and the brand grammar): no finding under fe/ may stand
+      `starci app lint --format json` at the app root (the FE canon, stylelint and the brand grammar): no finding under fe/ may stand
       under a done interface audit, drawing or asset.
   produced-lint:
     schema: starci/lint@1
     attach: lint.json
     purpose: >-
-      `hfs lint --changed <every file the op produced> --format json` at the app root (the FE canon, stylelint, the brand
+      `starci app lint --changed <every file the op produced> --format json` at the app root (the FE canon, stylelint, the brand
       grammar and the app checks over .starciwork records and assets): no finding may stand under a done drawing or asset.
   review-gate:
     schema: starci/gate@1

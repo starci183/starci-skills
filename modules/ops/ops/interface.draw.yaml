@@ -33,8 +33,8 @@ params:
     max: 10
     setBy: owner
     doc:
-      en: "Rounds of FIX then hfs lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
-      vi: "Số vòng SỬA rồi chạy lại hfs lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
+      en: "Rounds of FIX then starci app lint over the files the op produced before it stops: a lint still red after the last round is reported blocked with the exact findings of that round (knowledge/op-gate.yaml proofs.produced-lint)."
+      vi: "Số vòng SỬA rồi chạy lại starci app lint trên các tệp op đã tạo trước khi dừng: hết vòng cuối mà lint vẫn đỏ thì báo blocked kèm đúng các lỗi của vòng đó (knowledge/op-gate.yaml proofs.produced-lint)."
 nodeKinds: [ui]
 completionProfile: ui
 grammarContext: required
@@ -107,7 +107,7 @@ reads:
         component list, anatomy and closed values), the HeroUI styles (@heroui/styles) the components render
         with, and the brand CSS. The dispatch attaches these as packet context.grammar (grammarInputs
         component-source: grammar-source and heroui-styles roles; no capture, no reference render). Which
-        grammar the draw renders with is decided by `node scripts/work/draw-grammar.mjs --product <app dir>
+        grammar the draw renders with is decided by `starci work draw-grammar --product <app dir>
         --file <XBase>.draw.tsx`: the product's install when the draw type-checks against it, else the
         runtime-built claude-dist (an alias scoped to the draw bundle, provenance grammarSource
         claude-dist@<v>, upgradeOwed recorded for interface.implement)."
@@ -140,7 +140,7 @@ writes:
     path: .starciwork/shell/index.yaml
     schema: work/layout-tree@1
     content:
-      en: "The one layout tree, when this op is the workflow that owns the shell foundation (api dispatch claims foundation
+      en: "The one layout tree, when this op is the workflow that owns the shell foundation (starci kernel dispatch claims foundation
         `shell` for the first draw that finds parents to draw; scripts/kernel/shell-foundation.mjs): `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write` rewrites
         it from the frontend's app/, and this op decides each layout's chrome, captures every visible repository layout
@@ -265,8 +265,8 @@ writes:
     path: STARCI_JOB_SCRATCH/lint.json
     schema: starci/lint@1
     content:
-      en: "The hfs lint report of the drawn files (hfs lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
-      vi: "Báo cáo hfs lint của các tệp đã vẽ (hfs lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
+      en: "The starci app lint report of the drawn files (starci app lint --changed <those files> --format json at the app root): the FE canon, stylelint and the brand grammar's checks, every finding with its engine, rule, code, path and line, and the errors of a lint that could not run."
+      vi: "Báo cáo starci app lint của các tệp đã vẽ (starci app lint --changed <các tệp đó> --format json ở gốc app): canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu, từng lỗi kèm engine, luật, mã, đường dẫn và dòng, cùng errors khi lint không chạy được."
 steps:
   - reads:
       - target
@@ -284,7 +284,7 @@ steps:
         drawn, draw the parent - never wait for a separate brand.decide, never invent chrome). Run `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write`
         (with no frontend yet, `layout-tree.mjs plan` the tree from the accepted journeys and SDS) and read the tree. For
-        the record's route, list every layout above it (`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` names each
+        the record's route, list every layout above it (`starci work shell-conformance <ui-record-dir>` names each
         unsettled one). When every one is settled, skip to the next step. Otherwise, in THIS op and before drawing any
         screen: (a) decide each unknown chrome (visible when it draws a rail, bar or frame around its children,
         passthrough when it renders only document, providers or a guard); (b) a layout the frontend already has is
@@ -312,7 +312,7 @@ steps:
         (ui.<feature>.<layout>-layout, so it lives at features/<feature>/ui/<layout>-layout/), with
         `surface: layout` and `route` the layout node id; this op plans and names it when the tree has none
         (`layout-tree.mjs plan --design`). Every layout above the route is settled BY THE END OF THIS OP
-        (`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` judges the result) and is bound by its rev in
+        (`starci work shell-conformance <ui-record-dir>` judges the result) and is bound by its rev in
         shell.layouts; the layouts this op settled count. The chrome, navigation,
         UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before drawing.
         Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
@@ -340,7 +340,7 @@ steps:
         unchosen ones as evidence. Whatever candidatesPerScreen says, a record another leg waits on - a
         `surface: layout` record drawing a planned layout (its pages and, on a greenfield product, the brand
         lockup wait on it), or a record another record dependsOn - owes the owner ONE review of its drawn
-        parts before it is done: `node scripts/work/draw-review.mjs status --ui <ui-record-dir>` says whether
+        parts before it is done: `starci work draw-review status --ui <ui-record-dir>` says whether
         it is owed. A record already drawn at its current inputs is not redrawn for it: the attempt only
         files the review. Before drawing, classify every visible region by realization:
         use `raster-asset` for authored imagery whose identity depends on rich texture,
@@ -364,11 +364,11 @@ steps:
       en: "Write one exact brief per representative shape and breakpoint from accepted business/SDS,
         brand rules/masters and the resolved Grammar. It carries verbatim, and no number it does not
         carry is invented - a full-width control takes the fill-variant geometry the block gives, never
-        the hug control's: the geometry block `node scripts/work/ui/grammar-geometry.mjs --prompt --repo
+        the hug control's: the geometry block `starci work grammar-geometry --prompt --repo
         <repo>` prints; the applicable proof cases and knowledge/ui values resolved to numbers with their
-        rule ids that `node scripts/work/ui/ui-proof-brief.mjs --surface <ui-record-dir> --repo <repo>`
+        rule ids that `starci work ui-proof-brief --surface <ui-record-dir> --repo <repo>`
         prints; the grammar sources the dispatch attaches (packet context.grammar); and the brand block
-        `node scripts/work/brand/brand-palette.mjs --prompt .starciwork` prints - each chromatic token by role
+        `starci work brand-palette --prompt .starciwork` prints - each chromatic token by role
         with its hex and the rule that primary buttons, links, selected rows, focus rings, active tabs and
         every call to action are the primary hex. It states screen purpose, component regions, shape,
         viewport, accessibility and forbidden treatments, carries the line `Product locale: <default>`,
@@ -389,11 +389,11 @@ steps:
         spacing scale (gap/p/m steps 0 1 2 3 4 6 8 = GAP/PADDING-0..6; grid/flex/order/span); a free spacing
         value is named with its rule id in rationale.json (a spacing|layout decision), anything that paints is
         a grammar component. Hand-written HTML/CSS and storybook or reference screenshots are no longer
-        drawing inputs. Gate it first: `node scripts/work/draw/draw-source.mjs <XBase>.draw.tsx --fixture <json>
+        drawing inputs. Gate it first: `starci work draw-source <XBase>.draw.tsx --fixture <json>
         --product <app dir>` - TypeScript is the first gate (DRAW_TYPECHECK_FAILED: a prop or variant the
         grammar does not publish), then the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
         DRAW_IMPORT_OFF_GRAMMAR, DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE).
-        Render the part from the brief at @2x with `node scripts/work/draw-render.mjs`: the real `XBase`
+        Render the part from the brief at @2x with `starci work draw-render`: the real `XBase`
         with fixtures in the product's CSS (--component <XBase>.draw.tsx --export <XBase> --props
         <fixture.json> --css <product global css> --product <app dir> --out <dir> --viewports <w>x<h>
         [--full-page]); every bare import resolves from the product (read only; a drawing never edits the product
@@ -461,13 +461,13 @@ steps:
         generation, a new pose/composition in the same brand style), request it in asset-request.md
         beside the source (one heading per slot id: purpose, placement, pixel size, format, the brand master it
         references) and record it in ui.artworkSlots[] with status owed (DRAW_ASSET_SLOT_UNDECLARED otherwise;
-        `node scripts/work/asset-slot.mjs list <ui-record-dir>`); settle records each open slot and api status lists it
+        `starci work asset-slot list <ui-record-dir>`); settle records each open slot and starci kernel status lists it
         as assetSlotsOwed[] with an interface.asset leg in nextActions. Anything DNA lacks is a
         grammar proposal - grammar-proposal.md or .yaml beside the source or in its loop directory, each entry with
         its name, the gap in DNA, anatomy, tokens, the knowledge rules it claims and an isolated render
         (scripts/work/grammar-proposal.mjs check) - never invented inline; the owner decides it through the
         draw-review ask. THE DRAW LOOP (owner ruling 2026-09-27): render and judge every shape only through
-        `node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --source <XBase>.draw.tsx --fixture
+        `starci work draw-loop round --ui <ui-record-dir> --source <XBase>.draw.tsx --fixture
         <fixture.json> --product <app dir> --css <product global css> --base <XBase> --state <state> --viewports
         <desktop WxH>,<mobile WxH> --repo <repo>` (the product slot sizes; 1184 and 390 for Nivo): each round
         runs the source gate (draw-source.mjs, with the grammar resolution recorded in round-<n>/grammar.json),
@@ -481,27 +481,27 @@ steps:
         and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix
         the draw source against metrics.json and critique.json and run round again until the loop stops: every metric
         passes and beauty is at least allocation.drawLoop.beautyMin, or maxRounds rounds, or stallRounds rounds
-        in a row without progress. Then `node scripts/work/draw-loop.mjs finish --out <loop dir>` selects the
+        in a row without progress. Then `starci work draw-loop finish --out <loop dir>` selects the
         BEST round, installs its parts beside the source - with <part>.draw.tsx and <part>.fixture.json, the
         accepted draw source interface.implement starts from - and prints the ui.assets entries (generation.loop,
         grammarSource, grammarUpgradeOwed) to record verbatim. The loop lives in STARCI_JOB_SCRATCH/draw-loop (agent data,
         never in .starciwork): finish puts it in the blob store as one bundle that generation.loop {sha256, round} cites,
-        and api report attaches the draw-loop folder by itself, so every round and critique is an artifact of the attempt; outcome blocked means report `blocked` naming its remaining failures and the best
+        and starci kernel report attaches the draw-loop folder by itself, so every round and critique is an artifact of the attempt; outcome blocked means report `blocked` naming its remaining failures and the best
         round, never pass. Never hand-edit a part after finish, never self-score beauty, never skip the
         critic (a round drawn with --no-critic is critiqued by finish; DRAW_CRITIC_MISSING means no critic
         answered - report it, never a score). SELF-CHECK BEFORE EVERY REPORT, whatever its outcome: `node
         scripts/work/draw-gates.mjs --ui <ui-record-dir> --repo <repo> --files <every file report.files names>
-        --checks-out <evidence dir>/draw-gates.checks.json` runs exactly the gates api settle and api check judge
+        --checks-out <evidence dir>/draw-gates.checks.json` runs exactly the gates starci kernel settle and starci kernel record-checks judge
         this pass by - draw-acceptance, the draw-metrics re-measure of every live part, validate --strict,
         shell-conformance and the draw-loop outcome - and prints them as report.checks entries whose red ones name
         the implicated files (`failing`); put those entries in report.checks verbatim and name the checks file in
         report.files. Fix every red gate on your own files and run it again; a red gate whose failing files are
-        Work records outside your owned paths that nothing touched is recorded foreign by api check (not this
+        Work records outside your owned paths that nothing touched is recorded foreign by starci kernel record-checks (not this
         attempt's failure) - report it, never widen your scope to fix it. The owner gate (DRAW_NOT_OWNER_ACCEPTED)
         is never a red gate: with every machine gate green, file the draw-review ask. Save the capture as assets/directions/<shape>--<presentation>--<breakpoint>--<theme>.content.png
         beside its exact brief (.prompt.txt) and render source (.content.html), and declare that .html in
         ui.assets and the node assets list so shell-conformance measures its geometry - this part is
-        what the owner reviews - then composite it: `node scripts/work/compose-direction.mjs --ui <ui-record-dir>
+        what the owner reviews - then composite it: `starci work compose-direction --ui <ui-record-dir>
         --content <png> --breakpoint <bp> --theme <theme> --state <shape> --tool draw-render
         [--presentation page|overlay]` places it into the real layout capture - for a layout with
         destinations, the render with the destination the record's route makes active (a bound
@@ -552,13 +552,13 @@ steps:
       - workflow
     writes: [node, evidence, draws]
     action:
-      en: "Validate Work and every artifact hash, run `node scripts/work/ui/shell-conformance.mjs` on every
+      en: "Validate Work and every artifact hash, run `starci work shell-conformance` on every
         ui record directory written, then report the representative parts, briefs,
         actual tool provenance and complete coverage map. Everything shown to the owner - an ask's
         question.assets and picks, the report summary's images, the drawing notice - names the drawn
         parts (desktop and mobile), never a composite; the composites go in files and evidence for
         interface.implement and interface.audit. When `draw-review.mjs status` says the owner review is owed, report outcome `ask`
-        with `question` exactly what `node scripts/work/draw-review.mjs question --ui <ui-record-dir> --job
+        with `question` exactly what `starci work draw-review question --ui <ui-record-dir> --job
         <id> [--lang <owner_language>]` prints - one ask per record, kind draw-review, its question.assets the
         desktop and mobile light shape parts and question.review the record and the part digests the owner is
         shown. Rule (owner rulings 2026-09-27): every drawing is the owner's to accept, never answered
@@ -567,9 +567,9 @@ steps:
         the archetype's reference) or anything else as feedback (a reply to a single image is a note on that image);
         the form (Generate URL) takes a note per image and a golden box too; drawOwnerRulingOf reads from the job's
         ledger lineage whether the owner asked for this drawing (question.ownerRequested), and either way only
-        the owner accepts it. api report refuses a `done` report
+        the owner accepts it. starci kernel report refuses a `done` report
         that leaves one unreviewed (draw-review-owed). When the packet's context.owner_answers holds the answer
-        to that ask, run `node scripts/work/draw-review.mjs apply --ui <ui-record-dir> --receipt <its
+        to that ask, run `starci work draw-review apply --ui <ui-record-dir> --receipt <its
         receipt> --write`: accept writes the record done (verificationSource authored-claim) with
         ui.review.owner naming the receipt and the part digests accepted, which lets layout-tree.mjs settle the
         planned layout and crop the lockup, and promotes the drawing into brand.direction.golden when its
@@ -578,11 +578,11 @@ steps:
         redraw -> until golden') records every note as an owner ruling in ui.review.feedback (serve-ask already
         recorded draw-owner-ruling and draw-redraw-owed in the ledger) and learns each product-direction note
         into brand.direction.learned (proposed); this attempt then REDRAWS the same shapes through the draw loop:
-        its brief .prompt.txt carries `node scripts/work/draw-feedback.mjs brief --ui <ui-record-dir> --shape
+        its brief .prompt.txt carries `starci work draw-feedback brief --ui <ui-record-dir> --shape
         <XBase#state>` verbatim (every open note by its id, and every learned product ruling), the critic's rubric
         gates each note (draw-critic.mjs rubricFor), and a redraw that leaves one unaddressed - the owner's
         rejected bytes, a brief without the note id, or a critic that does not pass it - is DRAW_FEEDBACK_UNADDRESSED
-        (draw-review.mjs question refuses to ask, api report and api settle refuse); `node
+        (draw-review.mjs question refuses to ask, starci kernel report and starci kernel settle refuse); `node
         scripts/work/draw-feedback.mjs check --ui <dir>` says so first. Then ask again; repeat until the owner
         accepts. A note's class (product-direction, grammar, knowledge, one-off) is read from its structure; to
         correct it run `draw-feedback.mjs classify --ui <dir> --note <id> --class <c> --target <x> --by kernel
@@ -617,8 +617,8 @@ steps:
   - reads: [repo, grammar, brand]
     writes: [lint, evidence]
     action:
-      en: "FORCE THE FE CANON over what the draw produced: hfs lint --changed <every .draw.tsx, render source, stylesheet, asset and record file the draw wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks. FIX the drawn files and run it again, at most params.gateRounds rounds; a finding in a file the draw did not write is reported for its owner, never edited here. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
-      vi: "ÉP CHẠY CANON FE trên những gì bản vẽ tạo ra: hfs lint --changed <mọi tệp .draw.tsx, nguồn render, stylesheet, tài sản và bản ghi mà bản vẽ đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu. SỬA các tệp đã vẽ rồi chạy lại, tối đa params.gateRounds vòng; lỗi trong tệp bản vẽ không viết được báo cho chủ sở hữu, không sửa ở đây. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
+      en: "FORCE THE FE CANON over what the draw produced: starci app lint --changed <every .draw.tsx, render source, stylesheet, asset and record file the draw wrote> --format json > $STARCI_JOB_SCRATCH/lint.json at the app root - the FE canon, stylelint and the brand grammar's checks. FIX the drawn files and run it again, at most params.gateRounds rounds; a finding in a file the draw did not write is reported for its owner, never edited here. Still red after the last round: report blocked with the exact findings. Never report done while the lint has a finding or could not run. REPORT with lint.json attached."
+      vi: "ÉP CHẠY CANON FE trên những gì bản vẽ tạo ra: starci app lint --changed <mọi tệp .draw.tsx, nguồn render, stylesheet, tài sản và bản ghi mà bản vẽ đã viết> --format json > $STARCI_JOB_SCRATCH/lint.json ở gốc app - canon FE, stylelint và các kiểm tra của ngữ pháp thương hiệu. SỬA các tệp đã vẽ rồi chạy lại, tối đa params.gateRounds vòng; lỗi trong tệp bản vẽ không viết được báo cho chủ sở hữu, không sửa ở đây. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi. Không bao giờ báo done khi lint còn lỗi hoặc không chạy được. BÁO CÁO kèm lint.json."
 proofs:
   - id: render-provenance
     requirement:
@@ -627,7 +627,7 @@ proofs:
         capture; every raster region is an artworkSlots entry with its exact brief, generated by interface.asset
         (never painted by the drawer). A claimed or guessed model name is not proof. The pass is judged over EVERY asset it binds -
         written, adopted, inherited or already there - and every live drawing of each ui record they belong
-        to (scripts/work/draw/draw-acceptance.mjs, run by api settle) - an image with no draw-render receipt or
+        to (scripts/work/draw/draw-acceptance.mjs, run by starci kernel settle) - an image with no draw-render receipt or
         with image-gen provenance (DRAW_ASSET_NOT_TOKEN_RENDERED), a drawn data status (DATA_STATUS_DRAWN),
         a whole-screen drawing or record rather than ui.shapes per XBase#state (DRAW_NOT_SHAPES), or a pass
         that only adopts or reuses prior evidence (DRAW_NOT_REDRAWN) is refused draw-not-accepted. A prior
@@ -664,7 +664,7 @@ proofs:
   - id: content-truth
     requirement:
       en: Every drawn shape renders concrete values from the business record; a part showing a skeleton,
-        shimmer, grey placeholder block or other data status fails, and `starci validate` refuses a shape or
+        shimmer, grey placeholder block or other data status fails, and `starci runtime validate` refuses a shape or
         drawing of a data status as DATA_STATUS_DRAWN (scripts/work/ui/ui-shapes.mjs).
   - id: truth-boundary
     requirement:
@@ -687,7 +687,7 @@ proofs:
         not pass merely because its label explains it.
   - id: shell-conformance
     requirement:
-      en: "`node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` exits 0 for every ui record directory
+      en: "`starci work shell-conformance <ui-record-dir>` exits 0 for every ui record directory
         written: its route is a node of the layout tree (or declared new under an existing routeParent);
         surface, direction, routed and host agree per breakpoint; every layout above the route is settled
         by the END of the op (the ones this op drew or captured count; nothing is refused at the start)
@@ -702,7 +702,7 @@ proofs:
   - id: brand-palette
     requirement:
       en: "Every drawn part and composite the record declares is painted in the brand record's colours:
-        `node scripts/work/ui/shell-conformance.mjs <ui-record-dir>` reads their pixels
+        `starci work shell-conformance <ui-record-dir>` reads their pixels
         (scripts/work/brand/brand-palette.mjs) and refuses PALETTE_OFF_BRAND for any colour the brand does not
         declare - a default blue primary, a purple icon - naming the colour, its share of the coloured area
         and of the image, and the nearest brand token; PRIMARY_ABSENT when the brand primary appears nowhere
@@ -726,12 +726,12 @@ proofs:
         keeps), and `draw-review.mjs apply` writes the record done with ui.review.owner {dispatchId, receipt,
         receiptSha256, answeredBy, at, parts}. A draw-review ask is never answered automatically, and a
         delegate never accepts. A part redrawn after the acceptance leaves the drawing unaccepted until it is
-        reviewed again (direction-part.mjs drawingAcceptance). api report refuses draw-review-owed and api
+        reviewed again (direction-part.mjs drawingAcceptance). starci kernel report refuses draw-review-owed and api
         settle refuses DRAW_NOT_OWNER_ACCEPTED."
     check: scripts/work/draw-review.mjs
   - id: draw-quality
     requirement:
-      en: "Correct tokens are not a pass (scripts/work/draw/draw-quality.mjs, run by api settle through
+      en: "Correct tokens are not a pass (scripts/work/draw/draw-quality.mjs, run by starci kernel settle through
         draw-acceptance.mjs). Two drawn states of one XBase that differ only in a status band are one shape
         and a data status (SHAPE_DUPLICATE); a state a person leaves by a command renders a control for each
         command of the surface's FR (DRAW_ACTION_MISSING); the visible copy carries no internal ids or
@@ -781,7 +781,7 @@ proofs:
         (DRAW_LOOP_MISSING); every round keeps its source, parts, metrics.json and critique.json (the critic's
         model, exact prompt and verdict) as indexed job artifacts. At settle the runtime re-renders every live
         part and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs): a failure is
-        DRAW_METRICS_FAILED, a metric it could not run DRAW_METRICS_UNVERIFIED - api settle refuses
+        DRAW_METRICS_FAILED, a metric it could not run DRAW_METRICS_UNVERIFIED - starci kernel settle refuses
         draw-metrics-failed and the draw reports blocked with the remaining failures and its best round, never
         pass. The critic's beauty is the loop's stop condition; the owner's draw-review accept stays the final
         acceptance."
@@ -791,12 +791,12 @@ proofs:
       en: "Every gap in DNA the drawing met is a complete grammar proposal (scripts/work/grammar-proposal.mjs:
         name, gap, anatomy, tokens, claims, isolated render), listed in the draw-review ask
         (question.grammarProposals) for the owner - never accepted by the worker or the runtime - and recorded at
-        settle as a grammar-proposal-filed ledger event that api status lists as grammarProposals[] until a
+        settle as a grammar-proposal-filed ledger event that starci kernel status lists as grammarProposals[] until a
         grammar lane resolves it."
     check: scripts/work/grammar-proposal.mjs
   - id: binding
     requirement:
-      en: "`starci validate` passes, and `starci validate --strict` passes on the ui record directory
+      en: "`starci runtime validate` passes, and `starci runtime validate --strict` passes on the ui record directory
         it writes (the record, ui.flow included, compiles against work/ui-screen@1); every cited
         ID/path and asset byte exists, required assertions are
         covered, input bindings are current, and an honest not-run/fail cannot earn done."
@@ -809,8 +809,8 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: produced-lint
     requirement:
-      en: "api settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
-      vi: "api settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached lint.json (runtime check op-proof, proof produced-lint): a done without it (op-lint-proof-missing), with a lint that could not run (op-lint-tool-failed) or with any finding over the produced files (op-lint-findings) is refused."
+      vi: "starci kernel settle tự đọc lại lint.json đính kèm (check op-proof, proof produced-lint): done thiếu nó (op-lint-proof-missing), có lint không chạy được (op-lint-tool-failed) hoặc có bất kỳ lỗi nào trên các tệp đã tạo (op-lint-findings) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: APP_SHELL_UNSETTLED

@@ -48,9 +48,9 @@ jobs:
       # clean install of its own manifest and lock in a temp dir: nothing hoisted in this checkout can hide an undeclared
       # dependency (test-world 1.0.0 shipped one). Exit 1 a red package, 2 a proof that could not run - never a pass.
       - name: Published packages from a clean install
-        run: node scripts/gates/package-clean-test.mjs
+        run: starci release clean-test
 
       # The scaffolded app is proven against fresh registry installs: lint, typecheck and the api boot must RUN.
       # STARCI_REQUIRE_APP_INSTALLS=1 inside the script turns a missing install into a failure, never a skip.
       - name: Scaffold app against registry installs
-        run: node scripts/gates/release-app-installs.mjs
+        run: starci release app-installs

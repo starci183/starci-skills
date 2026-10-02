@@ -163,7 +163,7 @@ function answerGate(handle, rule, screen) {
 }
 
 /**
- * Answer an allowlisted gate that appears MID-RUN (the Kernel's `api nudge` on an op worker): the card's
+ * Answer an allowlisted gate that appears MID-RUN (the Kernel's `starci kernel nudge` on an op worker): the card's
  * gateAutoAnswer rule for `gate`, the same walk-and-Enter answerGate does at readiness, then up to settleMs
  * for the gate to leave the screen. A loop-detection dialog can halt a worker turn this way.
  * Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the

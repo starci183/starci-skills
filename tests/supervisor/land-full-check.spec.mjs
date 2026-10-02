@@ -1,4 +1,4 @@
-// 3.5: the land gate runs the FULL `starci check` (bin/starci.mjs check) of the candidate as a step of its own, not only the
+// 3.5: the land gate runs the FULL `starci runtime check` (bin/starci.mjs check) of the candidate as a step of its own, not only the
 // gate: a red run refuses the land, a green one passes, and a tree with no entry point is skipped (a fixture tree).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ const tree = (code, line = 'self-checks: 1 of 1 passed') => {
   return dir;
 };
 
-test('the land runs `starci check` of the candidate: green passes, red refuses with its output (passing and violating)', () => {
+test('the land runs `starci runtime check` of the candidate: green passes, red refuses with its output (passing and violating)', () => {
   const green = fullCheck(tree(0));
   assert.equal(green.ok, true);
   const red = fullCheck(tree(1, 'RT_EXAMPLE a self-check failed'));
@@ -40,7 +40,7 @@ test('a tree with no bin/starci.mjs is skipped, not a pass of the check it canno
   assert.deepEqual(fullCheck(tree(null)), { ok: true, skipped: true });
 });
 
-test('runChecks lists `starci check` as a step of the land and a red one fails the land, whatever else is green', () => {
+test('runChecks lists `starci runtime check` as a step of the land and a red one fails the land, whatever else is green', () => {
   const git = (dir, ...args) => spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
   const land = (code) => {
     const dir = tree(code);
@@ -57,9 +57,9 @@ test('runChecks lists `starci check` as a step of the land and a red one fails t
     return runChecks({ dir, base, head, specMode: 'none', runSpecs: false });
   };
   const green = land(0);
-  assert.deepEqual(green.checks.filter((c) => c.name === 'starci check').map((c) => c.ok), [true]);
+  assert.deepEqual(green.checks.filter((c) => c.name === 'starci runtime check').map((c) => c.ok), [true]);
   const red = land(1);
-  const step = red.checks.find((c) => c.name === 'starci check');
+  const step = red.checks.find((c) => c.name === 'starci runtime check');
   assert.equal(step.ok, false);
   assert.equal(red.ok, false, 'one red full check refuses the land');
 });

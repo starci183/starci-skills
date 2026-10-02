@@ -14,12 +14,12 @@ StarCi provides:
   op chain in the ledger — the plan survives sessions, restarts and context loss.
 - **A kernel agent per workflow:** `start-kernel` claims a queued goal and boots one long-lived
   `[Kernel]` agent. It never writes sqlite directly and never touches the host — every mutation goes
-  through one `node scripts/kernel/cli.mjs <verb>` call. `modules/kernel/api.yaml` and
+  through one `starci kernel <verb>` call. `modules/kernel/api.yaml` and
   `modules/cli/commands/kernel/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
 - **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
   GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
   is the single host runtime loop (`modules/reconciler/reconciler.yaml`).
-- **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
+- **Ephemeral op agents:** `starci kernel dispatch` spawns one short-lived `[Op]` agent per job through the
   per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
   cannot forget them; `settle` records the verdict and closes the worker.
 - **Contracts as data:** goals, kernel loop, op manifests, model routing and quality gates are YAML
@@ -62,7 +62,7 @@ From this repository root, run `npm ci`, `npm run check` for syntax and contract
 and `npm test` for the Node test suite. The runtime package has no separate TypeScript
 typecheck, lint, or build script; product examples declare their own `typecheck`,
 `lint`, `build`, and `test` commands. Run the runtime presentation gate with
-`node scripts/gates/repo-presentation.mjs --root . --runtime`.
+`starci gate repo-presentation --root . --runtime`.
 
 ## Install
 
@@ -72,11 +72,11 @@ From a clone of this repository:
 git clone https://github.com/starci183/starci-skills.git
 cd starci-skills
 npm ci
-node bin/starci.mjs init --dir /absolute/path/to/host
-node bin/starci.mjs doctor --dir /absolute/path/to/host
+starci runtime install --dir /absolute/path/to/host
+starci runtime doctor --dir /absolute/path/to/host
 ```
 
-Once published, the equivalent is `npx starci init --dir /absolute/path/to/host`. The same installer
+Once published, the equivalent is `npx starci runtime install --dir /absolute/path/to/host`. The same installer
 is reachable directly at `node scripts/install/install.mjs init --dir <host>`.
 
 The installer:
@@ -142,17 +142,17 @@ packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicon
 
 ```sh
 node bin/starci.mjs --help
-node bin/starci.mjs init --dir <host>      # install
-node bin/starci.mjs update --dir <host>    # update an install
-node bin/starci.mjs doctor --dir <host>    # verify an install (runs its own specs)
-node bin/starci.mjs api <verb>             # kernel api gate
-node bin/starci.mjs start                  # start-workflow
-node bin/starci.mjs goal                   # define-goal
-node bin/starci.mjs validate <work-root>   # read-only Work record/layout validation
+starci runtime install --dir <host>      # install
+starci runtime update --dir <host>    # update an install
+starci runtime doctor --dir <host>    # verify an install (runs its own specs)
+node bin/starci.mjs starci kernel <verb>             # kernel api gate
+starci workflow start                  # start-workflow
+starci workflow define                   # define-goal
+starci runtime validate <work-root>   # read-only Work record/layout validation
 ```
 
 Inside an install the same entry is `<host>/.claude/bin/starci.mjs`. Checks and tools are invoked
-directly, e.g. `node .claude/scripts/gates/gate.mjs`. The full surface — install verbs, the
+directly, e.g. `starci gate run`. The full surface — install verbs, the
 api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli.md).
 
 ## Documentation

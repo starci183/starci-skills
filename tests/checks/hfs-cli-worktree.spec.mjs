@@ -1,4 +1,4 @@
-// hfs-cli-worktree.spec.mjs - `hfs check` run from a `git worktree add` checkout whose node_modules is a junction (the way every
+// hfs-cli-worktree.spec.mjs - `starci app check` run from a `git worktree add` checkout whose node_modules is a junction (the way every
 // lane gates) prints its report and exits with a status. It once printed nothing there: argv[1] kept the junction path while
 // import.meta.url was the resolved one, so the entry-point test skipped main and the gate saw a silent pass.
 import { test } from 'node:test';
@@ -29,7 +29,7 @@ test('isMain compares real paths: an entry reached through a junction or symlink
   assert.equal(isMain(url, ['node']), false, 'no entry');
 });
 
-test('hfs check inside a git worktree with a junctioned node_modules is never silent: a report or a loud refusal', () => {
+test('starci app check inside a git worktree with a junctioned node_modules is never silent: a report or a loud refusal', () => {
   const repo = gitAdd(installPresets(writeCleanRepo(APP)));
   made.push(repo);
   execFileSync('git', ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init'], { stdio: 'ignore' });
@@ -56,7 +56,7 @@ test('hfs check inside a git worktree with a junctioned node_modules is never si
   }
   // never silent: either the report (exit 0 or 1) or a loud refusal on stderr with a non-zero status
   assert.equal(typeof run.status, 'number', `hfs ran to an exit status (signal ${run.signal}, error ${run.error?.message})`);
-  assert.ok(`${run.stdout}${run.stderr}`.trim().length > 0, 'hfs check printed nothing from a worktree');
-  if (run.status === 0 || run.status === 1) assert.match(run.stdout, /^hfs check /m, 'a finished check prints its report');
+  assert.ok(`${run.stdout}${run.stderr}`.trim().length > 0, 'starci app check printed nothing from a worktree');
+  if (run.status === 0 || run.status === 1) assert.match(run.stdout, /^starci app check /m, 'a finished check prints its report');
   else assert.ok(run.stderr.trim().length > 0, `a refusal (status ${run.status}) names its reason on stderr`);
 });

@@ -16,7 +16,7 @@ never proven by a dependency that may not be installed.
 ## Running it
 
 ```
-node scripts/work/brand/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
+starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
 ```
 
 `<work-root>` is the Work tree that owns the brand record (`<tree>/brand/index.yaml`; a repository root works

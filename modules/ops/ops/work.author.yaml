@@ -93,8 +93,8 @@ reads:
   - id: standard
     path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
-      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
+      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (starci app explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: .starciwork/features/<feature>/{impl/<repository>,uat}/<name>/index.yaml
@@ -117,7 +117,7 @@ writes:
         launchable: its proves edges to the accepted records it proves, the write scope as inspected
         owners or, in planned mode, design-traced owners, one requiresProof demand per observable
         outcome with a verbatim runnable command, and the exclusive runtime resources those checks
-        need. The authored proof demands include the record-class validator `starci validate` so wrong
+        need. The authored proof demands include the record-class validator `starci runtime validate` so wrong
         path, name or schema fails the record's own checks. Preserve every other authored line, including the record's
         title, refs, dependsOn and state. Never write completion, never write the kernel's own
         extension block, never write anything under the record's evidence folder, and never edit
@@ -163,7 +163,7 @@ writes:
       en: "Cut mode only. One child record per observable behaviour, written as work/implementation@1,
         state todo: its title, its proves edges, its write scope of at most twelve inspected files
         disjoint from every sibling and from the seam, and one runnable proof demand per outcome
-        plus the record-class validator `starci validate` so wrong path, name or schema fails the
+        plus the record-class validator `starci runtime validate` so wrong path, name or schema fails the
         child's own checks. Exactly one child is the seam - the one that owns the module wiring,
         dependency registration, migrations, shared contracts and shared types every other child
         would otherwise touch - and every other child names the seam in dependsOn, so it is built
@@ -200,8 +200,8 @@ steps:
   - reads: [standard, application-stacks, target]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Each record's write scope is app-relative paths in the slots that admit them (be/..., fe/..., .starciwork/..., .starcistacks/... at the app root); each proof demand names its test layer and the check that runs it - unit: <name>.service.spec.ts beside the service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts with useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts with useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts with useSandbox (npm run test:contract). A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Phạm vi ghi của mỗi bản ghi là đường dẫn tương đối theo app nằm trong slot nhận chúng (be/..., fe/..., .starciwork/..., .starcistacks/... ở gốc app); mỗi yêu cầu chứng minh nêu tầng test và lệnh chạy nó - unit: <name>.service.spec.ts cạnh service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts với useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts với useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts với useSandbox (npm run test:contract). Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Each record's write scope is app-relative paths in the slots that admit them (be/..., fe/..., .starciwork/..., .starcistacks/... at the app root); each proof demand names its test layer and the check that runs it - unit: <name>.service.spec.ts beside the service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts with useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts with useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts with useSandbox (npm run test:contract). A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/patterns/repo/starciwork.yaml knowledge/hfs/slots.yaml knowledge/patterns/be/test.yaml knowledge/op-gate.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Phạm vi ghi của mỗi bản ghi là đường dẫn tương đối theo app nằm trong slot nhận chúng (be/..., fe/..., .starciwork/..., .starcistacks/... ở gốc app); mỗi yêu cầu chứng minh nêu tầng test và lệnh chạy nó - unit: <name>.service.spec.ts cạnh service (npm test); integration: be/src/tests/integration/**/*.integration-spec.ts với useTestWorld({ modules }) (npm run test:integration); e2e: be/src/tests/e2e/**/*.e2e-spec.ts với useTestWorld({ apps }) (npm run test:e2e); contract: be/src/tests/contract/**/*.contract-spec.ts với useSandbox (npm run test:contract). Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - application-stacks
       - target
@@ -269,7 +269,7 @@ steps:
       - scripts
     writes: [node, evidence]
     action:
-      en: Run the record-class validator `starci validate` over the edited tree and confirm the record
+      en: Run the record-class validator `starci runtime validate` over the edited tree and confirm the record
         still validates and now declares both a write scope and proof demands; a planned record's
         missing owner path is a warning there, never a refusal. Record the demand-to-check mapping
         and any open question. Build nothing and change no product source;
@@ -304,7 +304,7 @@ steps:
   - reads: [target, neighbours]
     writes: [work-graph]
     action:
-      en: When the selected slice of the work graph is over its `api estimate` bound, cut it into child
+      en: When the selected slice of the work graph is over its `starci kernel estimate` bound, cut it into child
         task nodes of that slice, seam first - each with its own owned paths, reads, rollbackTo and size -
         and record the cut for that slice alone; the Work records this op authors stay one per child.
   - reads:
@@ -314,7 +314,7 @@ steps:
     action:
       en: "Cut mode. Turn the cut record into the seam record: it keeps its id and owns the module wiring,
         shared contracts and shared types every sibling would otherwise touch, and every sibling
-        names it in dependsOn. Then run the record-class validator `starci validate` over the edited
+        names it in dependsOn. Then run the record-class validator `starci runtime validate` over the edited
         tree and confirm every child is launchable on its own. Record the seam, the children and the
         write scope of each. Build nothing and change no product source; the kernel launches the
         seam first, fans the rest out behind it and proves the whole group once."
@@ -362,13 +362,13 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
-      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
-      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
   - id: doc-gate
     requirement:
-      en: "api settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
-      vi: "api settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached doc-gate.json (runtime check op-proof, proof doc-gate): a done without it (op-doc-gate-missing), with a check that could not run (op-doc-gate-tool-failed) or with a finding (op-doc-gate-red) is refused."
+      vi: "starci kernel settle tự đọc lại doc-gate.json đính kèm (check op-proof, proof doc-gate): done thiếu nó (op-doc-gate-missing), có bộ kiểm tra không chạy được (op-doc-gate-tool-failed) hoặc có lỗi (op-doc-gate-red) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: SCOPE_UNDETERMINED

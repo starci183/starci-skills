@@ -1,6 +1,6 @@
 // install.mjs — puts the shared-checkout guard around an op or [Worker] agent.
 //
-// api dispatch (opGuardLaunch), the [Worker] launch (workers.mjs workerGuard) and the Kernel launch
+// starci kernel dispatch (opGuardLaunch), the [Worker] launch (workers.mjs workerGuard) and the Kernel launch
 // (scripts/kernel/start-workflow.mjs, role 'kernel') call guardLaunch() for every agent they start
 // (modules/kernel/api.yaml conventions.sharedCheckout). Each layer is idempotent and best effort - a
 // guard that cannot be installed is reported on the dispatch receipt, never a reason to refuse the launch:
@@ -312,7 +312,7 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
 }
 
 /**
- * The layers a dispatch receipt (guardLaunch's, as api dispatch records it on op-dispatched `guard`) says did not
+ * The layers a dispatch receipt (guardLaunch's, as starci kernel dispatch records it on op-dispatched `guard`) says did not
  * install: [] for a whole guard. A switched-off layer is not a failure.
  */
 export function guardReceiptErrors(receipt) {

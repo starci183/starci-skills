@@ -28,7 +28,7 @@
 //     (knowledge/patterns/**, architecture-rules.yaml, modules/models/code-patterns.yaml)
 //     names though it is neither a code of the catalog nor a key of failure-codes.yaml; the finding names the file
 //                                                                                             HFS_RULE_CODE_UNCATALOGUED
-//   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `hfs check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
+//   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `starci app check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
 //     rule lists in failureCodes; a code no rule owns has no R-id, no gate and no parity proof. The only exempt codes are the
 //     infrastructure refusals ("cannot judge"), which their owners export as one list each (ERROR_RULE_IDS of the machine's
 //     index, REFUSAL_CODES of scripts/hfs/check.mjs)                                     HFS_RULE_CODE_UNOWNED
@@ -175,7 +175,7 @@ export async function pluginRuleIds(root, kind) {
 /**
  * The findings of a catalog: [{code, rule, enforcer?, message}].
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
- * codes: {machine, hfs, refusals}, every code the architecture machine and `hfs check` can emit and the refusal codes among them.
+ * codes: {machine, hfs, refusals}, every code the architecture machine and `starci app check` can emit and the refusal codes among them.
  */
 export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge, codes }) {
   const findings = [];
@@ -268,7 +268,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       for (const code of [...new Set(list)].sort()) {
         if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
         reported.add(code);
-        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (hfs check)`);
+        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (starci app check)`);
       }
     }
   }

@@ -8,7 +8,7 @@ adds:
     - STARCIWORK_DRIFT
 paths:
   - modules/ops/_common.yaml
-  - modules/kernel/api-commands/report.yaml
+  - modules/cli/commands/kernel/report.yaml
   - modules/ops/ops/uat.verify.yaml
   - modules/ops/ops/interface.audit.yaml
   - modules/schemas/work-layout.yaml

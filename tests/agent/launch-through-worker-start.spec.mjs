@@ -246,7 +246,7 @@ const seedOp=(fx,{jobId,model})=>{
 };
 
 for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-agent','codex',true],['devin-agent','devin',false]]){
-  test(`api dispatch --spawn launches a ${model} op through worker-start --agent ${agent}, never a terminal create`,t=>{
+  test(`starci kernel dispatch --spawn launches a ${model} op through worker-start --agent ${agent}, never a terminal create`,t=>{
     const fx=fixture(t);
     const jobId=`job-${agent}`;
     seedOp(fx,{jobId,model});

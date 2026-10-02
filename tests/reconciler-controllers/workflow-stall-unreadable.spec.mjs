@@ -7,7 +7,7 @@ import { stallFindings } from '../../scripts/supervisor/stall.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 
 // False progress-stall escalations on 'status unreadable': "STALLED <wf> idle 61m: frontier unreadable
-// (status unreadable); last progress op-dispatched ...". A read of api status minutes later answered in 3-5 s with the
+// (status unreadable); last progress op-dispatched ...". A read of starci kernel status minutes later answered in 3-5 s with the
 // frontier engaged and an interface.draw op RUNNING since that op-dispatched. An unreadable status is no evidence of a
 // stall: the controller holds the last readable status and retries, and only statusUnreadablePasses consecutive misses
 // open one runtime-defect (status-unreadable) DI for the Supervisor, naming the error; never a progress-stall.
@@ -48,7 +48,7 @@ const settings = (over = {}) => ({ ...{ resyncMs: 120_000, concurrency: 2, route
   graceMs: 5 * MIN, supervisorGraceMs: 30 * MIN, orphanedFrontierMs: 30 * MIN, revAckMs: 30 * MIN, goalMs: 0, supervisorGateMs: 360 * MIN, stuckSla: {}, statusUnreadablePasses: 3 }, ...over });
 const stalls = (rec) => rec.decisions.filter((d) => d.kind === 'progress-stall');
 
-test('an unreadable api status is not a stall: no STALLED finding, no progress-stall DI, no escalation to the Supervisor', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+test('an unreadable starci kernel status is not a stall: no STALLED finding, no progress-stall DI, no escalation to the Supervisor', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger);
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: unreadable });
   const r = await reconcileWorkflow(keyOf(LEDGER, WF), ctx, { settings: settings() });
@@ -124,7 +124,7 @@ test('stallFindings: an unreadable frontier is STATUS-UNREADABLE (not alerted) n
   assert.equal(f.alert, false);
   assert.equal(f.error, ERROR);
   assert.deepEqual(f.runningJobs, [DRAW]);
-  assert.match(f.line, new RegExp(`^STATUS-UNREADABLE ${WF} idle 120m: api status unreadable \\(status unreadable\\); stall not judged; running ${DRAW} \\(interface\\.draw\\)`));
+  assert.match(f.line, new RegExp(`^STATUS-UNREADABLE ${WF} idle 120m: starci kernel status unreadable \\(status unreadable\\); stall not judged; running ${DRAW} \\(interface\\.draw\\)`));
 
   // A readable frontier with no worker moving is still STALLED: the fix narrows nothing else.
   const idle = stallFindings(ledger.db, { repo: repoRoot, now: NOW, stallMinutes: 30, frontierOf: () => readable({ liveness: 'idle' }), kernelTurnOf: () => null });

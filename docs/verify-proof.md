@@ -40,7 +40,7 @@ Live integration verification (`integration.verify`: real OAuth/IdP, SMTP, payme
 credentials) follows the same rule (owner ruling 2026-09-29): it runs only on an explicit request ("integration test",
 the Vietnamese phrase for "integration test", "verify OAuth/SMTP/payment live", "live verification") or before release. The planner adds the leg only
 when the goal asks; an already-approved leg the goal did not ask for settles `deferred` at once (never dispatched, no
-attempt spent, nothing waits on it), and `api run-deferred-tests --kind integration` runs it when the owner wants it.
+attempt spent, nothing waits on it), and `starci kernel run-deferred-tests --kind integration` runs it when the owner wants it.
 
 ## The base worktree
 

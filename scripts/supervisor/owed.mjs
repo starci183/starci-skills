@@ -131,7 +131,7 @@ export const labelsOf = (kind, text) => LABEL_RULES.filter(([, test]) => test(St
 /** What the supervisor does about one OWED item, by what it is (the owner's grant: fix it, never ask). */
 export function actionOf(item) {
   const wf = item.workflowId, id = item.incidentId;
-  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: api incident --workflow ${wf} --resolve ${id} --by supervisor --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
+  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: starci kernel incident --workflow ${wf} --resolve ${id} --by supervisor --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
   const l = new Set(item.labels ?? []);
   if (item.pattern) {
     switch (item.pattern) {
@@ -405,7 +405,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         (SELECT settle_json FROM op_attempts a WHERE a.job_id=jobs.job_id ORDER BY attempt_id DESC LIMIT 1) AS result_json,
         created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id`).all(wf)
         .map((j) => withPayload(j));
-      // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain,
+      // An attempt settled peer-blocked (starci kernel settle: every red check was a peer's change) is not a failure of the chain,
       // nor one whose settle spent no business retry (engine/admission.mjs retryDisposition: a host terminal wipe's
       // retryClass environment, a proven no-effect launch, an owner answer).
       const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
@@ -507,7 +507,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const groups = new Map();
       for (const r of rejects) {
         const p = parse(r.payload_json);
-        // A write set another job's lease still owns is a wait, not a launcher failure: api dispatch
+        // A write set another job's lease still owns is a wait, not a launcher failure: starci kernel dispatch
         // now leaves such a job queued path-lease, and refusals recorded before that change do not
         // count either. Real launcher/host failures (any other reserve reason) still do.
         if (isLeaseOverlapRefusal(p)) continue;
@@ -537,7 +537,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job], lastFailureAt: r.last });
       }
     } catch { /* no events */ }
-    // Settled work that really owes work (api status staleOperations): an owner-declared breaking change or an
+    // Settled work that really owes work (starci kernel status staleOperations): an owner-declared breaking change or an
     // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
     // counts (work-ownership.mjs).
     try {

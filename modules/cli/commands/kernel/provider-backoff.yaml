@@ -1,4 +1,4 @@
-# The contract of `api provider-backoff` (scripts/kernel/verbs/provider-backoff.mjs): open the provider circuit a
+# The contract of `starci kernel provider-backoff` (scripts/kernel/verbs/provider-backoff.mjs): open the provider circuit a
 # persisting rate limit calls for (reconciler Resource controller, adaptive per-pool concurrency, scripts/machine/pool-backoff.mjs).
 group: kernel
 verb: provider-backoff
@@ -42,7 +42,7 @@ removed:
 purpose: "Open the ledger's provider-health circuit for one provider (failureKind quota by default,
   or rate-limited) for allocation.cooldownMs.<kind>, when the Resource controller's AIMD backoff
   held the provider's pool at its floor and the rate limit still persisted. The same circuit api
-  route and api dispatch already refuse on; it clears by expiry, the quota probe (quota) or the
+  route and starci kernel dispatch already refuse on; it clears by expiry, the quota probe (quota) or the
   Kernel's provider-health --recover. Idempotent: an open circuit is left as it is."
 writes:
   - machine.sqlite provider_health row of <provider> + one provider_health_events row

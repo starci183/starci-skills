@@ -1,0 +1,26 @@
+group: runtime
+verb: machine-db
+owner: runtime
+summary: inspect or maintain the host machine database
+impl: {script: engine/db/machine.mjs}
+positional:
+  - {name: action, enum: [init, status, ledgers, register, resolve], required: false, variadic: false}
+flags:
+  - {name: file, type: string}
+  - {name: all, type: boolean}
+  - {name: ledger-id, type: string}
+  - {name: name, type: string}
+  - {name: repo, type: string}
+  - {name: ledger-file, type: string}
+  - {name: product, type: string}
+  - {name: create, type: boolean}
+exit: {"0": action completed, "2": bad usage or database error}
+json: always
+examples:
+  - starci runtime machine-db status
+  - starci runtime machine-db ledgers --all
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node engine/db/machine.mjs
+  - node .claude/engine/db/machine.mjs

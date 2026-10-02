@@ -89,7 +89,7 @@ export function orderKeyOf(route, role, { fanOut = false, runtimes } = {}) {
 }
 
 // The pools one kind may run on at a measured difficulty: its order (orderKeyOf) at the
-// floor-raised tier. selectPool routes inside it and api dispatch launches only inside it.
+// floor-raised tier. selectPool routes inside it and starci kernel dispatch launches only inside it.
 export function kindOrder({ kind, role, difficulty, fanOut = false, runtimes, modelsDir } = {}) {
   const rt = runtimes ?? loadRuntimes(modelsDir);
   const measured = normalizeDifficulty(difficulty);
@@ -141,7 +141,7 @@ export function resolveLaunchModel(target, difficulty, opts = {}) {
   return { target: pool.target ?? target, modelId, effort: pool.effort?.[d] ?? null };
 }
 
-// The model + effort a worker launches with (worker-start --model/--effort). Order: the persisted `api route`
+// The model + effort a worker launches with (worker-start --model/--effort). Order: the persisted `starci kernel route`
 // decision when it names this target, the pool's difficulty pin, then the profile's own requestedModel for
 // launch-only targets (gpt-6-sol/gpt-6-luna) that runtimes.yaml has no pool for. No model at all is a typed error -
 // a worker is never started on the CLI's own default model, because attestation could not prove it.
@@ -247,7 +247,7 @@ function poolRejectionReasons({ pool, target, role, kind, order = null, difficul
   // An explicit-workflow-quota pool opens only under an owner grant
   // (config.yaml allocation.grants, engine/config.mjs allocationGrants). A
   // caller that passes no grants at all is a direct low-level consumer and is
-  // not gated; `api route` always passes the owner's grants.
+  // not gated; `starci kernel route` always passes the owner's grants.
   if (grants && pool.capacityAuthority === 'explicit-workflow-quota') {
     const grant = grants[pool.target ?? target] ?? grants[target] ?? null;
     if (!grant) reasons.push(`pool needs an owner grant (capacityAuthority explicit-workflow-quota; config.yaml allocation.grants names none for ${target})`);
@@ -484,7 +484,7 @@ const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().re
 // it, called only when the comparison is needed); by default it is resolved
 // from the agent card, which for an Orca-managed provider without an account
 // list stays unresolved and keeps the circuit. Nothing else closes a circuit
-// early but `api provider-health --recover`.
+// early but `starci kernel provider-health --recover`.
 // The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one fleet-wide fact per provider;
 // `db` (a ledger) is not read and stays in the signature for its callers.
 export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {

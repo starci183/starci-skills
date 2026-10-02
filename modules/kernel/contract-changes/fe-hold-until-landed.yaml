@@ -10,4 +10,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/dependency-graph.mjs
   - scripts/goal/define-goal.mjs
-  - modules/kernel/api-commands/incident.yaml
+  - modules/cli/commands/kernel/incident.yaml

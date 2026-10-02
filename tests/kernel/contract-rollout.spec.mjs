@@ -89,7 +89,7 @@ test('the contract version digests the brief, the shared documents and what the 
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-root-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const put=(rel,text)=>{fs.mkdirSync(path.dirname(path.join(root,rel)),{recursive:true});fs.writeFileSync(path.join(root,rel),text);};
-  put('modules/ops/ops/interface.draw.yaml','reads:\n  - path: modules/schemas/work-layout-tree.schema.yaml\ncheck: node scripts/work/ui/shell-conformance.mjs\n');
+  put('modules/ops/ops/interface.draw.yaml','reads:\n  - path: modules/schemas/work-layout-tree.schema.yaml\ncheck: starci work shell-conformance\n');
   put('modules/ops/_common.yaml','common\n');
   put('modules/schemas/work-layout-tree.schema.yaml','schema\n');
   const sha='0123456789abcdef0123456789abcdef01234567';

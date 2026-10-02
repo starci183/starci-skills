@@ -11,7 +11,7 @@ import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../../scripts/machi
 // config.yaml asks.autoAcceptRecommended answered it (answeredBy auto-recommended),
 // and the owner-answer retry (attempt 12) filed the SAME question again:
 // its packet carried no record of the answered ask. Dispatch now binds the answers of
-// the job's retry lineage into packet context.owner_answers and the op prompt, and api report refuses an
+// the job's retry lineage into packet context.owner_answers and the op prompt, and starci kernel report refuses an
 // ask that repeats one (modules/kernel/api.yaml dispatch.ownerAnswers, report refuses ask-already-answered).
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -22,7 +22,7 @@ const QUESTION={text:'Which study-day qualifier should the business rules use?',
 const env=(()=>{const e={...process.env};for(const k of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete e[k];return e;})();
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
-// api report prints its JSON, then the rendered report block.
+// starci kernel report prints its JSON, then the rendered report block.
 const reportOut=r=>{try{return JSON.parse(r.stdout.slice(0,r.stdout.indexOf('\n}')+2));}catch{return null;}};
 const lastErr=r=>{try{return JSON.parse(String(r.stderr).trim().split('\n').at(-1));}catch{return null;}};
 const json=v=>JSON.stringify(v??null);
@@ -149,14 +149,14 @@ test('repeatedAnswerOf matches the same text or the same options, never a handov
   assert.equal(repeatedAnswerOf({text:'Approve the package?',options:[]},handover,{op:'docs.author'})?.dispatchId,'ctx_h');
 });
 
-test('api report refuses an ask that repeats an answered ask of the lineage, and admits a declared re-ask loudly',t=>{
+test('starci kernel report refuses an ask that repeats an answered ask of the lineage, and admits a declared re-ask loudly',t=>{
   const fx=fixture(t),wf='wf-owner-answers-report';
   seedGoal(fx,wf);
   const ask=enqueue(fx,wf);
   answeredAsk(fx,wf,ask);
   const retry=enqueue(fx,wf);
   // Bind the retry the way dispatch does: an op_attempts row with its scratch dir, a contract row
-  // bound to that attempt, and the job running (H10: api report reads only the attempt's scratch).
+  // bound to that attempt, and the job running (H10: starci kernel report reads only the attempt's scratch).
   const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-scratch-'));
   fx.seed(l=>l.transaction(db=>{
     const at=Date.now();
@@ -194,7 +194,7 @@ test('api report refuses an ask that repeats an answered ask of the lineage, and
   assert.equal(event.reask.dispatchId,'ctx_3074731253e3');
 });
 
-test('api report still files a genuinely new ask on an owner-answer retry',t=>{
+test('starci kernel report still files a genuinely new ask on an owner-answer retry',t=>{
   const fx=fixture(t),wf='wf-owner-answers-new-ask';
   seedGoal(fx,wf);
   const ask=enqueue(fx,wf);

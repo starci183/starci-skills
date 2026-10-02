@@ -484,8 +484,8 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
 }
 
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
-//   node scripts/kernel/seam-policy.mjs canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
-//   node scripts/kernel/seam-policy.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
+//   starci machine seam-policy canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
+//   starci machine seam-policy canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
 // Each prints JSON whose `commands` / `command` are the api enqueue lines to run. Ledger reads only.
 async function main(argv) {
   const [verb, ...rest] = argv;
@@ -509,7 +509,7 @@ async function main(argv) {
       return 0;
     } finally { ledger.close(); }
   }
-  console.error('use: cut-seam.mjs canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
+  console.error('use: starci machine seam-policy canon-plan --scan <file> --cut-id <id> | canon-redispatch --repo <repo> --job <id> [--paths <csv>]');
   return 2;
 }
 if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; });

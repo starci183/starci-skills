@@ -1,0 +1,20 @@
+group: connect
+verb: ask-gateway
+owner: runtime
+summary: operate the local owner-ask HTTP gateway
+impl: {script: scripts/connectors/ask-gateway.mjs}
+positional:
+  - {name: action, enum: [start, run, status, stop], required: false, variadic: false}
+flags:
+  - {name: port, type: number}
+  - {name: repo, type: list}
+exit: {"0": action completed, "1": gateway unavailable, "2": bad usage or configuration}
+json: always
+examples:
+  - starci connect ask-gateway status
+  - starci connect ask-gateway start --repo <path>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/connectors/ask-gateway.mjs
+  - node .claude/scripts/connectors/ask-gateway.mjs

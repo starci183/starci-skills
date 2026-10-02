@@ -1,4 +1,4 @@
-# The contract of `api unit` (scripts/kernel/verbs/unit.mjs): the work units of a workflow and their try budgets.
+# The contract of `starci kernel unit` (scripts/kernel/verbs/unit.mjs): the work units of a workflow and their try budgets.
 group: kernel
 verb: unit
 owner: runtime

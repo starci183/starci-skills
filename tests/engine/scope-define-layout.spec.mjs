@@ -118,7 +118,7 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
     request: { goalIdentity: 'abc123', goalRevision: 0, outcome: 'Canonical Work, SRS, SDS and stacks.' },
     assertions: ['Every declared outcome maps to a required leaf, a deferred decision or a justified exclusion.'],
     nodes: [{ id: 'todo-app.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
-    review: { outcome: 'pass', checks: ['starci validate'] },
+    review: { outcome: 'pass', checks: ['starci runtime validate'] },
   };
   const withSetup = setup => ({ ...catalog, extensions: { work3: { setup } } });
   assert.ok(validate(withSetup({ 'wf-todo-app-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));

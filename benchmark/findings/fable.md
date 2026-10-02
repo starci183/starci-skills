@@ -159,9 +159,9 @@ Measured over 35 ops in `modules/ops/ops/` (13,512 lines, from 156 to 1,287 line
 
 | Dimension | What is typed | What is only prose |
 |---|---|---|
-| Input | Packet from `api dispatch`: `op`, `brief` (yaml path), `context{workflow, records, owned_paths}`, `constraints{model, budget, lease}` | All business parameters: number of candidates, number of audit rounds, file thresholds. No op has a `params`/`inputs` key |
+| Input | Packet from `starci kernel dispatch`: `op`, `brief` (yaml path), `context{workflow, records, owned_paths}`, `constraints{model, budget, lease}` | All business parameters: number of candidates, number of audit rounds, file thresholds. No op has a `params`/`inputs` key |
 | Context | `reads[]` lists record paths | The `purpose.en` of each read holds rules, not just a description of the data |
-| Return | `starci/op-report@1` JSON via `api report`: `outcome`, `summary` ≤600 chars, `files`, `checks`, `open`, `question`, `blocker`. Only this is validated (`report-envelope.mjs`) | `writes[]` additionally declares `handoff` (E/response.yaml, 7 ops), `matrixHandoff` (E/job-result.yaml, 23 ops), and per-op files: draws, flows, apiDelivery, assetManifest, intake, decision, scope, goal, verification |
+| Return | `starci/op-report@1` JSON via `starci kernel report`: `outcome`, `summary` ≤600 chars, `files`, `checks`, `open`, `question`, `blocker`. Only this is validated (`report-envelope.mjs`) | `writes[]` additionally declares `handoff` (E/response.yaml, 7 ops), `matrixHandoff` (E/job-result.yaml, 23 ops), and per-op files: draws, flows, apiDelivery, assetManifest, intake, decision, scope, goal, verification |
 
 **Three causes of uneven responses:**
 
@@ -211,7 +211,7 @@ route: {...}
 
 Drop the `business` block (generate it from steps or let the registry generate it). Drop
 `handoff`/`matrixHandoff` when there is no consumer. Params travel along the path: goal →
-`api enqueue --params` → packet → op reads `params.candidatesPerScreen`; api validates
+`starci kernel enqueue --params` → packet → op reads `params.candidatesPerScreen`; api validates
 params against the op's schema before dispatch. Then "generate 2-3 images" is a value, not a
 sentence.
 
@@ -221,7 +221,7 @@ unknown keys, params without defaults, writes without schema, and numbers hard-c
 
 - [ ] Schema `starci/op@1`
 - [ ] Check `check-op-manifest.mjs`
-- [ ] `api enqueue --params` + validate + packet.params
+- [ ] `starci kernel enqueue --params` + validate + packet.params
 - [ ] Move `interface.draw` to the new shape as the model (candidatesPerScreen)
 - [ ] Sweep `_common.yaml` to drop the matrix/cell/coordinator vocabulary
 
@@ -289,7 +289,7 @@ and 8 product findings (B1–B8). The assistant checked each A item against the 
 | A3 claude worker-start does not open the circuit | open | `api.mjs:1011-1081` only writes the circuit on `authFailure` or the `readiness` branch; an empty worker-start error falls through → `providerHealth: null` | Correct. `runtimes.yaml allocation.cooldownMs` is already a map by `failureKind`, only a `worker-start` key (data) and one branch in code are needed |
 | A4 dead ask URL | open | `poll.mjs openAsks()` takes the last `ask-serving` event, no probe. **But** `serve-ask.mjs:568` already emits `ask-serving-expired` and poll does not read it | Cheaper fix than Devin proposed: poll reads `ask-serving-expired` first, HTTP probe only for URLs not yet expired. `supervise.yaml:41` already promises "relayed only after re-verifying they answer 200", a prose-only contract |
 | A5 superseded ask still ASK-OPEN | open | Only 3 kinds: `ask-serving`, `ask-serving-expired`, `ask-answered`. No `ask-withdrawn` | Correct. The new kind must go into `serve-ask.mjs` or `api.mjs` when parking a replacement ask, and poll reads it |
-| A6 kernel only woken by the watchdog | watching | `api report` already wakes the kernel after committing the row (practice 21/9, Derived 10). The remaining hole is a race inside the kernel's own turn: it consumes the report and only then decides to yield | Disagree with option (a) poll wakes it itself: the supervisor becomes a second liveness actor, duplicating the watchdog and against `supervise.yaml never`. The right fix: the kernel yields only after the latest `api status` returns no actionable frontier. One line in `driver-loop.yaml` + `kernel-prompt.md` |
+| A6 kernel only woken by the watchdog | watching | `starci kernel report` already wakes the kernel after committing the row (practice 21/9, Derived 10). The remaining hole is a race inside the kernel's own turn: it consumes the report and only then decides to yield | Disagree with option (a) poll wakes it itself: the supervisor becomes a second liveness actor, duplicating the watchdog and against `supervise.yaml never`. The right fix: the kernel yields only after the latest `starci kernel status` returns no actionable frontier. One line in `driver-loop.yaml` + `kernel-prompt.md` |
 | A7 codex lacks browser tooling | watching | `interface.draw` already uses `route.riskHints: [host-tool-required:image_gen.imagegen]` | The mechanism exists, not yet applied: `interface.audit` declares `host-tool-required:browser-dom`, the agent card declares the capability, route-model filters |
 
 **Grit inside `poll.mjs` itself that Devin did not see.**
@@ -318,7 +318,7 @@ and 8 product findings (B1–B8). The assistant checked each A item against the 
 - [ ] `poll.mjs`: `WHERE report_id > ?`; read `ask-serving-expired`; probe the remaining URLs
 - [ ] `api.mjs`: unclassified worker-start error → `failureKind: 'worker-start'`, cooldown from `runtimes.yaml`
 - [ ] `ask-superseded` event when parking a replacement ask
-- [ ] `driver-loop.yaml` + `kernel-prompt.md`: yield only after the latest `api status` shows no work
+- [ ] `driver-loop.yaml` + `kernel-prompt.md`: yield only after the latest `starci kernel status` shows no work
 - [ ] `interface.audit` `route.riskHints` + capability on the agent card
 - [ ] Owner decision: does audit measure itself or trust the producer (A1)
 
@@ -515,7 +515,7 @@ allowlist.
 4. A7: do not delete `managed.dispatchId` on reject. The report binding comes from the
    `contracts` table; a rejected dispatch goes into `payload.rejectedDispatches[]`.
 5. A6: do not let `poll.mjs` wake the kernel. Fix it in the kernel: yield only after the
-   latest `api status` has no actionable frontier.
+   latest `starci kernel status` has no actionable frontier.
 6. Move `DEVIN_POLL_BUG.md` into `.claude/.experiments/practices/2026-09-22-supervisor-round1.md`
    in the Practiced/Observed/Derived/Open format; put section B into the project's
    `.starciwork`.
@@ -560,7 +560,7 @@ decided on 2026-09-22: "all the drifts you found". Lanes by dependency:
 | E prose | B, C | feedback-sediment section + ghost-context + P1.21–23, 25–29 docs/skills/CONTEXT part |
 | F2 examples | C | 8 missing schemas from real records, drop 4 skips, evidence regenerated by script |
 | G supervisor | Devin | items Devin has not landed when B, C, D finish: poll.mjs moves to scripts/supervisor, `WHERE report_id > ?`, ask-serving-expired, ask-superseded, worker-start failureKind, A7 contracts binding, A1 audit measures itself, riskHints |
-| H op-shape | B, C | schema `starci/op@1`, `check-op-manifest.mjs`, typed `params` + `api enqueue --params` + packet.params, drop handoff/matrixHandoff without consumer, drop the `business` block, migrate 35 ops, fix the interface.draw case |
+| H op-shape | B, C | schema `starci/op@1`, `check-op-manifest.mjs`, typed `params` + `starci kernel enqueue --params` + packet.params, drop handoff/matrixHandoff without consumer, drop the `business` block, migrate 35 ops, fix the interface.draw case |
 | I host-boundary | C, D | `lib.mjs` reads `calls.yaml`, live `agent-context` once per process, `providers.mjs --live`, `check-host-boundary.mjs`, `orca-cli` skill split from the kernel load path |
 | J quality-bar | C | QUALITY-BAR Evidence group becomes a check (`done` → artifact exists + digest matches), tick checkboxes by check name |
 
@@ -754,7 +754,7 @@ gpt-5.6-luna 18h sitting at the root, an "Idle" op under one kernel. Cross-check
 | 2 `[Op] interface.implement` luna 18h at root, ticked | `interface.implement a19` succeeded via managed worker codex `ctx_427183f`; the old managed Tasks | Settle only does `worker-stop` + `worker-release`, does not delete the Task; the Task belongs to a Run bound to the **old** kernel terminal, the restarted kernel has a new terminal so the Task falls out to the root |
 | Title "devin.exe: Kernel orchestration for…" | `[Kernel] <wf>` is applied only to the Task display name | Terminal rename exists only for managed workers, not for Devin terminals |
 
-The ledger's `api hierarchy` is right: every op has `parent = agent:kernel:<wf>`. What is
+The ledger's `starci kernel hierarchy` is right: every op has `parent = agent:kernel:<wf>`. What is
 wrong is the Orca tree (Run → Task → terminal), which is not synchronized on kernel restart
 and when a job ends.
 
@@ -808,7 +808,7 @@ The owner's idea: a long task gets 3 agents, a very long one 6; turn the knob up
 and 10. The owner adjusts only one thing.
 
 **Current state.** `config.yaml budgets.maxOps` is only validated, nobody enforces it. The
-real number is `runtimes.<pool>.maxParallel`. `api estimate` computes slices from
+real number is `runtimes.<pool>.maxParallel`. `starci kernel estimate` computes slices from
 `allocation.slicing` by a 15–30 minute window, not by size class. The owner has no knob.
 
 **Design.**
@@ -828,16 +828,16 @@ allocation:
       xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
 ```
 
-- `api estimate` returns `size: s|m|l|xl`, `agentsRequested` (from the table × gear),
+- `starci kernel estimate` returns `size: s|m|l|xl`, `agentsRequested` (from the table × gear),
   `agentsAchievable` (the number of path-disjoint slices that can actually be cut) and
   `reason` when achievable < requested.
 - `s`/`m` tasks are always 1 agent. The table applies only to `l`, `xl`.
 - The hard ceiling is still `runtimes.<pool>.maxParallel` + provider slots +
   `budgets.maxOps`. Gear does not raise the ceiling; when slots run short the remaining
-  slices stay queued and `api status` says why.
+  slices stay queued and `starci kernel status` says why.
 - The `from` thresholds come from real data: the closure of implement/refactor jobs in the
   nivo ledger (read a copy, read-only), not guessed.
-- `api status` adds `queuedBecause` for each queued job: `pool-full`, `path-lease`,
+- `starci kernel status` adds `queuedBecause` for each queued job: `pool-full`, `path-lease`,
   `dependency`, `circuit-open`, `max-ops`.
 
 Lane M (Opus) does this.
@@ -1010,7 +1010,7 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
   config, canon has one authority).
 
 - 07:15 AUTH is repeatedly woken by the watchdog: the kernel writes "[owner-gate-pending]" in prose, while status still reports 2 cuts of
-  integration.verify as ready. Patched `6b6f0579f`: `api incident --kind owner-gate --holds` holds the job (queuedBecause
+  integration.verify as ready. Patched `6b6f0579f`: `starci kernel incident --kind owner-gate --holds` holds the job (queuedBecause
   owner-gate, route/dispatch refuse), `--resolve` closes the incident (also the missing resolve verb). The AUTH kernel has
   moved to a structured gate (inc-4f9f44eb513a), actionable=false. Collab is stuck at a question dialog of the Devin CLI;
   the watchdog typed its wake-up text into the "Other" box because the ❭ cursor looks like a prompt. Patched `134fee6a0`: gate agent-question-dialog
@@ -1034,7 +1034,7 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 08:00 Answered the Modules ask (business.decide a8, public Sales route) under delegation: option 1, register the
   versioned Sales operations in Shared, keeping the approved meaning; the kernel was woken. The question shows "Ch?n
   tuy?n" (garbled "Select route"): 7 business.decide reports were written by PowerShell in the old code page, while the yaml records are intact.
-  Patched `d3932b804`: api report rejects prose that lost non-ASCII characters, the packet instructs to write report.json as UTF-8. Merged
+  Patched `d3932b804`: starci kernel report rejects prose that lost non-ASCII characters, the packet instructs to write report.json as UTF-8. Merged
   `lane-p4/e2e-flag` (the baseline e2e test only runs when STARCI_E2E_BASELINE=1). The fork reports a stale-input gap (a job that has
   settled is not marked stale when a knowledge input file changes digest); assigned the fork to do lane P5.
 
@@ -1217,10 +1217,10 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
 - 12:55 Fork: handed step 3edefde1b to the Mia Mia kernel; the owner chose offset-pop first for Mia Mia base-repos; the 4 watchdogs
   of starci-next and mia-mia restarted on main (re-exec every beat). P8 green but merging main (keeping last night's liveness
-  behaviors), adds api reconcile --retry-lineage for queued jobs not yet dispatched. P7b in progress (landed-check by target repo).
+  behaviors), adds starci kernel reconcile --retry-lineage for queued jobs not yet dispatched. P7b in progress (landed-check by target repo).
 
 - 13:30 The owner woke up, saw the nivo sidebar in chaos (ops lost their names, workers sitting outside, 58 agents) and chose "delete everything and restart", kernel
-  default Opus 5.5. Done: snapshot of the 4 goals; stopped 4 watchdogs; settled 12 open jobs as blocked; api finish for 4 workflows; closed every
+  default Opus 5.5. Done: snapshot of the 4 goals; stopped 4 watchdogs; settled 12 open jobs as blocked; starci kernel finish for 4 workflows; closed every
   nivo terminal; closed 160 Orca tasks (run-use a temporary terminal into each old run, task-update completed); releasing 341 workers
   (abandon + release) in progress. Root causes found and patched: settle/finish closed the Task with "done" while Orca only accepts completed so it
   never closed (`8f2623030`); the CLI overwrites the terminal name, the watchdog resets [Kernel]/[Op] (`705cda9ef`); the supervisor adds formal
@@ -1282,7 +1282,7 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 | Audit/e2e/integration real failures | ~20 | the quality loop catching product bugs | keep |
 | Died without report | 27 | infrastructure: dispatch reject, worker died, tonight's `--parent` bug | patched `--parent`, rejectDispatch closes the terminal (L) |
 | Asks counted as failed | ~16 | outcome `ask` settles as blocked, burns an attempt, inflates the failure rate | an ask is a waiting state: settle `awaiting-owner`, costs no attempt |
-| Dispatch when conditions are not met | ~7 | SRS/SDS todo, audit record missing, draw lineage missing | `api dispatch` checks `route.prerequisites` before spawn |
+| Dispatch when conditions are not met | ~7 | SRS/SDS todo, audit record missing, draw lineage missing | `starci kernel dispatch` checks `route.prerequisites` before spawn |
 | `provision.ask` does not say what it asks | 5 | the kernel calls the ask op without giving the question → `QUESTION_UNCLEAR` | enqueue `provision.ask` requires structured question params |
 | Wrong tool per provider | 3 | ImageGen/browser assigned to an agent that lacks them | route filters `riskHints host-tool-required` by agent card capability |
 | Wrong owned path | 1 | | |

@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/enqueue.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/enqueue.yaml
+  - modules/cli/commands/kernel/enqueue.yaml

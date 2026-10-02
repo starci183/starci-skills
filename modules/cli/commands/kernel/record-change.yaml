@@ -56,7 +56,7 @@ refuses:
   - record-change-record-invalid: --record is not a .starciwork record path (a glob, the ledger, kernel evidence)
   - record-change-record-missing: the record holds no record file (index.yaml/resource.yaml)
   - record-change-not-owner: "a file of the record is owned by another workflow (owners names each and
-      the rule); tell the owner with api notify --kind request. The refusal is recorded as a
+      the rule); tell the owner with starci kernel notify --kind request. The refusal is recorded as a
       record-change-refused event {record, reach, owners[]} on --workflow: a cross-workflow
       dependency the Supervisor reads (scripts/kernel/dependency-graph.mjs)"
   - record-change-uncommitted: "a file of the record differs from its committed revision: commit first,

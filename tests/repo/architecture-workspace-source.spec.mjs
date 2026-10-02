@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
 // A workspace package is read at its source: an app importing @demo/shared resolves to packages/shared/src whether or
-// not packages/shared was built, so no build is needed before `hfs check` and the exports apps consume count as used.
+// not packages/shared was built, so no build is needed before `starci app check` and the exports apps consume count as used.
 
 const DECLARED_TSCONFIG = `${JSON.stringify({
   compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true },

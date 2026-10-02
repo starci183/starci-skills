@@ -6,5 +6,5 @@ paths:
   - scripts/kernel/api-verbs/finish.mjs
   - scripts/kernel/api-verbs/archive.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/finish.yaml
-  - modules/kernel/api-commands/archive.yaml
+  - modules/cli/commands/kernel/finish.yaml
+  - modules/cli/commands/kernel/archive.yaml

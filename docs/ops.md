@@ -91,7 +91,7 @@ One rule has one place to be done and at most one place to be checked.
 | `policy` | op-specific policy data | prose an agent is meant to follow |
 
 An op has no authored summary. `modules/ops/registry.yaml` is generated from
-these manifests by `node scripts/route/build-ops-registry.mjs` and carries the
+these manifests by `starci runtime gen-ops` and carries the
 one-line goal, the params, the route keys and the lifecycle position — that is
 where a reader looking for "what is this op for" goes.
 
@@ -103,11 +103,11 @@ or the kernel may set it; the packet delivers the resolved number.
 ```text
 goal leg          scripts/goal/define-goal.mjs --params '{"<op>":{"<name>":<value>}}'
                   → goals.json.opChain.legs[].params   (modules/schemas/goal-plan.yaml)
-enqueue           api enqueue --op <id> --params '<json>'
+enqueue           starci kernel enqueue --op <id> --params '<json>'
                   → resolveOpParams validates type, min, max, enum and setter
                   → refuses `params-invalid` before any jobs row exists
                   → the row stores only the overrides
-dispatch          api dispatch → the brief's defaults with the overrides on top
+dispatch          starci kernel dispatch → the brief's defaults with the overrides on top
                   → packet.params (modules/kernel/dispatch.yaml)
 the agent         reads `params.<name>` from its packet, never a number from prose
 ```
@@ -134,11 +134,11 @@ on any finding.
 ## Lifecycle of an op
 
 ```text
-kernel: api enqueue --op <id> --paths <csv> [--params '<json>']
-      → api dispatch --job <id> --spawn      (the workflow worktree resolved, no worktree per op; worker-start; packet = {op, brief, params, context, constraints, returns})
+kernel: starci kernel enqueue --op <id> --paths <csv> [--params '<json>']
+      → starci kernel dispatch --job <id> --spawn      (the workflow worktree resolved, no worktree per op; worker-start; packet = {op, brief, params, context, constraints, returns})
       → [Op] agent runs the op loop inside owned_paths: READ (read-digest.mjs) → CODE → gate.mjs → FIX → REPORT
-      → api report --job <id> --report <file>  (starci/op-report@1 envelope, gate.json and read-digest.json attached)
-      → api consume-report → api check → api settle --job <id> --verdict <v>
+      → starci kernel report --job <id> --report <file>  (starci/op-report@1 envelope, gate.json and read-digest.json attached)
+      → starci kernel consume-report → starci kernel record-checks → starci kernel settle --job <id> --verdict <v>
                                            (op-gate enforcement; a green op is a checkpoint on wf-<workflowId>, a failed one is preserved and reset; worker released)
 ```
 
@@ -165,8 +165,8 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 8. Put anything op-specific left over under `policy:`.
 9. Fill `route:` so route-op resolves it.
 10. Run `node scripts/checks/check-op-manifest.mjs`, then
-    `node scripts/route/build-ops-registry.mjs` to regenerate the registry and
+    `starci runtime gen-ops` to regenerate the registry and
     `--check` to verify (never hand-edit it; see
     [ops-source-ownership](ops-source-ownership.md)).
-11. Dry-run: `node scripts/kernel/cli.mjs dispatch --job <id>` (no `--spawn`)
+11. Dry-run: `starci kernel dispatch --job <id>` (no `--spawn`)
     prints the packet, params included, without reserving or launching.

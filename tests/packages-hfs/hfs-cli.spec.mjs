@@ -248,7 +248,7 @@ test('every code the check can emit has a Vietnamese catalog entry, and the pack
     assert.match(why[code].titleVi, HAS_VIETNAMESE, code);
     assert.ok(why[code].whyVi.length > 20 && why[code].nextStepVi.length > 20, code);
   }
-  assert.deepEqual(driftOfRuntime(), [], 'run `node scripts/hfs/sync-runtime.mjs` after changing a copied runtime file');
+  assert.deepEqual(driftOfRuntime(), [], 'run `starci release sync-runtime` after changing a copied runtime file');
 });
 
 test('explain names the slot, tier, allowed imports and required tests of a path', () => {

@@ -1,0 +1,24 @@
+group: machine
+verb: seam-policy
+owner: runtime
+summary: plan canon cuts or redispatch a blocked canon slice
+impl: {script: scripts/kernel/seam-policy.mjs}
+positional:
+  - {name: action, enum: [canon-plan, canon-redispatch], required: true, variadic: false}
+flags:
+  - {name: scan, type: string}
+  - {name: cut-id, type: string}
+  - {name: root, type: string}
+  - {name: repo, type: string}
+  - {name: job, type: string}
+  - {name: paths, type: list}
+exit: {"0": plan produced, "2": bad usage}
+json: always
+examples:
+  - starci machine seam-policy canon-plan --scan <file> --cut-id <id>
+  - starci machine seam-policy canon-redispatch --repo <path> --job <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/kernel/seam-policy.mjs
+  - node .claude/scripts/kernel/seam-policy.mjs

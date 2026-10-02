@@ -192,7 +192,7 @@ test('the typed-log rules reach every new dispatch and every kernel boot', async
   assert.match(prompt, /LOG_TYPED_MISSING/);
   assert.match(prompt, /cli\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
   const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
-  assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'api dispatch renders the op prompt with the logging block');
+  assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'starci kernel dispatch renders the op prompt with the logging block');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);
   assert.match(kernelPrompt, /\[boundary\.typedLogs\]/);

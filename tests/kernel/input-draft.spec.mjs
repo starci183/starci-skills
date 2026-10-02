@@ -63,7 +63,7 @@ test('the classifier reads the draft in the input row: the runtime\'s own text i
   assert.equal(draftOwnership(`${WAKE} ${WAKE}`,{texts:[WAKE]}).kind,'runtime','wakes piled up are runtime text, not one submission');
   assert.equal(draftOwnership(`${OTHER} ${WAKE.slice(0,50)}`,{texts:[WAKE]}).kind,'runtime','another path\'s wake plus a cut-short one');
   assert.equal(draftOwnership(`${WAKE} also fix the lint`,{texts:[WAKE]}).kind,'foreign','words the runtime never typed');
-  assert.equal(draftOwnership('[watchdog] wake: api status',{texts:[WAKE]}).kind,'foreign');
+  assert.equal(draftOwnership('[watchdog] wake: starci kernel status',{texts:[WAKE]}).kind,'foreign');
 });
 
 // Every author of runtime-typed text: its leftover draft is runtime text, cleared, never a foreign-input
@@ -146,12 +146,12 @@ test('piled runtime wakes are cleared with Ctrl+U before the wake is typed; the 
 
 test('real foreign text in the draft refuses the wake: one Ctrl+U probe, its cut typed back; a draft that will not empty refuses too',t=>{
   const w=orcaWorld(t);
-  w.seed('term-k',{draft:'[watchdog] wake: api status'});
+  w.seed('term-k',{draft:'[watchdog] wake: starci kernel status'});
   const r=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-k',text:WAKE,intervalMs:0});
-  assert.deepEqual([r.ok,r.delivery,r.evidence,r.draft,r.sent],[false,'foreign-input','draft','[watchdog] wake: api status',null]);
+  assert.deepEqual([r.ok,r.delivery,r.evidence,r.draft,r.sent],[false,'foreign-input','draft','[watchdog] wake: starci kernel status',null]);
   assert.deepEqual(r.draftProbe,{verdict:'real',sends:2,restored:true});
-  assert.deepEqual(w.term('term-k').keys.map(k=>[k.text,k.enter]),[['\u0015',false],['[watchdog] wake: api status',false]],'the probe, then its cut typed back; the wake never');
-  assert.equal(w.term('term-k').draft,'[watchdog] wake: api status','the owner\'s text is back in the box');
+  assert.deepEqual(w.term('term-k').keys.map(k=>[k.text,k.enter]),[['\u0015',false],['[watchdog] wake: starci kernel status',false]],'the probe, then its cut typed back; the wake never');
+  assert.equal(w.term('term-k').draft,'[watchdog] wake: starci kernel status','the owner\'s text is back in the box');
   assert.equal(w.term('term-k').submitted,undefined);
   w.seed('term-s',{draft:`${WAKE}\n${WAKE}`,draftKeep:1});
   const s=w.call('scripts/kernel/wake-delivery.mjs','sendWakeWithProof',{terminal:'term-s',text:WAKE,intervalMs:0});
@@ -186,7 +186,7 @@ test('quit-agent empties a draft before its quit command, and types nothing over
   assert.ok(w.term('term-s').keys.every(k=>k.text==='\u0015'));
 });
 
-/* ------------------------------------------------------------------ api nudge */
+/* ------------------------------------------------------------------ starci kernel nudge */
 
 const nudgeFixture=t=>{
   const w=orcaWorld(t);

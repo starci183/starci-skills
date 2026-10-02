@@ -1,4 +1,4 @@
-# The contract of `api kernel-proposal` (scripts/kernel/verbs/kernel-proposal.mjs): tier 2.
+# The contract of `starci kernel kernel-proposal` (scripts/kernel/verbs/kernel-proposal.mjs): tier 2.
 group: kernel
 verb: kernel-proposal
 owner: runtime

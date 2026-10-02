@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/check.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/check.yaml
+  - modules/cli/commands/kernel/check.yaml

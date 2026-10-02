@@ -77,10 +77,10 @@ test("the Kernel's legitimate api calls, git reads and Orca orchestration pass",
   const { decide, worktree } = kernelSeat(t), wt = worktree.replace(/\\/g, '/');
   const api = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs').replace(/\\/g, '/');
   for (const command of [
-    `node ${api} status --repo ${wt} --workflow wf-kguard`,
-    `node ${api} dispatch-ready --repo ${wt} --workflow wf-kguard`,
-    `node ${api} log --repo ${wt} --workflow wf-kguard --kind decision --msg "next slice" --data '{"why":"the runtime runs git commit at settle"}'`,
-    `node ${api} settle --repo ${wt} --job op-a --verdict pass`,
+    `starci kernel status --repo ${wt} --workflow wf-kguard`,
+    `starci kernel dispatch-ready --repo ${wt} --workflow wf-kguard`,
+    `starci kernel log --repo ${wt} --workflow wf-kguard --kind decision --msg "next slice" --data '{"why":"the runtime runs git commit at settle"}'`,
+    `starci kernel settle --repo ${wt} --job op-a --verdict pass`,
     'git status --short',
     'git log --oneline -5',
     'git diff HEAD',

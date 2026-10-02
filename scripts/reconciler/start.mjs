@@ -270,9 +270,9 @@ export function serviceItems(probes, { publicUrl = null, config = null } = {}) {
 export function supervisorItem({ mode, statusJson, startJson = null }) {
   if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
   const h = statusJson?.health;
-  if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'node scripts/supervisor/start-supervisor.mjs --json');
+  if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'starci supervisor start --json');
   if (h?.live) return green('seats', 'supervisor', 'Supervisor seat', `live${h.terminal ? ` (${h.terminal})` : ''}${h.starting ? ', starting' : ''}`);
-  return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'node scripts/supervisor/start-supervisor.mjs --json');
+  return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'starci supervisor start --json');
 }
 
 /** A Kernel seat row from a watchdog `--once --json` answer. Pure. */
@@ -282,7 +282,7 @@ export function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
   const action = answer?.action ?? null;
   if (seatState === 'live' && answer?.ok !== false) return green('seats', id, name, `live (${action ?? 'ok'})`);
   return red('seats', id, name, `${seatState ?? 'unknown'}${action ? ` (${action})` : ''}${answer?.error ? `: ${String(answer.error).slice(0, 120)}` : ''}`,
-    `node scripts/kernel/kernel-watchdog.mjs --repo <repo> --workflow ${workflowId} --once --repair --json`);
+    `starci machine kernel-watchdog --repo <repo> --workflow ${workflowId} --once --repair --json`);
 }
 
 /* ------------------------------------------------------------ the read-only gather */
@@ -308,7 +308,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from <archive root>/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'starci runtime machine-db (initialises it) or restore from <archive root>/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
@@ -318,7 +318,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
   const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
-  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/housekeeping/ledger-hygiene.mjs)')
+  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, starci runtime ledger-hygiene)')
     : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   push(await worktreeItems({ env, repos: ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
   const pinBad = pinProblems(configuredPins(config));
@@ -363,7 +363,7 @@ export async function worktreeItems({ env = process.env, repos = [], counts = nu
     const id = `worktrees:${path.basename(r.repoRoot)}`, name = `worktrees ${path.basename(r.repoRoot)}`;
     const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : ''}`;
     return r.over || r.orphans.length
-      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: node scripts/machine/worktrees.mjs gc')
+      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: starci machine worktrees gc')
       : green('preflight', id, name, detail);
   });
 }

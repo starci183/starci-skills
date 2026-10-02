@@ -35,19 +35,19 @@ reads: "the job row + its payload (payload.difficulty is the fallback when --dif
   Free-form incident text is evidence for the Kernel but never provider-health input"
 providerCircuit: "a pool whose provider has an OPEN provider-health circuit is rejected with
   \"provider <failureKind> is unavailable: <detail> (circuit open until <iso>; the Kernel clears it
-  with api provider-health --provider <p> --recover --reason <text> --probe)\". An auth circuit
+  with starci kernel provider-health --provider <p> --recover --reason <text> --probe)\". An auth circuit
   records the non-reversible fingerprint of the credential it rejected
   (scripts/agent/credential-fingerprint.mjs: first 12 hex of sha256 over the Orca host account id
   for claude/codex) and reads CLOSED once the credential in effect has a different fingerprint.
   Otherwise only expiry or provider-health --recover closes it; resolving an incident never does. A
   QUOTA circuit (failureKind quota: a card's quotaExhausted) reads \"...; its quota probe clears it
-  (api provider-health --provider <p> --quota-probe, run by the watchdog ...)\" and needs no Kernel.
+  (starci kernel provider-health --provider <p> --quota-probe, run by the watchdog ...)\" and needs no Kernel.
   A CAPACITY circuit (failureKind capacity: modules/models/agents/devin.yaml capacityExhausted)
   expires after allocation.cooldownMs.capacity"
 kernelBias: "a Kernel does not bias a route (owner decision 2026-09-25: a Kernel once routed an
   interface.implement leg with --avoid devin-agent and it went to codex, defeating the evidence
   routing that sends implementation to Devin first). --prefer and --avoid are unknown options on api
-  route and api dispatch: both refuse them with the typed error unknown-option before any work. Pool
+  route and starci kernel dispatch: both refuse them with the typed error unknown-option before any work. Pool
   health and retry evidence are the router's: providerCircuit and lineageAdjust"
 lineageAdjust: "retry-aware routing (scripts/kernel/lineage-route.mjs). For a job with a retry
   lineage (payload.retry.retryOf|resumeOf, same unit of work), each earlier attempt that FAILED on a
@@ -100,7 +100,7 @@ refuses:
   - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps)
     operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind,
     reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the
-    job stays queued and `api status` reports it queuedBecause max-ops'
+    job stays queued and `starci kernel status` reports it queuedBecause max-ops'
   - "path-lease (field `reason`, `waiting: true`): a live `path:<owned_path>` lease of another job
     overlaps the job's owned_paths (dispatch.refuses path-lease). No pool decision is spent and no
     route-decided event written; prints {ok:false, jobId, kind, reason:\"path-lease\", waiting:true,
@@ -112,7 +112,7 @@ refuses:
   - unknown-option: "--prefer or --avoid was passed: a Kernel does not bias a route (kernelBias); only
       the owner goal routing_bias applies"
   - job-unknown: no jobs row for --job
-  - job-reconcile-required: effect_unknown remains fenced until api reconcile proves no effect
+  - job-reconcile-required: effect_unknown remains fenced until starci kernel reconcile proves no effect
   - job-settled: a settled job takes no route — the decision was already spent
   - job-not-queued: a live/leased/answering job cannot be rerouted; inspect status.workers and settle or
       reconcile its exact attempt
@@ -129,11 +129,11 @@ refuses:
     no agent in its <work> order at <difficulty> [...] has it; <pool> has it and is excluded by the
     goal's routing_bias avoid (the owner's). Only the owner changes that bias.\" — or, when no
     holder is only avoided, \"...; the agents that have it (...) are outside that order | no agent
-    card lists it under capabilities.hostTools. Raise api incident --kind tool-unavailable for the
+    card lists it under capabilities.hostTools. Raise starci kernel incident --kind tool-unavailable for the
     owner.\" — both end \"The job stays queued; never dispatch it on an agent without the tool.\""
   - "no decision (UNTYPED): selectPool returned none — capacity, eligibility or quota; a wait
     reason, not a failure. This one refusal prints {ok:false, jobId, kind, difficulty, bias,
     error:<selectPool message>} and exits 1 with no code string for the caller to match on"
-usedBy: "drive.dispatch — `api route` runs BEFORE every `api dispatch`: the model decision is a
+usedBy: "drive.dispatch — `starci kernel route` runs BEFORE every `starci kernel dispatch`: the model decision is a
   ledger fact (payload + route-decided event), never an ad hoc kernel pick and never a dispatch-time
   surprise"

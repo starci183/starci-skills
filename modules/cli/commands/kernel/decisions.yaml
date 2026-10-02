@@ -1,4 +1,4 @@
-# The contract of `api decisions` (scripts/kernel/verbs/decisions.mjs): Decision Items (reconciler DESIGN §10.3,
+# The contract of `starci kernel decisions` (scripts/kernel/verbs/decisions.mjs): Decision Items (reconciler DESIGN §10.3,
 # §11; contract change decision-items). The store logic is scripts/machine/decisions.mjs.
 group: kernel
 verb: decisions
@@ -88,8 +88,8 @@ removed:
 purpose: 'The one durable channel for "someone must decide": controllers and the SLA layer open a
   Decision Item (DI, starci/decision-item@1) for the Kernel, the Supervisor opens a
   supervisor-ruling DI instead of typing a notice (scripts/supervisor/notify.mjs), and a doorbell
-  only reminds the seat that DIs wait. The Kernel reads `api decisions --workflow <wf>` FIRST every
-  wake and resolves each item with one of its allowedVerbs and the `api decide` id it acted under. A
+  only reminds the seat that DIs wait. The Kernel reads `starci kernel decisions --workflow <wf>` FIRST every
+  wake and resolves each item with one of its allowedVerbs and the `starci kernel decide` id it acted under. A
   DI past dueAt is escalated once; past dueAt x2 it is escalated to the Supervisor
   (scripts/machine/decisions.mjs escalateDue). A claim holds a DI for 15 minutes.'
 reads:
@@ -112,14 +112,14 @@ rules:
   supervisorClaim: a --by supervisor claim of a decider-kernel DI needs the DI escalated, or its kind
     cross-workflow|deadlock
   decisionsFirst: an open, unclaimed decider-kernel DI older than 2 minutes (never a
-    supervisor-ruling; a job DI only while its job still waits on the Kernel) makes api route,
+    supervisor-ruling; a job DI only while its job still waits on the Kernel) makes starci kernel route,
     dispatch, enqueue and dispatch-ready refuse decisions-first with the oldest item and its
     copy-paste commands (scripts/machine/decisions.mjs refuseDecisionsFirst); a command carrying
     --resolves <that DI id>, and the children of graph-edit and redesign, pass. --next prints that
     item alone
   autoClose: every list closes a supervisor-ruling opened before the Kernel's latest runtime-rev ack
-    and a job DI whose job no longer waits on the Kernel (resolution by runtime); api archive and
-    api finish resolve every live DI of their workflow in the same transaction before the phase
+    and a job DI whose job no longer waits on the Kernel (resolution by runtime); starci kernel archive and
+    starci kernel finish resolve every live DI of their workflow in the same transaction before the phase
     flips (resolution by runtime, verb workflow-archived | workflow-finished, event
     decision-resolved auto:true), and a DI of an archived or finished workflow is never listed,
     escalated, rung or digested

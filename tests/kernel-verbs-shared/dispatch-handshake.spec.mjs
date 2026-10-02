@@ -12,7 +12,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-// Lane m13 — the dispatch handshake (defect: `api dispatch` marked a job
+// Lane m13 — the dispatch handshake (defect: `starci kernel dispatch` marked a job
 // running although the spawned terminal died at `401 Invalid API-key`).
 // A fake `orca` binary — a node script spawned through the existing
 // STARCI_ORCA_COMMAND/STARCI_ORCA_ARGS overrides — serves canned receipts:

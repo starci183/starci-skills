@@ -1,4 +1,4 @@
-# The contract of `api kernel-ack-rev` (scripts/kernel/verbs/kernel-ack-rev.mjs). One file per extension verb
+# The contract of `starci kernel kernel-ack-rev` (scripts/kernel/verbs/kernel-ack-rev.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.kernel-ack-rev (lane slim-api).
 group: kernel
 verb: kernel-ack-rev

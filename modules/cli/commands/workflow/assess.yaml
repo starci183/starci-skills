@@ -1,0 +1,16 @@
+group: workflow
+verb: assess
+owner: runtime
+summary: cold-scan repositories for goal-definition evidence
+impl: {script: scripts/goal/assess.mjs}
+flags:
+  - {name: repo, type: list}
+exit: {"0": assessment completed, "2": bad usage}
+json: flag
+examples:
+  - starci workflow assess --repo <path> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/goal/assess.mjs
+  - node .claude/scripts/goal/assess.mjs

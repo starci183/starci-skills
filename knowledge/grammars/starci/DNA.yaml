@@ -20,7 +20,7 @@ provenance:
   styleEntrypoint: "@starci/grammar/core/styles.css"
   generatedBy: "scripts/work/ui/grammar-knowledge.mjs --write (dna, tokens[], renderers[], identity.counts, provenance.digests)"
   driftCheck: |
-    `node scripts/work/ui/grammar-knowledge.mjs` (and `tests/work-ui/grammar-knowledge.spec.mjs` under `npm test`)
+    `starci work grammar-knowledge` (and `tests/work-ui/grammar-knowledge.spec.mjs` under `npm test`)
     compares this file with the source: `dna` must deep-equal every object `src/core/dna.ts` exports,
     each token row's value/dark/overrides must equal what `src/core/styles.css` (or Common) sets, and the
     renderer rows must equal the Common registry census, closed values included.

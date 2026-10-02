@@ -9,7 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {spawnAgent} from '../../scripts/agent/lib.mjs';
 
-// nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `api dispatch --job
+// nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `starci kernel dispatch --job
 // op-backend.implement-dd957e8395 --spawn` in a shell `timeout 115`, which killed the api mid-spawn. The row
 // stayed leased with no worker and no terminal: reconcile --drop refused drop-not-queued, --dead-worker
 // refused dead-worker-not-running, dispatch refused job-not-queued. The lease deadline (jobs.deadline,
@@ -89,7 +89,7 @@ test('past its lease deadline it is launch-abandoned: worker-dead, and reconcile
 test('the driver loop forbids bounding an api call with a shell timeout',async()=>{
   const {parseYaml}=await import('../../engine/yaml.mjs');
   const rule=parseYaml(fs.readFileSync(path.join(ROOT,'modules','kernel','driver-loop.yaml'),'utf8')).boundary.apiCallsRunToEnd;
-  assert.match(rule,/Never wrap an api call \(`api dispatch --spawn` above all\) in a shell\s+`timeout`/);
+  assert.match(rule,/Never wrap an api call \(`starci kernel dispatch --spawn` above all\) in a shell\s+`timeout`/);
 });
 
 // nivo inc-e523617a3c31: a job settled failed while the worker its killed dispatch created was still live, and nothing

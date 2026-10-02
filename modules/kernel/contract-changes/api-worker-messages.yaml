@@ -9,6 +9,6 @@ paths:
   - scripts/kernel/api-verbs/messages.mjs
   - scripts/kernel/api-verbs/reply.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/questions.yaml
-  - modules/kernel/api-commands/messages.yaml
-  - modules/kernel/api-commands/reply.yaml
+  - modules/cli/commands/kernel/questions.yaml
+  - modules/cli/commands/kernel/messages.yaml
+  - modules/cli/commands/kernel/reply.yaml

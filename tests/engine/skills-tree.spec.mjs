@@ -37,7 +37,7 @@ test('the workflow-chat skill is product-agnostic, forbids writing the store and
   assert.ok(/## Never[\s\S]*second workflow/.test(skill),'the Never section covers a second workflow');
   assert.ok(/inbox/.test(skill)&&/kernel terminal|cli\.mjs/.test(skill),'a live kernel is driven through inbox rows and its terminal');
   assert.ok(/Never approve/.test(skill),'approval is the owner\'s');
-  assert.ok(/`managed-agent` or `tool-unavailable`/.test(skill)&&/Orca host/.test(skill),'the api dispatch refusals the host cannot serve are relayed to the Orca host');
+  assert.ok(/`managed-agent` or `tool-unavailable`/.test(skill)&&/Orca host/.test(skill),'the starci kernel dispatch refusals the host cannot serve are relayed to the Orca host');
   const entry=read('CONTEXT.md');
   assert.ok(entry.includes('skills/workflow-chat'),'the entry routes a chat to the skill');
   // One shipped bootstrap template: init/AGENTS.md. CLAUDE.md/DEVIN.md are install-time copies emitted only

@@ -8,8 +8,8 @@ summary: >-
   dropped unit as a new try; scan records and proposal patches are kernel artifacts, never .starciwork/kernel-evidence.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/enqueue.yaml
-  - modules/kernel/api-commands/graph-edit.yaml
-  - modules/kernel/api-commands/kernel-proposal.yaml
+  - modules/cli/commands/kernel/enqueue.yaml
+  - modules/cli/commands/kernel/graph-edit.yaml
+  - modules/cli/commands/kernel/kernel-proposal.yaml
   - modules/kernel/driver-loop.yaml
   - modules/kernel/contract-changes/a3-canon-plan-gate.yaml

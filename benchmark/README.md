@@ -41,8 +41,8 @@ benchmark/
    `--repo` it takes the Work owner of every `.workspaces/projects/<p>/work.json` binding that holds a ledger:
 
    ```sh
-   node scripts/agent/benchmark-snapshot.mjs --since-hours 72
-   node scripts/agent/benchmark-snapshot.mjs --since-hours 72 --repo ../nivo-backend --repo ../mia-mia-backend
+   starci runtime benchmark-snapshot --since-hours 72
+   starci runtime benchmark-snapshot --since-hours 72 --repo ../nivo-backend --repo ../mia-mia-backend
    ```
 
    It writes `benchmark/snapshots/<today>-<N>h.json` and prints a short per-pool delta against the newest

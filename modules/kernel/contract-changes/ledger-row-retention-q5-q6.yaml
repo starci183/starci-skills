@@ -14,5 +14,5 @@ safetyCritical: false
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/ledger-row-retention-q5-q6.yaml
-  - modules/kernel/api-commands/finish.yaml
+  - modules/cli/commands/kernel/finish.yaml
   - scripts/lib/hk-ledger.mjs

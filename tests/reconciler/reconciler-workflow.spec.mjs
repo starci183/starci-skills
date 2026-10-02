@@ -122,7 +122,7 @@ test('a running workflow with a null goal text gets a critical GOAL_TEXT_MISSING
   assert.equal(slaDecisions.filter((d) => d.kind === 'runtime-defect').length, 1);
 }));
 
-test('asks: dead / stale / unserved are re-parked through api serve-ask (a would-row in shadow); on-demand is untouched', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+test('asks: dead / stale / unserved are re-parked through starci kernel serve-ask (a would-row in shadow); on-demand is untouched', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger, { progressAgoMin: 5 });
   const addAsk = (dispatchId, notified) => {
     // An open ask is a filed ask report on an attempt (poll.mjs openAsks): one job, one dispatch.
@@ -147,7 +147,7 @@ test('asks: dead / stale / unserved are re-parked through api serve-ask (a would
   assert.deepEqual(rec.api.map((a) => [a.verb, ...a.argv]), [['serve-ask', '--workflow', WF, '--dispatch', 'ctx_unserved00001']]);
 }));
 
-test('finish-ready (every job settled, handover approved) is api finish; an ended workflow clears its clocks', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
+test('finish-ready (every job settled, handover approved) is starci kernel finish; an ended workflow clears its clocks', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger, { progressAgoMin: 5 });
   const { ctx, rec } = fakeCtx({ repoRoot, ledgerFile, statusOf: () => status({ frontier: { state: 'finish-ready', actionable: true, openOperations: 0 },
     kernelRev: { stale: true, acked: 'a7461cbb4952aaaa', current: 'b709a530dffcbbbb', files: ['modules/kernel/driver-loop.yaml'] } }) });

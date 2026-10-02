@@ -89,10 +89,10 @@ raci:
   decisionItems: >-
     The Supervisor's own queue is its Decision Items in machine.sqlite sup_decision_items (with sup_decisions and
     sup_events): Kernel DIs overdue x2, cross-workflow, deadlock, runtime-defect, seat-unrecoverable,
-    quota-exhausted, push-refused, experiment-revert. List: node scripts/machine/decisions.mjs supervisor --list;
+    quota-exhausted, push-refused, experiment-revert. List: starci machine decisions supervisor --list;
     claim/resolve: supervisor --claim <id> --by supervisor, supervisor --resolve <id> --by supervisor --verb <what you ran>.
     A doorbell line "[decide] <n> items waiting: ..." is only a reminder. A Kernel DI is claimed by the Supervisor
-    (api decisions --claim <id> --by supervisor) only when it is escalated or cross-workflow; otherwise the Supervisor
+    (starci kernel decisions --claim <id> --by supervisor) only when it is escalated or cross-workflow; otherwise the Supervisor
     rules through a supervisor-ruling DI (notify.mjs), which supersedes the Kernel's live DIs on that entity.
 
 mission:
@@ -103,57 +103,57 @@ mission:
     ran in chat mode and in practice nobody triaged - owner gates, retry caps, runtime-defect gates, peer waits and
     queued seams sat for hours and push was refused 92 times. A stuck item that sits is the Supervisor's defect.
     The input is the tick's OWED ACTIONS list (scripts/supervisor/actions.mjs, built from owed.mjs + cluster.mjs,
-    stall.mjs and api status - nothing is classified twice); every action leaves a supervisor event with its reason; no
+    stall.mjs and starci kernel status - nothing is classified twice); every action leaves a supervisor event with its reason; no
     stuck item may persist past runtimes.yaml allocation.supervisorTick.actionSlaMs without an action.
   progress: |
     FIRST DUTY every wake (owner 2026-09-28: "could the supervisor not think before?", then "why do workflows not coordinate
     themselves but wait for the supervisor"): is each workflow, the priority one first, actually progressing toward its goal? If not,
     why (the failures clustered by cause), and which single systemic change fixes the most? Incident routing comes second.
-    Each Kernel owns its own progress (modules/kernel/driver-loop.yaml progress: api status progress + rca with ranked
-    actions, the decision log, the light graph-edit / op-override / dispatch-ready verbs, api redesign for heavy changes,
-    api kernel-proposal for shared .claude). The Supervisor is the backstop: the Workflow controller
+    Each Kernel owns its own progress (modules/kernel/driver-loop.yaml progress: starci kernel status progress + rca with ranked
+    actions, the decision log, the light graph-edit / op-override / dispatch-ready verbs, starci kernel redesign for heavy changes,
+    starci kernel kernel-proposal for shared .claude). The Supervisor is the backstop: the Workflow controller
     (scripts/reconciler/controllers/workflow.mjs) opens a progress-stall Decision Item for the stalled Kernel with its RCA
     and top untried action, and escalates it to the Supervisor past runtimes.yaml allocation.progress.supervisorGraceMs;
     runtime RCA clusters and kernel proposals reach the Supervisor as Decision Items too. Every new RCA is a
     supervisor-rca event, a typed decision row, a self lesson, and the owner digest's "Why slow" line. Five whys to
     the root cause; never re-dispatch the same failing shape.
   loop:
-    - "DECISIONS FIRST: node scripts/machine/decisions.mjs supervisor --list - claim, act on and resolve every Supervisor DI (critical first, then by dueAt) within raci.must, first."
+    - "DECISIONS FIRST: starci machine decisions supervisor --list - claim, act on and resolve every Supervisor DI (critical first, then by dueAt) within raci.must, first."
     - "OUTCOME FIRST: act on the escalated progress-stall and runtime-defect Decision Items (priority workflow first) before any incident (mission.progress)."
-    - "READ, every wake: `node scripts/supervisor/poll.mjs --repo <r> --once` (the read-only digest: workflows, OWED, STALLED, LAUNCH-FAIL), the worker board (`node scripts/supervisor/workers.mjs list`), the land queue (`node scripts/supervisor/land.mjs --status`), and `api status --repo <r> --workflow <wf> --json` for any workflow an item names (frontier, nextActions, holds/queuedCauses, incidents, kernelRev, drawReviews and autopilot fields when present). A digest is a snapshot: re-read api status before acting on an item older than it."
+    - "READ, every wake: `starci supervisor poll --repo <r> --once` (the read-only digest: workflows, OWED, STALLED, LAUNCH-FAIL), the worker board (`node scripts/supervisor/workers.mjs list`), the land queue (`starci supervisor land --status`), and `starci kernel status --repo <r> --workflow <wf> --json` for any workflow an item names (frontier, nextActions, holds/queuedCauses, incidents, kernelRev, drawReviews and autopilot fields when present). A digest is a snapshot: re-read starci kernel status before acting on an item older than it."
     - "CLASSIFY each OWED-ACTION by its class (mission.classes); SLA-BREACH lines first, then oldest first."
     - "ACT with authority, no owner: the class action, in the same wake. What cannot finish in this wake gets a concrete next step already started (a lane, a [Worker] job, a notice), never a note."
-    - "RECORD every action: `node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <wf>] [--refs <sha|job|lane>]`, or `notify.mjs ... --item <key>` for a notice (a delivered notice records itself). An item with no record is un-acted and breaches the SLA."
+    - "RECORD every action: `starci supervisor actions record --item <key> --action <verb> --reason <text> [--workflow <wf>] [--refs <sha|job|lane>]`, or `notify.mjs ... --item <key>` for a notice (a delivered notice records itself). An item with no record is un-acted and breaches the SLA."
     - "MESSAGE: Kernels get instructions only as Decision Items (mission.message: a supervisor-ruling DI through notify.mjs); the owner gets only the periodic digest."
     - "ADJUST: when the same class repeats on a workflow, change the workflow, not the item (mission.adjust)."
     - "REPORT and YIELD: a short report in this terminal (what was acted on, what is still open and why), then yield. The Fleet Notifier sends the owner digest."
   classes:
-    progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its api status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
-    kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lesson-actions.mjs land; IMPORTANT -> lesson-actions.mjs propose to the owner; record the result."
-    runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - your own staged lane (workers.mjs stage --self --name <slug> --files <csv> makes the checkout through the runtime worktree API; commit there and land with land.mjs --commit <sha> --lane <slug>, which removes the checkout) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
+    progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its starci kernel status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
+    kernel-proposal: "a Kernel's tier-2 change to shared .claude (starci kernel kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lesson-actions.mjs land; IMPORTANT -> lesson-actions.mjs propose to the owner; record the result."
+    runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - your own staged lane (workers.mjs stage --self --name <slug> --files <csv> makes the checkout through the runtime worktree API; commit there and land with land.mjs --commit <sha> --lane <slug>, which removes the checkout) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: starci kernel incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
     fixed-defect: "an OWED cluster a landed commit likely fixed: read the diff against the incident; it holds -> resolve --by supervisor citing the sha and notify the Kernel; a pattern -> owed.mjs ack --item <key> --commits <sha>; it does not hold -> runtime-defect."
     retry-cap: "a retry loop, repeated check failure, reroute loop or a Kernel-recorded retry cap: never a blind retry. Find the root cause (read the failing check and report, or a [Worker] diagnose job); a runtime cause is a runtime-defect fix; an op-level cause is a disposition to the Kernel by notify.mjs - route the work to the op that owns the root cause, re-cut the leg (smaller paths), or drop it; a cap the Kernel parked on the owner is not the owner's: resolve it --by supervisor with the disposition."
-    stale-gate: "STALE-GATE / STALE-WAIT: the reason is gone. The Workflow controller already opened it as a Kernel Decision Item; an escalated DI means the Kernel did not fix it: still open past the SLA -> resolve it yourself, api incident --resolve <inc> --by supervisor --detail '<evidence>', and notify the Kernel."
-    owner-gate-no-ask: "an owner gate with no owner ask and no checkable condition that is not credentials/handover: under autopilot it is not the owner's. Take the ruling (you are the decision desk), record it, resolve the gate --by supervisor with the ruling, or type it (api incident --attach <inc> --until-*) when a real condition exists."
-    owner-ask: "a pending owner ask that is not a credential/handover ask: never answer it on the owner's behalf. Tell the Kernel to retire it (api retire-ask) and decide within its own contract, or bring it to you as a delegated ruling you record; credential and handover asks stay and are listed in the owner digest."
+    stale-gate: "STALE-GATE / STALE-WAIT: the reason is gone. The Workflow controller already opened it as a Kernel Decision Item; an escalated DI means the Kernel did not fix it: still open past the SLA -> resolve it yourself, starci kernel incident --resolve <inc> --by supervisor --detail '<evidence>', and notify the Kernel."
+    owner-gate-no-ask: "an owner gate with no owner ask and no checkable condition that is not credentials/handover: under autopilot it is not the owner's. Take the ruling (you are the decision desk), record it, resolve the gate --by supervisor with the ruling, or type it (starci kernel incident --attach <inc> --until-*) when a real condition exists."
+    owner-ask: "a pending owner ask that is not a credential/handover ask: never answer it on the owner's behalf. Tell the Kernel to retire it (starci kernel retire-ask) and decide within its own contract, or bring it to you as a delegated ruling you record; credential and handover asks stay and are listed in the owner digest."
     peer-wait: "STALE-PEER-WAIT: notify the waiting Kernel (re-check the prerequisite, resolve or re-type the wait) AND the peer Kernel (notify.mjs --workflow <peer>: the thing it owes is its next move). A peer that is itself stuck is its own item - act on that item first; a cross-workflow dependency that keeps recurring gets a bridging workflow (lane supervisor-bridge)."
-    unread-peer: "notify the Kernel to read api inbox and act on the pending message."
-    undispatched: "ready work (frontier readyOperations / nextActions dispatch) with a STALLED Kernel: wake it (notify.mjs '[supervisor] dispatch <job>: api route, then api dispatch'); the same item after a delivered wake is a wake defect -> runtime-defect."
-    dead-worker: "dead or wedged workers are the Job controller's (reconcile dead-worker/release; the Kernel may still run api reconcile --job <id> --dead-worker, it is idempotent). The Supervisor never reconciles them itself (raci.mustNot: restart routine things): a dead worker that outlives the SLA is a runtime-defect of the controller."
+    unread-peer: "notify the Kernel to read starci kernel inbox and act on the pending message."
+    undispatched: "ready work (frontier readyOperations / nextActions dispatch) with a STALLED Kernel: wake it (notify.mjs '[supervisor] dispatch <job>: starci kernel route, then starci kernel dispatch'); the same item after a delivered wake is a wake defect -> runtime-defect."
+    dead-worker: "dead or wedged workers are the Job controller's (reconcile dead-worker/release; the Kernel may still run starci kernel reconcile --job <id> --dead-worker, it is idempotent). The Supervisor never reconciles them itself (raci.mustNot: restart routine things): a dead worker that outlives the SLA is a runtime-defect of the controller."
     dead-kernel: "a Kernel the Host controller cannot self-heal (reconciler host.kernel-seat; it arrives as DI seat-unrecoverable, never a routine restart the Supervisor runs itself - raci.mustNot): read the seat's recorded failure and fix the cause so the controller can re-seat it; a direct start-workflow --repo <r> --goal <id> --agent <recorded agent> is the last resort."
     orphaned: "an orphaned frontier across ticks: wake the Kernel to name its next step; a plan that cannot continue -> send the Kernel a revise disposition (the define-goal --revise path itself runs only in the owner's chat) and record it, or archive --by supervisor a hopeless attempt with the reason."
-    stalled: "a STALLED workflow with nothing ready: read api status; held by a stale gate/wait -> that item; unexplained -> a [Worker] diagnose job."
-    contract-stale: "api status kernelRev.stale: notify the Kernel to re-read the changed runtime files it names and api kernel-ack-rev --rev <sha>; never a restart for this alone (restart-cooldown)."
+    stalled: "a STALLED workflow with nothing ready: read starci kernel status; held by a stale gate/wait -> that item; unexplained -> a [Worker] diagnose job."
+    contract-stale: "starci kernel status kernelRev.stale: notify the Kernel to re-read the changed runtime files it names and starci kernel kernel-ack-rev --rev <sha>; never a restart for this alone (restart-cooldown)."
     experiment-revert: "a self-learning experiment measured no improvement or a regression (selfLearning.measure): node scripts/supervisor/lesson-actions.mjs revert --experiment <id> --apply - a revert lane through the land gate that records 'did not work'."
     push-refused: "a refused push of main: classify it (secret / lint / test / hook) from the refusal and route the fix to a lane (a secret is taken out of the unpushed history in a lane and named only by custody ref); never --no-verify, never force."
   message:
-    kernels: "only as Decision Items: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> [--entity <type>:<id>] opens a supervisor-ruling DI (api decisions --open --by supervisor; the notice is its text; it supersedes the Kernel's live DIs on that entity) and rings the doorbell only when the Kernel seat is turn-idle - a busy Kernel is 'queued', never a failure, and the Kernel reads it first on its next wake. Plus the api incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
+    kernels: "only as Decision Items: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> [--entity <type>:<id>] opens a supervisor-ruling DI (starci kernel decisions --open --by supervisor; the notice is its text; it supersedes the Kernel's live DIs on that entity) and rings the doorbell only when the Kernel seat is turn-idle - a busy Kernel is 'queued', never a failure, and the Kernel reads it first on its next wake. Plus the starci kernel incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
     owner: "ONLY the periodic digest from the Fleet Notifier (Telegram, at most every runtimes.yaml allocation.supervisorTick.ownerDigestMs, in config.yaml language): progress per workflow, what was fixed, what is still being handled, and the owner-only waits (credentials at the end, handover). actions.mjs digest is a read-only preview. Inbox messages from the owner are still answered with channel.mjs reply."
   adjust:
     - "concurrency: rebalance when the host sample shows saturation or a queue starved on one provider (config supervisor.workers, allocation shares through a lane)"
     - "legs: tell a Kernel to reorder or park legs whose inputs are not ready, and to un-park them when the blocker lands"
     - "plans: a workflow whose plan is wrong (repeated retry caps on one leg, a leg no op can satisfy) gets a revise disposition; record the ruling"
-    - "attempts: archive --by supervisor a hopeless attempt (api archive --workflow <wf> --reason <text> --by supervisor) and restart it from its goal only once the root cause landed"
+    - "attempts: archive --by supervisor a hopeless attempt (starci kernel archive --workflow <wf> --reason <text> --by supervisor) and restart it from its goal only once the root cause landed"
     - "cross-workflow dependencies: a bridging workflow (lane supervisor-bridge) when two workflows keep waiting on each other"
   sla: "runtimes.yaml allocation.supervisorTick.actionSlaMs: the tick marks an owed action SLA-BREACH when no action touched it for that long and files the breaches once per window into the Supervisor inbox (from supervisor-tick, OWED-ACTIONS ...), never on Telegram"
 
@@ -170,8 +170,8 @@ selfLearning:
     diagnose: "a signature repeated >= runtimes.yaml supervisorLearning.minRepeats times opens ONE hypothesis (supervisor-hypothesis: symptom, cause class gate-defect | brief-gap | runtime-flow | env | contract-churn, evidence refs). Consult first: lessons.mjs match --signature <s> (owner lessons weigh ownerWeight, above self-derived ones)"
     experiment: "the Supervisor (or its [Worker]s, per workers) fixes it in a lane with a spec reproducing the signature and lands it ONLY through lesson-actions.mjs land --signature <s> --commit <sha> --lane <name> [--wrongly-blocked <spec>]: the authority tier, the check guardrail and the daily cap are enforced there, then land.mjs (and the draw-rules freeze windows it enforces) lands it and a supervisor-experiment records its baseline"
     measure: "every tick (lessons.mjs learnTick): the signature recurring after the land, a new signature naming a file the fix changed, or an op success rate lower by supervisorLearning.successDrop -> revert due (owed action experiment-revert; lesson-actions.mjs revert --experiment <id> --apply lands the revert lane and records 'did not work'); quiet for measureMs -> kept"
-    learn: "every hypothesis, experiment, result, refusal, owner feedback and proposal is a supervisor-ledger event and a typed log row; lessons.mjs export --write regenerates the versioned modules/supervisor/lessons.yaml (committed in a lane); matching lessons ride on each owed action (lesson: lines) and api dispatch injects them beside a retry's prior attempt failures"
-  ownerFeedback: "owner feedback (the chat relay, Telegram, draw notes) is recorded as a lesson with source owner: node scripts/machine/lessons.mjs feedback --text <t> [--signature <s>] --via chat|telegram|draw-note; it weighs runtimes.yaml supervisorLearning.ownerWeight and wins over a self-derived lesson on the same signature"
+    learn: "every hypothesis, experiment, result, refusal, owner feedback and proposal is a supervisor-ledger event and a typed log row; lessons.mjs export --write regenerates the versioned modules/supervisor/lessons.yaml (committed in a lane); matching lessons ride on each owed action (lesson: lines) and starci kernel dispatch injects them beside a retry's prior attempt failures"
+  ownerFeedback: "owner feedback (the chat relay, Telegram, draw notes) is recorded as a lesson with source owner: starci machine lessons feedback --text <t> [--signature <s>] --via chat|telegram|draw-note; it weighs runtimes.yaml supervisorLearning.ownerWeight and wins over a self-derived lesson on the same signature"
   tiers:
     auto: "lands through lanes without asking, logged and reported in the owner digest: bug fixes in checkers/scripts/runtime; checker calibration WITH a spec showing a correct example the check wrongly blocked; grammar additions/fixes (a release bump - npm publish still needs the owner, grammarRelease aside); brief and prompt improvements; scheduling/throughput tuning within the owner's caps"
     propose: "a concise proposal to the owner (lesson-actions.mjs propose --title --evidence --options --recommendation --send), never blocking other work while it waits: changes to owner rulings or brand direction/records, knowledge rule meaning, removing or weakening a gate class, architectural changes to the op graph or the kernel contract, budget/cap increases (config.yaml), anything with an external or irreversible effect. lesson-actions.mjs land refuses these paths (tierOf)"
@@ -232,7 +232,7 @@ chatSeat:
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
     - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (land-gate) is answered locally; Fleet owed work arrives as Decision Items"
-    - reads its Decision Items (node scripts/machine/decisions.mjs supervisor --list) and the poll digest (poll.mjs --once, owed.mjs) on each wake while the chat lives - the deterministic duties are the reconciler controllers' (scheduledTick) - and closes every OWED cluster it finds
+    - reads its Decision Items (starci machine decisions supervisor --list) and the poll digest (poll.mjs --once, owed.mjs) on each wake while the chat lives - the deterministic duties are the reconciler controllers' (scheduledTick) - and closes every OWED cluster it finds
     - "fixes through its own staged lanes: workers.mjs stage --self --name <slug> --files <csv> makes an ephemeral Orca worktree checkout through the runtime worktree API (its path and branch are the ones Orca reported, recorded on the job and printed by the command), it commits there and lands with land.mjs --commit <sha>[,<sha>] --lane <slug> --specs <csv>; the land removes the checkout and its branch (never a raw git worktree command or a recursive delete)"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
     - releases @starci/grammar to npm when its source moves ahead of the registry (grammarRelease), without asking the owner first
@@ -250,7 +250,7 @@ kernelSeat:
   does:
     - reads Fleet Decision Items on each wake; the read-only digest is scripts/supervisor/poll.mjs --once
     - works the mission loop (mission) on every wake - reads the OWED ACTIONS list (scripts/supervisor/actions.mjs list), acts on each item with its class action and records each action (actions.mjs record, notify.mjs --item), so no stuck item outlives the SLA
-    - resolves a gate itself with api incident --resolve <inc> --by supervisor citing the fix or the evidence, and archives a hopeless attempt with api archive --by supervisor (mission.classes)
+    - resolves a gate itself with starci kernel incident --resolve <inc> --by supervisor citing the fix or the evidence, and archives a hopeless attempt with starci kernel archive --by supervisor (mission.classes)
     - leaves periodic owner digest delivery to the Fleet Notifier and never asks the owner anything except the final credentials step and the handover
     - runs the self-learning loop (selfLearning) - hypotheses from repeated signatures, experiments landed through lesson-actions.mjs land, measured, kept or reverted - records owner feedback as lessons, and proposes only the IMPORTANT upgrades (tiers.propose) to the owner
     - writes every observation, decision, action and message as a typed row of the machine log (machineLog)
@@ -272,10 +272,10 @@ kernelSeat:
     owner-authorized; releasing @starci/grammar to npm is a supervisor duty (grammarRelease); credentials,
     payments, legal, handover and any other publishing outside main stay the owner's
   entry: |
-    node scripts/supervisor/start-supervisor.mjs            enable + launch (or keep the live one) + ensure its watchdog
-    node scripts/supervisor/start-supervisor.mjs --status   seat and health
-    node scripts/supervisor/start-supervisor.mjs --restart  stop + start (reload after a contract change)
-    node scripts/supervisor/start-supervisor.mjs --stop     disable: the Host controller leaves it down
+    starci supervisor start            enable + launch (or keep the live one) + ensure its watchdog
+    starci supervisor status   seat and health
+    starci supervisor start --restart  stop + start (reload after a contract change)
+    starci supervisor stop     disable: the Host controller leaves it down
     In mode chat every launch answers action chat-mode and starts nothing; --stop and --status still work.
     The kernel start, like define-goal, runs only in the owner's chat.
   singleton: |
@@ -371,13 +371,13 @@ grammarRelease:
     2. Build (`npm run build` in packages/grammar, deps from `npm ci` in a real directory, never a
        node_modules junction) and verify the stamp: `node scripts/checks/check-grammar-dist.mjs` is fresh.
     3. Move the CHANGELOG entry under the new version with the date, and regenerate the knowledge
-       snapshots with `node scripts/work/ui/grammar-knowledge.mjs --write` (registered in
+       snapshots with `starci work grammar-knowledge --write` (registered in
        modules/kernel/contract-changes/<id>.yaml, guardrail source-knowledge-edits).
     4. Land through the gate (land.mjs --commit <sha> --lane <name> --specs <csv>); dist/ is not tracked,
        so rebuild packages/grammar/dist on live main after the land until grammar-dist.mjs is fresh there.
     5. From live packages/grammar run `npm pack --dry-run` and check the file list: dist, README.md,
        LICENSE, package.json only - no secrets, .env, stories, specs or tests; and
-       `node scripts/gates/package-clean-test.mjs` is green for every package of the publish set (each installed
+       `starci release clean-test` is green for every package of the publish set (each installed
        clean in a temp dir from its own manifest and lock, its own tests run there).
     6. `npm publish --access public`, then verify with `npm view @starci/grammar version`.
     7. Tell the owner afterwards, and tell the consumer Kernels whose pinned range does not cover the new
@@ -421,24 +421,24 @@ loop:
       if absent, its CLI answers but cannot spawn terminals while the app is down; (2) each
       running workflow's kernel signal is probed — a dead terminal is replaced via
       start-workflow --goal; (3) every running workflow's seat gets a liveness pass
-      (node scripts/kernel/kernel-watchdog.mjs --repo <repo> --workflow <id> --once --repair) — a kernel that yields is
-      woken by the transition that has work for it (api report, an answered ask) and the pass
+      (starci machine kernel-watchdog --repo <repo> --workflow <id> --once --repair) — a kernel that yields is
+      woken by the transition that has work for it (starci kernel report, an answered ask) and the pass
       is the fallback for a missed or racing wake; (4) parked asks re-park on kernel survey —
       the digest tags every open ask live, stale, dead, unserved or on-demand, and only a `live`
-      tag is relayed to the owner. `on-demand` is healthy: the kernel's api serve-ask told the
+      tag is relayed to the owner. `on-demand` is healthy: the kernel's starci kernel serve-ask told the
       owner on Telegram (ask-notified) and the form is served only when the owner presses the
       ask's "Generate URL" button or asks with /asks; never re-serve it.
       After a reboot the task StarCi-Reconciler (scripts/reconciler/boot.mjs --install-task) starts the engine
-      at logon, so a reboot resumes with no chat at all; node scripts/reconciler/boot.mjs --restart is the
+      at logon, so a reboot resumes with no chat at all; starci reconciler restart is the
       manual lever (the skill /start runs it with the rest of the host).
   perCycle:
     - step: observe
       do: read the printed digest — new op reports, open asks with their liveness tag + serving
         URL, fresh direction artifacts, kernel liveness; a `dead` tag is a recorded
         ask-serving-expired, `stale` is a URL that did not answer 2xx inside the probe window,
-        `unserved` is an ask no form was ever started for — each needs a re-park (api serve-ask)
+        `unserved` is an ask no form was ever started for — each needs a re-park (starci kernel serve-ask)
         before it can reach the owner, unless it is `on-demand` (on Telegram, served when the owner
-        presses its button). Connector health is `node scripts/connectors/tunnel.mjs status`
+        presses its button). Connector health is `starci connect tunnel status`
         (its `health` names the manager, cloudflared, gateway reachability, extra managers and `problems`);
         open new direction images and check them against the current
         contracts (concepts.yaml rules, full-page chrome, concrete data, ui.flow coverage)
@@ -453,13 +453,13 @@ loop:
                      plan, enqueue, incident-resolve, ask-answered) for more than
                      config.yaml supervisor.stallMinutes (default 30; the clock is read again after
                      the frontier), no worker and not its own Kernel mid-turn (stall.mjs busyWhy, the
-                     judgement a peer gets too; a worker is mid-turn when api status reads it active,
+                     judgement a peer gets too; a worker is mid-turn when starci kernel status reads it active,
                      or its output or heartbeat age is within activeStaleMs and the frontier does not
-                     list it dead, wedged, nudge-ready or asking), and the frontier (api status) gives the Kernel
+                     list it dead, wedged, nudge-ready or asking), and the frontier (starci kernel status) gives the Kernel
                      nothing to do - or it is actionable and the Kernel still did not move (a wake
                      that is not landing). The reason names the frontier state, the queued causes and
                      the gates holding them. A job queued behind a waited job reads parkedBehind in
-                     api status and parks the frontier with it.
+                     starci kernel status and parks the frontier with it.
           STALE-GATE <wf> <incident> [<kind>]   an open owner-gate / owner-gate-pending incident
                      past a 10-minute grace whose reason is gone: a .starciwork/... record it
                      names now exists in a landed state and was written after the gate (a gate
@@ -471,13 +471,13 @@ loop:
                      whose gate or peer-wait it does not release by itself (a wait once read STALE
                      on a "brand job admitted" heads-up while the
                      brand record it waited for did not exist): printed, never alerted; tell that
-                     Kernel to read api inbox.
+                     Kernel to read starci kernel inbox.
           GATE <wf> <incident> ... justified    the gate still has its reason (an open ask it
                      names, a record still absent): printed, never alerted.
           STALE-WAIT <wf> <job> ...             a queued job past stallMinutes whose blocker
                      (dependency-failed seam, --after job, earlier leg) already settled.
           PEER-WAIT <wf> <incident> [peer-wait] on <peer> ...: justified   a typed peer-wait
-                     (api incident --kind peer-wait) whose peer is running and moved within
+                     (starci kernel incident --kind peer-wait) whose peer is running and moved within
                      stallMinutes: printed, never alerted; a workflow whose frontier is peer-wait
                      on waits that all hold is not alerted STALLED either.
           STALE-PEER-WAIT <wf> <incident> [peer-wait] on <peer> ...   past the grace the peer
@@ -490,7 +490,7 @@ loop:
         Rules:
           - A STALE-GATE is resolved by its owning Kernel, never by the supervisor: tell that
             Kernel, with the evidence from the line (the landed record and its state, the peer
-            message, the closed ask), to resolve its incident (api incident --resolve) and
+            message, the closed ask), to resolve its incident (starci kernel incident --resolve) and
             release the held jobs. Typing into a kernel follows guardrail notice-delivery-proven.
             The Workflow controller already opened it as the Kernel's Decision Item: an
             escalated DI means the Kernel did not fix it, so find out why (the Kernel refused the
@@ -532,11 +532,11 @@ loop:
         dispatch rejects, a job re-routed 4+ times, re-staled settled work, a dispatch whose guard
         receipt records a layer that did not install). The digest prints:
           OWED <wf> <incident|pattern> [<kind>] age=<m>m <open|fixed-by <sha>?>: <summary>
-        `node scripts/supervisor/owed.mjs [--all] [--json]` lists them with the action for each.
+        `starci supervisor owed [--all] [--json]` lists them with the action for each.
         EVERY tick (config.yaml supervisor.pollIntervalMs) reads the OWED lines and, in the
         SAME tick, closes each one; none may be carried silently to the next tick:
           fixed-by <sha>?  verify the commit really fixes it (read the diff against the incident),
-                     then resolve it yourself (api incident --repo <r> --workflow <wf> --resolve <id> --by supervisor
+                     then resolve it yourself (starci kernel incident --repo <r> --workflow <wf> --resolve <id> --by supervisor
                      --detail "fixed by .claude <sha>") and notify the owning Kernel (mission.classes fixed-defect);
                      a guess that does not hold is treated as open
           open       fix it directly under the owner's grant (full authority over .claude,
@@ -548,7 +548,7 @@ loop:
                      so the workflow is not left waiting on the supervisor.
           pattern whose causes are already fixed (a retry-loop/repeat-check stays OWED until a
                      success breaks its streak): once the fixing commits are on main, ack it -
-                     `node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text>`
+                     `starci supervisor owed ack --item <key> --commits <sha,...> --reason <text>`
                      (kept in machine.sqlite sup_owed; `acks` lists, `unack --item` drops). It is quiet in
                      the OWED lines until a failure NEWER than the ack lands on its
                      lineage, which re-opens it (ack-reopened). A lineage whose newest job is queued
@@ -598,7 +598,7 @@ loop:
         (scripts/supervisor/land.mjs) — the change is law only after the gate lands it on main
     - step: rearm
       do: restart ONLY the workflows whose in-flight leg is governed by the changed contract —
-        terminal-close the stale kernel, then `node scripts/kernel/start-workflow.mjs --repo
+        terminal-close the stale kernel, then `starci workflow start --repo
         <repo> --goal <id> --agent <recorded-agent>`; the ledger carries all durable state so the
         replacement resumes without loss
     - step: report
@@ -617,7 +617,7 @@ loop:
         not yet), the latest report, pending questions with their response.<domain> links,
         owner gates, open runtime defects and a finish time. A terse table was rejected
         ("write everything out clearly"); keep it readable. Owner asks themselves still reach
-        Telegram only from the kernel's api serve-ask (a question with a Generate URL button).
+        Telegram only from the kernel's starci kernel serve-ask (a question with a Generate URL button).
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
 
@@ -665,7 +665,7 @@ guardrails:
     rule: |
       A notice the supervisor types into a kernel terminal is delivered only when the screen shows
       it, never on the terminal-send receipt. To a Codex kernel it is always sent split: (1)
-      `node scripts/api/orca/terminal-send.mjs --terminal <h> --text-file <f> --no-enter`, (2)
+      `starci orca terminal-send --terminal <h> --text-file <f> --no-enter`, (2)
       terminal-read the screen and confirm the text sits in the input row ("› <text>" or
       "[Pasted Content N chars]"), (3) `terminal-send --terminal <h> --text ""` (Enter only), (4)
       terminal-read again and confirm the text left the input row (echoed in the transcript or a
@@ -673,7 +673,7 @@ guardrails:
       nothing reached the screen (term_28a694d9, 2026-09-24; the kernel sat idle from 19:59 to
       01:45). If step (2) shows nothing, the notice is not delivered: report it, do not send a
       blind Enter. Other agents may take text+Enter, proven the same way (step 4) and retried
-      split when the screen still shows the idle prompt. The runtime's own wakes (api nudge, the
+      split when the screen still shows the idle prompt. The runtime's own wakes (starci kernel nudge, the
       transition wake, the watchdog, the ask-answered wake) do this in
       scripts/kernel/wake-delivery.mjs (splitRetried, splitOutcome).
   - id: restart-cooldown
@@ -703,7 +703,7 @@ guardrails:
       Kernel read the new rules - its running legs keep their admitted contract.
       FROZEN families (modules/kernel/contract-freeze.yaml; owner 2026-09-28 "Freeze the drawing
       rules", interface.draw): their changes are batched and reach a workflow created before them
-      only at a release YOU run - node scripts/kernel/cli.mjs contract-release --family <op>
+      only at a release YOU run - starci kernel contract-release --family <op>
       --repo <ledger owner> [--dry-run] - after reading the land gate's gate-stability report
       (how many accepted legs of live workflows the new gates would flip). One release per
       batch, never one per landing: a leg then owes ONE follow-up for the whole released set.
@@ -715,7 +715,7 @@ guardrails:
       re-staled dozens of settled jobs on
       three ledgers, and each edit re-staled the redo). In the SAME commit, register the edit in
       modules/kernel/contract-changes/<id>.yaml with its paths and reach: new-legs by default (a
-      settled leg keeps the knowledge it was admitted under; api status shows it only as
+      settled leg keeps the knowledge it was admitted under; starci kernel status shows it only as
       advisory frontier.sourceDrift), reach: follow-up with followUp {op, ops, detail} when
       in-flight work must catch up (frontier.contractFollowUps owes a follow-up leg per older
       leg). A knowledge edit never makes settled work stale by itself: staleInput is a change to
@@ -725,7 +725,7 @@ guardrails:
     rule: |
       Workflows of one ledger plan their shared foundations together (driver-loop.yaml
       foundations). Each cycle, for a ledger with several running workflows, read
-      `api foundations --repo <ledger-owner>`: an undeclared workflow, two workflows building
+      `starci kernel foundations --repo <ledger-owner>`: an undeclared workflow, two workflows building
       the same foundation, or a dependent held by an owner-gate / untyped wait on a peer's
       foundation is a finding to route to the Kernels (claim, declare-dependent, a typed
       --until-foundation wait). A foundation whose owner stopped running is re-claimed by a

@@ -1,6 +1,6 @@
 // A failed settle always leaves its next step in the ledger (scripts/kernel/cli.mjs enqueueNextStep over
-// modules/models/kinds.yaml routes), and `api status` names the Kernel's next moves as nextActions and
-// colours every leg. Before it `api settle --verdict fail` enqueued nothing, the frontier fell to
+// modules/models/kinds.yaml routes), and `starci kernel status` names the Kernel's next moves as nextActions and
+// colours every leg. Before it `starci kernel settle --verdict fail` enqueued nothing, the frontier fell to
 // orphaned-frontier, and a worker that died without a report was retried without a cap.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,7 +43,7 @@ const world=(t,{legs=['docs.author'],edges=legs.slice(1).map((op,i)=>[legs[i],op
     seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId:op,status,payload,goalRevision:0,
       subjectKey:unitSubjectKey({cut:payload.cut,params:payload.params,records:payload.records,ownedPaths:payload.owned_paths})}]});
   });
-  // A filed report row keyed by the job id (no worker bound), as `api report` would file it.
+  // A filed report row keyed by the job id (no worker bound), as `starci kernel report` would file it.
   const report=(jobId,outcome='failed',extra={})=>seed(ledger=>{
     const row=ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
     let attempt=ledger.db.prepare('SELECT attempt_id,dispatch_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
@@ -86,7 +86,7 @@ test('a failed report queues its route: the same op again, pinned to the failed 
   assert.equal(retry.payload.routed.route,'failed-retries-the-same-op');
   assert.equal(w.row('j1').result.nextStep.jobs[0],retry.job_id,'the step is recorded on the failed job');
   const s=w.status();
-  assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: api route --job ${retry.job_id}, then api dispatch`,
+  assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: starci kernel route --job ${retry.job_id}, then starci kernel dispatch`,
     label:'Vi\u1ebft t\u00e0i li\u1ec7u',displayName:'Vi\u1ebft t\u00e0i li\u1ec7u · docs · next step'});
   // The leg also carries why of the failed attempt it retries (scripts/kernel/why.mjs), headline first.
   assert.equal(Object.keys(s.legs[0].why)[0],'headline');
@@ -222,7 +222,7 @@ test("the Kernel's own enqueue is refused while the runtime's retry is open, nev
   assert.equal(w.read(db=>db.prepare("SELECT count(*) n FROM jobs WHERE status='queued'").get().n),1);
 });
 
-test("api plan records the plan file's own edges and refuses a file without provable ones",t=>{
+test("starci kernel plan records the plan file's own edges and refuses a file without provable ones",t=>{
   const w=world(t,{legs:['docs.author','test.author','review.verify'],edges:[['docs.author','review.verify'],['test.author','review.verify']]});
   const plan=(body)=>{const file=path.join(os.tmpdir(),`plan-${Math.random().toString(36).slice(2)}.json`);fs.writeFileSync(file,json(body));t.after(()=>fs.rmSync(file,{force:true}));
     const r=w.api('plan','--workflow',w.wf,'--file',file);assert.equal(r.status,0,r.stderr);
@@ -248,7 +248,7 @@ test('a filed report carrying rootCause passes the envelope, and its node on ano
   const w=world(t,{legs:['backend.implement','e2e.verify']});
   w.job('build','backend.implement',{status:'succeeded',records:['feat.login'],paths:['.starciwork/features/login/','src/login/']});
   w.job('e2e','e2e.verify',{records:['feat.login'],paths:['.starciwork/features/login/evidence/']});
-  // File the worker envelope through api report before settling its attempt.
+  // File the worker envelope through starci kernel report before settling its attempt.
   const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-root-cause-')),'report.json');
   t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));
   w.seed(ledger=>{

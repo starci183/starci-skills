@@ -20,6 +20,6 @@ paths:
   - modules/reconciler/job.yaml
   - modules/models/runtimes.yaml
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/archive.yaml
+  - modules/cli/commands/kernel/archive.yaml
   - modules/kernel/start-workflow.yaml
   - skills/restart/SKILL.md

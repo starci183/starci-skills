@@ -46,7 +46,7 @@ rules:
         - HFS_AGENT_DATA_TRACKED
         - HFS_SLOT_UNDECLARED
       manual:
-        - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
+        - starci runtime validate <app>/.starciwork passes.
     relatedExamples: []
   - id: REPO-WORK-2
     title: Agent data is never tracked

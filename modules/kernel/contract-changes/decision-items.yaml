@@ -22,7 +22,7 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/decision-items.yaml
-  - modules/kernel/api-commands/decisions.yaml
+  - modules/cli/commands/kernel/decisions.yaml
   - modules/kernel/kernel-prompt.md
   - modules/kernel/driver-loop.yaml
   - modules/supervisor/supervise.yaml

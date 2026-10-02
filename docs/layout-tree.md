@@ -11,7 +11,7 @@ disagree with the routes that actually exist.
 
 ## The record
 
-`node scripts/work/layout-tree.mjs scan --work .starciwork --write` generates the record. It only reads the
+`starci work layout-tree scan --work .starciwork --write` generates the record. It only reads the
 app's front end (`fe/`) beside the Work tree's app root, and writes nothing there.
 
 ### Apps
@@ -56,7 +56,7 @@ nodes. A layout whose file or navigation changed gets its `rev` bumped and, if v
 
 The layout tree is a foundation shared by the workflows of a project, written by one workflow at a time:
 `interface.draw` when it starts from a todo or unsettled shell (owner ruling 2026-09-29: a draw must work from todo;
-`api dispatch` claims foundation `shell` for the first draw that finds parents to draw, a draw of another workflow
+`starci kernel dispatch` claims foundation `shell` for the first draw that finds parents to draw, a draw of another workflow
 waits as `foundation-wait`, and a stalled owner opens a Supervisor Decision Item), and `brand.decide`, which still
 sets the brand identity and direction and may capture layouts. Keeping one writer at a time is what stops parallel
 workers from inventing chrome. The work, whichever op does it:
@@ -101,7 +101,7 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
   has a settled draw.
 - ImageGen draws only the slot content (page, loading, error, not-found) at the slot's aspect ratio, or the
   panel (modal, drawer), or a layout's own chrome with its slot keyed `#FF00FF`.
-- `node scripts/work/compose-direction.mjs --ui <dir> --content <png> --breakpoint <bp> --theme <t> --state <s>
+- `starci work compose-direction --ui <dir> --content <png> --breakpoint <bp> --theme <t> --state <s>
   [--presentation page|overlay]` does the compositing in pure JavaScript over PNG pixels, so the output is
   identical on every host:
   - a page goes into the innermost visible layout's capture, at its slot;
@@ -123,7 +123,7 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
 
 ## Checks
 
-`node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-dir | impl-dir>` is structural. The only
+`starci work shell-conformance <work-root | shell-dir | ui-dir | impl-dir>` is structural. The only
 prompt text it reads is the `Product locale: <default>` line.
 
 - **Tree:**
@@ -145,6 +145,6 @@ prompt text it reads is the `Product locale: <default>` line.
   `layout.tsx`, `page.tsx`, loading/error/not-found and, for a routed overlay, the `@slot/(.)segment`
   intercept.
 
-`starci validate` runs the ui half without pixel re-derivation. It reports records drawn before the layout tree
+`starci runtime validate` runs the ui half without pixel re-derivation. It reports records drawn before the layout tree
 (no binding, no route, a stale rev) as suspects, never as refusals. `interface.audit` applies
 the same check as its layout lens, classifying findings as `layout.structure` or `shell.conformance`.

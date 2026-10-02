@@ -56,7 +56,7 @@ retired:
   - {path: tests/core.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
   - {path: tests/module-spec.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
   - {path: modules/schemas/work.schema.yaml, retiredAt: 2026-09-29, removedIn: wp56-leftovers, replacedBy: 'work-workspace.schema.yaml, work-resource.schema.yaml and work-evidence.schema.yaml (one file per record kind); the monolith had no runtime reader'}
-  - {path: knowledge/repository-baseline.yaml, retiredAt: 2026-09-29, removedIn: hfs-sync, replacedBy: 'packages/hfs/templates rendered by hfs sync (husky, ci and e2e workflows, .gitignore, sonar, codecov, .starciwork/.gitignore) and the @starci presets; no baseline shape or copied config remains'}
+  - {path: knowledge/repository-baseline.yaml, retiredAt: 2026-09-29, removedIn: hfs-sync, replacedBy: 'packages/hfs/templates rendered by starci app sync (husky, ci and e2e workflows, .gitignore, sonar, codecov, .starciwork/.gitignore) and the @starci presets; no baseline shape or copied config remains'}
   - {path: tests/repository-baseline.spec.mjs, retiredAt: 2026-09-29, removedIn: hfs-sync, replacedBy: 'tests/hfs-sync.spec.mjs'}
   - {path: modules/models/agents/qwen.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (owner ruling 2026-09-29); claude, codex and devin remain'}
   - {path: modules/models/profiles/qwen-agent.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (modules/models/profiles/devin-agent.yaml leads hands-on work)'}
@@ -83,8 +83,8 @@ retired:
   - {path: knowledge/patterns/fe/test.yaml, retiredAt: 2026-09-30, removedIn: c0-defer, replacedBy: 'none: a front end has no tests by standard (FE_NO_TESTS, R97)'}
   - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-09-30, removedIn: c0-defer, replacedBy: 'none: a front end has no tests by standard (FE_NO_TESTS, R97)'}
   - {path: scripts/checks/architecture/size-growth.mjs, retiredAt: 2026-10-01, removedIn: c0-lint, replacedBy: 'eslint file-size-growth (R20) in both canons'}
-  - {path: scripts/secrets-guard.mjs, retiredAt: 2026-10-01, removedIn: rm-scripts, replacedBy: 'hfs work-hygiene staged secret judgement (R06) run by the managed pre-commit hook'}
-  - {path: scripts/checks/check-scoped-lint.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'scripts/checks/gate.mjs (hfs lint --changed, tsc, tests, merge guard; only findings new against the base block, measured read-only from git objects); whole-repository lint is hfs lint'}
+  - {path: scripts/secrets-guard.mjs, retiredAt: 2026-10-01, removedIn: rm-scripts, replacedBy: 'starci app hygiene staged secret judgement (R06) run by the managed pre-commit hook'}
+  - {path: scripts/checks/check-scoped-lint.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'scripts/checks/gate.mjs (starci app lint --changed, tsc, tests, merge guard; only findings new against the base block, measured read-only from git objects); whole-repository lint is starci app lint'}
   - {path: scripts/checks/scoped-lint-baseline.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'scripts/checks/gate.mjs read-only base measurement (no base tree); linksUnder moved to scripts/lib/safe-remove.mjs'}
   - {path: scripts/checks/scoped-lint-base-view.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'scripts/checks/gate.mjs read-only base measurement (no base tree, no base view)'}
   - {path: scripts/checks/scoped-lint-base-measure.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'scripts/checks/gate.mjs read-only base measurement'}
@@ -112,9 +112,9 @@ retired:
   - {path: tests/agent-readiness-pattern.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs'}
   - {path: tests/codex-unattended-ops.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs (Orca applies the per-agent default args)'}
   - {path: tests/guard-shim-reentry.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'the command-guard hook specs'}
-  - {path: scripts/kernel/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at api finish (full gate, merge guard, review.verify, rebase, CAS fast-forward, push)'}
-  - {path: scripts/kernel/api-verbs/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at api finish'}
-  - {path: scripts/kernel/push-gate.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: no op commits; the runtime commits each green op as its workflow checkpoint (scripts/kernel/workflow-checkpoint.mjs) and the workflow lands through the full gate at api finish'}
+  - {path: scripts/kernel/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at starci kernel finish (full gate, merge guard, review.verify, rebase, CAS fast-forward, push)'}
+  - {path: scripts/kernel/api-verbs/product-land.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'scripts/kernel/workflow-checkpoint.mjs finishWorkflow: a workflow lands into main once, at starci kernel finish'}
+  - {path: scripts/kernel/push-gate.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: no op commits; the runtime commits each green op as its workflow checkpoint (scripts/kernel/workflow-checkpoint.mjs) and the workflow lands through the full gate at starci kernel finish'}
   - {path: tests/push-gate.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: scripts/kernel/push-gate.mjs is retired'}
   - {path: tests/settle-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (only the runtime commits: checkpoint, foreign commit and foreign change)'}
   - {path: tests/work-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (a Work-owner ops .starciwork records are its checkpoint)'}
@@ -122,9 +122,9 @@ retired:
   - {path: scripts/kernel/product-worktree.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'scripts/kernel/workflow-worktree.mjs (one Orca worktree per workflow, removed by its release) and scripts/kernel/workflow-checkpoint.mjs (the land lock)'}
   - {path: tests/product-worktree.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'tests/workflow-worktree.spec.mjs'}
   - {path: tests/job-reap-ended-workflow.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'none: no per-op worktree exists to reap'}
-  - {path: modules/kernel/api-commands/product-land.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: the settle lands each op into main'}
+  - {path: modules/cli/commands/kernel/product-land.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: the settle lands each op into main'}
   - {path: scripts/kernel/api-verbs/product-deps.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: a dependency manifest change lands into main with its op; the settle names the install the live checkout owes'}
-  - {path: modules/kernel/api-commands/product-deps.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: no workflow deps unit without a workflow worktree'}
+  - {path: modules/cli/commands/kernel/product-deps.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: no workflow deps unit without a workflow worktree'}
   - {path: tests/product-land.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'tests/worktree-lifecycle.spec.mjs'}
   - {path: scripts/checks/code-patterns/common.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'none: the shared helpers of the code-pattern adapters, which nothing ran after check-scoped-lint.mjs retired'}
   - {path: scripts/checks/code-patterns/nest.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-be require-public-member-jsdoc (R109) for member docs; formatting is Prettier (R19 hfs format); comment casing is review'}
@@ -184,7 +184,7 @@ retired:
   - {path: tests/check-db-openers.spec.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'the spec of scripts/checks/check-db-openers.mjs, superseded by RT_EXTERNAL_OWNER (tests/runtime-hfs-rules.spec.mjs)'}
   - {path: scripts/api/orca/task-create.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'scripts/api/orca/worker-start.mjs: worker-start --spec files the Task in the same call (contract change worker-start-spec)'}
   - {path: scripts/api/orca/dispatch-show.mjs, retiredAt: 2026-10-01, removedIn: c0-lane-a, replacedBy: 'the worker-start receipt (result.worker.agentTerminalHandle), else worker-show result.dispatch.assigneeHandle (contract change worker-start-spec)'}
-  - {path: tests/orca-tasks-reconcile.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'tests/managed-dispatch.spec.mjs (settle releases after worker_done; api reconcile --orca-tasks is gone)'}
+  - {path: tests/orca-tasks-reconcile.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-settled, replacedBy: 'tests/managed-dispatch.spec.mjs (settle releases after worker_done; starci kernel reconcile --orca-tasks is gone)'}
   - {path: scripts/api/orca/request-show.mjs, retiredAt: 2026-10-02, removedIn: c1-batch7, replacedBy: 'scripts/api/orca/lib.mjs requestStateOf (orcaCall asks request-show itself after a lost receipt; the standalone wrapper had no reader)'}
   - {path: engine/db/migrations/machine/0002-worktrees-no-workflow-kind.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/machine/0003-worktrees-workflow-orca.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/machine/0001-init.sql: one schema file per database, no migration chain'}
@@ -974,7 +974,7 @@ moved:
   - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
   - {from: scripts/kernel/settle-landed.mjs, to: scripts/kernel/owned-path-effects.mjs, movedIn: WFWT2, quiesced: false}
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
-  - {from: modules/kernel/api-commands/, to: modules/cli/commands/kernel/, movedIn: c3-cli, quiesced: false}
+  - {from: modules/cli/commands/kernel/, to: modules/cli/commands/kernel/, movedIn: c3-cli, quiesced: false}
   - {from: scripts/checks/check-api-surface.mjs, to: scripts/checks/check-cli-parity.mjs, movedIn: c3-cli, quiesced: false}
   - {from: scripts/kernel/verbs/check.mjs, to: scripts/kernel/verbs/record-checks.mjs, movedIn: c3-cli, quiesced: false}
   - {from: tests/checks/check-api-surface.spec.mjs, to: tests/cli/cli-parity.spec.mjs, movedIn: c3-cli, quiesced: false}
@@ -993,7 +993,7 @@ retiredSymbols:
   - {symbol: releaseWorkerOnReport, replacedBy: 'nothing: the op worker_done and the settle worker-release end the worker'}
   - {symbol: reconcileReap, replacedBy: 'nothing: reconcile --reap is deleted with the reaper'}
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}
-  - {symbol: closeOperationTask, replacedBy: 'the op worker_done (api report -> scripts/api/orca/send.mjs send) settles its Task and Dispatch (REPLACE #9)'}
+  - {symbol: closeOperationTask, replacedBy: 'the op worker_done (starci kernel report -> scripts/api/orca/send.mjs send) settles its Task and Dispatch (REPLACE #9)'}
   - {symbol: TASK_CLOSED_STATUS, replacedBy: 'the op worker_done settles the Task (REPLACE #9)'}
   - {symbol: staleTasks, replacedBy: 'nothing: no Task is left open by hand any more (REPLACE #9)'}
   - {symbol: CLOSED_TASK_STATUSES, replacedBy: 'nothing: no Task is left open by hand any more (REPLACE #9)'}

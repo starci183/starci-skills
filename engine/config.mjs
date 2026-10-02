@@ -225,7 +225,7 @@ export function uatSettings(config=loadConfig()){
   return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
 }
 /**
- * config.yaml `allocation` beyond mode/preferredProvider — how `api route` spreads jobs over the pools
+ * config.yaml `allocation` beyond mode/preferredProvider — how `starci kernel route` spreads jobs over the pools
  * (scripts/agent/models.mjs selectPool):
  *   policy: prefer-then-overflow (the runtimes.yaml default) | balanced — among the eligible pools, the one
  *     furthest below its target share of the recent dispatches wins.
@@ -432,7 +432,7 @@ export function inspectOwnerConfig(root=configRoot){
  *             adds or changes and runs only those; the full unit suite is unit.verify's or /push-git's. false = the ops'
  *             policy.specsToggle deferral path (scripts/route/spec-deferral.mjs);
  *   e2e     - product e2e in workflows. Default OFF: e2e runs only when the goal or the owner explicitly asks (set true,
- *             or `api run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
+ *             or `starci kernel run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
  * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.
  */
 export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);

@@ -1,4 +1,4 @@
-// The repository-hygiene tree checks of `hfs check` (scripts/hfs/rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
+// The repository-hygiene tree checks of `starci app check` (scripts/hfs/rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
 // R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, R111 HFS_PEER_INTEGRATION_MISSING, and the slot app.scripts that holds the app root `scripts/` folder.
 // Each has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the passing base, checked at its root.
 import test from 'node:test';

@@ -21,7 +21,7 @@
 // read-only, the bot token is never printed and is scrubbed from every error.
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 //
-//   node scripts/connectors/telegram-media.mjs settle --ledger <runtime.sqlite> --repo <repo>
+//   starci connect telegram-media settle --ledger <runtime.sqlite> --repo <repo>
 //       --workflow <id> --job <id> --attempt <n> --op <op> --verdict pass|fail|blocked [--dispatch <id>]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -579,7 +579,7 @@ async function main() {
   const args = argsOf(process.argv.slice(2));
   const out = (value) => console.log(JSON.stringify(value));
   if (args._[0] !== 'settle') {
-    console.error('usage: telegram-media.mjs settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict pass|fail|blocked [--dispatch <id>]');
+    console.error('usage: starci connect telegram-media settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict pass|fail|blocked [--dispatch <id>]');
     process.exit(2);
   }
   for (const k of ['ledger', 'workflow', 'job', 'op', 'verdict']) if (typeof args[k] !== 'string') { out({ ok: false, error: `settle needs --${k}` }); process.exit(2); }

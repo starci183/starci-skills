@@ -24,7 +24,7 @@ user-invocable: true
    Monitor stream instead.
 
 `/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
-`node scripts/reconciler/debug-pass.mjs stop`.
+`starci debug pass stop`.
 
 Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
@@ -49,8 +49,8 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
    `dispatched` again, so a pass is idempotent.
 2. Diagnose each `dispatched` core alert read-only with section 3 until you can name its cause.
 3. A core defect: dispatch one lane (section 4), then
-   `node scripts/reconciler/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
-   workflow waiting normally): `node scripts/reconciler/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
+   `starci debug pass claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
+   workflow waiting normally): `starci debug pass note --key <alert key> --reason "<why>"`. A lane that
    died or landed without clearing its alert: `release --key <alert key>` so the next pass dispatches it again. A
    reservation nobody claims or notes within 30 minutes is dispatched again.
 4. Print a short diagnosis table in Vietnamese from `rows`, one row per alert: symptom (the alert text), cause (your
@@ -66,9 +66,9 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   every seat not live.
 - `wf:<ledger>:<workflow>:*` for every non-finished workflow of every registered active ledger (no hard-coded ids):
   `leg:<op>:<job>` turning failed/blocked/cancelled, `wedged`, `dead`, `stale`, `stuck`, `held`, `owner` (open owner
-  asks), `status` (api status failed twice in a row within the snapshot).
+  asks), `status` (starci kernel status failed twice in a row within the snapshot).
 - `tokens`: input+output tokens in the window above the spike limit, from `machine.sqlite` `llm_usage` (there is no
-  `api usage` verb).
+  `starci kernel usage` verb).
 - `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
 - `worktrees:<repo>`: for the runtime and every active ledger's repo, read from Orca's `worktree ps`: more worktrees than
   `claudeDebug.worktreeLimit`, a tree whose directory is gone, or a tree carrying the runtime's ownership stamp
@@ -123,11 +123,11 @@ node scripts/reconciler/engine.mjs --once --controller job --json     # then hos
 Compare wall time per controller; a controller that takes minutes on the engine thread starves the heartbeat. Do not
 pass `--apply`.
 
-Kernel screen (read only): `node scripts/api/orca/terminal-read.mjs --terminal <handle> --screen` (handle from
+Kernel screen (read only): `starci orca terminal-read --terminal <handle> --screen` (handle from
 `op_attempts.terminal_handle`, `seats`, `terminals`). Never `terminal-send`.
 
-Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/start.mjs --check`,
-`node scripts/supervisor/poll.mjs --once --repo <repo>`.
+Also: `starci reconciler status`, `starci reconciler up --check`,
+`starci supervisor poll --once --repo <repo>`.
 
 ## 4. Fix loop
 
@@ -148,7 +148,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
    held lanes keep the kernels on the broken core and collide with each other). Commits that are ready at the same
    moment go in one land (each land re-execs the engine); a busy gate is the only reason to wait, and the land runs
    again the moment it is free:
-   `node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
+   `starci supervisor land --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
    Anything under `modules/`, `knowledge/` or a schema needs a `modules/kernel/contract-changes/<id>.yaml`.
 5. Never push. Pushing is `/push-git`'s job (once it exists; reference it by name, never run `push-mains.mjs`).
 6. After the land, the next passes (section 2) show the alert `resolved` once it clears; then report to the owner in
@@ -176,7 +176,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   A probe that only needs the machine registry (not a project ledger too) may instead set the narrower
   `STARCI_TEST_MACHINE_FILE`; a probe that needs a specific ledger location without moving the whole state root may
   instead set `STARCI_PROJECTS_ROOT`. Verify before finishing: the probe's ledger id must not appear in
-  `node engine/db/machine.mjs ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
+  `starci runtime machine-db ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
 - A standard, schema or rule set that has not been released is unversioned or version 1 in the runtime; never label runtime
   content as a second version before a first one has shipped (owner ruling 2026-09-29).
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.

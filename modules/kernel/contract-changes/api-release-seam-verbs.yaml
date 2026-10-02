@@ -8,5 +8,5 @@ paths:
   - scripts/kernel/api-verbs/contract-release.mjs
   - scripts/kernel/api-verbs/cut-seam.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/contract-release.yaml
-  - modules/kernel/api-commands/cut-seam.yaml
+  - modules/cli/commands/kernel/contract-release.yaml
+  - modules/cli/commands/kernel/cut-seam.yaml

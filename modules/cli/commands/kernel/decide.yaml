@@ -1,4 +1,4 @@
-# The contract of `api decide` (scripts/kernel/verbs/decide.mjs): the Kernel's decision log (guardrail d,
+# The contract of `starci kernel decide` (scripts/kernel/verbs/decide.mjs): the Kernel's decision log (guardrail d,
 # owner 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
 group: kernel
 verb: decide
@@ -46,7 +46,7 @@ removed:
   - node scripts/kernel/cli.mjs decide
 purpose: "Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline
   snapshot of the units that passed their gates; close it next wake with keep|revert and what the
-  metric showed. A restarted Kernel reads the log (api status rca.decisions, decide --list) and
+  metric showed. A restarted Kernel reads the log (starci kernel status rca.decisions, decide --list) and
   never repeats a failed idea. Every mutating kernel verb (graph-edit, op-override, redesign) names
   an open decision."
 writes:

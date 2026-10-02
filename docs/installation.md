@@ -9,8 +9,8 @@ downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
 ```sh
-npx --yes --package=<reviewed-archive>.tgz starci init --dir /absolute/host
-npx --yes --package=<reviewed-archive>.tgz starci doctor --dir /absolute/host --quick
+npx --yes --package=<reviewed-archive>.tgz starci runtime install --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci runtime doctor --dir /absolute/host --quick
 ```
 
 `--dir` always means the **host** — the directory that will own `.claude/` —
@@ -89,8 +89,8 @@ automatically in that task's directory ancestry.
 ## Update
 
 ```sh
-npx --yes --package=<reviewed-archive>.tgz starci update --dir /absolute/host
-npx --yes --package=<reviewed-archive>.tgz starci doctor --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci runtime update --dir /absolute/host
+npx --yes --package=<reviewed-archive>.tgz starci runtime doctor --dir /absolute/host
 ```
 
 Updates replace unchanged installer-owned files, verify the installed tree,
@@ -110,6 +110,6 @@ settings are preserved.
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |
-| Runtime sources inconsistent | `starci doctor --dir <host> --quick`; report errors before running workflows. |
+| Runtime sources inconsistent | `starci runtime doctor --dir <host> --quick`; report errors before running workflows. |
 | Interrupted init/update | Re-run from the same reviewed package, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
 | Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |

@@ -129,7 +129,7 @@ test("orca orchestration check is refused from the Kernel's terminal; ops keep i
     assert.match(d.verdict.remedy, /api> messages/);
   }
   for (const command of ['orca orchestration check --ack', 'orca orchestration check --json']) assert.equal(await decide(command, 'term_op'), null, `an op keeps ${command}`);
-  for (const command of ['orca orchestration inbox --json', 'orca orchestration worker-show --dispatch d-1', `node scripts/kernel/cli.mjs messages --repo ${root.replace(/\\/g, '/')} --workflow wf`])
+  for (const command of ['orca orchestration inbox --json', 'orca orchestration worker-show --dispatch d-1', `starci kernel messages --repo ${root.replace(/\\/g, '/')} --workflow wf`])
     assert.equal(await decide(command, 'term_kernel'), null, command);
   assert.equal(kernelMailboxVerdict('orca', ['orchestration', 'check'], null), null, 'no guard, no mailbox rule');
 });

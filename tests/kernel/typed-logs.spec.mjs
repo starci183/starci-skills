@@ -165,7 +165,7 @@ test('syncDerivedLogs derives from a real ledger once: a second sync stores noth
   assert.deepEqual(readLogs(logs, { workflowId: WF }).rows.map((r) => r.kind), ['dispatch', 'check.result', 'cmd.run', 'settle', 'job.drop']);
 });
 
-test('api log: a kernel logs a typed row without a ledger write; an op logs only its own job', (t) => {
+test('starci kernel log: a kernel logs a typed row without a ledger write; an op logs only its own job', (t) => {
   const repo = repoDir(t);
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-a-1', opId: 'a', kind: 'op', workerId: 'term_op-a' }, { jobId: 'op-b-1', opId: 'b', kind: 'op' }] });

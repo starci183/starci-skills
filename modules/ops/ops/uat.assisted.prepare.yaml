@@ -64,7 +64,7 @@ reads:
     path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
     purpose:
       en: When dispatched, read the exact operation request, owned paths and standard starci/op-report@1
-        filing contract. Canonical report ingestion is api report for the current job; no operation
+        filing contract. Canonical report ingestion is starci kernel report for the current job; no operation
         writes .starciwork/runtime.sqlite directly.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model

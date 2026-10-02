@@ -148,9 +148,9 @@ test('a pick that cannot apply is refused before the queue with every file and h
   assert.deepEqual(conflictHunks('a\n<<<<<<< x\nb\n=======\nc\n>>>>>>> y\nd\n').map((h) => h.line), [2]);
 });
 
-/* ------------------------------------------------------------ api extensions */
+/* ------------------------------------------------------------ starci kernel extensions */
 
-test('api extensions load from files: verbs, flags, status fields; a bad module is a problem, not a crash', async (t) => {
+test('starci kernel extensions load from files: verbs, flags, status fields; a bad module is a problem, not a crash', async (t) => {
   const root = tmp(t, 'sup-k-lt-ext-');
   write(root, {
     'scripts/kernel/verbs/hello.mjs': "export default { verb: 'hello', required: ['workflow'], kernelOnly: true, flags: ['loud'], usage: '  hello --workflow <id>', run() {} };\n",

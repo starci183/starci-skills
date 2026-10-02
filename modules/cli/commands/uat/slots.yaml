@@ -1,0 +1,20 @@
+group: uat
+verb: slots
+owner: runtime
+summary: inspect UAT slots or run a command while holding one
+impl: {script: scripts/uat/uat-slots.mjs}
+positional:
+  - {name: action, enum: [status, run], required: true, variadic: false}
+  - {name: command, required: false, variadic: true}
+flags:
+  - {name: record-dir, type: string}
+exit: {"0": status clean or command passed, "1": command failed, "2": bad usage}
+json: none
+examples:
+  - starci uat slots status
+  - starci uat slots run --record-dir <dir> -- npm test
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/uat/uat-slots.mjs
+  - node .claude/scripts/uat/uat-slots.mjs

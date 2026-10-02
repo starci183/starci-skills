@@ -29,7 +29,7 @@ purpose: |-
 # route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
-  # The default policy. config.yaml allocation.policy overrides it for `api route` (engine/config.mjs
+  # The default policy. config.yaml allocation.policy overrides it for `starci kernel route` (engine/config.mjs
   # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
   # balanced walks the eligible pools of that order and takes the FIRST one still below its config.yaml
   # allocation.shares target of the recent dispatches (scripts/agent/balance.mjs counts them; scripts/agent/
@@ -193,19 +193,19 @@ allocation:
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
   fanOut: {seamFirst: true, maxPerGroup: 10}
-  # Deterministic same-op slicing — the kernel measures the write scope and calls `api estimate`;
+  # Deterministic same-op slicing — the kernel measures the write scope and calls `starci kernel estimate`;
   # it never guesses an agent count. W = sum(weight * count) in agent-minutes places the closure in
   # a `size` class, and the class plus the owner's `parallel.gear` (config.yaml) names how many
   # agents the op asks for. `s` and `m` are always one agent; only `l` and `xl` fan out. The static
   # bounds in kinds.yaml (12 files / 8 assertions / 3 components) are a coarse screen over the same
   # measure — the estimate is the authority. When N > 1 slices are admitted together the kernel
-  # routes them one after the other with plain api route (a Kernel --prefer/--avoid is ignored, owner
+  # routes them one after the other with plain starci kernel route (a Kernel --prefer/--avoid is ignored, owner
   # decision 2026-09-25) so the fleet spreads over the lanes instead of piling onto the first pool. A
   # hands-on slice (payload.cut) walks the scaffold order, Devin first (owner decision 2026-09-25): each
   # routed slice is already counted before the next one is routed, and a pool that reaches its share
   # passes the next slice down the order.
   # A gear never raises a pool's maxParallel, maxParallelOps or budgets.maxOps: it raises only what
-  # `api estimate` requests, and admission still clamps it.
+  # `starci kernel estimate` requests, and admission still clamps it.
   slicing:
     weights: {file: 4, assertion: 3, component: 12, record: 2}
     targetMinutes: [15, 30]
@@ -235,11 +235,11 @@ allocation:
   # for the nudge frontier (scripts/lib/terminal-liveness.mjs staleAwareState).
   # quietMs: a worker still at its idle prompt (or frozen) this long after a delivered nudge, with no
   # output since, is quiet - dead to the frontier; the watchdog settles it failed-no-report and queues
-  # its retry (api reconcile --dead-worker --settle-failed). A provider card's liveness.activeStaleMs /
+  # its retry (starci kernel reconcile --dead-worker --settle-failed). A provider card's liveness.activeStaleMs /
   # liveness.quietMs overrides these per provider (modules/models/agents/<provider>.yaml).
   # launchGraceMs: a managed worker-start returns before Orca injects the worker's Task, so for this
   # long after its op-dispatched event a managed worker that still reads an idle prompt is `starting`
-  # - never nudge-ready, and api nudge skips it worker-starting.
+  # - never nudge-ready, and starci kernel nudge skips it worker-starting.
   # A command-terminal dispatch has already proven its prompt submitted and carries no grace; a
   # staged paste is nudge-ready at any age, and a nudge since the dispatch ends the grace.
   # kernelTurnBudgetMs / supervisorTurnBudgetMs: the longest ONE busy turn of a Kernel / the [Supervisor] seat (its
@@ -295,7 +295,7 @@ allocation:
   # dailyAutoLandCap autonomous landings in 24 h; an owner-feedback lesson weighs ownerWeight (a self-derived one 1).
   supervisorLearning: {minRepeats: 2, measureMs: 21600000, dailyAutoLandCap: 8, ownerWeight: 3, successDrop: 0.1}
   # progress (scripts/kernel/progress-rca.mjs; owner 2026-09-28 "could the supervisor not think before?" and "why do
-  # workflows not coordinate themselves but wait for the supervisor"): the outcome SLA each Kernel reads first on every wake (api status
+  # workflows not coordinate themselves but wait for the supervisor"): the outcome SLA each Kernel reads first on every wake (starci kernel status
   # progress + rca) and the Supervisor backstops. units/h over windowMs (only units that passed their gates), ETA over
   # etaWindowMs. A priority workflow (highest ramThrottle.priorities weight) below minUnitsPerHour.priority for graceMs,
   # or holding queued-ready work while running < its allowed parallelism, is a progress stall: the Kernel acts on the
@@ -312,15 +312,15 @@ allocation:
     maxUnitsPerEdit: 3
     recutThreshold: 3
     commandTimeoutMs: 600000
-    # settleBacklog: SETTLE-FIRST - api route/dispatch refuse settle-backlog while >= max filed reports older than ageMs
+    # settleBacklog: SETTLE-FIRST - starci kernel route/dispatch refuse settle-backlog while >= max filed reports older than ageMs
     # wait unconsumed (a finished [Op] keeps its terminal and slot until its settle closes it).
     # The runtime settles green reports itself (settler below); this refusal counts only the reports waiting on the Kernel
     # (non-green outcomes and done reports the settler handed over as needs-kernel-decision), consumed or not.
     settleBacklog: {max: 3, ageMs: 120000}
     rca: {minFailures: 3, windowMs: 86400000, examples: 4}
   # settler (scripts/kernel/settle/job-settle.mjs; owner ruling settle-runtime-service 2026-09-28): the runtime settles every
-  # filed done report whose declared checks re-verify green through the same `api check` + `api settle` path, from each
-  # workflow watchdog loop every everyMs and right after `api report`. rerunTimeoutMs bounds one declared check re-run and
+  # filed done report whose declared checks re-verify green through the same `starci kernel record-checks` + `starci kernel settle` path, from each
+  # workflow watchdog loop every everyMs and right after `starci kernel report`. rerunTimeoutMs bounds one declared check re-run and
   # itemBudgetMs one report. invariantMaxAgeMs: the Supervisor tick asserts no filed/consumed report of a live job stays
   # unsettled and un-handed-over longer than this (settle-unsettled-report, a runtime bug). releaseWindowMs: settled jobs
   # this recent whose worker close is unproven are closed and verified. tail: the async settle tail (artifact indexing,
@@ -332,7 +332,7 @@ allocation:
     invariantMaxAgeMs: 180000
     releaseWindowMs: 86400000
     tail: {retryMs: 120000, maxAttempts: 5}
-  # redesign (api redesign; owner 2026-09-28: heavy redesign is dispatched to the op that owns it, and the Kernel stays on
+  # redesign (starci kernel redesign; owner 2026-09-28: heavy redesign is dispatched to the op that owns it, and the Kernel stays on
   # Devin): these ops, enqueued from an RCA, route as `routeAs` (implementation.plan: the plan order - Opus, then Sol) at
   # >= minDifficulty at `effort` whatever their usual order (work.author walks the review order, Devin first, otherwise).
   redesign:
@@ -364,7 +364,7 @@ allocation:
   cutSeam: {maxSiblingWaitMs: 1800000, recutAfterFailures: 2}
   # opTelemetry (scripts/machine/op-metrics.mjs): op health per op and per workflow over the last windowMs; the
   # supervisor tick records one supervisor-op-metrics snapshot per run and the owner digest's trend line compares the
-  # newest with the one closest to trendMs earlier. stuckSla: every wait a running workflow holds (api status stuck[])
+  # newest with the one closest to trendMs earlier. stuckSla: every wait a running workflow holds (starci kernel status stuck[])
   # is severity warn past warnMs and critical past criticalMs - either is a Supervisor owed action; the tick alerts
   # every critical one.
   opTelemetry:
@@ -416,7 +416,7 @@ allocation:
   # autopilot (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish, modules/kernel/
   # owner-rulings.yaml): "run to the finish in one go, don't stop to ask the owner - not even UX/UI review; the owner
   # reviews once at the end". enabled is the default for every running workflow; workflows.<workflowId>.enabled
-  # overrides it for one workflow (api autopilot --workflow <id> --set on|off records a ledger override that wins
+  # overrides it for one workflow (starci kernel autopilot --workflow <id> --set on|off records a ledger override that wins
   # over both). Under autopilot:
   #   - a draw-review or brand-direction-review ask whose machine gates pass is answered PROVISIONALLY (answeredBy
   #     autopilot, receipt provisional:true + gate evidence); it never becomes golden and never counts as an owner
@@ -503,12 +503,12 @@ allocation:
   # reconciler (scripts/reconciler/*; DESIGN 7.4-7.8, contract modules/reconciler/reconciler.yaml): the engine polls
   # every ledger's events every pollMs; the leader row lasts leaseMs and is renewed (with the heartbeat row and file)
   # every renewMs; boot.mjs ensure restarts an engine whose heartbeat is older than
-  # heartbeatStaleMs; one api status snapshot per workflow is shared for statusCacheMs; a failing key backs off
+  # heartbeatStaleMs; one starci kernel status snapshot per workflow is shared for statusCacheMs; a failing key backs off
   # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
   # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).
   reconciler: {pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: {minMs: 1000, maxMs: 300000}, crashLoop: {max: 3, windowMs: 1800000}}
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
-  # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
+  # `starci kernel dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
   # (scripts/machine/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
   # then reduce the number of parallel ops, avoid freezing the machine and killing ops mid-run"): at every dispatch the effective cap
@@ -539,7 +539,7 @@ allocation:
       # priorities: {<workflowId>: {weight, reserve}}. Weight 1 is everyone's default. A workflow below the top
       # weight leaves `reserve` slots (and the RAM its queued ops need) to the higher ones and loses its heavy
       # ops first under the heavy pause; the top one keeps starting heavy ops while they fit, until critical.
-      # The Supervisor overrides per host: node scripts/supervisor/ram-cap.mjs prioritize --workflow <id>
+      # The Supervisor overrides per host: starci supervisor ram-cap prioritize --workflow <id>
       # --weight <n> [--reserve <slots>]. Owner priority 2026-09-28: the prioritized FE refactor workflow ran
       # up to 15 parallel code.refactor slices first; the other workflows ramped up in what was left.
       priorities: {}
@@ -589,7 +589,7 @@ allocation:
   # A routed-but-queued job (payload.model set, status queued) holds its pool slot only this long after its latest route
   # decision (payload.routedAt, else its newest route-decided event): long enough for one fan-out's sequential route
   # calls to spread across pools, short enough that a job parked behind a gate, hold, peer-wait, dependency or
-  # readiness loop does not starve the pool (scripts/kernel/cli.mjs poolLoadOf, shared by api route and api status).
+  # readiness loop does not starve the pool (scripts/kernel/cli.mjs poolLoadOf, shared by starci kernel route and starci kernel status).
   # Running, leased and answering jobs always hold theirs. Re-routing refreshes the hold.
   routeHoldMs: 900000
   verifyAvoidsImplementRuntime: true
@@ -646,7 +646,7 @@ runtimes:
   # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
   # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
   # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
-  # `api route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed launch/refusal status are the live capacity signal on top of
+  # `starci kernel route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed launch/refusal status are the live capacity signal on top of
   # this cap. swe-2-max is a medium+ agent: no easy pin, and the easy tier does not list the pool.
   devin-agent:
     target: devin-agent

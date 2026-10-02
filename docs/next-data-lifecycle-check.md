@@ -1,6 +1,6 @@
 # Next data lifecycle key check
 
-`node scripts/hfs/architecture.mjs <repository>` reports two independent static rules for a project
+`starci runtime architecture <repository>` reports two independent static rules for a project
 that selects SWR:
 
 - `FE_SWR_KEY_IDENTITY` requires every declared result identity on every active

@@ -7,7 +7,7 @@ summary: >-
   requeues a no-effect launch to ready. Provider-health circuits are machine.sqlite provider_health rows.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/settle.yaml
-  - modules/kernel/api-commands/reconcile.yaml
-  - modules/kernel/api-commands/provider-backoff.yaml
+  - modules/cli/commands/kernel/settle.yaml
+  - modules/cli/commands/kernel/reconcile.yaml
+  - modules/cli/commands/kernel/provider-backoff.yaml
   - modules/kernel/contract-changes/a3-schema-port.yaml

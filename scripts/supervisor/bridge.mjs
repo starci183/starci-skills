@@ -248,7 +248,7 @@ export async function cmdBridge(args, { env = process.env } = {}) {
   }
   const rewired = await rewireBridge(repo, bridgeId, { env, args, quiet: true });
   const notices = [];
-  if (blocker) notices.push(await notify(repo, blocker, `${TAG} ${bridgeId}: bridging workflow ${workflowId} now owns the shared part ${foundation} that ${dependents.join(', ')} waited on you for (${clip(reason, 200)}). Its landing releases them; your own job for it is redundant once ${foundation} lands - drop or verify it then (api foundations shows the owner).`, args));
+  if (blocker) notices.push(await notify(repo, blocker, `${TAG} ${bridgeId}: bridging workflow ${workflowId} now owns the shared part ${foundation} that ${dependents.join(', ')} waited on you for (${clip(reason, 200)}). Its landing releases them; your own job for it is redundant once ${foundation} lands - drop or verify it then (starci kernel foundations shows the owner).`, args));
   supervisorAction({ item: args.finding ?? `bridge|${bridgeId}`, action: 'bridge', reason, workflowId, refs: [bridgeId, foundation, ...dependents], env });
   return { ok: true, action: 'bridge', bridgeId, workflowId, foundation, dependents, blocker, ...approval, record: { ...record, state: rewired.record?.state ?? record.state }, started, rewire: rewired, notices };
 }
@@ -304,7 +304,7 @@ export async function cmdTransfer(args, { env = process.env } = {}) {
     });
     if (out.dryRun) return { ok: true, dryRun: true, action: 'transfer', target, from: out.from, to };
     const notices = [];
-    for (const wf of [out.from, to].filter(Boolean)) notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ownership of ${target} moved from ${out.from ?? '-'} to ${to} (${clip(reason, 200)}); the new owner declares its changes (api record-change), the other reads it.`, args));
+    for (const wf of [out.from, to].filter(Boolean)) notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ownership of ${target} moved from ${out.from ?? '-'} to ${to} (${clip(reason, 200)}); the new owner declares its changes (starci kernel record-change), the other reads it.`, args));
     supervisorAction({ item: args.finding ?? `transfer|${target}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, target], env });
     return { ok: true, action: 'transfer', bridgeId, target, from: out.from, to, ...approval, notices };
   }
@@ -354,7 +354,7 @@ export async function cmdTransfer(args, { env = process.env } = {}) {
   if (results.length) updateBridge(repo, bridgeId, (b) => ({ ...b, rewired: results }));
   const notices = [];
   for (const wf of [...new Set([from, to, ...moved.dependents].filter(Boolean))]) {
-    notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${mergeInto ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}` : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`} - ${clip(reason, 200)}. Read api foundations; re-check it in your own preflight.`, args));
+    notices.push(await notify(repo, wf, `${TAG} ${bridgeId}: ${mergeInto ? `foundation ${name} is merged into ${mergeInto} (owner ${to ?? '-'}); a need of ${name} is now a need of ${mergeInto}` : `foundation ${name} now belongs to ${to} (was ${from ?? 'unowned'})`} - ${clip(reason, 200)}. Read starci kernel foundations; re-check it in your own preflight.`, args));
   }
   supervisorAction({ item: args.finding ?? `transfer|foundation:${name}`, action: 'transfer', reason, workflowId: to, refs: [bridgeId, name, mergeInto].filter(Boolean), env });
   return { ok: true, action: 'transfer', bridgeId, foundation: name, ...(mergeInto ? { mergeInto } : {}), from, to, dependents: moved.dependents, rewired: results, ...approval, notices };
@@ -389,7 +389,7 @@ export async function cmdRevise(args, { env = process.env } = {}) {
     return rec;
   });
   const notice = await notify(repo, workflowId, rec.state === 'applied'
-    ? `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run api survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.`
+    ? `${TAG} ${bridgeId}: the Supervisor revised your goal to rev ${preview.nextRevision} (provisional, ${clip(reason, 200)}): run starci kernel survey and resurvey the pending goal-revision inbox; queued legs it removed were superseded.`
     : `${TAG} ${bridgeId}: the Supervisor requests a goal revision (${clip(reason, 200)}): ${rec.state === 'refused' ? `it could not be applied (${clip(rec.error, 160)}) - settle or reconcile the open legs it names, ` : ''}the owner or autopilot applies it; keep the duplicated legs parked meanwhile.`, args);
   supervisorAction({ item: args.finding ?? `revise|${workflowId}`, action: 'revise', reason, workflowId, refs: [bridgeId], env });
   return { ok: rec.state !== 'refused', action: 'revise', bridgeId, workflowId, state: rec.state, ...approval, preview: rec.preview, ...(applied ? { applied } : {}), notice };
@@ -427,7 +427,7 @@ export async function cmdDesignate(args, { env = process.env } = {}) {
     appendEvents(ledger, [lead, waiter], 'supervisor-cycle-designated', { bridgeId, lead, waiter, releases, reason, ...approval });
   });
   const notices = [
-    await notify(repo, lead, `${TAG} ${bridgeId}: circular wait with ${waiter} broken - you lead the shared part (${clip(reason, 200)}). Wait(s) ${releases.join(', ')} resolved: enqueue the held work now, land it, and tell ${waiter} (api notify) when it landed.`, args),
+    await notify(repo, lead, `${TAG} ${bridgeId}: circular wait with ${waiter} broken - you lead the shared part (${clip(reason, 200)}). Wait(s) ${releases.join(', ')} resolved: enqueue the held work now, land it, and tell ${waiter} (starci kernel notify) when it landed.`, args),
     await notify(repo, waiter, `${TAG} ${bridgeId}: circular wait with ${lead} broken - ${lead} leads the shared part; keep your wait on it and do not build it yourself (${clip(reason, 200)}).`, args),
   ];
   supervisorAction({ item: args.finding ?? `designate|${lead}+${waiter}`, action: 'designate', reason, workflowId: lead, refs: [bridgeId, ...releases], env });

@@ -15,7 +15,7 @@
 //   services  per unit-tested subject (its role in `role`): its coverage (the four pcts), its spec beside it, and the kit judgment of that spec
 //             (op-gate.yaml unitKit: Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a
 //             `new <Service>(` of the subject forbidden).
-// `api settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
+// `starci kernel settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

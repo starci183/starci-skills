@@ -7,6 +7,6 @@ paths:
   - scripts/kernel/api-verbs/notify.mjs
   - scripts/kernel/api-verbs/inbox.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/peers.yaml
-  - modules/kernel/api-commands/notify.yaml
-  - modules/kernel/api-commands/inbox.yaml
+  - modules/cli/commands/kernel/peers.yaml
+  - modules/cli/commands/kernel/notify.yaml
+  - modules/cli/commands/kernel/inbox.yaml

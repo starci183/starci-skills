@@ -12,7 +12,7 @@ import {jobResult} from '../../engine/db/ledger.mjs'; const DRIVE=path.parse(os.
 //   - a running job whose exact terminal is disconnected, or whose handle a
 //     live Orca no longer knows (terminal_handle_stale), makes the frontier
 //     'worker-dead' and actionable - it no longer reads a silent 'engaged';
-//   - api reconcile --dead-worker returns a provably no-effect attempt to
+//   - starci kernel reconcile --dead-worker returns a provably no-effect attempt to
 //     queued at the SAME attempt (no business attempt spent), releasing leases;
 //   - a filed report takes the ordinary consume/check/settle route, unwritten;
 //   - an uncommitted change or a commit on the owned paths fences it

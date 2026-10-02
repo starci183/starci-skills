@@ -43,7 +43,7 @@ rules:
         - HFS_STACKS_SHAPE
         - HFS_STACKS_IN_SIDE
       manual:
-        - node scripts/gates/starcistacks.mjs <app> exits 0 (the app root).
+        - starci gate starcistacks <app> exits 0 (the app root).
     relatedExamples: []
   - id: REPO-STACKS-2
     title: Shared host services are declared, not copied

@@ -122,7 +122,7 @@ test('a declaration is checked against the manifest, per side', () => {
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['app.ci-e2e'] })), 'HFS_DECLARATION_INVALID');          // the root's
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.made.up'] })), 'HFS_DECLARATION_INVALID');
   refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'worker' }, { name: 'cli', kind: 'cli' }] })), 'HFS_DECLARATION_INVALID');   // no api app
-  // connections declared and no cli app: the declaration stands; BE_CLI_REQUIRED (hfs check) names the missing cli app
+  // connections declared and no cli app: the declaration stands; BE_CLI_REQUIRED (starci app check) names the missing cli app
   assert.doesNotThrow(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }] })));
   refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');   // the migrate kind is gone: a cli command migrates
   assert.doesNotThrow(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }], connections: [] })));
@@ -276,7 +276,7 @@ test('BE side: tracked, tier, required files', () => {
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
   assert.equal(has('jest.config.e2e.js'), false);
   assert.deepEqual(minimums.map((m) => m.slot).sort(), ['be.app.api', 'be.feature']);
-  // the cli app is required by BE_CLI_REQUIRED (hfs check), not by the slot: with or without a connection, no cli path is a slot requirement of an app that declares none
+  // the cli app is required by BE_CLI_REQUIRED (starci app check), not by the slot: with or without a connection, no cli path is a slot requirement of an app that declares none
   const noDb = sideOf(app({ be: { ...BE_SIDE, apps: [{ name: 'core', kind: 'api' }], connections: [] } }), 'be');
   assert.equal(noDb.requiredPaths().paths.some((e) => e.slot === 'be.app.cli'), false);
 });

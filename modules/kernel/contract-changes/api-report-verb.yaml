@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/report.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/report.yaml
+  - modules/cli/commands/kernel/report.yaml

@@ -201,7 +201,7 @@ test('a rule that claims every enforcer is built but whose code nothing emits is
   for (const r of machineOnly) assert.ok(findings.some((f) => f.code === 'HFS_RULE_CODE_UNEMITTED' && f.rule === r.id), r.id);
 });
 
-test('a code the machine or hfs check can emit that no rule lists is unowned; an infrastructure refusal is exempt (RED19)', () => {
+test('a code the machine or starci app check can emit that no rule lists is unowned; an infrastructure refusal is exempt (RED19)', () => {
   const catalog = loadRuleCatalog();
   const [rule] = catalog.rules;
   const owned = rule.failureCodes[0];
@@ -209,7 +209,7 @@ test('a code the machine or hfs check can emit that no rule lists is unowned; an
   const findings = run(catalog, { codes });
   assert.deepEqual(findings.map((f) => f.code), ['HFS_RULE_CODE_UNOWNED', 'HFS_RULE_CODE_UNOWNED']);
   assert.ok(findings[0].message.startsWith('ARCH_CODE_NOBODY_OWNS can be emitted by the machine check'), findings[0].message);
-  assert.ok(findings[1].message.startsWith('HFS_CODE_NOBODY_OWNS can be emitted by the hfs check'), findings[1].message);
+  assert.ok(findings[1].message.startsWith('HFS_CODE_NOBODY_OWNS can be emitted by the starci app check'), findings[1].message);
   // Owned codes, sub-codes of a rule and refusals alone leave the check clean.
   const subCodes = catalog.rules.flatMap((r) => r.failureCodes);
   assert.deepEqual(run(catalog, { codes: { machine: [...subCodes, 'ARCH_CANNOT_JUDGE'], hfs: subCodes, refusals: ['ARCH_CANNOT_JUDGE'] } }), []);

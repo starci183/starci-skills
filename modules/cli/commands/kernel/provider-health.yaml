@@ -37,7 +37,7 @@ removed:
 quotaCircuit: A provider whose agent card declares quotaExhausted is parked with failureKind quota
   when a dispatch rejection's signal/error carries its quota codes (e.g. insufficient_quota,
   quota-exhausted, HTTP 429 with a quota code) or its refused screen shows the quota row, or when
-  api status / api observe read that row on a worker screen. It opens on the first observation and
+  starci kernel status / starci kernel observe read that row on a worker screen. It opens on the first observation and
   lasts allocation.cooldownMs.quota with the usual backoff. No [infra-provider] incident is raised
   for it
 quotaProbe: "--quota-probe (no --provider = every provider whose card declares
@@ -78,5 +78,5 @@ refuses:
   - "probe-failed: --probe could not prove the credential; the circuit stays open and events
     provider-health-recover-refused {provider, reason, probe} is appended"
 usedBy: the Kernel, after the owner or a supervisor fixed a credential that an auth circuit still
-  holds (driver-loop.yaml providerCircuitRecovery). Route and dispatch refusals, api status
+  holds (driver-loop.yaml providerCircuitRecovery). Route and dispatch refusals, starci kernel status
   queuedBecause circuit-open and the [infra-provider] incident text name this command

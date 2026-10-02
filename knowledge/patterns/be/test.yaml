@@ -565,8 +565,8 @@ rules:
     requirement: |-
       The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
       it with ONE scope, the unit-tested roles: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
-      `sonar.coverage.exclusions` listing every executable file that is not of a unit-tested role (SonarQube has no coverage inclusions: hfs sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
-      100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. hfs sync
+      `sonar.coverage.exclusions` listing every executable file that is not of a unit-tested role (SonarQube has no coverage inclusions: starci app sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
+      100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. starci app sync
       renders the scope into both files from the jest preset's `COVERAGE_SOURCES`, so it can never drift. The Sonar gate
       (`knowledge/sonar-gate.yaml`) holds coverage at 100 overall and on new code, and the runtime judges it per file: one service
       or cli command below 100 fails. Handlers, resolvers, controllers, modules, config and tests are not coverage targets; fe/ has no tests.
@@ -576,13 +576,13 @@ rules:
     cases:
       - id: case-1
         when: sonar-project.properties
-        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every file of no unit-tested role (fe/** included), no coverage exclusion; hfs sync renders the file'
+        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every file of no unit-tested role (fe/** included), no coverage exclusion; starci app sync renders the file'
       - id: case-2
         when: CI
         write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action and the CODECOV_TOKEN secret'
       - id: case-3
         when: codecov.yml
-        write: 'project and patch status target 100% on paths be/src/**/*.service.ts and be/src/features/cli/**/*.cli.ts, fe/** ignored; hfs sync renders the file from the same scope as Sonar'
+        write: 'project and patch status target 100% on paths be/src/**/*.service.ts and be/src/features/cli/**/*.cli.ts, fe/** ignored; starci app sync renders the file from the same scope as Sonar'
     verification:
       automated:
         - HFS_SONAR_CONFIG

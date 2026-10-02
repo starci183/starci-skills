@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/status.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/status.yaml
+  - modules/cli/commands/kernel/status.yaml

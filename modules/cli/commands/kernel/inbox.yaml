@@ -30,7 +30,7 @@ removed:
 reads: peer-message inbox rows addressed to --workflow, and the latest 20 it sent
 writes: without --ack nothing. --ack sets that pending row status applied, disposition_json
   {disposition, by, at} and applied_at, and appends 'peer-message-acked' {key, from, kind,
-  disposition} on --workflow; the sender reads the disposition back in its own `api inbox` sent list
+  disposition} on --workflow; the sender reads the disposition back in its own `starci kernel inbox` sent list
 returns: "{ok:true, workflowId, pending:[{key, from, fromTitle, kind, subject, body, replyTo,
   refs[], at}], sent:[{key, to, kind, subject, replyTo, at, status, disposition, appliedAt}] newest
   first}  | --ack: {ok:true, workflowId, acked:{key, from, kind, subject, disposition}, pending:<n

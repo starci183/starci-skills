@@ -1,5 +1,4 @@
 internal:
-  - {path: engine/db/machine.mjs, why: "Host machine-state maintenance entry", usedBy: [engine/db/ledger.mjs]}
   - {path: scripts/agent/bias.mjs, why: "Model-routing bias helper", usedBy: [scripts/route/route-model.mjs]}
   - {path: scripts/agent/quota/index.mjs, why: "Provider quota probe child", usedBy: [scripts/agent/credential-probe.mjs]}
   - {path: scripts/agent/send.mjs, why: "Agent prompt-delivery helper", usedBy: [scripts/agent/lib.mjs]}
@@ -18,9 +17,7 @@ internal:
   - {path: scripts/api/orca/task-update.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/launch-smoke.mjs]}
   - {path: scripts/api/orca/terminal-close.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/close-op-terminal.mjs]}
   - {path: scripts/api/orca/terminal-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/checks/check-orca-tree.mjs]}
-  - {path: scripts/api/orca/terminal-read.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/clear-draft.mjs]}
   - {path: scripts/api/orca/terminal-rename.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
-  - {path: scripts/api/orca/terminal-send.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/agent/lib.mjs]}
   - {path: scripts/api/orca/terminal-show.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/kernel/close-op-terminal.mjs]}
   - {path: scripts/api/orca/terminal-wait.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/machine/close-verify.mjs]}
   - {path: scripts/api/orca/worker-list.mjs, why: "Internal Orca API wrapper", usedBy: [scripts/lib/worker-accounting.mjs]}
@@ -61,21 +58,13 @@ internal:
   - {path: scripts/checks/check-schema-catalog.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/checks/check-worktree-add.mjs, why: "Runtime check-suite member", usedBy: [scripts/checks/check-runtime.mjs]}
   - {path: scripts/cli/main.mjs, why: "Runtime-side catalog dispatcher", usedBy: [packages/cli/src/main.mjs]}
-  - {path: scripts/connectors/ask-gateway.mjs, why: "Reconciler-managed ask gateway service", usedBy: [scripts/reconciler/services.mjs]}
-  - {path: scripts/connectors/telegram-media.mjs, why: "Telegram media-delivery child", usedBy: [scripts/connectors/telegram.mjs]}
-  - {path: scripts/connectors/telegram.mjs, why: "Reconciler-managed Telegram service", usedBy: [scripts/reconciler/services.mjs]}
-  - {path: scripts/connectors/tunnel.mjs, why: "Reconciler-managed tunnel service", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/context/pack.mjs, why: "Operation context-pack builder", usedBy: [scripts/kernel/dispatch-op.mjs]}
   - {path: scripts/gates/probe-reference-conventions.mjs, why: "Read-only reference-rule probe", usedBy: [knowledge/patterns/scan-coverage.yaml]}
-  - {path: scripts/goal/assess.mjs, why: "Goal-definition assessment helper", usedBy: [scripts/goal/define-goal.mjs]}
-  - {path: scripts/hfs/architecture.mjs, why: "HFS architecture check engine", usedBy: [scripts/gates/canon-scan.mjs]}
   - {path: scripts/housekeeping/blob-gc.mjs, why: "Blob garbage-collection controller", usedBy: [scripts/housekeeping/hk-ledger.mjs]}
   - {path: scripts/housekeeping/owner-claims-audit.mjs, why: "Owner-claim incident audit", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/ask-server.mjs, why: "Kernel ask-form server child", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/dispatch-op.mjs, why: "Kernel operation-dispatch helper", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/kernel/kernel-watchdog.mjs, why: "Reconciler-managed kernel watchdog", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/kernel/report-render.mjs, why: "Kernel report renderer", usedBy: [scripts/kernel/verbs/report.mjs]}
-  - {path: scripts/kernel/seam-policy.mjs, why: "Kernel seam-policy helper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/kernel/settle/canon-parity.mjs, why: "Kernel settlement parity helper", usedBy: [scripts/kernel/settle/job-settle.mjs]}
   - {path: scripts/kernel/settle/job-settle.mjs, why: "Reconciler-managed settlement service", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/kernel/transcripts.mjs, why: "Kernel transcript projection helper", usedBy: [scripts/kernel/verbs/report.mjs]}
@@ -84,12 +73,8 @@ internal:
   - {path: scripts/lib/spec-deps.mjs, why: "Affected-spec dependency resolver", usedBy: [scripts/supervisor/land.mjs]}
   - {path: scripts/machine/close-verify.mjs, why: "Terminal-close verification helper", usedBy: [scripts/kernel/kernel-watchdog.mjs]}
   - {path: scripts/machine/contract-changes-store.mjs, why: "Contract-change store helper", usedBy: [scripts/kernel/runtime-rev.mjs]}
-  - {path: scripts/machine/decisions.mjs, why: "Decision-ledger helper", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/machine/lessons.mjs, why: "Supervisor lesson-store helper", usedBy: [scripts/supervisor/lesson-actions.mjs]}
-  - {path: scripts/machine/op-metrics.mjs, why: "Operation metrics projection", usedBy: [scripts/kernel/cli.mjs]}
   - {path: scripts/machine/worker-list-all.mjs, why: "Cross-run worker projection", usedBy: [scripts/checks/check-orca-tree.mjs]}
   - {path: scripts/machine/worker-output.mjs, why: "Worker transcript projection", usedBy: [scripts/kernel/transcripts.mjs]}
-  - {path: scripts/machine/worktrees.mjs, why: "Machine worktree-state helper", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/reconciler/controllers/job.mjs, why: "Engine-discovered job controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/controllers/workflow.mjs, why: "Engine-discovered workflow controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/engine.mjs, why: "Reconciler engine child", usedBy: [scripts/reconciler/boot.mjs]}
@@ -99,7 +84,6 @@ internal:
   - {path: scripts/reconciler/sla.mjs, why: "Workflow SLA controller", usedBy: [scripts/reconciler/engine.mjs]}
   - {path: scripts/reconciler/tunnel-task.mjs, why: "Host-run harness tunnel task registration entry", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/route/route-model.mjs, why: "Model-route selector", usedBy: [scripts/goal/define-goal.mjs]}
-  - {path: scripts/route/route-op.mjs, why: "Operation-route selector", usedBy: [scripts/kernel/driver-loop.mjs]}
   - {path: scripts/route/route-plan.mjs, why: "Goal route-plan helper", usedBy: [scripts/goal/define-goal.mjs]}
   - {path: scripts/supervisor/channel.mjs, why: "Supervisor channel helper", usedBy: [scripts/supervisor/supervisor-watchdog.mjs]}
   - {path: scripts/supervisor/direct-commits.mjs, why: "Direct-commit fleet audit", usedBy: [scripts/reconciler/controllers/fleet.mjs]}
@@ -109,10 +93,8 @@ internal:
   - {path: scripts/supervisor/supervisor-watchdog.mjs, why: "Host supervisor watchdog", usedBy: [scripts/reconciler/controllers/host.mjs]}
   - {path: scripts/supervisor/telegram-bridge.mjs, why: "Reconciler-managed owner bridge", usedBy: [scripts/reconciler/services.mjs]}
   - {path: scripts/supervisor/workers.mjs, why: "Supervisor repair-worker launcher", usedBy: [scripts/supervisor/supervisor-watchdog.mjs]}
-  - {path: scripts/uat/assisted-runner.mjs, why: "Assisted-UAT process runner", usedBy: [scripts/api/process/run-program.mjs]}
   - {path: scripts/uat/test-secret.mjs, why: "Runtime test-secret reader behind the app secret owner", usedBy: [scripts/supervisor/push-mains.mjs]}
-  - {path: scripts/uat/uat-slots.mjs, why: "UAT concurrency semaphore", usedBy: [scripts/kernel/driver-loop.mjs]}
-  - {path: scripts/work/purge-workflow.mjs, why: "Finished-workflow purge helper", usedBy: [scripts/kernel/cli.mjs]}
+  - {path: scripts/work/purge-workflow.mjs, why: "Finished-workflow purge helper", usedBy: [scripts/housekeeping/hk-ledger.mjs]}
   - {path: scripts/work/validate/check-evidence-binding.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-example-work.mjs, why: "Example work-record validator", usedBy: [.github/workflows/examples.yml]}
   - {path: scripts/work/validate/check-work-artifacts.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
@@ -120,7 +102,6 @@ internal:
   - {path: scripts/work/validate/check-work-deep.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-surfaces.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/work-hygiene.mjs, why: "Runtime work-hygiene engine behind the app hygiene owner", usedBy: [scripts/kernel/cli.mjs]}
-  - {path: scripts/work/work-graph.mjs, why: "Kernel work-graph mutation helper", usedBy: [scripts/kernel/cli.mjs]}
   - {path: tests/fixtures/gate/hfs-lint-eslint-only.mjs, why: "Gate-test fake app CLI", usedBy: [tests/gates/gate.spec.mjs]}
   - {path: tests/helpers/source-canon-registry.mjs, why: "Scaffold-test registry server", usedBy: [tests/packages-hfs/hfs-scaffold-app.spec.mjs]}
   - {path: packages/hfs/runtime/scripts/hfs/architecture.mjs, why: "Generated runtime copy of the HFS architecture entry", usedBy: [scripts/hfs/sync-runtime.mjs]}

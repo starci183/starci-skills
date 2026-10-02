@@ -15,10 +15,10 @@ records it. Read `host-contract.md` for the call contract (`modules/host/orca/ca
 
 | ID | Mechanism | Why it stays |
 |---|---|---|
-| T6 | Screen-proven wakes and nudges (`kernel/wake-delivery.mjs`, `api nudge`, `agent/lib.mjs` delivery, `terminal-send` Enter retry) | Orca proves `turn_started` only on hosts with prompt receipts, and a mailbox `send` is a durable enqueue with a best-effort wake. Only the frame proves that a turn began on Codex and Devin (the 2026-09-23/24 incidents). Smoke E6 (live, Orca 1.4.209, 2026-10-02) settled it: `orchestration send --to dispatch:<id>` to an idle worker that already sent worker_done is refused `dispatch_inactive` ("Dispatch <id> is completed; its worker will never read that mailbox. Send to run:<id> instead, or start a new Dispatch for follow-up work."). A worker is re-engaged only through the terminal (`terminal send` with Enter) or a new Dispatch, so this row stays. No runtime caller issues `send --to dispatch:`. |
+| T6 | Screen-proven wakes and nudges (`kernel/wake-delivery.mjs`, `starci kernel nudge`, `agent/lib.mjs` delivery, `terminal-send` Enter retry) | Orca proves `turn_started` only on hosts with prompt receipts, and a mailbox `send` is a durable enqueue with a best-effort wake. Only the frame proves that a turn began on Codex and Devin (the 2026-09-23/24 incidents). Smoke E6 (live, Orca 1.4.209, 2026-10-02) settled it: `orchestration send --to dispatch:<id>` to an idle worker that already sent worker_done is refused `dispatch_inactive` ("Dispatch <id> is completed; its worker will never read that mailbox. Send to run:<id> instead, or start a new Dispatch for follow-up work."). A worker is re-engaged only through the terminal (`terminal send` with Enter) or a new Dispatch, so this row stays. No runtime caller issues `send --to dispatch:`. |
 | T7 | `terminal-rename` with the `[Op]`/`[Kernel]` title | `--display-name` names the Task, not the tab. This is presentation; the handle comes from the start receipt. |
 | M3 | Decision Items plus the doorbell | DIs carry the decider, escalation and claims. Orca's `send` is transport only (the doorbell follows T6). |
-| M4 | Peer messages between workflows (`api notify`/`api inbox`) | Peer-wait gating and dispositions are ledger semantics, and the Kernel never calls Orca. |
+| M4 | Peer messages between workflows (`starci kernel notify`/`starci kernel inbox`) | Peer-wait gating and dispositions are ledger semantics, and the Kernel never calls Orca. |
 | M5 | Owner and Supervisor channel (`supervisor/channel.mjs`, `tell.mjs`, Telegram) | The owner's desktop chat and Telegram are not Orca terminals. An Orca `ask` never reaches the owner. |
 | D1 | The ledger work graph (generations, cuts, path leases, goal revisions, cross-workflow waits) | Orca Tasks have plain deps only. Mirroring the graph into Orca would be new code for sidebar display. |
 | G1 | Decision Items (`decision_items`, `sup_decision_items`, the escalation ladder) | Orca gates are Task-scoped and can be resolved by any coordinator. They have no decider class, due date, escalation, claim or evidence, and most DIs have no Task. |
@@ -75,7 +75,7 @@ handle; `worker-read --source auto` always works. A worker's **output** is there
 - `scripts/api/orca/worker-read.mjs` `workerRead` reads one page; `scripts/machine/worker-output.mjs` `workerOutput` follows the top-level cursor
   unchanged until a page is empty, and restarts once without the cursor on `source_changed`. Its `contentComplete`
   is true only when every page said so; `clipping` is kept.
-- `api observe` returns `output` (read by the job's Dispatch). The turn state is still classified from the frame (T2).
+- `starci kernel observe` returns `output` (read by the job's Dispatch). The turn state is still classified from the frame (T2).
 - `kernel/transcripts.mjs` reads attempt snapshots, the final transcript and Kernel/Supervisor seat snapshots by
   Dispatch. The seat's Dispatch is `seats.detail_json` `value.dispatch`. Every stored text starts with a header line
   that carries `contentComplete` and `clipping`.
@@ -108,7 +108,7 @@ is), so such a worker reads unverified, never dead.
 
 | ID | Was | Now |
 |---|---|---|
-| W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `api report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and releases. `worker-stop` is only the fallback for a Dispatch that did not settle. The close, quit and reap paths stay until smoke E1 (#10). |
+| W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `starci kernel report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and releases. `worker-stop` is only the fallback for a Dispatch that did not settle. The close, quit and reap paths stay until smoke E1 (#10). |
 | D2 | One Task per op attempt, closed by hand (`closeOperationTask`, `staleTasks`, `reconcile --orca-tasks`, the gc tasks collector) | The `worker_done` settlement closes the Task. All four are deleted. |
 
 ### Known limits that stay (alpha.5)

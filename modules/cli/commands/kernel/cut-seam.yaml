@@ -54,7 +54,7 @@ writes: "exactly one event, never a job row: --publish-interface -> seam-interfa
   released to build against it: status seamStub mode interface); --release -> seam-released {op,
   cutId, reason, seamJobId, seamStatus} (siblings run on a stub now: mode released); --reconcile ->
   seam-reconciled {op, cutId, exitCode, via: reconcile, command, evidence, seamJobId} on the sibling
-  (the cut-seam-reconcile result; red owes a retry of that ordinal). api settle writes
+  (the cut-seam-reconcile result; red owes a retry of that ordinal). starci kernel settle writes
   seam-reconciled itself (via settle-checks for a stub sibling passing after its seam passed, via
   full-regression-final for every stub sibling still owed when the pass closes the set)"
 returns: "{ok:true, mode, jobId?, workflowId, op, cutId, files?|seamJobId?, exitCode?}"

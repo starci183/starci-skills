@@ -1,12 +1,12 @@
 name: examples
 
 # Every example app of this repository in CI: GitHub runs only the root workflows, so the app's own ci.yml (the app-repository
-# form hfs sync renders) never runs here. The app list is DERIVED: job `apps` prints every examples/* folder whose hfs.json is of
+# form starci app sync renders) never runs here. The app list is DERIVED: job `apps` prints every examples/* folder whose hfs.json is of
 # kind app (scripts/checks/check-examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
 # list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/check-examples-ci.mjs).
 #
 # Two triggers, one workflow (owner ruling: e2e runs manually only):
-#   push / pull_request   per app: install, typecheck, hfs lint (with the Sonar import file), the unit project with coverage
+#   push / pull_request   per app: install, typecheck, starci app lint (with the Sonar import file), the unit project with coverage
 #                         (per-file 100 on the services; it writes be/coverage/lcov.info), the Codecov upload under the app's
 #                         flag, the front-end build, and the Sonar scan and quality gate where a server is configured
 #                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip).
@@ -117,8 +117,8 @@ jobs:
         run: npm ci
       - name: Typecheck both sides
         run: npm run typecheck
-      # THE lint of the app (ESLint with both canons, stylelint, hfs check), also written as the one Sonar import file.
-      - name: hfs lint
+      # THE lint of the app (ESLint with both canons, stylelint, starci app check), also written as the one Sonar import file.
+      - name: starci app lint
         working-directory: .
         run: node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
       - name: Unit tests with coverage (per-file 100 on the services; writes be/coverage/lcov.info)

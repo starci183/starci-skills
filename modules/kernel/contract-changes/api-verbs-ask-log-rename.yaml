@@ -5,7 +5,7 @@ summary: >-
   `api kernel-ack-rev`, `api rename` and `api log` moved out of scripts/kernel/api.mjs into
   scripts/kernel/api-verbs/<verb>.mjs (the file-based verb registry, scripts/kernel/api-extensions.mjs),
   and their contracts moved out of modules/kernel/api.yaml commands into
-  modules/kernel/api-commands/<verb>.yaml. The helpers they share with the verbs still in api.mjs moved
+  modules/cli/commands/kernel/<verb>.yaml. The helpers they share with the verbs still in api.mjs moved
   to scripts/kernel/api-lib/ (rows.mjs ledger reads, kernel-seat.mjs, caller.mjs op-caller guard,
   asks.mjs retireAsk) and api.mjs imports them back under the same names. Behaviour is identical:
   same args, reads, returns and refusals; extension verbs whose help line stays in api.mjs usage() set
@@ -23,9 +23,9 @@ paths:
   - scripts/kernel/api-verbs/rename.mjs
   - scripts/kernel/api-verbs/log.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/serve-ask.yaml
-  - modules/kernel/api-commands/retire-ask.yaml
-  - modules/kernel/api-commands/kernel-ack-rev.yaml
-  - modules/kernel/api-commands/rename.yaml
-  - modules/kernel/api-commands/log.yaml
+  - modules/cli/commands/kernel/serve-ask.yaml
+  - modules/cli/commands/kernel/retire-ask.yaml
+  - modules/cli/commands/kernel/kernel-ack-rev.yaml
+  - modules/cli/commands/kernel/rename.yaml
+  - modules/cli/commands/kernel/log.yaml
   - modules/kernel/contract-changes/api-verbs-ask-log-rename.yaml

@@ -1,4 +1,4 @@
-# The contract of `api verify-proofs` (scripts/kernel/verbs/verify-proofs.mjs). One file per extension
+# The contract of `starci kernel verify-proofs` (scripts/kernel/verbs/verify-proofs.mjs). One file per extension
 # verb (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.verify-proofs
 # (lane slim-04).
 group: kernel

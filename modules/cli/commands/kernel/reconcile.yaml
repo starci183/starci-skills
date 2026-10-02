@@ -42,7 +42,7 @@ removed:
   - node scripts/kernel/cli.mjs reconcile
 salvage: "`--dead-worker` first looks for a report the dead worker wrote but never filed: an
   op-report@1 report*.json under its owned paths modified since its dispatch, stamped for this job
-  or unstamped (scripts/kernel/report-salvage.mjs), filed through api report itself so every report
+  or unstamped (scripts/kernel/report-salvage.mjs), filed through starci kernel report itself so every report
   guard applies. A filed one returns {ok, jobId, recovery:'settle', salvaged:{file, outcome},
   tried[], next} and a 'report-salvaged' event; the Kernel checks and settles it. --no-salvage skips
   the search."
@@ -151,7 +151,7 @@ releaseWorker: "`--release-worker` proves, and if needed redoes, a SETTLED job's
   frontier.heldWorkerJobs) it releases the worker without settling (settle's worker-stop when
   needed, then worker-release), the path leases are released, and the proof is recorded as
   payload.workerReleased {at, heldBy, custody}; the job stays running (its Orca Task settled with
-  the op's worker_done). The worker then reads liveness released, and api settle reuses the recorded
+  the op's worker_done). The worker then reads liveness released, and starci kernel settle reuses the recorded
   proof (custody released, proof released-while-held) instead of releasing again, so a later
   --release-worker on the settled job answers alreadyReleased. One event
   'worker-released-while-held'; a repeat writes nothing (alreadyReleased:true). Returns

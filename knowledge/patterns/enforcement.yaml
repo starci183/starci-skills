@@ -73,8 +73,8 @@ rules:
     hfsRules: [R18]
     requirement: |
       The implemented read-only gate is
-      `node scripts/gates/gate.mjs --root <app> --changed <file> [...]`.
-      It runs hfs lint over the changed files, tsc per owning project and the slice's tests, and blocks only on findings the
+      `starci gate run --root <app> --changed <file> [...]`.
+      It runs starci app lint over the changed files, tsc per owning project and the slice's tests, and blocks only on findings the
       base does not have (exit 1); a tool that could not run is exit 2, never a pass. It changes no rule and no inline config.
       Its success means result integrity only: disabled rules, unused directives, TypeScript directives, semantic aliases and
       structural omissions still need the separate config and source audit. It never grants code acceptance.

@@ -11,10 +11,10 @@ they disagree with prose, the YAML wins.
 
 ```text
 owner prompt
-  → node scripts/goal/define-goal.mjs        workflows + goals(rev) + inbox rows      phase queued
-  → node scripts/kernel/start-workflow.mjs   claims the inbox row, spawns [Kernel] <workflow_id>   phase running
+  → starci workflow define        workflows + goals(rev) + inbox rows      phase queued
+  → starci workflow start   claims the inbox row, spawns [Kernel] <workflow_id>   phase running
   → driver loop (below)                      until every unit settled + final verify pass
-  → api finish                               phase finished; history preserved
+  → starci kernel finish                               phase finished; history preserved
 ```
 
 ## Phases, including paused and stopped
@@ -26,8 +26,8 @@ refuses any other; every change writes a `lifecycle_changes` row with who and wh
 
 - **paused** is temporary: the Kernel seat is `parked` with a reason, no new work is dispatched,
   and the phase returns to `running` when the reason clears.
-- **stopped** belongs to the owner. `api lifecycle --stop` stops a workflow; only the owner's
-  `api lifecycle --resume` moves it back to `queued`. No controller, Kernel or Supervisor resumes a
+- **stopped** belongs to the owner. `starci kernel lifecycle --stop` stops a workflow; only the owner's
+  `starci kernel lifecycle --resume` moves it back to `queued`. No controller, Kernel or Supervisor resumes a
   stopped workflow, and no controller replaces the seat of a paused or stopped one.
 - A `finished` or `stopped` workflow can be `archived`; an archived workflow accepts no new event or
   job, and its open incidents were closed when it finished.
@@ -68,11 +68,11 @@ worker recovery, ready dispatch and seat liveness:
 
 | Step | Call | Why |
 | --- | --- | --- |
-| survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
-| plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
-| enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `api decisions --workflow <id>` then `api status` and an allowed decision verb | Claim and resolve non-green verdicts, worker questions, progress stalls and Supervisor rulings; use `--decision <id>` for the chosen action. Yield when no decision is executable. Job, Workflow and Host controllers continue their mechanical passes. |
-| finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
+| survey | `starci kernel survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
+| plan | `starci kernel plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
+| enqueue | `starci kernel enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
+| drive | `starci kernel decisions --workflow <id>` then `starci kernel status` and an allowed decision verb | Claim and resolve non-green verdicts, worker questions, progress stalls and Supervisor rulings; use `--decision <id>` for the chosen action. Yield when no decision is executable. Job, Workflow and Host controllers continue their mechanical passes. |
+| finish | `starci kernel finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
 
 The kernel decides the plan and its open Decision Items. It never decides scope, identity or
 authority, never answers an `ask` itself, and never edits the ledger by hand.
@@ -80,7 +80,7 @@ authority, never answers an `ask` itself, and never edits the ledger by hand.
 ## The verbs — `modules/kernel/api.yaml`
 
 ```text
-node scripts/kernel/cli.mjs <verb> --repo <path> [...]
+starci kernel <verb> --repo <path> [...]
 ```
 
 `modules/kernel/api.yaml` and `modules/cli/commands/kernel/<verb>.yaml`
@@ -94,7 +94,7 @@ exits 1 with `{ok:false, reason}` where the reason string is the contract.
 `observe` is read-only in every way that matters: it returns the exact worker
 terminal's liveness plus a bounded screen tail as reasoning context and
 appends only a compact `op-observed` receipt — an op's screen is never proof,
-and only `api report` plus recorded `api check` rows support a verdict.
+and only `starci kernel report` plus recorded `starci kernel record-checks` rows support a verdict.
 
 ## Dispatch — `modules/kernel/dispatch.yaml`
 
@@ -135,7 +135,7 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
 `grammar.update`, `task.execute`) runs one loop:
 
 1. **READ** — `scripts/gates/read-digest.mjs --root <app> --touch <files>`
-   prints what the slice must read before coding: the `hfs explain` slot map of
+   prints what the slice must read before coding: the `starci app explain` slot map of
    each touched file, the pattern files of each file kind (`op-gate.yaml`
    `kinds`: the family's `always` files plus those of the longest listed slot
    prefix) and the example files of the same slots. It records the READ digest
@@ -143,7 +143,7 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
 2. **CODE** — inside the owned paths, in the workflow worktree.
 3. **CHECK** — `scripts/gates/gate.mjs --root <app> --changed <files>
    [--tests <pattern>]`, forced every round. It runs, in order: the merge guard;
-   `hfs lint --changed` at the app root (the BE canon under `be/`, the FE canon
+   `starci app lint --changed` at the app root (the BE canon under `be/`, the FE canon
    under `fe/`, the repository checks); the root `codegen` and the build of
    every workspace package that exports `dist`; `tsc`, one incremental program
    per tsconfig owning a changed file; with `--tests`, the slice's specs. Only
@@ -155,14 +155,14 @@ Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
    green, `1` new findings, `2` a tool could not run (never a pass). Its stdout is
    one `starci/gate@1` document.
 4. **FIX** — and check again, up to the op's `params.gateRounds` rounds.
-5. **REPORT** — `api report` with `gate.json` and `read-digest.json`
+5. **REPORT** — `starci kernel report` with `gate.json` and `read-digest.json`
    attached. Still red after the last round is `blocked` with the exact
    findings.
 
 `gate.mjs`, `read-digest.mjs`, the packet's owned paths and every finding use
 the same app-relative paths (`be/src/...`, `fe/apps/...`) at the app root.
 
-**Settle enforcement.** `api settle` re-reads both attached documents itself
+**Settle enforcement.** `starci kernel settle` re-reads both attached documents itself
 (`scripts/kernel/gate-settle.mjs`, recorded as the runtime check `op-gate`) and
 refuses a `done` that is `op-gate-proof-missing` (no gate JSON),
 `op-gate-tool-failed` (exit 2), `op-gate-new-findings`,
@@ -228,7 +228,7 @@ never commit keep the shared tree.
   fallback names is the writer's). The owner reads its own records at its
   workflow branch (`workflowCommittedReader`), so its later settles see them
   before it lands; every other workflow reads main, so a peer sees the record
-  when the owner lands. `api record-change` reads the owner's records in its
+  when the owner lands. `starci kernel record-change` reads the owner's records in its
   workflow worktree.
 - **Failure.** A failed or blocked op's uncommitted work is preserved to
   `refs/heads/preserved/<workflowId>/<op>` (a snapshot commit that never holds
@@ -246,7 +246,7 @@ never commit keep the shared tree.
   removal, then `git branch -d`. The reconciler's GC controller
   (`gc:worktrees`, always active) also collects a workflow worktree whose
   owner process is gone longer than `ownerGoneMs`, always after preserving its
-  work, and only through Orca. `node scripts/machine/worktrees.mjs
+  work, and only through Orca. `starci machine worktrees
   counts` shows each repository's count against its cap; `start --check`
   reports them.
 

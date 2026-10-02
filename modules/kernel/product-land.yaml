@@ -11,4 +11,4 @@ worktrees:
   rebaseMilestoneBehind: 20     # a workflow branch is rebased mid-workflow once main is this many commits past its merge-base (scripts/lib/rebase-milestone.mjs)
 
 invariant:
-  importsCacheMs: 300000        # api status importsBroken: one scan per tree state within this window
+  importsCacheMs: 300000        # starci kernel status importsBroken: one scan per tree state within this window

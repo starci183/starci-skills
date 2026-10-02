@@ -1,4 +1,4 @@
-// The mid-workflow rebase (WFWT2 2.1): after a green checkpoint, api settle asks milestoneRebase, which reads the facts
+// The mid-workflow rebase (WFWT2 2.1): after a green checkpoint, starci kernel settle asks milestoneRebase, which reads the facts
 // and lets scripts/lib/rebase-milestone.mjs decide. Due: the branch is rebased onto main and the checkpoint follows. A
 // conflict leaves the branch where it was, keeps its head as preserved/<wf>/rebase-<onto12> and escalates one
 // rebase-conflict Decision Item; the same main tip is never tried twice. A live sibling op blocks it.
@@ -129,7 +129,7 @@ test('a conflict: the branch stays, its head is preserved, one rebase-conflict D
   assert.equal(fx.escalations.length, 2);
 });
 
-test('api settle is the caller (settleCheckpoint), after a green checkpoint only; rebase-conflict is a Decision Item kind', (t) => {
+test('starci kernel settle is the caller (settleCheckpoint), after a green checkpoint only; rebase-conflict is a Decision Item kind', (t) => {
   const fx = fixture(t, { behindLimit: 1 });
   commit(fx.repo, 'fe/x1.ts', '1\n');
   write(fx.dir, 'be/d.ts', 'export const d = 1;\n');

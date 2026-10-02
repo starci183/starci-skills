@@ -228,7 +228,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal('shims' in (guard??{}),false,'the guard reaches the agent through its terminal binding only');
 
   // A pass is earned from the worker's filed done claim plus an independent
-  // green Kernel check. api report sends the op's one worker_done (orca-deep-map
+  // green Kernel check. starci kernel report sends the op's one worker_done (orca-deep-map
   // REPLACE #9), so Orca settles the Task and Dispatch and settle only releases.
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
@@ -243,7 +243,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.ok(sends[0].includes('--retry-request'),'a lost receipt replays, never a second worker_done');
   assert.equal(flagOf(sends[0],'dispatch-capability'),'dcap_fake','the op\'s own Dispatch capability authenticates the worker_done');
   assert.equal(JSON.stringify(jobRow(fx.repo,jobId)).includes('dcap_fake'),false,'the capability is never stored on the job');
-  assert.deepEqual([json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.outcome,json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.ok],['succeeded',true],'api report sent the worker_done and the job keeps its receipt');
+  assert.deepEqual([json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.outcome,json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.ok],['succeeded',true],'starci kernel report sent the worker_done and the job keeps its receipt');
   fx.env.STARCI_CALLER='runtime-settler';
   const checked=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
     checks:[{name:'validator',command:'managed validation',exitCode:0,evidence:'green'}],
@@ -263,7 +263,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal('taskClosed' in (json(s.stdout)??{}),false);
 });
 
-test('api report without the op\'s Dispatch capability sends no worker_done, records dispatch_capability_missing, and settle fences the Dispatch with worker-stop then releases it',t=>{
+test('starci kernel report without the op\'s Dispatch capability sends no worker_done, records dispatch_capability_missing, and settle fences the Dispatch with worker-stop then releases it',t=>{
   const fx=fixture(t);
   const jobId='job-managed-no-capability';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
@@ -829,7 +829,7 @@ const seedOp=(fx,workflowId,jobId,opId,payload={})=>{
   try{enqueueFixtureJob(ledger,{jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:[`.starciwork/features/x/${jobId}`],...payload}});}
   finally{ledger.close();}
 };
-// The owner's routing_bias on the workflow goal (define-goal): the only bias api route applies - a Kernel
+// The owner's routing_bias on the workflow goal (define-goal): the only bias starci kernel route applies - a Kernel
 // --prefer/--avoid is refused as an unknown option (owner decision 2026-09-25).
 const seedGoalBias=(fx,workflowId,routingBias)=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});

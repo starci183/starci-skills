@@ -35,7 +35,7 @@
 // `language` (vi, else en). The supervisor side is scripts/supervisor/channel.mjs.
 //
 // Owner asks on demand (owner, 2026-09-24: "serve the url only when asked"):
-// a kernel's `api serve-ask` only sends the question with a "Generate URL"
+// a kernel's `starci kernel serve-ask` only sends the question with a "Generate URL"
 // button (callback_data `ask:<16 hex>`, telegram.mjs askKeyOf). Pressing it
 // here answers the callback, launches scripts/kernel/ask-server.mjs for that ask
 // detached (--on-demand telegram; it hides its children's windows) unless its

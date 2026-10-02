@@ -13,7 +13,7 @@
 //   merge-guard   the gate's merge guard over base..HEAD of the released repository (scripts/gates/gate.mjs mergeGuard): a merge
 //                 that kept the lane side over a main change is red;
 //   check         `npm run check` of the runtime.
-// `api settle` re-reads the proof (scripts/kernel/gate-settle.mjs) and refuses a done release with a step missing, skipped or red.
+// `starci kernel settle` re-reads the proof (scripts/kernel/gate-settle.mjs) and refuses a done release with a step missing, skipped or red.
 // Exit 0 every step passed, 1 a step is red or skipped, 2 the proof could not be built.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,7 +60,7 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
   const runtimeResult = results[0];
   // The runtime judgment must have bound at least one code-pattern profile to its published canon by the content digest.
   const unbound = !broken && !(Number(runtimeResult.profiles) > 0);
-  return { id: 'canon-pins', command: `node scripts/checks/check-canon-pins.mjs --json${results.length > 1 ? ' (+ --repo <app>)' : ''}`, exit: Math.max(...results.map((r) => r.exit ?? 2)),
+  return { id: 'canon-pins', command: `starci runtime check --only canon-pins -- --json${results.length > 1 ? ' (+ --repo <app>)' : ''}`, exit: Math.max(...results.map((r) => r.exit ?? 2)),
     status: broken ? STEP_STATUS.toolFailed : red.length || unbound ? STEP_STATUS.red : STEP_STATUS.pass,
     profiles: runtimeResult.profiles, pins: runtimeResult.pins,
     detail: broken ? `check-canon-pins produced no JSON (${broken.label})` : unbound ? 'no code-pattern profile is bound to its canon content digest' : red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ') };

@@ -12,7 +12,7 @@ import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../../scripts/kernel/input-digests.mjs';
 
-// Stale input: `api dispatch` records the digests of the inputs an op reads
+// Stale input: `starci kernel dispatch` records the digests of the inputs an op reads
 // (contracts.context_json.inputs) by kind. A Source-law input (knowledge/**,
 // modules/schemas/**) edited after admission is advisory `sourceDrift`, never
 // stale; a product Work record the job read (payload.records under .starciwork),
@@ -259,7 +259,7 @@ test('a finished workflow reports no stale input',t=>{
 
 // knowledge/application-stacks.yaml
 // and knowledge/repository-baseline.yaml were edited under dozens of
-// settled legs of four workflows; `api status` listed every one in staleInput, the Kernels redid the
+// settled legs of four workflows; `starci kernel status` listed every one in staleInput, the Kernels redid the
 // seams, and each further edit re-staled the redo. The same happened through a cut set
 // (8 slices, seam first). The fix: Source edits are judged against admission.
 const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/repository-baseline.yaml';

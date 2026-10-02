@@ -49,7 +49,7 @@ diff: "STRUCTURAL only — the derived op ids vs the approved opChain legs. Adde
   re-ordered legs are divergence; edges and allowlist wording inside the approved shape are not
   (modules/schemas/goal-plan.yaml rules: disjoint allowlists). One addition is not divergence:
   handover.review appended as the LAST leg of a plan whose approved opChain lacks it — the owner
-  handover every workflow owes before `api finish` (driver-loop.yaml handoverLoop). The divergence
+  handover every workflow owes before `starci kernel finish` (driver-loop.yaml handoverLoop). The divergence
   then records handoverAppended:true."
 returns: "{ok:true, workflowId, goalRevision, divergence:{storedOps,planOps,missing[],extra[],
   reordered,noStoredChain,handoverAppended?,diverged}, lineage, inboxApplied, legs,
@@ -60,5 +60,5 @@ refuses:
     unknown leg or form a cycle; the plan is refused and nothing is written"
   - plan-file-invalid: unparseable, or fails the goal-plan {legs:[{op,...}]} shape — the refusal names the rule
   - workflow-unknown
-usedBy: tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan
+usedBy: tick.plan — divergence -> starci kernel incident --kind plan-divergence, never a quiet re-plan
   (driver-loop.yaml)

@@ -49,7 +49,7 @@ export function unfixableSlicesOf(plan) {
  */
 export function requirePlannedCanonSlice({ cut, ownedPaths, scanFile }) {
   if (!scanFile) {
-    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (node scripts/kernel/seam-policy.mjs canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
+    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (starci machine seam-policy canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
   }
   const plan = canonCutPlanOf(readCanonScan(scanFile), { cutId: cut.id });
   const slice = plan.slices.find((s) => Number(s.ordinal) === Number(cut.ordinal));

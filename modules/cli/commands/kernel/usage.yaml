@@ -1,4 +1,4 @@
-# The contract of `api usage` (scripts/kernel/verbs/usage.mjs). One file per extension verb
+# The contract of `starci kernel usage` (scripts/kernel/verbs/usage.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs).
 group: kernel
 verb: usage
@@ -48,5 +48,5 @@ unavailable: "an attempt whose usage cannot be measured is stored with op_attemp
   30 minutes with no session file found live or in the session archive. It is never given a number.
   coverage.pending counts settled attempts not yet decided (their session may still be archived);
   the sweep looks again until it measures or marks them"
-usedBy: the Kernel and the Supervisor reading what a workflow spent; `api status` carries the same
+usedBy: the Kernel and the Supervisor reading what a workflow spent; `starci kernel status` carries the same
   summary as its `usage` field

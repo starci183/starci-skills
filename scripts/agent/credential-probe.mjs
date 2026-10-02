@@ -1,5 +1,5 @@
 // scripts/agent/credential-probe.mjs — one cheap live proof that a provider's
-// credential in effect is accepted, for `api provider-health --recover --probe`.
+// credential in effect is accepted, for `starci kernel provider-health --recover --probe`.
 //
 //   probeProviderCredential(provider) -> {ok, provider, kind, status?, detail,
 //                                         credentialFingerprint, credentialSource}

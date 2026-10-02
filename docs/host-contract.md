@@ -116,11 +116,11 @@ worker-show first, cleaned only when Orca shows the worker ended; partial →
 `settle` releases the worker with `worker-stop` + `worker-release`.
 
 The host launch is only the delivery half of the op lifecycle; the durable
-record is the ledger's op IPC (docs/ledger-db.md §4a): `api dispatch` writes
+record is the ledger's op IPC (docs/ledger-db.md §4a): `starci kernel dispatch` writes
 the `contracts` row — the contract is the dispatch authority, the Task spec
-only delivers it — the worker reads it via `api op-contract` and files its
-outcome with `api report`; the kernel marks it integrated with `api consume-report`,
-records its re-run via `api check`, and `api settle` releases the leases, the
+only delivers it — the worker reads it via `starci kernel op-contract` and files its
+outcome with `starci kernel report`; the kernel marks it integrated with `starci kernel consume-report`,
+records its re-run via `starci kernel record-checks`, and `starci kernel settle` releases the leases, the
 worker and consumes the job's report row (`reports.consumed_at`) as part of
 recording the verdict.
 
@@ -153,7 +153,7 @@ from the launching terminal (its coordinator) and starts the Kernel with
 `startAgent` (worker-start --spec files the Kernel Task). The Kernel's first operation creates the workflow Run from
 the Kernel's own terminal (Orca takes Run-scoped calls only from a Run's
 coordinator). An explicit Kernel agent/model pin fails closed when unavailable;
-it is never silently substituted. `api hierarchy` projects `workflow → Kernel → Op`.
+it is never silently substituted. `starci kernel hierarchy` projects `workflow → Kernel → Op`.
 
 **The nested Run rule.** An agent that starts agents binds its OWN Run and starts
 them there, which is the shape Orca's own worker preamble prescribes (SUB-DISPATCH):

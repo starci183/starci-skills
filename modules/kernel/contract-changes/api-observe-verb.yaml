@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/observe.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/observe.yaml
+  - modules/cli/commands/kernel/observe.yaml

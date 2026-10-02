@@ -28,7 +28,7 @@ reach: new-legs
 paths:
   - modules/kernel/contract-changes/product-worktrees.yaml
   - modules/kernel/product-land.yaml
-  - modules/kernel/api-commands/product-land.yaml
+  - modules/cli/commands/kernel/product-land.yaml
   - modules/kernel/dispatch.yaml
   - modules/ops/ops/code.refactor.yaml
   - scripts/kernel/product-worktree.mjs

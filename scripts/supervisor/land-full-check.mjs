@@ -1,4 +1,4 @@
-// land-full-check.mjs - the land gate's full `starci check` step (3.5). The gate is not the whole check: the candidate's
+// land-full-check.mjs - the land gate's full `starci runtime check` step (3.5). The gate is not the whole check: the candidate's
 // own `npm run check` (bin/starci.mjs check: node --check, the runtime HFS check and every retained self-check) runs in
 // its scratch tree as a step of the land, and a red one refuses the land with its output tail. There is no red-on-main
 // baseline for it: main is kept green, and a land never makes a self-check red.
@@ -19,8 +19,8 @@ export function fullCheck(dir, runner = nodeRunner, tail = (text) => String(text
   return { ok: r.ok, output: tail(full), full };
 }
 
-/** The `starci check` entry of runChecks' list, or null when the tree has no entry point. */
+/** The `starci runtime check` entry of runChecks' list, or null when the tree has no entry point. */
 export function fullCheckStep(dir, runner = nodeRunner) {
   const full = fullCheck(dir, runner);
-  return full.skipped ? null : { name: 'starci check', ok: full.ok, ...(full.ok ? {} : { output: full.output }) };
+  return full.skipped ? null : { name: 'starci runtime check', ok: full.ok, ...(full.ok ? {} : { output: full.output }) };
 }

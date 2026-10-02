@@ -6,5 +6,5 @@ paths:
   - scripts/kernel/api-verbs/plan.mjs
   - scripts/kernel/api-verbs/hierarchy.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/plan.yaml
-  - modules/kernel/api-commands/hierarchy.yaml
+  - modules/cli/commands/kernel/plan.yaml
+  - modules/cli/commands/kernel/hierarchy.yaml

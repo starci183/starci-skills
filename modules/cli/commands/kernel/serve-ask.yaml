@@ -1,4 +1,4 @@
-# The contract of `api serve-ask` (scripts/kernel/verbs/serve-ask.mjs). One file per extension verb
+# The contract of `starci kernel serve-ask` (scripts/kernel/verbs/serve-ask.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.serve-ask (lane slim-api).
 group: kernel
 verb: serve-ask

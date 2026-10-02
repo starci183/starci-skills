@@ -1,5 +1,5 @@
-# The kernel group: the ledger-gate verbs formerly spelled `starci api <verb>` or
-# `node scripts/kernel/cli.mjs <verb>`. Every verb runs scripts/kernel/cli.mjs.
+# The kernel group: the ledger-gate verbs formerly spelled `starci starci kernel <verb>` or
+# `starci kernel <verb>`. Every verb runs scripts/kernel/cli.mjs.
 group: kernel
 summary: kernel ledger verbs (runtime internals; the Kernel agent's door to the ledger)
 owner: runtime

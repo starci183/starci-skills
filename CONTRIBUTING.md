@@ -61,14 +61,14 @@ Kernels run `.claude` main live, so no one edits the main checkout in place. A l
 into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
 `<lanesRoot>/<lane>` (the lanes root is `STARCI_LANES_ROOT`, else the owner config `roots.lanes`,
 else `<starciLocalRoot>/lanes`; `lanesRoot()` in `scripts/machine/home.mjs`), never with junctions or symlinks. It lands one commit at a time with
-`node scripts/supervisor/land.mjs --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
+`starci supervisor land --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
 
 - `land.mjs` runs from the main checkout, never from the lane worktree.
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
   owning lane, not into a drive-by edit.
 - A lane that depends on another's surface starts after that one merges, and merges `main` before
   it reads anything.
-- A lane finishes by submitting its report through the kernel (`api report`) so the ledger records
+- A lane finishes by submitting its report through the kernel (`starci kernel report`) so the ledger records
   the outcome; no report, the lane is not done.
 - Deletions and import rewiring that cross allowlists are their own cut, merged between lanes.
 

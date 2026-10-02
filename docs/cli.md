@@ -252,13 +252,150 @@ starci app upgrade
 starci app upgrade --edition full --plan
 ```
 
+## starci connect
+
+operate owner connectors and their delivery services
+
+### starci connect ask-gateway
+
+operate the local owner-ask HTTP gateway
+
+| flag | type | |
+| --- | --- | --- |
+| `--port` | number |  |
+| `--repo` | list |  |
+
+Positionals: action?
+
+exit: 0 action completed; 1 gateway unavailable; 2 bad usage or configuration
+
+json: always
+
+```sh
+starci connect ask-gateway status
+starci connect ask-gateway start --repo <path>
+```
+
+Removed spellings: `node scripts/connectors/ask-gateway.mjs`, `node .claude/scripts/connectors/ask-gateway.mjs`
+
+### starci connect telegram
+
+deliver and maintain owner Telegram notifications
+
+| flag | type | |
+| --- | --- | --- |
+| `--discover-chat` | boolean |  |
+| `--ledger` | string |  |
+| `--repo` | string |  |
+| `--workflow` | string |  |
+| `--dispatch` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 Telegram delivery failed; 2 bad usage or configuration
+
+json: always
+
+```sh
+starci connect telegram discover-chat
+starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id>
+```
+
+Removed spellings: `node scripts/connectors/telegram.mjs`, `node .claude/scripts/connectors/telegram.mjs`
+
+### starci connect telegram-media
+
+deliver settled operation media through Telegram
+
+| flag | type | |
+| --- | --- | --- |
+| `--ledger` | string | required |
+| `--repo` | string |  |
+| `--workflow` | string | required |
+| `--job` | string | required |
+| `--attempt` | number |  |
+| `--op` | string | required |
+| `--verdict` | enum pass|fail|blocked | required |
+| `--dispatch` | string |  |
+
+Positionals: action
+
+exit: 0 delivery completed or was skipped; 1 delivery failed; 2 bad usage
+
+json: always
+
+```sh
+starci connect telegram-media settle --ledger <file> --workflow <id> --job <id> --op <op> --verdict pass
+```
+
+Removed spellings: `node scripts/connectors/telegram-media.mjs`, `node .claude/scripts/connectors/telegram-media.mjs`
+
+### starci connect tunnel
+
+operate the Cloudflare owner-ask tunnel
+
+| flag | type | |
+| --- | --- | --- |
+| `--port` | number |  |
+| `--fast` | boolean |  |
+
+Positionals: action?
+
+exit: 0 action completed; 1 tunnel unavailable; 2 bad usage or configuration
+
+json: always
+
+```sh
+starci connect tunnel status
+starci connect tunnel dry-run
+```
+
+Removed spellings: `node scripts/connectors/tunnel.mjs`, `node .claude/scripts/connectors/tunnel.mjs`
+
 ## starci debug
 
 run a fixed read-only inspector against the StarCi runtime
 
+### starci debug pass
+
+run or maintain the debug loop; writes only its own debug-loop state
+
+| flag | type | |
+| --- | --- | --- |
+| `--snapshot` | string |  |
+| `--child-timeout` | number |  |
+| `--token-window` | number |  |
+| `--token-spike` | number |  |
+| `--key` | string |  |
+| `--lane` | string |  |
+| `--reason` | string |  |
+
+Positionals: action
+
+exit: 0 debug-loop state action completed; 1 state action failed; 2 bad usage
+
+json: always
+
+```sh
+starci debug pass setup
+starci debug pass pass
+starci debug pass claim --key <alert> --lane <lane>
+starci debug pass status
+```
+
+Removed spellings: `node scripts/reconciler/debug-pass.mjs`
+
 ### starci debug run
 
 run one allowlisted read-only runtime inspector
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--since-hours` | number |  |
+| `--child-timeout` | number |  |
+| `--token-window` | number |  |
+| `--token-spike` | number |  |
 
 Positionals: inspector
 
@@ -270,7 +407,285 @@ json: flag
 starci debug run orca-status
 starci debug run runtime-status --json
 starci debug run supervisor-status
+starci debug run model-scorecard --repo <path>
+starci debug run core-watch
 ```
+
+Removed spellings: `node scripts/agent/model-scorecard.mjs`, `node scripts/reconciler/core-watch.mjs`
+
+## starci gate
+
+run repository, conformance, custody and verification gates
+
+### starci gate canon-scan
+
+measure canon conformance debt and plan its disjoint slices
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string | required |
+| `--stack-kind` | enum next|nest |  |
+| `--families` | list |  |
+| `--paths` | list |  |
+| `--exclude` | list |  |
+| `--machines` | list |  |
+| `--fix` | boolean |  |
+| `--out` | string |  |
+| `--blob` | boolean |  |
+
+exit: 0 selected machines ran and no finding remains; 1 findings remain; 2 bad usage; 3 a selected machine could not run
+
+json: flag
+
+```sh
+starci gate canon-scan --root <repo> --stack-kind next --json
+starci gate canon-scan --root <repo> --paths apps/web/src --fix
+```
+
+Removed spellings: `node scripts/gates/canon-scan.mjs`, `node .claude/scripts/gates/canon-scan.mjs`
+
+### starci gate custody-exec
+
+decrypt one custody document for a command or a bounded read
+
+| flag | type | |
+| --- | --- | --- |
+| `--get` | string |  |
+| `--keys` | boolean |  |
+| `--input-type` | enum yaml|json|dotenv |  |
+
+Positionals: file, command?
+
+exit: 0 requested read or command completed; 1 decryption, lookup or command failed; 2 bad usage
+
+json: none
+
+```sh
+starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --keys
+starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --get TOKEN
+```
+
+Removed spellings: `node scripts/gates/custody-exec.mjs`, `node .claude/scripts/gates/custody-exec.mjs`
+
+### starci gate env-health
+
+inspect and manage the served environment used by verification
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--env` | list |  |
+| `--paths` | list |  |
+| `--restart` | boolean |  |
+| `--probe-timeout-ms` | number |  |
+| `--ready-timeout-ms` | number |  |
+| `--service` | string |  |
+| `--url` | string |  |
+
+Positionals: action, command?
+
+exit: 0 requested environment action is ready; 2 bad usage; 3 environment is not ready
+
+json: always
+
+```sh
+starci gate env-health status
+starci gate env-health check --repo <repo> --env local --restart
+starci gate env-health serve --env local --service api --cwd <checkout> -- npm start
+```
+
+Removed spellings: `node scripts/uat/env-health.mjs`, `node .claude/scripts/uat/env-health.mjs`
+
+### starci gate hfs-sync
+
+check an app's generated files and custody trees for drift
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+
+exit: 0 generated files and custody trees are clean; 1 findings remain; 2 bad usage
+
+json: flag
+
+```sh
+starci gate hfs-sync --repo <product-repo>
+starci gate hfs-sync --repo <product-repo> --json
+```
+
+Removed spellings: `node scripts/gates/hfs-sync.mjs`, `node .claude/scripts/gates/hfs-sync.mjs`
+
+### starci gate read
+
+build the recorded READ digest for an operation
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--touch` | list |  |
+| `--read` | list |  |
+| `--knowledge` | list |  |
+| `--out` | string |  |
+
+exit: 0 digest built; 2 digest could not be built or usage was invalid
+
+json: always
+
+```sh
+starci gate read --root <app> --touch be/src/app.service.ts --out read-digest.json
+starci gate read --knowledge knowledge/op-gate.yaml
+```
+
+Removed spellings: `node scripts/gates/read-digest.mjs`, `node .claude/scripts/gates/read-digest.mjs`
+
+### starci gate repo-presentation
+
+check repository presentation rules for a product or runtime tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--runtime` | boolean |  |
+
+exit: 0 presentation is clean; 1 presentation findings remain; 2 bad usage
+
+json: flag
+
+```sh
+starci gate repo-presentation --root <repo>
+starci gate repo-presentation --root <repo> --runtime --json
+```
+
+Removed spellings: `node scripts/gates/repo-presentation.mjs`, `node .claude/scripts/gates/repo-presentation.mjs`
+
+### starci gate run
+
+run the measured product or document gate
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--base` | string |  |
+| `--main` | string |  |
+| `--changed` | list |  |
+| `--tests` | string |  |
+| `--out` | string |  |
+| `--scope` | enum code|docs (default code) |  |
+| `--tree` | string |  |
+
+exit: 0 gate is clean; 1 findings remain; 2 a machine could not run or usage was invalid
+
+json: always
+
+```sh
+starci gate run --root <app> --changed be/src/app.service.ts --out gate.json
+starci gate run --scope docs --tree <app>/.starciwork --out doc-gate.json
+```
+
+Removed spellings: `node scripts/gates/gate.mjs`, `node .claude/scripts/gates/gate.mjs`
+
+### starci gate sonar
+
+inspect, provision and run the local Sonar quality gate
+
+| flag | type | |
+| --- | --- | --- |
+| `--key` | string |  |
+| `--name` | string |  |
+| `--with-token` | boolean |  |
+| `--wait` | boolean |  |
+| `--base` | string |  |
+| `--paths` | list |  |
+| `--project-gate` | boolean |  |
+| `--out` | string |  |
+| `--blob` | boolean |  |
+| `--log` | string |  |
+| `--token-ref` | string |  |
+| `--no-ensure` | boolean |  |
+| `--timeout` | number |  |
+| `--wait-timeout` | number |  |
+| `--isolate` | boolean |  |
+| `--keep-slice-project` | boolean |  |
+| `--declaration` | string |  |
+| `--host` | string |  |
+| `--stack` | string |  |
+
+Positionals: command, arguments?
+
+exit: 0 requested inspection or gate passed; 1 gate failed or scan was refused; 2 command was blocked or usage was invalid
+
+json: always
+
+```sh
+starci gate sonar status
+starci gate sonar scan --cwd <repo> --base <rev> --paths src --wait
+starci gate sonar dashboard --cwd <repo>
+```
+
+Removed spellings: `node scripts/gates/sonar-local.mjs`, `node .claude/scripts/gates/sonar-local.mjs`
+
+### starci gate starcistacks
+
+check a repository's stack declaration and custody layout
+
+| flag | type | |
+| --- | --- | --- |
+| `--new` | boolean |  |
+| `--admitted-at` | string |  |
+| `--op` | string |  |
+
+Positionals: repo-root
+
+exit: 0 declaration and custody layout are clean; 1 repository is refused; 2 bad usage
+
+json: flag
+
+```sh
+starci gate starcistacks <repo-root>
+starci gate starcistacks <repo-root> --new --json
+```
+
+Removed spellings: `node scripts/gates/starcistacks.mjs`, `node .claude/scripts/gates/starcistacks.mjs`
+
+### starci gate test-world
+
+run and judge one managed test-world project
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--project` | enum e2e|integration|contract | required |
+| `--tests` | string |  |
+| `--out` | string |  |
+
+exit: 0 project is green; 1 findings or a red run remain; 2 summary could not be built or usage was invalid
+
+json: always
+
+```sh
+starci gate test-world --root <app> --project e2e --out test-world-run.json
+```
+
+Removed spellings: `node scripts/gates/test-world-run.mjs`, `node .claude/scripts/gates/test-world-run.mjs`
+
+### starci gate unit
+
+run unit tests and judge per-subject coverage and test-kit use
+
+| flag | type | |
+| --- | --- | --- |
+| `--root` | string |  |
+| `--out` | string |  |
+
+exit: 0 unit run is green; 1 findings or a red run remain; 2 summary could not be built or usage was invalid
+
+json: always
+
+```sh
+starci gate unit --root <app> --out unit-run.json
+```
+
+Removed spellings: `node scripts/gates/unit-run.mjs`, `node .claude/scripts/gates/unit-run.mjs`
 
 ## starci guard
 
@@ -666,7 +1081,7 @@ Removed spellings: `starci api dispatch`, `node scripts/kernel/cli.mjs dispatch`
 
 ### starci kernel dispatch-ready
 
-route + dispatch queued-ready units up to api status progress.allowedParallel
+route + dispatch queued-ready units up to starci kernel status progress.allowedParallel
 
 | flag | type | |
 | --- | --- | --- |
@@ -748,7 +1163,7 @@ Removed spellings: `starci api estimate`, `node scripts/kernel/cli.mjs estimate`
 
 ### starci kernel extensions
 
-the file-based api extensions: verbs, status fields, boolean flags, load problems
+the file-based starci kernel extensions: verbs, status fields, boolean flags, load problems
 
 exit: 0 when every extension loads; 1 when one is a problem (named in `problems`).; 2 bad usage
 
@@ -1472,7 +1887,7 @@ Removed spellings: `starci api route`, `node scripts/kernel/cli.mjs route`
 
 ### starci kernel run-deferred-tests
 
-re-queue the test legs the owner's config.yaml specs switches deferred (api status testsDeferred)
+re-queue the test legs the owner's specs switch deferred (see status testsDeferred)
 
 | flag | type | |
 | --- | --- | --- |
@@ -1648,6 +2063,213 @@ starci kernel verify-proofs --repo <path>
 
 Removed spellings: `starci api verify-proofs`, `node scripts/kernel/cli.mjs verify-proofs`
 
+## starci machine
+
+inspect and maintain host machine state
+
+### starci machine decisions
+
+inspect and act on runtime and Supervisor decision items
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | string |  |
+| `--apply` | boolean |  |
+| `--list` | boolean |  |
+| `--all` | boolean |  |
+| `--ring` | boolean |  |
+| `--claim` | string |  |
+| `--resolve` | string |  |
+| `--by` | string |  |
+| `--verb` | string |  |
+| `--decision` | string |  |
+| `--note` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 action failed; 2 bad usage
+
+json: flag
+
+```sh
+starci machine decisions supervisor --list
+starci machine decisions ring --repo <path> --workflow <id>
+```
+
+Removed spellings: `node scripts/machine/decisions.mjs`, `node .claude/scripts/machine/decisions.mjs`
+
+### starci machine kernel-watchdog
+
+inspect or repair one running workflow Kernel seat
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--workflow` | string |  |
+| `--goal` | string |  |
+| `--once` | boolean | required |
+| `--repair` | boolean |  |
+| `--interval-ms` | number |  |
+
+exit: 0 seat healthy or repaired; 1 seat check failed; 2 bad usage
+
+json: flag
+
+```sh
+starci machine kernel-watchdog --repo <path> --workflow <id> --once
+starci machine kernel-watchdog --repo <path> --workflow <id> --once --repair
+```
+
+Removed spellings: `node scripts/kernel/kernel-watchdog.mjs`, `node .claude/scripts/kernel/kernel-watchdog.mjs`
+
+### starci machine lessons
+
+inspect and update Supervisor learning records
+
+| flag | type | |
+| --- | --- | --- |
+| `--signature` | string |  |
+| `--text` | string |  |
+| `--commit` | list |  |
+| `--experiment` | string |  |
+| `--outcome` | enum kept|reverted|did-not-work |  |
+| `--reason` | string |  |
+| `--via` | enum chat|telegram|draw-note |  |
+| `--refs` | list |  |
+| `--items` | string |  |
+| `--write` | boolean |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 action failed; 2 bad usage
+
+json: flag
+
+```sh
+starci machine lessons list --json
+starci machine lessons feedback --text <text> --via chat
+```
+
+Removed spellings: `node scripts/machine/lessons.mjs`, `node .claude/scripts/machine/lessons.mjs`
+
+### starci machine op-metrics
+
+report operation health metrics across managed ledgers
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--window-ms` | number |  |
+| `--by` | enum op|workflow (default op) |  |
+| `--trend` | boolean |  |
+
+exit: 0 metrics reported; 1 a ledger was unreadable; 2 bad usage
+
+json: flag
+
+```sh
+starci machine op-metrics --by workflow
+starci machine op-metrics --trend --json
+```
+
+Removed spellings: `node scripts/machine/op-metrics.mjs`, `node .claude/scripts/machine/op-metrics.mjs`
+
+### starci machine seam-policy
+
+plan canon cuts or redispatch a blocked canon slice
+
+| flag | type | |
+| --- | --- | --- |
+| `--scan` | string |  |
+| `--cut-id` | string |  |
+| `--root` | string |  |
+| `--repo` | string |  |
+| `--job` | string |  |
+| `--paths` | list |  |
+
+Positionals: action
+
+exit: 0 plan produced; 2 bad usage
+
+json: always
+
+```sh
+starci machine seam-policy canon-plan --scan <file> --cut-id <id>
+starci machine seam-policy canon-redispatch --repo <path> --job <id>
+```
+
+Removed spellings: `node scripts/kernel/seam-policy.mjs`, `node .claude/scripts/kernel/seam-policy.mjs`
+
+### starci machine worktrees
+
+inspect, collect or resume runtime worktrees
+
+| flag | type | |
+| --- | --- | --- |
+| `--plan` | boolean |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 a worktree problem remains; 2 bad usage
+
+json: flag
+
+```sh
+starci machine worktrees counts --json
+starci machine worktrees gc --plan
+```
+
+Removed spellings: `node scripts/machine/worktrees.mjs`, `node .claude/scripts/machine/worktrees.mjs`
+
+## starci orca
+
+call the runtime-owned Orca host boundary
+
+### starci orca terminal-read
+
+read an Orca terminal screen and staged draft
+
+| flag | type | |
+| --- | --- | --- |
+| `--terminal` | string | required |
+| `--tail` | boolean |  |
+| `--limit` | number |  |
+
+exit: 0 terminal read; 1 Orca call failed; 2 bad usage
+
+json: always
+
+```sh
+starci orca terminal-read --terminal <handle>
+starci orca terminal-read --terminal <handle> --tail --limit 100
+```
+
+Removed spellings: `node scripts/api/orca/terminal-read.mjs`, `node .claude/scripts/api/orca/terminal-read.mjs`
+
+### starci orca terminal-send
+
+send text or Enter to an Orca terminal
+
+| flag | type | |
+| --- | --- | --- |
+| `--terminal` | string | required |
+| `--text` | string |  |
+| `--text-file` | string |  |
+| `--no-enter` | boolean |  |
+| `--wait-submit` | number |  |
+
+exit: 0 input accepted; 1 Orca call failed; 2 bad usage
+
+json: always
+
+```sh
+starci orca terminal-send --terminal <handle> --text <text>
+starci orca terminal-send --terminal <handle> --text-file <file> --no-enter
+```
+
+Removed spellings: `node scripts/api/orca/terminal-send.mjs`, `node .claude/scripts/api/orca/terminal-send.mjs`
+
 ## starci reconciler
 
 control and inspect the host reconciler engine
@@ -1750,20 +2372,250 @@ starci reconciler up --check --json
 
 Removed spellings: `node scripts/reconciler/start.mjs`
 
+## starci release
+
+prove, inspect and perform runtime release operations
+
+### starci release app-installs
+
+verify a scaffolded app against fresh registry installs
+
+| flag | type | |
+| --- | --- | --- |
+| `--keep` | boolean |  |
+
+exit: 0 scaffold install and application proof passed; 1 scaffold, install or application proof failed; 2 bad usage
+
+json: none
+
+```sh
+starci release app-installs
+starci release app-installs --keep
+```
+
+Removed spellings: `node scripts/gates/release-app-installs.mjs`, `node .claude/scripts/gates/release-app-installs.mjs`
+
+### starci release check
+
+run the one read-only release readiness gate
+
+| flag | type | |
+| --- | --- | --- |
+| `--final` | boolean |  |
+| `--only` | list |  |
+
+exit: 0 release proofs are green or the selected subset passed; 1 one or more proofs are red; 2 a proof could not run or usage was invalid
+
+json: flag
+
+```sh
+starci release check
+starci release check --final --json
+starci release check --only publish-plan,canon-pins
+```
+
+Removed spellings: `node scripts/gates/release-check.mjs`, `node .claude/scripts/gates/release-check.mjs`, `npm run release:check`
+
+### starci release clean-test
+
+test published packages from fresh isolated installs
+
+| flag | type | |
+| --- | --- | --- |
+| `--changed` | list |  |
+| `--base` | string |  |
+
+exit: 0 every selected package is green; 1 a selected package is red; 2 a package proof could not run or usage was invalid
+
+json: none
+
+```sh
+starci release clean-test
+starci release clean-test --changed packages/cli/package.json
+starci release clean-test --base origin/main
+```
+
+Removed spellings: `node scripts/gates/package-clean-test.mjs`, `node .claude/scripts/gates/package-clean-test.mjs`
+
+### starci release launch-smoke
+
+prove live nested-agent launch paths on an Orca host
+
+| flag | type | |
+| --- | --- | --- |
+| `--app-repo` | string |  |
+| `--entry` | string |  |
+| `--timeout-ms` | number |  |
+| `--out` | string |  |
+| `--as` | enum supervisor|worker|kernel|op|opFe|opFail|critic |  |
+
+Positionals: action?
+
+exit: 0 smoke or role action passed; 1 smoke or role action failed; 2 bad usage or no entry terminal
+
+json: always
+
+```sh
+starci release launch-smoke --app-repo <scratch-app>
+starci release launch-smoke stage --as kernel
+starci release launch-smoke mark --as op
+```
+
+Removed spellings: `node scripts/kernel/launch-smoke.mjs`, `node .claude/scripts/kernel/launch-smoke.mjs`
+
+### starci release proof
+
+build the release proof attached before publish or deploy effects
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--base` | string | required |
+| `--main` | string |  |
+| `--out` | string |  |
+
+exit: 0 every release step passed; 1 a release step is red or skipped; 2 proof could not be built or usage was invalid
+
+json: always
+
+```sh
+starci release proof --repo <repo> --base <range-start>^ --out release-proof.json
+```
+
+Removed spellings: `node scripts/gates/release-proof.mjs`, `node .claude/scripts/gates/release-proof.mjs`
+
+### starci release publish
+
+plan or perform the owner-run package publication sequence
+
+| flag | type | |
+| --- | --- | --- |
+| `--publish` | boolean |  |
+| `--npm-user` | string |  |
+| `--poll-minutes` | number (default 15) |  |
+| `--pre-land-ref` | string |  |
+
+exit: 0 plan is clear or publication completed; 1 a publication step failed; 2 bad usage or environment; 3 packages published but canon binding is not green; 4 plan has blockers
+
+json: none
+
+```sh
+starci release publish
+starci release publish --publish --npm-user <name>
+```
+
+Removed spellings: `node scripts/gates/release-publish.mjs`, `node .claude/scripts/gates/release-publish.mjs`, `npm run release:publish`
+
+### starci release sync-runtime
+
+refresh or check the runtime copies bundled in published packages
+
+| flag | type | |
+| --- | --- | --- |
+| `--check` | boolean |  |
+
+exit: 0 copies were refreshed or already agree; 1 bundled copies drift in check mode; 2 bad usage
+
+json: none
+
+```sh
+starci release sync-runtime
+starci release sync-runtime --check
+```
+
+Removed spellings: `node scripts/hfs/sync-runtime.mjs`, `node .claude/scripts/hfs/sync-runtime.mjs`
+
+## starci route
+
+resolve runtime operations from structured routing inputs
+
+### starci route op
+
+resolve the operation that serves a structured routing request
+
+| flag | type | |
+| --- | --- | --- |
+| `--kind` | string |  |
+| `--node-kind` | string |  |
+| `--phase` | string |  |
+| `--intent` | list |  |
+| `--ops-dir` | string |  |
+
+exit: 0 operation resolved; 1 no operation matched; 2 bad usage
+
+json: flag
+
+```sh
+starci route op --kind backend.implement --json
+starci route op --node-kind ui --intent implement
+```
+
+Removed spellings: `node scripts/route/route-op.mjs`, `node .claude/scripts/route/route-op.mjs`
+
 ## starci runtime
 
 install, update and check the StarCi runtime tree
+
+### starci runtime architecture
+
+check one repository against the runtime architecture rules
+
+| flag | type | |
+| --- | --- | --- |
+| `--base` | string |  |
+
+Positionals: repo-root
+
+exit: 0 architecture clean; 1 violations or execution errors; 2 bad usage
+
+json: always
+
+```sh
+starci runtime architecture <repo-root>
+starci runtime architecture <repo-root> --base <commit>
+```
+
+Removed spellings: `node scripts/hfs/architecture.mjs`, `node .claude/scripts/hfs/architecture.mjs`
+
+### starci runtime benchmark-snapshot
+
+append one model-pool snapshot file under benchmark/snapshots
+
+| flag | type | |
+| --- | --- | --- |
+| `--since-hours` | number | required |
+| `--repo` | list |  |
+| `--date` | string |  |
+| `--dir` | string |  |
+
+exit: 0 snapshot appended; 1 output exists or snapshot failed; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime benchmark-snapshot --since-hours 24
+starci runtime benchmark-snapshot --since-hours 24 --repo <path> --json
+```
+
+Removed spellings: `node scripts/agent/benchmark-snapshot.mjs`
 
 ### starci runtime check
 
 judge the runtime tree — node --check, the runtime HFS check, the retained self-checks
 
-exit: 0 every step passed; 1 a check failed or found error findings; 2 bad usage
+| flag | type | |
+| --- | --- | --- |
+| `--only` | string |  |
+
+Positionals: check-arguments?
+
+exit: 0 every step passed; 1 a check failed or found error findings; 2 bad usage or an unknown check name
 
 json: flag
 
 ```sh
 starci runtime check
+starci runtime check --only cli-parity -- --root <tree>
 ```
 
 Removed spellings: `starci check`
@@ -1786,6 +2638,49 @@ starci runtime doctor --cwd <repo> --quick
 
 Removed spellings: `starci doctor`, `npx starci doctor`
 
+### starci runtime gen-ops
+
+regenerate or check the generated operation registry
+
+| flag | type | |
+| --- | --- | --- |
+| `--check` | boolean |  |
+| `--ops-dir` | string |  |
+| `--out` | string |  |
+
+exit: 0 registry written or current; 1 registry is stale or sources are invalid; 2 bad usage
+
+json: none
+
+```sh
+starci runtime gen-ops
+starci runtime gen-ops --check
+starci runtime gen-ops --ops-dir <dir> --out <file>
+```
+
+Removed spellings: `node scripts/route/build-ops-registry.mjs`
+
+### starci runtime housekeeping
+
+inspect or apply the host housekeeping sweeps
+
+| flag | type | |
+| --- | --- | --- |
+| `--dry-run` | boolean |  |
+| `--apply` | boolean |  |
+| `--only` | string |  |
+
+exit: 0 every selected sweep passed; 1 one or more sweeps failed; 2 bad usage
+
+json: always
+
+```sh
+starci runtime housekeeping --dry-run
+starci runtime housekeeping --apply --only tmp,logs
+```
+
+Removed spellings: `node scripts/housekeeping/housekeeping.mjs`
+
 ### starci runtime install
 
 install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude
@@ -1806,6 +2701,53 @@ starci runtime install --cwd <repo> --hosts claude,devin
 ```
 
 Removed spellings: `starci init`, `npx starci init`
+
+### starci runtime ledger-hygiene
+
+report orphan ledgers and legacy repository-local ledger stores
+
+| flag | type | |
+| --- | --- | --- |
+| `--apply` | boolean |  |
+
+exit: 0 no findings remain; 1 findings remain or archival failed; 2 bad usage
+
+json: flag
+
+```sh
+starci runtime ledger-hygiene
+starci runtime ledger-hygiene --apply --json
+```
+
+Removed spellings: `node scripts/housekeeping/ledger-hygiene.mjs`
+
+### starci runtime machine-db
+
+inspect or maintain the host machine database
+
+| flag | type | |
+| --- | --- | --- |
+| `--file` | string |  |
+| `--all` | boolean |  |
+| `--ledger-id` | string |  |
+| `--name` | string |  |
+| `--repo` | string |  |
+| `--ledger-file` | string |  |
+| `--product` | string |  |
+| `--create` | boolean |  |
+
+Positionals: action?
+
+exit: 0 action completed; 2 bad usage or database error
+
+json: always
+
+```sh
+starci runtime machine-db status
+starci runtime machine-db ledgers --all
+```
+
+Removed spellings: `node engine/db/machine.mjs`, `node .claude/engine/db/machine.mjs`
 
 ### starci runtime status
 
@@ -1879,6 +2821,277 @@ Removed spellings: `starci version`, `npx starci version`
 
 inspect, start or stop the one StarCi Supervisor seat
 
+### starci supervisor actions
+
+list, record, or preview the Supervisor's owed-action audit trail
+
+| flag | type | |
+| --- | --- | --- |
+| `--open` | boolean |  |
+| `--item` | string |  |
+| `--action` | string |  |
+| `--reason` | string |  |
+| `--workflow` | string |  |
+| `--refs` | string |  |
+| `--until` | string |  |
+| `--hold-ms` | number |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 runtime read or write failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor actions list --open
+starci supervisor actions record --item <key> --action <verb> --reason <text>
+starci supervisor actions digest --json
+```
+
+Removed spellings: `node scripts/supervisor/actions.mjs`
+
+### starci supervisor bridge
+
+inspect and govern cross-workflow dependencies and shared ownership
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--start` | boolean |  |
+| `--dry-run` | boolean |  |
+| `--no-notify` | boolean |  |
+| `--request-only` | boolean |  |
+| `--owner-ok` | boolean |  |
+| `--dependents` | string |  |
+| `--foundation` | string |  |
+| `--goal` | string |  |
+| `--reason` | string |  |
+| `--blocker` | string |  |
+| `--title` | string |  |
+| `--kind` | enum layout-tree|brand|grammar|module|contract|baseline|scaffold|other |  |
+| `--waits` | string |  |
+| `--paths` | string |  |
+| `--finding` | string |  |
+| `--bridge` | string |  |
+| `--record` | string |  |
+| `--to` | string |  |
+| `--merge-into` | string |  |
+| `--workflow` | string |  |
+| `--text` | string |  |
+| `--lead` | string |  |
+| `--waiter` | string |  |
+| `--releases` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 governance action refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor bridge detect --repo <path>
+starci supervisor bridge list --repo <path> --json
+starci supervisor bridge rewire --repo <path> --bridge <id>
+```
+
+Removed spellings: `node scripts/supervisor/bridge.mjs`
+
+### starci supervisor gc
+
+inspect or collect leftover workers, shells, lanes, temp data, leases, and logs
+
+| flag | type | |
+| --- | --- | --- |
+| `--dry-run` | boolean |  |
+| `--apply` | boolean |  |
+| `--only` | string |  |
+| `--plan` | boolean |  |
+| `--holder` | string |  |
+| `--trigger` | string |  |
+
+exit: 0 sweep completed cleanly; 1 sweep reported errors or a busy lock; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor gc --dry-run
+starci supervisor gc --apply --only agents,shells
+starci supervisor gc --plan --json
+```
+
+Removed spellings: `node scripts/supervisor/gc.mjs`
+
+### starci supervisor land
+
+run the in-runtime land gate; external land-to-main.sh remains external
+
+| flag | type | |
+| --- | --- | --- |
+| `--job` | string |  |
+| `--commit` | string |  |
+| `--specs` | string |  |
+| `--reason` | string |  |
+| `--full-by-push-git` | boolean |  |
+| `--lane` | string |  |
+| `--no-push` | boolean |  |
+| `--notify` | boolean |  |
+| `--status` | boolean |  |
+| `--wait-ms` | number |  |
+
+exit: 0 land passed or status was read; 1 land refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor land --status
+starci supervisor land --job <job-id>
+starci supervisor land --commit <sha> --specs touching --lane <name>
+```
+
+Removed spellings: `node scripts/supervisor/land.mjs`
+
+### starci supervisor notify
+
+deliver a durable Supervisor ruling to one workflow Kernel
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--workflow` | string | required |
+| `--text` | string |  |
+| `--text-file` | string |  |
+| `--item` | string |  |
+| `--entity` | string |  |
+
+exit: 0 notice delivered or durably queued; 1 decision delivery failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor notify --repo <path> --workflow <id> --text <text>
+starci supervisor notify --repo <path> --workflow <id> --text-file <file> --json
+```
+
+Removed spellings: `node scripts/supervisor/notify.mjs`
+
+### starci supervisor owed
+
+inspect and acknowledge work that running workflows owe the Supervisor
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--workflow` | list |  |
+| `--all` | boolean |  |
+| `--item` | string |  |
+| `--commits` | string |  |
+| `--reason` | string |  |
+| `--force` | boolean |  |
+
+Positionals: action?
+
+exit: 0 inspection or acknowledgement completed; 1 finding or acknowledgement refusal; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor owed --repo <path>
+starci supervisor owed ack --item <key> --commits <sha> --reason <text>
+starci supervisor owed acks --json
+```
+
+Removed spellings: `node scripts/supervisor/owed.mjs`
+
+### starci supervisor poll
+
+stream or print a read-only Supervisor digest of workflow progress and blockers
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string |  |
+| `--workflow` | list |  |
+| `--interval-ms` | number |  |
+| `--stall-minutes` | number |  |
+| `--once` | boolean |  |
+
+exit: 0 polling ended cleanly; 1 ledger or host inspection failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor poll --repo <path> --once
+starci supervisor poll --repo <path> --workflow <id> --json
+```
+
+Removed spellings: `node scripts/supervisor/poll.mjs`
+
+### starci supervisor push
+
+run full repository suites and push clean main branches
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--check` | boolean |  |
+
+exit: 0 every selected repository is green; 1 suite or push refused or failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor push
+starci supervisor push --repo <path> --check
+starci supervisor push --json
+```
+
+Removed spellings: `node scripts/supervisor/push-git.mjs`
+
+### starci supervisor ram-cap
+
+inspect or override RAM-aware workflow dispatch priorities
+
+| flag | type | |
+| --- | --- | --- |
+| `--op` | string |  |
+| `--workflow` | string |  |
+| `--weight` | number |  |
+| `--reserve` | number |  |
+
+Positionals: action?
+
+exit: 0 status read or priority updated; 1 priority update failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor ram-cap status
+starci supervisor ram-cap prioritize --workflow <id> --weight 2 --reserve 1
+starci supervisor ram-cap unprioritize --workflow <id>
+```
+
+Removed spellings: `node scripts/supervisor/ram-cap.mjs`
+
+### starci supervisor report
+
+render or send the owner's detailed workflow progress report
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+| `--send` | boolean |  |
+
+exit: 0 report rendered or sent; 1 delivery failed; 2 bad usage
+
+json: flag
+
+```sh
+starci supervisor report
+starci supervisor report --repo <path> --send
+starci supervisor report --json
+```
+
+Removed spellings: `node scripts/supervisor/progress-report.mjs`
+
 ### starci supervisor start
 
 enable and start the one long-lived Supervisor seat
@@ -1923,9 +3136,85 @@ json: flag
 starci supervisor stop
 ```
 
+### starci supervisor tell
+
+send a desktop message to the Supervisor or read its recent replies
+
+| flag | type | |
+| --- | --- | --- |
+| `--wait` | boolean |  |
+| `--timeout-ms` | number |  |
+| `--read` | boolean |  |
+| `--since` | string |  |
+| `--limit` | number |  |
+
+Positionals: text?
+
+exit: 0 message sent or replies read; 2 bad usage; 124 reply wait timed out
+
+json: flag
+
+```sh
+starci supervisor tell <text>
+starci supervisor tell <text> --wait
+starci supervisor tell --read --since 30m --json
+```
+
+Removed spellings: `node scripts/supervisor/tell.mjs`
+
+## starci uat
+
+run assisted and slot-controlled user acceptance tests
+
+### starci uat assisted-runner
+
+inspect and run a prepared assisted UAT request
+
+| flag | type | |
+| --- | --- | --- |
+| `--request` | string | required |
+| `--receipt` | string | required |
+| `--after` | number |  |
+| `--value` | enum ok|fail|cancel |  |
+| `--actor` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 request or session failed; 2 bad usage
+
+json: always
+
+```sh
+starci uat assisted-runner inspect --request <request.yaml> --receipt <receipt.yaml>
+starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.yaml> --value ok
+```
+
+Removed spellings: `node scripts/uat/assisted-runner.mjs`, `node .claude/scripts/uat/assisted-runner.mjs`
+
+### starci uat slots
+
+inspect UAT slots or run a command while holding one
+
+| flag | type | |
+| --- | --- | --- |
+| `--record-dir` | string |  |
+
+Positionals: action, command?
+
+exit: 0 status clean or command passed; 1 command failed; 2 bad usage
+
+json: none
+
+```sh
+starci uat slots status
+starci uat slots run --record-dir <dir> -- npm test
+```
+
+Removed spellings: `node scripts/uat/uat-slots.mjs`, `node .claude/scripts/uat/uat-slots.mjs`
+
 ## starci work
 
-Work records, drawing, brand, layout, grammar and example proof tools
+design and UI proof tooling of the Work owner
 
 ### starci work asset-slot
 
@@ -1942,6 +3231,28 @@ starci work asset-slot check .starciwork
 ```
 
 Removed spellings: `node scripts/work/asset-slot.mjs`
+
+### starci work brand
+
+derive or verify the canonical brand Work record
+
+| flag | type | |
+| --- | --- | --- |
+| `--source` | string |  |
+| `--stage` | enum decide|verify |  |
+| `--grammar-root` | string |  |
+
+Positionals: work-root
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work brand .starciwork --stage verify --json
+```
+
+Removed spellings: `node scripts/work/brand/brand.mjs`
 
 ### starci work brand-direction
 
@@ -1967,9 +3278,657 @@ starci work brand-direction status --work .starciwork
 
 Removed spellings: `node scripts/work/brand-direction.mjs`
 
+### starci work brand-palette
+
+emit a brand palette prompt or check rendered images against it
+
+| flag | type | |
+| --- | --- | --- |
+| `--prompt` | string |  |
+| `--check` | string |  |
+| `--brand` | string |  |
+| `--scan` | string |  |
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work brand-palette --scan .starciwork --json
+```
+
+Removed spellings: `node scripts/work/brand/brand-palette.mjs`
+
+### starci work compose-direction
+
+place drawn content into its measured page or overlay shell
+
+| flag | type | |
+| --- | --- | --- |
+| `--ui` | string | required |
+| `--content` | string | required |
+| `--breakpoint` | string | required |
+| `--theme` | enum light|dark | required |
+| `--state` | string |  |
+| `--presentation` | enum page|overlay |  |
+| `--host-state` | string |  |
+| `--fit` | enum cover|stretch |  |
+| `--scrim` | number |  |
+| `--tool` | string |  |
+| `--prompt` | string |  |
+| `--out` | string |  |
+
+exit: 0 composite written; 1 composition refused; 2 bad usage
+
+json: flag
+
+```sh
+starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light
+```
+
+Removed spellings: `node scripts/work/compose-direction.mjs`
+
+### starci work draw-acceptance
+
+verify that drawn assets are accepted render shapes
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--job` | string |  |
+| `--files` | string |  |
+
+exit: 0 accepted; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-acceptance --repo <repo> --job <job> --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-acceptance.mjs`
+
+### starci work draw-dna
+
+compare a rendered drawing with grammar DNA
+
+| flag | type | |
+| --- | --- | --- |
+| `--family` | string |  |
+| `--proposals` | string |  |
+
+Positionals: html
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-dna <render.html> --family starci --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-dna.mjs`
+
+### starci work draw-feedback
+
+build, inspect, check, or classify drawing feedback
+
+| flag | type | |
+| --- | --- | --- |
+| `--ui` | string | required |
+| `--shape` | string |  |
+| `--note` | string |  |
+| `--class` | string |  |
+| `--target` | string |  |
+| `--as` | string |  |
+| `--by` | enum kernel|critic |  |
+| `--write` | boolean |  |
+
+Positionals: command
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-feedback status --ui <record> --json
+```
+
+Removed spellings: `node scripts/work/draw-feedback.mjs`
+
+### starci work draw-gates
+
+run machine and owner gates for a drawn UI record
+
+| flag | type | |
+| --- | --- | --- |
+| `--ui` | string | required |
+| `--repo` | string | required |
+| `--files` | string |  |
+| `--no-remeasure` | boolean |  |
+| `--checks-out` | string |  |
+
+exit: 0 gates green; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-gates --ui <record> --repo <repo> --json
+```
+
+Removed spellings: `node scripts/work/draw-gates.mjs`
+
+### starci work draw-grammar
+
+resolve the grammar package used by a drawing
+
+| flag | type | |
+| --- | --- | --- |
+| `--product` | string | required |
+| `--file` | string |  |
+| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar-dist` | string |  |
+
+exit: 0 grammar resolved; 1 resolution failed; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-grammar --product <app> --json
+```
+
+Removed spellings: `node scripts/work/draw-grammar.mjs`
+
+### starci work draw-layer
+
+verify that drawings are isolated content layers
+
+| flag | type | |
+| --- | --- | --- |
+| `--playwright` | string |  |
+
+Positionals: path
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-layer <render-dir> --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-layer.mjs`
+
+### starci work draw-loop
+
+render, score, inspect, finish, or verify an iterative drawing loop
+
+| flag | type | |
+| --- | --- | --- |
+| `--ui` | string |  |
+| `--html` | string |  |
+| `--source` | string |  |
+| `--fixture` | list |  |
+| `--product` | string |  |
+| `--css` | list |  |
+| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar-dist` | string |  |
+| `--base` | string |  |
+| `--state` | string |  |
+| `--viewports` | string |  |
+| `--repo` | string |  |
+| `--out` | string |  |
+| `--family` | string |  |
+| `--drawer` | string |  |
+| `--no-full-page` | boolean |  |
+| `--no-critic` | boolean |  |
+| `--parts` | string |  |
+| `--prompt` | string |  |
+| `--force` | boolean |  |
+
+Positionals: command
+
+exit: 0 success; 1 drawing gates red; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-loop status --out <loop-dir> --json
+```
+
+Removed spellings: `node scripts/work/draw-loop.mjs`
+
+### starci work draw-rationale
+
+verify the rationale bound to a rendered drawing
+
+| flag | type | |
+| --- | --- | --- |
+| `--rationale` | string |  |
+| `--ui` | string |  |
+| `--records` | string |  |
+
+Positionals: html
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-rationale <render.html> --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-rationale.mjs`
+
+### starci work draw-render
+
+render HTML or a drawing component at declared viewports
+
+| flag | type | |
+| --- | --- | --- |
+| `--html` | string |  |
+| `--out` | string | required |
+| `--viewports` | string | required |
+| `--name` | string |  |
+| `--theme` | enum light|dark |  |
+| `--component` | string |  |
+| `--export` | string |  |
+| `--props` | string |  |
+| `--css` | list |  |
+| `--state` | string |  |
+| `--base` | string |  |
+| `--rationale` | string |  |
+| `--product` | string |  |
+| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar-dist` | string |  |
+| `--harness-out` | string |  |
+| `--full-page` | boolean |  |
+| `--trace` | boolean |  |
+
+exit: 0 renders written; 1 render failed; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-render --html <file> --out <dir> --viewports 390x844 --json
+```
+
+Removed spellings: `node scripts/work/draw-render.mjs`
+
+### starci work draw-review
+
+inspect, ask for, or apply owner review of a drawing
+
+| flag | type | |
+| --- | --- | --- |
+| `--ui` | string | required |
+| `--lang` | enum en|vi |  |
+| `--owner-requested` | boolean |  |
+| `--job` | string |  |
+| `--receipt` | string |  |
+| `--write` | boolean |  |
+
+Positionals: command
+
+exit: 0 success; 1 review failed; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-review status --ui <record> --json
+```
+
+Removed spellings: `node scripts/work/draw-review.mjs`
+
+### starci work draw-source
+
+validate a drawing source and its fixture bindings
+
+| flag | type | |
+| --- | --- | --- |
+| `--fixture` | list |  |
+| `--product` | string |  |
+| `--grammar` | enum auto|product|claude-dist |  |
+| `--grammar-dist` | string |  |
+| `--rationale` | string |  |
+
+Positionals: source
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-source <X.draw.tsx> --product <app> --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-source.mjs`
+
+### starci work draw-taste
+
+check a rendered drawing against visual taste rules
+
+| flag | type | |
+| --- | --- | --- |
+| `--html` | string | required |
+| `--png` | list |  |
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work draw-taste --html <render.html> --json
+```
+
+Removed spellings: `node scripts/work/draw/draw-taste.mjs`
+
+### starci work example-critique
+
+derive example critique records from a Work tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--write` | boolean |  |
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: none
+
+```sh
+starci work example-critique --work .starciwork --write
+```
+
+Removed spellings: `node scripts/example/example-critique.mjs`
+
+### starci work example-derive
+
+derive example catalog artifacts from a Work tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--write` | boolean |  |
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: none
+
+```sh
+starci work example-derive --work .starciwork --write
+```
+
+Removed spellings: `node scripts/example/example-derive.mjs`
+
+### starci work example-evidence
+
+collect evidence for one example Work record
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--record` | string | required |
+| `--cwd` | string | required |
+| `--assert` | list |  |
+
+exit: 0 evidence collected; 1 evidence failed; 2 bad usage
+
+json: none
+
+```sh
+starci work example-evidence --work .starciwork --record <id> --cwd <repo>
+```
+
+Removed spellings: `node scripts/example/example-evidence.mjs`
+
+### starci work example-verify
+
+replay and verify evidence for one example Work record
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--record` | string | required |
+| `--cwd` | string | required |
+
+exit: 0 evidence verified; 1 verification failed; 2 bad usage
+
+json: none
+
+```sh
+starci work example-verify --work .starciwork --record <id> --cwd <repo>
+```
+
+Removed spellings: `node scripts/example/example-verify.mjs`
+
+### starci work grammar-geometry
+
+emit grammar geometry guidance or check captured geometry
+
+| flag | type | |
+| --- | --- | --- |
+| `--prompt` | boolean |  |
+| `--repo` | string | required |
+| `--family` | enum starci|nivo |  |
+| `--check` | string |  |
+| `--viewport` | string |  |
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work grammar-geometry --prompt --repo <repo> --json
+```
+
+Removed spellings: `node scripts/work/ui/grammar-geometry.mjs`
+
+### starci work grammar-knowledge
+
+compare or refresh measured grammar knowledge
+
+| flag | type | |
+| --- | --- | --- |
+| `--write` | boolean |  |
+
+exit: 0 clean; 1 drift; 2 bad usage
+
+json: flag
+
+```sh
+starci work grammar-knowledge --write
+```
+
+Removed spellings: `node scripts/work/ui/grammar-knowledge.mjs`
+
+### starci work grammar-proposal
+
+list or check grammar proposals in Work records
+
+Positionals: command, target
+
+exit: 0 success; 1 incomplete proposals; 2 bad usage
+
+json: flag
+
+```sh
+starci work grammar-proposal check .starciwork
+```
+
+Removed spellings: `node scripts/work/grammar-proposal.mjs`
+
+### starci work grammar-registry-pin
+
+check a frontend grammar dependency against the registry pin
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work grammar-registry-pin --repo <repo> --json
+```
+
+Removed spellings: `node scripts/work/ui/grammar-registry-pin.mjs`
+
+### starci work graph
+
+inspect, validate, diff or propose a workflow work graph
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | string | required |
+| `--workflow` | string |  |
+| `--version` | number |  |
+| `--file` | string |  |
+| `--from` | number |  |
+| `--to` | number |  |
+| `--job` | string |  |
+| `--reason` | string |  |
+| `--slice` | string |  |
+
+Positionals: action
+
+exit: 0 action completed; 1 graph refused or invalid; 2 bad usage
+
+json: flag
+
+```sh
+starci work graph show --repo <path> --workflow <id>
+starci work graph propose --repo <path> --job <id> --file <candidate> --reason <text>
+```
+
+Removed spellings: `node scripts/work/work-graph.mjs`, `node .claude/scripts/work/work-graph.mjs`
+
+### starci work layout-tree
+
+scan, capture, plan, lock, or inspect a product layout tree
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string |  |
+| `--app-dir` | list |  |
+| `--write` | boolean |  |
+| `--app` | string |  |
+| `--repo-root` | string |  |
+| `--node` | list |  |
+| `--breakpoint` | string |  |
+| `--theme` | string |  |
+| `--file` | string |  |
+| `--url` | string |  |
+| `--provenance` | string |  |
+| `--destination` | string |  |
+| `--route` | list |  |
+| `--locale` | string |  |
+| `--from` | string |  |
+| `--rect` | string |  |
+| `--active-nav` | string |  |
+| `--design` | string |  |
+| `--files` | string |  |
+| `--key` | string |  |
+| `--tolerance` | number |  |
+
+Positionals: command, image?
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work layout-tree scan --work .starciwork --json
+```
+
+Removed spellings: `node scripts/work/layout-tree.mjs`
+
+### starci work render-proof
+
+render a proof document for one Work record
+
+| flag | type | |
+| --- | --- | --- |
+| `--work` | string | required |
+| `--record` | string | required |
+
+exit: 0 proof rendered; 1 render failed; 2 bad usage
+
+json: none
+
+```sh
+starci work render-proof --work .starciwork --record <id>
+```
+
+Removed spellings: `node scripts/work/render-proof.mjs`
+
+### starci work shell-conformance
+
+check Work and implementation records against the measured frontend shell
+
+| flag | type | |
+| --- | --- | --- |
+| `--admitted-at` | string |  |
+| `--op` | string |  |
+
+Positionals: target
+
+exit: 0 clean; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work shell-conformance .starciwork --json
+```
+
+Removed spellings: `node scripts/work/ui/shell-conformance.mjs`
+
+### starci work ui-proof-brief
+
+emit a UI proof brief or score a rendered surface
+
+| flag | type | |
+| --- | --- | --- |
+| `--surface` | string |  |
+| `--repo` | string | required |
+| `--family` | enum starci|nivo |  |
+| `--elements` | string |  |
+| `--score` | string |  |
+| `--viewport` | string |  |
+
+exit: 0 success; 1 findings; 2 bad usage
+
+json: flag
+
+```sh
+starci work ui-proof-brief --surface <record> --repo <repo> --json
+```
+
+Removed spellings: `node scripts/work/ui/ui-proof-brief.mjs`
+
 ## starci workflow
 
 workflow lifecycle — define a goal, start its kernel, status, stop
+
+### starci workflow assess
+
+cold-scan repositories for goal-definition evidence
+
+| flag | type | |
+| --- | --- | --- |
+| `--repo` | list |  |
+
+exit: 0 assessment completed; 2 bad usage
+
+json: flag
+
+```sh
+starci workflow assess --repo <path> --json
+```
+
+Removed spellings: `node scripts/goal/assess.mjs`, `node .claude/scripts/goal/assess.mjs`
 
 ### starci workflow define
 

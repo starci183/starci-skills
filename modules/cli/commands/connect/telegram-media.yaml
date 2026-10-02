@@ -1,0 +1,25 @@
+group: connect
+verb: telegram-media
+owner: runtime
+summary: deliver settled operation media through Telegram
+impl: {script: scripts/connectors/telegram-media.mjs}
+positional:
+  - {name: action, enum: [settle], required: true, variadic: false}
+flags:
+  - {name: ledger, type: string, required: true}
+  - {name: repo, type: string}
+  - {name: workflow, type: string, required: true}
+  - {name: job, type: string, required: true}
+  - {name: attempt, type: number}
+  - {name: op, type: string, required: true}
+  - {name: verdict, type: enum, enum: [pass, fail, blocked], required: true}
+  - {name: dispatch, type: string}
+exit: {"0": delivery completed or was skipped, "1": delivery failed, "2": bad usage}
+json: always
+examples:
+  - starci connect telegram-media settle --ledger <file> --workflow <id> --job <id> --op <op> --verdict pass
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/connectors/telegram-media.mjs
+  - node .claude/scripts/connectors/telegram-media.mjs

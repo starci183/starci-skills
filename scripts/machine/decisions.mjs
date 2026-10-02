@@ -17,11 +17,11 @@
 //   ladder    escalateDue: a Kernel DI past dueAt is escalated once (a reminder, still the Kernel's); past dueAt x2
 //             it is marked escalated and becomes a Supervisor DI in machine.sqlite.
 //
-//   node scripts/machine/decisions.mjs ring --repo <r> --workflow <wf> [--json]
-//   node scripts/machine/decisions.mjs escalate-due [--apply] [--json]          (default: plan only, shadow)
-//   node scripts/machine/decisions.mjs supervisor --list [--all] [--json]
-//   node scripts/machine/decisions.mjs supervisor --claim <id> --by <actor> | --resolve <id> --by <actor> --verb <text> [--decision <id>]
-//   node scripts/machine/decisions.mjs supervisor --ring [--json]
+//   starci machine decisions ring --repo <r> --workflow <wf> [--json]
+//   starci machine decisions escalate-due [--apply] [--json]          (default: plan only, shadow)
+//   starci machine decisions supervisor --list [--all] [--json]
+//   starci machine decisions supervisor --claim <id> --by <actor> | --resolve <id> --by <actor> --verb <text> [--decision <id>]
+//   starci machine decisions supervisor --ring [--json]
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
@@ -692,7 +692,7 @@ export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, not
   });
 }, { env, now });
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: node scripts/machine/decisions.mjs supervisor --list`;
+export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: starci machine decisions supervisor --list`;
 /** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
 export const SUP_RING_KIND = 'supervisor-ring';
 
@@ -803,7 +803,7 @@ if (isMain(import.meta.url)) {
       const list = await listSupervisorDecisions({ all: has('all') });
       return print({ ok: true, decisions: list }, list.map((d) => `${d.id} [${d.status}${d.severity === 'critical' ? ' CRITICAL' : ''}] ${d.kind} due ${new Date(d.dueAt).toISOString().slice(0, 16)}Z: ${d.summary}`).join('\n') || 'no open Supervisor decisions');
     }
-    throw refuse('use: decisions.mjs ring | escalate-due [--apply] | supervisor [--list|--claim|--resolve|--ring]', 'usage');
+    throw refuse('use: starci machine decisions ring | escalate-due [--apply] | supervisor [--list|--claim|--resolve|--ring]', 'usage');
   };
   main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code ?? null })); process.exitCode = error?.code === 'usage' ? 2 : 1; });
 }

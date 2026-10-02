@@ -7,6 +7,6 @@ paths:
   - scripts/kernel/api-verbs/op-contract.mjs
   - scripts/kernel/api-verbs/consume-report.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/survey.yaml
-  - modules/kernel/api-commands/op-contract.yaml
-  - modules/kernel/api-commands/consume-report.yaml
+  - modules/cli/commands/kernel/survey.yaml
+  - modules/cli/commands/kernel/op-contract.yaml
+  - modules/cli/commands/kernel/consume-report.yaml

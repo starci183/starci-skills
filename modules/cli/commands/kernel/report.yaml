@@ -62,7 +62,7 @@ writes: "One transaction under api_requests idempotency (request id = sha(verb, 
   op_attempts.transcript_sha (scripts/kernel/transcripts.mjs), the Kernel is woken
   (scripts/kernel/wake-delivery.mjs, delivery proven from the screen; the watchdog
   allocation.watchdogCadenceMs is only the fallback) and the runtime settler starts. No report is
-  ever read back from a file: the reports row is the record, and `api status` projects it. A row
+  ever read back from a file: the reports row is the record, and `starci kernel status` projects it. A row
   filed with outcome 'ask' then follows askLifecycle below until it is answered or superseded."
 returns: "{ok:true, jobId, workflowId, dispatchId, attemptId, outcome, reportId, attachments,
   artifacts:[{id, name, sha256}], audit?:{auditId, verdict}, kernelWake:{action,terminal,...},
@@ -79,7 +79,7 @@ answeredAsks: "an `ask` report is checked against the answered asks of the job's
   ask"
 binding: "The job's open attempt is the binding: its dispatch_id is the identity the envelope must
   match (run/task/dispatch/from are stamped from op_attempts, the worker never claims them) and it
-  must carry the contracts row `api dispatch` wrote (keyed attempt_id). A redispatch is a new
+  must carry the contracts row `starci kernel dispatch` wrote (keyed attempt_id). A redispatch is a new
   attempt with its own contract, so an old dispatch never files into it."
 refuses:
   - report-job-not-active: the job is not running, answering, effect_unknown or reported - a queued or

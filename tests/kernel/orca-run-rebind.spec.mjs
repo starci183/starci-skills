@@ -14,7 +14,7 @@ import {bindWorkflowRun} from '../../scripts/kernel/orca-runs.mjs';
 // still existed, but Orca named the pre-reboot terminal as its coordinator, and
 // orcaCall reported only stderr while Orca wrote its refusal as JSON on stdout.
 // The fake Orca refuses a worker-start --spec (it files the Task) from a terminal that is not the Run's
-// coordinator the same way; api dispatch must re-bind the Run once and
+// coordinator the same way; starci kernel dispatch must re-bind the Run once and
 // dispatch, and a lost Run must be replaced by a new one.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
