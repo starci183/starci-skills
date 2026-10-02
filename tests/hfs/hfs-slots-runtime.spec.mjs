@@ -80,3 +80,12 @@ test('the runtime resolver: slots, tiers, owners, the forbidden current paths an
   assert.deepEqual(r.importAllowed('scripts/kernel/a.mjs', 'scripts/agent/lib.mjs'), { allowed: true, reason: 'allowed', fromTier: 'kernel', toTier: 'domain' });
   assert.equal(r.importAllowed('scripts/lib/a.mjs', 'scripts/kernel/b.mjs').reason, 'tierDirection');
 });
+
+test('state directories and local junk named in the review log are forbidden in the tree, not only untracked', () => {
+  const m = runtimeManifest();
+  const r = createSlotResolver(m, resolveRepoDeclaration(m, { hfs: 1, kind: 'runtime', project: 'starci' }));
+  for (const forbidden of ['runtime/x.json', 'mcp/server.json', 'worktrees/a/b.txt', '.starciwork/runtime.sqlite', '.experiments/note.md', 'config.yaml.bak-20261001065612', 'nul', 'nul.txt', 'lp-specs.txt', '3-jobs/a.json', 'LEAD.md']) {
+    assert.equal(r.classifyPath(forbidden).status, 'forbidden', `${forbidden} must be forbidden`);
+  }
+  assert.notEqual(r.classifyPath('docs/goal.md').status, 'forbidden');
+});
