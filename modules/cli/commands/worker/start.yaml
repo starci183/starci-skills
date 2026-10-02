@@ -1,0 +1,32 @@
+group: worker
+verb: start
+owner: runtime
+summary: start one supervised agent in a registered worktree in an Orca run
+impl: {module: scripts/machine/worker-verbs.mjs, export: workerStartVerb}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - point the spec to a brief file; use @file only when its contents must be passed as the Task
+  - never pass --model for Devin; its account-selected model is not inferred
+  - stagger starts by about 30 seconds and assign one Codex worker to each disjoint chunk
+  - create the caller Run in this same terminal before starting its workers
+  - always finish the worker with starci worker close; release alone is not complete cleanup
+flags:
+  - {name: agent, type: enum, enum: [codex, claude, devin, cursor], required: true, summary: agent runtime to start}
+  - {name: model, type: string, summary: 'registered model id for Codex, Claude or Cursor'}
+  - {name: worktree, type: string, required: true, summary: registered worktree path in the current repository}
+  - {name: spec, type: string, required: true, summary: 'one-line brief reference, brief path or @file to read'}
+  - {name: task-title, type: string, required: true, summary: short title recorded on the Orca Task}
+  - {name: run, type: string, summary: Orca Run id (default is the Run bound to this terminal)}
+positional: []
+exit:
+  "0": "worker started"
+  "1": "Orca or the host could not prove the start"
+  "2": "invalid agent, model, brief, worktree or Run binding"
+json: starci/worker-start@1
+examples:
+  - starci worker start --agent devin --worktree <path> --spec @brief.md --task-title "CLI worker verbs"
+  - starci worker start --agent codex --model gpt-6-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

@@ -1,0 +1,29 @@
+group: docker
+verb: build
+owner: runtime
+summary: build one declared application image from the application root
+impl: {module: scripts/machine/docker-build.mjs, export: dockerBuild}
+effect: host
+roles: [worker, lead, coordinator, owner]
+conventions:
+  - build context is the app root and the Dockerfile is be/apps/<app>/Dockerfile or fe/apps/<app>/Dockerfile
+  - the local tag is <project>/<app>:<tag>; this verb never pushes and never logs in
+  - published ports come from the project's 41000-44999 block
+  - never touch containers of another project (the protected local installation) or ports 3000 and 3100
+  - clean up with `starci docker down`
+flags:
+  - {name: tag, type: string, default: dev, summary: local image tag}
+  - {name: no-cache, type: boolean, summary: disable Docker build cache}
+positional:
+  - {name: app, required: true, variadic: false}
+exit:
+  "0": "the image was built"
+  "1": "Docker build failed"
+  "2": "usage or Docker ownership policy was refused"
+json: starci/docker-build@1
+examples:
+  - starci docker build identity
+  - starci docker build landing --tag dev --no-cache --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

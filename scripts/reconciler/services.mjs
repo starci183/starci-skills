@@ -242,7 +242,7 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
         const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run });
         return t.exists || settings.allowTaskRepair ? t : { ...t, unmanaged: true };
       },
-      start: () => ({ cmd: starciLauncher(), args: ['reconciler', 'install-task', '--apply', '--json'] }) }),
+      start: () => ({ cmd: starciLauncher(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),
   ];
   for (const c of settings.checkers) {
     out.push({ name: `checker:${c.name}`, kind: 'checker', restart: false, ownerPath: false, ...c, start: () => null,

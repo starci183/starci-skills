@@ -1,0 +1,28 @@
+group: lint
+verb: run
+owner: runtime
+summary: lint changed files or the release-scoped whole repository
+impl: {module: scripts/machine/ladder-lint.mjs, export: lintRun}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - Use L1 while working, L2 before asking for a land, and L3 when an IO slot changed.
+  - L0 and L1 stay on changed files; L4 is the only whole-repository lint scope.
+  - Product apps go through starci app lint; the runtime uses its structural lint self-check family.
+flags:
+  - {name: level, type: enum, enum: [L0, L1, L2, L3, L4], default: L1, summary: lint ladder level}
+  - {name: changed, type: list, summary: changed repository paths}
+  - {name: all, type: boolean, summary: whole-repository lint at L4 only}
+  - {name: fix, type: boolean, summary: let the app linters apply safe fixes}
+positional: []
+exit:
+  "0": "lint was clean"
+  "1": "lint findings"
+  "2": "usage or ladder policy refusal"
+json: starci/lint-run@1
+examples:
+  - starci lint run --level L1 --changed scripts/machine/example.mjs
+  - starci lint run --level L4 --all
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

@@ -118,7 +118,12 @@ export function validateArgs(argv, verb, globalFlags = []) {
     if (global.json === true && verb.json === 'none') {
       throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ' has no machine output');
     }
-    return { ok: true, values, global, localArgs, positionals };
+    const args = {};
+    for (const flag of locals.values()) {
+      if (Object.hasOwn(values, flag.name)) args[flag.name] = values[flag.name];
+      else if (flag.default !== undefined) args[flag.name] = flag.type === 'list' && !Array.isArray(flag.default) ? [flag.default] : flag.default;
+    }
+    return { ok: true, values, args, global, localArgs, positionals };
   } catch (error) {
     return { ok: false, code: 2, error: String(error?.message ?? error) };
   }

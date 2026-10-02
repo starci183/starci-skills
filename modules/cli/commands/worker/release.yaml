@@ -1,0 +1,23 @@
+group: worker
+verb: release
+owner: runtime
+summary: release settled Orca worker accounting without claiming full cleanup
+impl: {module: scripts/machine/worker-verbs.mjs, export: workerReleaseVerb}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - release is retained for lifecycle recovery; normal completion always uses starci worker close
+  - release alone can leave an agent terminal and process running
+flags:
+  - {name: dispatch, type: string, required: true, summary: authoritative Orca Dispatch id}
+positional: []
+exit:
+  "0": "worker released"
+  "1": "Orca could not prove the release"
+  "2": "bad usage"
+json: starci/worker-release@1
+examples:
+  - starci worker release --dispatch <dispatch-id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

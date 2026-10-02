@@ -15,7 +15,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const GEN = path.join(repoRoot, 'scripts', 'cli', 'gen-catalog.mjs');
 const DRIFT = 'RT_CLI_CATALOG_DRIFT';
 
-const GLOBAL_YAML = `flags:
+const GLOBAL_YAML = `commands: [explain]
+flags:
   - {name: json, type: boolean}
   - {name: cwd, type: string}
   - {name: quiet, type: boolean}
@@ -36,6 +37,10 @@ editions: [full]
 since: 1.0.0-alpha.4
 removed: ['starci api settle']
 `;
+const MODULE_VERB = VERB.replace('impl: {script: scripts/kernel/cli.mjs, args: [settle]}', `impl: {module: scripts/machine/settle.mjs, export: settle}
+effect: host
+roles: [lead, owner]
+conventions: [run only one settlement at a time]`);
 
 const fixture = (edit) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-catalog-'));
@@ -56,6 +61,7 @@ test('the real catalog loads: six groups planned or present, kernel verbs sorted
   const cat = loadCatalog(repoRoot);
   assert.equal(cat.schema, 'starci/cli-catalog@1');
   assert.deepEqual(cat.global.flags.map((f) => f.name), ['json', 'cwd', 'quiet', 'help', 'edition']);
+  assert.deepEqual(cat.global.commands, ['explain']);
   const kernel = cat.groups.find((g) => g.group === 'kernel');
   assert.ok(kernel, 'kernel group');
   assert.ok(kernel.verbs.length >= 55, 'every kernel verb catalogued');
@@ -108,6 +114,54 @@ test('an unknown global or flag key is rejected', () => {
     const errors = catalogErrors(root);
     assert.ok(errors.some((e) => /unknown global key "bogus"/.test(e)), JSON.stringify(errors));
     assert.ok(errors.some((e) => /unknown flag key "alias"/.test(e)), JSON.stringify(errors));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a module implementation requires effect and roles', () => {
+  const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB
+    .replace('effect: host\n', '')
+    .replace('roles: [lead, owner]\n', '')));
+  try {
+    const errors = catalogErrors(root);
+    assert.ok(errors.some((e) => /module impl requires effect/.test(e)), JSON.stringify(errors));
+    assert.ok(errors.some((e) => /module impl requires roles/.test(e)), JSON.stringify(errors));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('effects, roles, conventions and module shape are validated from one catalog source', () => {
+  const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB
+    .replace('effect: host', 'effect: machine')
+    .replace('roles: [lead, owner]', 'roles: [pilot]')
+    .replace('conventions: [run only one settlement at a time]', 'conventions: [""]')
+    .replace('export: settle', 'export: bad-name')));
+  try {
+    const errors = catalogErrors(root);
+    assert.ok(errors.some((e) => /effect must be one of/.test(e)), JSON.stringify(errors));
+    assert.ok(errors.some((e) => /unknown role "pilot"/.test(e)), JSON.stringify(errors));
+    assert.ok(errors.some((e) => /conventions entries must be non-empty/.test(e)), JSON.stringify(errors));
+    assert.ok(errors.some((e) => /impl\.export must be an identifier/.test(e)), JSON.stringify(errors));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a side-effecting verb requires a convention', () => {
+  const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB.replace('conventions: [run only one settlement at a time]\n', '')));
+  try {
+    assert.ok(catalogErrors(root).some((e) => /effect host requires at least one convention/.test(e)));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('generated catalog and docs carry function-verb policy metadata', async () => {
+  const root = fixture((put) => {
+    put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB);
+    put('scripts/machine/settle.mjs', 'export async function settle() { return {code: 0}; }\n');
+  });
+  try {
+    const outputs = await generateAll(root);
+    assert.match(outputs['packages/cli/src/catalog.generated.mjs'], /"effect": "host"/);
+    assert.match(outputs['docs/cli.md'], /Effect: host/);
+    assert.match(outputs['docs/cli.md'], /Conventions:\n\n- run only one settlement at a time/);
+    assert.match(outputs['docs/cli.md'], /Replaces: `starci api settle`/);
+    assert.match(outputs['packages/cli/completions/starci.bash'], /\bexplain\b/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

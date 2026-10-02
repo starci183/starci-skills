@@ -13,14 +13,8 @@
 //   starci reconciler restart                           stop the engine (if any), then ensure
 //   starci reconciler status [--json]                   leader, epoch, heartbeat age, modes, queue depth, open violations
 //   starci reconciler up [flags]                        bring everything up and print one checklist (start.mjs)
-//   starci reconciler install-task [--apply]
-//                                                       print (default) or create the task StarCi-Reconciler: at logon and
-//                                                       every 5 minutes, conhost --headless, IgnoreNew, below-normal. Only
-//                                                       the owner or the coordinator runs --apply.
 import '../api/process/hide-child-windows.mjs';
-import os from 'node:os';
 import path from 'node:path';
-import { runPowershell } from '../api/process/run-powershell.mjs';
 import { spawnNode } from '../api/node/spawn-node.mjs';
 import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs';
@@ -30,13 +24,10 @@ import { translator } from '../lib/i18n.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { reconcilerTaskScript, starciShimPath } from '../machine/task-register.mjs';
 
 const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
-const TASK_NAME = 'StarCi-Reconciler';
-const TASK_EVERY_MINUTES = 5;
-/** The one per-user launcher written by `starci runtime install`. */
-export const starciShimPath = ({ home = os.homedir(), platform = process.platform } = {}) =>
-  path.join(home, '.starci', 'bin', platform === 'win32' ? 'starci.cmd' : 'starci');
+export { starciShimPath };
 /**
  * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
@@ -255,38 +246,8 @@ const describeStatus = (s) => {
 };
 
 /** The PowerShell that registers StarCi-Reconciler through the per-user starci shim. Pure. */
-export function taskScript({ starci = starciShimPath(), workdir = SKILL_ROOT, every = TASK_EVERY_MINUTES } = {}) {
-  const q = (s) => String(s).replace(/'/g, "''");
-  return [
-    "$ErrorActionPreference = 'Stop'",
-    "$conhost = Join-Path $env:SystemRoot 'System32\\conhost.exe'",
-    "$cmd = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
-    `$starci = '${q(starci)}'`,
-    `$argLine = '--headless "' + $cmd + '" /d /s /c ""' + $starci + '" reconciler start"'`,
-    `$action = New-ScheduledTaskAction -Execute $conhost -Argument $argLine -WorkingDirectory '${q(workdir)}'`,
-    '$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name',
-    `$every = New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes ${every})`,
-    '$logon = New-ScheduledTaskTrigger -AtLogOn -User $user',
-    '$logon.Repetition = $every.Repetition',
-    "$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -Priority 7 -ExecutionTimeLimit (New-TimeSpan -Minutes 4) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden",
-    '$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited',
-    `$task = Register-ScheduledTask -TaskName '${TASK_NAME}' -Action $action -Trigger @($logon, $every) -Settings $settings -Principal $principal -Description 'StarCi reconciler: starci reconciler start (DESIGN 7.7)' -Force`,
-    `Write-Output ("registered {0}: at logon and every ${every} minutes -> {1} {2}" -f $task.TaskName, $conhost, $argLine)`,
-  ].join('\n');
-}
-
-function installTask({ apply, json }) {
-  const script = taskScript();
-  if (!apply) {
-    const out = { ok: true, applied: false, task: TASK_NAME, powershell: script };
-    console.log(json ? JSON.stringify(out) : `Would register ${TASK_NAME} (re-run with --apply to create it; the owner or the coordinator does):\n${script}`);
-    return;
-  }
-  if (process.platform !== 'win32') { console.log(JSON.stringify({ ok: false, reason: 'not-windows' })); process.exitCode = 1; return; }
-  const r = runPowershell(script);
-  const out = { ok: r.status === 0, applied: true, task: TASK_NAME, output: String(r.stdout || r.stderr || '').trim().slice(0, 600) };
-  console.log(json ? JSON.stringify(out) : `${out.ok ? 'created' : 'FAILED'} ${TASK_NAME}: ${out.output}`);
-  if (!out.ok) process.exitCode = 1;
+export function taskScript({ starci, workdir = SKILL_ROOT, every = 5 } = {}) {
+  return reconcilerTaskScript({ starci, workdir, everyMinutes: every });
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -297,7 +258,6 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (argv.includes('--up') || argv[0] === 'up') { const { main: start } = await import('./start.mjs'); await start(argv.filter((a) => a !== '--up' && a !== 'up')); return; }
-  if (argv.includes('--install-task')) { installTask({ apply: argv.includes('--apply'), json }); return; }
   if (argv.includes('--stop')) {
     const r = stopEngine();
     console.log(json ? JSON.stringify(r) : `[reconciler boot] ${r.action}${r.stopped.length ? ` pid ${r.stopped.map((item) => item.pid).join(', ')}` : ''}`);

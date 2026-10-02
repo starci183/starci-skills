@@ -15,12 +15,18 @@ const global = [
 ];
 const catalog = {
   global,
+  commands: ['explain'],
   groups: {
     app: { owner: '@starci/hfs', summary: 'app commands', verbs: {
       check: { group: 'app', verb: 'check', summary: 'check an app', flags: [], json: 'flag', editions: ['full'] },
     } },
     runtime: { owner: 'runtime', summary: 'runtime commands', verbs: {
-      check: { group: 'runtime', verb: 'check', summary: 'check the runtime', flags: [], json: 'flag' },
+      check: {
+        group: 'runtime', verb: 'check', summary: 'check the runtime', flags: [],
+        effect: 'host', roles: ['lead', 'owner'], conventions: ['run the scoped checks only'],
+        exit: { 0: 'clean', 1: 'findings', 2: 'bad usage' }, json: 'flag',
+        removed: ['node scripts/checks/check-runtime.mjs'],
+      },
       install: { group: 'runtime', verb: 'install', summary: 'install the runtime', flags: [{ name: 'force', type: 'boolean' }], json: 'none' },
     } },
   },
@@ -43,10 +49,19 @@ test('help and completion are served without a runtime', async () => {
   assert.match(top.value.out, /Groups:/);
   const group = capture();
   assert.equal(await main(['runtime', '--help'], { ...group, catalog, retired }), 0);
-  assert.match(group.value.out, /check\s+check the runtime/);
+  assert.match(group.value.out, /check\s+\[host\] check the runtime/);
   const verb = capture();
   assert.equal(await main(['runtime', 'check', '--help'], { ...verb, catalog, retired }), 0);
   assert.match(verb.value.out, /check the runtime/);
+  assert.match(verb.value.out, /Effect: host\nRoles: lead, owner/);
+  assert.match(verb.value.out, /Conventions:\n  - run the scoped checks only/);
+  assert.match(verb.value.out, /Exit codes:/);
+  const explain = capture();
+  assert.equal(await main(['explain', 'runtime', 'check'], { ...explain, catalog, retired }), 0);
+  assert.match(explain.value.out, /Replaces: node scripts\/checks\/check-runtime\.mjs/);
+  const unknown = capture();
+  assert.equal(await main(['explain', 'runtime', 'nope'], { ...unknown, catalog, retired }), 2);
+  assert.match(unknown.value.err, /available: check, install/);
   const completion = capture();
   assert.equal(await main(['completion', 'bash'], { ...completion, catalog, retired, completionFor: () => 'complete\n' }), 0);
   assert.equal(completion.value.out, 'complete\n');

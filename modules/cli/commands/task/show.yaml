@@ -1,0 +1,20 @@
+group: task
+verb: show
+owner: runtime
+summary: show state, runs, result and action for one runtime scheduled task
+impl: {module: scripts/machine/task-verbs.mjs, export: taskShow}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - names select only the runtime-owned harness tunnel and reconciler tasks
+flags: []
+positional:
+  - {name: name, enum: [harness-tunnel, reconciler], required: true, variadic: false}
+exit: {"0": task details listed, "1": Task Scheduler could not be read, "2": bad usage or unknown task name}
+json: starci/task-show@1
+examples:
+  - starci task show reconciler
+  - starci task show harness-tunnel --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

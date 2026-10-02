@@ -105,7 +105,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   ]);
   const { CATALOG, RETIRED } = catalogModule;
   const { completionFor, completionShells } = completionModule;
-  const { groupHelp, topHelp, verbHelp } = helpModule;
+  const { explainHelp, groupHelp, topHelp, verbHelp } = helpModule;
   const { installRuntime } = installModule;
   const { linkRuntime } = linkModule;
   const { splitCommand, validateArgs, withFlagsBeforeDashes } = argsModule;
@@ -151,6 +151,23 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     const text = (io.completionFor ?? completionFor)(shell);
     if (text == null) return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
     writeTo(stdout, text);
+    return 0;
+  }
+  if (split.group === 'explain' && (catalog.commands ?? []).includes('explain')) {
+    if (split.help && !split.verb && !split.args.length) {
+      writeTo(stdout, 'Usage: starci explain <group> <verb>\n');
+      return 0;
+    }
+    const groupName = split.verb;
+    const verbNames = split.args.filter((token) => !token.startsWith('-'));
+    if (!groupName || verbNames.length !== 1) return fail(stderr, 'explain expects <group> <verb>');
+    const target = catalog.groups?.[groupName];
+    if (!target) return fail(stderr, `unknown group "${groupName}"`);
+    const verbName = verbNames[0];
+    if (!target.verbs?.[verbName]) {
+      return fail(stderr, `unknown verb "${verbName}" for group "${groupName}" (available: ${Object.keys(target.verbs ?? {}).join(', ')})`);
+    }
+    writeTo(stdout, explainHelp(catalog, groupName, verbName));
     return 0;
   }
 

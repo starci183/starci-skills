@@ -1,0 +1,24 @@
+group: supabase
+verb: start
+owner: runtime
+summary: start the app's Supabase stack after enforcing its isolated port block
+impl: {module: scripts/machine/supabase-stack.mjs, export: supabaseStart}
+effect: host
+roles: [worker, lead, coordinator, owner]
+conventions:
+  - one local Supabase stack belongs to one project and uses only its configured 41000-44999 port block
+  - never start a protected foreign stack or use ports 3000, 3100, 54320-54329 or 55321-55327
+  - secrets stay in sops and never appear in command output
+  - stop the project's stack when the work that needs it is done
+flags: []
+positional: []
+exit:
+  "0": "the project stack started"
+  "1": "the Supabase CLI failed"
+  "2": "the config, port policy or host lock refused the start"
+json: starci/supabase-start@1
+examples:
+  - starci supabase start --cwd <app>
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

@@ -1,0 +1,26 @@
+group: check
+verb: run
+owner: runtime
+summary: run changed-scope checks or the full structural check set
+impl: {module: scripts/machine/ladder-check.mjs, export: checkRun}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - Use L1 while working, L2 before asking for a land, and L3 when an IO slot changed.
+  - Runtime L1 selects only manifest self-checks whose implementation path changed; L2 and above run the full check.
+  - App L1 uses starci app check --fast; L2 and above use the full app check, with every example added at L4.
+flags:
+  - {name: level, type: enum, enum: [L0, L1, L2, L3, L4], default: L1, summary: check ladder level}
+  - {name: changed, type: list, summary: changed repository paths}
+positional: []
+exit:
+  "0": "every selected check passed"
+  "1": "check findings"
+  "2": "usage or ladder policy refusal"
+json: starci/check-run@1
+examples:
+  - starci check run --level L1 --changed scripts/checks/check-doc-language.mjs
+  - starci check run --level L2
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

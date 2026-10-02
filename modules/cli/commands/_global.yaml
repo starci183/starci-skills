@@ -1,8 +1,9 @@
-# Global flags of the unified starci CLI, spelled once here (design.md). They are
-# parsed by the dispatcher before the verb; a verb yaml never repeats them.
+# Global flags and in-process commands of the unified starci CLI, spelled once
+# here (design.md). Flags are parsed before the verb; a verb yaml never repeats them.
 # --cwd replaces --repo/--root of the hfs (app) verbs; kernel verbs keep their own
 # documented --repo <path> (the managed repository, a different meaning).
 schema: starci/cli-global-flags@1
+commands: [explain]
 flags:
   - name: json
     type: boolean

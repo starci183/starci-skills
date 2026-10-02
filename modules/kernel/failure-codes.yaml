@@ -6064,6 +6064,17 @@ SUBSCRIPTION_UNDECLARED:
   owner: op-retry
   kind: check-finding
 
+SUPABASE_PORT_POLICY:
+  title: "Supabase port policy refused"
+  title_vi: "Chính sách cổng Supabase từ chối"
+  meaning_vi: "Lệnh Supabase bị từ chối vì dự án, khối cổng hoặc tiến trình đang giữ cổng không thuộc ngăn xếp cục bộ riêng của ứng dụng."
+  causes_vi:
+    - "Cổng nằm ngoài 41000-44999, trùng nhau hoặc thuộc dải dành riêng không phải của ứng dụng"
+    - "project_id bị thiếu, chứa nivo-lite hoặc một tiến trình khác đang lắng nghe trên cổng đã khai báo"
+  nextStep_vi: "Sửa supabase/config.toml để dùng project_id và khối cổng riêng, hoặc dừng tiến trình đang giữ cổng, rồi chạy lại lệnh."
+  owner: op-retry
+  kind: verb-refusal
+
 SUPERVISOR_GATE_OVERDUE:
   title: "Supervisor gate open too long"
   title_vi: "Cổng chờ Supervisor mở quá lâu"
@@ -14441,3 +14452,13 @@ RT_DOC_NO_OWNER:
   nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
   owner: supervisor
   kind: check-finding
+
+DOCKER_PORT_POLICY:
+  title: "Docker ownership or published-port policy was refused"
+  title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"
+  meaning_vi: "Lệnh Docker đã nhắm tới container nivo-lite thuộc hệ thống khác, dùng tên dự án không hợp lệ, công bố cổng được bảo vệ, hoặc công bố cổng ngoài dải 41000-44999 dành cho dự án."
+  causes_vi:
+    - "Compose đặt container_name chứa nivo-lite hoặc công bố cổng 3000, 3100, 54320-54329, 55321-55327 hay một cổng ngoài dải dự án."
+  nextStep_vi: "Đổi tên container sang tên thuộc dự án, lấy cổng trong dải 41000-44999 của dự án, rồi chạy lại lệnh starci docker; không sửa hay dừng container nivo-lite."
+  owner: runtime-core
+  kind: verb-refusal

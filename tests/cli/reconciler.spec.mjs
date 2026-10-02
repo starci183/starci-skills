@@ -6,7 +6,7 @@ import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs
 import { main as runtimeMain } from '../../scripts/cli/main.mjs';
 import { starciShimPath, stopEngine, taskScript } from '../../scripts/reconciler/boot.mjs';
 
-test('reconciler catalog resolves controls, task install and the full up checklist', () => {
+test('reconciler catalog resolves controls and the full up checklist', () => {
   const calls = [];
   const runScript = (script, args) => { calls.push({ script, args }); return 0; };
   for (const argv of [
@@ -14,15 +14,13 @@ test('reconciler catalog resolves controls, task install and the full up checkli
     ['reconciler', 'stop'],
     ['reconciler', 'restart'],
     ['reconciler', 'status', '--json'],
-    ['reconciler', 'install-task', '--apply'],
     ['reconciler', 'up', '--check', '--wait', '5', '--no-build'],
   ]) assert.equal(runtimeMain(argv, { catalog, runScript }), 0, argv.join(' '));
   assert.deepEqual(calls.map((call) => call.args), [
-    ['ensure', '--json'], ['--stop'], ['--restart'], ['--status', '--json'], ['--install-task', '--apply'], ['--check', '--wait', '5', '--no-build'],
+    ['ensure', '--json'], ['--stop'], ['--restart'], ['--status', '--json'], ['--check', '--wait', '5', '--no-build'],
   ]);
   assert.match(calls[0].script, /scripts[\\/]reconciler[\\/]boot\.mjs$/);
   assert.match(calls.at(-1).script, /scripts[\\/]reconciler[\\/]start\.mjs$/);
-  assert.equal(runtimeMain(['reconciler', 'install-task', '--force'], { catalog, stderr: () => {}, runScript }), 2);
 });
 
 test('reconciler task registration launches the resolved starci shim', () => {

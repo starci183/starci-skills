@@ -1,0 +1,27 @@
+group: git
+verb: backup
+owner: runtime
+summary: push local branch tips only to dated backup refs
+impl: {module: scripts/machine/git-backup.mjs, export: gitBackup}
+effect: remote
+roles: [coordinator, owner]
+conventions:
+  - backup writes only refs/backup/<yyyy-mm-dd>/<branch>, never branches or tags
+  - backup refs trigger no workflow and are the only push a coordinator may make
+  - pushes are never forced and the pre-push hook is never bypassed
+flags:
+  - {name: remote, type: string, default: origin, summary: the configured remote that receives the backup refs}
+  - {name: branches, type: list, summary: local branches to back up (default is the current branch and main)}
+  - {name: dry-run, type: boolean, summary: print the refspecs without pushing}
+positional: []
+exit:
+  "0": "backup refs pushed or the dry run is valid"
+  "1": "the push failed"
+  "2": "invalid remote, branch or force request"
+json: starci/git-backup@1
+examples:
+  - starci git backup
+  - starci git backup --branches lane/cli --branches main --dry-run
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

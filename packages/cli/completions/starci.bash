@@ -8,29 +8,40 @@ _starci() {
     group="${COMP_WORDS[1]}"
     verb="${COMP_WORDS[2]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "app connect debug gate guard harness kernel machine orca reconciler release route runtime supervisor uat work workflow help completion" -- "$cur") )
+        COMPREPLY=( $(compgen -W "app check connect debug docker gate git guard harness kernel lint machine npm orca reconciler release route runtime supabase supervisor task test typecheck uat work worker workflow help completion explain" -- "$cur") )
         return 0
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
         app) COMPREPLY=( $(compgen -W "add check emit explain hygiene lint new scaffold secret stack sync upgrade" -- "$cur") );;
+        check) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         connect) COMPREPLY=( $(compgen -W "ask-gateway telegram telegram-media tunnel" -- "$cur") );;
         debug) COMPREPLY=( $(compgen -W "pass run" -- "$cur") );;
+        docker) COMPREPLY=( $(compgen -W "build down ps up" -- "$cur") );;
         gate) COMPREPLY=( $(compgen -W "canon-scan custody-exec env-health hfs-sync read reference-conventions repo-presentation run sonar starcistacks test-world unit" -- "$cur") );;
+        git) COMPREPLY=( $(compgen -W "backup commit land sync" -- "$cur") );;
         guard) COMPREPLY=( $(compgen -W "command footprint-scan seat-tools verify-commit" -- "$cur") );;
-        harness) COMPREPLY=( $(compgen -W "install-task open start status stop" -- "$cur") );;
+        harness) COMPREPLY=( $(compgen -W "open start status stop" -- "$cur") );;
         kernel) COMPREPLY=( $(compgen -W "archive artifacts autopilot consume-report contract-release coverage cut-seam decide decisions dispatch dispatch-ready enqueue estimate extensions finish foundation foundations graph-edit hierarchy inbox incident kernel-ack-rev kernel-proposal lifecycle log logs messages notify nudge observe op-contract op-override peers plan provider-backoff provider-health questions reconcile record-change record-checks redesign rename reply report retire-ask route run-deferred-tests serve-ask settle settle-tail status survey unit usage verify-proofs" -- "$cur") );;
+        lint) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         machine) COMPREPLY=( $(compgen -W "decisions kernel-watchdog lessons op-metrics seam-policy worktrees" -- "$cur") );;
+        npm) COMPREPLY=( $(compgen -W "ci install" -- "$cur") );;
         orca) COMPREPLY=( $(compgen -W "terminal-read terminal-send" -- "$cur") );;
-        reconciler) COMPREPLY=( $(compgen -W "install-task once restart start status stop up" -- "$cur") );;
+        reconciler) COMPREPLY=( $(compgen -W "once restart start status stop up" -- "$cur") );;
         release) COMPREPLY=( $(compgen -W "app-installs check clean-test cut launch-smoke proof publish sync-runtime" -- "$cur") );;
         route) COMPREPLY=( $(compgen -W "op" -- "$cur") );;
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-catalog gen-ops housekeeping install ledger-hygiene link machine-db owner-claims-audit readme-blocks status update validate version" -- "$cur") );;
+        supabase) COMPREPLY=( $(compgen -W "start status stop" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge channel direct-commits gate-stability gc land lesson-actions notify owed poll push push-mains ram-cap report start status stop telegram-bridge tell watchdog workers" -- "$cur") );;
+        task) COMPREPLY=( $(compgen -W "list register show" -- "$cur") );;
+        test) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
+        typecheck) COMPREPLY=( $(compgen -W "run" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
         work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette check-example-work compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste evidence-binding example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        worker) COMPREPLY=( $(compgen -W "close list read release show start stop" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess bias define start status stop" -- "$cur") );;
         completion) COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- "$cur") );;
+        explain) COMPREPLY=( $(compgen -W "app check connect debug docker gate git guard harness kernel lint machine npm orca reconciler release route runtime supabase supervisor task test typecheck uat work worker workflow" -- "$cur") );;
             *) COMPREPLY=();;
         esac
         return 0
@@ -60,6 +71,8 @@ _starci() {
         app:secret:--bytes) return 0;;
         app:stack:--stack) return 0;;
         app:stack:--services) return 0;;
+        check:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
+        check:run:--changed) return 0;;
         connect:ask-gateway:--port) return 0;;
         connect:ask-gateway:--repo) return 0;;
         connect:telegram:--ledger) return 0;;
@@ -87,6 +100,10 @@ _starci() {
         debug:run:--child-timeout) return 0;;
         debug:run:--token-window) return 0;;
         debug:run:--token-spike) return 0;;
+        docker:build:--tag) return 0;;
+        docker:down:--env) return 0;;
+        docker:up:--env) return 0;;
+        docker:up:--wait-seconds) return 0;;
         gate:canon-scan:--root) return 0;;
         gate:canon-scan:--stack-kind) COMPREPLY=( $(compgen -W "next nest" -- "$cur") ); return 0;;
         gate:canon-scan:--families) return 0;;
@@ -138,6 +155,20 @@ _starci() {
         gate:test-world:--out) return 0;;
         gate:unit:--root) return 0;;
         gate:unit:--out) return 0;;
+        git:backup:--remote) return 0;;
+        git:backup:--branches) return 0;;
+        git:commit:--type) COMPREPLY=( $(compgen -W "feat fix refactor test docs chore land release" -- "$cur") ); return 0;;
+        git:commit:--scope) return 0;;
+        git:commit:--summary) return 0;;
+        git:commit:--body) return 0;;
+        git:commit:--paths) return 0;;
+        git:commit:--lane) return 0;;
+        git:commit:--co-author) return 0;;
+        git:land:--verified) return 0;;
+        git:land:--verified-log) return 0;;
+        git:land:--lane) return 0;;
+        git:land:--concurrency) return 0;;
+        git:sync:--main-ref) return 0;;
         guard:footprint-scan:--root) return 0;;
         guard:footprint-scan:--depth) return 0;;
         kernel:archive:--repo) return 0;;
@@ -468,6 +499,8 @@ _starci() {
         kernel:usage:--workflow) return 0;;
         kernel:verify-proofs:--repo) return 0;;
         kernel:verify-proofs:--workflow) return 0;;
+        lint:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
+        lint:run:--changed) return 0;;
         machine:decisions:--repo) return 0;;
         machine:decisions:--workflow) return 0;;
         machine:decisions:--claim) return 0;;
@@ -498,6 +531,7 @@ _starci() {
         machine:seam-policy:--repo) return 0;;
         machine:seam-policy:--job) return 0;;
         machine:seam-policy:--paths) return 0;;
+        npm:ci:--workspace) return 0;;
         orca:terminal-read:--terminal) return 0;;
         orca:terminal-read:--limit) return 0;;
         orca:terminal-send:--terminal) return 0;;
@@ -658,6 +692,15 @@ _starci() {
         supervisor:workers:--summary-file) return 0;;
         supervisor:workers:--needs) return 0;;
         supervisor:workers:--reason) return 0;;
+        test:run:--level) COMPREPLY=( $(compgen -W "L1 L2 L3 L4" -- "$cur") ); return 0;;
+        test:run:--changed) return 0;;
+        test:run:--against) return 0;;
+        test:run:--spec) return 0;;
+        test:run:--concurrency) return 0;;
+        test:run:--root) return 0;;
+        typecheck:run:--level) COMPREPLY=( $(compgen -W "L0 L1 L2 L3 L4" -- "$cur") ); return 0;;
+        typecheck:run:--changed) return 0;;
+        typecheck:run:--project) return 0;;
         uat:assisted-runner:--request) return 0;;
         uat:assisted-runner:--receipt) return 0;;
         uat:assisted-runner:--after) return 0;;
@@ -810,6 +853,20 @@ _starci() {
         work:ui-proof-brief:--elements) return 0;;
         work:ui-proof-brief:--score) return 0;;
         work:ui-proof-brief:--viewport) return 0;;
+        worker:close:--dispatch) return 0;;
+        worker:list:--run) return 0;;
+        worker:list:--worktree) return 0;;
+        worker:read:--dispatch) return 0;;
+        worker:read:--lines) return 0;;
+        worker:release:--dispatch) return 0;;
+        worker:show:--dispatch) return 0;;
+        worker:start:--agent) COMPREPLY=( $(compgen -W "codex claude devin cursor" -- "$cur") ); return 0;;
+        worker:start:--model) return 0;;
+        worker:start:--worktree) return 0;;
+        worker:start:--spec) return 0;;
+        worker:start:--task-title) return 0;;
+        worker:start:--run) return 0;;
+        worker:stop:--dispatch) return 0;;
         workflow:assess:--repo) return 0;;
         workflow:bias:--normalize) return 0;;
         workflow:define:--repo) return 0;;
@@ -849,12 +906,17 @@ _starci() {
         app:stack) COMPREPLY=( $(compgen -W "--stack --services --k3d --force --json --cwd --quiet --help --edition" -- "$cur") );;
         app:sync) COMPREPLY=( $(compgen -W "--check --write --json --cwd --quiet --help --edition" -- "$cur") );;
         app:upgrade) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
+        check:run) COMPREPLY=( $(compgen -W "--level --changed --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:ask-gateway) COMPREPLY=( $(compgen -W "--port --repo --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram) COMPREPLY=( $(compgen -W "--discover-chat --ledger --repo --workflow --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:telegram-media) COMPREPLY=( $(compgen -W "--ledger --repo --workflow --job --attempt --op --verdict --dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         connect:tunnel) COMPREPLY=( $(compgen -W "--port --fast --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:pass) COMPREPLY=( $(compgen -W "--snapshot --child-timeout --token-window --token-spike --key --lane --reason --json --cwd --quiet --help --edition" -- "$cur") );;
         debug:run) COMPREPLY=( $(compgen -W "--repo --since-hours --child-timeout --token-window --token-spike --json --cwd --quiet --help --edition" -- "$cur") );;
+        docker:build) COMPREPLY=( $(compgen -W "--tag --no-cache --json --cwd --quiet --help --edition" -- "$cur") );;
+        docker:down) COMPREPLY=( $(compgen -W "--env --volumes --json --cwd --quiet --help --edition" -- "$cur") );;
+        docker:ps) COMPREPLY=( $(compgen -W "--all --json --cwd --quiet --help --edition" -- "$cur") );;
+        docker:up) COMPREPLY=( $(compgen -W "--env --wait-seconds --build --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:canon-scan) COMPREPLY=( $(compgen -W "--root --stack-kind --families --paths --exclude --machines --fix --out --blob --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:custody-exec) COMPREPLY=( $(compgen -W "--get --keys --input-type --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:env-health) COMPREPLY=( $(compgen -W "--repo --env --paths --restart --probe-timeout-ms --ready-timeout-ms --service --url --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -867,11 +929,14 @@ _starci() {
         gate:starcistacks) COMPREPLY=( $(compgen -W "--new --admitted-at --op --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:test-world) COMPREPLY=( $(compgen -W "--root --project --tests --out --json --cwd --quiet --help --edition" -- "$cur") );;
         gate:unit) COMPREPLY=( $(compgen -W "--root --out --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:backup) COMPREPLY=( $(compgen -W "--remote --branches --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:commit) COMPREPLY=( $(compgen -W "--type --scope --summary --body --paths --lane --co-author --dry-run --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:land) COMPREPLY=( $(compgen -W "--verified --verified-log --dry-run --lane --concurrency --json --cwd --quiet --help --edition" -- "$cur") );;
+        git:sync) COMPREPLY=( $(compgen -W "--main-ref --dry-run --abort-on-conflict --json --cwd --quiet --help --edition" -- "$cur") );;
         guard:command) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         guard:footprint-scan) COMPREPLY=( $(compgen -W "--root --depth --json --cwd --quiet --help --edition" -- "$cur") );;
         guard:seat-tools) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         guard:verify-commit) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
-        harness:install-task) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         harness:open) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         harness:start) COMPREPLY=( $(compgen -W "--tunnel --json --cwd --quiet --help --edition" -- "$cur") );;
         harness:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -931,15 +996,17 @@ _starci() {
         kernel:unit) COMPREPLY=( $(compgen -W "--repo --workflow --unit --raise-budget --by --ref --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:usage) COMPREPLY=( $(compgen -W "--repo --workflow --legs --json --cwd --quiet --help --edition" -- "$cur") );;
         kernel:verify-proofs) COMPREPLY=( $(compgen -W "--repo --workflow --json --cwd --quiet --help --edition" -- "$cur") );;
+        lint:run) COMPREPLY=( $(compgen -W "--level --changed --all --fix --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:decisions) COMPREPLY=( $(compgen -W "--repo --workflow --apply --list --all --ring --claim --resolve --by --verb --decision --note --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:kernel-watchdog) COMPREPLY=( $(compgen -W "--repo --workflow --goal --once --repair --interval-ms --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:lessons) COMPREPLY=( $(compgen -W "--signature --text --commit --experiment --outcome --reason --via --refs --items --write --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:op-metrics) COMPREPLY=( $(compgen -W "--repo --window-ms --by --trend --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:seam-policy) COMPREPLY=( $(compgen -W "--scan --cut-id --root --repo --job --paths --json --cwd --quiet --help --edition" -- "$cur") );;
         machine:worktrees) COMPREPLY=( $(compgen -W "--plan --json --cwd --quiet --help --edition" -- "$cur") );;
+        npm:ci) COMPREPLY=( $(compgen -W "--workspace --json --cwd --quiet --help --edition" -- "$cur") );;
+        npm:install) COMPREPLY=( $(compgen -W "--dev --json --cwd --quiet --help --edition" -- "$cur") );;
         orca:terminal-read) COMPREPLY=( $(compgen -W "--terminal --tail --limit --json --cwd --quiet --help --edition" -- "$cur") );;
         orca:terminal-send) COMPREPLY=( $(compgen -W "--terminal --text --text-file --no-enter --wait-submit --json --cwd --quiet --help --edition" -- "$cur") );;
-        reconciler:install-task) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:once) COMPREPLY=( $(compgen -W "--controller --key --apply --json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:restart) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
         reconciler:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -973,6 +1040,9 @@ _starci() {
         runtime:update) COMPREPLY=( $(compgen -W "--force --hosts --no-bootstrap --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:validate) COMPREPLY=( $(compgen -W "--strict --owned --json --cwd --quiet --help --edition" -- "$cur") );;
         runtime:version) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        supabase:start) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        supabase:status) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        supabase:stop) COMPREPLY=( $(compgen -W "--no-backup --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:actions) COMPREPLY=( $(compgen -W "--open --item --action --reason --workflow --refs --until --hold-ms --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:bridge) COMPREPLY=( $(compgen -W "--repo --start --dry-run --no-notify --request-only --owner-ok --dependents --foundation --goal --reason --blocker --title --kind --waits --paths --finding --bridge --record --to --merge-into --workflow --text --lead --waiter --releases --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:channel) COMPREPLY=( $(compgen -W "--id --label --repos --force --peek --text --text-file --to --timeout-ms --json --cwd --quiet --help --edition" -- "$cur") );;
@@ -995,6 +1065,11 @@ _starci() {
         supervisor:tell) COMPREPLY=( $(compgen -W "--wait --timeout-ms --read --since --limit --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:watchdog) COMPREPLY=( $(compgen -W "--once --json --cwd --quiet --help --edition" -- "$cur") );;
         supervisor:workers) COMPREPLY=( $(compgen -W "--cluster --title --files --incidents --specs --brief --brief-file --agent --job --dry-run --self --name --outcome --commit --summary --summary-file --needs --reason --json --cwd --quiet --help --edition" -- "$cur") );;
+        task:list) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        task:register) COMPREPLY=( $(compgen -W "--apply --json --cwd --quiet --help --edition" -- "$cur") );;
+        task:show) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
+        test:run) COMPREPLY=( $(compgen -W "--level --changed --against --spec --concurrency --root --release-cut --json --cwd --quiet --help --edition" -- "$cur") );;
+        typecheck:run) COMPREPLY=( $(compgen -W "--level --changed --project --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:assisted-runner) COMPREPLY=( $(compgen -W "--request --receipt --after --value --actor --json --cwd --quiet --help --edition" -- "$cur") );;
         uat:slots) COMPREPLY=( $(compgen -W "--record-dir --json --cwd --quiet --help --edition" -- "$cur") );;
         work:asset-slot) COMPREPLY=( $(compgen -W "--json --cwd --quiet --help --edition" -- "$cur") );;
@@ -1030,6 +1105,13 @@ _starci() {
         work:render-proof) COMPREPLY=( $(compgen -W "--work --record --json --cwd --quiet --help --edition" -- "$cur") );;
         work:shell-conformance) COMPREPLY=( $(compgen -W "--admitted-at --op --json --cwd --quiet --help --edition" -- "$cur") );;
         work:ui-proof-brief) COMPREPLY=( $(compgen -W "--surface --repo --family --elements --score --viewport --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:close) COMPREPLY=( $(compgen -W "--dispatch --stop-first --retry-release --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:list) COMPREPLY=( $(compgen -W "--run --by-lane --active --worktree --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:read) COMPREPLY=( $(compgen -W "--dispatch --lines --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:release) COMPREPLY=( $(compgen -W "--dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:show) COMPREPLY=( $(compgen -W "--dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:start) COMPREPLY=( $(compgen -W "--agent --model --worktree --spec --task-title --run --json --cwd --quiet --help --edition" -- "$cur") );;
+        worker:stop) COMPREPLY=( $(compgen -W "--dispatch --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:assess) COMPREPLY=( $(compgen -W "--repo --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:bias) COMPREPLY=( $(compgen -W "--normalize --json --cwd --quiet --help --edition" -- "$cur") );;
         workflow:define) COMPREPLY=( $(compgen -W "--repo --project --text --title --display-name --params --plan --revise --reason --approve-revision --defined-by --approved-by --bridge-id --routing-bias --json --cwd --quiet --help --edition" -- "$cur") );;

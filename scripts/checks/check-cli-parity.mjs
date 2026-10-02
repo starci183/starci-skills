@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 
@@ -49,6 +50,13 @@ const read = (file) => {
 };
 
 const posix = (file) => String(file).replace(/\\/g, '/');
+
+const declaresExport = (source, name) => {
+  const id = escapeRegExp(name);
+  return new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${id}\\b`).test(source)
+    || new RegExp(`\\bexport\\s+const\\s+${id}\\b`).test(source)
+    || new RegExp(`\\bexport\\s*\\{[^}]*\\b${id}\\b[^}]*\\}`).test(source);
+};
 
 const codeOnly = (text) => {
   let out = '', state = 'code', escaped = false, inClass = false, significant = '';
@@ -203,6 +211,8 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   }
   const groups = new Map(cat.groups.map((g) => [g.group, g]));
   const implScripts = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.script).filter(Boolean).map(posix)));
+  const implModules = new Set(cat.groups.flatMap((g) => g.verbs.map((v) => v.impl?.module).filter(Boolean).map(posix)));
+  const implementations = new Set([...implScripts, ...implModules]);
   const routedEntries = new Set(implScripts);
   for (const group of cat.groups) for (const verb of group.verbs) for (const spelling of verb.removed ?? []) {
     const match = /^node\s+(?:\.claude[\\/])?((?:engine|scripts|ui|bin|packages[\\/][^\\/]+[\\/](?:bin|src))[\\/][^\s"']+)/.exec(spelling);
@@ -222,7 +232,7 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
     const absolute = path.join(root, ...item.path.split('/'));
     if (!fs.existsSync(absolute)) { bad(`internal:${item.path}`, 'internal entry stale: file does not exist'); continue; }
     if (!hasEntryGate(read(absolute))) bad(`internal:${item.path}`, 'internal entry stale: file has no entry gate');
-    if (implScripts.has(item.path)) bad(`internal:${item.path}`, 'internal entry stale: file is also a catalog verb implementation');
+    if (implementations.has(item.path)) bad(`internal:${item.path}`, 'internal entry stale: file is also a catalog verb implementation');
   }
 
   const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
@@ -248,6 +258,13 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
     for (const v of g.verbs) {
       if (typeof v.summary !== 'string' || !v.summary.trim()) bad(`docs:${g.group}/${v.verb}`, 'catalog verb has no summary');
       if (v.impl?.script && !fs.existsSync(path.join(root, v.impl.script))) bad(`handler:${g.group}/${v.verb}`, `impl script ${v.impl.script} does not exist`);
+      if (v.impl?.module) {
+        const moduleFile = path.join(root, v.impl.module);
+        if (!fs.existsSync(moduleFile)) bad(`handler:${g.group}/${v.verb}`, `impl module ${v.impl.module} does not exist`);
+        else if (!declaresExport(read(moduleFile), v.impl.export)) {
+          bad(`handler:${g.group}/${v.verb}`, `impl module ${v.impl.module} does not export ${v.impl.export}`);
+        }
+      }
       if (g.group === 'kernel' && v.impl?.script === 'scripts/kernel/cli.mjs' && !modules.has(v.verb) && !switchVerbs.includes(v.verb)) {
         bad(`handler:kernel/${v.verb}`, 'no verb module and no cli.mjs dispatch case');
       }
@@ -262,6 +279,7 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   for (const [verb, mod] of modules) {
     const doc = catalogKernelVerbs.get(verb);
     if (!doc) continue;
+    if (doc.impl?.module) continue;
     const have = flagNames(doc);
     const inUsage = flagsOfUsage(mod.usage ?? (coreUsage[verb] ?? []).join('\n'));
     for (const f of inUsage) if (!have.has(f)) bad(`flags:kernel/${verb}`, `--${f} of the usage is not a catalog flag`);

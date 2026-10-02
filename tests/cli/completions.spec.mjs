@@ -105,7 +105,7 @@ test('zsh and fish completions retain structural invariants without their shells
 });
 
 test('bash completion returns groups, verbs, command flags and a safe value result', { skip: bash ? false : 'bash binary is unavailable; bash behavior check skipped' }, () => {
-  assert.deepEqual(sorted(bashCompletions(['starci', ''])), sorted([...commandGroups, 'help', 'completion']));
+  assert.deepEqual(sorted(bashCompletions(['starci', ''])), sorted([...commandGroups, 'help', 'completion', 'explain']));
   assert.deepEqual(sorted(bashCompletions(['starci', 'gate', ''])), sorted(Object.keys(CATALOG.groups.gate.verbs)));
   assert.deepEqual(sorted(bashCompletions(['starci', 'kernel', 'survey', '--'])), sorted(commandFlags('kernel', 'survey')));
   assert.deepEqual(bashCompletions(['starci', 'runtime', 'check', '--only', '']), []);
@@ -125,7 +125,7 @@ function Complete([string]$line) { @((TabExpansion2 $line $line.Length).Completi
   const result = run(powershell, ['-NoProfile', '-NonInteractive', '-Command', command]);
   assert.equal(result.status, 0, result.stderr);
   const completed = JSON.parse(result.stdout.trim());
-  assert.deepEqual(sorted(completed.top), sorted([...commandGroups, 'help', 'completion']));
+  assert.deepEqual(sorted(completed.top), sorted([...commandGroups, 'help', 'completion', 'explain']));
   assert.deepEqual(sorted(completed.gate), sorted(Object.keys(CATALOG.groups.gate.verbs)));
   assert.ok(Array.isArray(completed.surveyBare), 'bare -- completion must not crash');
   assert.deepEqual(sorted(completed.survey), sorted(commandFlags('kernel', 'survey')));

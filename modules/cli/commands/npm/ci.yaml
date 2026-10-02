@@ -1,0 +1,25 @@
+group: npm
+verb: ci
+owner: runtime
+summary: install a clean lockfile into this worktree under the host lock
+impl: {module: scripts/machine/npm-ci.mjs, export: npmCi}
+effect: host
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - npm ci installs the lockfile into this worktree's real node_modules and never uses a junction or symbolic link
+  - package.json and package-lock.json must be clean before the run
+  - dependency installs run one at a time under the host lock and never use npm install
+flags:
+  - {name: workspace, type: list, summary: npm workspaces to install}
+positional: []
+exit:
+  "0": "the clean lockfile was installed"
+  "1": "npm or the host lock failed"
+  "2": "the worktree or install state was refused"
+json: starci/npm-ci@1
+examples:
+  - starci npm ci
+  - starci npm ci --workspace packages/cli
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

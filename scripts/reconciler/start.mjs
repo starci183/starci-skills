@@ -259,7 +259,7 @@ function serviceItems(probes, { publicUrl = null, config = null } = {}) {
     const detail = p.ok ? `up${d.status ? ` (HTTP ${d.status}` : ''}${d.ms != null ? `${d.status ? ', ' : ' ('}${d.ms}ms` : ''}${d.status || d.ms != null ? ')' : ''}${p.name === 'harness-tunnel' && publicUrl ? ` ${publicUrl}` : ''}`
       : `down: ${d.error ?? d.status ?? d.verdict ?? (d.value ? (d.value.health?.problems?.[0] ?? (d.value.running === false ? 'not running' : JSON.stringify(d.value).slice(0, 120))) : 'no answer')}`;
     if (p.name.startsWith('sched-task:')) return p.ok ? green('services', p.name, `scheduled task ${p.name.slice(11)}`, `exists (${d.status ?? 'ok'})`, { required: false })
-      : warn('services', p.name, `scheduled task ${p.name.slice(11)}`, p.unmanaged ? 'missing (unmanaged)' : 'not healthy', 'starci reconciler install-task --apply (the owner)');
+      : warn('services', p.name, `scheduled task ${p.name.slice(11)}`, p.unmanaged ? 'missing (unmanaged)' : 'not healthy', 'starci task register reconciler --apply (the owner)');
     if (p.ok) return green('services', p.name, label, detail);
     if (!serviceWanted(p.name, config)) return green('services', p.name, label, 'off in config.yaml connectors (not required)', { required: false });
     return red('services', p.name, label, detail, p.name === 'orca' ? 'open Orca yourself, then run start again (start never launches a GUI app)' : 'the reconciler Host controller manages this service; run starci reconciler start');

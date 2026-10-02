@@ -11,7 +11,8 @@ import { checkCliParity, checkCliParityMain, flagsOfUsage } from '../../scripts/
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const GLOBAL_YAML = `flags:
+const GLOBAL_YAML = `commands: [explain]
+flags:
   - {name: json, type: boolean}
   - {name: cwd, type: string}
   - {name: quiet, type: boolean}
@@ -33,6 +34,22 @@ editions: [full]
 since: 1.0.0-alpha.4
 removed: ['starci api ${verb}']
 `;
+const moduleYaml = (verb, flags, extra = '') => `group: kernel
+verb: ${verb}
+owner: runtime
+summary: test module verb ${verb}
+impl: {module: scripts/machine/${verb}.mjs, export: ${verb}}
+effect: host
+roles: [lead, owner]
+conventions: [run this fixture under the host lock]
+flags: [${flags.map(flagSig).join(', ')}]
+exit: {0: ok, 1: refused, 2: bad usage}
+json: flag
+examples: ['starci kernel ${verb}']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []
+${extra}`;
 const verbModule = (verb, usage, required) => `export default {
   verb: '${verb}',
   required: [${required.map((r) => `'${r}'`).join(', ')}],
@@ -135,6 +152,61 @@ test('a catalog verb with no handler is a finding', () => {
     const report = checkCliParity(root);
     assert.equal(report.ok, false);
     assert.ok(report.findings.some((f) => f.what === 'handler:kernel/ghost'));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a module verb passes when its file declares the named export', () => {
+  const root = fixture((t, put) => {
+    put('modules/cli/commands/kernel/probe.yaml', moduleYaml('probe', ['workflow', ['deep', 'boolean']]));
+    put('scripts/machine/probe.mjs', 'export async function probe() { return {code: 0}; }\n');
+  });
+  try {
+    const report = checkCliParity(root);
+    assert.equal(report.ok, true, JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a module verb with a missing file is a handler finding', () => {
+  const root = fixture((t, put) => put('modules/cli/commands/kernel/probe.yaml', moduleYaml('probe', [])));
+  try {
+    const report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => f.what === 'handler:kernel/probe' && /impl module .* does not exist/.test(f.detail)), JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a module verb with a missing export is a handler finding', () => {
+  const root = fixture((t, put) => {
+    put('modules/cli/commands/kernel/probe.yaml', moduleYaml('probe', []));
+    put('scripts/machine/probe.mjs', 'export const another = async () => ({code: 0});\n');
+  });
+  try {
+    const report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => f.what === 'handler:kernel/probe' && /does not export probe/.test(f.detail)), JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('module policy metadata failures are catalog parity findings', () => {
+  const root = fixture((t, put) => {
+    put('modules/cli/commands/kernel/probe.yaml', moduleYaml('probe', [])
+      .replace('effect: host\n', '')
+      .replace('roles: [lead, owner]\n', ''));
+    put('scripts/machine/probe.mjs', 'export function probe() { return {code: 0}; }\n');
+  });
+  try {
+    const report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => /module impl requires effect/.test(f.detail)), JSON.stringify(report.findings));
+    assert.ok(report.findings.some((f) => /module impl requires roles/.test(f.detail)), JSON.stringify(report.findings));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a host-effect module without a convention is a catalog parity finding', () => {
+  const root = fixture((t, put) => {
+    put('modules/cli/commands/kernel/probe.yaml', moduleYaml('probe', []).replace('conventions: [run this fixture under the host lock]\n', ''));
+    put('scripts/machine/probe.mjs', 'export const probe = async () => ({code: 0});\n');
+  });
+  try {
+    const report = checkCliParity(root);
+    assert.ok(report.findings.some((f) => /effect host requires at least one convention/.test(f.detail)), JSON.stringify(report.findings));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
