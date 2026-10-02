@@ -28,13 +28,13 @@ sideEffects:
     never writing its value
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: application-stacks
     path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+      docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
     purpose:
       en: Resolve the selected backend Stack environment and its identity custody for every credential
         read. When the selected scope touches application deployment, bootstrap or recovery,
@@ -98,15 +98,13 @@ reads:
         Capabilities are the intersection of actual tools, selected profile policy, op permissions
         and existing task authority.
   - id: workflow
-    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
+    path: shared
     purpose:
-      en: When selected inside the named workflow, read the exact request, strict response contract and
-        primary/secondary authority JSON. Standalone op execution does not invent a workflow
-        request.
+      en: shared
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
   - id: world
     path: <app>/be/src/tests/world/** + <app>/be/src/tests/{integration,contract}/** + <app>/be/jest.config.js
@@ -138,16 +136,14 @@ writes:
         secret is redacted before the assets are hashed. This op runs only its declared live exchange and
         the specs its changed files affect, never a whole repository suite or e2e (owner 2026-09-29)."
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from hfs explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
   - id: source
     path: <app>/<write-ceiling>
@@ -369,9 +365,9 @@ blockers:
       vi: "App không có khai báo @starci/test-world (be/src/tests/world/test-world.config.ts gọi defineTestWorld) hoặc be/jest.config.js không phải starciJestConfig() của @starci/jest-preset: báo đúng khoảng trống cho op build sở hữu; spec không bao giờ tự dựng world thay vào."
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
+  env: shared
   slug: Identity custody slug the integration declaration names (custody identity:<slug>)
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
+  app: shared
   bound-paths: Inspected source read set covering the delivered client of this integration
   write-ceiling: Explicit owned spec paths under be/src/tests/integration/ and be/src/tests/contract/
 layoutPolicy:

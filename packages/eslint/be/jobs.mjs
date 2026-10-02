@@ -7,7 +7,7 @@
  * `platform/jobs` is the ONE owner of the row: it declares the entity, the claim and the guarded writes, and nothing else writes it.
  *
  * Everything is found by TYPE ORIGIN (the `JobClaims`, `JobStep`, `RunKey` and `FencedProcessor` declared by `platform/jobs`, the entity
- * class declared by that owner, typeorm receivers and query builders) and by the slot view (`be.jobs.steps`, `be.feature.jobs`); the
+ * class declared by that owner, typeorm receivers and query builders) and by the slot view (`be.feature.jobs.steps`, `be.feature.jobs`); the
  * only names read are the contract's own members `runKey`, `jobId` and `expectedFencingToken`.
  */
 import ts from "typescript"
@@ -133,7 +133,7 @@ export const jobRunKey = {
     },
     create(context) {
         const hfs = hfsOf(context)
-        if (hfs.slotOf(context.filename) !== "be.jobs.steps") return {}
+        if (hfs.slotOf(context.filename) !== "be.feature.jobs.steps") return {}
         return {
             CallExpression(node) {
                 const callee = node.callee
@@ -175,7 +175,7 @@ export const jobShape = {
         const isProcessorFile = base.endsWith(".processor.ts")
         const isStepFile = base.endsWith(".step.ts")
         const inJob = found.slot === "be.feature.jobs.queue"
-        const inSteps = found.slot === "be.jobs.steps"
+        const inSteps = found.slot === "be.feature.jobs.steps"
         const inPlatform = hfs.tierOf(file) === "platform" && ownerNameOf(hfs, file) === "jobs"
         const check = (node) => {
             const name = node.id?.name ?? "this class"

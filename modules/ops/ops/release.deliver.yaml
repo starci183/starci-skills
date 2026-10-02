@@ -18,37 +18,27 @@ sideEffects:
   - Only the selected operation contract permits effects; no union of mode permissions.
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: shared
     purpose:
-      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
-        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks check
-        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
-        additionally requires the selected real startup, persistence, recovery and application
-        checks. This conditional read grants no extra deployment or source scope.
+      en: shared
   - id: target
     path: N/index.yaml
     purpose:
       en: Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
         Preserve unaffected accepted content.
   - id: selection
-    path: params.mode + the exact mode contract in this operator JSON
+    path: shared
     purpose:
-      en: params.mode names the one execution mode; select means the request names it. Select exactly one
-        operation, its target, scope and criteria before any effect. No automatic chain.
+      en: shared
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: release-proof
     path: knowledge/op-gate.yaml + scripts/gates/release-proof.mjs + scripts/gates/release-app-installs.mjs + knowledge/hfs/canon-pins.yaml + modules/models/code-patterns.yaml
     purpose:
@@ -56,17 +46,13 @@ reads:
       vi: "Bằng chứng phát hành mà một lần publish hoặc deploy phải có: release-app-installs (hfs đã publish dựng một app, app cài mới từ npm registry, spec scaffold chạy lint, typecheck và khởi động api với yêu cầu có bản cài), check-canon-pins (mọi pin, và mọi profile code-pattern gắn với canon đã publish bằng digest nội dung), merge guard trên dải phát hành và npm run check của runtime."
 writes:
   - id: node
-    path: N/index.yaml
-    fields: [completion.inputDigest, completion.evidence]
+    path: shared
     content:
-      en: Bind only the selected mode completion profile and its actual evidence.
+      en: shared
   - id: evidence
-    path: evidence/**
-    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
-    artifacts: [manifest.yaml, result.json]
+    path: shared
     content:
-      en: Record operation, exact scope, criteria, output artifact references, observed effects and
-        unresolved findings.
+      en: shared
   - id: release-proof
     path: STARCI_JOB_SCRATCH/release-proof.json
     schema: starci/release-proof@1
@@ -109,10 +95,10 @@ blockers:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  environment: Resolved environment label
-  resource: Selected owned asset name
+  app: shared
+  bound-paths: shared
+  environment: shared
+  resource: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:
@@ -254,7 +240,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.
@@ -388,7 +374,7 @@ policy:
       reads:
         - id: application-stacks
           path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-            docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+            docs/application-stacks.md + modules/schemas/application-stacks.schema.yaml
           purpose:
             en: Reconcile component ownership, encrypted credential custody, lifecycle commands and existing
               consumers. This conditional read grants no extra deployment or source scope.

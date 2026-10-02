@@ -1,20 +1,11 @@
 # Profile: cursor-agent - the Cursor CLI (cursor-agent) as a launch-only operation target (not a pool).
 # Business frame: the fourth Orca agent provider. The runtime can launch it with `--agent cursor`; no automatic chain
 # routes to it, because it has no quota probe (live-proven 2026-10-02 with --model auto).
+# Registry facts (runtime, launch agent, default model) live in modules/models/registry.yaml —
+# targets.cursor-agent (`defaultModel: auto` is the CLI's selector keyword).
 
 target: cursor-agent          # registry.yaml targets
-provider: cursor
-runtime: cursor               # registry.yaml
 schema: starci/module-model-profile@1
-
-identity:
-  requestedModel: auto        # Orca's catalog default for cursor; the account's list is `cursor-agent --list-models` (logged in on this host)
-  profiles:
-    working: auto
-    reasoning: auto
-
-launch:
-  orca: {agent: cursor}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 business:
   question: >-

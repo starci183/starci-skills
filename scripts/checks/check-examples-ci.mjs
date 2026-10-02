@@ -15,8 +15,8 @@
 //
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
-//   node scripts/checks/check-examples-ci.mjs --images   every deployable image as JSON ([{app, name, file}]); lite owns back-end images only
+//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
+//   node scripts/checks/check-examples-ci.mjs --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json); lite owns back-end images only
 //   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own edition-matched quality files (codecov.yml, sonar-project.properties, be/jest.config.js) from the render
 //
 // The quality files of each example (codecov.yml, sonar-project.properties, be/jest.config.js) are rendered here from the SOURCE slot manifest of this

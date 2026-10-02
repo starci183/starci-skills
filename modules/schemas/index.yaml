@@ -427,26 +427,26 @@ schemas:
     file: modules/kernel/retired-paths.yaml
     dialect: prose-data
     subsystem: kernel
-    governs: "The path ledger for intentionally retired runtime files (retired[]), moved files (moved[] from -> to, the chunk that moved them, quiesced for a pinned path) and replaced symbols (retiredSymbols[])."
-    binds: "modules/kernel/retired-paths.yaml retired[], moved[] and retiredSymbols[] entries"
-    usedBy: [scripts/checks/check-contract-cites.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
+    governs: "The path ledger for intentionally retired runtime files (retired[]), moved files (moved[] from -> to, the chunk that moved them, quiesced for a pinned path), replaced symbols (retiredSymbols[]) and retired namings that are not paths (retiredNames[])."
+    binds: "modules/kernel/retired-paths.yaml retired[], moved[], retiredNames[] and retiredSymbols[] entries"
+    usedBy: [scripts/checks/check-contract-cites.mjs, scripts/checks/check-retired-names.mjs, scripts/hfs/runtime-rules/retired.mjs, scripts/hfs/runtime-rules/size.mjs, scripts/hfs/runtime-check.mjs]
     business:
-      question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path or symbol stay gone?"
-      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, the pending ratchet across a move).
-      whenNot: Never authorizes a live runtime reference to a deleted or moved file.
+      question: "Is a cited deleted or moved path an intentional retirement rather than a broken live contract cite, and does a retired path, name or symbol stay gone?"
+      whenNeeded: Checking historical contract-change and owner-ruling citations to removed or moved files; every runtime check (RT_RETIRED_PRESENT, RT_RETIRED_NAME_LIVE, RT_PINNED_PATH_MOVED).
+      whenNot: Never authorizes a live runtime reference to a deleted or moved file or name.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
   - id: starci/i18n-catalog@1
     file: modules/i18n/messages/common.yaml
     dialect: prose-data
     subsystem: kernel
-    governs: "The Vietnamese message catalog of owner-visible runtime text: modules/i18n/messages/<area>.yaml, a messages[] list of {en, vi} entries keyed from the English source."
+    governs: "The one Vietnamese message catalog for runtime and UI text: modules/i18n/messages/<area>.yaml, scoped messages[] lists of {en, vi} entries keyed from the English source."
     binds: "modules/i18n/messages/*.yaml messages[] entries"
-    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs]
+    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs, scripts/hfs/sync-runtime.mjs]
     business:
-      question: "What does the owner read in Vietnamese for this English runtime message?"
-      whenNeeded: Translating a Telegram notice, a why line, a progress report or any owner-visible runtime message; the only declared home of Vietnamese outside the failure-code, op and archetype fields.
-      whenNot: Never holds English-only text, a second translation of one source, or a message whose placeholders differ between en and vi.
+      question: "What does the owner read in Vietnamese for this English runtime or UI message?"
+      whenNeeded: Translating a Telegram notice, why line, progress report or browser label; the only declared catalog home of Vietnamese outside the failure-code, op and archetype fields.
+      whenNot: Never holds English-only text, a second translation of one source in one scope, or a message whose placeholders differ between en and vi.
       selectedBy: scripts/lib/i18n.mjs translator(language) and the i18n-catalog check.
 
   - id: starci/op@1
@@ -629,7 +629,7 @@ schemas:
     usedBy: [agents and skills, reading knowledge/**/*.yaml]
     business:
       question: "Is this example reusable — does it say what it adapts, needs and how to verify?"
-      whenNeeded: Curating example code into the knowledge fleet.
+      whenNeeded: Curating example code into the knowledge library.
       whenNot: Not example CODE itself — the manifest describing it.
       selectedBy: Knowledge authoring review.
 
@@ -794,7 +794,7 @@ schemas:
     file: modules/schemas/profile-registry.schema.yaml
     dialect: json-schema
     subsystem: model
-    governs: "The model/runtime registry contract — runtimes[], aliases, executionModel, defaults, targets, skills, operators, fallback."
+    governs: "The ONE model catalog — models (id, provider, tier, price), pools (membership, roles, concurrency, difficulty pins), runtimes[], aliases, executionModel, targets, skills, operators, fallback."
     binds: "modules/models/registry.yaml (carries schema starci/profile-registry@1)"
     usedBy: [scripts/checks/check-providers.mjs (reads modules/models/registry.yaml targets; Orca admission must use profile resolver output)]
     business:
@@ -807,18 +807,18 @@ schemas:
   # BUILD HELPERS
   # --------------------------------------------------------------------------
 
-  - id: starci/json-exceptions@1
-    file: modules/schemas/json-exceptions.yaml
-    dialect: prose-data
+  - id: starci/allowlist@1
+    file: modules/schemas/allowlist.schema.yaml
+    dialect: json-schema
     subsystem: build
-    governs: "Exact relative paths allowed to remain authored JSON — exact files, plus exact directories whose direct children are an append-only one-file-per-entry record; no wildcards; each entry carries a reason."
-    binds: the authored-JSON allowlist (rendered envs, realm imports, UAT run receipts, licenses...)
-    usedBy: [scripts/checks/check-json-exceptions.mjs (inventory-only; offenders listed)]
+    governs: "The ONE explicit allowlist of the runtime, modules/kernel/allowlist.yaml: every exception list a runtime check keeps is a named section (not-codes, json-exceptions, dead-script-entries, export-used), each entry carrying the reason the exception exists, each section shrink-only."
+    binds: "modules/kernel/allowlist.yaml sections and their {literal|path, reason} entries"
+    usedBy: [scripts/lib/allowlist.mjs (readAllowlist), scripts/checks/check-one-allowlist.mjs (sprawl guard)]
     business:
-      question: "Which JSON files are legitimate exceptions?"
-      whenNeeded: Adding any authored .json — it needs a listed exception with a reason, or it converts to YAML.
-      whenNot: Never a wildcard allowlist; adding an exception is a deliberate per-file decision, and a registered directory is a deliberate per-record decision (benchmark/snapshots).
-      selectedBy: The json-exceptions check at lint/gate time.
+      question: "Where is the exception a runtime check keeps — and why does it exist?"
+      whenNeeded: Any check that needs an exception list reads its section here; a new exception is an entry with a reason, never a new file.
+      whenNot: Never a second allowlist, baseline, pending or entries file — check-one-allowlist refuses one by name.
+      selectedBy: The reader's section name passed to scripts/lib/allowlist.mjs readAllowlist(kind).
 
   # --------------------------------------------------------------------------
   # KNOWN GAPS
@@ -841,6 +841,7 @@ moduleLocalDocumentKinds:
     governs: "This file is a schema document: it `describes` the record const its consumers stamp."
     files:
       - modules/schemas/agent-hierarchy.yaml
+      - modules/schemas/allowlist.schema.yaml
       - modules/schemas/application-stacks.schema.yaml
       - modules/schemas/canon-pins.schema.yaml
       - modules/schemas/hfs-peer-integrations.schema.yaml
@@ -928,11 +929,11 @@ moduleLocalDocumentKinds:
   - id: starci/module-goal-legality@1
     governs: "The five legality families a proposed op chain must satisfy."
     files: [modules/goal/legality.yaml]
+  - id: starci/module-goal-source-phrases@1
+    governs: "The Vietnamese phrase lists runtime source matchers read through scripts/lib/source-phrases.mjs (declared Vietnamese fields, scripts/lib/language.mjs)."
+    files: [modules/goal/source-phrases.yaml]
 
   # --- models ---------------------------------------------------------------
-  - id: starci/module-models-index@1
-    governs: "The modules/models coverage manifest."
-    files: [modules/models/index.yaml]
   - id: starci/module-model-selection@1
     governs: "Which model may take which workload — qualification, probation, ordering."
     files: [modules/models/selection.yaml]
@@ -940,7 +941,7 @@ moduleLocalDocumentKinds:
     governs: "The units, waves and shared seams scripts/gates/canon-scan.mjs cuts a canon-conformance cleanup by."
     files: [modules/models/canon-conformance.yaml]
   - id: starci/module-model-profile@1
-    governs: "One routing/capability target: identity, capacity cache, launch shape, position."
+    governs: "One routing/capability target's behavioral position: business frame, when-needed, failure modes. Model facts (provider, models, capacity, launch) live only in modules/models/registry.yaml."
     files:
       - modules/models/profiles/claude-agent.yaml
       - modules/models/profiles/codex-agent.yaml
@@ -956,7 +957,7 @@ moduleLocalDocumentKinds:
       - modules/models/agents/devin.yaml
       - modules/models/agents/cursor.yaml
   - id: starci/runtimes@1
-    governs: "The quota-window runtime pools, allocation policy and roleOfKind table. The only concurrency authority."
+    governs: "The operational runtime policy: allocation orders, roleOfKind table and host tuning. Pool membership, models and concurrency live in modules/models/registry.yaml pools."
     files: [modules/models/runtimes.yaml]
   - id: starci/kinds@1
     governs: "The operation-kind catalog: lanes, routes, blockers, the kernel-agent legality graph."
@@ -970,10 +971,6 @@ moduleLocalDocumentKinds:
   - id: starci/model-qualifications@1
     governs: "The measured-qualification store. Empty in the package: shipping is not certifying."
     files: [modules/models/qualifications.yaml]
-  - id: starci/model-prices@1
-    governs: "The per-model price table behind llm_usage cost_usd. A model with no declared rate has NULL cost, never a guess."
-    files: [modules/models/prices.yaml]
-
   # --- hosts ----------------------------------------------------------------
   - id: starci/orca-provider@1
     governs: "The Orca host contract entry — hierarchy names, environment binding, kernel and op call templates."

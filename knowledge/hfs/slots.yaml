@@ -107,6 +107,21 @@ appKinds:
   be: [api, worker, cli]
   fe: [next]
 
+# RT_SLOT_ID_SHAPE — the slot-id grammar and the suffix vocabulary law, stated once (scripts/checks/check-slot-id-shape.mjs
+# reads this block): an id is dot-separated lowercase kebab segments whose first segment is one of `prefixes`;
+# `<side>.app.<kind>` names a kind of appKinds.<side>; any other deeper id extends a declared slot id (its `parent`)
+# or names `parent` explicitly. The role-suffix vocabulary never shares a word with bannedSuffixes and holds no
+# synonym pair beyond `sameConceptPairs` — the one owner-approved pair (step + saga-step: `.saga-step.ts` stays).
+# Every pair in `refusedPairs` may never both be live suffixes.
+# `glossary` (S9-02): the five names for "handles an incoming thing" are five distinct kinds, not synonyms —
+# consumer answers an event, subscription serves realtime, webhook is its own kind, processor runs a job, handler
+# is CQRS. That is why appKinds may say worker while bannedSuffixes refuses the worker/job file suffixes.
+naming:
+  prefixes: [app, be, fe, repo]
+  sameConceptPairs: [[step, saga-step]]
+  refusedPairs: [[use-case, handler], [listener, subscription], [job, processor], [worker, processor], [dto, input], [repository, mapper]]
+  glossary: {consumer: event, subscription: realtime, webhook: webhook, processor: job, handler: cqrs}
+
 # ---------------------------------------------------------------------------------------------------------
 # Tiers and the dependency direction matrix (owner granularity; type-only imports count; no cycles anywhere)
 # mayImport lists the tiers a file of that tier may import. Importing inside the same owner is always allowed.
@@ -139,14 +154,17 @@ tiers:
 crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
 crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 
-# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/hfs/slots.mjs).
+# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/hfs/slots.mjs, which
+# merges common under the profile: a side restates a common key only to override it).
 ruleParams:
-  be:
-    # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
+  common:
+    # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft. Slot
+    # budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
-    # R21 HFS_DUPLICATE_CODE: the ONE threshold of duplicate code (the architecture machine reads it here; no other file states it):
-    # a token-normalised block of at least `lines` source lines and `tokens` tokens that appears twice.
+    # R21 HFS_DUPLICATE_CODE: the one threshold of duplicate code of both sides (the architecture machine reads it here;
+    # no other file states it): a token-normalised block of at least `lines` source lines and `tokens` tokens that appears twice.
     duplicateBlock: {lines: 8, tokens: 60}
+  be:
     # R90 BE_INFRA_OWNER: raw infrastructure library (a module specifier or a global reference) -> the platform or
     # integration capabilities allowed to import it; [] means nowhere in a back end. A specifier also covers its subpaths.
     infraOwners:
@@ -182,6 +200,18 @@ ruleParams:
       socket.io: [platform/realtime]
       graphql-subscriptions: [platform/realtime]
       graphql-ws: [platform/realtime]
+    # R87 BE_CQRS_SHAPE no-event-bus: the in-process event vocabulary the rule refuses. `imports` maps a module
+    # specifier to the member names that are an in-process event; `[]` flags the package itself (its emitter packages
+    # are the `[]` owners of infraOwners above). `classes` maps a module specifier to the class names that are an
+    # in-process bus when constructed or extended.
+    eventBus:
+      imports:
+        "@nestjs/cqrs": [EventBus, EventsHandler, IEventHandler]
+        "@nestjs/event-emitter": []
+      classes:
+        events: [EventEmitter]
+        "node:events": [EventEmitter]
+        rxjs: [Subject, BehaviorSubject, ReplaySubject, AsyncSubject]
     # R48 BE_SPEC_QUALITY spec-infra-double-from-kit: in a `<name>.service.spec.ts` a provider `{ provide: TOKEN, useValue: X }` takes X from
     # the kit named here (the package root of `kit`). The token name is normalised to UPPER_SNAKE (`EntityManager` -> ENTITY_MANAGER), the
     # FIRST entry whose `token` regex matches decides, and `fallback` decides for every other token. `forms` say what X may be:
@@ -278,10 +308,6 @@ ruleParams:
     # migration tree (supabase/migrations/*.sql, forward-only), so a lite back end holds no TypeORM migration or entity under
     # be/ (R34/R35 read schemaAuthority; be.persistence's lite overlay allows neither).
     lite: {schemaAuthority: supabase, unitRoles: []}     # lite has no test world: no service or cli command owes a unit spec
-  fe:
-    # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
-    fileLines: {soft: 500, hardGrowth: true}
-    duplicateBlock: {lines: 8, tokens: 60}
 
 slots:
 
@@ -1422,7 +1448,7 @@ slots:
     composedBy: [api, worker]
     goesTo: "the full edition: a lite app has no job queue"
     rules: [BE_BACKGROUND_UNOWNED]
-  - id: be.jobs.steps
+  - id: be.feature.jobs.steps
     profiles: [be]
     path: "src/features/jobs/<job>/steps/"
     presence: opt-in

@@ -1,6 +1,7 @@
 // node start.mjs           the harness UI for development: the API server and the Vite dev server.
 // node start.mjs --tunnel  the harness's named Cloudflare tunnel (starci-harness, %USERPROFILE%/.cloudflared/harness.yml)
-//                          to the served UI on 127.0.0.1:4547; the tunnel credential file authenticates it, never a token.
+//                          to the served UI on 127.0.0.1:<statusApp.port of modules/models/runtimes.yaml>;
+//                          the tunnel credential file authenticates it, never a token.
 import os from 'node:os';
 import path from 'node:path';
 import { spawnNode } from '../scripts/api/node/spawn-node.mjs';

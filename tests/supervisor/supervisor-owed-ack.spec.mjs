@@ -17,7 +17,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const OWED_CLI=path.join(ROOT,'scripts','supervisor','owed.mjs');
 const MIN=60_000;
 const NOW=Date.now();
-const WF='wf-todo-app-work-and-stacks-mud7kjun';
+const WF='wf-shop-work-and-stacks-mud7kjun';
 const OP='brand.decide';
 const id=n=>`op-brand.decide-00000000${String(n).padStart(2,'0')}`;
 const job=(n,{status,agoMin,after=null,retry=true})=>({jobId:id(n),opId:OP,attempt:n,status,createdAt:NOW-agoMin*MIN,updatedAt:NOW-(agoMin-5)*MIN,

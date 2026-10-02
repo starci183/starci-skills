@@ -1,8 +1,0 @@
-id: api-check-verb
-effectiveAt: '2026-09-28T17:30:00+07:00'
-summary: 'Move check result attribution and filing with its command contract to a per-verb module.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/check.mjs
-  - modules/kernel/api.yaml
-  - modules/kernel/api-commands/check.yaml

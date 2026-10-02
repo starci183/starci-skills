@@ -3,7 +3,7 @@
 // `orca orchestration worker-start --spec <text>` takes the spec inline: there is no --spec-file, and
 // scripts/api/orca/lib.mjs passes it as one argv element to spawnSync. Windows caps a whole command
 // line at 32767 UTF-16 units, so a packet above that fails at spawn with ENAMETOOLONG before Orca sees
-// it - deterministically, every retry (nivo wf-nivo-workspace-provision-mujek7cb inc-826e077777de: a
+// it - deterministically, every retry (inc-826e077777de: a
 // leg, op-business.decide-cc63d20d87, carried 993 frozen owned_paths and
 // its rendered packet never launched). A command-terminal launch then sends Orca's returned preamble,
 // which embeds the spec, through `terminal send --text` - the same ceiling a second time.

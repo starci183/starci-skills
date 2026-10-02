@@ -5,8 +5,9 @@
 //
 // For the files a slice will touch it prints, and records with their sha256, exactly what the slice must read before coding:
 //   - the slot map: `hfs explain <path> --json` of each touched file (its slot, tier, allowed imports, rules);
-//   - the pattern files (knowledge/patterns/...) of each file kind, from op-gate.yaml `kinds` (family `always` plus the longest
-//     listed slot prefix);
+//   - the pattern files (knowledge/patterns/...) of each file kind: the family's `always` files (op-gate.yaml `kinds`) plus
+//     the topics of the longest dotted slot prefix the derived slot->topic map knows (slotTopicMap, from each topic's own
+//     `slots` field in index.yaml reading order);
 //   - the example files of the same slots in the example app (op-gate.yaml `examples`), matched by the slot's explain pattern.
 // `--read` adds any other file the slice read (app-relative); `--knowledge` adds runtime knowledge files (knowledge/..., a
 // deciding or authoring op's READ: the patterns, catalogs and rules its decision cites), role `knowledge`. A deciding op that
@@ -47,12 +48,46 @@ export function loadOpGate({ base = runtimeRoot, file = null } = {}) {
 /** The ops held to the loop at settle. */
 export const loopOps = (doc = loadOpGate()) => new Set(doc.enforcedOps);
 
+let topicMapCache = null;
+/**
+ * The slot -> pattern-topic map, derived from the topics' own `slots` fields (knowledge/patterns/<family>/<topic>.yaml) -
+ * the one derivation; no list in op-gate.yaml repeats it. A slot's topics come in the reading order of its family's
+ * index.yaml `topics` registry; a topic file no index names sorts after the registered ones by path. Returns
+ * Map<slotId, [family/topic.yaml, ...]>.
+ */
+export function slotTopicMap({ base = runtimeRoot } = {}) {
+  if (topicMapCache?.base === base) return topicMapCache.map;
+  const root = path.join(base, PATTERN_ROOT);
+  const declared = [];
+  const families = fs.existsSync(root) ? fs.readdirSync(root, { withFileTypes: true }) : [];
+  families.forEach((entry, familyRank) => {
+    if (!entry.isDirectory()) return;
+    const files = fs.readdirSync(path.join(root, entry.name)).filter((f) => f.endsWith('.yaml'));
+    const order = files.includes('index.yaml')
+      ? (parseYaml(fs.readFileSync(path.join(root, entry.name, 'index.yaml'), 'utf8')).topics ?? []).map((t) => t.path).filter(Boolean)
+      : [];
+    const rank = new Map(order.map((file, i) => [file, i]));
+    for (const file of files) {
+      if (file === 'index.yaml') continue;
+      const doc = parseYaml(fs.readFileSync(path.join(root, entry.name, file), 'utf8'));
+      for (const slot of doc?.slots ?? []) declared.push({ slot, rel: `${entry.name}/${file}`, familyRank, rank: rank.get(file) ?? rank.size });
+    }
+  });
+  const map = new Map();
+  for (const d of declared.sort((a, b) => a.familyRank - b.familyRank || a.rank - b.rank || a.rel.localeCompare(b.rel))) {
+    if (!map.has(d.slot)) map.set(d.slot, []);
+    map.get(d.slot).push(d.rel);
+  }
+  topicMapCache = { base, map };
+  return map;
+}
+
 /**
  * The pattern files (runtime-relative, knowledge/patterns/...) a slot owes: its family's `always` files plus those of the
- * longest dotted prefix listed under `slots`. A null slot (hfs could not explain the path) owes no named file; its judgment
- * asks for any pattern file instead.
+ * longest dotted prefix of the slot the derived map knows (slotTopicMap). A null slot (hfs could not explain the path)
+ * owes no named file; its judgment asks for any pattern file instead.
  */
-function patternsForSlot(slot, doc = loadOpGate()) {
+export function patternsForSlot(slot, doc = loadOpGate(), map = slotTopicMap()) {
   if (!slot) return [];
   const family = doc.kinds[String(slot).split('.')[0]];
   if (!family) return [];
@@ -60,7 +95,7 @@ function patternsForSlot(slot, doc = loadOpGate()) {
   let own = [];
   for (let n = parts.length; n > 0; n -= 1) {
     const prefix = parts.slice(0, n).join('.');
-    if (family.slots?.[prefix]) { own = family.slots[prefix]; break; }
+    if (map.has(prefix)) { own = map.get(prefix); break; }
   }
   return [...new Set([...(family.always ?? []), ...own])].map((rel) => `${PATTERN_ROOT}/${rel}`);
 }

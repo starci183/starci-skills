@@ -60,7 +60,7 @@ test('schema and loader agree on a broken manifest', () => {
   }
 });
 
-test('the loader also refuses what only semantics can see', () => {
+test('the slot-manifest loader also refuses what only semantics can see', () => {
   const load = (mutate) => { const doc = parseYaml(manifestText); mutate(doc); return () => loadSlotManifest({ text: JSON.stringify(doc) }); };
   refusal(load((d) => { d.slots[1].id = d.slots[0].id; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots[0].tier = 'nowhere'; }), 'HFS_MANIFEST_INVALID');
@@ -84,7 +84,7 @@ test('hfs.json: schema and loader agree', () => {
     'connection as a bare string': app({ be: { ...BE_SIDE, connections: ['primary'] } }),
     'no apps on a side': app({ fe: { apps: [] } }),
     'unknown key': { ...APP, owners: ['x'] },
-    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../todo-app-be' } }),
+    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../shop-be' } }),
     'bad project name': { ...APP, project: 'My App' },
   };
   for (const [name, declaration] of Object.entries(bad)) {
@@ -457,7 +457,7 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
   const cli = sideOf(APP, 'be');
   assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').slot, 'be.cli');
   assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').status, 'owned');
-  assert.equal(cli.classifyPath('src/features/api/orders/transport/cli/import.cli.ts').slot === 'be.cli', false);
+  assert.equal(cli.classifyPath('src/features/api/orders/transport/rest/import.cli.ts').slot === 'be.cli', false);
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
@@ -538,11 +538,16 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   assert.equal(feHfs.classifyPath('packages/app-api/src/graphql.ts').slot, 'fe.package.api');
   assert.equal(feHfs.classifyPath('packages/app-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
-  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.common.fileLines.soft = 0; }, (d) => { delete d.ruleParams.common.duplicateBlock; }, (d) => { d.ruleParams.common.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.common.extra = 1; }, (d) => { d.ruleParams.fe = { extra: 1 }; }, (d) => { d.ruleParams.fe = { duplicateBlock: { lines: 1, tokens: 60 } }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }, (d) => { d.ruleParams.be.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { delete d.ruleParams.be.paramNames; }, (d) => { d.ruleParams.be.paramNames = []; }, (d) => { d.ruleParams.be.paramNames[0].names = ['Clock']; }, (d) => { d.ruleParams.be.paramNames[0].typeSuffix = 'Port'; }, (d) => { d.ruleParams.be.paramNames[0].extra = 1; }]) {
     const doc = parseYaml(manifestText); mutate(doc);
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
   }
+  // a side restates a common key only to override it: ruleParams(profile) merges common under the profile
+  const overridden = parseYaml(manifestText); overridden.ruleParams.fe = { duplicateBlock: { lines: 10, tokens: 60 } };
+  const feParams = ruleParams(loadSlotManifest({ text: JSON.stringify(overridden) }), 'fe');
+  assert.deepEqual(feParams.duplicateBlock, { lines: 10, tokens: 60 });
+  assert.deepEqual(feParams.fileLines, { soft: 500, hardGrowth: true });
   // two entries for one type are a loader refusal (a schema cannot state uniqueness by a member)
   const twice = parseYaml(manifestText); twice.ruleParams.be.paramNames.push({ type: 'Clock', names: ['now'] });
   refusal(() => loadSlotManifest({ text: JSON.stringify(twice) }), 'HFS_MANIFEST_INVALID');

@@ -1,7 +1,7 @@
 /*
  * GENERATED FILE - do not edit by hand.
  *
- * Regenerate with `node scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
+ * Regenerate with `node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
  * The source of truth is the knowledge tree's `ui/composition`, `ui/presentation`, `ui/proof`
  * and `grammars/starci` topic files; a family that publishes no `PREFIX-n` heading contributes
  * no rules and therefore does not appear here.

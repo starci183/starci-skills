@@ -53,6 +53,16 @@ $defs:
         properties:
           be: {$ref: '#/$defs/nameList'}
           fe: {$ref: '#/$defs/nameList'}
+      naming:
+        type: object
+        additionalProperties: false
+        required: [prefixes]
+        description: RT_SLOT_ID_SHAPE vocabulary — id prefixes, the declared same-concept/refused suffix pairs, and the S9-02 incoming-thing glossary. Optional so a manifest pinned to an older minor still validates.
+        properties:
+          prefixes: {$ref: '#/$defs/nameList'}
+          sameConceptPairs: {$ref: '#/$defs/stringPairs'}
+          refusedPairs: {$ref: '#/$defs/stringPairs'}
+          glossary: {type: object, additionalProperties: {type: string, minLength: 1}}
       tiers:
         type: object
         additionalProperties: false
@@ -63,12 +73,20 @@ $defs:
       ruleParams:
         type: object
         additionalProperties: false
-        required: [be, fe]
+        required: [common, be]
         properties:
+          common:
+            type: object
+            additionalProperties: false
+            required: [fileLines, duplicateBlock]
+            description: The parameters both sides share (ruleParams(profile) merges common under the profile); a side restates one of them only to override it.
+            properties:
+              fileLines: {$ref: '#/$defs/fileLines'}
+              duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
           be:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns, addKinds]
+            required: [infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -80,6 +98,30 @@ $defs:
                   type: array
                   uniqueItems: true
                   items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
+              eventBus:
+                type: object
+                additionalProperties: false
+                required: [imports, classes]
+                description: >-
+                  R87 BE_CQRS_SHAPE no-event-bus. `imports`: module specifier -> the member names that are an in-process event
+                  ([] flags the package itself); `classes`: module specifier -> the class names that are an in-process bus when
+                  constructed or extended.
+                properties:
+                  imports:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: array
+                      uniqueItems: true
+                      items: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
+                  classes:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: array
+                      minItems: 1
+                      uniqueItems: true
+                      items: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
               specDoubles:
                 type: object
                 additionalProperties: false
@@ -199,7 +241,7 @@ $defs:
           fe:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock]
+            description: The fe overrides of ruleParams.common, when a side needs its own value.
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -312,19 +354,6 @@ $defs:
         type: array
         minItems: 1
         items: {$ref: '#/$defs/runtimeSlot'}
-      pending:
-        type: array
-        description: The one shrink-only allowlist of the runtime check. A finding matching an entry is reported at level pending; an entry that matches no finding is RT_PENDING_STALE, and an entry that covers a finding the base revision did not allow is RT_PENDING_ADDED.
-        items:
-          type: object
-          additionalProperties: false
-          required: [path, rule, lane, since, reason]
-          properties:
-            path: {type: string, minLength: 1}
-            rule: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
-            lane: {type: string, pattern: '^C[1-8][ab]?$'}
-            since: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
-            reason: {type: string, minLength: 1}
       consumers:
         type: array
         items: {type: string}
@@ -370,6 +399,7 @@ $defs:
       retiredIn: {$ref: '#/$defs/major'}
       successor: {type: string}
       generatedBy: {type: string, minLength: 1, description: 'the one writer of a generated slot (tracked: generated)'}
+      parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
       - if: {properties: {tracked: {const: external}}, required: [tracked]}
         then: {required: [goesTo], properties: {presence: {const: forbidden}}}
@@ -428,6 +458,14 @@ $defs:
     minItems: 1
     uniqueItems: true
     items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+  stringPairs:
+    type: array
+    uniqueItems: true
+    items:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
   tierMap:
     type: object
     minProperties: 1
@@ -566,6 +604,7 @@ $defs:
       since: {$ref: '#/$defs/semver'}
       retiredIn: {$ref: '#/$defs/major'}
       successor: {type: string}
+      parent: {type: string, pattern: '^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$', description: 'the declared slot id this id extends; RT_SLOT_ID_SHAPE requires the id to start with <parent>.'}
     allOf:
       - if: {properties: {tracked: {const: external}}, required: [tracked]}
         then: {required: [goesTo], properties: {presence: {const: forbidden}}}

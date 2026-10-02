@@ -15,19 +15,18 @@ required:
 properties:
   schema:
     const: work/workspace@1
-    description: Record family discriminator. Every record names its own family so a file can be validated
-      without inferring its meaning from the directory it happens to sit in.
+    $ref: "urn:work:common:1#/$defs/familyDiscriminator"
   id:
-    $ref: "#/$defs/slug"
+    $ref: "urn:work:common:1#/$defs/slugId"
     description: The workspace's stable identifier. It names this tree, and it is what a runtime resolving a
       project binding matches against.
   project:
-    $ref: "#/$defs/slug"
+    $ref: "urn:work:common:1#/$defs/slugId"
     description: The project this tree belongs to. It is a separate field from the id because a project can
       outlive or precede the tree that describes it, and conflating the two makes a rename look like a new
       workspace.
   description:
-    $ref: "#/$defs/prose"
+    $ref: "urn:work:common:1#/$defs/prose"
     description: What the product is, in one sentence. It is the first thing a reader of the tree sees, and
       it is here rather than in the catalog because it describes the product, not its feature list.
   repositories:
@@ -45,22 +44,11 @@ properties:
         - name
       properties:
         role:
-          $ref: "#/$defs/slug"
+          $ref: "urn:work:common:1#/$defs/slugId"
           description: What the repository is for - be, fe, and whatever else a product genuinely needs. The
             role is recorded so that a reader can tell which side of the product a proof came from without
             recognising repository names.
         name:
-          $ref: "#/$defs/slug"
+          $ref: "urn:work:common:1#/$defs/slugId"
           description: The repository's name, as every other record refers to it. Names rather than paths,
             because a path is a fact about one machine and this record must be true on all of them.
-$defs:
-  prose:
-    type: string
-    minLength: 1
-    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
-      a written one, so it is refused at the type.
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
-      written twice by two authors is the same string.

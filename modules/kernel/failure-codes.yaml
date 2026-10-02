@@ -1524,7 +1524,7 @@ DRAW_BASE_SIGNATURE:
   causes_vi:
     - "Thiếu XBase"
     - "Fixture sai dạng"
-  nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; sửa nguồn theo mẫu shape-slot rồi vẽ lại."
+  nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; sửa nguồn theo luật drawing rồi vẽ lại."
   owner: other-op:interface.draw
   kind: check-finding
 
@@ -2190,7 +2190,7 @@ FE_COMPONENT_API:
     - "Component nhận className từ ngoài"
     - "Khối kết nối không có bản trình bày thuần"
     - "Trạng thái dữ liệu tự chế thay vì qua SlotView"
-  nextStep_vi: "Sửa chữ ký component theo mẫu shape-slot và tách phần trình bày; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  nextStep_vi: "Sửa chữ ký component theo luật drawing và tách phần trình bày; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -4426,11 +4426,11 @@ RT_DEAD_SCRIPT:
 RT_DEAD_ENTRY:
   title: "Stale dead-scripts entry"
   title_vi: "Mục khai báo CLI đã lỗi thời"
-  meaning_vi: "Danh sách scripts/checks/dead-scripts.entries nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
+  meaning_vi: "Mục dead-script-entries của modules/kernel/allowlist.yaml nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
   causes_vi:
     - "Script đã bị xóa nhưng mục khai báo còn lại"
     - "Script đã được nối vào mã nên không còn là CLI độc lập"
-  nextStep_vi: "Người giám sát xóa dòng đó khỏi dead-scripts.entries qua một lane đã land."
+  nextStep_vi: "Người giám sát xóa dòng đó khỏi mục dead-script-entries của modules/kernel/allowlist.yaml qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4441,18 +4441,7 @@ HFS_SOURCE_NOT_ENGLISH:
   causes_vi:
     - "Chú thích hoặc chuỗi viết bằng tiếng Việt"
     - "Thông điệp cho chủ chưa đi qua danh mục i18n"
-  nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages hoặc ui/src/i18n/messages, qua một lane đã land."
-  owner: supervisor
-  kind: runtime-fault
-
-HFS_SOURCE_PENDING_STALE:
-  title: "Stale source-language pending entry"
-  title_vi: "Mục chờ chuyển ngôn ngữ đã lỗi thời"
-  meaning_vi: "Danh sách scripts/checks/source-language.pending nêu một tệp đã sạch tiếng Việt hoặc đã bị xóa, nên mục chờ phải được xóa (danh sách chỉ co lại)."
-  causes_vi:
-    - "Tệp đã được chuyển sang tiếng Anh"
-    - "Tệp đã bị xóa hoặc đổi tên"
-  nextStep_vi: "Người giám sát xóa dòng đó khỏi source-language.pending qua một lane đã land."
+  nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages, qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4473,6 +4462,28 @@ RT_I18N_SCHEMA:
   causes_vi:
     - "Tệp mới tạo thiếu dòng schema"
   nextStep_vi: "Người giám sát thêm dòng schema vào đầu tệp qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_AREA:
+  title: "I18n catalog area does not match its file"
+  title_vi: "Khu vực danh mục i18n không khớp tên tệp"
+  meaning_vi: "Trường area của danh mục không trùng với tên tệp, nên nội dung không có một chủ đề rõ ràng."
+  causes_vi:
+    - "Đổi tên tệp nhưng chưa đổi area"
+    - "Sao chép phần đầu từ danh mục khác"
+  nextStep_vi: "Người giám sát đặt area bằng tên tệp không có đuôi qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_SCOPE:
+  title: "I18n catalog scope is invalid"
+  title_vi: "Phạm vi danh mục i18n không hợp lệ"
+  meaning_vi: "Danh mục không khai báo scope runtime hoặc ui, nên loader không biết nơi dùng các bản dịch."
+  causes_vi:
+    - "Tệp mới thiếu scope"
+    - "Scope mang một giá trị ngoài runtime và ui"
+  nextStep_vi: "Người giám sát khai báo scope runtime hoặc ui qua một lane đã land."
   owner: supervisor
   kind: runtime-fault
 
@@ -4520,7 +4531,7 @@ RT_I18N_PLACEHOLDERS:
 RT_I18N_DUPLICATE:
   title: "I18n source translated twice"
   title_vi: "Một nguồn tiếng Anh được dịch hai lần"
-  meaning_vi: "Cùng một chuỗi en xuất hiện trong hai mục của danh mục, tức là hai cách dịch cho một thông điệp."
+  meaning_vi: "Cùng một chuỗi en xuất hiện hai lần trong một scope của danh mục, tức là hai cách dịch cho một thông điệp ở cùng nơi dùng."
   causes_vi:
     - "Hai lane cùng thêm một thông điệp"
   nextStep_vi: "Người giám sát giữ một mục và xóa mục còn lại qua một lane đã land."
@@ -4697,7 +4708,7 @@ RT_EXTERNAL_OWNER:
   causes_vi:
     - "Gọi spawnSync/execFile hay fetch trực tiếp trong tầng nghiệp vụ hoặc trong scripts/lib"
     - "Một tệp api của hệ thống này khởi chạy chương trình của hệ thống khác"
-  nextStep_vi: "Người giám sát chuyển lời gọi vào một tệp lệnh của scripts/api/<hệ thống>/ rồi gọi hàm đó, qua lane của chunk ghi trong mục pending; mục pending được xóa cùng commit."
+  nextStep_vi: "Người giám sát chuyển lời gọi vào một tệp lệnh của scripts/api/<hệ thống>/ rồi gọi hàm đó, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -4708,7 +4719,7 @@ RT_TIER_DIRECTION:
   causes_vi:
     - "Một dịch vụ dùng chung nằm ở tầng cao hơn nơi dùng nó"
     - "Thư viện cơ sở import mã nghiệp vụ"
-  nextStep_vi: "Người giám sát chuyển phần dùng chung xuống tầng được phép (machine, lib) hoặc đảo chiều phụ thuộc, qua lane của chunk ghi trong mục pending."
+  nextStep_vi: "Người giám sát chuyển phần dùng chung xuống tầng được phép (machine, lib) hoặc đảo chiều phụ thuộc, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -4767,6 +4778,17 @@ RT_RETIRED_PRESENT:
   owner: supervisor
   kind: check-finding
 
+GENERATED_UNTRACKED:
+  title: "Tracked path under a generated root"
+  title_vi: "Đường dẫn được git theo dõi dưới một gốc sinh tự động"
+  meaning_vi: "Một tệp được git theo dõi nằm dưới một gốc sinh tự động của ruleParams.runtime.generated (knowledge/hfs/runtime-slots.yaml). Một gốc như vậy chỉ chứa thứ generatedBy của nó ghi ra (scripts/hfs/sync-runtime.mjs cho các bản sao runtime/ của gói) và đã được gitignore, nên index không bao giờ được giữ một bản sao cũ."
+  causes_vi:
+    - "Commit các tệp runtime/ của gói như mã nguồn thay vì để sync-runtime.mjs tái tạo"
+    - "git add -f qua một mục .gitignore"
+  nextStep_vi: "Người giám sát chạy git rm -r --cached trên gốc sinh tự động đó và giữ mục .gitignore của nó; chỉ generatedBy ghi vào đó."
+  owner: supervisor
+  kind: check-finding
+
 RT_GENERATED_DRIFT:
   title: "Generated copy drifted"
   title_vi: "Bản sao sinh tự động bị lệch"
@@ -4774,7 +4796,7 @@ RT_GENERATED_DRIFT:
   causes_vi:
     - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
     - "Sửa tay một tệp trong thư mục runtime/ của gói"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs rồi commit các bản sao; không sửa tay thư mục runtime/ của gói."
+  nextStep_vi: "Người giám sát chạy bước sinh bản sao runtime của kiểm tra (sync-runtime); các bản sao là kết quả sinh tự động đã gitignore nên không commit, và không sửa tay thư mục runtime/ của gói."
   owner: supervisor
   kind: check-finding
 
@@ -4789,25 +4811,25 @@ RT_CITED_PATH_MISSING:
   owner: supervisor
   kind: check-finding
 
-RT_PENDING_STALE:
-  title: "Pending entry is stale"
-  title_vi: "Mục pending đã cũ"
-  meaning_vi: "Một mục trong danh sách pending của knowledge/hfs/runtime-slots.yaml không còn cho phép phát hiện nào (khoản nợ đã trả) hoặc ghi một mã mà không luật runtime nào báo."
+RT_RETIRED_NAME_LIVE:
+  title: "A retired name appears in a live file"
+  title_vi: "Một tên đã loại bỏ xuất hiện trong tệp đang dùng"
+  meaning_vi: "Một tệp đang sống được git theo dõi nhắc tới một tên mà registry tuyên bố đã chết: một đường dẫn trong retired[] hoặc moved[].from của modules/kernel/retired-paths.yaml, hoặc một tên gọi không phải đường dẫn trong retiredNames[] (một app đã xóa, một kiểu đặt tên tầng, một tiền tố verb). Lịch sử (contract-changes, CHANGELOG, benchmark, các bản ghi .starciwork) và chính registry được giữ tên đó; văn bản đang sống thì không."
   causes_vi:
-    - "Lane đã sửa vi phạm nhưng quên xóa mục pending"
-    - "Gõ sai mã luật trong mục pending"
-  nextStep_vi: "Người giám sát xóa mục đó trong cùng commit đã sửa vi phạm."
+    - "Di chuyển hay đổi tên một cơ chế mà văn bản, comment hay fixture kiểm thử vẫn nhắc tên cũ"
+    - "Sao chép một ví dụ hay mẫu kiểm thử cũ vào một tệp mới"
+  nextStep_vi: "Người giám sát viết lại chỗ đó theo tên hiện tại (moved[].to, hoặc ghi chú của mục retiredNames) hoặc xóa nó; một tên mà một luật phải gọi đích danh được viết từ các phần ghép, không phải literal."
   owner: supervisor
   kind: check-finding
 
-RT_PENDING_ADDED:
-  title: "Pending list grew"
-  title_vi: "Danh sách pending bị nới rộng"
-  meaning_vi: "Một mục pending cho phép một phát hiện mà danh sách pending của bản gốc (merge-base với main) không cho phép. Danh sách chỉ được thu hẹp: vi phạm mới phải được sửa, không được ghi thêm."
+RT_ALLOWLIST_SPRAWL:
+  title: "A second allowlist or baseline file exists"
+  title_vi: "Có thêm một tệp allowlist hay baseline thứ hai"
+  meaning_vi: "Một tệp được git theo dõi trông giống một danh sách cho phép ngoài modules/kernel/allowlist.yaml — theo hậu tố tên (.pending, .entries, .not-codes) hoặc theo tên (exceptions, baseline, allowlist trong một tệp yaml/json/txt), hoặc một tệp danh sách trần trong scripts/checks mà một reader nạp. Mọi ngoại lệ của một kiểm tra runtime là một mục có lý do trong một section của allowlist duy nhất."
   causes_vi:
-    - "Thêm mục pending để làm xanh kiểm tra thay vì sửa mã"
-    - "Mở rộng glob của một mục có sẵn"
-  nextStep_vi: "Người giám sát sửa vi phạm mới và bỏ phần mở rộng của danh sách pending; một tệp được chuyển chỗ giữ quyền của nó qua moved[] trong retired-paths.yaml."
+    - "Một lane tạo tệp danh sách riêng thay vì thêm mục vào section của modules/kernel/allowlist.yaml"
+    - "Một tệp allowlist cũ chưa được xóa sau khi nội dung của nó chuyển vào allowlist chung"
+  nextStep_vi: "Người giám sát chuyển các mục (kèm nguyên lý do) vào section tương ứng của modules/kernel/allowlist.yaml qua scripts/lib/allowlist.mjs rồi xóa tệp riêng đó trong cùng commit."
   owner: supervisor
   kind: check-finding
 
@@ -4839,7 +4861,7 @@ RT_ABSOLUTE_PATH:
   causes_vi:
     - "Một lane ghi đường dẫn máy của nó vào mã, tài liệu, tri thức, ví dụ hoặc dữ liệu thử"
     - "Một spec dựng fixture từ ổ đĩa ghi cứng thay vì thư mục tạm của nó"
-  nextStep_vi: "Người giám sát đổi đường dẫn thành đường dẫn tương đối hoặc tên giữ chỗ (<runtime>/..., %LOCALAPPDATA% chưa khai triển), cho mã lấy đường dẫn từ gốc runtime, os.tmpdir(), cấu hình hoặc hàm gốc trạng thái, và cho spec dựng fixture từ thư mục tạm; vector kiểm thử phân tích đường dẫn thật thì ghi vào pending kèm lý do."
+  nextStep_vi: "Người giám sát đổi đường dẫn thành đường dẫn tương đối hoặc tên giữ chỗ (<runtime>/..., %LOCALAPPDATA% chưa khai triển), cho mã lấy đường dẫn từ gốc runtime, os.tmpdir(), cấu hình hoặc hàm gốc trạng thái, và cho spec dựng fixture từ thư mục tạm."
   owner: supervisor
   kind: check-finding
 
@@ -4849,8 +4871,30 @@ RT_PINNED_PATH_MOVED:
   meaning_vi: "Một đường dẫn được ghim (ruleParams.runtime.pinned: được lưu ngoài git trong hook, settings, tác vụ định kỳ, prompt) không còn tồn tại mà không có mục moved[] trong retired-paths.yaml, hoặc được chuyển bằng một mục moved[] không có quiesced: true."
   causes_vi:
     - "Đổi tên một tệp mà hook hay tác vụ định kỳ đang trỏ tới"
-    - "Chuyển tệp khi fleet còn đang chạy"
-  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi fleet đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
+    - "Chuyển tệp khi các worker còn đang chạy"
+  nextStep_vi: "Người giám sát khôi phục đường dẫn, hoặc chuyển nó trong một lần land khi các worker đã dừng với mục moved[] có quiesced: true rồi viết lại các bản lưu bên ngoài."
+  owner: supervisor
+  kind: check-finding
+
+RT_SCHEMA_NOT_SHARED:
+  title: "Work schema block duplicated"
+  title_vi: "Khối schema Work bị lặp"
+  meaning_vi: "Một khối YAML giống hệt nhau (từ 5 dòng trở lên) xuất hiện trong từ 3 lược đồ work-*.schema.yaml trở lên, thay vì nằm một lần trong modules/schemas/work-common.schema.yaml và được tham chiếu bằng $ref urn:work:common:1."
+  causes_vi:
+    - "Chép một khối lược đồ từ family này sang family khác thay vì đưa nó vào work-common"
+    - "Thêm schema work mới bằng cách sao chép nguyên một schema cũ"
+  nextStep_vi: "Đưa khối vào $defs của modules/schemas/work-common.schema.yaml và thay mỗi bản lặp bằng {$ref: 'urn:work:common:1#/$defs/<tên>'}, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_OP_FIELD_NOT_COMMON:
+  title: "Op field restates a shared fragment"
+  title_vi: "Trường op chép lại mảnh dùng chung"
+  meaning_vi: "Một trường trong modules/ops/ops/*.yaml chép nguyên văn một mảnh đã khai báo trong mục shared: của modules/ops/_common.yaml, trong khi marker shared của mergeOpShared (scripts/lib/op-shared.mjs) dựng lại đúng giá trị đó."
+  causes_vi:
+    - "Viết giá trị literal thay vì đánh dấu path: shared, placeholders.<khoá>: shared hoặc graphPolicy.location: shared"
+    - "Sửa op mà không biết mảnh đã được khai báo trong _common.yaml"
+  nextStep_vi: "Thay giá trị literal bằng marker shared tương ứng; một trường op cần giá trị khác mảnh chung thì giữ literal là đúng, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -14168,6 +14212,17 @@ RT_RULE_ID_GAP:
   owner: supervisor
   kind: check-finding
 
+RT_RULE_UNCITED:
+  title: "A catalog rule no pattern topic cites"
+  title_vi: "Một luật của danh mục mà không chủ đề pattern nào trích dẫn"
+  meaning_vi: "Một luật của knowledge/hfs/rules.yaml không được nêu trong hfsRules của bất kỳ chủ đề nào dưới knowledge/patterns/** và cũng không mang scope: runtime. Luật của sản phẩm tồn tại để được dạy; một luật không được trích dẫn là luật mà một lane không bao giờ đọc."
+  causes_vi:
+    - "Thêm một luật vào danh mục mà không trích dẫn nó từ chủ đề dạy nó"
+    - "Một luật chỉ quản trị chính kho runtime mà thiếu scope: runtime"
+  nextStep_vi: "Người giám sát thêm mã luật vào hfsRules của chủ đề knowledge/patterns dạy nó, hoặc đánh dấu luật scope: runtime khi nó chỉ quản trị kho runtime, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_GENERATED_BLOCK_STALE:
   title: "A generated README block or derived field differs from its source"
   title_vi: "Khối README sinh tự động khác nguồn của nó"
@@ -14198,6 +14253,51 @@ RT_PROSE_RESTATES_SLOTS:
     - "Chép cây thư mục hoặc danh sách tệp của slots.yaml vào văn bản"
     - "Liệt kê các tệp cấu hình của gốc ứng dụng trong một câu"
   nextStep_vi: "Người giám sát thay bản chép bằng mã slot (slot app.format-config...) hoặc bằng một khối sinh tự động, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PORT_RESTATED:
+  title: "A port literal is spelled outside its owner"
+  title_vi: "Một literal cổng được viết ngoài tệp chủ sở hữu"
+  meaning_vi: "Một cổng của runtime chỉ được viết literal một lần, trong tệp chủ của nó: port và devPort của UI nằm trong modules/models/runtimes.yaml (statusApp) và đọc qua ui/ports.mjs, host SonarQube nội bộ trong DEFAULT_HOST của scripts/gates/sonar-local.mjs. Một literal cổng ở vị trí cổng (authority scheme://host:NNNN, host:NNNN, gán *port*/PORT, lời gọi listen(NNNN)) trong một tệp không phải chủ sở hữu — hoặc cùng một literal không chủ trong từ hai tệp nguồn runtime — là một bản chép lại. Spec, test, bản runtime sinh ra, lịch sử hợp đồng, CHANGELOG, .starciwork và khai báo stack của sản phẩm nằm ngoài luật."
+  causes_vi:
+    - "Hard-code một port của runtime trong script hay tài liệu thay vì import từ tệp chủ"
+    - "Hai tệp nguồn cùng viết literal một port không chủ mà không khai báo hằng số chủ sở hữu"
+  nextStep_vi: "Người giám sát thay literal bằng import từ tệp chủ (ui/ports.mjs, sonar-local DEFAULT_HOST) hoặc khai báo một hằng số chủ duy nhất rồi cho mọi nơi khác tham chiếu."
+  owner: supervisor
+  kind: check-finding
+
+RT_CONFIG_DEFAULT_TWICE:
+  title: "A documented default is restated outside its owner"
+  title_vi: "Một giá trị mặc định được khai báo lại ngoài tệp chủ"
+  meaning_vi: "Mỗi mặc định của cấu hình được viết một lần trong tệp chủ của nó: các leaf camelCase hay khóa lowercase của config.example.yaml, và các mặc định mà chủ sở hữu khai báo (DEFAULTS của scripts/machine/home.mjs cho supervisor và ngôn ngữ owner, engine/config.mjs cho connector/ask/UAT/spec/allocation, engine/orca-config.mjs cho độ sâu worker, scripts/reconciler/state.mjs cho mode của controller). Một literal fallback (??, ||, mặc định tham số, hay ternary kiểu language === 'en' ? 'en' : 'vi') ở tệp khác là bản chép lại; phía đọc gọi accessor của chủ (supervisorSettings(), configuredMode(), ownerLanguage()). Spec, test, runtime sinh ra, story và template HFS nằm ngoài luật."
+  causes_vi:
+    - "Viết ?? <literal> hay || <literal> cho một khóa đã có trong config.example.yaml thay vì gọi accessor"
+    - "Khai báo tham số mặc định bằng literal giá trị mà chủ sở hữu đã định"
+  nextStep_vi: "Người giám sát thay literal bằng accessor của chủ sở hữu (import DEFAULTS/supervisorSettings/ownerLanguage...) hoặc chuyển mặc định về tệp chủ rồi đọc qua nó."
+  owner: supervisor
+  kind: check-finding
+
+RT_VERSION_RESTATED:
+  title: "A pinned version is spelled outside canon-pins.yaml"
+  title_vi: "Một phiên bản ghim được viết ngoài canon-pins.yaml"
+  meaning_vi: "knowledge/hfs/canon-pins.yaml viết phiên bản của mọi gói @starci và mọi phụ thuộc được ghim đúng một lần; package.json là nơi cài đặt khai báo và lockfile là kết quả resolve. Một literal semver bằng pin — hay specifier name@x.y.z nhắc tới nó — ở bất cứ đâu khác là bản chép lại, trừ các khóa binding mà refresher sở hữu và ghi đè tại chỗ (canon.version của code-pattern bindings do check-canon-pins giữ; provenance.version và identity.version của grammar snapshot do grammar-knowledge.mjs ghi lại). Manifest, lockfile, changelog, lịch sử hợp đồng, spec, test, runtime sinh ra và .starciwork nằm ngoài luật."
+  causes_vi:
+    - "Viết số phiên bản của một pin trong prose hay YAML thay vì nhắc tới tên pin"
+    - "Chép specifier name@x.y.z vào tài liệu hay mẫu scaffold"
+  nextStep_vi: "Người giám sát viết lại theo tên pin (\"the pinned @starci/grammar\", \"knowledge/hfs/canon-pins.yaml\") hoặc để refresher ghi qua khóa binding đã khai báo — không bao giờ viết literal."
+  owner: supervisor
+  kind: check-finding
+
+RT_SLOT_ID_SHAPE:
+  title: "A slot id breaks the manifest's declared grammar"
+  title_vi: "Một slot id vi phạm ngữ pháp mà manifest khai báo"
+  meaning_vi: "Một slot id đi theo ngữ pháp mà chính manifest khai báo: các đoạn lowercase kebab ngăn bằng dấu chấm, đoạn đầu thuộc naming.prefixes của knowledge/hfs/slots.yaml (profiles của runtime-slots.yaml), <side>.app.<kind> chỉ một kind trong appKinds.<side>, và mọi id sâu hơn mở rộng một id đã khai báo — qua trường parent tường minh, hoặc một family mà ít nhất hai slot cùng dùng; một id sâu lẻ loi tự bịa ra family. Từ vựng suffix không chứa cặp đồng nghĩa: suffixes của một profile không trùng bannedSuffixes, không cặp nào trong naming.refusedPairs sống ở cả hai vế, và naming.sameConceptPairs (step + saga-step) là ngoại lệ duy nhất — sống ở cả hai vế hoặc bị bỏ."
+  causes_vi:
+    - "Đặt một slot id mới không bắt đầu bằng prefix khai báo hay không kebab-case"
+    - "Tạo một id sâu không mở rộng slot nào đã khai báo và family chỉ có một thành viên"
+    - "Thêm một suffix đồng nghĩa với một suffix đã có mà không khai báo cặp đó trong naming"
+  nextStep_vi: "Người giám sát sửa id theo ngữ pháp (đổi tên, đặt parent, hay khai báo prefix/family trong naming của manifest) hoặc đưa từ trùng nghĩa về bannedSuffixes / khai báo cặp trong naming.sameConceptPairs/refusedPairs."
   owner: supervisor
   kind: check-finding
 
@@ -14233,6 +14333,49 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
   nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
   owner: runtime-core
   kind: check-finding
+
+RT_EXAMPLE_COUPLING:
+  title: "Runtime source names a concrete example tree"
+  title_vi: "Mã nguồn runtime gọi tên một cây examples/ cụ thể"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử contract-change, CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
+  causes_vi:
+    - "Một script hay gate đọc ví dụ của riêng một sản phẩm (ví dụ một tệp declaration đặt theo tên repo) lúc chạy, thay vì một mẫu chung hay tệp của repo đang được kiểm"
+    - "Comment, tài liệu hay chuỗi trong nguồn trích dẫn đường dẫn examples/<name> cụ thể thay vì nói examples/<app>"
+  nextStep_vi: "Người giám sát khái quát hóa chỗ đó (ví dụ examples/<app>, một mẫu template.*, hay một hằng trong scripts/lib/example-refs.mjs khi runtime thật sự đọc cây đó) hoặc trỏ tới repo đang được kiểm tra, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PRODUCT_NAME_IN_SOURCE:
+  title: "A product name is written in runtime source"
+  title_vi: "Tên một sản phẩm xuất hiện trong mã nguồn runtime"
+  meaning_vi: "Một tệp nguồn runtime được theo dõi viết tên của một sản phẩm mà runtime từng ship kèm (danh sách đóng PRODUCT_NAMES trong scripts/lib/example-refs.mjs) hoặc một mã inc-<hash> có tiền tố là tên sản phẩm. Canon chạy trong mọi repo sản phẩm, nên một tên cứng trong source rò rỉ phán đoán của một sản phẩm sang mọi sản phẩm khác. Spec, test và lịch sử được giữ tên đó; mọi nơi khác phải nói chung chung hoặc qua hằng khai báo trong scripts/lib/example-refs.mjs."
+  causes_vi:
+    - "Một câu chuyện sự cố trong comment hay log viết thẳng tên sản phẩm (ví dụ workflow wf-<product>-… hay một ledger cụ thể) thay vì 'a product's …' hay <product>"
+    - "Một ánh xạ, alias hay fixture đặt theo tên sản phẩm được để trong source thay vì trong tệp khai báo chung"
+  nextStep_vi: "Người giám sát viết lại chỗ đó theo dạng chung (<product>, a product's …, acme cho một ví dụ) hoặc chuyển giá trị thật sự cần vào một hằng trong scripts/lib/example-refs.mjs, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_HOST_PATH_IN_TEMPLATE:
+  title: "A host drive path is hard-coded in source"
+  title_vi: "Một đường dẫn trên host bị viết cứng trong mã nguồn"
+  meaning_vi: "Một tệp nguồn runtime hay một template quản lý viết cứng một đường dẫn của máy host — một ổ đĩa Windows kiểu chữ cái kèm dấu hai chấm, một thư mục người dùng kiểu Users hay home, hay một đường AppData đã bung. Source và template ship sang mọi máy và mọi sản phẩm, nên đường dẫn phải tương đối, đi qua runtime root, os.tmpdir() hay một giá trị cấu hình."
+  causes_vi:
+    - "Sao chép một đường dẫn tuyệt đối từ máy phát triển vào một script, template hay fixture"
+    - "Một chuỗi gỡ lỗi hay ví dụ viết thẳng đường dẫn host thay vì biến môi trường hay đường tương đối"
+  nextStep_vi: "Người giám sát thay đường đó bằng đường tương đối, runtime root, os.tmpdir() hay một cấu hình đã khai báo, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_DOC_NO_OWNER:
+  title: "A document has no single ownership header"
+  title_vi: "Một tài liệu không có đúng một dòng sở hữu"
+  meaning_vi: "Một tệp docs/*.md không mở đầu bằng đúng một dòng sở hữu — \"Owner: <đường dẫn knowledge/ hoặc modules/ tồn tại>\" khi tài liệu giải thích một nguồn do máy sở hữu, hoặc \"Task: <một việc>\" với một tài liệu hướng dẫn — hoặc nó trùng một tài liệu khác: cùng một dòng Task, hoặc hai tiêu đề chung từ hai từ chủ đề trở lên trong khi ít nhất 30% câu của tài liệu ngắn hơn xuất hiện trong tài liệu kia. Một câu chuyện chỉ có một tài liệu; nguồn máy là luật và tài liệu chỉ đọc nó."
+  causes_vi:
+    - "Thêm một tài liệu mà quên dòng Owner:/Task: đầu tiên, hoặc Owner trỏ tới một đường dẫn không tồn tại hay ngoài knowledge/ và modules/"
+    - "Tách một tài liệu thành hai mà không gộp nội dung trùng hoặc không đổi dòng Task của một trong hai"
+  nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
+  owner: supervisor
 
 DB_MIGRATION_SHAPE:
   title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"

@@ -4,13 +4,13 @@
 //                         built-in replacements included) stays replaced
 //   RT_PINNED_PATH_MOVED  a pinned path (ruleParams.runtime.pinned: persisted outside git in hooks, settings, the scheduled
 //                         task, prompts) exists, or it moved through a moved[] entry marked `quiesced: true` (landed with the
-//                         fleet stopped); a moved[] entry from a pinned path without `quiesced: true` is refused
+//                         workers stopped); a moved[] entry from a pinned path without `quiesced: true` is refused
 // Pure: the registry, the tracked files and the parsed sources come in through ctx.
 import { globExpression } from '../../lib/glob.mjs';
 import { declaredNames } from './source-ast.mjs';
+import { RETIRED_PATHS_FILE } from '../../lib/check-scan.mjs';
 
 export const CODES = Object.freeze({ retired: 'RT_RETIRED_PRESENT', pinned: 'RT_PINNED_PATH_MOVED' });
-export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 
 /** The rows of moved[] as [from, to] pairs; a `from` ending in / moved a directory and everything below it. */
 const pairsOf = (moved) => (moved ?? []).filter((m) => m?.from && m?.to).map((m) => [String(m.from), String(m.to)]);
@@ -78,7 +78,7 @@ export function pinnedFindings(ctx) {
   }
   for (const entry of moved) {
     const pin = entry?.from && isPinned(entry.from);
-    if (pin && entry.quiesced !== true) found.push({ code: CODES.pinned, level: 'error', path: entry.from, message: `${entry.from} is pinned (${pin.why}) and moved to ${entry.to} without quiesced: true: a pinned path moves only in a land with the fleet stopped (chunk C7/C8), then the persisted copies are rewritten` });
+    if (pin && entry.quiesced !== true) found.push({ code: CODES.pinned, level: 'error', path: entry.from, message: `${entry.from} is pinned (${pin.why}) and moved to ${entry.to} without quiesced: true: a pinned path moves only in a land with the workers stopped (chunk C7/C8), then the persisted copies are rewritten` });
   }
   return found;
 }

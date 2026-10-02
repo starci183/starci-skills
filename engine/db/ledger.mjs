@@ -140,7 +140,7 @@ const CHECKPOINTER_AUTOCHECKPOINT=8000;
 const READ_PRAGMAS=Object.freeze({query_only:'ON',temp_store:'MEMORY',cache_size:-16000,trusted_schema:'OFF'});
 const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
 /** BEGIN IMMEDIATE: spin for `spinMs` without the busy handler's 15 ms sleeps, then wait with the connection's busy_timeout. */
-export const LEDGER_SPIN_MS=20;
+const LEDGER_SPIN_MS=20;
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
   if(spinMs>0){
     const busyTimeoutMs=Number(db.prepare('PRAGMA busy_timeout').get()?.timeout??LEDGER_BUSY_TIMEOUT_MS);

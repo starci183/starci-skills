@@ -8,6 +8,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.app.worker, be.transport.message, be.feature.jobs]
 provenance:
   reviewedAt: 2026-09-30
   sources:
@@ -15,7 +18,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
     - owner-locked BE convention 2026-09-30
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
     Static checks prove that a background method has a runner and that an app composes it. They do not prove lease
@@ -29,8 +32,8 @@ rules:
     requirement: |-
       An app of kind `worker` or `api` composes the message transport and the job processors of its own service (a separate worker app
       is opt-in, for a service that must scale its consumers on their own). Every message transport and processor is composed by at
-      least one app, and an e2e run boots that app's real AppModule. A schedule is a BullMQ job scheduler, so it runs once for the
-      fleet whatever the replica count.
+      least one app, and an e2e run boots that app's real AppModule. A schedule is a BullMQ job scheduler, so it runs once per
+      deployment whatever the replica count.
     rationale: |-
       A job or consumer that no process composes never runs.
     cases:

@@ -27,6 +27,7 @@ import { deferredQueueCause } from '../autopilot-run.mjs';
 import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
 import { resolveOpParams } from '../dispatch-op.mjs';
+import { readOpManifest } from '../../lib/op-shared.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
 import { opInputPaths, recordInputs, workInputPaths } from '../input-digests.mjs';
@@ -125,7 +126,7 @@ export default {
   // bound record whose dependsOn is not done where the op requires done. A
   // dispatch that can only end blocked on them is a wasted launch.
   const briefForAdmission = (() => {
-    try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8')); } catch { return null; }
+    try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return null; }
   })();
   const prerequisites = briefForAdmission ? checkPrerequisites({ brief: briefForAdmission, payload, repo }) : { unmet: [], unknown: [] };
   if (prerequisites.unmet.length) {
@@ -184,7 +185,7 @@ export default {
 
   // The packet's params are the brief's defaults with the overrides enqueue
   // already validated on top — dispatch resolves, it never re-decides.
-  const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
+  const briefDoc = briefForAdmission ?? readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   // The workflow worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca created it before the
@@ -263,10 +264,9 @@ export default {
   const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
   const title = terminalTitle;
   // The one launch (contract-changes/launch-through-worker-start.yaml, worker-start-spec.yaml): worker-start --spec
-  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's pin at the kind's tier, else the
-  // profile's requestedModel (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
-  const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel,
-    payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
+  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's
+  // pin at the kind's tier, else the registry default (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
+  const launchModel = resolveWorkerLaunchModel({ target: model.target, payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
   const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false; // the plan shows the flags spawnAgent really sends: a card with start.modelArgument false (devin) gets no --model/--effort
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },

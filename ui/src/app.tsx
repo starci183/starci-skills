@@ -27,7 +27,7 @@ const navigation = [
 
 function routePage(route: Route): string | null {
   switch (route.kind) {
-    case 'overview': return './pages/work/fleet.tsx';
+    case 'overview': return './pages/work/workers.tsx';
     case 'workflow': return './pages/work/workflow.tsx';
     case 'attempt': return './pages/attempt/attempt.tsx';
     case 'decisions': return './pages/decisions/decisions.tsx';

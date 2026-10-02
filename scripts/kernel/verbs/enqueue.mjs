@@ -6,6 +6,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { getWorkflow, latestGoal, jobPayloadOf, ownedPathsOf } from './shared/rows.mjs';
 import { peerOverlapHeadsUp } from './shared/peer-waits.mjs';
 import { splitGoalLegParams, resolveOpParams } from '../dispatch-op.mjs';
+import { readOpManifest } from '../../lib/op-shared.mjs';
 import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot-run.mjs';
 import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
@@ -44,7 +45,7 @@ export default {
   // the approved goal leg carries what the owner chose, --params carries what the
   // kernel chose, and a value that fails either authority is refused here rather
   // than reaching an agent as an unbound number.
-  const brief = parseYaml(fs.readFileSync(briefFile, 'utf8'));
+  const brief = readOpManifest(briefFile);
   let flagParams = null;
   if (args.params !== undefined) {
     try { flagParams = JSON.parse(args.params); }
@@ -92,7 +93,7 @@ export default {
     const wrongFamily = familyViolations(familyGuard, ownedPaths);
     if (wrongFamily.length) {
       const owners = familyOwners(fs.readdirSync(path.join(skillRoot, 'modules', 'ops', 'ops')).filter((f) => f.endsWith('.yaml'))
-        .map((f) => { try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', f), 'utf8')); } catch { return null; } }).filter(Boolean));
+        .map((f) => { try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', f)); } catch { return null; } }).filter(Boolean));
       const hint = [...new Set(wrongFamily.map((v) => v.family).filter(Boolean))].map((family) => `${family}/ -> ${(owners.get(family) ?? ['no op']).join('|')}`).join('; ');
       const out = { ok: false, workflowId, op: args.op, reason: 'owned-paths-outside-writes', violations: wrongFamily, families: [...(familyGuard?.families ?? [])], owners: Object.fromEntries(owners),
         detail: `${wrongFamily.length} owned path(s) lie outside ${args.op}'s writes: ${wrongFamily.slice(0, 5).map((v) => `${v.path} (${v.why})`).join('; ')}${hint ? `. Route by family: ${hint}` : ''}` };
@@ -179,7 +180,7 @@ export default {
   let contractChange = null;
   if (args['contract-change'] != null || args['follow-up-of'] != null) {
     const change = changeById(registry, String(args['contract-change'] ?? '').trim());
-    if (!change || change.reach !== 'follow-up') throw Object.assign(new Error(`--contract-change ${args['contract-change'] ?? '(missing)'} names no registered reach: follow-up change in modules/kernel/contract-changes.yaml`), { code: 'contract-change-unknown' });
+    if (!change || change.reach !== 'follow-up') throw Object.assign(new Error(`--contract-change ${args['contract-change'] ?? '(missing)'} names no registered reach: follow-up change in modules/kernel/contract-changes/`), { code: 'contract-change-unknown' });
     const source = db.prepare('SELECT job_id FROM jobs WHERE job_id=? AND workflow_id=?').get(String(args['follow-up-of'] ?? ''), workflowId);
     if (!source) throw Object.assign(new Error(`--follow-up-of ${args['follow-up-of'] ?? '(missing)'} is not a job of ${workflowId}`), { code: 'follow-up-of-unknown' });
     contractChange = { id: change.id, followUpOf: source.job_id };

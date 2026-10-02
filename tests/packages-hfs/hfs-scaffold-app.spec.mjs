@@ -39,7 +39,7 @@ const installs = runtimeInstalls();
 const missing = missingFrom(installs);
 const skipReason = missing.length ? `no install holds ${missing.join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false;
 // A skip must never pass silently. Locally it prints one SKIPPED line. The release verification and CI set
-// STARCI_REQUIRE_APP_INSTALLS=1 (scripts/install/fresh-app-installs.mjs provides fresh registry installs), and then a
+// STARCI_REQUIRE_APP_INSTALLS=1 (scripts/gates/release-app-installs.mjs provides fresh registry installs), and then a
 // missing install fails the test instead of skipping it.
 export const REQUIRE_APP_INSTALLS = process.env.STARCI_REQUIRE_APP_INSTALLS === '1';
 function gate(name, reason) {

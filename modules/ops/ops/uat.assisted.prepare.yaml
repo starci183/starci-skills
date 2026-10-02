@@ -12,7 +12,7 @@ sideEffects:
     authenticated profile
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -286,13 +286,13 @@ blockers:
       en: A declared prerequisite is not effectively done or a required selected input is missing; never
         weaken the graph, invent acceptance or run a predecessor to proceed.
 placeholders:
-  feature: Selected feature slug
-  flow: Selected UAT flow slug
-  flow-id: Stable accepted flow ID rendered to a safe deterministic filename
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  feature: shared
+  flow: shared
+  flow-id: shared
+  app: shared
+  bound-paths: shared
   environment: Resolved environment resource slug
-  playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright
+  playwright-manifest-and-lockfile: shared
   existing-browser-suite-and-page-objects: Existing project browser automation input paths
 layoutPolicy:
   checks: [starci-validate]

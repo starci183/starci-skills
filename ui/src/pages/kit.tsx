@@ -56,7 +56,7 @@ export default function KitPage() {
           </ConceptBlock>
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">{t('File types and paths')}</h2>
             <div className="mb-3 flex flex-wrap gap-2">{fileKinds.map((kind) => <FileTypeBadge kind={kind} key={kind} />)}</div>
-            <div className="grid gap-2"><PathLink path="todo-app/.starciwork/evidence" kind="dir" /><PathLink path="todo-app/src/module.ts" kind="file" /></div>
+            <div className="grid gap-2"><PathLink path="shop/.starciwork/evidence" kind="dir" /><PathLink path="shop/src/module.ts" kind="file" /></div>
           </ConceptBlock>
           <ConceptBlock concept="C4"><h2 className="mb-2 text-sm font-medium">{t('Unit distribution')}</h2><LifecycleBar counts={unitCounts} /></ConceptBlock>
         </CardContent></Card>
@@ -66,7 +66,7 @@ export default function KitPage() {
     <div className="kit-grid">
       <Card><CardHeader><CardTitle>{t('Card and Advanced')}</CardTitle></CardHeader><CardContent className="grid gap-4">
         <p className="text-sm text-muted-foreground">{t('One surface, clearly tiered text, details separated by thin lines.')}</p>
-        <Advanced summary={t('Code and paths')} variant="inline"><PathLink path="todo-app/src/module.ts" kind="file" /></Advanced>
+        <Advanced summary={t('Code and paths')} variant="inline"><PathLink path="shop/src/module.ts" kind="file" /></Advanced>
         <Button variant="outline" className="justify-self-start" onClick={() => setDrawerOpen(true)}>{t('View the drawer')}</Button>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>{t('Table and states')}</CardTitle></CardHeader><CardContent className="grid gap-4">
@@ -76,6 +76,6 @@ export default function KitPage() {
       </CardContent></Card>
     </div>
     <Card><CardHeader><CardTitle>{t('Loading and errors')}</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><PageSkeleton /><FeedbackState error onRetry={() => undefined}>{t('Could not read the data source.')}</FeedbackState></CardContent></Card>
-    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} title="Drawer" description={t('Read-only technical details')}><div className="grid gap-4"><p>{t('Info stays on one surface level.')}</p><Advanced summary={t('Code and paths')}><PathLink path="todo-app/src/module.ts" kind="file" /></Advanced></div></Drawer>
+    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} title="Drawer" description={t('Read-only technical details')}><div className="grid gap-4"><p>{t('Info stays on one surface level.')}</p><Advanced summary={t('Code and paths')}><PathLink path="shop/src/module.ts" kind="file" /></Advanced></div></Drawer>
   </ConceptBlock>;
 }

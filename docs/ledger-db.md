@@ -1,3 +1,4 @@
+Task: read the runtime's storage
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
 The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql`
@@ -117,7 +118,7 @@ agent are unavailable, and a terminal scrollback is never a source. `llm_usage` 
 (non-cached) input, `output_tokens` includes reasoning, `reasoning_tokens` is that subset. An op attempt gets one row per model when it
 settles (`recordAttemptUsage`, idempotent); a Kernel session gets `kernel-turn` rows and the Supervisor seat `supervisor-turn` rows
 (machine.sqlite) as increments over what is already recorded for that session (`turn_ref` `<seat>:<session>@<turns>`), so a re-run
-never counts twice. `cost_usd` is set only when every rate the model used is declared in `modules/models/prices.yaml`.
+never counts twice. `cost_usd` is set only when every rate the model used is declared in `modules/models/registry.yaml` `models.<id>.price`.
 
 While an attempt runs, the Host controller stores a redacted scrollback snapshot every 60 s in
 `attempt_transcript_snapshots`; Kernel and Supervisor seats get `seat_transcript_snapshots` in
@@ -143,7 +144,7 @@ after its `mode_changes` row, the throttle mode only after its `throttle_events`
 `service_events` and `leader_history` are never updated or deleted. A refused push always carries a
 `failure_signature`; an engine action keeps its full result, stdout and stderr as blobs.
 
-SQLite forbids a persistent view that reads an attached database, so fleet views run the same view on
+SQLite forbids a persistent view that reads an attached database, so cross-ledger views run the same view on
 each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a batch of ledgers
 (at most 9) is for manual queries only.
 

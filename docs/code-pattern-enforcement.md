@@ -1,3 +1,4 @@
+Owner: modules/models/code-patterns.yaml
 # Code pattern enforcement
 
 `modules/models/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. Generated `modules/models/code-patterns.yaml` is the runtime form.
@@ -59,4 +60,4 @@ unavailable.
 
 ## Evidence limits
 
-A complete code-pattern result proves only the declared mechanical obligations over the recorded files and tool identities. Agents still review responsibility, cohesion, state/effect ownership and edge cases using `docs/architecture-rules.md`, `docs/portable-source-architecture.md` and `docs/backend-source-pattern.md`. Applicable typecheck, boot, contract, concurrency, recovery and rendered behavior evidence remains separate.
+A complete code-pattern result proves only the declared mechanical obligations over the recorded files and tool identities. Agents still review responsibility, cohesion, state/effect ownership and edge cases using `docs/architecture.md`. Applicable typecheck, boot, contract, concurrency, recovery and rendered behavior evidence remains separate.

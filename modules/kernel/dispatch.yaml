@@ -369,7 +369,7 @@ spawnMechanics:
     The kernel's own launch is the same worker-start (scripts/kernel/start-workflow.mjs
     via startAgent: entry Run -> Kernel Task -> worker-start -> attest).
   naming: >-
-    Orca titles are the fleet's address book and are written at creation, not
+    Orca titles are the workers' address book and are written at creation, not
     left to the provider's own summary; a terminal nobody reads is closed
     (scripts/agent/lib.mjs terminal close). The exact titles and the tree they
     render are one rule, stated once in modules/kernel/start-workflow.yaml

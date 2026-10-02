@@ -8,6 +8,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.platform.event-bus, be.platform.queue, be.platform.jobs, be.platform, be.integrations]
 provenance:
   reviewedAt: 2026-09-30
   sources:
@@ -22,7 +25,7 @@ rules:
   - id: BE-INFRA-1
     title: One owner per raw infrastructure library
     kind: mandatory
-    hfsRules: [R90]
+    hfsRules: [R90, R142]
     requirement: |-
       An import or a global reference of a raw library is allowed only in its owner, read from `ruleParams.be.infraOwners` of
       the slot manifest: `fetch`, `axios`, `got`, `undici`, `node:http(s)` request APIs in `platform/http`; `cache-manager`,
@@ -43,6 +46,7 @@ rules:
     verification:
       automated:
         - BE_INFRA_OWNER
+        - BE_AMBIENT_ID
       manual: []
     relatedExamples: []
   - id: BE-INFRA-2

@@ -4,11 +4,11 @@
  *
  * - `one-connection-per-database` (R84 `BE_CONNECTION_DUPLICATE`) closes the ways a second door to a database appears:
  *   `InjectEntityManager(`, `InjectDataSource(` and `getEntityManagerToken(` are called only in the
- *   `<conn>.decorators.ts` of the platform database capability, in the migrate app and in the test database fixture; any
+ *   `<conn>.decorators.ts` of the platform database capability, in the cli app and in the test database fixture; any
  *   exported injector of an `EntityManager` (its declared type is `TypedParameterDecorator<EntityManager>`, whatever it
  *   is called) is `Inject<Pascal(conn)>EntityManager` for a declared connection and lives in that connection's
  *   `<conn>.decorators.ts`; `TypeOrmModule.forRoot*` and `new DataSource(` live in the platform database capability and
- *   the migrate app; the literal connection name is written once, in `<conn>.connection.ts`; and a `<conn>.config.ts`
+ *   the cli app; the literal connection name is written once, in `<conn>.connection.ts`; and a `<conn>.config.ts`
  *   reads only keys that start with that connection's `envPrefix`.
  * - `em-injection-slots` (R88 `BE_TRANSPORT_SHAPE`) lets a class receive the `EntityManager` only in an application
  *   handler, a domain service and the platform capabilities that own a `persistence/` - never in transport,
@@ -38,7 +38,7 @@ const RAW_CONNECTION_CALLS = new Set(["InjectEntityManager", "InjectDataSource",
 /** The initializers that can be an injector factory; a plain value is never typed here. */
 const FUNCTION_LIKE = new Set(["ArrowFunctionExpression", "FunctionExpression", "CallExpression"])
 
-/** Whether a file may build connections: the platform database capability and the migrate app. */
+/** Whether a file may build connections: the platform database capability and the cli app. */
 const mayBuildConnections = (hfs, file) => inDatabaseCapability(hfs, file) || inCli(hfs, file)
 
 /** `new DataSource(` also in the test world (`src/tests/world`), which owns the shared test infrastructure (owner ruling 2026-09-30). */
@@ -120,11 +120,11 @@ export const oneConnectionPerDatabase = {
         schema: [],
         messages: {
             rawInjector:
-                "`{{name}}` is called here. A connection is reached only through its own injector: `{{name}}` is written in `platform/database/<connection>.decorators.ts`, the migrate app and the test database fixture, and nowhere else. Inject the shared EntityManager with `Inject<Connection>EntityManager()`.",
+                "`{{name}}` is called here. A connection is reached only through its own injector: `{{name}}` is written in `platform/database/<connection>.decorators.ts`, the cli app and the test database fixture, and nowhere else. Inject the shared EntityManager with `Inject<Connection>EntityManager()`.",
             injectorHome:
                 "`{{name}}` is an EntityManager injector that is not the one injector of a declared connection. The only allowed injector is `Inject<Pascal(connection)>EntityManager`, exported from `platform/database/<connection>.decorators.ts` of a connection declared in `hfs.json`. A capability- or feature-specific injector, a second injector for one database and an alias are all a second door to the same database: use the connection's own injector.",
             registration:
-                "`{{what}}` builds a connection outside the platform database capability and the migrate app. A connection is registered once, in `platform/database`; the migrate app builds its `DataSource` from the same `<connection>.config.ts`.",
+                "`{{what}}` builds a connection outside the platform database capability and the cli app. A connection is registered once, in `platform/database`; the cli app builds its `DataSource` from the same `<connection>.config.ts`.",
             literal:
                 "The connection name `{{name}}` is written as a string here. It is written once, as `export const {{constant}} = \"{{name}}\"` in `platform/database/{{name}}.connection.ts`; import that constant.",
             envKey:

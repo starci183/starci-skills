@@ -1,7 +1,0 @@
-id: ops-layoutpolicy-checks-only
-effectiveAt: '2026-09-28T15:45:00+07:00'
-summary: "Every op manifest's layoutPolicy drops its three copy-pasted prose keys (layout, artifacts, wrongLayout) and keeps only checks — the single key code reads (scripts/route/route-model.mjs appends it to the kind's check list; scripts/kernel/op-prompt.mjs names layoutPolicy.checks to the agent). The shared invariant they restated 37 times moves into modules/schemas/op.schema.yaml layoutPolicy.description, and the schema now declares layoutPolicy.checks as a string list. Adds no check or finding code; nothing refused before is accepted or vice versa"
-reach: new-legs
-paths:
-  - modules/ops/ops
-  - modules/schemas/op.schema.yaml

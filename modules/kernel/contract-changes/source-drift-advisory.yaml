@@ -1,4 +1,0 @@
-id: source-drift-advisory
-effectiveAt: '2026-09-24T18:50:00+07:00'
-summary: a settled leg is judged by the Source knowledge it was admitted under; a later knowledge/schema edit is advisory sourceDrift, never staleInput; staleInput is a change to the product records the leg read, from outside its workflow
-reach: new-legs

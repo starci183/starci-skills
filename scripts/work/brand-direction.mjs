@@ -35,7 +35,7 @@ import {
 } from './brand/brand.mjs';
 import { flag, reviewMain, sha256File, slash, writeRecordFile } from './work-io.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const OWNER = 'owner';
 /** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY). */
@@ -80,7 +80,7 @@ function reviewedGolden(loaded, name) {
  * The brand-direction-review ask for one archetype: {kind, text, options, refs, assets, review}. It carries no
  * recommended option and carries question.review, so it is never answered automatically.
  */
-export function directionReviewQuestion(work, { archetype, lang = 'en' } = {}) {
+export function directionReviewQuestion(work, { archetype, lang = ownerLanguage() } = {}) {
   const loaded = loadDirection(work);
   const { direction, repoRoot } = loaded;
   if (!DIRECTION_ARCHETYPES.includes(archetype)) throw new Error(`--archetype must be one of ${DIRECTION_ARCHETYPES.join(', ')}`);
@@ -255,7 +255,7 @@ function brandDirectionMain(argv = []) {
     question: (work, args) => {
       const archetype = flag(args, '--archetype');
       if (!archetype) return { exitCode: 2, text: usage };
-      return { result: directionReviewQuestion(work, { archetype, lang: flag(args, '--lang') ?? 'en' }) };
+      return { result: directionReviewQuestion(work, { archetype, lang: flag(args, '--lang') ?? ownerLanguage() }) };
     },
     apply: (work, receipt, args) => {
       const r = applyDirectionReview(work, receipt, { write: args.includes('--write') });

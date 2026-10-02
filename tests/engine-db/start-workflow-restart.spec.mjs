@@ -32,7 +32,7 @@ const fixture=t=>{
   fs.writeFileSync(fake,FAKE_ORCA.replaceAll("'dispatch-fake-1'","(state.dispatchSeq=(state.dispatchSeq??0)+1,'dispatch-fake-'+state.dispatchSeq)"));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
-    // The machine registry is fleet-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
+    // The machine registry is worker-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{}),...(f.releaseFails?{STARCI_FAKE_ORCA_RELEASE_FAILS:'1'}:{})}});
   const f={};

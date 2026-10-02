@@ -98,8 +98,8 @@ test('law tokens: knowledge, schema paths and the named data-owned files, never 
   assert.deepEqual(workInputPaths({records:['.starciwork/shell/index.yaml','.starciwork/features/x/fr/','src/a.ts','.starciwork/runtime.sqlite','.starciwork/kernel-evidence/w/x.json','.starciwork/kernel-approvals/w/x.json','.starciwork/features/<f>/**','.starciwork/../x']}),
     ['.starciwork/shell/index.yaml','.starciwork/features/x/fr']);
   assert.deepEqual([{path:'knowledge/a.yaml'},{path:'.starciwork/index.yaml'},{path:'docs/x.md'},{path:'knowledge/a.yaml',kind:'work'}].map(inputKindOf),['source','work',null,'work'],'an entry recorded before kinds is classified by its path');
-  assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)'),['knowledge/repository-baseline.yaml']);
-  assert.deepEqual(lawTokens('scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml + docs/architecture-check.md'),['modules/models/code-patterns.yaml']);
+  assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/churn-baseline.yaml (shapes common and nest)'),['knowledge/churn-baseline.yaml']);
+  assert.deepEqual(lawTokens('scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml + docs/architecture.md'),['modules/models/code-patterns.yaml']);
   assert.deepEqual(lawTokens('knowledge/patterns/be/* + knowledge/../CONTEXT.md'),['knowledge/patterns/be/*']);
   const brief={reads:[{path:'knowledge/grammars/<family>/DNA.yaml'}],policy:{executionModes:{lint:{reads:[{path:'knowledge/coding-reference.yaml'}]}}}};
   assert.deepEqual(opInputPaths(brief,{params:{family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml']);
@@ -258,11 +258,11 @@ test('a finished workflow reports no stale input',t=>{
 /* ------------------------------ the churn the live ledgers hit */
 
 // knowledge/application-stacks.yaml
-// and knowledge/repository-baseline.yaml were edited under dozens of
+// and the repository baseline record (BASELINE, a fixture path) were edited under dozens of
 // settled legs of four workflows; `api status` listed every one in staleInput, the Kernels redid the
 // seams, and each further edit re-staled the redo. The same happened through a cut set
 // (8 slices, seam first). The fix: Source edits are judged against admission.
-const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/repository-baseline.yaml';
+const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/churn-baseline.yaml';
 const T_ADMIT=Date.parse('2026-09-24T16:00:00+07:00');
 const churnRegistry=(t,{followUp=false}={})=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-churn-registry-'));

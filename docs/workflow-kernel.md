@@ -1,3 +1,4 @@
+Owner: modules/kernel/
 # Workflow kernel
 
 The kernel is **one long-lived logical LLM agent per workflow**. A provider

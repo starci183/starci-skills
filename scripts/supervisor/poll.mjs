@@ -203,7 +203,7 @@ const LAUNCH_WINDOW_MS = 3600000;
 
 /**
  * Kernel jobs still dispatchable whose workflow is finished or archived: a seat nothing releases
- * (nivo kept kernel-wf-nivo-ang-stales-refactor-mu9nfaxf 'running' days after its finish).
+ * (a ledger kept kernel-wf-<product>-ang-stales-refactor-mu9nfaxf 'running' days after its finish).
  * `api reconcile --orphan-kernel-jobs` settles them; the host controller boot phase (scripts/reconciler/boot.mjs --restart) runs it.
  */
 export const orphanKernelJobs = (db) => db.prepare(`SELECT j.job_id, j.workflow_id, j.status, j.worker_id, w.phase, w.archived_at

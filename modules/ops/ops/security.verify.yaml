@@ -8,17 +8,14 @@ completionProfile: implementation
 sideEffects: [execution of exactly the declared read-only scan/analysis commands in the declared sandbox]
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: shared
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+      en: shared
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
@@ -64,12 +61,9 @@ reads:
         tree, touch a shared or production target, or exfiltrate code or secrets; an inspection that
         cannot stay read-only is outside this op.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
 writes:
   - id: node
     path: N/index.yaml
@@ -213,8 +207,8 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
   manifest-paths: Manifest and script files defining the listed scan commands
 layoutPolicy:
   checks: [starci-validate]

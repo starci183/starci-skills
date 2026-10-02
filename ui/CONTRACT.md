@@ -1,6 +1,6 @@
 # StarCi public status UI contract
 
-The StarCi runtime is a control plane. The owner defines a Goal; one long-lived Kernel seat steers each Workflow; an ephemeral Op agent runs one job and reports; checks and the settler determine the verdict; the reconciler's seven controllers maintain mechanical progress; the Supervisor makes fleet-level decisions. The public UI observes these records and never performs their transitions.
+The StarCi runtime is a control plane. The owner defines a Goal; one long-lived Kernel seat steers each Workflow; an ephemeral Op agent runs one job and reports; checks and the settler determine the verdict; the reconciler's seven controllers maintain mechanical progress; the Supervisor makes worker-wide decisions. The public UI observes these records and never performs their transitions.
 
 The canonical schema is `starci/runtime@1` for each project ledger and `starci/machine@1` for the host machine. The runtime source is `.claude`; the machine database path is resolved by `engine/db/machine.mjs` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Project ledger paths are resolved only through `machine.ledgers`. The UI opens both through the exported read-only engine readers.
 
@@ -9,7 +9,7 @@ The canonical schema is `starci/runtime@1` for each project ledger and `starci/m
 | Concept | Question answered | UI location | Read API | Source |
 | --- | --- | --- | --- | --- |
 | C1 Goal | What was approved and which revision? | Workflow goal | `/api/workflows/:p/:wf` | `goals`, `goal_inputs` |
-| C2 Workflow | Is it progressing; why; when will it finish? | Overview rows, Workflow header | `/api/fleet`, `/api/workflows*` | `workflows`, `v_workflow_progress`, `lifecycle_changes`, `metrics_snapshots` |
+| C2 Workflow | Is it progressing; why; when will it finish? | Overview rows, Workflow header | `/api/workers`, `/api/workflows*` | `workflows`, `v_workflow_progress`, `lifecycle_changes`, `metrics_snapshots` |
 | C3 Seat | Is its Kernel or Supervisor present? | Workflow seat, System Services | `/api/seats` | `v_seats`, `v_deaf_seats`, `seat_turns` |
 | C4 Work graph | What is ready and what blocks it? | Workflow graph, units and inspector | `/api/workflows/:p/:wf/graph`, `/units*` | `v_units`, `unit_edges`, `v_blocking` |
 | C5 Kernel decision | What did the Kernel decide; did it work? | Workflow Decisions and Why | `/api/decisions/log`, `/rca` | `decisions`, `metrics_snapshots` |
@@ -33,7 +33,7 @@ An ended workflow (`phase` `archived`|`finished`) contributes no live row to `v_
 
 ## 1. HTTP API and source map
 
-Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
+Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port `statusApp.port` of `modules/models/runtimes.yaml`. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
 
 | Endpoint | Main source | UI consumer |
 | --- | --- | --- |
@@ -42,7 +42,7 @@ Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public re
 | `/api/search` | machine and ledger `v_search_ids`, log FTS | Global search |
 | `/api/blob/:sha` | machine or ledger `blobs`, content-addressed artifact store | Evidence, transcript, images, diff, logs |
 | `/api/live` | machine and ledger `v_live_marks` | Shell invalidation |
-| `/api/fleet` | `v_workflow_progress`, decisions, seats, SLA, progress snapshots | Overview |
+| `/api/workers` | `v_workflow_progress`, decisions, seats, SLA, progress snapshots | Overview |
 | `/api/projects` | `ledgers`, `repositories`, `workflows` | Overview project selector |
 | `/api/workflows` | `v_workflow_progress`, `workflows` | Overview list |
 | `/api/workflows/:p/:wf` | `workflows`, `goals`, progress/RCA snapshots, seats, blockers | Workflow header |

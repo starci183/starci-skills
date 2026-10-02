@@ -10,13 +10,16 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.persistence]
 provenance:
   reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
     - owner decision 2026-10-02 (bounded contexts; apps/cli is the migration runner)
     - https://typeorm.io/docs/migrations/why

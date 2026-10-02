@@ -95,7 +95,7 @@ guidance:
       custody bindings, not application responsibility. Bind static provenance first, then collect
       live health, migration, remote-contract and caller-journey evidence separately. Project folder
       examples guide inquiry and are not a forced universal layout. See
-      docs/application-runtime-config-and-health.md.
+      docs/application-stacks.md.
   - id: STACK-MATERIALIZE
     requirement: |
       Compose secrets bind-mount runtime files; they are not encrypted storage or protection
@@ -141,7 +141,7 @@ guidance:
       technical keys and setup within existing authority.
   - id: STACK-EVIDENCE
     requirement: |
-      Read docs/application-stacks.md, docs/application-stacks-vps.md and the synthetic kit
+      Read docs/application-stacks.md and the synthetic kit
       examples/ecommerce-app/.starcistacks. Author .starcistacks/application-stacks.yaml against
       modules/schemas/application-stacks.schema.yaml. Declare dev docker-compose and VPS docker-swarm.
       Render the actual deployment model with docker compose config or docker stack config and run the

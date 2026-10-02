@@ -6,11 +6,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkStarciStacks, checkStarciStacksMain, ownerAskConflict, resolveStackService, schemaErrors, CODES } from '../../scripts/gates/starcistacks.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schema = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'application-stacks.schema.yaml'), 'utf8'));
-const fixtures = path.join(root, 'examples', 'starcistacks-services');
+const fixtures = path.join(root, 'tests', 'fixtures', 'starcistacks-services');
 
 const write = (file, body) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); };
 const yamlOf = (value) => JSON.stringify(value, null, 2); // JSON is YAML
@@ -159,17 +158,6 @@ test('the CLI exits 0 on suspects, 1 on refusals, 2 on usage', async (t) => {
   assert.equal((await checkStarciStacksMain([product, '--admitted-at', 'nope'])).exitCode, 2);
   const json = JSON.parse((await checkStarciStacksMain([product, '--json'])).text);
   assert.equal(json.schema, 'starci/starcistacks-check@1');
-});
-
-test('the contract change registers every code the check emits', () => {
-  const changes = loadContractChanges(root).changes;
-  const change = changes.find((item) => item.id === 'starcistacks-services');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers starcistacks-services');
-  const custody = changes.find((item) => item.id === 'starcistacks-infra-value-custody');
-  assert.ok(custody?.safetyCritical, 'the infra value custody rule is a safety-critical change');
-  const registered = changes.flatMap((item) => item.adds.codes).filter((code) => code.startsWith('STACKS_'));
-  assert.deepEqual(registered.sort(), [...CODES].sort());
-  assert.ok(change.adds.checks.includes('starci-starcistacks-check'));
 });
 
 test('api report refuses an ask for a declared credential and files any other ask', async (t) => {

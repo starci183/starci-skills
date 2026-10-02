@@ -24,7 +24,7 @@ import {
 import { LITE_FE_DECLARATION, at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 
 // Rules that read the slot of the file (fetch-only-in-api-client, ...) run under the fixture repository: two apps and the
-// shared packages, so `at("apps/web/...")` is an app file and `at("packages/todo-app-api/...")` the shared api package.
+// shared packages, so `at("apps/web/...")` is an app file and `at("packages/shop-api/...")` the shared api package.
 const slots = slotTester()
 const typed = typedTester()
 const typedLite = typedTester({ declaration: LITE_FE_DECLARATION, lite: true })
@@ -34,8 +34,8 @@ const tester = new RuleTester({
 })
 
 const CLIENT = at("apps/web/src/modules/api/client.ts")
-const PKG_CLIENT = at("packages/todo-app-api/src/client.ts")
-const PKG_TRANSPORT = at("packages/todo-app-api/src/transport.ts")
+const PKG_CLIENT = at("packages/shop-api/src/client.ts")
+const PKG_TRANSPORT = at("packages/shop-api/src/transport.ts")
 const READER = at("apps/web/src/modules/api/course/read-course.ts")
 const GENERATED = at("apps/web/src/modules/api/__generated__/types.ts")
 const HOOK = at("apps/web/src/hooks/course/useCourse.ts")
@@ -81,7 +81,7 @@ test("FE-TRANSPORT-1: fetch is reached in the api client slot and nowhere else",
       { filename: PKG_TRANSPORT, code: "const r = await fetch(url, { signal })", errors: [{ messageId: "outside" }] },
       { filename: at("apps/web/src/modules/api/transport.ts"), code: "const r = await fetch(url, { signal })", errors: [{ messageId: "outside" }] },
       { filename: at("apps/admin/src/hooks/course/useCourse.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
-      { filename: at("packages/todo-app-i18n/src/messages.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
+      { filename: at("packages/shop-i18n/src/messages.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
       // a connection that is not `fetch` is a transport too
       { filename: HOOK, code: "const r = new Request(url)", errors: [{ messageId: "channel" }] },
       { filename: HOOK, code: "const s = new EventSource(url)", errors: [{ messageId: "channel" }] },
@@ -142,7 +142,7 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: CLIENT, code: "export const f = () => { let n = 0; return n }" },
       { filename: PKG_CLIENT, code: "export const f = () => { let n = 0; return n }" },
       { filename: HOOK, code: "let token = null" },
-      { filename: at("packages/todo-app-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
+      { filename: at("packages/shop-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
       { filename: GENERATED, code: "let x = 1" },
       { filename: at("apps/web/src/modules/api/__generated__/graphql.ts"), code: "let x = 1" },
       // a folder named api below another module is not the API layer
@@ -156,7 +156,7 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: CLIENT, code: "var cache = {}", errors: [{ messageId: "shared" }] },
       { filename: PKG_CLIENT, code: "let token = null", errors: [{ messageId: "shared" }] },
       { filename: PKG_TRANSPORT, code: "let token = null", errors: [{ messageId: "shared" }] },
-      { filename: at("packages/todo-app-api/src/outcome.ts"), code: "export let last = null", errors: [{ messageId: "shared" }] },
+      { filename: at("packages/shop-api/src/outcome.ts"), code: "export let last = null", errors: [{ messageId: "shared" }] },
     ],
   })
 })
@@ -341,7 +341,7 @@ test("TRANSPORT-7: a switch over an Outcome names every kind", () => {
 
 test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () => {
   const API_OUTCOME = at("apps/web/src/modules/api/outcome.ts")
-  const PKG_OUTCOME = at("packages/todo-app-api/src/outcome.ts")
+  const PKG_OUTCOME = at("packages/shop-api/src/outcome.ts")
   const UNION = "export type Outcome<T> = { ok: true; data: T } | { ok: false; kind: \"refused\" | \"unavailable\" }"
   typed.run("one-outcome-union", oneOutcomeUnion, {
     valid: [
@@ -388,7 +388,7 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       },
       // in another app and in a package that is not the api package
       { filename: at("apps/admin/src/hooks/course/useCourse.ts"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
-      { filename: at("packages/todo-app-ui/src/leaves/Menu/index.tsx"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
+      { filename: at("packages/shop-ui/src/leaves/Menu/index.tsx"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
       // another file of the api layer is not the outcome file
       { filename: CLIENT, code: UNION, errors: [{ messageId: "second" }] },
       { filename: PKG_CLIENT, code: UNION, errors: [{ messageId: "second" }] },

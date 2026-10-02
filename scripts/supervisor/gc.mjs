@@ -84,7 +84,7 @@ import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { evictOverCap, spareInfo } from './lane-cap.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
-import { translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 
 export const SCHEMA = 'starci/gc-report@1';
@@ -602,7 +602,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
 /* ------------------------------------------------------------ the run */
 
 /** The one owner-digest line (Vietnamese per config.yaml language vi; English otherwise). */
-export function gcLine(counts, { language = 'vi', apply = true } = {}) {
+export function gcLine(counts, { language = ownerLanguage(), apply = true } = {}) {
   const bytes = (counts.freedBytes ?? 0) + (counts.ramFreedBytes ?? 0);
   return translator(language)(
     apply ? 'Garbage collected: {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}'
@@ -628,7 +628,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     if (!lock?.ok) {
       report.ok = false; report.busy = true;
       report.errors.push(`gc-busy: another GC apply holds the host lock (${JSON.stringify(lock?.holder ?? null).slice(0, 160)}); nothing was touched`);
-      report.line = gcLine(report.counts, { language: language ?? 'vi', apply }); report.durationMs = Date.now() - started;
+      report.line = gcLine(report.counts, { language: language ?? ownerLanguage(), apply }); report.durationMs = Date.now() - started;
       return report;
     }
   }
@@ -795,7 +795,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     report.counts.ramFreedBytes = Math.max(0, (deps.freemem ?? os.freemem)() - freeBefore);
   }
   report.ok = report.ok && report.errors.length === 0;
-  const lang = language ?? (() => { try { return deps.language ?? null; } catch { return null; } })() ?? 'vi';
+  const lang = language ?? (() => { try { return deps.language ?? null; } catch { return null; } })() ?? ownerLanguage();
   report.line = gcLine(report.counts, { language: lang, apply });
   report.durationMs = Date.now() - started;
 
@@ -859,8 +859,7 @@ export function parseArgs(argv = []) {
 if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
-  let language = 'vi';
-  try { language = (await import('../machine/home.mjs')).supervisorSettings().language ?? 'vi'; } catch { /* vi */ }
+  const language = ownerLanguage();
   // --plan: no seen-state, no log rows, no lessons; --holder: the host-lock holder of an apply (deps other than holder drop the lock, so name only it)
   const deps = args.plan ? { writeState: () => {}, log: () => {}, lesson: () => null } : args.holder ? { holder: args.holder } : {};
   const report = await runGc({ apply: args.apply, only: args.only, language, trigger: args.trigger ?? 'manual', deps });

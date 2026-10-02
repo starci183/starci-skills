@@ -5,7 +5,7 @@
 //   node scripts/work/brand/brand-palette.mjs --check <png> --brand <work-root> [--json]
 //   node scripts/work/brand/brand-palette.mjs --scan <work-root> [--json]     every part, composite and capture, read-only
 //
-// Owner, 2026-09-24 ("why is it red one time and green the next??"): one nivo drawing painted its primary button, links and selection in
+// Owner, 2026-09-24 ("why is it red one time and green the next??"): one product drawing painted its primary button, links and selection in
 // the image model's default blue while the brand has ONE accent, Unicorn red. scripts/work/ui/render.mjs already read
 // pixels against the brand (`palette-off-brand`, `primary-absent`), but only the example render proof ran it, so
 // nothing on the draw, brand or implement path ever looked at a colour. This module is the drawn-image form of those
@@ -101,7 +101,7 @@ function hueName(h) {
 /**
  * The brand's palette as the checks read it: every declared colour (tokens with their roles, scale steps, the
  * dark answers), the chromatic ones marked, the primary picked out, and which tokens carry the primary's colour
- * (nivo's danger and focus are its accent, so they count as the primary too).
+ * (a product whose danger and focus are its accent counts them as the primary too).
  */
 export function brandPalette(brand, { brandDir = null } = {}) {
   const entries = brandColours(brand).map((entry) => ({ ...entry, oklch: entry.color.oklch, chromatic: entry.color.oklch.C >= CHROMATIC_TOKEN }));

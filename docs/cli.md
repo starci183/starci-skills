@@ -1,3 +1,4 @@
+Owner: modules/kernel/api.yaml
 # Command surface
 
 There are two surfaces: `bin/starci.mjs` (through a reviewed npm archive, or

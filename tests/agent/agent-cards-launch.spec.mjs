@@ -37,7 +37,8 @@ test('a launch that names no model starts the card\'s model, so a dead default i
     rename: () => ({ ok: true }),
     show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6-luna' } }) };
   const card = loadAdapter('codex').card;
-  assert.equal(card.start.defaultModel, 'gpt-6-luna');
+  // The card's `defaultModel: pool` resolves through the provider pool's registry.yaml defaultModel.
+  assert.equal(card.start.defaultModel, 'pool');
   const r = spawnAgent({ provider: 'codex', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 1 }, io });
   assert.equal(r.ok, true, r.error);
   assert.equal(calls[0].model, 'gpt-6-luna');

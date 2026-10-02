@@ -22,7 +22,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 
-const WORK='wf-todo-app-work-and-stacks-mud7kjun',BASE='wf-todo-app-base-repos-mud7kk5c',DONE='wf-todo-app-finished',OTHER='wf-todo-app-other';
+const WORK='wf-shop-work-and-stacks-mud7kjun',BASE='wf-shop-base-repos-mud7kk5c',DONE='wf-shop-finished',OTHER='wf-shop-other';
 const DETAIL='brand.decide preflight needs installed @starci/grammar 0.5.0 in FE; peer owns the FE upgrade (pm-ab67deff28d8)';
 
 const fixture=t=>{

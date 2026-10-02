@@ -2,8 +2,8 @@
 //
 // An owner-gate or peer-wait used to describe its release only in free text ("resolve when
 // .starciwork/shell/index.yaml exists", "wait for job X to settle + sha"). Nobody re-checked it and
-// workflows sat for hours after the condition held (nivo wf-nivo-app-auth-mudqjob3 inc-9f2e1e7ff1f6
-// waited on op-backend.implement-82b3110067; Collab inc-28187662c4fe on the Modules shell rev).
+// workflows sat for hours after the condition held (inc-9f2e1e7ff1f6
+// waited on op-backend.implement-82b3110067; inc-28187662c4fe on the Modules shell rev).
 // `api incident ... --until-<type> <spec>` stores TYPED conditions on the incident; the runtime
 // evaluates them read-only on every `api status` (every watchdog tick), before route/dispatch, after
 // a settle and after a peer message, and resolves the incident itself once every condition holds
@@ -269,7 +269,7 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
     }
     if (cond.type === 'job') {
       // The wait follows the job's retry lineage (lineageHeadOf): a cancelled job was dropped or
-      // re-planned, never settled (nivo auth inc-7c46a61faba1 released on a cancel of
+      // re-planned, never settled (an auth workflow's inc-7c46a61faba1 released on a cancel of
       // op-backend.implement-3156a882e8), and a failed job with a retry is not the unit's last word.
       const head = lineageHeadById(db, cond.jobId);
       if (!head) return { met: false, unmeetable: `job ${cond.jobId} is gone`, evidence: `${cond.jobId} absent` };

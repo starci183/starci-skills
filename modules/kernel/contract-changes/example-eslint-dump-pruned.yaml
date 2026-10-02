@@ -1,5 +1,0 @@
-id: example-eslint-dump-pruned
-effectiveAt: '2026-09-28T16:00:00+07:00'
-summary: "Remove the obsolete JSON exception for the generated ecommerce eslint output after deleting that tracked dump. No runtime behavior or schema shape changes."
-paths:
-  - modules/schemas/json-exceptions.yaml

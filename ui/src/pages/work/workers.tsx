@@ -1,0 +1,55 @@
+import { useState } from 'react';
+import { ArrowRight, CircleAlert } from 'lucide-react';
+import { refreshQuery, useApiQuery } from '../../api/query';
+import type { WorkersViewV2, HostView } from '../../contract';
+import { formatReason } from '../../i18n/vi';
+import { t } from '../../i18n/t';
+import { Card, CardContent } from '../../components/ui/card';
+import { ConceptBlock, type Concept } from '../../components/concept';
+import { StatusChip, StatusDot } from '../../components/status-chip';
+import { statusFromUi } from '../../components/status';
+import { KpiExtras, KpiStrip } from '../../components/overview/kpi-strip';
+import { WorkflowCard } from '../../components/overview/workflow-card';
+import { LiveFeed } from '../../components/overview/live-feed';
+import { ModelsPanel } from '../../components/overview/models-panel';
+import { HostCard } from '../../components/host/host-card';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
+import { Advanced, Stagger, StaggerItem } from '../../components/motion';
+
+export const concept: Concept = 'C2';
+
+const healthNames: Record<string, string> = { engine: 'Engine', services: t('Services'), seats: t('Seats'), ram: 'RAM', sla: 'SLA', leaks: t('Leaks'), gc: t('Cleanup'), land: 'Land', providers: t('Providers') };
+const whoNames: Record<string, string> = { owner: t('The owner'), supervisor: 'Supervisor', kernel: 'Kernel', controller: 'Controller' };
+
+export function WorkersPage() {
+  const [project, setProject] = useState('all');
+  const workers = useApiQuery<WorkersViewV2>('/api/workers?phase=all', { topics: ['workers', 'decisions', 'system'], intervalMs: 20_000 });
+  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['workers'], intervalMs: 60_000 });
+  const host = useApiQuery<HostView>('/api/host', { topics: ['system'], intervalMs: 10_000 });
+  const data = workers.data ?? undefined;
+  const visibleWorkflows = (data?.workflows ?? []).filter(row => project === 'all' || row.project === project);
+  const summary = data ? t('{live} workflows running · {bad} need handling · {owner} waiting for the owner', { live: data.counts.live, bad: data.counts.bad, owner: data.counts.ownerDecisions }) : t('Reading the situation…');
+  const healthCount = data?.health.items.length ?? 0;
+  return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-24 md:gap-8">
+    <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('StarCi / overview')}</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t('Overview')}</h1><p className="text-sm text-muted-foreground">{summary}</p></header>
+    {workers.error && <FeedbackState error onRetry={() => refreshQuery('/api/workers?phase=all')}>{workers.error}</FeedbackState>}
+    <KpiStrip summary={data?.summary} needsAttention={data?.counts.bad} />
+    <ConceptBlock concept="C12" as="section"><div className="mb-3 flex items-center gap-2"><CircleAlert className="size-4" aria-hidden="true" /><h2 className="font-semibold">{t('Needs attention')}</h2><span className="text-sm text-muted-foreground">{data?.attention.length ?? '—'}</span></div>
+      <Card><CardContent className="p-4 pt-4 sm:p-6 sm:pt-6">{data?.attention.length ? <Stagger className="divide-y">{data.attention.map((item, index) => <StaggerItem key={`${item.ref.kind}-${item.ref.id}-${index}`} className="py-3 first:pt-0 last:pb-0"><a href={item.ref.href} className="flex min-w-0 items-center gap-3 hover:text-primary"><StatusChip status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate text-sm" title={formatReason(item.reason)}>{formatReason(item.reason)}</span><span className="hidden text-xs text-muted-foreground sm:block">{whoNames[item.who] ?? item.who}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></a></StaggerItem>)}</Stagger> : workers.loading ? <PageSkeleton label={t('Loading…')} /> : <FeedbackState>{t('Nothing needs attention.')}</FeedbackState>}</CardContent></Card>
+    </ConceptBlock>
+    <ConceptBlock concept="C2" as="section" className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Workflow</h2><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{visibleWorkflows.length} workflow</span><label className="sr-only" htmlFor="workers-project">{t('Project')}</label><select id="workers-project" value={project} onChange={event => setProject(event.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs"><option value="all">{t('All projects')}</option>{projects.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div></div>
+      <Stagger key={project} className="grid gap-4 md:grid-cols-2">{visibleWorkflows.map(row => <StaggerItem key={`${row.project}/${row.id}`} className="min-w-0"><WorkflowCard row={row} /></StaggerItem>)}</Stagger>
+      {data && visibleWorkflows.length === 0 && <FeedbackState>{t('No matching workflows.')}</FeedbackState>}
+    </ConceptBlock>
+    <section className="flex min-w-0 flex-col gap-4" aria-label={t('System details')}>
+      <Advanced variant="card" title={t('Host')} summary={host.data ? `CPU ${host.data.cpu.loadPct ?? '—'} % · RAM ${Math.round(host.data.ram.usedPct)} %` : t('CPU, RAM, GPU, disks')}><HostCard bare /></Advanced>
+      <Advanced variant="card" title={t('Models and tokens')} summary={t('running agents · ops by model · 24-hour tokens')}><div className="flex flex-col gap-4"><ModelsPanel summary={data?.summary} bare /><KpiExtras summary={data?.summary} /></div></Advanced>
+      <Advanced variant="card" title={t('Happening now')} summary={t('the live event stream')}><div className="overflow-hidden"><LiveFeed /></div></Advanced>
+      <Advanced variant="card" title={t('System health')} summary={t('{n} items · {m} need handling', { n: healthCount, m: data?.counts.bad ?? 0 })}>
+        <ConceptBlock concept="C13" as="div" className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">{data?.health.items.map(item => <a key={item.key} href={item.href} className="flex min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted/50"><StatusDot status={statusFromUi(item.ui)} /><span className="font-medium">{healthNames[item.key]}</span><span className="min-w-0 truncate text-muted-foreground" title={item.value}>{item.value}</span></a>) ?? <span className="text-sm text-muted-foreground">{t('Loading…')}</span>}</ConceptBlock>
+      </Advanced>
+    </section>
+  </div>;
+}
+
+export default WorkersPage;

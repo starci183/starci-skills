@@ -1,8 +1,0 @@
-id: nivo-main-colour-ink-ruled
-effectiveAt: '2026-09-28T00:30:00+07:00'
-summary: "Owner ruled the Nivo main colour on 2026-09-27 ('settled'): brand ink #040d1c is the accent (primary buttons, meters, emphasis); red #e3001f only for artwork/mascot and danger. The Nivo seed direction's pendingRulings main-colour is now ruled with its receipt; owner-rulings.yaml nivo-main-colour-ink is confirmed. Owed in the product: nivo-fe binds --nivo-accent to #040d1c, and brand.decide records it in the Nivo brand record. Adds no check or finding code"
-reach: new-legs
-paths:
-  - knowledge/ui/examples/brand-direction.nivo.yaml
-  - modules/kernel/owner-rulings.yaml
-  - tests/brand-direction.spec.mjs

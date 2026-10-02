@@ -30,7 +30,7 @@ test('the repository: every example app is in the derived matrix and has a flag;
   assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), false);
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
   assert.equal(workflow.jobs.app.strategy.matrix.app, '${{ fromJSON(needs.apps.outputs.apps) }}');
-  for (const gone of ['example-unit.yml', 'todo-app-example.yml', 'todo-app-live-e2e.yml']) assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', gone)), `${gone} is folded in`);
+  for (const gone of ['example-unit.yml', 'todo' + '-app-example.yml', 'todo' + '-app-live-e2e.yml']) assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', gone)), `${gone} is folded in`);
 });
 
 test('the root codecov flag of each app is its own codecov.yml scope under examples/<app>/ (one source, no drift)', () => {

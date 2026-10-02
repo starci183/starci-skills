@@ -6,9 +6,10 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import { isMain } from '../../lib/is-main.mjs';
+import { workCommonDef } from '../../lib/work-schemas.mjs';
 
 /**
- * Every check in the fleet so far reads one record and asks whether that record agrees with itself: an id
+ * Every check so far reads one record and asks whether that record agrees with itself: an id
  * matching its directory, a digest matching its bytes, a ref that resolves to something
  * (check-example-work.mjs), or a record against the code and files around it (check-work-deep.mjs). Nothing
  * asked whether the records agree with EACH OTHER, and that is where the worst findings sat: a rule
@@ -78,7 +79,14 @@ export function declaredStateValues(schema) {
   let allowed = null;
   if (fs.existsSync(file)) {
     try {
-      const enumValues = parseYaml(fs.readFileSync(file, 'utf8'))?.$defs?.state?.enum;
+      const doc = parseYaml(fs.readFileSync(file, 'utf8'));
+      let enumValues = doc?.$defs?.state?.enum;
+      if (!Array.isArray(enumValues)) {
+        // The shared `state` shape moved to work-common.schema.yaml; the family file keeps only the $ref.
+        const ref = /^urn:work:common:1#\/\$defs\/(.+)$/
+          .exec(doc?.properties?.state?.$ref ?? doc?.$defs?.state?.$ref ?? '')?.[1];
+        if (ref) enumValues = workCommonDef(ref, root)?.enum;
+      }
       if (Array.isArray(enumValues) && enumValues.length) allowed = enumValues;
     } catch { allowed = null; }
   }

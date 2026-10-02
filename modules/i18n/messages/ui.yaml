@@ -1,0 +1,2571 @@
+schema: starci/i18n-catalog@1
+area: ui
+scope: ui
+purpose: Owner-visible browser interface text, keyed from the English source at each t() call site.
+messages:
+  - en: " (minimum {n})"
+    vi: " (tối thiểu {n})"
+  - en: " (open)"
+    vi: " (còn mở)"
+  - en: " / {n} errors"
+    vi: " / {n} lỗi"
+  - en: " · {n} errors"
+    vi: " · {n} lỗi"
+  - en: " · {n} failed"
+    vi: " · {n} hỏng"
+  - en: " · {n} parallel units"
+    vi: " · {n} unit song song"
+  - en: " · {n} tries"
+    vi: " · thử {n} lần"
+  - en: " · order {order}"
+    vi: " · thứ tự {order}"
+  - en: " · policy {policy}"
+    vi: " · chính sách {policy}"
+  - en: " · rejected {n}"
+    vi: " · bị từ chối {n}"
+  - en: ({n} attempts)
+    vi: ({n} lần thử)
+  - en: (no attempts yet)
+    vi: (chưa có lần thử)
+  - en: (try {n}/5)
+    vi: (lần {n}/5)
+  - en: (unknown check)
+    vi: (không rõ check)
+  - en: (windowed, no wrapping)
+    vi: (hiển thị theo cửa sổ, không xuống dòng)
+  - en: ", the current leg"
+    vi: ", chặng hiện tại"
+  - en: ; this op ran on the main checkout so there is no separate worktree to compare
+    vi: ; op này chạy trên bản checkout chính nên không có worktree riêng để so
+  - en: "{at}/{total} results"
+    vi: "{at}/{total} kết quả"
+  - en: "{attempts} attempts · {failures} failed"
+    vi: "{attempts} lần thử · {failures} hỏng"
+  - en: "{done} of {total} legs passed"
+    vi: "{done} trên {total} chặng đạt"
+  - en: "{done}/{total} legs passed"
+    vi: "{done}/{total} chặng đạt"
+  - en: "{green} pass, {red} red"
+    vi: "{green} đạt, {red} đỏ"
+  - en: "{green}/{checks} checks pass"
+    vi: "{green}/{checks} check đạt"
+  - en: "{green}/{checks} checks pass, {red} red"
+    vi: "{green}/{checks} check đạt, {red} đỏ"
+  - en: "{h} h {m} min"
+    vi: "{h} giờ {m} phút"
+  - en: "{in} in · {out} out"
+    vi: "{in} vào · {out} ra"
+  - en: "{input} in · {output} out"
+    vi: "{input} vào · {output} ra"
+  - en: "{legs} legs in the chain · {attempts} attempts · {failures} failed"
+    vi: "{legs} chặng trong chuỗi · {attempts} lần thử · {failures} lần hỏng"
+  - en: "{lines} lines · {kind} · {at}"
+    vi: "{lines} dòng · {kind} · {at}"
+  - en: "{m} min"
+    vi: "{m} phút"
+  - en: "{m} min {s} sec"
+    vi: "{m} phút {s} giây"
+  - en: "{n} attached records"
+    vi: "{n} bản ghi đính kèm"
+  - en: "{n} attempts"
+    vi: "{n} lần thử"
+  - en: "{n} blocking points"
+    vi: "{n} điểm đang chặn"
+  - en: "{n} decisions waiting"
+    vi: "{n} quyết định đang chờ"
+  - en: "{n} dispatched"
+    vi: giao {n}
+  - en: "{n} empty files · hide"
+    vi: "{n} tệp rỗng · ẩn"
+  - en: "{n} empty files · view"
+    vi: "{n} tệp rỗng · xem"
+  - en: "{n} failed"
+    vi: "{n} hỏng"
+  - en: "{n} failed attempts"
+    vi: "{n} lần thử hỏng"
+  - en: "{n} failing sources"
+    vi: "{n} nguồn hỏng"
+  - en: "{n} failures"
+    vi: "{n} lần hỏng"
+  - en: "{n} files changed"
+    vi: "{n} tệp thay đổi"
+  - en: "{n} files written to the repo"
+    vi: "{n} tệp trong repo đã được ghi"
+  - en: "{n} hidden lines"
+    vi: "{n} dòng bị ẩn"
+  - en: "{n} hours"
+    vi: "{n} giờ"
+  - en: "{n} hours ago"
+    vi: "{n} giờ trước"
+  - en: "{n} Kernel notes"
+    vi: "{n} ghi chú của Kernel"
+  - en: "{n} lines"
+    vi: "{n} dòng"
+  - en: "{n} lines back"
+    vi: lùi {n} dòng
+  - en: "{n} lines forward"
+    vi: tiến {n} dòng
+  - en: "{n} min"
+    vi: "{n} phút"
+  - en: "{n} minutes ago"
+    vi: "{n} phút trước"
+  - en: "{n} open"
+    vi: "{n} đang mở"
+  - en: "{n} ops"
+    vi: "{n} op"
+  - en: "{n} paths"
+    vi: "{n} đường dẫn"
+  - en: "{n} paths may be written"
+    vi: "{n} đường dẫn được sửa"
+  - en: "{n} paths may be written:"
+    vi: "{n} đường dẫn được sửa:"
+  - en: "{n} projects from sources"
+    vi: "{n} dự án từ các nguồn"
+  - en: "{n} removed"
+    vi: "{n} đã gỡ"
+  - en: "{n} sec"
+    vi: "{n} giây"
+  - en: "{n} seconds ago"
+    vi: "{n} giây trước"
+  - en: "{n} settled"
+    vi: chốt {n}
+  - en: "{n} units/hour"
+    vi: "{n} unit/giờ"
+  - en: "{n}/{total} attempts"
+    vi: "{n}/{total} lần thử"
+  - en: "{n}/hour"
+    vi: "{n}/giờ"
+  - en: "{n}B"
+    vi: "{n} tỷ"
+  - en: "{n}k"
+    vi: "{n} N"
+  - en: "{n}M"
+    vi: "{n} tr"
+  - en: "{nodes} slices · {edges} edges"
+    vi: "{nodes} lát cắt · {edges} cạnh"
+  - en: "{pass} passed, {fail} failed, {other} other"
+    vi: "{pass} đạt, {fail} hỏng, {other} khác"
+  - en: "{pass}/{total} passed"
+    vi: "{pass}/{total} đạt"
+  - en: "{units} units · {done} passed"
+    vi: "{units} unit · {done} đạt"
+  - en: "{who} is handling · {reason}"
+    vi: "{who} đang lo · {reason}"
+  - en: … and {n} more paths
+    vi: … và {n} đường dẫn nữa
+  - en: A chain of {legs} legs in {cols} columns
+    vi: Chuỗi {legs} chặng, {cols} cột
+  - en: A data source is stale or failing
+    vi: Một nguồn dữ liệu đang cũ hoặc hỏng
+  - en: added
+    vi: thêm
+  - en: After
+    vi: Sau
+  - en: Agent attested
+    vi: Agent đã chứng thực
+  - en: Agents have reported and are waiting for the Kernel to settle.
+    vi: Agent đã báo, đang chờ Kernel chốt.
+  - en: Agents running
+    vi: Agent đang chạy
+  - en: All kinds
+    vi: Mọi loại
+  - en: "also: {names}"
+    vi: "cũng là: {names}"
+  - en: Analytics
+    vi: Phân tích
+  - en: Answer the decision
+    vi: Trả lời quyết định
+  - en: assertions passed
+    vi: assertion đạt
+  - en: Assignment
+    vi: Phân công
+  - en: At
+    vi: Thời điểm
+  - en: At time
+    vi: Vào lúc
+  - en: attempt
+    vi: lần thử
+  - en: Attempt
+    vi: Lần thử
+  - en: attempt {n}
+    vi: lần thử {n}
+  - en: Attempt duration by op
+    vi: Thời gian mỗi lần thử theo op
+  - en: Attempt lifecycle
+    vi: Vòng đời lần thử
+  - en: Attempt timeline by leg
+    vi: Dòng thời gian các lần thử theo chặng
+  - en: Attempts dispatched and attempts settled, per {step}.
+    vi: Số lần thử được giao và số lần thử được chốt, mỗi {step}.
+  - en: Attempts settled with a failing result.
+    vi: Lần thử đã chốt với kết quả không đạt.
+  - en: Attempts settled with a passing result.
+    vi: Lần thử đã chốt với kết quả đạt.
+  - en: "author op: {op}"
+    vi: "op tác giả: {op}"
+  - en: Back to Overview
+    vi: Về Tổng quan
+  - en: Before
+    vi: Trước
+  - en: Binary file.
+    vi: Tệp nhị phân.
+  - en: Blob store
+    vi: Kho blob
+  - en: blocked
+    vi: bị chặn
+  - en: Blocked
+    vi: Bị chặn
+  - en: Branch · worktree
+    vi: Nhánh · worktree
+  - en: by {actor}
+    vi: bởi {actor}
+  - en: By model
+    vi: Theo model
+  - en: By op (leg)
+    vi: Theo op (chặng)
+  - en: By record
+    vi: Theo lượt ghi
+  - en: Cache
+    vi: Cache
+  - en: Cache read
+    vi: Cache đọc
+  - en: Cache write
+    vi: Cache ghi
+  - en: cancelled
+    vi: đã huỷ
+  - en: Cancelled
+    vi: Đã huỷ
+  - en: Changes
+    vi: Thay đổi
+  - en: changes the op wrote to the repo
+    vi: thay đổi op đã ghi vào repo
+  - en: Check output
+    vi: Output của check
+  - en: Check the URL.
+    vi: Kiểm tra URL.
+  - en: check.* — check
+    vi: check.* — kiểm tra
+  - en: Checked
+    vi: Đã kiểm
+  - en: "Claimed paths: {paths}"
+    vi: "Đường dẫn op tuyên bố: {paths}"
+  - en: Clear search
+    vi: Xoá tìm kiếm
+  - en: closed
+    vi: đã đóng
+  - en: cmd.* — command
+    vi: cmd.* — lệnh
+  - en: Collapse
+    vi: Thu gọn
+  - en: Component kit
+    vi: Bộ thành phần
+  - en: Conditions · {n}
+    vi: Điều kiện · {n}
+  - en: Content
+    vi: Nội dung
+  - en: controller actions taken
+    vi: hành động controller đã thực hiện
+  - en: Copied
+    vi: Đã chép
+  - en: Copy
+    vi: Chép
+  - en: Copy all
+    vi: Chép hết
+  - en: Copy source
+    vi: Chép nguồn
+  - en: Copy the full value
+    vi: Chép giá trị đầy đủ
+  - en: Cost
+    vi: Chi phí
+  - en: Cost (USD)
+    vi: Chi phí (USD)
+  - en: "Could not read {name}: {error}"
+    vi: "Không đọc được {name}: {error}"
+  - en: Could not read the API contract
+    vi: Không đọc được hợp đồng API
+  - en: Could not read the dispatched data yet.
+    vi: Chưa đọc được dữ liệu giao.
+  - en: Could not read the workflow goal yet.
+    vi: Chưa đọc được mục tiêu workflow.
+  - en: Counting files…
+    vi: Đang đếm tệp…
+  - en: critical SLA violation
+    vi: vi phạm SLA nghiêm trọng
+  - en: Currently at
+    vi: Đang ở
+  - en: Cut · after
+    vi: Cắt · sau
+  - en: Dark theme
+    vi: Giao diện tối
+  - en: Data
+    vi: Dữ liệu
+  - en: "Data sources:"
+    vi: "Nguồn số liệu:"
+  - en: day
+    vi: ngày
+  - en: Decision
+    vi: Quyết định
+  - en: decision — decision
+    vi: decision — quyết định
+  - en: Decisions
+    vi: Quyết định
+  - en: deferred
+    vi: hoãn
+  - en: Deferred / external
+    vi: Hoãn / ngoài workflow
+  - en: Deferred by configuration
+    vi: Hoãn theo cấu hình
+  - en: deleted
+    vi: đã xoá
+  - en: Diff
+    vi: Diff
+  - en: difficulty {level}
+    vi: độ khó {level}
+  - en: dispatch — dispatch
+    vi: dispatch — giao việc
+  - en: Dispatched
+    vi: Giao
+  - en: Dispatched attempts the agent has not reported yet.
+    vi: Lần thử đã giao, agent chưa báo kết quả.
+  - en: "Domains: {list}"
+    vi: "Miền: {list}"
+  - en: Done
+    vi: Xong
+  - en: Download .txt
+    vi: Tải .txt
+  - en: dropped
+    vi: đã bỏ
+  - en: Dropped
+    vi: Đã bỏ
+  - en: Duration per attempt (minutes)
+    vi: Thời gian mỗi lần thử (phút)
+  - en: Each bar is one op. Length follows the attempt count; the k/n label is passes over total
+      attempts.
+    vi: Mỗi thanh là một op. Độ dài theo số lần thử; nhãn k/n là số lần đạt trên tổng số lần thử.
+  - en: Each dot is one attempt, from dispatch to settle. A hollow dot is an open attempt, counted up to
+      now.
+    vi: Mỗi chấm là một lần thử, từ lúc giao tới lúc chốt. Chấm rỗng là lần thử còn mở, tính tới bây
+      giờ.
+  - en: Empty files
+    vi: Tệp rỗng
+  - en: "event: {event}"
+    vi: "sự kiện: {event}"
+  - en: Evidence files
+    vi: Tệp bằng chứng
+  - en: Evidence submitted by the op (`evidence/`)
+    vi: Bằng chứng op nộp (`evidence/`)
+  - en: evidence/ is the op evidence folder; older attempts recorded it as E/
+    vi: evidence/ là thư mục bằng chứng của op; lần thử cũ ghi là E/
+  - en: Fail
+    vi: Hỏng
+  - en: failed
+    vi: hỏng
+  - en: Failed
+    vi: Hỏng
+  - en: failed / blocked in 24 h
+    vi: hỏng / chặn 24 giờ
+  - en: Failed/blocked
+    vi: Hỏng/chặn
+  - en: file.* — file edit
+    vi: file.* — sửa tệp
+  - en: Files that belong to none of the groups above.
+    vi: Tệp không thuộc nhóm nào ở trên.
+  - en: Files the op wrote itself to prove its result.
+    vi: Tệp op tự viết ra để chứng minh kết quả.
+  - en: final copy
+    vi: bản cuối
+  - en: Final copy
+    vi: Bản cuối
+  - en: Find text or /regex/
+    vi: Tìm chữ hoặc /regex/
+  - en: Finished
+    vi: Đã xong
+  - en: Worker metrics
+    vi: Số liệu toàn hệ thống
+  - en: Follow live
+    vi: Theo trực tiếp
+  - en: from the CLI transcript
+    vi: từ transcript CLI
+  - en: Go
+    vi: Đi
+  - en: Goal · revision {n}
+    vi: Mục tiêu · bản {n}
+  - en: goal revision {n}
+    vi: mục tiêu bản {n}
+  - en: Handled externally
+    vi: Do bên ngoài xử lý
+  - en: Hide the English original
+    vi: Ẩn bản gốc tiếng Anh
+  - en: Images & video
+    vi: Ảnh & video
+  - en: IMG
+    vi: ẢNH
+  - en: in
+    vi: vào
+  - en: In
+    vi: Vào
+  - en: in {input} · out {output}
+    vi: vào {input} · ra {output}
+  - en: in {input} · out {output} · {cost}
+    vi: vào {input} · ra {output} · {cost}
+  - en: in {input} · out {output} · {cost} · {turns} turns
+    vi: vào {input} · ra {output} · {cost} · {turns} lượt
+  - en: incident — incident
+    vi: incident — sự cố
+  - en: Infrastructure & cost
+    vi: Hạ tầng & chi phí
+  - en: Infrastructure and cost
+    vi: Hạ tầng và chi phí
+  - en: Input records
+    vi: Bản ghi đầu vào
+  - en: Input tokens
+    vi: Token vào
+  - en: Inputs
+    vi: Đầu vào
+  - en: Inputs & context
+    vi: Đầu vào & ngữ cảnh
+  - en: Integration commit
+    vi: Commit tích hợp
+  - en: Job system log · {n}
+    vi: Nhật ký hệ thống của job · {n}
+  - en: Jump to end
+    vi: Về cuối
+  - en: Jump to line
+    vi: Nhảy tới dòng
+  - en: Kernel (coordinator turns)
+    vi: Kernel (lượt điều phối)
+  - en: Kernel hands to the op
+    vi: Kernel giao cho op
+  - en: Kernel has not settled
+    vi: Kernel chưa chốt
+  - en: Kernel notes
+    vi: Kernel ghi chú
+  - en: Kernel seat · {state}
+    vi: Ghế Kernel · {state}
+  - en: Kernel turn
+    vi: lượt Kernel
+  - en: Kernel verdict
+    vi: Quyết định của Kernel
+  - en: "Kernel verdict: {verdict}"
+    vi: "Kernel chốt: {verdict}"
+  - en: "Kernel: blocked"
+    vi: "Kernel: chặn"
+  - en: "Kernel: cancelled"
+    vi: "Kernel: huỷ"
+  - en: "Kernel: dropped"
+    vi: "Kernel: bỏ"
+  - en: "Kernel: fail"
+    vi: "Kernel: hỏng"
+  - en: "Kernel: not settled"
+    vi: "Kernel: chưa chốt"
+  - en: "Kernel: partial"
+    vi: "Kernel: một phần"
+  - en: "Kernel: pass"
+    vi: "Kernel: đạt"
+  - en: "Kernel: unknown"
+    vi: "Kernel: chưa rõ"
+  - en: Key file
+    vi: Tệp chính
+  - en: Kind
+    vi: Loại
+  - en: land — land
+    vi: land — hạ cánh
+  - en: "Large file: only the beginning is shown."
+    vi: "Tệp lớn: chỉ hiện phần đầu."
+  - en: "Large file: only the first 2000 lines are shown."
+    vi: "Tệp lớn: chỉ hiện 2000 dòng đầu."
+  - en: "Last event:"
+    vi: "Sự kiện cuối:"
+  - en: "Latest attempt #{id}"
+    vi: "Lần thử mới nhất #{id}"
+  - en: learnings drawn
+    vi: bài học rút ra
+  - en: Ledger file
+    vi: Sổ ledger
+  - en: Leg {op}
+    vi: Chặng {op}
+  - en: legs passed
+    vi: chặng đạt
+  - en: Level
+    vi: Mức
+  - en: Level · actor
+    vi: Mức · Actor
+  - en: Light theme
+    vi: Giao diện sáng
+  - en: line {n}
+    vi: dòng {n}
+  - en: Line…
+    vi: Dòng…
+  - en: Live
+    vi: Trực tiếp
+  - en: loading
+    vi: đang tải
+  - en: Loading page…
+    vi: Đang tải trang…
+  - en: Loading…
+    vi: Đang đọc…
+  - en: Location
+    vi: Vị trí
+  - en: Log rows
+    vi: Dòng nhật ký
+  - en: Logs
+    vi: Nhật ký
+  - en: "Long diff: only the beginning is shown."
+    vi: "Diff dài: chỉ hiện phần đầu."
+  - en: machine
+    vi: máy
+  - en: Machine
+    vi: Máy
+  - en: Main navigation
+    vi: Điều hướng chính
+  - en: "manifest concludes: {outcome}"
+    vi: "manifest kết luận: {outcome}"
+  - en: milestones measured from the ledger, with SLA deadlines
+    vi: các mốc đo từ ledger, kèm hạn SLA
+  - en: Mobile navigation
+    vi: Điều hướng di động
+  - en: Model · effort · difficulty
+    vi: Model · effort · độ khó
+  - en: modified
+    vi: sửa
+  - en: Needs a question
+    vi: Cần hỏi
+  - en: "Next attempt #{id}"
+    vi: "Lần thử sau #{id}"
+  - en: Next result
+    vi: Kết quả sau
+  - en: Next result (Enter)
+    vi: Kết quả sau (Enter)
+  - en: "Next step:"
+    vi: "Bước tiếp theo:"
+  - en: "Next step: {step}"
+    vi: "Bước tiếp theo: {step}"
+  - en: No agents running.
+    vi: Không có agent nào đang chạy.
+  - en: No assignee recorded
+    vi: Chưa ghi người xử lý
+  - en: No attempt has a timestamp in this range yet.
+    vi: Chưa có lần thử nào có mốc thời gian trong khoảng này.
+  - en: No attempts in this range yet.
+    vi: Chưa có lần thử nào trong khoảng này.
+  - en: No attempts to draw a timeline for yet.
+    vi: Chưa có lần thử nào để vẽ dòng thời gian.
+  - en: no attempts yet
+    vi: chưa có lần thử
+  - en: No attempts yet, nothing dispatched.
+    vi: Chưa có lần thử nào, chưa giao gì.
+  - en: No comparison available for this file.
+    vi: Không có bản so sánh cho tệp này.
+  - en: No controller action recorded yet.
+    vi: Chưa có hành động controller nào được ghi.
+  - en: No data yet
+    vi: Chưa có dữ liệu
+  - en: No decision tied to this attempt yet.
+    vi: Chưa có quyết định nào gắn với lần thử này.
+  - en: no dedicated branch
+    vi: không có nhánh riêng
+  - en: No description for this op yet.
+    vi: Chưa có mô tả cho op này.
+  - en: No diff recorded yet.
+    vi: Chưa có diff được ghi nhận.
+  - en: No file report yet.
+    vi: Chưa có báo cáo tệp.
+  - en: No goal recorded yet.
+    vi: Chưa có mục tiêu được ghi nhận.
+  - en: No image
+    vi: Không có ảnh
+  - en: No image to show yet.
+    vi: Chưa có ảnh để xem.
+  - en: No land record for this attempt. Land runs at workflow level once every leg has passed, so most
+      attempts have no such step.
+    vi: Lần thử này không có bản ghi land. Land chạy ở tầng workflow khi mọi chặng đã đạt, nên đa số lần
+      thử không có bước này.
+  - en: No legs yet
+    vi: Chưa có chặng
+  - en: No links yet.
+    vi: Chưa có liên kết.
+  - en: No log lines for this job.
+    vi: Không có dòng nhật ký nào cho job này.
+  - en: No mark yet
+    vi: Chưa có mốc
+  - en: No matching log rows.
+    vi: Không có dòng nhật ký phù hợp.
+  - en: No matching timeline entries yet.
+    vi: Chưa có diễn biến phù hợp.
+  - en: No media yet.
+    vi: Chưa có media.
+  - en: No next step recorded yet.
+    vi: Chưa ghi bước tiếp theo.
+  - en: No ops running.
+    vi: Không có op nào đang chạy.
+  - en: no reason recorded
+    vi: chưa ghi lý do
+  - en: No reason recorded
+    vi: Không ghi lý do
+  - en: No related lesson yet.
+    vi: Chưa có bài học liên quan.
+  - en: No report yet
+    vi: Chưa có báo cáo
+  - en: No results
+    vi: Không có kết quả
+  - en: No rework needed; the kernel moves to the next leg.
+    vi: Không cần làm lại; kernel chuyển sang chặng tiếp.
+  - en: No slice graph for this scope yet (the work graph has not been written).
+    vi: Chưa có đồ thị lát cắt cho phạm vi này (work graph chưa được ghi).
+  - en: No sources
+    vi: Không có nguồn
+  - en: No terminals yet.
+    vi: Chưa có terminal nào.
+  - en: No transcript yet
+    vi: Chưa có transcript
+  - en: No workflows yet.
+    vi: Chưa có workflow nào.
+  - en: none
+    vi: không có
+  - en: None
+    vi: Không có
+  - en: none (the op reads the existing Work itself)
+    vi: không có (op tự đọc Work đang có)
+  - en: None yet
+    vi: Chưa có
+  - en: Not applicable
+    vi: Không áp dụng
+  - en: Not declared.
+    vi: Không khai báo.
+  - en: not dispatched
+    vi: chưa giao
+  - en: Not dispatched
+    vi: Chưa giao
+  - en: not estimable
+    vi: chưa ước tính được
+  - en: Not reached yet
+    vi: Chưa tới
+  - en: not recorded
+    vi: chưa ghi nhận
+  - en: not reported
+    vi: chưa báo
+  - en: Not settled
+    vi: Chưa chốt
+  - en: Not yet their turn or waiting for a slot, in a running workflow.
+    vi: Chưa tới lượt hoặc chờ slot, ở workflow đang chạy.
+  - en: now
+    vi: bây giờ
+  - en: One line
+    vi: Một dòng
+  - en: One row per workflow; each cell is a leg of the chain, x/y is legs passed over total.
+    vi: Mỗi workflow một hàng; mỗi ô là một chặng của chuỗi, x/y là số chặng đã đạt trên tổng.
+  - en: Op asked back
+    vi: Op hỏi lại
+  - en: op evidence file
+    vi: tệp bằng chứng của op
+  - en: Op has not reported
+    vi: Op chưa báo
+  - en: Op manifest
+    vi: Khai báo op
+  - en: Op must read
+    vi: Op phải đọc
+  - en: Op report
+    vi: Báo cáo của op
+  - en: Op reported blocked
+    vi: Op báo bị chặn
+  - en: Op reported done
+    vi: Op báo xong
+  - en: Op reported failed
+    vi: Op báo hỏng
+  - en: Op reported partial
+    vi: Op báo một phần
+  - en: "Op reported: {outcome}"
+    vi: "Op báo: {outcome}"
+  - en: open
+    vi: đang mở
+  - en: Open (hollow)
+    vi: Còn mở (rỗng)
+  - en: Open attempt
+    vi: Mở lần thử
+  - en: Open land output ({size})
+    vi: Mở output land ({size})
+  - en: Open leg {op}
+    vi: Mở chặng {op}
+  - en: Open workflow
+    vi: Mở workflow
+  - en: ops running
+    vi: op đang chạy
+  - en: Other
+    vi: Khác
+  - en: out
+    vi: ra
+  - en: Out
+    vi: Ra
+  - en: Outcome
+    vi: Kết quả
+  - en: Outcome the Op reported
+    vi: Kết quả Op tự báo
+  - en: Outcomes by op
+    vi: Kết quả theo op
+  - en: Output of the commands the op ran while working.
+    vi: Output của các lệnh op chạy trong lúc làm việc.
+  - en: Output tokens
+    vi: Token ra
+  - en: Outputs
+    vi: Đầu ra
+  - en: over SLA
+    vi: quá SLA
+  - en: Overview
+    vi: Tổng quan
+  - en: Page is being prepared
+    vi: Trang đang được chuẩn bị
+  - en: Page not found
+    vi: Không tìm thấy trang
+  - en: Pages
+    vi: Trang
+  - en: parallel
+    vi: song song
+  - en: Params
+    vi: Tham số
+  - en: partial
+    vi: một phần
+  - en: Partial
+    vi: Một phần
+  - en: Pass
+    vi: Đạt
+  - en: passed
+    vi: đạt
+  - en: Passed
+    vi: Đạt
+  - en: passed in 24 h
+    vi: đạt 24 giờ
+  - en: Paused
+    vi: Tạm dừng
+  - en: picked
+    vi: đã chọn
+  - en: Polling
+    vi: Đang dò
+  - en: Polling periodically
+    vi: Dò định kỳ
+  - en: Previous attempt
+    vi: Lần thử trước
+  - en: Previous result
+    vi: Kết quả trước
+  - en: Previous result (Shift+Enter)
+    vi: Kết quả trước (Shift+Enter)
+  - en: "Progress of {name}: {progress}"
+    vi: "Tiến độ {name}: {progress}"
+  - en: Project {db}
+    vi: Dự án {db}
+  - en: Proposal
+    vi: Đề xuất
+  - en: Public · read-only
+    vi: Công khai · chỉ đọc
+  - en: Rate
+    vi: Tốc độ
+  - en: rate · parallelism · assignee · Kernel seat · attempts
+    vi: tốc độ · song song · người xử lý · ghế Kernel · số lần thử
+  - en: read {read} · write {write}
+    vi: đọc {read} · ghi {write}
+  - en: Reading {name}…
+    vi: Đang đọc {name}…
+  - en: Reading the API contract…
+    vi: Đang đọc hợp đồng API…
+  - en: Read-only UI
+    vi: UI chỉ đọc
+  - en: Reasoning
+    vi: Suy luận
+  - en: Receiving live updates (SSE)
+    vi: Đang nhận cập nhật trực tiếp (SSE)
+  - en: reconciler.* — reconciler
+    vi: reconciler.* — bộ điều phối
+  - en: Record
+    vi: Bản ghi
+  - en: redacted scrollback, not a terminal screenshot
+    vi: scrollback đã che, không phải ảnh chụp terminal
+  - en: References
+    vi: Tham chiếu
+  - en: related decision items
+    vi: mục quyết định liên quan
+  - en: Related lessons
+    vi: Bài học liên quan
+  - en: Report consumed
+    vi: Đã đọc báo cáo
+  - en: Reported
+    vi: Đã báo cáo
+  - en: reported by the provider
+    vi: nhà cung cấp báo
+  - en: Requirements (FR) the op claims it did
+    vi: Yêu cầu (FR) op tuyên bố đã làm
+  - en: "Result: {text}"
+    vi: "Kết quả: {text}"
+  - en: Results of commands the op ran
+    vi: Kết quả lệnh op tự chạy
+  - en: Retry
+    vi: Thử lại
+  - en: revision {n}
+    vi: bản {n}
+  - en: Role
+    vi: Vai trò
+  - en: Routed
+    vi: Đã định tuyến
+  - en: Routing
+    vi: Định tuyến
+  - en: Run · transcript
+    vi: Chạy · transcript
+  - en: Run the next attempt.
+    vi: Chạy lần thử tiếp theo.
+  - en: running
+    vi: đang chạy
+  - en: Running
+    vi: Đang chạy
+  - en: running for {n} min
+    vi: đang chạy {n} phút
+  - en: Scope
+    vi: Phạm vi
+  - en: Screenshots and recorded video.
+    vi: Ảnh chụp màn hình và video ghi lại.
+  - en: Search
+    vi: Tìm
+  - en: Search in file
+    vi: Tìm trong tệp
+  - en: Search the transcript
+    vi: Tìm trong transcript
+  - en: sensitive data redacted, ANSI colour codes stripped
+    vi: đã che dữ liệu nhạy cảm, đã bỏ mã màu ANSI
+  - en: settle — settle
+    vi: settle — chốt
+  - en: "Settle reason: {reason}"
+    vi: "Lý do chốt: {reason}"
+  - en: Settled
+    vi: Chốt
+  - en: settling
+    vi: đang chốt
+  - en: SHA after land
+    vi: SHA sau land
+  - en: Show content
+    vi: Xem nội dung
+  - en: Slice graph
+    vi: Đồ thị lát cắt
+  - en: Slot released
+    vi: Đã trả slot
+  - en: Slow
+    vi: Chậm
+  - en: Source
+    vi: Nguồn
+  - en: Source changes made by the attempt.
+    vi: Thay đổi mã nguồn của lần thử.
+  - en: Source, workflow, job, trace and raw data
+    vi: Nguồn, workflow, job, trace và dữ liệu thô
+  - en: "Source: {at}"
+    vi: "Nguồn: {at}"
+  - en: "Sources: {list}"
+    vi: "Nguồn: {list}"
+  - en: "Stale: {list}"
+    vi: "Cũ: {list}"
+  - en: stalled, no progress
+    vi: đứng yên, không có tiến triển
+  - en: StarCi · Overview
+    vi: StarCi · Tổng quan
+  - en: StarCi · Workflow monitoring and operations hub.
+    vi: StarCi · Trung tâm theo dõi workflow và vận hành.
+  - en: Started
+    vi: Bắt đầu
+  - en: State
+    vi: Trạng thái
+  - en: "State:"
+    vi: "Trạng thái:"
+  - en: Stdout/stderr of each check, grouped by check name.
+    vi: Stdout/stderr của từng check, nhóm theo tên check.
+  - en: Step {n}
+    vi: Bước {n}
+  - en: step.* — step
+    vi: step.* — bước
+  - en: stopped
+    vi: đã dừng
+  - en: Stopped
+    vi: Đã dừng
+  - en: Stuck
+    vi: Kẹt
+  - en: Switch to dark theme
+    vi: Đổi sang giao diện tối
+  - en: Switch to light theme
+    vi: Đổi sang giao diện sáng
+  - en: System
+    vi: Hệ thống
+  - en: Tab hidden, updates paused
+    vi: Tab đang ẩn, tạm dừng cập nhật
+  - en: Terminal ({n})
+    vi: Terminal ({n})
+  - en: Terminal and process logs.
+    vi: Log của terminal và tiến trình.
+  - en: Terminal closed
+    vi: Terminal đã đóng
+  - en: The file was deleted in this commit, so it has no content.
+    vi: Tệp đã bị xoá trong commit này nên không có nội dung.
+  - en: The image is archived and cannot be read right now.
+    vi: Ảnh đã lưu trữ, hiện không đọc được.
+  - en: The kernel has not settled this attempt yet.
+    vi: Kernel chưa chốt lần thử này.
+  - en: The kernel recorded no reason beyond the verdict.
+    vi: Kernel không ghi thêm lý do ngoài kết luận.
+  - en: the Kernel seat is vacant
+    vi: ghế Kernel đang trống
+  - en: "The llm_usage table has no rows for this section yet: the runtime has not recorded tokens."
+    vi: "Bảng llm_usage chưa có dòng nào cho mục này: runtime chưa ghi token."
+  - en: The manifest declares no assertions.
+    vi: Manifest không khai báo assertion nào.
+  - en: The op contract declares no required reads.
+    vi: Hợp đồng op không khai báo mục bắt buộc phải đọc.
+  - en: The op declares no read data.
+    vi: Op không khai báo dữ liệu đọc.
+  - en: The op has not written a result summary.
+    vi: Op chưa viết tóm tắt kết quả.
+  - en: The runtime has not written tokens to llm_usage in the last 24 hours.
+    vi: Runtime chưa ghi token vào llm_usage trong 24 giờ qua.
+  - en: This attempt has no evidence files yet.
+    vi: Lần thử này chưa có tệp bằng chứng nào.
+  - en: This file is unchanged from its parent commit.
+    vi: Tệp này không đổi so với commit cha.
+  - en: This job stores no input payload.
+    vi: Job này không lưu payload đầu vào.
+  - en: This page has no UI in the current build.
+    vi: Trang này chưa có UI ở bản hiện tại.
+  - en: This workflow has no planned op chain yet.
+    vi: Workflow này chưa có chuỗi op được lên kế hoạch.
+  - en: Throughput
+    vi: Thông lượng
+  - en: Throughput over time
+    vi: Thông lượng theo thời gian
+  - en: Time
+    vi: Giờ
+  - en: Timeline
+    vi: Diễn biến
+  - en: Timeline, scroll horizontally
+    vi: Dòng thời gian, cuộn ngang
+  - en: Tokens & cost
+    vi: Token & chi phí
+  - en: tokens in / out
+    vi: token vào / ra
+  - en: Tokens in 24 h
+    vi: Token 24 giờ
+  - en: Tool calls
+    vi: Gọi công cụ
+  - en: Tools
+    vi: Công cụ
+  - en: Transcript with sensitive data redacted
+    vi: Transcript đã che dữ liệu nhạy cảm
+  - en: try {n}
+    vi: lần {n}
+  - en: try {n}/5
+    vi: lần {n}/5
+  - en: try {tries}/{budget}
+    vi: lần {tries}/{budget}
+  - en: Turns
+    vi: Lượt
+  - en: Unblocks
+    vi: Mở khoá
+  - en: unchanged
+    vi: không đổi
+  - en: units queued
+    vi: unit đang chờ
+  - en: unknown
+    vi: chưa rõ
+  - en: Unknown
+    vi: Chưa rõ
+  - en: unknown agent
+    vi: agent chưa rõ
+  - en: unknown model
+    vi: chưa rõ model
+  - en: Unknown model
+    vi: Chưa rõ mô hình
+  - en: Unknown model / agent
+    vi: Chưa rõ model / agent
+  - en: unreadable
+    vi: không đọc được
+  - en: UTF-16 BE → decoded
+    vi: UTF-16 BE → đã giải mã
+  - en: UTF-16 LE with BOM → decoded
+    vi: UTF-16 LE có BOM → đã giải mã
+  - en: UTF-8 with BOM → BOM stripped
+    vi: UTF-8 có BOM → đã bỏ BOM
+  - en: "Verbatim: {raw}"
+    vi: "Nguyên văn: {raw}"
+  - en: Version {n}
+    vi: Phiên bản {n}
+  - en: View file
+    vi: Xem tệp
+  - en: View full
+    vi: Xem đầy đủ
+  - en: View leg {op}
+    vi: Xem chặng {op}
+  - en: View pending decisions
+    vi: Xem quyết định đang chờ
+  - en: View Products
+    vi: Xem Sản phẩm
+  - en: View the English original
+    vi: Xem bản gốc tiếng Anh
+  - en: View the running leg
+    vi: Xem chặng đang chạy
+  - en: View what is blocking
+    vi: Xem chỗ đang chặn
+  - en: Waiting
+    vi: Chờ
+  - en: Waiting / not reached
+    vi: Chờ / chưa tới
+  - en: waiting for an owner decision
+    vi: đang chờ chủ quyết định
+  - en: Waiting on ops
+    vi: Chờ các op
+  - en: Waiting to retry
+    vi: Chờ thử lại
+  - en: Warning
+    vi: Cảnh báo
+  - en: what the kernel hands over, what the op must read
+    vi: kernel giao gì, op phải đọc gì
+  - en: What the Kernel hands to each unit
+    vi: Kernel giao cho mỗi đơn vị
+  - en: "What the Kernel hands to each unit (attempt #{id})"
+    vi: "Kernel giao cho mỗi đơn vị (lần thử #{id})"
+  - en: what the op reported, what the kernel decided, and why
+    vi: op báo gì, kernel quyết gì và vì sao
+  - en: Who touched it
+    vi: Ai đã đụng tới
+  - en: Why
+    vi: Vì sao
+  - en: "Why:"
+    vi: "Vì sao:"
+  - en: Work slice graph
+    vi: Đồ thị lát cắt công việc
+  - en: Workflow · attempt
+    vi: Workflow · lần thử
+  - en: Workflow goal
+    vi: Mục tiêu workflow
+  - en: Workflow goal, revision {n}
+    vi: Mục tiêu workflow, bản {n}
+  - en: Workflow id
+    vi: Mã workflow
+  - en: Workflow progress
+    vi: Tiến độ workflow
+  - en: workflows needing attention
+    vi: workflow cần xử lý
+  - en: Workflows that are stuck or slow and need a person.
+    vi: Workflow đang kẹt hoặc chậm, cần người xem.
+  - en: "Working on:"
+    vi: "Đang làm:"
+  - en: Worktree removed
+    vi: Worktree đã gỡ
+  - en: Wrap
+    vi: Xuống dòng
+  - en: Write scope
+    vi: Phạm vi ghi
+  - en: " · archived"
+    vi: " · đã lưu trữ"
+  - en: " · open"
+    vi: " · đang mở"
+  - en: " · overdue"
+    vi: " · quá hạn"
+  - en: " · parent"
+    vi: " · cha"
+  - en: " · running"
+    vi: " · đang chạy"
+  - en: " · runtime confirmed {done}/{total}"
+    vi: " · runtime xác nhận {done}/{total}"
+  - en: " · stale: {list}"
+    vi: " · chậm: {list}"
+  - en: " · try {n}/5"
+    vi: " · lần {n}/5"
+  - en: " · {n} ops running"
+    vi: " · {n} op đang chạy"
+  - en: " · {n} runs"
+    vi: " · {n} lần chạy"
+  - en: " · {n} units"
+    vi: " · {n} unit"
+  - en: 24 h done / failed
+    vi: 24 giờ xong / lỗi
+  - en: 24 hours
+    vi: 24 giờ
+  - en: 7 days
+    vi: 7 ngày
+  - en: A credential item needs handling over a separate channel. Content is hidden.
+    vi: Có mục xác thực cần xử lý qua kênh riêng. Nội dung được ẩn.
+  - en: A UI sample for checking both themes. The numbers below are demo data of the component kit.
+    vi: Mẫu giao diện kiểm tra hai theme. Các con số dưới đây là dữ liệu demo của bộ thành phần.
+  - en: Accountable owner
+    vi: Chủ trách nhiệm
+  - en: Action
+    vi: Hành động
+  - en: Action {id}
+    vi: Hành động {id}
+  - en: "Actor: all"
+    vi: "Actor: tất cả"
+  - en: "Actor: {actor}"
+    vi: "Actor: {actor}"
+  - en: Advanced
+    vi: Nâng cao
+  - en: Advanced filters
+    vi: Bộ lọc nâng cao
+  - en: After {list}
+    vi: Sau {list}
+  - en: Agent seats
+    vi: Ghế agent
+  - en: All
+    vi: Tất cả
+  - en: All actors
+    vi: Mọi actor
+  - en: All levels
+    vi: Mọi mức
+  - en: All projects
+    vi: Mọi dự án
+  - en: All time
+    vi: Mọi thời gian
+  - en: Answer channel
+    vi: Kênh trả lời
+  - en: Answered
+    vi: Đã trả lời
+  - en: Ask the owner
+    vi: Hỏi thầy
+  - en: Assigned paths
+    vi: Đường dẫn được giao
+  - en: "Attempt #{id}"
+    vi: "Lần thử #{id}"
+  - en: Attempt {n}
+    vi: Lần thử {n}
+  - en: Attempts
+    vi: Lần thử
+  - en: Attempts · {n}
+    vi: Lần thử · {n}
+  - en: Attempts per leg
+    vi: Lần thử theo chặng
+  - en: Automatic action
+    vi: Hành động tự động
+  - en: Awaiting a decision
+    vi: Chờ quyết định
+  - en: Awaiting decision
+    vi: Chờ quyết
+  - en: Awaiting decision · {n}
+    vi: Chờ quyết · {n}
+  - en: Awaiting the owner
+    vi: Chờ thầy trả lời
+  - en: Binary file
+    vi: Tệp nhị phân
+  - en: "Blocker the op raised: {detail}"
+    vi: "Vướng mắc op nêu: {detail}"
+  - en: Blocking · {n}
+    vi: Đang chặn · {n}
+  - en: Branch
+    vi: Nhánh
+  - en: Breadcrumb
+    vi: Đường dẫn
+  - en: Brief id (digest)
+    vi: Mã đề bài (digest)
+  - en: Budget
+    vi: Ngân sách
+  - en: business (the result does not meet the requirements yet)
+    vi: nghiệp vụ (kết quả chưa đúng yêu cầu)
+  - en: By {actor}
+    vi: Bởi {actor}
+  - en: Cache read + write
+    vi: Cache đọc + ghi
+  - en: Card and Advanced
+    vi: Card và Nâng cao
+  - en: Channel
+    vi: Kênh
+  - en: Channel, opened time, evidence and history
+    vi: Kênh, thời điểm mở, bằng chứng và lịch sử
+  - en: "Channel: {channel}"
+    vi: "Kênh: {channel}"
+  - en: Circuit open until
+    vi: Circuit mở đến
+  - en: Claim and escalation history
+    vi: Lịch sử nhận và leo thang
+  - en: Claimed
+    vi: Đã nhận
+  - en: Claimed for handling
+    vi: Đã nhận xử lý
+  - en: Cleanup
+    vi: Dọn dẹp
+  - en: "Cleanup #{id}"
+    vi: "Dọn dẹp #{id}"
+  - en: Cleanup runs
+    vi: Lần dọn dẹp
+  - en: Clear filters
+    vi: Xóa lọc
+  - en: Clear filters ({n})
+    vi: Xóa lọc ({n})
+  - en: Clear the {state} filter
+    vi: Bỏ lọc {state}
+  - en: Click to enlarge
+    vi: Bấm để phóng to
+  - en: Close
+    vi: Đóng
+  - en: Close details
+    vi: Đóng chi tiết
+  - en: Code
+    vi: Mã
+  - en: Code / entity
+    vi: Mã / thực thể
+  - en: Code and paths
+    vi: Mã và đường dẫn
+  - en: Collapse all
+    vi: Thu hết
+  - en: Columns per day
+    vi: Cột theo ngày
+  - en: Common failure classes
+    vi: Các lớp lỗi hay gặp
+  - en: Completion criteria
+    vi: Tiêu chí hoàn thành
+  - en: Condition
+    vi: Tình trạng
+  - en: Controller name
+    vi: Tên controller
+  - en: Copy path
+    vi: Chép đường dẫn
+  - en: Copy path {path}
+    vi: Chép đường dẫn {path}
+  - en: Copy text
+    vi: Sao chép
+  - en: Copy the command
+    vi: Chép lệnh
+  - en: Copy the value
+    vi: Chép giá trị
+  - en: Cost & where it ran
+    vi: Chi phí & nơi chạy
+  - en: Cost per day (USD, Vietnam time)
+    vi: Chi phí theo ngày (USD, giờ Việt Nam)
+  - en: Could not find the id.
+    vi: Không tìm được ID.
+  - en: Could not load image {name}.
+    vi: Không tải được ảnh {name}.
+  - en: Could not load the attempt list ({error}).
+    vi: Không tải được danh sách lần thử ({error}).
+  - en: Could not load the content ({error}).
+    vi: Không tải được nội dung ({error}).
+  - en: Could not load the next page.
+    vi: Không tải được trang kế tiếp.
+  - en: Could not read the content (HTTP {status}).
+    vi: Không đọc được nội dung (HTTP {status}).
+  - en: Could not read the content.
+    vi: Không đọc được nội dung.
+  - en: Could not read the data source.
+    vi: Không đọc được nguồn dữ liệu.
+  - en: Could not read the data.
+    vi: Không đọc được dữ liệu.
+  - en: Could not read the host info.
+    vi: Không đọc được thông tin máy chủ.
+  - en: "Could not read the logs. "
+    vi: "Không đọc được nhật ký. "
+  - en: "Could not read the op commit: {error}"
+    vi: "Không đọc được commit của op: {error}"
+  - en: "Could not read the overall state: {error}"
+    vi: "Không đọc được trạng thái chung: {error}"
+  - en: "Could not read the search: {error}"
+    vi: "Không đọc được tìm kiếm: {error}"
+  - en: "Could not read the source: {error}"
+    vi: "Không đọc được nguồn: {error}"
+  - en: Count
+    vi: Số lượng
+  - en: CPU and free RAM trend
+    vi: Xu hướng CPU và RAM trống
+  - en: "CPU temperature:"
+    vi: "Nhiệt độ CPU:"
+  - en: CPU · {cores} cores / {threads} threads
+    vi: CPU · {cores} nhân / {threads} luồng
+  - en: CPU, RAM, GPU, disks
+    vi: CPU, RAM, GPU, ổ đĩa
+  - en: Crash-loop signs
+    vi: Có dấu hiệu lặp khởi động
+  - en: Credential details are hidden.
+    vi: Chi tiết xác thực được ẩn.
+  - en: Credential request · content hidden.
+    vi: Yêu cầu xác thực · nội dung được ẩn.
+  - en: Custom range
+    vi: Khoảng tùy chọn
+  - en: Dark
+    vi: Tối
+  - en: "Data sources: {list}"
+    vi: "Nguồn số liệu: {list}"
+  - en: Data table
+    vi: Bảng dữ liệu
+  - en: Debug only
+    vi: Chỉ debug
+  - en: Decided
+    vi: Đã quyết
+  - en: Decider
+    vi: Người quyết
+  - en: "Decider: {who}"
+    vi: "Người quyết: {who}"
+  - en: Decision items
+    vi: Mục quyết định
+  - en: Decision log
+    vi: Nhật ký quyết định
+  - en: Decision opened
+    vi: Quyết định được mở
+  - en: Decision {id}
+    vi: Quyết định {id}
+  - en: DECISION
+    vi: QUYẾT ĐỊNH
+  - en: Deferred
+    vi: Hoãn
+  - en: Deferred / not done
+    vi: Hoãn / không làm
+  - en: "Deferred: {reason}"
+    vi: "Hoãn: {reason}"
+  - en: Delivery
+    vi: Giao
+  - en: Dependencies
+    vi: Quan hệ phụ thuộc
+  - en: "Depends on:"
+    vi: "Phụ thuộc:"
+  - en: DESIGN
+    vi: THIẾT KẾ
+  - en: Detailed analytics
+    vi: Phân tích chi tiết
+  - en: Details
+    vi: Chi tiết
+  - en: Disks (free space)
+    vi: Ổ đĩa (còn trống)
+  - en: Distribution of tries per unit
+    vi: Phân bố số lần thử mỗi đơn vị
+  - en: Done on try 1
+    vi: Xong ở lần 1
+  - en: Download
+    vi: Tải về
+  - en: Due
+    vi: Đến hạn
+  - en: Due {at}
+    vi: Hạn {at}
+  - en: "Due: {at}"
+    vi: "Hạn: {at}"
+  - en: "Duration:"
+    vi: "Thời gian:"
+  - en: Each box is one leg of the plan. Columns are the order; vertically stacked boxes run in
+      parallel. Click a box for details.
+    vi: Mỗi ô là một chặng của kế hoạch. Cột là thứ tự, ô xếp dọc chạy song song. Bấm vào ô để xem chi
+      tiết.
+  - en: Effective cap
+    vi: Giới hạn thực
+  - en: Effects
+    vi: Tác động
+  - en: Empty file (no content).
+    vi: Tệp rỗng (không có nội dung).
+  - en: Empty file.
+    vi: Tệp trống.
+  - en: Ended
+    vi: Kết thúc
+  - en: "Engine error: {error}"
+    vi: "Lỗi engine: {error}"
+  - en: Engine queue
+    vi: Hàng đợi engine
+  - en: Engine starts
+    vi: Khởi động engine
+  - en: Engine, SLA, resources, services, cleanup, land, Supervisor and learning from the runtime
+      sources.
+    vi: Engine, SLA, tài nguyên, dịch vụ, dọn dẹp, land, Supervisor và học từ các nguồn runtime.
+  - en: English version
+    vi: Bản tiếng Anh
+  - en: Enqueued at
+    vi: Xếp hàng lúc
+  - en: Enter an id or keyword…
+    vi: Nhập ID hoặc từ khóa…
+  - en: Enter an id to open its evidence.
+    vi: Nhập một ID để mở bằng chứng tương ứng.
+  - en: Error
+    vi: Lỗi
+  - en: Errors only
+    vi: Chỉ lỗi
+  - en: Escalated
+    vi: Đã leo thang
+  - en: Events
+    vi: Sự kiện
+  - en: Evidence
+    vi: Bằng chứng
+  - en: "Example: reconciler."
+    vi: "Ví dụ: reconciler."
+  - en: "Example: tsc-app"
+    vi: "Ví dụ: tsc-app"
+  - en: Expand all
+    vi: Mở hết
+  - en: Expired
+    vi: Hết hạn
+  - en: External
+    vi: Ngoài workflow
+  - en: External effects
+    vi: Tác động ngoài
+  - en: "Failed checks: {list}."
+    vi: "Kiểm chứng hỏng: {list}."
+  - en: Failed probes / 24 h
+    vi: Probe lỗi / 24 giờ
+  - en: "Failure class: {text}."
+    vi: "Nhóm lỗi: {text}."
+  - en: Figures summed over each attempt; per-model and per-op detail is unavailable because llm_usage
+      is empty.
+    vi: Số liệu tóm tắt trên từng lần thử; chi tiết theo model và op chưa có vì llm_usage trống.
+  - en: File types and paths
+    vi: Loại tệp và đường dẫn
+  - en: Files the op wrote to the repo
+    vi: Tệp op đã ghi vào repo
+  - en: Files the op wrote to the repo and the key evidence
+    vi: Tệp op đã ghi vào repo và bằng chứng chính
+  - en: Filters
+    vi: Bộ lọc
+  - en: First seen
+    vi: Thấy lần đầu
+  - en: First step
+    vi: Bước đầu
+  - en: First-try pass rate by model
+    vi: Tỉ lệ đạt ở lần đầu theo mô hình
+  - en: Fit
+    vi: Vừa khung
+  - en: Follow does not support full-text search; clear the keyword to enable.
+    vi: Theo dõi không hỗ trợ tìm toàn văn; xóa từ khóa để bật.
+  - en: Following live
+    vi: Đang theo dõi trực tiếp
+  - en: Free CPU and RAM over time
+    vi: CPU và RAM trống theo thời gian
+  - en: Free RAM
+    vi: RAM trống
+  - en: Free RAM %
+    vi: RAM trống %
+  - en: Freed
+    vi: Giải phóng
+  - en: From
+    vi: Từ lúc
+  - en: Full-text search
+    vi: Tìm toàn văn
+  - en: Global Supervisor seat
+    vi: Ghế Supervisor toàn cục
+  - en: GPU load
+    vi: Tải GPU
+  - en: Grounding ({n})
+    vi: Căn cứ ({n})
+  - en: Handler unknown
+    vi: Chưa rõ ai xử lý
+  - en: HANDOVER
+    vi: BÀN GIAO
+  - en: Happening now
+    vi: Đang diễn ra
+  - en: Has errors
+    vi: Có lỗi
+  - en: Has warnings
+    vi: Có cảnh báo
+  - en: Held by
+    vi: Giữ bởi
+  - en: Host
+    vi: Máy chủ
+  - en: Host + all projects
+    vi: Máy chủ + mọi dự án
+  - en: Host / agent
+    vi: Máy chủ / agent
+  - en: Host CPU
+    vi: CPU máy
+  - en: Host only
+    vi: Chỉ máy chủ
+  - en: Host RAM
+    vi: RAM máy
+  - en: Host sample trend
+    vi: Xu hướng mẫu máy
+  - en: How many tries each unit needed, and the most common failure classes.
+    vi: Số lần thử mỗi đơn vị cần, và các lớp lỗi hay gặp nhất.
+  - en: IMPLEMENT
+    vi: TRIỂN KHAI
+  - en: In use / capacity
+    vi: Đang dùng / sức chứa
+  - en: Incident state
+    vi: Trạng thái sự cố
+  - en: Incidents
+    vi: Sự cố
+  - en: Info
+    vi: Thông tin
+  - en: Info only
+    vi: Chỉ thông tin
+  - en: Info stays on one surface level.
+    vi: Thông tin giữ một cấp bề mặt.
+  - en: Infrastructure
+    vi: Hạ tầng
+  - en: Infrastructure · worktrees
+    vi: Hạ tầng · worktree
+  - en: infrastructure
+    vi: hạ tầng
+  - en: Inputs, detailed verification, cost, raw files, transcript, diff, land and the timeline.
+    vi: Đầu vào, kiểm chứng chi tiết, chi phí, tệp thô, transcript, diff, land và dòng thời gian.
+  - en: Interval
+    vi: Chu kỳ
+  - en: Invariants being violated
+    vi: Bất biến đang vi phạm
+  - en: Item
+    vi: Mục
+  - en: Job id
+    vi: Mã job
+  - en: JSON data
+    vi: Dữ liệu JSON
+  - en: JSONL · {n} lines
+    vi: JSONL · {n} dòng
+  - en: Kernel seat
+    vi: Ghế Kernel
+  - en: "Kernel verdict: awaiting the owner"
+    vi: "Kernel chốt: chờ thầy trả lời"
+  - en: "Kernel verdict: settling"
+    vi: "Kernel chốt: đang chốt"
+  - en: Key
+    vi: Khóa
+  - en: Key evidence
+    vi: Bằng chứng chính
+  - en: Kind / channel
+    vi: Loại / kênh
+  - en: Kind prefix
+    vi: Tiền tố loại
+  - en: "Kind: all"
+    vi: "Loại: tất cả"
+  - en: "Kind: {kind}"
+    vi: "Loại: {kind}"
+  - en: Land failed
+    vi: Land hỏng
+  - en: Land queue
+    vi: Hàng đợi land
+  - en: Land results
+    vi: Kết quả land
+  - en: Landed
+    vi: Đã land
+  - en: Large file ({size}) — only the first 2000 lines are shown.
+    vi: Tệp lớn ({size}) — chỉ hiện 2000 dòng đầu.
+  - en: Last heartbeat {ago}
+    vi: Nhịp cuối {ago}
+  - en: Last hour
+    vi: 1 giờ qua
+  - en: Last run
+    vi: Chạy gần nhất
+  - en: Last seen
+    vi: Thấy lần cuối
+  - en: Last 15 minutes
+    vi: 15 phút qua
+  - en: Last 24 hours
+    vi: 24 giờ qua
+  - en: Last 7 days
+    vi: 7 ngày qua
+  - en: "Last-commit check: {result}."
+    vi: "Kiểm tra commit cuối: {result}."
+  - en: Latency
+    vi: Độ trễ
+  - en: Latest error
+    vi: Lỗi gần nhất
+  - en: Latest probe
+    vi: Probe cuối
+  - en: Leaks
+    vi: Rò rỉ
+  - en: Learning
+    vi: Học
+  - en: Leg {seq} · level {level}
+    vi: Chặng {seq} · cấp {level}
+  - en: Legend
+    vi: Chú giải
+  - en: Lesson
+    vi: Bài học
+  - en: Lessons and experiments
+    vi: Bài học và thí nghiệm
+  - en: Level ≥ warning
+    vi: Mức ≥ cảnh báo
+  - en: Light
+    vi: Sáng
+  - en: Limits
+    vi: Giới hạn
+  - en: Load error
+    vi: Lỗi tải
+  - en: Load more
+    vi: Tải thêm
+  - en: Loading
+    vi: Đang tải
+  - en: Loading and errors
+    vi: Tải và lỗi
+  - en: Loading the description…
+    vi: Đang tải mô tả…
+  - en: Log filters
+    vi: Bộ lọc nhật ký
+  - en: Lost signal
+    vi: Mất tín hiệu
+  - en: Maximum allowed effects
+    vi: Hiệu ứng tối đa được phép
+  - en: May write to
+    vi: Được ghi vào
+  - en: Minimum level
+    vi: Mức tối thiểu
+  - en: Mismatch
+    vi: Lệch
+  - en: "Mismatch: op declared {opExit}, runtime ran {runtimeExit}."
+    vi: "Lệch: op khai {opExit}, runtime chạy {runtimeExit}."
+  - en: Mode
+    vi: Chế độ
+  - en: Model × op performance / 7 days
+    vi: Hiệu năng model × op / 7 ngày
+  - en: Models and tokens
+    vi: Mô hình và token
+  - en: "Models: first-try pass"
+    vi: "Mô hình: đạt ở lần đầu"
+  - en: More filters
+    vi: Thêm bộ lọc
+  - en: Move to the next leg
+    vi: Chuyển sang chặng kế tiếp
+  - en: Must produce
+    vi: Phải tạo ra
+  - en: Needed {n} tries
+    vi: Cần {n} lần
+  - en: Needs attention
+    vi: Cần xử lý
+  - en: Needs inputs
+    vi: Cần đầu vào
+  - en: Next
+    vi: Lần sau
+  - en: Next work
+    vi: Việc tiếp
+  - en: No analysis yet.
+    vi: Chưa có bản phân tích.
+  - en: No attempt in this range has reported token or cost figures yet. Once the provider returns them
+      the numbers will show here.
+    vi: Chưa có lần thử nào trong khoảng này báo số token hoặc chi phí. Khi nhà cung cấp trả về, số liệu
+      sẽ hiện ở đây.
+  - en: No attempts yet — this leg is waiting for {what}.
+    vi: Chưa có lần thử — chặng này chờ {what}.
+  - en: No attempts yet.
+    vi: Chưa có lần thử.
+  - en: No blockers recorded.
+    vi: Chưa có điểm chặn nào được ghi.
+  - en: No checks recorded for this attempt yet.
+    vi: Chưa có check nào được ghi cho lần thử này.
+  - en: No checks yet
+    vi: Chưa có check
+  - en: No command recorded.
+    vi: Chưa có lệnh được ghi.
+  - en: No content is allowed to be shown.
+    vi: Không có nội dung được phép hiển thị.
+  - en: No content yet.
+    vi: Chưa có nội dung.
+  - en: No coverage snapshot yet
+    vi: Chưa có snapshot coverage
+  - en: No CPU reading yet
+    vi: Chưa có số đo CPU
+  - en: No data yet.
+    vi: Chưa có dữ liệu.
+  - en: No dedicated-path limit.
+    vi: Không giới hạn đường dẫn.
+  - en: No events yet.
+    vi: Chưa có sự kiện.
+  - en: No external effects.
+    vi: Không có tác động ngoài.
+  - en: No failure class recorded.
+    vi: Không có lớp lỗi nào được ghi.
+  - en: No history events yet.
+    vi: Chưa có sự kiện lịch sử.
+  - en: No leader yet
+    vi: Chưa có leader
+  - en: No linked evidence yet.
+    vi: Chưa có bằng chứng liên kết.
+  - en: No matching data.
+    vi: Không có dữ liệu phù hợp.
+  - en: No matching decisions.
+    vi: Không có quyết định phù hợp.
+  - en: No matching incidents.
+    vi: Không có sự cố phù hợp.
+  - en: No matching results.
+    vi: Không có kết quả phù hợp.
+  - en: No matching units.
+    vi: Không có đơn vị phù hợp.
+  - en: No matching workflows.
+    vi: Không có workflow phù hợp.
+  - en: No NVIDIA GPU.
+    vi: Không có GPU NVIDIA.
+  - en: No open questions.
+    vi: Không có câu hỏi đang mở.
+  - en: No options recorded yet.
+    vi: Chưa có lựa chọn được ghi.
+  - en: No output file yet
+    vi: Chưa có tệp output
+  - en: No pending decisions.
+    vi: Chưa có quyết định đang chờ.
+  - en: No per-agent RAM reading yet.
+    vi: Chưa có số đo RAM theo agent.
+  - en: No seat yet
+    vi: Chưa có ghế
+  - en: No settled decisions yet.
+    vi: Chưa có quyết định đã chốt.
+  - en: No source timestamp yet
+    vi: Chưa có thời điểm nguồn
+  - en: No timeline yet.
+    vi: Chưa có diễn biến.
+  - en: No unit was tried in this range yet.
+    vi: Chưa có đơn vị nào được thử trong khoảng này.
+  - en: No units in the graph yet.
+    vi: Chưa có đơn vị trong đồ thị.
+  - en: No units yet.
+    vi: Chưa có đơn vị.
+  - en: No verify snapshot yet
+    vi: Chưa có snapshot verify
+  - en: No worktrees recorded.
+    vi: Chưa có worktree được ghi.
+  - en: No {label} yet
+    vi: Chưa có {label}
+  - en: Not delivered to a seat
+    vi: Chưa giao tới ghế
+  - en: Not enough samples
+    vi: Chưa đủ mẫu
+  - en: Not enough samples to draw a trend yet.
+    vi: Chưa đủ mẫu để vẽ xu hướng.
+  - en: Not recorded.
+    vi: Không ghi.
+  - en: Not valid JSON ({error}). Shown as text.
+    vi: Không phải JSON hợp lệ ({error}). Hiển thị dạng văn bản.
+  - en: Nothing needs attention.
+    vi: Không có việc cần xử lý.
+  - en: Nothing recorded yet
+    vi: Chưa ghi nhận
+  - en: Nothing to do next yet.
+    vi: Chưa có việc tiếp.
+  - en: Notifications
+    vi: Thông báo
+  - en: "On the machine:"
+    vi: "Trên máy:"
+  - en: One global Supervisor seat; a Kernel is bound to each workflow. Executing ops live inside
+      attempts.
+    vi: Một ghế Supervisor toàn cục; mỗi workflow gắn một Kernel. Op thực thi sống trong các lần thử.
+  - en: One surface, clearly tiered text, details separated by thin lines.
+    vi: Một bề mặt, chữ rõ cấp bậc, chi tiết tách bằng đường mảnh.
+  - en: Only overdue
+    vi: Chỉ quá hạn
+  - en: Op and runtime disagree
+    vi: Op và runtime lệch nhau
+  - en: Op chain
+    vi: Chuỗi op
+  - en: Op declared
+    vi: Op khai
+  - en: Op graph · {n} units
+    vi: Đồ thị theo Op · {n} đơn vị
+  - en: Op graph with dependency arrows
+    vi: Đồ thị Op có mũi tên phụ thuộc
+  - en: Op list by dependency
+    vi: Danh sách Op theo phụ thuộc
+  - en: Op manifest file
+    vi: Tệp khai báo op (manifest)
+  - en: "Op self-reported: not reported"
+    vi: "Op tự báo: chưa báo cáo"
+  - en: "Op self-reported: unclear"
+    vi: "Op tự báo: chưa rõ"
+  - en: "Op self-reported: {outcome}"
+    vi: "Op tự báo: {outcome}"
+  - en: Op-declared and runtime-run do not match
+    vi: Op khai và runtime chạy không khớp
+  - en: Open
+    vi: Đang mở
+  - en: "Open attempt #{id}"
+    vi: "Mở lần thử #{id}"
+  - en: Open decisions
+    vi: Quyết định mở
+  - en: Open details
+    vi: Mở chi tiết
+  - en: Open in Cursor
+    vi: Mở trong Cursor
+  - en: Open in VS Code on the host
+    vi: Mở trong VS Code trên máy chủ
+  - en: Open leaks
+    vi: Rò rỉ mở
+  - en: Open questions
+    vi: Câu hỏi còn mở
+  - en: Open raw ↗
+    vi: Mở thô ↗
+  - en: Open SLA windows
+    vi: Đợt SLA đang mở
+  - en: Open terminals
+    vi: Terminal đang mở
+  - en: Open the containing folder
+    vi: Mở thư mục chứa tệp
+  - en: Open the decision
+    vi: Mở quyết định
+  - en: Open the full raw file ↗
+    vi: Mở tệp thô đầy đủ ↗
+  - en: Open the latest attempt
+    vi: Mở lần thử mới nhất
+  - en: Open violations
+    vi: Vi phạm mở
+  - en: Open {title}
+    vi: Mở {title}
+  - en: Opened
+    vi: Mở
+  - en: Opened at
+    vi: Mở lúc
+  - en: over time
+    vi: quá thời gian
+  - en: Overdue
+    vi: Quá hạn
+  - en: "Owned path:"
+    vi: "Đường dẫn sở hữu:"
+  - en: Owner
+    vi: Chủ
+  - en: Owner rulings
+    vi: Ruling của thầy
+  - en: "Owner: {who}"
+    vi: "Phụ trách: {who}"
+  - en: Paraphrase
+    vi: Diễn giải
+  - en: Parent agent
+    vi: Agent mẹ
+  - en: Partial report
+    vi: Báo cáo một phần
+  - en: Pass / fail / blocked
+    vi: Đạt / trượt / chặn
+  - en: Pass rate
+    vi: Tỷ lệ đạt
+  - en: Passed on the first try
+    vi: Đạt ở lần đầu
+  - en: Paste a workflow, unit, attempt, decision or blob id.
+    vi: Dán ID workflow, unit, attempt, quyết định hoặc blob.
+  - en: Path
+    vi: Đường dẫn
+  - en: PDF file
+    vi: Tệp PDF
+  - en: Pick an Op group or a unit to see details.
+    vi: Chọn một nhóm Op hoặc đơn vị để xem chi tiết.
+  - en: PLANNING
+    vi: LẬP KẾ HOẠCH
+  - en: "Power:"
+    vi: "Điện năng:"
+  - en: PREPARATION
+    vi: CHUẨN BỊ
+  - en: Previous
+    vi: Lần trước
+  - en: Previous scope
+    vi: Phạm vi trước đó
+  - en: Probes and state transitions from the runtime source
+    vi: Probe và chuyển trạng thái từ nguồn runtime
+  - en: Produces
+    vi: Tạo ra
+  - en: Products (real output)
+    vi: Sản phẩm (đầu ra thật)
+  - en: Project
+    vi: Dự án
+  - en: Project / workflow
+    vi: Dự án / workflow
+  - en: Project, channel and ask time
+    vi: Dự án, kênh và thời điểm hỏi
+  - en: Project, workflow, channel and opened time
+    vi: Dự án, workflow, kênh và thời điểm mở
+  - en: Project, workflow, op and updated time
+    vi: Dự án, workflow, op và thời điểm cập nhật
+  - en: Projects
+    vi: Dự án
+  - en: Providers
+    vi: Nhà cung cấp
+  - en: Queue
+    vi: Hàng đợi
+  - en: Queued
+    vi: Đang chờ
+  - en: RAM per agent
+    vi: RAM theo agent
+  - en: Rates by model, durations, retries, tokens and cost
+    vi: Tỉ lệ theo model, thời lượng, thử lại, token và chi phí
+  - en: Raw files
+    vi: Tệp thô
+  - en: Read-only record · answer through the shown channel
+    vi: Bản ghi chỉ đọc · trả lời qua kênh đang hiển thị
+  - en: Read-only technical details
+    vi: Chi tiết kỹ thuật chỉ đọc
+  - en: Reading the attempt…
+    vi: Đang đọc lần thử…
+  - en: Reading the content…
+    vi: Đang đọc nội dung…
+  - en: Reading the data…
+    vi: Đang đọc dữ liệu…
+  - en: Reading the decision…
+    vi: Đang đọc quyết định…
+  - en: Reading the host…
+    vi: Đang đọc máy chủ…
+  - en: Reading the incidents…
+    vi: Đang đọc sự cố…
+  - en: Reading the logs…
+    vi: Đang đọc nhật ký…
+  - en: Reading the op chain…
+    vi: Đang đọc chuỗi op…
+  - en: Reading the op files…
+    vi: Đang đọc tệp của op…
+  - en: Reading the questions…
+    vi: Đang đọc câu hỏi…
+  - en: Reading the situation…
+    vi: Đang đọc tình hình…
+  - en: Reading the unit…
+    vi: Đang đọc đơn vị…
+  - en: Reading the workflow…
+    vi: Đang đọc workflow…
+  - en: Reason
+    vi: Lý do
+  - en: Recent actions
+    vi: Hành động gần đây
+  - en: Recent probes
+    vi: Probe gần đây
+  - en: Recent throttles
+    vi: Lần ghìm gần đây
+  - en: Recommended
+    vi: Đề xuất
+  - en: Reconnecting
+    vi: Đang nối lại
+  - en: Recorded options
+    vi: Lựa chọn đã ghi
+  - en: "Redacted: {detail}"
+    vi: "Đã che: {detail}"
+  - en: Reference
+    vi: Tham chiếu
+  - en: Refresh
+    vi: Làm mới
+  - en: Rejected at handoff
+    vi: Bị từ chối khi giao
+  - en: Replan
+    vi: Lập lại kế hoạch
+  - en: Report
+    vi: Báo cáo
+  - en: REQUEST
+    vi: YÊU CẦU
+  - en: Required outcome
+    vi: Kết quả cần đạt
+  - en: Reset
+    vi: Đặt lại
+  - en: Resolved
+    vi: Đã giải
+  - en: Resource
+    vi: Tài nguyên
+  - en: Resources
+    vi: Tài nguyên
+  - en: Result blob
+    vi: Blob kết quả
+  - en: Resumed from
+    vi: Tiếp nối từ
+  - en: Retries
+    vi: Thử lại
+  - en: "Retry reason:"
+    vi: "Lý do thử lại:"
+  - en: Retry this op
+    vi: Thử lại op này
+  - en: Role / workflow
+    vi: Vai trò / workflow
+  - en: Run
+    vi: Lần
+  - en: "Running attempt #{id}."
+    vi: "Đang chạy lần thử #{id}."
+  - en: Running.
+    vi: Đang chạy.
+  - en: Runtime error · core fixes
+    vi: Lỗi runtime · core sửa
+  - en: Runtime ran
+    vi: Runtime chạy
+  - en: Samples from host_samples
+    vi: Mẫu từ host_samples
+  - en: Schedules
+    vi: Lịch chạy
+  - en: SCOPE
+    vi: PHẠM VI
+  - en: Scope record
+    vi: Bản ghi phạm vi
+  - en: Search an id or evidence
+    vi: Tìm ID hoặc bằng chứng
+  - en: Search in StarCi
+    vi: Tìm trong StarCi
+  - en: Search keywords
+    vi: Từ khóa tìm kiếm
+  - en: Search results
+    vi: Kết quả tìm kiếm
+  - en: Search the content
+    vi: Tìm trong nội dung
+  - en: Search the logs
+    vi: Tìm trong nhật ký
+  - en: Searching…
+    vi: Đang tìm…
+  - en: Seat
+    vi: Ghế
+  - en: Seats
+    vi: Ghế
+  - en: Selected nodes
+    vi: Các nút được chọn
+  - en: Semantic statuses
+    vi: Trạng thái ngữ nghĩa
+  - en: Service
+    vi: Dịch vụ
+  - en: Services
+    vi: Dịch vụ
+  - en: Session record
+    vi: Bản ghi phiên
+  - en: Settling
+    vi: Đang chốt
+  - en: Seven controllers
+    vi: Bảy controller
+  - en: Seven states
+    vi: Bảy trạng thái
+  - en: shared change (another op has to handle it)
+    vi: thay đổi dùng chung (cần op khác xử lý)
+  - en: Since
+    vi: Từ
+  - en: SLA catalog
+    vi: Danh mục SLA
+  - en: "Slow sources: {list}"
+    vi: "Nguồn chậm: {list}"
+  - en: "Source out of sync: {list}"
+    vi: "Nguồn chậm: {list}"
+  - en: Speed
+    vi: Tốc độ
+  - en: StarCi / decisions
+    vi: StarCi / quyết định
+  - en: StarCi / observation
+    vi: StarCi / Quan sát
+  - en: StarCi / operations
+    vi: StarCi / Vận hành
+  - en: StarCi / overview
+    vi: StarCi / tổng quan
+  - en: Starts / 1 hour
+    vi: Khởi động / 1 giờ
+  - en: State unknown
+    vi: Chưa rõ trạng thái
+  - en: Step
+    vi: Bước
+  - en: "Still missing in the repo: {list}."
+    vi: "Còn thiếu ở repo: {list}."
+  - en: Stop and wait for handling
+    vi: Dừng chờ xử lý
+  - en: Stop reason
+    vi: Lý do dừng
+  - en: Strikes
+    vi: Lần lỗi
+  - en: Structured result
+    vi: Kết quả cấu trúc
+  - en: Suggested actions
+    vi: Hành động gợi ý
+  - en: Summary
+    vi: Tóm tắt
+  - en: Superseded
+    vi: Đã thay thế
+  - en: Supervisor seat
+    vi: Ghế Supervisor
+  - en: Supervisor workers
+    vi: Worker của Supervisor
+  - en: System details
+    vi: Chi tiết hệ thống
+  - en: System health
+    vi: Sức khỏe hệ thống
+  - en: System sections
+    vi: Các phần hệ thống
+  - en: System source {at}
+    vi: Nguồn hệ thống {at}
+  - en: Table and states
+    vi: Bảng và trạng thái
+  - en: Tail {labels}
+    vi: Đuôi {labels}
+  - en: Target
+    vi: Đích
+  - en: "Target:"
+    vi: "Đích:"
+  - en: The brief the op read
+    vi: Đề bài op đã đọc
+  - en: The choices are saved in the URL.
+    vi: Các lựa chọn được lưu trong đường dẫn.
+  - en: The common failure classes
+    vi: Các lớp lỗi hay gặp
+  - en: The content was archived and is no longer on the machine.
+    vi: Nội dung đã được lưu trữ và không còn trên máy.
+  - en: The event stream from the host and project ledgers; filters live in the URL.
+    vi: Dòng sự kiện từ ledger máy và ledger dự án; bộ lọc nằm trong đường dẫn.
+  - en: The kernel could not observe any check to cross-check.
+    vi: Kernel không quan sát được kiểm chứng nào để đối chiếu.
+  - en: "The kernel cross-checked {observed} checks: {passed} passed, {failed} failed."
+    vi: "Kernel đối chiếu {observed} kiểm chứng: {passed} đạt, {failed} hỏng."
+  - en: The last commit the op reported was verified by the kernel in the repo.
+    vi: Commit cuối mà op báo đã được kernel xác minh trong repo.
+  - en: The op contract declares no products.
+    vi: Hợp đồng op không khai báo sản phẩm.
+  - en: The op reported blocked and the kernel kept that conclusion.
+    vi: Op báo bị chặn và kernel giữ nguyên kết luận đó.
+  - en: The op retries itself
+    vi: Op tự thử lại
+  - en: The op self-reported done but the kernel rejected that report because the checks are not green.
+    vi: Op tự báo hoàn tất nhưng kernel bác báo cáo đó vì kiểm chứng không xanh.
+  - en: The op wrote no files to the repo (the report lists no files).
+    vi: Op không ghi tệp nào vào repo (báo cáo không liệt kê tệp).
+  - en: The owner
+    vi: Thầy
+  - en: The rest
+    vi: Phần còn lại
+  - en: "The server has no products API yet: only the report file list and the patch.diff diff are
+      shown, no content."
+    vi: "Máy chủ chưa có API sản phẩm: chỉ hiện danh sách tệp của báo cáo và diff patch.diff, không có
+      nội dung."
+  - en: The server redacted sensitive information
+    vi: Máy chủ đã che thông tin nhạy cảm
+  - en: "The source is failing; keeping the last rows read. "
+    vi: "Nguồn đang lỗi; giữ dòng đã đọc gần nhất. "
+  - en: The source is failing; showing the last read. {error}
+    vi: Nguồn đang lỗi; hiển thị bản đã đọc gần nhất. {error}
+  - en: The supervisor handles it
+    vi: Supervisor xử lý
+  - en: The Supervisor is a single global seat; Supervisor workers do the watching. Per-workflow Kernels
+      and per-attempt ops are shown on their own pages.
+    vi: Supervisor là một ghế toàn cục; worker Supervisor xử lý việc giám sát. Kernel theo workflow và
+      Op theo attempt được hiển thị ở trang riêng.
+  - en: The verbatim brief
+    vi: Nguyên văn đề bài
+  - en: The whole system also has no usage record for the last 24 hours.
+    vi: Toàn hệ thống 24 giờ qua cũng chưa có bản ghi sử dụng.
+  - en: The share of each unit's first attempt settled as passed, per model.
+    vi: Tỉ lệ lần thử đầu tiên của mỗi đơn vị được chốt là đạt, theo từng mô hình.
+  - en: The Supervisor's workers
+    vi: Worker của Supervisor
+  - en: The workflow's leg chain
+    vi: Chuỗi chặng của workflow
+  - en: This commit also changed {n} other files
+    vi: Commit này còn đổi {n} tệp khác
+  - en: This op has no product files or key evidence to show.
+    vi: Op này không có tệp sản phẩm lẫn bằng chứng chính nào để hiển thị.
+  - en: This op wrote no dedicated evidence files; its products are the repo files above.
+    vi: Op này không ghi tệp bằng chứng riêng; sản phẩm của nó là các tệp repo ở trên.
+  - en: Throttle mode
+    vi: Chế độ giới hạn
+  - en: Time range
+    vi: Khoảng thời gian
+  - en: Time window
+    vi: Khoảng thời gian
+  - en: Tokens and cost
+    vi: Token và chi phí
+  - en: Tokens by model
+    vi: Token theo model
+  - en: Tokens by op
+    vi: Token theo op
+  - en: Tokens by provider
+    vi: Token theo nhà cung cấp
+  - en: Tokens per day (no provider-reported cost yet)
+    vi: Token theo ngày (chưa có chi phí do nhà cung cấp báo)
+  - en: tooling
+    vi: công cụ
+  - en: "Totals over the last {window} from the llm_usage table: by model, by op and by day."
+    vi: "Cộng dồn trong {window} qua từ bảng llm_usage: theo model, theo op và theo ngày."
+  - en: Track pending decisions, questions to the owner and incidents. This page is read-only.
+    vi: Theo dõi việc đang chờ quyết, câu hỏi gửi thầy và sự cố. Trang này chỉ đọc.
+  - en: Transition
+    vi: Chuyển
+  - en: transient (infrastructure or network)
+    vi: tạm thời (hạ tầng hoặc mạng)
+  - en: Tries per unit
+    vi: Số lần thử mỗi đơn vị
+  - en: Try 1
+    vi: Lần 1
+  - en: Try 2
+    vi: Lần 2
+  - en: Try 3 and up / failure classes
+    vi: Lần 3 trở lên / lớp lỗi
+  - en: "Uncommitted files remain: {list}."
+    vi: "Còn tệp chưa commit: {list}."
+  - en: Unit distribution
+    vi: Phân bố đơn vị
+  - en: Units
+    vi: Đơn vị
+  - en: Units · {n}
+    vi: Đơn vị · {n}
+  - en: Until
+    vi: Đến lúc
+  - en: Up {uptime}
+    vi: Bật {uptime}
+  - en: Updated
+    vi: Cập nhật
+  - en: Updated {at}
+    vi: Cập nhật {at}
+  - en: Used / limit
+    vi: Đã dùng / giới hạn
+  - en: Used / reserved / limit
+    vi: Đã dùng / dự trữ / giới hạn
+  - en: Value
+    vi: Giá trị
+  - en: Verification
+    vi: Kiểm chứng
+  - en: VERIFY
+    vi: KIỂM CHỨNG
+  - en: View output →
+    vi: Xem output →
+  - en: View raw
+    vi: Xem thô
+  - en: View results
+    vi: Xem kết quả
+  - en: View the drawer
+    vi: Mở drawer
+  - en: View the related decision
+    vi: Xem quyết định liên quan
+  - en: View the unit result
+    vi: Xem kết quả đơn vị
+  - en: "View the waiting leg: {name}"
+    vi: "Xem chặng chờ: {name}"
+  - en: View transcript
+    vi: Xem transcript
+  - en: View tree
+    vi: Xem cây
+  - en: View workflow {wf}
+    vi: Xem workflow {wf}
+  - en: View {name}
+    vi: Xem {name}
+  - en: Violation
+    vi: Vi phạm
+  - en: Waited
+    vi: Đã chờ
+  - en: Waiting for a decision via {channel}.
+    vi: Đang chờ quyết qua {channel}.
+  - en: Waiting for op {op}
+    vi: Chờ op {op}
+  - en: Waiting for the owner
+    vi: Chờ thầy
+  - en: Waiting for {list} to finish first.
+    vi: Chờ {list} xong trước.
+  - en: Waiting until
+    vi: Chờ đến
+  - en: Warning and up
+    vi: Cảnh báo trở lên
+  - en: Warnings only
+    vi: Chỉ cảnh báo
+  - en: What it does
+    vi: Làm gì
+  - en: What the Supervisor owes
+    vi: Việc Supervisor còn nợ
+  - en: What this op does
+    vi: Op này làm gì
+  - en: Where it ran & resources
+    vi: Nơi chạy & tài nguyên
+  - en: Where it ran and resources
+    vi: Nơi chạy và tài nguyên
+  - en: Why · cause analysis
+    vi: Vì sao · phân tích nguyên nhân
+  - en: Why it stopped
+    vi: Vì sao dừng
+  - en: Window
+    vi: Cửa sổ
+  - en: Windows blocks CPU temperature reading (needs admin)
+    vi: Windows chặn đọc nhiệt độ CPU (cần quyền admin)
+  - en: Work
+    vi: Việc
+  - en: Workflow content
+    vi: Nội dung workflow
+  - en: Workflow, actor, kind, time range and other filters
+    vi: Workflow, actor, loại, khoảng thời gian và các bộ lọc khác
+  - en: "Workflow: all"
+    vi: "Workflow: tất cả"
+  - en: wrong report contract
+    vi: sai hợp đồng báo cáo
+  - en: YAML · {n} lines
+    vi: YAML · {n} dòng
+  - en: "attempt #{id}"
+    vi: "lần thử #{id}"
+  - en: attempts
+    vi: lần thử
+  - en: base
+    vi: gốc
+  - en: cannot be previewed.
+    vi: không xem trực tiếp được.
+  - en: collapse
+    vi: thu gọn
+  - en: "cwd: not recorded"
+    vi: "cwd: chưa ghi"
+  - en: "dispatch #{id}"
+    vi: "giao #{id}"
+  - en: done
+    vi: xong
+  - en: empty array
+    vi: mảng rỗng
+  - en: empty object
+    vi: đối tượng rỗng
+  - en: expires {at}
+    vi: hết hạn {at}
+  - en: failed/blocked
+    vi: hỏng/chặn
+  - en: first try {pass}/{first} · p50 {p50}
+    vi: lần đầu {pass}/{first} · p50 {p50}
+  - en: folder
+    vi: thư mục
+  - en: Hand to a decider
+    vi: Chuyển cho người quyết
+  - en: head
+    vi: đầu
+  - en: infra & cost · attempts per leg · slices · {decisions} awaiting decision · {blocked} blocking
+    vi: hạ tầng & chi phí · lần thử theo chặng · lát cắt · {decisions} chờ quyết · {blocked} đang chặn
+  - en: inputs · outputs · {units} units · {attempts} attempts · tokens
+    vi: đầu vào · đầu ra · {units} đơn vị · {attempts} lần thử · token
+  - en: integrated
+    vi: tích hợp
+  - en: items
+    vi: mục
+  - en: its turn to be dispatched
+    vi: tới lượt điều phối
+  - en: keys
+    vi: khoá
+  - en: last {window}
+    vi: "{window} qua"
+  - en: load {n} %
+    vi: tải {n} %
+  - en: main checkout
+    vi: checkout chính
+  - en: model unknown
+    vi: chưa rõ mô hình
+  - en: more {n} ({remaining} left)
+    vi: thêm {n} (còn {remaining})
+  - en: needs
+    vi: cần
+  - en: needs a question
+    vi: cần hỏi
+  - en: no checks yet
+    vi: chưa có check
+  - en: no dedicated worktree — the op ran on the main checkout
+    vi: không có worktree riêng — op chạy trên checkout chính
+  - en: no external effects
+    vi: không có tác động ngoài
+  - en: no land record yet
+    vi: chưa có bản ghi land
+  - en: no lane
+    vi: không có lane
+  - en: no path limit
+    vi: không giới hạn đường dẫn
+  - en: no reading yet
+    vi: chưa có số đo
+  - en: no transcript yet
+    vi: chưa có transcript
+  - en: open path
+    vi: mở
+  - en: rejected at dispatch
+    vi: bị từ chối khi giao
+  - en: removed
+    vi: đã gỡ
+  - en: reported
+    vi: đã báo cáo
+  - en: running agents · ops by model · 24-hour tokens
+    vi: agent đang chạy · op theo mô hình · token 24 giờ
+  - en: the ask channel
+    vi: Kênh hỏi thầy
+  - en: the deferred condition to lift
+    vi: điều kiện hoãn được gỡ
+  - en: the live event stream
+    vi: dòng sự kiện trực tiếp
+  - en: "throttled: {mode}"
+    vi: "giới hạn: {mode}"
+  - en: tokens not measurable{reason}
+    vi: token không đo được{reason}
+  - en: tokens not recorded
+    vi: token chưa ghi nhận
+  - en: "tokens: not recorded"
+    vi: "token: chưa ghi nhận"
+  - en: try {n}/{total}
+    vi: lần {n}/{total}
+  - en: unblocks {n}
+    vi: gỡ chặn {n}
+  - en: up {uptime}
+    vi: bật {uptime}
+  - en: waiting for the owner
+    vi: chờ thầy trả lời
+  - en: workflows
+    vi: workflow
+  - en: "{actions} actions · {decisions} decisions · {lessons} lessons"
+    vi: "{actions} tác động · {decisions} quyết định · {lessons} bài học"
+  - en: "{codes} codes · {refs} references"
+    vi: "{codes} mã · {refs} tham chiếu"
+  - en: "{d} days {h} h"
+    vi: "{d} ngày {h} giờ"
+  - en: "{encoding} → decoded"
+    vi: "{encoding} → đã giải mã"
+  - en: "{free} GB free / {total} GB"
+    vi: "{free} GB trống / {total} GB"
+  - en: "{kind}: {n} attempts"
+    vi: "{kind}: {n} lần thử"
+  - en: "{live} workflows running · {bad} need handling · {owner} waiting for the owner"
+    vi: "{live} workflow đang chạy · {bad} cần xử lý · {owner} việc chờ thầy"
+  - en: "{model}: no first try settled yet"
+    vi: "{model}: chưa có lần đầu nào được chốt"
+  - en: "{model}: {pass}/{first} first tries passed"
+    vi: "{model}: {pass}/{first} lần đầu đạt"
+  - en: "{n} actions"
+    vi: "{n} hành động"
+  - en: "{n} active workers"
+    vi: "{n} worker đang hoạt động"
+  - en: "{n} attempts in 24 hours · updated {at}"
+    vi: "{n} lần thử trong 24 giờ · cập nhật {at}"
+  - en: "{n} bytes"
+    vi: "{n} bytes"
+  - en: "{n} checks{runs} · runtime confirmed {done}/{total}"
+    vi: "{n} check{runs} · runtime xác nhận {done}/{total}"
+  - en: "{n} controllers · {m} active"
+    vi: "{n} controller · {m} hoạt động"
+  - en: "{n} decisions"
+    vi: "{n} quyết định"
+  - en: "{n} declared products · {limits}"
+    vi: "{n} sản phẩm khai · {limits}"
+  - en: "{n} dispatches"
+    vi: "{n} lượt giao"
+  - en: "{n} duties"
+    vi: "{n} duty"
+  - en: "{n} escalations"
+    vi: "{n} lần leo thang"
+  - en: "{n} files"
+    vi: "{n} tệp"
+  - en: "{n} files · click to view content"
+    vi: "{n} tệp · bấm để xem nội dung"
+  - en: "{n} items"
+    vi: "{n} mục"
+  - en: "{n} items · {m} need handling"
+    vi: "{n} mục · {m} cần xử lý"
+  - en: "{n} key evidence files"
+    vi: "{n} tệp bằng chứng chính"
+  - en: "{n} lanes"
+    vi: "{n} lane"
+  - en: "{n} latest samples"
+    vi: "{n} mẫu gần nhất"
+  - en: "{n} mismatched"
+    vi: "{n} lệch"
+  - en: "{n} new rows"
+    vi: "{n} dòng mới"
+  - en: "{n} notifications"
+    vi: "{n} thông báo"
+  - en: "{n} overdue"
+    vi: "{n} quá hạn"
+  - en: "{n} pairs"
+    vi: "{n} cặp"
+  - en: "{n} pools"
+    vi: "{n} pool"
+  - en: "{n} providers"
+    vi: "{n} provider"
+  - en: "{n} quotas"
+    vi: "{n} hạn mức"
+  - en: "{n} recent runs"
+    vi: "{n} lần gần đây"
+  - en: "{n} resources"
+    vi: "{n} tài nguyên"
+  - en: "{n} rows loaded"
+    vi: "{n} dòng đã tải"
+  - en: "{n} rules"
+    vi: "{n} quy tắc"
+  - en: "{n} rulings"
+    vi: "{n} ruling"
+  - en: "{n} runs"
+    vi: "{n} lần"
+  - en: "{n} scopes"
+    vi: "{n} phạm vi"
+  - en: "{n} services"
+    vi: "{n} dịch vụ"
+  - en: "{n} terminals"
+    vi: "{n} terminal"
+  - en: "{n} tickets"
+    vi: "{n} ticket"
+  - en: "{n} times / 24 hours"
+    vi: "{n} lần / 24 giờ"
+  - en: "{n} tokens"
+    vi: "{n} token"
+  - en: "{n} units needed {tries} tries"
+    vi: "{n} đơn vị cần {tries} lần thử"
+  - en: "{n} violations"
+    vi: "{n} vi phạm"
+  - en: "{n} windows"
+    vi: "{n} đợt"
+  - en: "{n} writable paths"
+    vi: "{n} đường dẫn được ghi"
+  - en: "{n}% at the latest observation"
+    vi: "{n}% ở quan sát gần nhất"
+  - en: "{n}/{total} marks"
+    vi: "{n}/{total} mốc"
+  - en: "{name}: in {input}, out {output}"
+    vi: "{name}: vào {input}, ra {output}"
+  - en: "{open}/{count} open"
+    vi: "{open}/{count} đang mở"
+  - en: "{pass} passed · {fail} failed"
+    vi: "{pass} đạt · {fail} hỏng"
+  - en: "{sup} Supervisor · {ker} Kernel"
+    vi: "{sup} Supervisor · {ker} Kernel"
+  - en: "{total} attempts: {settled} settled, {running} running"
+    vi: "{total} lần thử: {settled} đã chốt, {running} đang chạy"
+  - en: "{who} · since {at}"
+    vi: "{who} · từ {at}"
+  - en: … {n} more characters
+    vi: … thêm {n} ký tự
+  - en: ← Overview
+    vi: ← Tổng quan
+  - en: Bad / Stuck
+    vi: Hỏng / Kẹt
+  - en: Slow / Warning
+    vi: Chậm / Cảnh báo
+  - en: OK
+    vi: Ổn
+  - en: Planned
+    vi: Đã lên kế hoạch
+  - en: Queued unit
+    vi: Đang xếp hàng
+  - en: Deciding
+    vi: Đang quyết định
+  - en: Dispatch
+    vi: Giao
+  - en: Run step
+    vi: Chạy
+  - en: Checks
+    vi: Kiểm
+  - en: Verdict
+    vi: Chốt
+  - en: Hypothesis
+    vi: Giả thuyết
+  - en: Experiment
+    vi: Thí nghiệm
+  - en: Experiment result
+    vi: Kết quả thí nghiệm
+  - en: Kept
+    vi: Giữ
+  - en: Reverted
+    vi: Hoàn tác
+  - en: Keep
+    vi: Giữ
+  - en: Revert
+    vi: Hoàn tác
+  - en: Proposed
+    vi: Đề xuất
+  - en: An owner decision is pending
+    vi: Có quyết định của chủ đang chờ
+  - en: A decision is pending
+    vi: Có quyết định đang chờ
+  - en: A decision is overdue
+    vi: Quyết định đã quá hạn
+  - en: The workflow phase was recorded
+    vi: Pha workflow được ghi nhận
+  - en: Dispatched below the minimum
+    vi: Giao việc dưới mức tối thiểu
+  - en: A ready unit has not been dispatched
+    vi: Có đơn vị sẵn sàng chưa được giao
+  - en: The machine is throttled for RAM
+    vi: Máy đang giới hạn do RAM
+  - en: An op has missed its heartbeat deadline
+    vi: Op chưa có tín hiệu trong hạn
+  - en: An op question is overdue
+    vi: Câu hỏi của Op đã quá hạn
+  - en: The Kernel seat is vacant
+    vi: Ghế Kernel đang trống
+  - en: Waiting for an upstream unit
+    vi: Đang chờ đơn vị trước hoàn thành
+  - en: An op is waiting for an answer
+    vi: Op đang chờ câu trả lời
+  - en: A post-settlement step failed
+    vi: Bước sau settle bị lỗi
+  - en: The SLA is critical
+    vi: SLA ở mức nghiêm trọng
+  - en: The SLA has a warning
+    vi: SLA đang cảnh báo
+  - en: A unit failed
+    vi: Đơn vị bị lỗi
+  - en: Progress needs attention
+    vi: Tiến độ cần chú ý
+  - en: Decision kind
+    vi: Loại quyết định
+  - en: Phase
+    vi: Pha
+  - en: Allowed parallelism
+    vi: Mức song song cho phép
+  - en: Ready in queue
+    vi: Sẵn sàng trong hàng đợi
+  - en: Non-green settlement
+    vi: Chốt kết quả chưa đạt
+  - en: Missing credentials
+    vi: Thiếu thông tin truy cập
+  - en: Completed
+    vi: Đã hoàn thành
+  - en: Decision pending · {kind}
+    vi: Quyết định đang chờ · {kind}
+  - en: Open incident · {kind}
+    vi: Sự cố đang mở · {kind}
+  - en: No reason recorded.
+    vi: Chưa có lý do được ghi nhận
+  - en: No timestamp recorded
+    vi: Chưa có thời điểm
+  - en: just now
+    vi: vừa xong
+  - en: "{n} days ago"
+    vi: "{n} ngày trước"

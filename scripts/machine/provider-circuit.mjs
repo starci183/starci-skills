@@ -1,6 +1,6 @@
 // provider-circuit.mjs — the provider-health circuit lives in machine.sqlite provider_health (DBTREE §4.5 B4).
 //
-// One provider credential is one fleet-wide availability fact, so the circuit is a machine row, not a per-ledger signal
+// One provider credential is one worker-wide availability fact, so the circuit is a machine row, not a per-ledger signal
 // (the runtime signals table only takes kernel|stop|launch|decision-doorbell). `value` is the circuit shape the kernel
 // used to store in the provider-health signal ({status, failureKind, provider, model, strikes, credentialFingerprint,
 // ...}); it rides in provider_health.detail_json, `expiresAt` in circuit_open_until. Every change of status appends one

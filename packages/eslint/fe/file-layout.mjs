@@ -213,7 +213,7 @@ const featureTiers = (hfs) => {
  * `fe.package.ui`; an app holds the shared ones only when the repository declares that package and another app can
  * consume them. A one-app front end has nothing to share, so every tier may stay with that app.
  *
- * WHAT IT COST TO LEARN. A shared package carried one `blocks/FleetRow/` while its own header
+ * WHAT IT COST TO LEARN. A shared package carried one `blocks/WorkerRow/` while its own header
  * insisted that "a block carries feature meaning and therefore belongs to the app that owns the
  * feature". The document was right, the tree disagreed, and nothing turned red for either of them -
  * which is the whole argument for this rule rather than the paragraph.
@@ -259,7 +259,7 @@ export const monorepoTierBelongsToItsSide = {
  *
  * WHY THIS RULE EXISTS RATHER THAN THE PARAGRAPH ALONE. The law said "the route file mounts and
  * nothing else" and had said so for as long as the tier list existed. Nothing checked it. A page
- * owner was written to `app/<segment>/fleet-page.tsx`, carried through a build, a lint run, a
+ * owner was written to `app/<segment>/workers-page.tsx`, carried through a build, a lint run, a
  * typecheck, four sealed screenshots and an approval, and arrived at the edge of a production write
  * with every gate green - because every gate was reading rules, and this one was only prose.
  *

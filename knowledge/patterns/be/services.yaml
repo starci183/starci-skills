@@ -10,6 +10,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.app, be.app.worker, be.transport.message, be.feature.saga, be.contract]
 provenance:
   reviewedAt: 2026-10-02
   sources:
@@ -26,7 +29,7 @@ rules:
   - id: BE-SERVICES-1
     title: A service lives only at be/apps/<service> and no service imports its sibling
     kind: mandatory
-    hfsRules: [R163, R168, R165]
+    hfsRules: [R163, R168, R165, R187, R188, R189, R190, R191]
     requirement: |-
       A back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `app.module.ts`, its Dockerfile) sharing the `be/src`
       libraries and the repository's one package.json; a Dockerfile or a package.json of its own anywhere else makes a second
@@ -45,6 +48,11 @@ rules:
         - HFS_SERVICE_PLACEMENT
         - BE_SERVICE_ISOLATION
         - HFS_SERVICE_STACK_DECLARATION
+        - HFS_DOCKER_BUILD_CONTEXT
+        - HFS_DOCKER_STAGES
+        - HFS_DOCKER_ENTRY
+        - HFS_DOCKER_BASE_PIN
+        - HFS_DOCKER_SECRETS
       manual:
         - Confirm the shared code a service needs belongs in be/src, not copied between apps.
     relatedExamples: []

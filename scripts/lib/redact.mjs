@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from './secret-patterns.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { altOf } from './source-phrases.mjs';
 
 const REDACTION_VERSION = 'v1';
 export const MARK = '[redacted]';
@@ -28,7 +29,7 @@ const RULES = [
   { name: 'url-credentials', re: /\b([a-z][a-z0-9+.-]*:\/\/)([^\s:@/"'<>]+):([^\s@/"'<>]+)@/gi, to: (m, scheme, user) => `${scheme}${user}:${MARK}@` },
   { name: 'auth-header', re: /\b(Bearer|Basic|Token)(\s+)[A-Za-z0-9._~+/=-]{8,}/gi, to: (m, a, b) => `${a}${b}${MARK}` },
   { name: 'url-secret', re: /([?&#](?:access_token|refresh_token|id_token|token|key|api_key|apikey|secret|code|password|otp|sig|signature)=)([^&#\s"']+)/gi, to: (m, a) => `${a}${MARK}` },
-  { name: 'otp', re: /\b(otp|one[-_ ]?time[-_ ]?(?:code|password|pin)|verification[-_ ]?code|2fa[-_ ]?code|mã[ _-]?(?:otp|xác[ _-]?(?:thực|minh)))(\s*[:=]?\s*["']?)(\d{4,8})\b/giu, to: (m, a, b) => `${a}${b}${MARK}` },
+  { name: 'otp', re: new RegExp(`\\b(otp|one[-_ ]?time[-_ ]?(?:code|password|pin)|verification[-_ ]?code|2fa[-_ ]?code|${altOf('redact.otpLabel')})(\\s*[:=]?\\s*["']?)(\\d{4,8})\\b`, 'giu'), to: (m, a, b) => `${a}${b}${MARK}` },
   // ENV_STYLE_KEY=value / ENV_STYLE_KEY: value (shell exports, dotenv, compose, CLI echo).
   { name: 'env-secret', re: /\b((?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)(\s*[:=]\s*["']?)((?!\[redacted)[^\s"'`]{3,})/g,
     to: (m, a, b, c) => (isSecretEnvName(a) && !c.startsWith('/run/secrets/') && !c.startsWith('$') ? `${a}${b}${MARK}` : m) },

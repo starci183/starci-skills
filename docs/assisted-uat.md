@@ -1,3 +1,4 @@
+Owner: modules/schemas/assisted-uat-request.schema.yaml
 # Assisted UAT
 
 Assisted UAT is a two-operation proof path for an accepted browser flow that contains at least one

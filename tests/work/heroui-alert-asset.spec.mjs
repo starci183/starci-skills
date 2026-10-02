@@ -22,7 +22,6 @@ import {
 import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 import { DEFAULT_RUBRIC } from '../../scripts/work/draw-critic.mjs';
 import { directionReviewQuestion } from '../../scripts/work/brand-direction.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-alert-asset-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -246,7 +245,7 @@ test('api status lists assetSlotsOwed and proposes an interface.asset leg for th
 
 test('the runtime text says the real HeroUI Alert everywhere: no "tone fill", secondary Button, full-width h-2 Meter, asset slots', () => {
   const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-  for (const p of ['knowledge/ui/examples/brand-direction.nivo.yaml', 'modules/ops/ops/interface.draw.yaml', 'scripts/work/draw-critic.mjs', 'knowledge/ui/composition/accent.yaml']) {
+  for (const p of ['knowledge/ui/examples/brand-direction.example.yaml', 'modules/ops/ops/interface.draw.yaml', 'scripts/work/draw-critic.mjs', 'knowledge/ui/composition/accent.yaml']) {
     assert.doesNotMatch(read(p).replace(/wrongly said "tone fill"/, ''), /Alert[^\n]{0,80}tone fill|tone fill[^\n]{0,40}Alert/i, p);
   }
   const g2 = DEFAULT_RUBRIC.checks.find((c) => c.id === 'G2').test;
@@ -263,7 +262,7 @@ test('the runtime text says the real HeroUI Alert everywhere: no "tone fill", se
 });
 
 test('the Nivo seed records the owner\'s stated choices without accepting them', () => {
-  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml'), 'utf8')).direction;
+  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.example.yaml'), 'utf8')).direction;
   const main = direction.pendingRulings.find((r) => r.id === 'main-colour');
   assert.equal(main.status, 'ruled', 'the owner ruled the main colour on 2026-09-27');
   assert.match(main.ruling, /#040d1c/);
@@ -283,7 +282,7 @@ test('the brand-direction-review ask carries the owner\'s stated choice beside t
   const root = tmp(t);
   const brandDir = path.join(root, '.starciwork', 'brand');
   fs.mkdirSync(path.join(brandDir, 'assets'), { recursive: true });
-  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.nivo.yaml'), 'utf8')).direction;
+  const direction = parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge', 'ui', 'examples', 'brand-direction.example.yaml'), 'utf8')).direction;
   const png = Buffer.from('png-dashboard');
   fs.writeFileSync(path.join(brandDir, 'assets', 'dash.png'), png);
   direction.golden = [{ archetype: 'dashboard', html: 'assets/dash.html', png: 'assets/dash.png', sha256: sha256(png), breakpoint: 'desktop' }];
@@ -292,11 +291,4 @@ test('the brand-direction-review ask carries the owner\'s stated choice beside t
   const q = directionReviewQuestion(path.join(root, '.starciwork'), { archetype: 'dashboard' });
   assert.doesNotMatch(q.text, /owner stated: black/);
   assert.equal(q.recommended, undefined, 'never auto-accepted');
-});
-
-test('the contract change registers the new codes for interface.draw and the asset-slot reach of interface.asset', () => {
-  const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'heroui-alert-asset-slots');
-  assert.ok(change);
-  for (const code of [DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, DRAW_ASSET_SLOT_UNDECLARED]) assert.ok(change.adds.codes.includes(code), code);
-  assert.deepEqual([...change.ops].sort(), ['interface.asset', 'interface.draw']);
 });

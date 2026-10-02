@@ -35,7 +35,7 @@ import { recommended as nativeControlsRecommended, rules as nativeControlsRules 
 import { recommended as nextConventionsRecommended, rules as nextConventionsRules } from "./next-conventions.mjs"
 import { recommended as propsRecommended, rules as propsRules } from "./props-and-slots.mjs"
 import { recommended as servedLocaleRecommended, rules as servedLocaleRules } from "./served-locale.mjs"
-import { recommended as shapeSlotRecommended, rules as shapeSlotRules } from "./shape-slot.mjs"
+import { recommended as drawingRecommended, rules as drawingRules } from "./drawing.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-and-state-budget.mjs"
 import { recommended as sizeGrowthRecommended, rules as sizeGrowthRules } from "./size-growth.mjs"
 import { recommended as statusColorsRecommended, rules as statusColorsRules } from "./status-colors.mjs"
@@ -77,7 +77,7 @@ const CONTRIBUTIONS = [
   { law: "next-conventions", rules: nextConventionsRules, recommended: nextConventionsRecommended },
   { law: "props-and-slots", rules: propsRules, recommended: propsRecommended },
   { law: "served-locale", rules: servedLocaleRules, recommended: servedLocaleRecommended },
-  { law: "shape-slot", rules: shapeSlotRules, recommended: shapeSlotRecommended },
+  { law: "drawing", rules: drawingRules, recommended: drawingRecommended },
   { law: "size-and-state-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
   { law: "size-growth", rules: sizeGrowthRules, recommended: sizeGrowthRecommended },
   { law: "status-colors", rules: statusColorsRules, recommended: statusColorsRecommended },

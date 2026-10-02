@@ -15,7 +15,7 @@ provenance:
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
-    - docs/source-layout.md
+    - docs/architecture.md
   limitations: |-
     The tree law governs entries and top-level placement, tooling ownership and budgets. It does not certify behavior, deployment
     or product completeness.

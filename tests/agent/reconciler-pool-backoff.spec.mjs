@@ -10,7 +10,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { aimdStep, backoffPersists, capsOf, poolRowOf, entriesOfRows } from '../../scripts/machine/pool-backoff.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
-import { selectPool } from '../../scripts/agent/models.mjs';
+import { selectPool, loadRuntimes } from '../../scripts/agent/models.mjs';
 import { createResourceController, POOLS_KEY } from '../../scripts/reconciler/controllers/resource.mjs';
 
 const T = 2_000_000_000_000;
@@ -53,7 +53,7 @@ test('capsOf: only backed-off pools of a fresh publication', () => {
 });
 
 test('route: a pool at its backed-off cap is rejected and the next eligible pool takes the job', () => {
-  const runtimes = parseYaml(fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'modules', 'models', 'runtimes.yaml'), 'utf8'));
+  const runtimes = loadRuntimes(path.join(import.meta.dirname, '..', '..', 'modules', 'models'));
   const capacity = { 'devin-agent': { running: 5, auth: 'ok' }, 'codex-agent': { running: 1, auth: 'ok' } };
   const base = { kind: 'backend.implement', difficulty: 'medium', runtimes, capacity };
   const free = selectPool({ ...base, backoff: {} });
@@ -82,7 +82,7 @@ function setup({ events = [], health = [], logs = [] } = {}) {
   const calls = { api: [], log: [] };
   const src = { events, health, logs };
   let now = T;
-  const ctxOf = (mode) => ({ mode, now: () => now, ledgers: [{ ledgerId: 'todo-app-be' }, { ledgerId: 'supervisor' }],
+  const ctxOf = (mode) => ({ mode, now: () => now, ledgers: [{ ledgerId: 'shop-be' }, { ledgerId: 'supervisor' }],
     read: (id, fn) => fn(ledgerDb(src)), api: async (...a) => { calls.api.push(a); return { ok: true }; }, run: async () => ({ ok: true }),
     clock() {}, clear() {}, openDecision: async () => ({ ok: true }), log: (kind, msg, data) => calls.log.push({ kind, msg, data }) });
   const backoff = () => entriesOfRows(readMachine((m) => m.poolBackoff(), [], { env }));
@@ -110,7 +110,7 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   assert.equal(s.backoff()['devin-agent'].cap, 2);
   const opened = s.calls.api.filter((a) => a[1] === 'provider-backoff');
   assert.equal(opened.length, 1, 'one circuit per floor episode, on the one product ledger');
-  assert.deepEqual(opened[0].slice(0, 2), ['todo-app-be', 'provider-backoff']);
+  assert.deepEqual(opened[0].slice(0, 2), ['shop-be', 'provider-backoff']);
   assert.ok(opened[0][2].includes('devin') && opened[0][2].includes('--open-circuit'));
   // Quiet: +1 after 15 minutes.
   s.src.events = [];

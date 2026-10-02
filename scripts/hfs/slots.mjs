@@ -16,10 +16,9 @@
 // One loader, two manifest kinds. `kind: app` (the default; knowledge/hfs/slots.yaml) is the product standard above.
 // `kind: runtime` (knowledge/hfs/runtime-slots.yaml, schema starci/runtime-slots@<major>) is the standard of the StarCi
 // runtime repository itself: one profile `runtime`, no sides and no app kinds, slot ids runtime.<name>, the tracked value
-// `generated` (a copy written only by the slot's `generatedBy`), and a top-level `pending` list, the one shrink-only
-// allowlist of the runtime check (scripts/hfs/runtime-check.mjs). A runtime repository declares itself with
+// `generated` (a copy written only by the slot's `generatedBy`). A runtime repository declares itself with
 // hfs.json {"hfs": <major>, "kind": "runtime", "project": <name>}.
-import { paramNamesOk } from './param-names.mjs';
+import { ruleParamsProblems } from './rule-params-shape.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -28,8 +27,8 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, roleListProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
-import { declaredSlotEnabled, kindParamProblems, optionalSlotProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
+import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, triggerProblems } from './declaration-slots.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
 import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
 export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
@@ -157,7 +156,7 @@ function manifestShapeProblems(m) {
   if (!isPlainObject(m)) return ['the manifest is not a map'];
   if (!MANIFEST_KINDS.includes(manifestKind(m))) return [`kind must be one of ${MANIFEST_KINDS.join(', ')}`];
   if (manifestKind(m) === RUNTIME_KIND) return runtimeShapeProblems(m);
-  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'editions', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
+  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'editions', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers', 'naming']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -184,36 +183,7 @@ function manifestShapeProblems(m) {
     if (tiers === undefined) continue;
     bad.push(...tierMapProblems(profile, tiers));
   }
-  const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
-  const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
-  const BE_REQUIRED = ['fileLines', 'duplicateBlock', 'infraOwners', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'logicRoles', 'thinRoles', 'patternScenarios', 'kindPatterns', 'addKinds'];
-  const BE_KEYS = [...BE_REQUIRED, 'schemaAuthority', 'lite'];
-  const keysOk = (obj, required, allowed) => Object.keys(obj).every((k) => allowed.includes(k)) && required.every((k) => k in obj);
-  const liteOk = (lite, base) => lite === undefined || (isPlainObject(lite) && Object.keys(lite).length && Object.keys(lite).every((k) => k !== 'lite' && base.includes(k)));
-  const rp = m.ruleParams;
-  if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
-  else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || !keysOk(rp.be, BE_REQUIRED, BE_KEYS)
-      || (rp.be.schemaAuthority !== undefined && !SCHEMA_AUTHORITIES.includes(rp.be.schemaAuthority))
-      || !liteOk(rp.be.lite, BE_KEYS)) bad.push(`ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds; optional: schemaAuthority (${SCHEMA_AUTHORITIES.join(' | ')}) and lite (overrides of the same keys)`); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
-    bad.push(...scenarioProblem(rp.be.patternScenarios), ...kindParamProblems(rp.be, m.triggerKinds));
-    if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
-    const owners = rp.be.infraOwners;
-    const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
-    if (!isPlainObject(owners) || !Object.keys(owners).length || !Object.entries(owners).every(([key, list]) => key && Array.isArray(list) && list.every((o) => ownerId.test(String(o))) && new Set(list).size === list.length)) bad.push('ruleParams.be.infraOwners must map a non-empty specifier to a list of unique platform/<capability> or integrations/<provider> owners ([] means nowhere)');
-    if (!paramNamesOk(rp.be.paramNames)) bad.push('ruleParams.be.paramNames must be a non-empty list of unique {type | typeSuffix, names, nameSuffix?} entries');
-    const roleList = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => /^[a-z][a-z0-9-]*$/.test(String(x))) && new Set(v).size === v.length;
-    if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
-    if (!roleList(rp.be.bannedSuffixes)) bad.push('ruleParams.be.bannedSuffixes must be a non-empty list of unique kebab-case suffixes');
-    else if (roleList(rp.be.suffixes) && rp.be.suffixes.some((x) => rp.be.bannedSuffixes.includes(x))) bad.push('ruleParams.be.suffixes and bannedSuffixes must be disjoint');
-    const formNames = ['call', 'new', 'curried', 'object', 'primitive', 'array'];
-    const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => formNames.includes(x)) && new Set(v).size === v.length;
-    const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
-    const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
-    const sd = rp.be.specDoubles;
-    if (!isPlainObject(sd) || Object.keys(sd).sort().join() !== 'doubles,fallback,kit' || typeof sd.kit !== 'string' || !sd.kit || !Array.isArray(sd.doubles) || !sd.doubles.length || !sd.doubles.every((e) => doubleOk(e) && regexOk(e.token) && Object.keys(e).length === 3) || !doubleOk(sd.fallback) || Object.keys(sd.fallback).length !== 2) bad.push('ruleParams.be.specDoubles must be {kit, doubles: [{token: regex, double, forms}], fallback: {double, forms}} with forms drawn from call, new, curried, object, primitive, array');
-    if (!fileLinesOk(rp.fe.fileLines) || !blockOk(rp.fe.duplicateBlock) || !keysOk(rp.fe, ['fileLines', 'duplicateBlock'], ['fileLines', 'duplicateBlock', 'lite']) || !liteOk(rp.fe.lite, ['fileLines', 'duplicateBlock'])) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}; optional: lite (overrides of the same keys)');
-  }
+  bad.push(...ruleParamsProblems(m));
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
   m.slots.forEach((slot, index) => bad.push(...slotProblems(slot, index, APP_KIND, { appScope: APP_SCOPE, scopes: SCOPES })));
   return bad;
@@ -751,11 +721,11 @@ export function createSlotResolver(manifest, repo) {
   });
 }
 
-/** The rule parameters of one profile (be: fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes; fe: fileLines, duplicateBlock; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. Under `edition` lite the `lite` overrides of ruleParams.<profile> merge over the base (the `lite` key itself is never returned). */
+/** The rule parameters of one profile (be: infraOwners, suffixes, bannedSuffixes and the rest over the shared ruleParams.common fileLines and duplicateBlock; fe: common alone or with its overrides; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. Under `edition` lite the `lite` overrides of ruleParams.<profile> merge over the base (the `lite` key itself is never returned). */
 export function ruleParams(manifest, profile, edition = 'full') {
   const profiles = manifestKind(manifest) === RUNTIME_KIND ? [RUNTIME_KIND] : PROFILES;
   if (!profiles.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
-  return editionRuleParams(manifest.ruleParams[profile], edition);
+  return editionRuleParams({ ...manifest.ruleParams.common, ...manifest.ruleParams[profile] }, edition);
 }
 
 /**
@@ -799,13 +769,14 @@ function ruleCatalogProblems(d) {
     const at = `rules[${index}]`;
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'scope', 'kinds', 'gates', 'failureCodes', 'editions', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
     // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
     if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
     else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
     if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
     if (typeof r.law !== 'string' || !r.law.trim()) bad.push(`${label}.law is missing`);
     if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);
+    if (r.scope !== undefined && r.scope !== 'runtime') bad.push(`${label}.scope is absent or runtime`);
     const enumList = (key, allowed) => {
       if (!Array.isArray(r[key]) || !r[key].length) { bad.push(`${label}.${key} must be a non-empty list`); return []; }
       for (const v of r[key]) if (!allowed.includes(v)) bad.push(`${label}.${key} has ${JSON.stringify(v)}, not one of ${allowed.join(', ')}`);

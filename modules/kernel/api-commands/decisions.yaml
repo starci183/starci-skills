@@ -20,7 +20,7 @@ reads: [inbox kind decision]
 writes: [inbox kind decision (status open|claimed|resolved|escalated|superseded), events decision-opened / decision-claimed / decision-resolved / decision-escalated / decision-expired / decision-superseded]
 rules:
   idempotent: an --open whose key (--key, default <kind>:<entity-type>:<entity-id>) already has a DI returns that DI; a new occurrence needs a new key
-  decider: --decider defaults by kind - cap-starved, quota-exhausted, runtime-defect, cross-workflow, deadlock, seat-unrecoverable, service-quarantined, experiment-revert, hypothesis, push-refused and kernel-proposal are the Supervisor's (resource, host, fleet and learning policy); every other kind is the Kernel's
+  decider: --decider defaults by kind - cap-starved, quota-exhausted, runtime-defect, cross-workflow, deadlock, seat-unrecoverable, service-quarantined, experiment-revert, hypothesis, push-refused and kernel-proposal are the Supervisor's (resource, host, workers and learning policy); every other kind is the Kernel's
   supersede: a supervisor-ruling --open supersedes the live Kernel DIs on the same entity (status superseded, event decision-superseded)
   claim: one live claimer per DI for 15 minutes; an expired claim reads open again (event decision-expired on the next claim)
   supervisorClaim: a --by supervisor claim of a decider-kernel DI needs the DI escalated, or its kind cross-workflow|deadlock

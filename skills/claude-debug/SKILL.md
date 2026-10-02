@@ -117,7 +117,7 @@ Which controller blocks the engine thread: time each one alone (`--once` keeps i
 engine's keys):
 
 ```
-node scripts/reconciler/engine.mjs --once --controller job --json     # then host, workflow, resource, gc, fleet, learning
+node scripts/reconciler/engine.mjs --once --controller job --json     # then host, workflow, resource, gc, workers, learning
 ```
 
 Compare wall time per controller; a controller that takes minutes on the engine thread starves the heartbeat. Do not

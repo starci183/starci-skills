@@ -17,7 +17,7 @@ StarCi provides:
   through one `node scripts/kernel/cli.mjs <verb>` call. `modules/kernel/api.yaml` and
   `modules/kernel/api-commands/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
 - **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
-  GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
+  GC, Workers and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
   is the single host runtime loop (`modules/reconciler/reconciler.yaml`).
 - **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
   per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
@@ -51,9 +51,9 @@ The examples use NestJS backend and Next.js frontend applications.
 
 This repository is the StarCi runtime package: `modules/` holds contracts, `engine/` and
 `scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
-human guidance, and `examples/` holds two backend/frontend product examples (todo-app, ecommerce-app) and
-shape-slot, the front-end slot-teaching fixture (not a product). Each
-product example follows the [HFS tree](docs/source-layout.md); [Detailed layout](#detailed-layout)
+human guidance, and `examples/` holds one backend/frontend product example (ecommerce-app), the
+shape-slot front-end slot-teaching fixture (not a product) and the starcistacks-services declarations. Each
+product example follows the [HFS tree](docs/architecture.md); [Detailed layout](#detailed-layout)
 maps the runtime directories below.
 
 ## Development
@@ -133,7 +133,7 @@ init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
 docs/               documentation
-examples/           ecommerce-app (full reference product), lite-app (tools-produced lite booking app), and shape-slot (slot-teaching fixture)
+examples/           ecommerce-app (a reference product with recorded .starciwork evidence), lite-app (a tools-produced lite booking app), shape-slot (a slot-teaching fixture, not a product) and starcistacks-services (service declarations)
 tests/              node:test specs — npm test
 packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
 ```

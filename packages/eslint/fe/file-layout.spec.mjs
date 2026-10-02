@@ -97,7 +97,7 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${A}/loading.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       // The exact file this rule was written for: it built, linted, typechecked and was approved.
-      { filename: at(`${L}/provisioning/fleet-page.tsx`), code: "export const FleetPage = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/provisioning/workers-page.tsx`), code: "export const WorkersPage = () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${L}/dashboard/DashboardHeader.tsx`), code: "export const H = () => null", errors: [{ messageId: "stray" }] },
       // `utils` is not a framework slot, and a route folder is not where a helper hides.
       { filename: at(`${L}/provisioning/utils.ts`), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
@@ -181,15 +181,15 @@ test("FILE-5: each tier sits on its own side of the feature line", () => {
       // a folder of the package that is no layer at all is another rule business
       { filename: at("packages/nivo-ui/src/utils/format.ts"), code: "export const f = () => null" },
       // The app holds the tiers that know one.
-      { filename: at("apps/web/src/components/blocks/fleet/FleetRow/index.tsx"), code: "export const FleetRow = () => null" },
-      { filename: at("apps/web/src/features/pages/FleetPage/component.tsx"), code: "export const FleetPageBase = () => null" },
+      { filename: at("apps/web/src/components/blocks/workers/WorkerRow/index.tsx"), code: "export const WorkerRow = () => null" },
+      { filename: at("apps/web/src/features/pages/WorkersPage/component.tsx"), code: "export const WorkersPageBase = () => null" },
       // a folder named like a shared layer that no slot owns is not a component
       { filename: at("apps/web/src/modules/components/leaves/Badge.ts"), code: "export const Badge = () => null" },
     ],
     invalid: [
       // The failure this rule was written for: a domain sentence in the shared package.
-      { filename: at("packages/nivo-ui/src/blocks/FleetRow/index.tsx"), code: "export const FleetRow = () => null", errors: [{ messageId: "featureInPackage" }] },
-      { filename: at("packages/nivo-ui/src/pages/FleetPage/component.tsx"), code: "export const FleetPageBase = () => null", errors: [{ messageId: "featureInPackage" }] },
+      { filename: at("packages/nivo-ui/src/blocks/WorkerRow/index.tsx"), code: "export const WorkerRow = () => null", errors: [{ messageId: "featureInPackage" }] },
+      { filename: at("packages/nivo-ui/src/pages/WorkersPage/component.tsx"), code: "export const WorkersPageBase = () => null", errors: [{ messageId: "featureInPackage" }] },
       // The mirror image: shared vocabulary trapped inside one app.
       { filename: at("apps/web/src/components/leaves/Badge/index.tsx"), code: "export const Badge = () => null", errors: [{ messageId: "vocabularyInApp" }] },
       { filename: at("apps/admin/src/components/composites/Table/index.tsx"), code: "export const Table = () => null", errors: [{ messageId: "vocabularyInApp" }] },

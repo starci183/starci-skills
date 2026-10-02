@@ -11,7 +11,7 @@ export const ORDER_PAYMENT_WINDOW_MS = 3_600_000
 export const isExpireOrdersPayload = (value: unknown): value is ExpireOrdersPayload =>
     typeof value === "object" && value !== null && "olderThanMs" in value && typeof value.olderThanMs === "number"
 
-/** The job scheduler of the expiry sweep: BullMQ fires it every `everyMs` for the whole fleet, whatever the replica count. */
+/** The job scheduler of the expiry sweep: BullMQ fires it every `everyMs` for the whole deployment, whatever the replica count. */
 export const orderExpirySchedulerOf = (options: OrderExpiryOptions): QueueSchedulerDefinition => ({
     queue: ORDER_EXPIRY_QUEUE,
     id: "expire-pending-orders",

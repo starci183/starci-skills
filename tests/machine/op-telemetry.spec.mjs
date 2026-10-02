@@ -160,7 +160,7 @@ test('severity and settings: thresholds come from runtimes.yaml, a missing one r
 test('trendLine compares the newest snapshot with the one closest to trendMs earlier', () => {
   const snap = (at, rate, wait, warn, critical) => ({ at, windowMs: 24 * HOUR, totals: { successRate: rate, queueWaitP50: wait, topFailureClass: 'check:e2e' }, stuck: { warn, critical } });
   assert.equal(trendLine([], { trendMs: 24 * HOUR }), null);
-  const line = trendLine([snap(NOW - 30 * HOUR, 0.4, 10 * MIN, 1, 0), snap(NOW - 24 * HOUR, 0.5, 8 * MIN, 2, 1), snap(NOW, 0.62, 5 * MIN, 3, 2)], { trendMs: 24 * HOUR });
+  const line = trendLine([snap(NOW - 30 * HOUR, 0.4, 10 * MIN, 1, 0), snap(NOW - 24 * HOUR, 0.5, 8 * MIN, 2, 1), snap(NOW, 0.62, 5 * MIN, 3, 2)], { trendMs: 24 * HOUR, language: 'en' });
   assert.equal(line, 'Op health 1.0d: success 62% (+12pt), median wait 5m (-3m), stuck 5 (2 critical) (+2); top failure check:e2e [vs 1.0d ago]');
   const trv = translator('vi');
   assert.equal(trendLine([snap(NOW, 0.62, 5 * MIN, 0, 0)], { trendMs: HOUR, language: 'vi' }),

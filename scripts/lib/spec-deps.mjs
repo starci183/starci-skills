@@ -33,14 +33,14 @@ function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf
     });
     if (hit && !path.relative(root, hit).startsWith('..')) out.push(posix(path.relative(root, hit)));
   }
-  // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/x/y.mjs') is a
+  // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/kernel/cli.mjs') is a
   // dependency too: the spec exercises that entry and everything it imports.
   for (const rel of spawnedEntriesOf(text)) if (fs.existsSync(path.join(root, rel))) out.push(rel);
   return out;
 }
 
 const ENTRY_ROOTS = '(?:scripts|engine|bin)';
-/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/a/b.mjs') or as path segments ('scripts', 'a', 'b.mjs'). */
+/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/kernel/cli.mjs') or as path segments ('scripts', 'kernel', 'cli.mjs'). */
 function spawnedEntriesOf(text) {
   const out = new Set();
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);
@@ -70,7 +70,7 @@ const QUOTED_PATH = /['"`]((?:examples|packages|knowledge|modules)\/[\w./@-]+?)\
 const QUOTED_SEGMENTS = /['"`](examples|packages|knowledge|modules)['"`]((?:\s*,\s*['"`][\w.@-]+['"`])+)/g;
 const QUOTED_WORD = /['"`]([\w.@-]+)['"`]/g;
 /**
- * The repository trees a test names as DATA (a path string `'packages/hfs/templates'` or path segments `'examples', 'ecommerce-app', 'be'`): a spec that reads
+ * The repository trees a test names as DATA (a path string `'packages/hfs/templates'` or path segments `'examples', '<app>', 'be'`): a spec that reads
  * a template tree or an example app depends on every file below it, though it imports none of them.
  */
 export function dataRefsOf(text) {

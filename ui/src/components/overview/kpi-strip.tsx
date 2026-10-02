@@ -1,4 +1,4 @@
-import type { FleetSummary } from '../../contract';
+import type { WorkersSummary } from '../../contract';
 import type { Tone } from '../status';
 import type { Concept } from '../concept';
 import { compactVi, costVi } from '../usage-view';
@@ -10,14 +10,14 @@ export const concept: Concept = 'C2';
 type Kpi = { tone: Tone; value: number; label: string; note: string };
 
 /** Essentials: four big numbers (ops running, workflows needing attention, passed / failed in 24 h) that count up on first view. */
-export function KpiStrip({ summary, needsAttention }: { summary: FleetSummary | undefined; needsAttention: number | undefined }) {
+export function KpiStrip({ summary, needsAttention }: { summary: WorkersSummary | undefined; needsAttention: number | undefined }) {
   const items: Kpi[] = summary ? [
     { tone: 'running', value: summary.opsRunning, label: t('ops running'), note: t('Dispatched attempts the agent has not reported yet.') },
     { tone: 'failed', value: needsAttention ?? 0, label: t('workflows needing attention'), note: t('Workflows that are stuck or slow and need a person.') },
     { tone: 'success', value: summary.passed24h, label: t('passed in 24 h'), note: t('Attempts settled with a passing result.') },
     { tone: 'failed', value: summary.failed24h, label: t('failed / blocked in 24 h'), note: t('Attempts settled with a failing result.') },
   ] : [];
-  if (!summary) return <section aria-label={t('Fleet-wide metrics')} className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
+  if (!summary) return <section aria-label={t('Worker metrics')} className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
     {Array.from({ length: 4 }, (_, index) => <div key={index} className="kpi-cell"><div className="h-8 w-12 rounded bg-muted" /><div className="mt-3 h-4 w-24 rounded bg-muted" /><div className="mt-2 h-3 w-full rounded bg-muted" /></div>)}
   </section>;
   return <Stagger className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
@@ -30,7 +30,7 @@ export function KpiStrip({ summary, needsAttention }: { summary: FleetSummary | 
 }
 
 /** Secondary numbers (settling ops, queued units, 24 h tokens) shown inside "Advanced". */
-export function KpiExtras({ summary }: { summary: FleetSummary | undefined }) {
+export function KpiExtras({ summary }: { summary: WorkersSummary | undefined }) {
   if (!summary) return null;
   const usage = summary.usage24h;
   const tokens = usage.recorded ? usage.inputTokens + usage.outputTokens : null;

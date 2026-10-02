@@ -1,6 +1,6 @@
 // index-lock.mjs — the ONE recovery of a stale `.git/index.lock` in a shared product checkout.
 //
-// Every workflow of a product repo works in one checkout (todo-app, ecommerce-app, ...). A git process that
+// Every workflow of a product repo works in one checkout (one shared checkout per product). A git process that
 // dies mid-write (a host terminal wipe, a killed worker) leaves `<gitdir>/index.lock` behind, and from then on
 // every `git add` / `git commit` in that checkout refuses "Unable to create .../index.lock: File exists" - for
 // every workflow at once. One op once settled blocked on

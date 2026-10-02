@@ -4,7 +4,7 @@
 // is who uses the product. They are different people: an owner who reads
 // Vietnamese logs can ship an English product, and three parallel drawings that
 // took owner_language as their UI language drew one screen in English and two in
-// Vietnamese (wf-nivo-modules-agentos). The value is the shell record's
+// Vietnamese (wf-<product>-modules-agentos). The value is the shell record's
 // productLocale.default (.starciwork/shell/index.yaml, work/layout-tree@1), else
 // the brand record's voice.locales default; with neither, it is null and the
 // packet says so rather than guessing.

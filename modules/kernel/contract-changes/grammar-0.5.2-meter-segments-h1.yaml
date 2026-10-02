@@ -1,9 +1,0 @@
-id: grammar-0.5.2-meter-segments-h1
-effectiveAt: '2026-09-27T19:30:00+07:00'
-summary: "Owner ruling update 2026-09-27 on Meter segments (still @starci/grammar 0.5.2, unpublished): the segmented track is HeroUI h-1 (0.25rem, 4px), not h-2 - full container width like a Progress track, N equal pill segments 0.25rem apart, one role=meter; the plain meter keeps h-2. common/components-overlays.css re-cuts the vendor track height with !important; Offset Pop's segmented line drops its ink outline (empty segments ink 18%). knowledge/grammars DNA re-measured (sheet digests) and starci/DNA.yaml + brand-direction.nivo.yaml Meter.segments prose name the h-1 track. Adds no op check or finding code"
-paths:
-  - knowledge/grammars/common/DNA.yaml
-  - knowledge/grammars/starci/DNA.yaml
-  - knowledge/grammars/offset-pop/DNA.yaml
-  - knowledge/ui/examples/brand-direction.nivo.yaml
-reach: new-legs
