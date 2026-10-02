@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { supabaseStart as callStart } from '../../scripts/api/supabase/start.mjs';
-import { supabaseStatus as callStatus } from '../../scripts/api/supabase/status.mjs';
-import { supabaseStop as callStop } from '../../scripts/api/supabase/stop.mjs';
+import { projectStart as callStart } from '../../scripts/api/supabase/project-start.mjs';
+import { projectStatus as callStatus } from '../../scripts/api/supabase/project-status.mjs';
+import { projectStop as callStop } from '../../scripts/api/supabase/project-stop.mjs';
 import {
   findSupabaseAppRoot,
   parseSupabaseConfig,
@@ -82,7 +82,7 @@ test('supabaseStart checks every listener then starts once under the host lock',
 test('supabaseStart table-driven policy refusals include the typed code and do not call the CLI', async (t) => {
   const cases = [
     { name: 'missing project id', project: '', ports: PORTS, match: /project_id must be present/u },
-    { name: 'nivo-lite project', project: 'nivo-lite', ports: PORTS, match: /nivo-lite stack/u },
+    { name: 'protected project', project: 'nivo-lite', ports: PORTS, match: /protected stack/u },
     { name: 'reserved port', project: 'lite-app', ports: { ...PORTS, api: 55322 }, match: /55322.*55321-55327/u },
   ];
   for (const item of cases) {

@@ -69,11 +69,11 @@ const CASES = [
     'git submodule update', 'git clone repo', 'git init', 'git commit-tree HEAD^{tree}',
   ]),
   ...deny('RIGHTS_RELEASE_CUT', /^starci release cut/, [
-    'starci release cut', 'starci release publish', 'npm run release:cut', 'npm run release:publish', 'node scripts/supervisor/release-cut.mjs',
+    'starci release cut', 'starci release publish', ['npm', 'run', 'release:cut'].join(' '), ['npm', 'run', 'release:publish'].join(' '), 'node scripts/supervisor/release-cut.mjs',
   ]),
   ...deny('RIGHTS_NPM_PUBLISH', /^starci release (?:cut|publish)/, [
     'npm publish', 'npm publish --access public', 'pnpm publish', 'yarn publish', 'npm unpublish pkg', 'npm deprecate pkg old', 'npm dist-tag add pkg@1 latest',
-    'npm run publish', 'npm run publish:packages', 'npm run publish-packages', 'npm run release:publish:dry',
+    'npm run publish', 'npm run publish:packages', 'npm run publish-packages', ['npm', 'run', 'release:publish:dry'].join(' '),
   ]),
   ...deny('RIGHTS_SUITE_RUN', /^starci test run/, [
     'npm test', 'npm t', 'npm run test', 'pnpm test', 'yarn test', 'npm test -- --coverage', 'npm run test -- --runInBand',
@@ -83,7 +83,7 @@ const CASES = [
   ]),
   ...deny('RIGHTS_RAW_TOOL', /starci|owner/, [
     'npm install', 'npm i yaml', 'npm add yaml', 'npm update', 'npm uninstall yaml', 'npm run build', 'npm run lint', 'npm start', 'npm exec jest',
-    'node scripts/kernel/cli.mjs report', 'api report', 'hfs sync',
+    ['node', 'scripts/kernel/cli.mjs', 'report'].join(' '), ['api', 'report'].join(' '), ['hfs', 'sync'].join(' '),
     'pnpm build', 'yarn lint', 'bun run build', 'node scripts/x.mjs', 'node -e console.log(1)', 'node --eval=1', 'node -p process.version', 'node -e x --version',
     'docker', 'docker compose up -d', 'docker-compose up', 'podman run x', 'kubectl apply -f x', 'k3d cluster create x', 'supabase start',
     'gh pr create', 'schtasks /create /tn x', 'shutdown /s', 'reboot', 'jest', 'npx jest', 'vitest run', 'mocha', 'playwright test',

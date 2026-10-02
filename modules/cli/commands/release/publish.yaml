@@ -16,7 +16,7 @@ flags:
   - {name: poll-minutes, type: number, default: 15, summary: registry confirmation deadline per package}
   - {name: pre-land-ref, type: string, summary: require HEAD to equal this pre-land commit}
   - {name: expect-sha, type: string, summary: require the release worktree HEAD to equal this freeze commit}
-  - {name: examples, type: list, default: [ecommerce-app, shape-slot, lite-app], summary: example apps to re-pin and prove}
+  - {name: examples, type: list, summary: example apps to re-pin and prove (default is every discovered app example)}
 positional: []
 exit:
   "0": plan is clear or publication completed

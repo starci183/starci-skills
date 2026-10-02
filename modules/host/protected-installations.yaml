@@ -1,0 +1,8 @@
+schema: starci/protected-installations@1
+containerMarkers:
+  - nivo-lite
+ports:
+  list: [3000, 3100]
+  ranges:
+    - {first: 54320, last: 54329}
+    - {first: 55321, last: 55327}

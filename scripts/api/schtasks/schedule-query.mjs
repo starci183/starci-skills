@@ -1,5 +1,5 @@
-// query.mjs - make exactly one PowerShell call and return one scheduled task as stable JSON.
-import { spawnSync } from 'node:child_process';
+// schedule-query.mjs - return one scheduled task as stable JSON in one PowerShell call.
+import { scheduleSpawn } from './lib.mjs';
 
 const QUERY_SCRIPT = [
   'param([string]$TaskName)',
@@ -20,8 +20,5 @@ const QUERY_SCRIPT = [
   '} | ConvertTo-Json -Compress',
 ].join('\n');
 
-/** Query one task by exact Task Scheduler name without a shell. */
-export const queryScheduledTask = (taskName, { env = process.env, powershell = 'powershell.exe', timeout = 30_000 } = {}) =>
-  spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', QUERY_SCRIPT, taskName], {
-    encoding: 'utf8', env, windowsHide: true, timeout,
-  });
+/** Query one task by exact Task Scheduler name. */
+export const scheduleQuery = (taskName, options = {}) => scheduleSpawn(QUERY_SCRIPT, [taskName], options);

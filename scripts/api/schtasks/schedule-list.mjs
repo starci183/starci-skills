@@ -1,5 +1,5 @@
-// list.mjs - make exactly one PowerShell call and return the runtime's registered scheduled tasks as stable JSON.
-import { spawnSync } from 'node:child_process';
+// schedule-list.mjs - return the runtime's registered scheduled tasks as stable JSON in one PowerShell call.
+import { scheduleSpawn } from './lib.mjs';
 
 const LIST_SCRIPT = [
   'param([Parameter(ValueFromRemainingArguments=$true)][string[]]$TaskNames)',
@@ -23,8 +23,5 @@ const LIST_SCRIPT = [
   '$rows | ConvertTo-Json -Compress',
 ].join('\n');
 
-/** List the exact task names supplied by the runtime without a shell. */
-export const listScheduledTasks = (taskNames, { env = process.env, powershell = 'powershell.exe', timeout = 30_000 } = {}) =>
-  spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', LIST_SCRIPT, ...taskNames], {
-    encoding: 'utf8', env, windowsHide: true, timeout,
-  });
+/** List the exact task names supplied by the runtime. */
+export const scheduleList = (taskNames, options = {}) => scheduleSpawn(LIST_SCRIPT, taskNames, options);

@@ -83,6 +83,7 @@ test('the ported land gate refuses a changed source import that does not resolve
     mergeBase: () => 'base',
     diff: () => ({ status: 0, stdout: 'scripts/bad.mjs\n', stderr: '' }),
     primaryWorktreeOf: () => ({ ok: true, primary }),
+    env: { SWC_NATIVE_BINDING_CACHE: path.join(root, 'swc-cache') },
   });
   assert.equal(out.ok, false);
   assert.match(out.problems.join('\n'), /does not resolve/);

@@ -7,22 +7,20 @@ import { composeConfig as realComposeConfig } from '../api/docker/compose-config
 import { composeDown as realComposeDown } from '../api/docker/compose-down.mjs';
 import { composeUp as realComposeUp } from '../api/docker/compose-up.mjs';
 import { composePs as realComposePs } from '../api/docker/compose-ps.mjs';
-import { dockerPs as realDockerPs } from '../api/docker/ps.mjs';
+import { ps as realDockerPs } from '../api/docker/ps.mjs';
 import { resourceList as realResourceList } from '../api/docker/resource-list.mjs';
 import { resourceRemove as realResourceRemove } from '../api/docker/resource-remove.mjs';
+import { resultDetail as detail, resultOk as ok } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import {
-  COMPOSE_PROJECT_LABEL,
   DOCKER_PORT_POLICY,
-  STARCI_PROJECT_LABEL,
+  PROJECT_LABEL_KEY,
   dockerProjectName,
   isForeignContainer,
   ownershipFilters,
   refusePortPolicy,
 } from './docker-policy.mjs';
 
-const ok = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const detail = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().slice(0, 500);
 const refused = (message) => ({
   code: 2,
   stderr: `${DOCKER_PORT_POLICY}: ${message}`,
@@ -87,8 +85,8 @@ const healthOf = (row) => {
 };
 
 /** Compose override that adds the ownership label to every resource this project creates. External resources are not created. */
-export function labelsOverride(model, project) {
-  const labels = { [STARCI_PROJECT_LABEL]: project };
+function labelsOverride(model, project) {
+  const labels = { [PROJECT_LABEL_KEY]: project };
   const entries = (value, skipExternal = false) => Object.fromEntries(Object.entries(value ?? {})
     .filter(([, definition]) => !skipExternal || definition?.external !== true)
     .map(([name]) => [name, { labels }]));
@@ -138,7 +136,7 @@ export async function dockerUp(ctx, deps = {}) {
       let rows;
       try { rows = jsonRows(listed.stdout); } catch (error) { return { code: 1, stderr: `starci docker up: Compose ps returned invalid JSON (${error.message})` }; }
       const containers = rows.map((row) => ({ name: String(row.Name ?? row.name ?? ''), ports: portsOfComposeRow(row), health: healthOf(row) }));
-      if (containers.some(({ name }) => isForeignContainer(name))) return refused('Compose reported a foreign nivo-lite container after startup');
+      if (containers.some(({ name }) => isForeignContainer(name))) return refused('Compose reported a protected foreign container after startup');
       const text = [`starci docker up: ${projectName}`, ...containers.map((item) => `${item.name} ${item.health} ${item.ports.join(', ') || 'no published ports'}`)].join('\n');
       return { code: 0, text, data: { schema: 'starci/docker-up@1', project: identity.project, stack: selected.stack, containers } };
     }, deps);
@@ -192,20 +190,18 @@ export async function dockerDown(ctx, deps = {}) {
   });
 }
 
-/** List StarCi-labelled containers; --all additionally exposes nivo-lite containers as foreign, but never mutates them. */
+/** List StarCi-labelled containers; --all additionally exposes protected containers as foreign, but never mutates them. */
 export async function dockerPs(ctx, deps = {}) {
   const all = ctx.args?.all === true;
-  const result = await (deps.dockerPs ?? realDockerPs)({ all, filters: all ? [] : [`label=${STARCI_PROJECT_LABEL}`] }, { cwd: ctx.cwd });
+  const result = await (deps.dockerPs ?? realDockerPs)({ all, filters: all ? [] : [`label=${PROJECT_LABEL_KEY}`] }, { cwd: ctx.cwd });
   if (!ok(result)) return failed('ps', result);
   let rows;
   try { rows = jsonRows(result.stdout); } catch (error) { return { code: 1, stderr: `starci docker ps: Docker returned invalid JSON (${error.message})` }; }
   const containers = rows.map((row) => {
     const labels = labelsOf(row);
     const name = String(row.Names ?? row.Name ?? row.name ?? '');
-    return { name, project: labels[STARCI_PROJECT_LABEL] ?? null, ports: String(row.Ports ?? row.ports ?? '').split(/,\s*/).filter(Boolean), health: healthOf(row), foreign: isForeignContainer(name) };
+    return { name, project: labels[PROJECT_LABEL_KEY] ?? null, ports: String(row.Ports ?? row.ports ?? '').split(/,\s*/).filter(Boolean), health: healthOf(row), foreign: isForeignContainer(name) };
   }).filter((row) => row.project !== null || (all && row.foreign));
   const text = containers.length ? containers.map((item) => `${item.name}${item.foreign ? ' [foreign]' : ''} ${item.health} ${item.ports.join(', ') || 'no published ports'}`).join('\n') : 'no StarCi containers';
   return { code: 0, text, data: { schema: 'starci/docker-ps@1', containers } };
 }
-
-export const DOCKER_LABELS = Object.freeze({ project: STARCI_PROJECT_LABEL, composeProject: COMPOSE_PROJECT_LABEL });

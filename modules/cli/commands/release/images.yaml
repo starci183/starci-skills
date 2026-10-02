@@ -9,7 +9,7 @@ conventions:
   - images are built sequentially from be/apps or fe/apps with the application root as context
   - proof containers publish no ports and carry the exact starci.project label
   - healthy containers pass; an image without HEALTHCHECK must remain running for ten seconds
-  - teardown always removes the exact proof container id and never touches nivo-lite or port 3100
+  - teardown always removes the exact proof container id and never touches a protected installation or protected port
 flags:
   - {name: app, type: string, summary: app root to prove (default is the current directory)}
   - {name: sides, type: list, summary: "selected sides, each be or fe (default both)"}
@@ -23,8 +23,8 @@ exit:
   "2": usage, app shape or protected Docker policy was refused
 json: starci/release-images@1
 examples:
-  - starci release images --app examples/ecommerce-app
-  - starci release images --app examples/lite-app --sides be --remove-images --json
+  - starci release images --app <app-root>
+  - starci release images --app <app-root> --sides be --remove-images --json
 editions: [full]
 since: 1.0.0-alpha.4
 removed: [bash docker-proof.sh]

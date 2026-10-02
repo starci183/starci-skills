@@ -2,7 +2,7 @@ group: worker
 verb: show
 owner: runtime
 summary: show one supervised worker and Orca's exact liveness observation
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerShowVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerShowVerb}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:

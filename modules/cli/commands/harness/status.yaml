@@ -2,7 +2,7 @@ group: harness
 verb: status
 owner: runtime
 summary: report whether the harness health endpoint is up
-impl: {module: scripts/machine/harness-verbs.mjs, export: harnessStatusVerb}
+impl: {module: ui/harness-verbs.mjs, export: harnessStatusVerb}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:
@@ -20,4 +20,4 @@ examples:
 editions: [full]
 since: 1.0.0-alpha.4
 removed:
-  - node ui/start.mjs status
+  - node ui/harness-verbs.mjs status

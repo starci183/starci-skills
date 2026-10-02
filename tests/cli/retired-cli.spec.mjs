@@ -27,6 +27,7 @@ const catalog = {
         { verb: 'stack', removed: ['starci-test-stack', 'npx starci-test-stack'] },
       ],
     },
+    { group: 'check', verbs: [{ verb: 'run', removed: [] }] },
   ],
 };
 const matchers = retiredMatchers(catalog);
@@ -72,6 +73,7 @@ test('each removed top-level starci verb has a failing and passing fixture', () 
     assert.deepEqual(calls(`Run \`${replacement}\`.`), [], replacement);
   }
   assert.deepEqual(calls('Run `starci runtime check`.'), [], 'the runtime group is not the retired top-level check');
+  assert.deepEqual(calls('Run `starci check run --level L2`.'), [], 'a current verb under the check group is not the retired top-level check');
 });
 
 test('overlapping generic spellings produce one finding and exact catalog replacements win', () => {

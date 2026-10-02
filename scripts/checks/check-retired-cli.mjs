@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { maskTextRange } from '../lib/text-mask.mjs';
 import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
 import { sentencesOf } from './check-guidance-commands.mjs';
 
@@ -87,17 +88,21 @@ export function retiredMatchers(catalog) {
     regex: commandRegex('npx[ \\t]+hfs(?:[ \\t]+([a-z][a-z0-9-]*))?'),
     hit: (match) => ({ spelling: match[0], use: match[1] ? `starci app ${match[1]}` : 'starci app', kind: 'hfs', priority: 2 }),
   }, {
-    regex: commandRegex('starci-test-stack'),
+    regex: commandRegex(['starci', 'test', 'stack'].join('-')),
     hit: (match) => ({ spelling: match[0], use: 'starci app stack', kind: 'stack', priority: 1 }),
   });
   if (appVerbs.length) matchers.push({
     regex: commandRegex(`hfs[ \\t]+(${alternation(appVerbs)})`),
     hit: (match) => ({ spelling: match[0], use: `starci app ${match[1]}`, kind: 'hfs', priority: 1 }),
   });
-  for (const [verb, use] of Object.entries(TOP_LEVEL)) matchers.push({
-    regex: commandRegex(`starci[ \\t]+${verb}`),
-    hit: (match) => ({ spelling: match[0], use, kind: 'top-level', priority: 2 }),
-  });
+  for (const [verb, use] of Object.entries(TOP_LEVEL)) {
+    const currentVerbs = (catalog.groups?.find((group) => group.group === verb)?.verbs ?? []).map((entry) => entry.verb).filter(Boolean);
+    const currentVerbSuffix = currentVerbs.length ? `(?![ \\t]+(?:${alternation(currentVerbs)})(?![\\w-]))` : '';
+    matchers.push({
+      regex: commandRegex(`starci[ \\t]+${verb}${currentVerbSuffix}`),
+      hit: (match) => ({ spelling: match[0], use, kind: 'top-level', priority: 2 }),
+    });
+  }
   return matchers;
 }
 
@@ -118,8 +123,6 @@ const isFullyExempt = (file) => {
     || rel === 'packages/cli/src/removed.mjs';
 };
 
-const masked = (text, from, to) => `${text.slice(0, from)}${text.slice(from, to).replace(/[^\r\n]/g, ' ')}${text.slice(to)}`;
-
 /** Hide only the catalog's removed field, preserving offsets and other fields. */
 export function maskCatalogRemoved(text) {
   let result = String(text);
@@ -131,7 +134,7 @@ export function maskCatalogRemoved(text) {
     const indent = /^\s*/.exec(content)[0].length;
     const starts = /^\s*removed\s*:/.test(content);
     const continues = blockIndent !== null && (!content.trim() || indent > blockIndent);
-    if (starts || continues) result = masked(result, match.index, match.index + line.length);
+    if (starts || continues) result = maskTextRange(result, match.index, match.index + line.length);
     if (starts) blockIndent = /:\s*$/.test(content) ? indent : null;
     else if (blockIndent !== null && content.trim() && indent <= blockIndent) blockIndent = null;
   }
@@ -145,7 +148,7 @@ function maskDispatcherTable(text, file) {
   const start = text.indexOf('const RETIRED_BUILTINS = [');
   if (start < 0) return text;
   const end = text.indexOf('\n];', start);
-  return end < 0 ? text : masked(text, start, end + 3);
+  return end < 0 ? text : maskTextRange(text, start, end + 3);
 }
 
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;

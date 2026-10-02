@@ -7,19 +7,22 @@ import { proofImageInspect as realImageInspect } from '../api/docker/proof-image
 import { proofImageRemove as realImageRemove } from '../api/docker/proof-image-remove.mjs';
 import { proofRun as realRun } from '../api/docker/proof-run.mjs';
 import { containerInspect as realContainerInspect } from '../api/docker/container-inspect.mjs';
+import { asList } from '../lib/list.mjs';
+import { protectedPortsInText } from '../lib/protected-installations.mjs';
+import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { isForeignContainer } from '../machine/docker-policy.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 
-const success = (result) => Boolean(result && !result.error && result.status === 0);
 const text = (result) => String(result?.stdout ?? '').trim();
-const failure = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().split(/\r?\n/).at(-1) ?? '';
-const list = (value, fallback) => {
-  const values = value === undefined ? fallback : Array.isArray(value) ? value : [value];
+const commaList = (value, fallback) => {
+  const values = asList(value === undefined ? fallback : value);
   return values.flatMap((entry) => String(entry).split(',')).map((entry) => entry.trim()).filter(Boolean);
 };
 
 /** `starci release images`: release-image build/run/health/teardown proof with exact-id cleanup. */
 export async function releaseProofImages(ctx, deps = {}) {
+  const success = (result) => resultOk(result, { acceptOk: false });
+  const failure = (result) => resultDetail(result, { limit: null, lastLine: true });
   if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci release images: no positional arguments are accepted' };
   const root = path.resolve(ctx.cwd ?? process.cwd(), ctx.args?.app ?? '.');
   let declaration;
@@ -27,10 +30,10 @@ export async function releaseProofImages(ctx, deps = {}) {
   catch (error) { return { code: 2, stderr: `starci release images: --app must name an app root (${error.message})` }; }
   if (!fs.existsSync(path.join(root, 'package.json'))) return { code: 2, stderr: 'starci release images: --app must contain package.json' };
   const project = String(declaration?.project ?? '');
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(project) || isForeignContainer(project)) return { code: 2, stderr: 'starci release images: the project name is invalid or belongs to nivo-lite' };
-  const sides = list(ctx.args?.sides, ['be', 'fe']);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(project) || isForeignContainer(project)) return { code: 2, stderr: 'starci release images: the project name is invalid or belongs to a protected installation' };
+  const sides = commaList(ctx.args?.sides, ['be', 'fe']);
   if (sides.some((side) => !['be', 'fe'].includes(side))) return { code: 2, stderr: 'starci release images: --sides accepts only be and fe' };
-  const only = new Set(list(ctx.args?.only, []));
+  const only = new Set(commaList(ctx.args?.only, []));
   const images = [];
   for (const side of sides) {
     const apps = path.join(root, side, 'apps');
@@ -39,7 +42,8 @@ export async function releaseProofImages(ctx, deps = {}) {
       const dockerfile = path.join(side, 'apps', entry.name, 'Dockerfile');
       if (!entry.isDirectory() || !fs.existsSync(path.join(root, dockerfile)) || (only.size && !only.has(entry.name))) continue;
       if (isForeignContainer(entry.name)) return { code: 2, stderr: `starci release images: refusing foreign image name ${entry.name}` };
-      if (/\b3100\b/.test(fs.readFileSync(path.join(root, dockerfile), 'utf8'))) return { code: 2, stderr: `starci release images: ${dockerfile} names protected port 3100` };
+      const protectedPorts = protectedPortsInText(fs.readFileSync(path.join(root, dockerfile), 'utf8'));
+      if (protectedPorts.length) return { code: 2, stderr: `starci release images: ${dockerfile} names protected port ${protectedPorts[0]}` };
       images.push({ side, app: entry.name, dockerfile: dockerfile.split(path.sep).join('/'), tag: `${project}/${entry.name}:dev` });
     }
   }

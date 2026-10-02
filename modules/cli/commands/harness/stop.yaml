@@ -2,7 +2,7 @@ group: harness
 verb: stop
 owner: runtime
 summary: stop only harness processes recorded by harness start
-impl: {module: scripts/machine/harness-verbs.mjs, export: harnessStopVerb}
+impl: {module: ui/harness-verbs.mjs, export: harnessStopVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:
@@ -21,4 +21,4 @@ examples:
 editions: [full]
 since: 1.0.0-alpha.4
 removed:
-  - node ui/start.mjs stop
+  - node ui/harness-verbs.mjs stop

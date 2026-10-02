@@ -2,7 +2,7 @@ group: worker
 verb: start
 owner: runtime
 summary: start one supervised agent in a registered worktree in an Orca run
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerStartVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerStartVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:

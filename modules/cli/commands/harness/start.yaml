@@ -2,7 +2,7 @@ group: harness
 verb: start
 owner: runtime
 summary: start the harness API and UI or its named tunnel
-impl: {module: scripts/machine/harness-verbs.mjs, export: harnessStartVerb}
+impl: {module: ui/harness-verbs.mjs, export: harnessStartVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:
@@ -23,7 +23,5 @@ examples:
 editions: [full]
 since: 1.0.0-alpha.4
 removed:
-  - node ui/start.mjs
-  - node ui/start.mjs --tunnel
-  - node ui/start.mjs start
-  - node ui/start.mjs start --tunnel
+  - node ui/harness-verbs.mjs
+  - node ui/harness-verbs.mjs --tunnel

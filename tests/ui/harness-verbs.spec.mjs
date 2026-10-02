@@ -5,7 +5,7 @@ import {
   harnessStartVerb,
   harnessStatusVerb,
   harnessStopVerb,
-} from '../../scripts/machine/harness-verbs.mjs';
+} from '../../ui/harness-verbs.mjs';
 
 const ctx = (args = {}) => ({ args, env: {}, now: 123, io: { stdout: () => {}, stderr: () => {} } });
 

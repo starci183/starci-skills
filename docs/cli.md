@@ -1113,7 +1113,7 @@ json: none
 starci harness open
 ```
 
-Replaces: `node ui/start.mjs open`
+Replaces: `node ui/harness-verbs.mjs open`
 
 ### starci harness start
 
@@ -1142,7 +1142,7 @@ starci harness start
 starci harness start --tunnel
 ```
 
-Replaces: `node ui/start.mjs`, `node ui/start.mjs --tunnel`, `node ui/start.mjs start`, `node ui/start.mjs start --tunnel`
+Replaces: `node ui/harness-verbs.mjs`, `node ui/harness-verbs.mjs --tunnel`
 
 ### starci harness status
 
@@ -1165,7 +1165,7 @@ starci harness status
 starci harness status --json
 ```
 
-Replaces: `node ui/start.mjs status`
+Replaces: `node ui/harness-verbs.mjs status`
 
 ### starci harness stop
 
@@ -1189,7 +1189,7 @@ starci harness stop
 starci harness stop --json
 ```
 
-Replaces: `node ui/start.mjs stop`
+Replaces: `node ui/harness-verbs.mjs stop`
 
 ## starci kernel
 
@@ -2584,7 +2584,7 @@ exit: 0 lint was clean; 1 lint findings; 2 usage or ladder policy refusal
 json: starci/lint-run@1
 
 ```sh
-starci lint run --level L1 --changed scripts/machine/example.mjs
+starci lint run --level L1 --changed scripts/machine/ladder-lint.mjs
 starci lint run --level L4 --all
 ```
 
@@ -3098,15 +3098,15 @@ Conventions:
 - images are built sequentially from be/apps or fe/apps with the application root as context
 - proof containers publish no ports and carry the exact starci.project label
 - healthy containers pass; an image without HEALTHCHECK must remain running for ten seconds
-- teardown always removes the exact proof container id and never touches nivo-lite or port 3100
+- teardown always removes the exact proof container id and never touches a protected installation or protected port
 
 exit: 0 every selected image built, ran healthy and was torn down; 1 a Docker, health, teardown or host-lock step failed; 2 usage, app shape or protected Docker policy was refused
 
 json: starci/release-images@1
 
 ```sh
-starci release images --app examples/ecommerce-app
-starci release images --app examples/lite-app --sides be --remove-images --json
+starci release images --app <app-root>
+starci release images --app <app-root> --sides be --remove-images --json
 ```
 
 Replaces: `bash docker-proof.sh`
@@ -3169,7 +3169,7 @@ plan or perform the owner-run package publication sequence
 | `--poll-minutes` | number (default 15) |  |
 | `--pre-land-ref` | string |  |
 | `--expect-sha` | string |  |
-| `--examples` | list (default ecommerce-app,shape-slot,lite-app) |  |
+| `--examples` | list |  |
 
 Effect: publish
 
@@ -4376,7 +4376,7 @@ exit: 0 selected specs passed; 1 a check or spec was red; 2 usage or ladder poli
 json: starci/test-run@1
 
 ```sh
-starci test run --level L1 --changed scripts/machine/example.mjs
+starci test run --level L1 --changed scripts/machine/ladder-test.mjs
 starci test run --level L2 --against main --json
 starci test run --level L3 --against main
 ```

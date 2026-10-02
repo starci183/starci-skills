@@ -2,7 +2,7 @@ group: worker
 verb: stop
 owner: runtime
 summary: stop a supervised worker that Orca still reports as working
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerStopVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerStopVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:

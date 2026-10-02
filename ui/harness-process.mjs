@@ -4,15 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { tunnelRun } from '../api/cloudflared/tunnel-run.mjs';
-import { spawnNode } from '../api/node/spawn-node.mjs';
-import { killTree } from '../api/process/kill-tree.mjs';
-import { openBrowser } from '../api/process/open-browser.mjs';
-import { processList } from '../api/process/process-list.mjs';
-import { starciLocalRoot } from '../../engine/db/machine.mjs';
-import { startHarnessServer } from '../../ui/server.mjs';
+import { tunnelRun } from '../scripts/api/cloudflared/tunnel-run.mjs';
+import { spawnNode } from '../scripts/api/node/spawn-node.mjs';
+import { killTree } from '../scripts/api/process/kill-tree.mjs';
+import { openBrowser } from '../scripts/api/process/open-browser.mjs';
+import { processList } from '../scripts/api/process/process-list.mjs';
+import { starciLocalRoot } from '../engine/db/machine.mjs';
+import { startHarnessServer } from './server.mjs';
 
-const UI_ROOT = fileURLToPath(new URL('../../ui/', import.meta.url));
+const UI_ROOT = fileURLToPath(new URL('./', import.meta.url));
 const VERB_MODULE = fileURLToPath(new URL('./harness-verbs.mjs', import.meta.url));
 const VITE_TOOL_ENTRY = path.join('node_modules', 'vite', 'bin', 'vite.js');
 const STATE_SCHEMA = 'starci/harness-processes@1';
@@ -192,7 +192,7 @@ export function stopHarness({
 }
 
 export async function harnessUrl({ tunnel = false } = {}) {
-  const { servicePorts } = await import('../reconciler/services.mjs');
+  const { servicePorts } = await import('../scripts/reconciler/services.mjs');
   const ports = servicePorts();
   if (tunnel) return ports.harnessPublicUrl ?? ports.harnessUrl ?? 'http://127.0.0.1:4547';
   return ports.harnessUrl ?? 'http://127.0.0.1:4547';
@@ -202,7 +202,7 @@ export async function harnessUrl({ tunnel = false } = {}) {
 export async function harnessStatus({ probe = null, url = null } = {}) {
   const target = url ?? await harnessUrl();
   const run = probe ?? (async (endpoint) => {
-    const { httpUp } = await import('../reconciler/services.mjs');
+    const { httpUp } = await import('../scripts/reconciler/services.mjs');
     return httpUp(endpoint, { timeoutMs: 15_000, tries: 3 });
   });
   try {

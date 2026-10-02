@@ -9,10 +9,10 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { lines } from '../lib/verb-call.mjs';
 import { pathList } from './test-ladder.mjs';
 
 const slash = (value) => String(value).replaceAll(path.sep, '/').replace(/^\.\//, '');
-const lines = (value) => String(value ?? '').split(/\r?\n/).map((line) => slash(line.trim())).filter(Boolean);
 export const RUNTIME_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Spawn-result normalization shared by fake and real runners. */
@@ -32,7 +32,7 @@ export function workingChanges(root, deps = {}) {
   const runLsFiles = deps.lsFiles ?? lsFiles;
   const tracked = runOutcome(runDiff(['--name-only', '--diff-filter=ACMR', 'HEAD'], { cwd: root }));
   const untracked = runOutcome(runLsFiles(['--others', '--exclude-standard'], { cwd: root }));
-  return [...new Set([...lines(tracked.stdout), ...lines(untracked.stdout)])].sort();
+  return [...new Set([...lines(tracked.stdout).map(slash), ...lines(untracked.stdout).map(slash)])].sort();
 }
 
 /** Committed changes between the local-main reference and HEAD: the L2/L3 change set. */
@@ -53,7 +53,7 @@ export function cleanTree(root, deps = {}) {
 export function tracked(root, pathspec, deps = {}) {
   if (deps.trackedFiles) return pathList(deps.trackedFiles(root, pathspec));
   const result = runOutcome((deps.lsFiles ?? lsFiles)([pathspec], { cwd: root }));
-  return result.ok ? lines(result.stdout) : [];
+  return result.ok ? lines(result.stdout).map(slash) : [];
 }
 
 /** Runtime or product app, from the repository's declaration. */

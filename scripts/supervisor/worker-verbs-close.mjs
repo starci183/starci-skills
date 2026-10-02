@@ -1,5 +1,5 @@
 // worker-verbs-close.mjs - expose the one full worker close path and require every cleanup proof.
-import { closeWorker } from './worker-close.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 
 /** Release, close and prove the process tree gone through closeWorker. */
 export async function workerCloseVerb(ctx, deps = {}) {

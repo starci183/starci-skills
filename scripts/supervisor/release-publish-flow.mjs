@@ -9,12 +9,12 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { loadPins } from '../gates/canon-pins.mjs';
 import { releasePublish } from '../gates/release-publish.mjs';
+import { discoverExampleApps } from '../lib/example-refs.mjs';
+import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 
-const ok = (result) => Boolean(result && !result.error && result.status === 0);
-const message = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().split(/\r?\n/).at(-1) ?? '';
-const exampleNames = (value) => {
-  const values = value === undefined ? ['ecommerce-app', 'shape-slot', 'lite-app'] : Array.isArray(value) ? value : [value];
+const exampleNames = (value, root) => {
+  const values = value === undefined ? discoverExampleApps(root) : Array.isArray(value) ? value : [value];
   return values.flatMap((entry) => String(entry).split(',')).map((entry) => entry.trim()).filter(Boolean);
 };
 
@@ -85,9 +85,11 @@ function repinExample(root, name, pins, write) {
 
 /** `starci release publish`: existing registry publication plus the final binding and example refresh flow. */
 export async function releasePublishFlow(ctx, deps = {}) {
+  const ok = (result) => resultOk(result, { acceptOk: false });
+  const message = (result) => resultDetail(result, { limit: null, lastLine: true });
   if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci release publish: no positional arguments are accepted' };
   const root = path.resolve(ctx.cwd ?? process.cwd());
-  const examples = exampleNames(ctx.args?.examples);
+  const examples = exampleNames(ctx.args?.examples, root);
   const lines = [];
   const data = { schema: 'starci/release-publish-flow@1', published: ctx.args?.publish === true, rebind: null, examples: [] };
   const node = deps.runNode ?? runNode, npm = deps.runNpm ?? runNpm;

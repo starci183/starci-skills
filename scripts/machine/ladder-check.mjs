@@ -1,6 +1,7 @@
 // ladder-check.mjs - `starci check run`: choose the applicable existing runtime/app checks for one ladder level.
 import fs from 'node:fs';
 import path from 'node:path';
+import { failedRunFinding } from '../lib/verb-call.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { RUNTIME_ROOT, repositoryKind, runStarci, selfChecksForChanges, workingChanges } from './ladder-select.mjs';
 
@@ -15,10 +16,9 @@ function examples(root, deps) {
   } catch { return []; }
 }
 
-const findingOf = (name, run) => ({ kind: 'check-red', check: name, status: run.status, message: (run.stderr || run.stdout || `${name} exited ${run.status}`).trim().slice(-2000) });
-
 /** `starci check run`; it only selects and calls the existing runtime/app check entries. */
 export async function checkRun(ctx, deps = {}) {
+  const findingOf = (name, run) => failedRunFinding('check-red', { check: name }, run);
   const args = ctx?.args ?? {};
   const level = args.level ?? 'L1';
   const root = path.resolve(ctx?.cwd ?? process.cwd());

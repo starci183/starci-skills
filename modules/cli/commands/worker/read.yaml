@@ -2,7 +2,7 @@ group: worker
 verb: read
 owner: runtime
 summary: read a bounded tail of one supervised worker's output
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerReadVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerReadVerb}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:

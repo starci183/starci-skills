@@ -2,5 +2,5 @@
 import { dockerSpawn } from './lib.mjs';
 
 /** The spawn result of `docker ps`; filters are Docker label filters, not name patterns. */
-export const dockerPs = ({ all = false, filters = [] } = {}, { cwd, docker = 'docker', timeout = 30_000 } = {}) =>
+export const ps = ({ all = false, filters = [] } = {}, { cwd, docker = 'docker', timeout = 30_000 } = {}) =>
   dockerSpawn(['ps', ...(all ? ['-a'] : []), ...filters.flatMap((filter) => ['--filter', filter]), '--format', '{{json .}}'], { cwd, docker, timeout });

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { workerListVerb, workingByLane, worktreesWithWorkingAgents } from '../../scripts/machine/worker-verbs-list.mjs';
+import { workerListVerb, workingByLane, worktreesWithWorkingAgents } from '../../scripts/supervisor/worker-verbs-list.mjs';
 
 const a = path.join(process.cwd(), 'lane-a');
 const b = path.join(process.cwd(), 'lane-b');

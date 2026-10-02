@@ -1,6 +1,7 @@
 // raw-command-scan.mjs - classify command-shaped guidance with the shared R223 policy evaluator.
 // This module only extracts explicit command spans; command admission remains command-policy.yaml plus policyVerdict().
 import { policyVerdict } from '../../guards/command-policy.mjs';
+import { maskTextRange } from '../../lib/text-mask.mjs';
 import { lineTextAt, sentenceRanges, sentenceTextAt } from '../../lib/tracked-text-scan.mjs';
 import { sentencesOf } from '../check-guidance-commands.mjs';
 
@@ -20,10 +21,9 @@ const programName = (value) => {
   return word.includes('/') ? null : word;
 };
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
-const masked = (text, from, to) => `${text.slice(0, from)}${text.slice(from, to).replace(/[^\r\n]/g, ' ')}${text.slice(to)}`;
 
 /** Whether a tracked path is agent-facing guidance in the R201 raw-command scope. */
-export function isRawGuidanceFile(file) {
+function isRawGuidanceFile(file) {
   const rel = posix(file);
   const base = rel.slice(rel.lastIndexOf('/') + 1);
   return rel.startsWith('docs/')
@@ -36,7 +36,7 @@ export function isRawGuidanceFile(file) {
 }
 
 /** Whole-file exemptions shared by the raw-guidance pass. */
-export function isRawGuidanceExempt(file) {
+function isRawGuidanceExempt(file) {
   const rel = posix(file);
   const base = rel.slice(rel.lastIndexOf('/') + 1);
   return rel.startsWith('tests/')
@@ -47,7 +47,7 @@ export function isRawGuidanceExempt(file) {
 }
 
 /** Mask catalog `conventions` and `removed` values without changing source offsets. */
-export function maskCatalogGuidanceFields(text, file) {
+function maskCatalogGuidanceFields(text, file) {
   const rel = posix(file);
   if (!rel.startsWith('modules/cli/commands/') || !/\.ya?ml$/i.test(rel)) return String(text);
   let result = String(text);
@@ -60,7 +60,7 @@ export function maskCatalogGuidanceFields(text, file) {
     const key = /^\s*([A-Za-z][A-Za-z0-9-]*)\s*:/.exec(content)?.[1] ?? null;
     const starts = key && CATALOG_TEXT_FIELDS.has(key);
     const continues = blockIndent !== null && (!content.trim() || indent > blockIndent);
-    if (starts || continues) result = masked(result, match.index, match.index + line.length);
+    if (starts || continues) result = maskTextRange(result, match.index, match.index + line.length);
     if (starts) blockIndent = /:\s*$/.test(content) ? indent : null;
     else if (blockIndent !== null && content.trim() && indent <= blockIndent) blockIndent = null;
   }
@@ -77,7 +77,7 @@ const addCandidate = (out, seen, text, at) => {
 };
 
 /** Explicit command spans: fenced lines, inline code, and shell/PowerShell prompt lines. */
-export function rawCommandSpans(text) {
+function rawCommandSpans(text) {
   const source = String(text);
   const out = [], seen = new Set();
   let fenced = false;
@@ -107,7 +107,7 @@ const npxProgram = (args) => {
 };
 
 /** Split the permitted simple shell separators; command text is guidance, never executed. */
-export function commandsFromSpan(text) {
+function commandsFromSpan(text) {
   const out = [];
   for (let segment of String(text).replace(/^\s*(?:\$|PS>|>)\s*/i, '').split(/&&|[;|]/)) {
     segment = segment.trim();

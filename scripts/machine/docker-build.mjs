@@ -1,12 +1,10 @@
 // docker-build.mjs - `starci docker build`: one declared app, app-root context, deterministic local tag, never push/login.
 import fs from 'node:fs';
 import path from 'node:path';
-import { dockerBuild as realDockerBuild } from '../api/docker/build.mjs';
+import { build as realDockerBuild } from '../api/docker/build.mjs';
+import { resultDetail as detail, resultOk as success } from '../lib/verb-call.mjs';
 import { DOCKER_PORT_POLICY, isForeignContainer } from './docker-policy.mjs';
 import { underHostLock } from './verb-lock.mjs';
-
-const detail = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().slice(0, 500);
-const success = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
 
 /** Build one be/fe app declared by hfs.json from the application root. */
 export async function dockerBuild(ctx, deps = {}) {
@@ -25,7 +23,7 @@ export async function dockerBuild(ctx, deps = {}) {
   const tag = `${project}/${app}:${tagName}`;
   if (isForeignContainer(tag)) return {
     code: 2,
-    stderr: `${DOCKER_PORT_POLICY}: image ${tag} belongs to nivo-lite and is foreign`,
+    stderr: `${DOCKER_PORT_POLICY}: image ${tag} belongs to a protected installation and is foreign`,
     data: { schema: 'starci/docker-refusal@1', ok: false, code: DOCKER_PORT_POLICY, message: `image ${tag} is foreign` },
   };
   const dockerfile = path.join(matches[0], 'apps', app, 'Dockerfile').split(path.sep).join('/');

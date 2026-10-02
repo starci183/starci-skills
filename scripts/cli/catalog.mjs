@@ -35,6 +35,7 @@ const VERB_REQUIRED = ['group', 'verb', 'owner', 'summary', 'impl', 'flags', 'ex
 const JSON_RE = /^(always|flag|none|starci\/\S+@\d+)$/;
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 const EXPORT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const MODULE_ROOTS = ['scripts/', 'ui/'];
 
 const err = (errors, file, msg) => errors.push(`${file}: ${msg}`);
 
@@ -125,8 +126,8 @@ const checkVerb = (errors, file, groupName, doc) => {
       if (hasModule) {
         moduleImpl = true;
         if (typeof doc.impl.module !== 'string' || !doc.impl.module) err(errors, file, 'impl.module is required');
-        else if (!doc.impl.module.startsWith('scripts/') || !doc.impl.module.endsWith('.mjs') || path.posix.normalize(doc.impl.module) !== doc.impl.module) {
-          err(errors, file, 'impl.module must be a repo-relative .mjs path under scripts/');
+        else if (!MODULE_ROOTS.some((root) => doc.impl.module.startsWith(root)) || !doc.impl.module.endsWith('.mjs') || path.posix.normalize(doc.impl.module) !== doc.impl.module) {
+          err(errors, file, 'impl.module must be a repo-relative .mjs path under scripts/ or ui/');
         }
         if (typeof doc.impl.export !== 'string' || !EXPORT_RE.test(doc.impl.export)) err(errors, file, 'impl.export must be an identifier');
         if (Object.hasOwn(doc.impl, 'args')) err(errors, file, 'impl.args is only valid with impl.script');

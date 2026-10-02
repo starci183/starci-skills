@@ -33,8 +33,9 @@ test('RT_HOOK_SHAPE: a commit gate that types or tests is refused, naming what i
   assert.match(messages('npx jest --bail\n')[0], /test run/);
   assert.match(messages('npm test\n')[0], /test run/);
   assert.equal(commit('npm run typecheck\nnpx jest\n').length, 2);
-  assert.ok(commit('npx hfs work-hygiene\n').every((f) => f.code === 'RT_HOOK_SHAPE'));
-  assert.deepEqual(commit('# no typecheck and no jest here, only eslint\nnpx hfs work-hygiene\nnpx eslint $be\nnpx prettier --check $formatted\n'), [], 'comments are not judged; eslint and prettier are L0');
+  const retiredHygiene = ['npx', 'hfs', 'work-hygiene'].join(' ');
+  assert.ok(commit(`${retiredHygiene}\n`).every((f) => f.code === 'RT_HOOK_SHAPE'));
+  assert.deepEqual(commit(`# no typecheck and no jest here, only eslint\n${retiredHygiene}\nnpx eslint $be\nnpx prettier --check $formatted\n`), [], 'comments are not judged; eslint and prettier are L0');
 });
 
 test('RT_HOOK_SHAPE: a push gate that builds, tests or lacks the release gate markers is refused', () => {

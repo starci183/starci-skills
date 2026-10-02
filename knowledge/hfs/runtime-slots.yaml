@@ -47,7 +47,7 @@ ruleParams:
     # HFS_SIZE_GROWTH: a runtime source file above soft may not grow against the base revision; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
     # The runtime's production source: what the external-owner, tier, base-purity and source-name rules read.
-    sourceRoots: [bin, engine, scripts, ui/api, ui/server.mjs, ui/start.mjs]
+    sourceRoots: [bin, engine, scripts, ui/api, ui/server.mjs, ui/harness-process.mjs, ui/harness-verbs.mjs]
     # RT_EXTERNAL_OWNER: a module specifier, a global or a spawned program word -> the owners allowed to use it ([] means
     # nowhere in runtime production code). An owner is api/<system> (the folder scripts/api/<system>/), api/* (any api
     # system) or engine/db (the DB tier). A program word is read from the spawn's command with the TypeScript AST
@@ -266,14 +266,14 @@ slots:
     rules: [RT_PINNED_PATH_MOVED, RT_TIER_DIRECTION]
   - id: runtime.ui
     profiles: [runtime]
-    # The harness UI app: a node API server (server.mjs, start.mjs, api/**) and a Vite client (src/**), with its own package.json.
+    # The harness UI app: a node API server (server.mjs, harness-*.mjs, api/**) and a Vite client (src/**), with its own package.json.
     path: "ui/"
     presence: required
     tracked: tracked
     tier: entry
     owner: true
     requires: [package.json, server.mjs, README.md, CONTRACT.md]
-    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
+    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, harness-process.mjs, harness-verbs.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
@@ -472,6 +472,15 @@ slots:
     profiles: [runtime]
     # Runtime self-checks only: each judges the runtime tree with catalogued codes; run by `starci runtime check`.
     path: "scripts/checks/check-<topic>.mjs"
+    presence: required
+    tracked: tracked
+    tier: checks
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
+  - id: runtime.checks-lib
+    profiles: [runtime]
+    # Shared implementation helpers used only by runtime self-checks.
+    path: "scripts/checks/lib/<name>.mjs"
     presence: required
     tracked: tracked
     tier: checks

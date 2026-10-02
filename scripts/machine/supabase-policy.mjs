@@ -1,6 +1,7 @@
 // supabase-policy.mjs - the pure boundary for the port block owned by one local Supabase stack.
+import { protectedPortLabel } from '../lib/protected-installations.mjs';
 
-export const SUPABASE_PORT_NAMES = Object.freeze([
+const SUPABASE_PORT_NAMES = Object.freeze([
   'api',
   'db',
   'shadow',
@@ -10,8 +11,8 @@ export const SUPABASE_PORT_NAMES = Object.freeze([
   'pooler',
 ]);
 
-export const SUPABASE_PORT_MIN = 41000;
-export const SUPABASE_PORT_MAX = 44999;
+const SUPABASE_PORT_MIN = 41000;
+const SUPABASE_PORT_MAX = 44999;
 
 const integerPort = (value) => {
   if (typeof value === 'number') return Number.isInteger(value) ? value : null;
@@ -35,11 +36,8 @@ const entriesOf = (ports) => {
 };
 
 const reservedRule = (port) => {
-  if (port === 3100) return '3100 is never ours';
-  if (port === 3000) return '3000 is never ours';
-  if (port >= 54320 && port <= 54329) return '54320-54329 are never ours';
-  if (port >= 55321 && port <= 55327) return '55321-55327 are never ours';
-  return null;
+  const label = protectedPortLabel(port);
+  return label ? `${label} ${label.includes('-') ? 'are' : 'is'} never ours` : null;
 };
 
 /** Validate one app's seven configured ports. Returns only deterministic policy facts. */

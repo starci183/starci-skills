@@ -2,13 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { portListener } from '../api/process/port-listener.mjs';
-import { supabaseStart as callSupabaseStart } from '../api/supabase/start.mjs';
-import { supabaseStatus as callSupabaseStatus } from '../api/supabase/status.mjs';
-import { supabaseStop as callSupabaseStop } from '../api/supabase/stop.mjs';
+import { projectStart as callSupabaseStart } from '../api/supabase/project-start.mjs';
+import { projectStatus as callSupabaseStatus } from '../api/supabase/project-status.mjs';
+import { projectStop as callSupabaseStop } from '../api/supabase/project-stop.mjs';
+import { isProtectedContainer } from '../lib/protected-installations.mjs';
 import { underHostLock } from './verb-lock.mjs';
 import { checkPortBlock } from './supabase-policy.mjs';
 
-export const SUPABASE_CONFIG = path.join('supabase', 'config.toml');
+const SUPABASE_CONFIG = path.join('supabase', 'config.toml');
 
 const PORT_FIELD = Object.freeze({
   'api.port': 'api',
@@ -115,7 +116,7 @@ function loadApp(cwd, api) {
 
 const projectProblem = (projectId) => {
   if (!String(projectId ?? '').trim()) return 'project_id must be present in supabase/config.toml';
-  if (/nivo-lite/iu.test(projectId)) return `project id ${projectId} is forbidden: never operate the nivo-lite stack`;
+  if (isProtectedContainer(projectId)) return `project id ${projectId} is forbidden: never operate a protected stack`;
   return null;
 };
 

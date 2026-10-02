@@ -3,7 +3,8 @@
 // The default output is the exact reviewable PowerShell script. Only --apply crosses the injected schtasks seam.
 import os from 'node:os';
 import path from 'node:path';
-import { registerScheduledTask } from '../api/schtasks/register.mjs';
+import { scheduleRegister as registerScheduledTask } from '../api/schtasks/schedule-register.mjs';
+import { resultDetail, resultOk, resultOutput } from '../lib/verb-call.mjs';
 
 export const TASK_DEFINITIONS = Object.freeze({
   'harness-tunnel': Object.freeze({
@@ -22,8 +23,6 @@ export const TASK_DEFINITIONS = Object.freeze({
 
 const quote = (value) => String(value).replaceAll("'", "''");
 const taskOf = (name) => TASK_DEFINITIONS[String(name ?? '')] ?? null;
-const resultOk = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const resultDetail = (result) => String(result?.stdout || result?.stderr || result?.error?.message || '').trim().slice(0, 600);
 
 /** The per-user launcher written by `starci runtime install`; retained for internal callers that need the resolved path. */
 export const starciShimPath = ({ home = os.homedir(), platform = process.platform } = {}) =>
@@ -34,7 +33,7 @@ const launcherLine = (starci) => starci
   : "$starci = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.starci\\bin\\starci.cmd'";
 
 /** Build the exact idempotent, per-user Register-ScheduledTask script for one known runtime task. */
-export function taskRegistrationScript(name, { taskName, starci, workdir, everyMinutes } = {}) {
+function taskRegistrationScript(name, { taskName, starci, workdir, everyMinutes } = {}) {
   const definition = taskOf(name);
   if (!definition) throw new Error(`unknown runtime task: ${name}`);
   const registeredName = taskName ?? definition.taskName;
@@ -98,7 +97,7 @@ export async function taskRegister(ctx, deps = {}) {
     data: { schema: 'starci/task-register@1', ok: false, applied: false, name, reason: 'not-windows' } };
   const result = await (deps.registerScheduledTask ?? registerScheduledTask)(script, { env: ctx?.env });
   const ok = resultOk(result);
-  const detail = resultDetail(result);
+  const detail = resultOutput(result).slice(0, 600) || resultDetail(result, { limit: 600 });
   return {
     code: ok ? 0 : 1,
     ...(ok ? { text: detail || `registered ${definition.taskName}: ${definition.action}` }

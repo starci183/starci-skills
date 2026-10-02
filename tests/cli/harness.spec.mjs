@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { main as runtimeMain } from '../../scripts/cli/main.mjs';
-import { harnessStatus, openHarness } from '../../scripts/machine/harness-process.mjs';
+import { harnessStatus, openHarness } from '../../ui/harness-process.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const readYaml = (relative) => parseYaml(fs.readFileSync(path.join(root, relative), 'utf8'));
@@ -27,7 +27,7 @@ const capture = () => {
 };
 
 test('harness catalog dispatches all four function-backed verbs and validates flags', async () => {
-  assert.deepEqual(Object.values(verbs).map(({ impl }) => impl.module), Array(4).fill('scripts/machine/harness-verbs.mjs'));
+  assert.deepEqual(Object.values(verbs).map(({ impl }) => impl.module), Array(4).fill('ui/harness-verbs.mjs'));
   const calls = [];
   const module = Object.fromEntries(['harnessStartVerb', 'harnessStopVerb', 'harnessStatusVerb', 'harnessOpenVerb'].map((name) => [name, async (ctx) => {
     calls.push({ name, ctx });

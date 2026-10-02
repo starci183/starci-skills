@@ -1,7 +1,7 @@
 // worker-verbs.spec.mjs - read/show/stop/release wrappers use only their injectable Orca call files.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { workerReadVerb, workerReleaseVerb, workerShowVerb, workerStopVerb } from '../../scripts/machine/worker-verbs.mjs';
+import { workerReadVerb, workerReleaseVerb, workerShowVerb, workerStopVerb } from '../../scripts/supervisor/worker-verbs.mjs';
 
 test('worker show maps Orca state and observation', async () => {
   const result = await workerShowVerb({ args: { dispatch: 'ctx_1' } }, { workerShow: () => ({ ok: true, state: 'ready',

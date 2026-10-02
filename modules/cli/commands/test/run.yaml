@@ -25,7 +25,7 @@ exit:
   "2": "usage or ladder policy refusal"
 json: starci/test-run@1
 examples:
-  - starci test run --level L1 --changed scripts/machine/example.mjs
+  - starci test run --level L1 --changed scripts/machine/ladder-test.mjs
   - starci test run --level L2 --against main --json
   - starci test run --level L3 --against main
 editions: [full]

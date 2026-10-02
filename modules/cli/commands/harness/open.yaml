@@ -2,7 +2,7 @@ group: harness
 verb: open
 owner: runtime
 summary: open the local harness URL in the default browser
-impl: {module: scripts/machine/harness-verbs.mjs, export: harnessOpenVerb}
+impl: {module: ui/harness-verbs.mjs, export: harnessOpenVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:
@@ -19,4 +19,4 @@ examples:
 editions: [full]
 since: 1.0.0-alpha.4
 removed:
-  - node ui/start.mjs open
+  - node ui/harness-verbs.mjs open

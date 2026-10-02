@@ -9,22 +9,16 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { install } from '../api/npm/install.mjs';
+import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { primaryWorktree, linkedNodeModules, lockedValue } from './npm-ci.mjs';
 import { underHostLock } from './verb-lock.mjs';
 
 const PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
 const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
-const success = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const output = (result, key = 'stdout') => String(result?.[key] ?? (key === 'stdout' ? result?.out : result?.err) ?? '').trim();
-const refusal = (cwd, text, code = 2, extra = {}) => ({
-  code,
-  text: `starci npm install: ${text}`,
-  data: { schema: 'starci/npm-install@1', ok: false, cwd, ms: 0, ...extra }
-});
 
 /** Read the one package-name to exact-version map from canon-pins.yaml. */
-export function loadCanonPins(root = skillRoot) {
+function loadCanonPins(root = skillRoot) {
   const document = parseYaml(fs.readFileSync(path.join(root, PINS_FILE), 'utf8'));
   return Object.fromEntries(Object.entries(document?.pins ?? {}).map(([name, value]) => [name, String(value?.version ?? '')]));
 }
@@ -67,6 +61,8 @@ export function resolveInstallPackages(requested, pins) {
 /** Install exact dependencies under the host lock and return the package manifest diff stat. */
 export async function npmInstall(ctx, deps = {}) {
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
+  const refusal = (location, text, code = 2, extra = {}) => verbRefusal('starci npm install', text, code,
+    { schema: 'starci/npm-install@1', ok: false, cwd: location, ms: 0, ...extra });
   const api = {
     diff: deps.diff ?? diff,
     install: deps.install ?? install,

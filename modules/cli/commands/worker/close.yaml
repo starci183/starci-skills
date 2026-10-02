@@ -2,7 +2,7 @@ group: worker
 verb: close
 owner: runtime
 summary: release a worker, close its terminal and prove its process tree is gone
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerCloseVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerCloseVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:

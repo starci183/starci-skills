@@ -6,15 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
+import { resultDetail, resultOk } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cliEntry = path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs');
-const ok = (result) => Boolean(result && !result.error && (result.status ?? result.code) === 0);
-const detail = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().split(/\r?\n/).at(-1) ?? '';
 
 /** `starci smoke scaffold`: one sequential scaffold/install/lint/typecheck/build/check proof. */
 export async function smokeScaffold(ctx, deps = {}) {
+  const ok = (result) => resultOk(result, { acceptOk: false, codeFallback: true });
+  const detail = (result) => resultDetail(result, { limit: null, lastLine: true });
   const edition = String(ctx.global?.edition ?? ctx.args?.edition ?? '');
   if (!['full', 'lite'].includes(edition)) return { code: 2, stderr: 'starci smoke scaffold: --edition must be full or lite' };
   if ((ctx.positionals ?? []).length) return { code: 2, stderr: 'starci smoke scaffold: no positional arguments are accepted' };

@@ -5,8 +5,22 @@
 // runtime genuinely reads that tree or names that product at run time; a pointer that can be generic must
 // be generic in the file that holds it.
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 /** The runtime's example tree root. */
 export const EXAMPLES_ROOT = 'examples';
+
+/** Every examples/<name>/hfs.json declaration of kind app, sorted by name. */
+export function discoverExampleApps(root) {
+  const directory = path.join(root, EXAMPLES_ROOT);
+  let entries;
+  try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return []; }
+  return entries.filter((entry) => entry.isDirectory()).filter((entry) => {
+    try { return JSON.parse(fs.readFileSync(path.join(directory, entry.name, 'hfs.json'), 'utf8'))?.kind === 'app'; }
+    catch { return false; }
+  }).map((entry) => entry.name).sort();
+}
 
 /** The generic services-block template a starcistacks follow-up leg is pointed at (S11-02: one template
  *  for every repository - the per-repository blocks it replaced are spec fixtures under

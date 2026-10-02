@@ -4,19 +4,18 @@ import { push } from '../api/git/push.mjs';
 import { remote } from '../api/git/remote.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
-
-const ok = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const output = (result, key = 'stdout') => String(result?.[key] ?? (key === 'stdout' ? result?.out : result?.err) ?? '').trim();
-const list = (value) => Array.isArray(value) ? value : value == null ? [] : [value];
-const refusal = (text, code = 2, data = {}) => ({ code, text: `starci git backup: ${text}`, data: { schema: 'starci/git-backup@1', ok: false, ...data } });
+import { asList } from '../lib/list.mjs';
+import { refusal as verbRefusal, resultOk as ok, resultOutput as output } from '../lib/verb-call.mjs';
 
 function branchNames(value, current) {
-  const requested = list(value).map((item) => String(item ?? '').trim()).filter(Boolean);
+  const requested = asList(value).map((item) => String(item ?? '').trim()).filter(Boolean);
   return [...new Set(requested.length ? requested : [current, 'main'].filter(Boolean))];
 }
 
 /** Push selected local branches to refs/backup/<UTC date>/ and nowhere else. */
 export async function gitBackup(ctx, deps = {}) {
+  const refusal = (text, code = 2, data = {}) => verbRefusal('starci git backup', text, code,
+    { schema: 'starci/git-backup@1', ok: false, ...data });
   const api = { push, remote, revParse, symbolicRef, ...deps };
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
   const remoteName = String(ctx?.args?.remote ?? 'origin').trim();

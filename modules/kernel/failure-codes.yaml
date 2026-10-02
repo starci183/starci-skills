@@ -14367,7 +14367,7 @@ RT_RETIRED_CLI_CALL:
 CLI_ONLY_ENTRY:
   title: "A tracked file runs a runtime script directly"
   title_vi: "Một file được theo dõi chạy trực tiếp script của runtime"
-  meaning_vi: "Một prompt, tài liệu, skill, file knowledge, cấu hình, CI, hook hoặc đăng ký tác vụ chạy node scripts/..., node ui/start.mjs hoặc npm run bọc script runtime thay vì starci <group> <verb>."
+  meaning_vi: "Một prompt, tài liệu, skill, file knowledge, cấu hình, CI, hook hoặc đăng ký tác vụ chạy node scripts/..., chạy trực tiếp ui/harness-verbs.mjs hoặc npm run bọc script runtime thay vì starci <group> <verb>."
   causes_vi:
     - "Vi phạm luật R201: mọi hành động phải đi qua starci <group> <verb>."
   nextStep_vi: "Đổi lời gọi thành lệnh starci mà bộ kiểm tra gợi ý; nếu script chưa có verb thì thêm file catalog hoặc khai báo nội bộ trong modules/cli/commands/_internal.yaml."

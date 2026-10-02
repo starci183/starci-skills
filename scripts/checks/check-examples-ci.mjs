@@ -32,6 +32,7 @@ import { codecovPaths, coverageComponents } from '../hfs/coverage-scope.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
+import { discoverExampleApps } from '../lib/example-refs.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readTextFile } from '../lib/read-text.mjs';
 
@@ -47,12 +48,7 @@ const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
 
 /** The example apps: every examples/<name>/hfs.json of kind app, sorted by name. */
 export function exampleApps(root = ROOT) {
-  const dir = path.join(root, 'examples');
-  let entries = [];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isDirectory()); } catch { return []; }
-  return entries.filter((entry) => {
-    try { return JSON.parse(fs.readFileSync(path.join(dir, entry.name, 'hfs.json'), 'utf8'))?.kind === 'app'; } catch { return false; }
-  }).map((entry) => entry.name).sort();
+  return discoverExampleApps(root);
 }
 
 /** The coverage paths of one example app from the repository root: the measured roots of its be side under examples/<app>/. */

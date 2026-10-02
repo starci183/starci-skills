@@ -2,7 +2,7 @@ group: worker
 verb: list
 owner: runtime
 summary: list supervised workers or working-agent counts by worktree lane
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerListVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerListVerb}
 effect: read
 roles: [worker, lead, coordinator, release, owner]
 conventions:

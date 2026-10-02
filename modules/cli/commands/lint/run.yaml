@@ -21,7 +21,7 @@ exit:
   "2": "usage or ladder policy refusal"
 json: starci/lint-run@1
 examples:
-  - starci lint run --level L1 --changed scripts/machine/example.mjs
+  - starci lint run --level L1 --changed scripts/machine/ladder-lint.mjs
   - starci lint run --level L4 --all
 editions: [full]
 since: 1.0.0-alpha.4

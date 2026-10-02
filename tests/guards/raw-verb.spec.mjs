@@ -83,6 +83,7 @@ test('guardRaw returns 127 when the shim is the only PATH match', async (t) => {
 test('runRealTool uses inherited stdio without a shell and routes Windows command scripts through cmd.exe', () => {
   const calls = [];
   const spawn = (command, args, options) => { calls.push({ command, args, options }); return { status: 23 }; };
+  const comspec = path.resolve('system', 'cmd.exe');
   assert.equal(runRealTool(path.resolve('bin', 'git.exe'), ['status'], { platform: 'win32', spawn }), 23);
   assert.equal(calls[0].command, path.resolve('bin', 'git.exe'));
   assert.deepEqual(calls[0].args, ['status']);
@@ -91,9 +92,9 @@ test('runRealTool uses inherited stdio without a shell and routes Windows comman
   assert.equal(calls[0].options.windowsVerbatimArguments, undefined);
 
   assert.equal(runRealTool(path.resolve('bin with spaces', 'npm.cmd'), ['run', 'x & y'], {
-    platform: 'win32', spawn, comspec: 'C:\\Windows\\System32\\cmd.exe',
+    platform: 'win32', spawn, comspec,
   }), 23);
-  assert.equal(calls[1].command, 'C:\\Windows\\System32\\cmd.exe');
+  assert.equal(calls[1].command, comspec);
   assert.deepEqual(calls[1].args.slice(0, 3), ['/d', '/s', '/c']);
   assert.match(calls[1].args[3], /npm\.cmd/);
   assert.match(calls[1].args[3], /\^&/);

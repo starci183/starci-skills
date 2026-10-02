@@ -1,7 +1,7 @@
 // worker-verbs-close.spec.mjs - full-close proof mapping over the one closeWorker seam.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { workerCloseVerb } from '../../scripts/machine/worker-verbs-close.mjs';
+import { workerCloseVerb } from '../../scripts/supervisor/worker-verbs-close.mjs';
 
 test('worker close forwards recovery flags and succeeds only with every proof', async () => {
   let call;

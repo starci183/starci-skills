@@ -918,7 +918,7 @@ complete -c starci -n '__starci_using_command release publish' -l npm-user -r -d
 complete -c starci -n '__starci_using_command release publish' -l poll-minutes -r -d 'registry confirmation deadline per package'
 complete -c starci -n '__starci_using_command release publish' -l pre-land-ref -r -d 'require HEAD to equal this pre-land commit'
 complete -c starci -n '__starci_using_command release publish' -l expect-sha -r -d 'require the release worktree HEAD to equal this freeze commit'
-complete -c starci -n '__starci_using_command release publish' -l examples -r -d 'example apps to re-pin and prove'
+complete -c starci -n '__starci_using_command release publish' -l examples -r -d 'example apps to re-pin and prove (default is every discovered app example)'
 complete -c starci -n '__starci_using_command release sync-runtime' -l check -d 'report drift without writing copies'
 complete -c starci -n '__starci_using_command route op' -l kind -r -d 'operation id or family to route'
 complete -c starci -n '__starci_using_command route op' -l node-kind -r -d 'work node kind the operation serves'

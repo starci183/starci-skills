@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { syntaxCheck } from '../api/node/syntax-check.mjs';
 import { runNode } from '../api/node/run-node.mjs';
+import { failedRunFinding } from '../lib/verb-call.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { projectsForChanges, repositoryKind, runOutcome, tracked, typeScriptProjects, workingChanges } from './ladder-select.mjs';
 
@@ -29,11 +30,9 @@ function runProject(root, project, deps) {
   return runOutcome((deps.runNode ?? runNode)([tsc, '--noEmit', '-p', project], { cwd: root, maxBuffer: 64 * 1024 * 1024 }));
 }
 
-const findingOf = (project, run) => ({ kind: 'typecheck-red', project, status: run.status,
-  message: (run.stderr || run.stdout || `${project} exited ${run.status}`).trim().slice(-4000) });
-
 /** `starci typecheck run`; projects can be supplied explicitly or are selected from the changed paths. */
 export async function typecheckRun(ctx, deps = {}) {
+  const findingOf = (project, run) => failedRunFinding('typecheck-red', { project }, run, { limit: 4000 });
   const args = ctx?.args ?? {};
   const level = args.level ?? 'L1';
   const root = path.resolve(ctx?.cwd ?? process.cwd());

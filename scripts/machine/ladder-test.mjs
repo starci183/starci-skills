@@ -21,7 +21,7 @@ const sameSelection = (left, right) => left.length === right.length && left.ever
 const allSpecGlob = (files) => files.some((file) => /(?:^|\/)(?:\*\*\/)?\*\.spec\.mjs$/i.test(file));
 
 /** Boundary specs in the same app/package root as a touched IO path. */
-export function affectedBoundarySpecs(changed, specs) {
+function affectedBoundarySpecs(changed, specs) {
   const io = pathList(changed).filter((file) => IO_PATH.test(file));
   if (!io.length) return [];
   const owner = (file) => {
@@ -33,7 +33,7 @@ export function affectedBoundarySpecs(changed, specs) {
 }
 
 /** Failed spec paths exposed by Node's spec reporter. */
-export function failedSpecFiles(output, root) {
+function failedSpecFiles(output, root) {
   const files = [];
   for (const match of String(output).matchAll(/(?:test at |file:\/\/\/)([^\s):]+\.spec\.mjs)/g)) {
     let file = decodeURIComponent(match[1].replace(/^file:\/\//, ''));

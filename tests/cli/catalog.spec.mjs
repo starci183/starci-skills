@@ -128,6 +128,18 @@ test('a module implementation requires effect and roles', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('module implementations admit entry-tier ui modules and reject modules outside scripts or ui', () => {
+  const accepted = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB.replace('scripts/machine/settle.mjs', 'ui/settle.mjs')));
+  const rejected = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB.replace('scripts/machine/settle.mjs', 'engine/settle.mjs')));
+  try {
+    assert.doesNotThrow(() => loadCatalog(accepted));
+    assert.ok(catalogErrors(rejected).some((e) => /under scripts\/ or ui\//.test(e)), JSON.stringify(catalogErrors(rejected)));
+  } finally {
+    fs.rmSync(accepted, { recursive: true, force: true });
+    fs.rmSync(rejected, { recursive: true, force: true });
+  }
+});
+
 test('effects, roles, conventions and module shape are validated from one catalog source', () => {
   const root = fixture((put) => put(`${CATALOG_DIR}/kernel/settle.yaml`, MODULE_VERB
     .replace('effect: host', 'effect: machine')

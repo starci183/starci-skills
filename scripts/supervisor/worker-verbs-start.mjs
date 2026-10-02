@@ -4,6 +4,7 @@ import path from 'node:path';
 import { loadModelRegistry } from '../agent/model-registry.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
+import { readEnv } from '../lib/env.mjs';
 import { registeredWorktree } from './worker-verbs-list.mjs';
 
 const refusal = (message, extra = {}) => ({ code: 2, text: `starci worker start: ${message}`,
@@ -100,7 +101,7 @@ export async function workerStartVerb(ctx, deps = {}) {
 
   const started = await (deps.workerStart ?? workerStart)({
     agent, ...(model ? { model } : {}), worktree: `path:${target.path}`, spec: spec.spec, taskTitle: title,
-    run: args.run, from: ctx?.env?.ORCA_TERMINAL_HANDLE ?? process.env.ORCA_TERMINAL_HANDLE,
+    run: args.run, from: readEnv('ORCA_TERMINAL_HANDLE', ctx?.env),
   });
   if (consumerFenced(started)) return refusal('caller is not bound to this Run; run orca orchestration run-create in this same terminal, then retry');
   if (!started?.ok) return { code: 1, text: `starci worker start: ${started?.error ?? started?.errorCode ?? 'worker-start failed'}`,

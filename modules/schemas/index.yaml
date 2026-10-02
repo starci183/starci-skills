@@ -728,6 +728,19 @@ schemas:
       whenNot: Not a lockfile and not a statement that a repository was upgraded; it names the target, the repository proves the result.
       selectedBy: check-canon-pins reads it; the pin-drift gate compares a repository with it.
 
+  - id: starci/protected-installations@1
+    file: modules/schemas/protected-installations.schema.yaml
+    dialect: json-schema
+    subsystem: host
+    governs: "The container-name markers and host-port ranges owned by installations runtime actions must never mutate."
+    binds: modules/host/protected-installations.yaml
+    usedBy: [scripts/lib/protected-installations.mjs]
+    business:
+      question: "Which host resources belong to a protected installation rather than this runtime?"
+      whenNeeded: Before Docker, Supabase or release-image code accepts a container name or host port.
+      whenNot: Not an inventory of running resources and not authority to inspect or change a protected installation.
+      selectedBy: The shared loader is imported by every policy that guards these host resources.
+
   # --------------------------------------------------------------------------
   # ASSISTED UAT — immutable human-checkpoint package and derived verification
   # --------------------------------------------------------------------------
@@ -847,6 +860,7 @@ moduleLocalDocumentKinds:
       - modules/schemas/hfs-peer-integrations.schema.yaml
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml
+      - modules/schemas/protected-installations.schema.yaml
 
   - id: starci/cli-global-flags@1
     governs: "The global flags every starci command accepts (modules/cli/commands/_global.yaml)."

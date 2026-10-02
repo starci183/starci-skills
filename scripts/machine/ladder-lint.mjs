@@ -1,5 +1,6 @@
 // ladder-lint.mjs - `starci lint run`: changed-file lint while working and whole-repository lint only at release cut.
 import path from 'node:path';
+import { failedRunFinding } from '../lib/verb-call.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
 import { RUNTIME_ROOT, repositoryKind, runStarci, workingChanges } from './ladder-select.mjs';
 
@@ -15,10 +16,9 @@ export function lintChecksForChanges(changed) {
   return RUNTIME_LINT_CHECKS.filter((id) => id === 'doc-language' ? prose : id === 'specs' ? specs : code);
 }
 
-const findingOf = (name, run) => ({ kind: 'lint-red', check: name, status: run.status, message: (run.stderr || run.stdout || `${name} exited ${run.status}`).trim().slice(-2000) });
-
 /** `starci lint run`; process execution stays behind the starci CLI and is injectable with deps.runStarci. */
 export async function lintRun(ctx, deps = {}) {
+  const findingOf = (name, run) => failedRunFinding('lint-red', { check: name }, run);
   const args = ctx?.args ?? {};
   const level = args.level ?? 'L1';
   const root = path.resolve(ctx?.cwd ?? process.cwd());

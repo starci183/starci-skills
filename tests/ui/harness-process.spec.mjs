@@ -3,8 +3,8 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { stopHarness } from '../../scripts/machine/harness-process.mjs';
-import { harnessStartVerb } from '../../scripts/machine/harness-verbs.mjs';
+import { stopHarness } from '../../ui/harness-process.mjs';
+import { harnessStartVerb } from '../../ui/harness-verbs.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
 
 const childProcess = (pid) => Object.assign(new EventEmitter(), {
@@ -52,7 +52,7 @@ test('start verb records the in-process server owner and resolves with code one 
   const record = JSON.parse(fs.readFileSync(stateFile, 'utf8')).processes.app;
   assert.equal(record.pid, 77);
   assert.equal(record.children[0], 501);
-  assert.match(record.script.replace(/\\/g, '/'), /scripts\/machine\/harness-verbs\.mjs$/);
+  assert.match(record.script.replace(/\\/g, '/'), /ui\/harness-verbs\.mjs$/);
   child.emit('exit', 9);
   assert.deepEqual(await resultPromise, { code: 1 });
   assert.deepEqual(closed, ['server']);
@@ -119,7 +119,7 @@ test('stop refuses a recorded PID that belongs to another process', (t) => {
   const stateFile = path.join(dir, 'harness.json');
   fs.writeFileSync(stateFile, `${JSON.stringify({
     schema: 'starci/harness-processes@1',
-    processes: { app: { pid: 99, mode: 'app', script: 'scripts/machine/harness-verbs.mjs', startedAt: 3_000, children: [503] } },
+    processes: { app: { pid: 99, mode: 'app', script: 'ui/harness-verbs.mjs', startedAt: 3_000, children: [503] } },
   })}\n`);
   const killed = [];
   const result = stopHarness({
@@ -134,7 +134,7 @@ test('stop refuses a recorded PID that belongs to another process', (t) => {
 
 test('harness modules have no standalone entry and no server script is spawned', () => {
   const root = path.resolve(import.meta.dirname, '..', '..');
-  for (const relative of ['scripts/machine/harness-process.mjs', 'scripts/machine/harness-verbs.mjs', 'ui/server.mjs']) {
+  for (const relative of ['ui/harness-process.mjs', 'ui/harness-verbs.mjs', 'ui/server.mjs']) {
     const source = fs.readFileSync(path.join(root, relative), 'utf8');
     assert.doesNotMatch(source, /\bisMain\b|process\.argv/);
     assert.ok(source.split(/\r?\n/).length <= 300, `${relative} stays at or below 300 lines`);

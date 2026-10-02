@@ -7,16 +7,9 @@ import path from 'node:path';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { ci } from '../api/npm/ci.mjs';
+import { asList } from '../lib/list.mjs';
+import { refusal as verbRefusal, resultOk as success, resultOutput as output } from '../lib/verb-call.mjs';
 import { underHostLock } from './verb-lock.mjs';
-
-const success = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const output = (result, key = 'stdout') => String(result?.[key] ?? (key === 'stdout' ? result?.out : result?.err) ?? '').trim();
-const values = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
-const refusal = (cwd, text, code = 2, extra = {}) => ({
-  code,
-  text: `starci npm ci: ${text}`,
-  data: { schema: 'starci/npm-ci@1', ok: false, cwd, ms: 0, ...extra }
-});
 
 const comparablePath = (value) => {
   const resolved = path.resolve(value);
@@ -60,6 +53,8 @@ export function lockedValue(result) {
 /** Run a real npm ci for this checkout, never an install or a borrowed node_modules. */
 export async function npmCi(ctx, deps = {}) {
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
+  const refusal = (location, text, code = 2, extra = {}) => verbRefusal('starci npm ci', text, code,
+    { schema: 'starci/npm-ci@1', ok: false, cwd: location, ms: 0, ...extra });
   const api = {
     ci: deps.ci ?? ci,
     lstat: deps.lstat ?? fs.lstatSync,
@@ -86,7 +81,7 @@ export async function npmCi(ctx, deps = {}) {
   if (!link.ok) return refusal(cwd, `cannot inspect node_modules: ${link.error}`);
   if (link.linked) return refusal(cwd, 'node_modules is a junction or symbolic link; remove it before npm ci');
 
-  const workspaces = values(ctx?.args?.workspace).map((item) => String(item ?? '').trim());
+  const workspaces = asList(ctx?.args?.workspace).map((item) => String(item ?? '').trim());
   if (workspaces.some((item) => !item)) return refusal(cwd, '--workspace values may not be empty');
 
   try {

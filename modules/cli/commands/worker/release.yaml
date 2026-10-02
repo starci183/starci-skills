@@ -2,7 +2,7 @@ group: worker
 verb: release
 owner: runtime
 summary: release settled Orca worker accounting without claiming full cleanup
-impl: {module: scripts/machine/worker-verbs.mjs, export: workerReleaseVerb}
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerReleaseVerb}
 effect: host
 roles: [lead, coordinator, owner]
 conventions:

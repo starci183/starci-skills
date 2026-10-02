@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { workerStartVerb } from '../../scripts/machine/worker-verbs-start.mjs';
+import { workerStartVerb } from '../../scripts/supervisor/worker-verbs-start.mjs';
 
 const current = path.join(process.cwd(), 'lane-current');
 const target = path.join(process.cwd(), 'lane-target');

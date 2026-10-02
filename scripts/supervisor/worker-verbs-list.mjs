@@ -3,7 +3,7 @@ import path from 'node:path';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { worktreePathOf } from '../lib/worker-accounting.mjs';
-import { workerListAll } from './worker-list-all.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 
 const text = (value) => String(value ?? '').trim();
 const pathKey = (value) => path.resolve(String(value ?? '')).replaceAll('\\', '/').toLowerCase();

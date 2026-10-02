@@ -8,11 +8,7 @@ import { remote } from '../api/git/remote.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
 import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
-
-const ok = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const output = (result, key = 'stdout') => String(result?.[key] ?? (key === 'stdout' ? result?.out : result?.err) ?? '').trim();
-const refusal = (text, code = 2, data = {}) => ({ code, text: `starci git sync: ${text}`, data: { schema: 'starci/git-sync@1', ok: false, ...data } });
-const lines = (text) => String(text ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+import { lines, refusal as verbRefusal, resultOk as ok, resultOutput as output } from '../lib/verb-call.mjs';
 
 function dirtyPaths(text) {
   const records = String(text ?? '').split('\0').filter(Boolean);
@@ -45,6 +41,8 @@ function isRemoteTracking(ref, cwd, gitRemote) {
 
 /** Merge local main into the current clean lane, or inspect the merge without changing it. */
 export async function gitSync(ctx, deps = {}) {
+  const refusal = (text, code = 2, data = {}) => verbRefusal('starci git sync', text, code,
+    { schema: 'starci/git-sync@1', ok: false, ...data });
   const api = { diff, isAncestor, merge, mergeTree, remote, revParse, statusQuery, worktreeListPorcelain, ...deps };
   const cwd = path.resolve(ctx?.cwd ?? process.cwd());
   const status = api.statusQuery(['--porcelain=v1', '-z', '--untracked-files=no'], { cwd, config: { 'core.quotepath': 'off' } });

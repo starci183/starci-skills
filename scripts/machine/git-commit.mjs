@@ -8,14 +8,12 @@ import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
+import { asList } from '../lib/list.mjs';
+import { refusal as verbRefusal, resultOk as ok, resultOutput as output } from '../lib/verb-call.mjs';
 
 const TYPES = new Set(['feat', 'fix', 'refactor', 'test', 'docs', 'chore', 'land', 'release']);
 
-const ok = (result) => Boolean(result && (result.ok ?? (!result.error && result.status === 0)));
-const output = (result, key = 'stdout') => String(result?.[key] ?? (key === 'stdout' ? result?.out : result?.err) ?? '').trim();
-const list = (value) => Array.isArray(value) ? value : value == null ? [] : [value];
 const slash = (value) => value.split(path.sep).join('/');
-const refusal = (text, code = 2) => ({ code, text: `starci git commit: ${text}`, data: { schema: 'starci/git-commit@1', ok: false } });
 
 function stagedFiles(cwd, gitDiff) {
   const result = gitDiff(['--cached', '--name-only', '--'], { cwd, config: { 'core.quotepath': 'off' } });
@@ -45,6 +43,8 @@ function resolvePaths(inputs, cwd, root, exists) {
 
 /** Commit the requested paths or the existing index with the StarCi subject and trailers. */
 export async function gitCommit(ctx, deps = {}) {
+  const refusal = (text, code = 2) => verbRefusal('starci git commit', text, code,
+    { schema: 'starci/git-commit@1', ok: false });
   const api = { add, commit, diff, porcelainStatus, revParse, revParseQuery, symbolicRef, exists: fs.existsSync, ...deps };
   const args = ctx?.args ?? {};
   const type = String(args.type ?? '').trim();
@@ -69,7 +69,7 @@ export async function gitCommit(ctx, deps = {}) {
     return refusal(`role ${role} may not commit on main; commit on a lane and use starci git sync to merge local main into lanes`);
   }
 
-  const requested = list(args.paths);
+  const requested = asList(args.paths);
   const checked = resolvePaths(requested, cwd, root, api.exists);
   if (checked.error) return refusal(checked.error);
   const addPaths = checked.paths ?? [];
