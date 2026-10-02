@@ -218,4 +218,3 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
   }
   return out;
 }
-
