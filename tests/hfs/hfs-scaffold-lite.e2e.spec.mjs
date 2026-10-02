@@ -29,8 +29,7 @@ const APP_NAME = 'litedemo';
 /** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
 const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
 const skipReason = dockerProbe.status === 0 ? false
-  : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/?
-/)[0] ?? 'docker info failed'}`;
+  : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
 
 const portBusy = (port) => new Promise((resolve) => {
   const socket = net.connect({ host: '127.0.0.1', port });
@@ -41,8 +40,7 @@ const portBusy = (port) => new Promise((resolve) => {
 /** Who holds a port: the Docker container publishing it, else an unnamed local process. */
 const holderOf = (port) => {
   const listing = spawnSync('docker', ['ps', '--format', '{{.Names}} {{.Ports}}'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
-  const row = String(listing.stdout ?? '').split(/?
-/).find((line) => new RegExp(`:${port}->`).test(line));
+  const row = String(listing.stdout ?? '').split(/\r?\n/).find((line) => new RegExp(`:${port}->`).test(line));
   return row ? `the container ${row.split(' ')[0]}` : 'a local process outside Docker';
 };
 
