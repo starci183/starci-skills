@@ -71,7 +71,7 @@ import { UpgradeError, upgradeMain } from '../upgrade/index.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--edition full]
 hfs lint [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
-hfs scaffold app <name> [--into <dir>]
+hfs scaffold app <name> [--into <dir>] [--edition full|lite]
 hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
@@ -79,7 +79,7 @@ hfs work-hygiene
 hfs secret list|show|set|gen ...
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
-hfs add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--repo <dir>]
+hfs add <api|webhook|realtime|saga|job|reactor|queue|projection|cli|table|app> <name> [--fe] [--no-types] [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--repo <dir>]
 hfs new image [--repo <dir>]
 hfs upgrade --edition full [--plan] [--repo <dir>]
 `;
@@ -87,7 +87,7 @@ const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done', '--edition']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
-const BOOL_FLAGS = new Set(['--json', '--fast']);
+const BOOL_FLAGS = new Set(['--json', '--fast', '--fe', '--no-types']);
 
 function parse(argv) {
   const opts = { positional: [] };
@@ -250,7 +250,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'add') {
       const [noun, name, ...extra] = opts.positional;
       if (!noun || !name || extra.length) throw new Error('hfs add takes `<noun> <name>` and the options of the noun');
-      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done } });
+      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done, fe: opts.fe, noTypes: opts['no-types'] } });
       for (const file of created) stdout(`created ${file}
 `);
       stdout(`hfs add ${noun}: registered patterns ${registered.patterns.join(', ')}${registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : ''}
@@ -259,8 +259,8 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     }
     if (verb === 'scaffold') {
       const [kind, name, ...extra] = opts.positional;
-      if (kind !== 'app' || !name || extra.length || opts.repo !== undefined) throw new Error('hfs scaffold takes `app <name> [--into <dir>]`');
-      const { root: created, files } = scaffoldApp({ name, into: path.resolve(opts.into ?? process.cwd()), presets: presets ?? await scaffoldPresets() });
+      if (kind !== 'app' || !name || extra.length || opts.repo !== undefined) throw new Error('hfs scaffold takes `app <name> [--into <dir>] [--edition full|lite]`');
+      const { root: created, files } = scaffoldApp({ name, into: path.resolve(opts.into ?? process.cwd()), edition: opts.edition ?? 'full', presets: presets ?? (opts.edition === 'lite' ? undefined : await scaffoldPresets()) });
       stdout(`hfs scaffold app: created ${created} (${files.length} files); next: npm ci, then npm run lint\n`);
       return 0;
     }

@@ -1,0 +1,256 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
+import { addApp } from "../../packages/hfs/scaffold/add-app.mjs";
+import { addKind } from "../../packages/hfs/scaffold/add.mjs";
+import { main } from "../../packages/hfs/bin/hfs.mjs";
+import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
+
+const made = [];
+const ts = createRequire(import.meta.url)("typescript");
+test.after(() => {
+  for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+const declaration = {
+  hfs: 2,
+  kind: "app",
+  edition: "lite",
+  project: "demo",
+  sides: {
+    be: {
+      apps: [{ name: "api", kind: "api" }],
+      kinds: ["api"],
+      connections: [
+        {
+          name: "primary",
+          envPrefix: "PRIMARY_DB",
+          owner: "api",
+          isolation: "schema",
+          provider: "supabase",
+        },
+      ],
+    },
+    fe: {
+      apps: [{ name: "web", kind: "next" }],
+      reads: ["be/contracts/", "supabase/types/"],
+    },
+  },
+};
+
+const repo = () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hfs-add-lite-"));
+  made.push(root);
+  fs.writeFileSync(
+    path.join(root, "hfs.json"),
+    `${JSON.stringify(declaration, null, 2)}\n`,
+  );
+  return root;
+};
+const has = (root, relative) =>
+  fs.existsSync(path.join(root, ...relative.split("/")));
+const read = (root, relative) =>
+  fs.readFileSync(path.join(root, ...relative.split("/")), "utf8");
+const parses = (text) =>
+  ts.transpileModule(text, {
+    reportDiagnostics: true,
+    compilerOptions: { experimentalDecorators: true },
+  }).diagnostics.length === 0;
+
+test("add table writes one policy-complete migration, FE db modules, and regenerated types", async () => {
+  const root = repo();
+  const generated =
+    "export type Database = { public: { Tables: { orders: { Row: { id: string } } } } }\n";
+  const result = addTable({
+    root,
+    name: "orders",
+    fe: true,
+    now: () => Date.UTC(2026, 9, 2, 12, 34, 56),
+    emitTypes: () => generated,
+  });
+  const migration = "supabase/migrations/20261002123456_orders.sql";
+  assert.deepEqual(result.created, [
+    migration,
+    "fe/apps/web/src/modules/db/orders/read-orders.ts",
+    "fe/apps/web/src/modules/db/orders/write-orders.ts",
+  ]);
+  assert.equal(read(root, "supabase/types/database.types.ts"), generated);
+  assert.match(
+    read(root, migration),
+    /create policy "orders_authenticated_update"/,
+  );
+  assert.match(
+    read(root, "fe/apps/web/src/modules/db/orders/read-orders.ts"),
+    /\.limit\(100\)/,
+  );
+  assert.match(
+    read(root, "fe/apps/web/src/modules/db/orders/write-orders.ts"),
+    /const principal = await getPrincipal\(\)/,
+  );
+  for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
+    assert.equal(parses(read(root, file)), true, `${file} parses`);
+  }
+  const findings = await checkDatabase({
+    repoRoot: root,
+    files: [migration, "supabase/types/database.types.ts"],
+    now: () => Date.UTC(2026, 9, 2, 12, 35, 0),
+  });
+  assert.deepEqual(findings, []);
+  assert.throws(
+    () => addTable({ root, name: "orders", emitTypes: false }),
+    (error) => error?.code === "HFS_ADD_EXISTS",
+  );
+});
+
+test("add table rolls back its files when the mandatory types emit fails and supports the explicit no-types seam", () => {
+  const root = repo();
+  assert.throws(
+    () =>
+      addTable({
+        root,
+        name: "invoices",
+        now: () => Date.UTC(2026, 9, 2, 12, 34, 56),
+        emitTypes: () => {
+          throw new Error("CLI absent");
+        },
+      }),
+    /CLI absent/,
+  );
+  assert.equal(
+    has(root, "supabase/migrations/20261002123456_invoices.sql"),
+    false,
+  );
+  const skipped = addTable({
+    root,
+    name: "invoices",
+    now: () => Date.UTC(2026, 9, 2, 12, 34, 57),
+    emitTypes: false,
+  });
+  assert.equal(skipped.types, "skipped");
+  assert.equal(
+    has(root, "supabase/migrations/20261002123457_invoices.sql"),
+    true,
+  );
+  assert.equal(has(root, "supabase/types/database.types.ts"), false);
+});
+
+test("the add table CLI accepts --fe and --no-types and reports its created files", async () => {
+  const root = repo();
+  let out = "";
+  let err = "";
+  const code = await main(
+    ["add", "table", "audit-events", "--fe", "--no-types", "--repo", root],
+    {
+      stdout: (text) => {
+        out += text;
+      },
+      stderr: (text) => {
+        err += text;
+      },
+    },
+  );
+  assert.equal(code, 0, err);
+  assert.match(out, /created supabase\/migrations\/\d{14}_audit-events\.sql/);
+  assert.match(
+    out,
+    /created fe\/apps\/web\/src\/modules\/db\/audit-events\/write-audit-events\.ts/,
+  );
+  assert.equal(has(root, "supabase/types/database.types.ts"), false);
+});
+
+test("add app writes an edition-matched Next workspace and registers it in both manifests", () => {
+  const root = repo();
+  fs.writeFileSync(
+    path.join(root, "package.json"),
+    `${JSON.stringify({ name: "demo", private: true, workspaces: ["fe/packages/*"] }, null, 2)}\n`,
+  );
+  fs.mkdirSync(path.join(root, "fe", "apps", "web"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "fe", "apps", "web", "package.json"),
+    `${JSON.stringify({ name: "@demo/web", private: true, scripts: { build: "next build" }, dependencies: { next: "16.0.0" } }, null, 2)}\n`,
+  );
+  const result = addApp({ root, name: "admin" });
+  assert.ok(result.created.includes("fe/apps/admin/src/modules/db/server.ts"));
+  assert.equal(
+    JSON.parse(read(root, "fe/apps/admin/package.json")).name,
+    "@demo/admin",
+  );
+  assert.deepEqual(JSON.parse(read(root, "hfs.json")).sides.fe.apps, [
+    { name: "web", kind: "next" },
+    { name: "admin", kind: "next" },
+  ]);
+  assert.deepEqual(JSON.parse(read(root, "package.json")).workspaces, [
+    "fe/packages/*",
+    "fe/apps/*",
+  ]);
+  assert.throws(
+    () => addApp({ root, name: "admin" }),
+    (error) => error?.code === "HFS_ADD_EXISTS",
+  );
+});
+
+test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, and a spec-free custom group", () => {
+  const root = repo();
+  fs.mkdirSync(path.join(root, "be"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "be", "nest-cli.json"),
+    `${JSON.stringify(
+      {
+        $schema: "https://json.schemastore.org/nest-cli",
+        collection: "@nestjs/schematics",
+        monorepo: true,
+        root: "apps/api",
+        sourceRoot: "apps/api/src",
+        projects: {
+          api: {
+            type: "application",
+            root: "apps/api",
+            entryFile: "main",
+            sourceRoot: "apps/api/src",
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const result = addKind({
+    repoRoot: root,
+    noun: "cli",
+    name: "requeue",
+    options: { service: "DeadLetterService=@modules/domain/order" },
+  });
+  assert.ok(result.created.includes("be/apps/cli/src/main.ts"));
+  assert.ok(
+    result.created.includes("be/src/features/cli/requeue/subs/run.cli.ts"),
+  );
+  assert.equal(
+    result.created.some((file) => file.endsWith(".spec.ts")),
+    false,
+  );
+  assert.match(
+    read(root, "be/src/features/cli/migrate/subs/run.cli.ts"),
+    /\["run", "db:push"\]/,
+  );
+  assert.match(
+    read(root, "be/src/features/cli/seed/subs/run.cli.ts"),
+    /InjectPrimaryEntityManager/,
+  );
+  assert.match(
+    read(root, "be/src/features/cli/cli.module.ts"),
+    /RequeueModule/,
+  );
+  assert.ok(
+    JSON.parse(read(root, "hfs.json")).sides.be.apps.some(
+      (app) => app.name === "cli" && app.kind === "cli",
+    ),
+  );
+  assert.ok(JSON.parse(read(root, "be/nest-cli.json")).projects.cli);
+  for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
+    assert.equal(parses(read(root, file)), true, `${file} parses`);
+  }
+});

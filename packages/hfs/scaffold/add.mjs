@@ -21,6 +21,9 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { TEMPLATES_DIR } from '../sync/index.mjs';
 import { ScaffoldError, pascalOf } from './service.mjs';
 import { refuseInEdition } from './edition-gate.mjs';
+import { addTable } from './add-table.mjs';
+import { addApp } from './add-app.mjs';
+import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const VARIABLE = /<([A-Za-z][A-Za-z0-9]*)>/g;
@@ -95,6 +98,14 @@ function variablesOf({ spec, noun, name, options }) {
  * @returns {{ created: Array<string>, registered: { patterns: Array<string>, kinds: Array<string> } }} The files written (app-root relative) and what hfs.json gained.
  */
 export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) {
+  if (noun === 'table') {
+    const result = addTable({ root: repoRoot, name, fe: options.fe === true, emitTypes: options.noTypes === true ? false : options.emitTypes, now });
+    return { ...result, registered: { patterns: [], kinds: [] } };
+  }
+  if (noun === 'app') {
+    const result = addApp({ root: repoRoot, name });
+    return { ...result, registered: { patterns: [], kinds: [] } };
+  }
   const manifest = loadSlotManifest();
   const params = ruleParams(manifest, 'be');
   const spec = params.addKinds[noun];
@@ -107,7 +118,11 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const specs = nouns.map((each) => [each, params.addKinds[each]]);
   const patterns = [...new Set(specs.flatMap(([, eachSpec]) => eachSpec.patterns))];
   const topics = new Set([...specs.map(([, eachSpec]) => eachSpec.topic), ...topicsOfPatterns(patterns)]);
-  const trees = new Map([...topics].map((topic) => [topic, readTree(topic)]));
+  const liteCli = noun === 'cli' && repo.edition === 'lite';
+  const trees = new Map([...topics].map((topic) => {
+    const entries = readTree(topic);
+    return [topic, liteCli ? selectLiteCliEntries(entries) : entries];
+  }));
   // The slots the noun's trees name decide whether the edition has the noun (a slot lite does not carry or forbids
   // makes it a full-edition capability); never the noun's name. Optional entries are never generated, so they gate nothing.
   const writtenSlots = new Set();
@@ -141,13 +156,14 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const clash = planned.filter((file) => file.instance && fs.existsSync(file.absolute)).map((file) => file.target);
   if (clash.length) throw new ScaffoldError('HFS_ADD_EXISTS', `${noun} ${name} already exists: ${clash.join(', ')}`);
 
+  const bootstrapCreated = liteCli ? ensureLiteCli({ root: repoRoot, manifest, repo }) : [];
   for (const file of planned) {
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
     fs.writeFileSync(file.absolute, file.body);
   }
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
   const registered = register({ declarationFile, spec: { patterns, trigger: spec.trigger } });
-  return { created: planned.map((file) => `be/${file.target}`), registered };
+  return { created: [...bootstrapCreated, ...planned.map((file) => `be/${file.target}`)], registered };
 }
 
 /**

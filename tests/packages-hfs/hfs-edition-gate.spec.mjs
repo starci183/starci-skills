@@ -106,13 +106,13 @@ test('the nouns lite keeps are untouched: add api, add webhook and add cli still
   const webhook = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--repo', dir]);
   assert.equal(webhook.code, 0, webhook.err);
   assert.ok(exists(dir, 'be/src/features/webhooks/payment-gateway/transport/http/payment-gateway.webhook.ts'));
-  // add cli wires the new group into the static cli feature root, which exists once the app has a cli
-  const cliModule = path.join(dir, 'be', 'src', 'features', 'cli', 'cli.module.ts');
-  fs.mkdirSync(path.dirname(cliModule), { recursive: true });
-  fs.writeFileSync(cliModule, ['import { Module } from "@nestjs/common"', '', '@Module({ imports: [] })', 'export class CliModule {}', ''].join('\n'));
+  // a lite app has no cli app until the first `add cli`, which bootstraps apps/cli and its static cli feature root, then wires the group in
+  fs.mkdirSync(path.join(dir, 'be'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'be', 'nest-cli.json'), JSON.stringify({ collection: '@nestjs/schematics', monorepo: true, root: 'apps/api', sourceRoot: 'apps/api/src', projects: { api: { type: 'application', root: 'apps/api', entryFile: 'main', sourceRoot: 'apps/api/src' } } }));
   const addCli = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
   assert.equal(addCli.code, 0, addCli.err);
   assert.ok(exists(dir, 'be/src/features/cli/requeue/requeue.cli.ts'));
+  assert.ok(exists(dir, 'be/apps/cli/src/main.ts'), 'the first add cli of a lite app creates be/apps/cli');
   // and `new image` is untouched
   assert.equal((await cli(['new', 'image', '--repo', repo(LITE)])).code, 0);
 });

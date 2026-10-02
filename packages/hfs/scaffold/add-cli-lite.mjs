@@ -1,0 +1,185 @@
+import fs from "node:fs";
+import path from "node:path";
+import { resolveRepoDeclaration } from "../runtime/scripts/hfs/slots.mjs";
+import { imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
+import { ScaffoldError } from "./service.mjs";
+
+const read = (relative) =>
+  fs
+    .readFileSync(path.join(TEMPLATES_DIR, ...relative.split("/")), "utf8")
+    .replace(/\r\n/g, "\n");
+const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
+
+/** Lite has no test world, so the existing cli tree is selected without its colocated full-edition specs. */
+export const selectLiteCliEntries = (entries) =>
+  entries.filter((entry) => !entry.path.endsWith(".spec.ts"));
+
+const CLI_OPTIONS = `import type { EnvSource } from "@modules/platform/config"
+import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
+import type { DatabaseConnectionOptions } from "@modules/platform/database"
+
+/** Everything the lite cli needs: the least-privilege Supabase PostgreSQL connection. */
+export interface CliAppOptions {
+    readonly connections: ReadonlyArray<DatabaseConnectionOptions>
+}
+
+/** Reads the one declared connection without adding entities or TypeORM migrations. */
+export const parseCliAppOptions = (env: EnvSource): CliAppOptions => ({
+    connections: [parsePrimaryDatabaseConfig(env)],
+})
+`;
+
+const MIGRATE_RUN = `import { spawn } from "node:child_process"
+import { CommandRunner, SubCommand } from "nest-commander"
+
+/** Runs the managed db:push wrapper; the wrapper owns Supabase CLI flags and sealed secret loading. */
+export const runDbPush = (): Promise<void> =>
+    new Promise((resolve, reject) => {
+        const command = process.platform === "win32" ? "npm.cmd" : "npm"
+        const child = spawn(command, ["run", "db:push"], { stdio: "inherit" })
+        child.once("error", reject)
+        child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(\`db:push exited \${code ?? "without a status"}\`)))
+    })
+
+@SubCommand({ name: "run", description: "Push the pending Supabase migrations" })
+/** \`cli migrate run\`: delegates schema authority to the managed Supabase db:push script. */
+export class RunCli extends CommandRunner {
+    async run(): Promise<void> {
+        await runDbPush()
+    }
+}
+`;
+
+const SEED_RUN = `import { readFile } from "node:fs/promises"
+import { CommandRunner, SubCommand } from "nest-commander"
+import type { EntityManager } from "typeorm"
+import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import type { SqlText } from "@modules/platform/database"
+
+const SEED_FILE = "supabase/seed.sql"
+
+const assertSeedText = (_text: string): asserts _text is SqlText => {
+    // The brand is compile-time only; the tracked seed is reviewed and no runtime value is interpolated into it.
+}
+
+const seedText = (text: string): SqlText => {
+    assertSeedText(text)
+    return text
+}
+
+@SubCommand({ name: "run", description: "Run the tracked Supabase seed through the application role" })
+/** \`cli seed run\`: executes the one tracked seed through the shared least-privilege EntityManager. */
+export class RunSeedsCli extends CommandRunner {
+    constructor(@InjectPrimaryEntityManager() private readonly manager: EntityManager) {
+        super()
+    }
+
+    async run(): Promise<void> {
+        const text = seedText(await readFile(SEED_FILE, "utf8"))
+        if (text.trim() !== "") await this.manager.query(text)
+    }
+}
+`;
+
+/**
+ * Creates the optional lite cli app and its Supabase migrate/seed groups on first `add cli`.
+ * Existing cli trees are never repaired or overwritten: drift remains a check finding.
+ */
+export function ensureLiteCli({ root, manifest, repo }) {
+  if (repo.edition !== "lite") return [];
+  const declarationFile = path.join(root, "hfs.json");
+  const declaration = JSON.parse(fs.readFileSync(declarationFile, "utf8"));
+  const declared = declaration.sides.be.apps.some((app) => app.kind === "cli");
+  const cliRoot = path.join(root, "be", "apps", "cli");
+  if (declared) {
+    if (!fs.existsSync(cliRoot))
+      throw new ScaffoldError(
+        "HFS_ADD_CLI_DRIFT",
+        "hfs.json declares the cli app but be/apps/cli is missing; restore the declared tree before adding a group",
+      );
+    return [];
+  }
+  if (
+    fs.existsSync(cliRoot) ||
+    fs.existsSync(path.join(root, "be", "src", "features", "cli"))
+  ) {
+    throw new ScaffoldError(
+      "HFS_ADD_EXISTS",
+      "a cli tree exists but hfs.json does not declare it; hfs add never adopts an unowned tree",
+    );
+  }
+
+  const files = [
+    ["be/apps/cli/src/main.ts", read("be/skeleton/apps/cli/src/main.ts")],
+    [
+      "be/apps/cli/src/app.module.ts",
+      read("be/skeleton/apps/cli/src/app.module.ts"),
+    ],
+    ["be/apps/cli/src/cli.options.ts", CLI_OPTIONS],
+    [
+      "be/src/features/cli/index.ts",
+      read("be/skeleton/src/features/cli/index.ts"),
+    ],
+    [
+      "be/src/features/cli/cli.module.ts",
+      read("be/skeleton/src/features/cli/cli.module.ts"),
+    ],
+    [
+      "be/src/features/cli/migrate/migrate.cli.ts",
+      read("be/skeleton/src/features/cli/migrate/migrate.cli.ts"),
+    ],
+    [
+      "be/src/features/cli/migrate/migrate.module.ts",
+      read("be/skeleton/src/features/cli/migrate/migrate.module.ts"),
+    ],
+    ["be/src/features/cli/migrate/subs/run.cli.ts", MIGRATE_RUN],
+    [
+      "be/src/features/cli/seed/seed.cli.ts",
+      read("be/skeleton/src/features/cli/seed/seed.cli.ts"),
+    ],
+    [
+      "be/src/features/cli/seed/seed.module.ts",
+      read("be/skeleton/src/features/cli/seed/seed.module.ts"),
+    ],
+    ["be/src/features/cli/seed/subs/run.cli.ts", SEED_RUN],
+  ];
+  declaration.sides.be.apps.push({ name: "cli", kind: "cli" });
+  declaration.sides.be.kinds = [
+    ...new Set([...(declaration.sides.be.kinds ?? []), "cli"]),
+  ].sort();
+  const resolved = resolveRepoDeclaration(manifest, declaration);
+  const image = imageFiles(resolved).find(
+    (file) => file.path === "be/apps/cli/Dockerfile",
+  );
+  if (!image)
+    throw new ScaffoldError(
+      "HFS_ADD_TEMPLATE_MISSING",
+      "the cli Dockerfile template did not render",
+    );
+  files.push([image.path, image.content]);
+
+  const nestFile = path.join(root, "be", "nest-cli.json");
+  if (!fs.existsSync(nestFile))
+    throw new ScaffoldError(
+      "HFS_ADD_CLI_NEST_CONFIG",
+      "add cli needs be/nest-cli.json",
+    );
+  const nest = JSON.parse(fs.readFileSync(nestFile, "utf8"));
+  nest.projects = {
+    ...(nest.projects ?? {}),
+    cli: {
+      type: "application",
+      root: "apps/cli",
+      entryFile: "main",
+      sourceRoot: "apps/cli/src",
+    },
+  };
+  for (const [relative, body] of files) {
+    const target = path.join(root, ...relative.split("/"));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, body);
+  }
+  fs.writeFileSync(nestFile, json(nest));
+  fs.writeFileSync(declarationFile, json(declaration));
+  return files.map(([relative]) => relative);
+}
