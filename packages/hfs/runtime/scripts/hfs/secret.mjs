@@ -14,8 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { decrypt as sopsDecrypt } from '../api/sops/decrypt.mjs';
-import { sopsSeal } from '../api/sops/seal.mjs';
-import { resolveSops } from '../api/sops/lib.mjs';
+import { seal as sopsSeal } from '../api/sops/seal.mjs';
 
 export class SecretError extends Error {}
 
@@ -73,19 +72,21 @@ const fileOf = (directory, slug) => {
   return path.join(directory, `${slug}.enc`);
 };
 
-/** The default sops seam: the runtime's sops api with the binary found on this machine. */
+/** The default sops seam: the runtime's sops api, which finds the binary on this machine. */
 export function defaultSops(env = process.env) {
-  const bin = resolveSops(env);
-  const need = () => { if (!bin) throw new SecretError('sops is not installed (Windows: winget install Mozilla.SOPS)'); return bin; };
+  const refuse = (what, result) => {
+    if (result.error?.code === 'SOPS_MISSING') return new SecretError(result.error.message);
+    return new SecretError(`sops could not ${what} (exit ${String(result.status)})`);
+  };
   return {
     decrypt(file, format) {
-      const result = sopsDecrypt(need(), ['decrypt', '--input-type', format, '--output-type', 'json', file], { env });
-      if (result.status !== 0) throw new SecretError(`sops could not decrypt ${path.basename(file)} (exit ${String(result.status)}); is the age identity installed?`);
+      const result = sopsDecrypt(null, ['decrypt', '--input-type', format, '--output-type', 'json', file], { env });
+      if (result.status !== 0) throw refuse(`decrypt ${path.basename(file)}; is the age identity installed?`, result);
       return JSON.parse(result.stdout);
     },
     seal(request) {
-      const result = sopsSeal(need(), request, { env });
-      if (result.status !== 0) throw new SecretError(`sops could not seal the secret (exit ${String(result.status)}): ${String(result.stderr).trim().split('\n').at(-1)}`);
+      const result = sopsSeal(null, request, { env });
+      if (result.status !== 0) throw refuse(`seal the secret: ${String(result.stderr).trim().split(String.fromCharCode(10)).at(-1)}`, result);
       return result.stdout;
     },
   };
