@@ -70,7 +70,7 @@ declared it is `HFS_SLOT_NOT_ENABLED`. The saga is a folder of a feature (`knowl
 be/src/features/<feature>/saga/
   <saga>.saga.service.ts          the orchestrator: lists the steps and compensations, a service unit-tested beside it
   <saga>.saga-state.ts            the typed state of a run: status and the version fence
-  steps/<step>.step.ts            one step: names its event, dispatches one command
+  steps/<step>.saga-step.ts            one step: names its event, dispatches one command
   compensations/<step>.compensation.ts   REQUIRED for every step: names the failure event, dispatches one command
 ```
 

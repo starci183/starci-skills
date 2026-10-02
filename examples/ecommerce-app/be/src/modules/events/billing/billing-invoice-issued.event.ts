@@ -1,6 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
+import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
 import type { ParsedEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
 
 /** The payload of `billing.invoice-issued` (the contract `be/contracts/billing/events.json`). */
 export interface InvoiceIssuedPayload {
@@ -31,10 +30,11 @@ export class InvoiceIssuedEvent extends BaseEvent {
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
     static parse(envelope: unknown): ParsedEvent<InvoiceIssuedEvent> {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, totalMinorUnits } = envelope.payload
+        const read = readEnvelope(envelope)
+        if (read === null) return null
+        const { orderId, totalMinorUnits } = read.payload
         return typeof orderId === "string" && typeof totalMinorUnits === "number"
-            ? new InvoiceIssuedEvent(envelope.eventId, { orderId, totalMinorUnits })
+            ? new InvoiceIssuedEvent(read.eventId, { orderId, totalMinorUnits })
             : null
     }
 }

@@ -144,6 +144,7 @@ export const eventConsumerShape = {
     create(context) {
         const hfs = hfsOf(context)
         const file = context.filename
+        if (isExempt(hfs, file)) return {}
         const inTransport = hfs.slotOf(file) === "be.transport.message"
         const isConsumerFile = baseName(file).endsWith(".consumer.ts")
         const check = (node) => {

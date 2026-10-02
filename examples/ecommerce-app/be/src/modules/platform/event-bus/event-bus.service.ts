@@ -2,12 +2,12 @@ import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
-import { isRecord } from "@modules/platform/primitives"
 import { EventBusError, EventBusErrorCode } from "./errors/event-bus.error"
 import type { BaseEvent, EventClass, EventDeadLetter, EventEnvelope } from "./event-bus.contracts"
 import { InjectEventBusOptions, InjectEventTransport } from "./event-bus.decorators"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventBus } from "./event-bus.port"
+import { readEnvelopeText } from "./event-envelope.policy"
 import type { EventTransport, InboundMessage } from "./event-transport.port"
 import {
     ATTEMPT_HEADER,
@@ -27,16 +27,6 @@ const MARKER_VALUE = "{}"
 /** The id of a dead letter: where its message sits on the dead-letter topic. */
 const deadLetterIdOf = (message: InboundMessage): string =>
     [message.topic, message.partition, message.offset].join(DEAD_LETTER_ID_SEPARATOR)
-
-/** The event name an envelope text carries, or an empty text when the text is not an envelope. */
-const eventNameOf = (value: string): string => {
-    try {
-        const envelope: unknown = JSON.parse(value)
-        return isRecord(envelope) && typeof envelope.eventName === "string" ? envelope.eventName : ""
-    } catch {
-        return ""
-    }
-}
 
 @Injectable()
 /**
@@ -73,10 +63,10 @@ export class EventBusService implements EventBus {
     /** The events of the class that ran out of attempts and were not requeued since. */
     async deadLetters(event: EventClass<BaseEvent>): Promise<ReadonlyArray<EventDeadLetter>> {
         const messages = await this.transport.read(deadLetterTopicOf(this.options.topicPrefix, event.eventName))
-        const closed = new Set(messages.flatMap((message) => message.headers[REQUEUED_HEADER] ?? []))
+        const closed = new Set(messages.map((message) => message.headers[REQUEUED_HEADER]))
         return messages
             .filter((message) => message.headers[REQUEUED_HEADER] === undefined)
-            .filter((message) => eventNameOf(message.value) === event.eventName)
+            .filter((message) => readEnvelopeText(message.value).eventName === event.eventName)
             .filter((message) => !closed.has(deadLetterIdOf(message)))
             .map((message) => ({
                 id: deadLetterIdOf(message),
@@ -89,7 +79,7 @@ export class EventBusService implements EventBus {
 
     /** Puts a dead letter back on its main topic with a fresh attempt count and closes it with a marker; an id the topic does not hold is refused. */
     async requeue(deadLetterId: string): Promise<void> {
-        const topic = deadLetterId.split(DEAD_LETTER_ID_SEPARATOR)[0] ?? ""
+        const topic = deadLetterId.slice(0, deadLetterId.indexOf(DEAD_LETTER_ID_SEPARATOR))
         const letter = (await this.transport.read(topic)).find((message) => deadLetterIdOf(message) === deadLetterId)
         const origin = letter?.headers[ORIGIN_HEADER]
         if (letter === undefined || origin === undefined) {

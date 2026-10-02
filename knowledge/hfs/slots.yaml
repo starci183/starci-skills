@@ -167,7 +167,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga, contracts, port, resolver, controller, gateway, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -720,7 +720,7 @@ slots:
     presence: opt-in
     tracked: tracked
     tier: feature
-    allows: ["<step>.step.ts"]    # one step, dispatching one command and naming the event it puts on the wire
+    allows: ["<step>.saga-step.ts"]    # one step, dispatching one command and naming the event it puts on the wire
     tests: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
   - id: be.feature.saga.compensations

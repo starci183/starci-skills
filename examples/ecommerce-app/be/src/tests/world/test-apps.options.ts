@@ -64,7 +64,11 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...inboxEntities, ...eventBusEntities]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [
+    ...invoiceEntities,
+    ...inboxEntities,
+    ...eventBusEntities,
+]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>

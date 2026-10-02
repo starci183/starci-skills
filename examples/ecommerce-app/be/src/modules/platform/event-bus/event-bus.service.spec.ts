@@ -14,12 +14,16 @@ const AT = "2026-02-03T04:05:06.000Z"
 
 const options: EventBusOptions = {
     brokers: ["localhost:9094"],
-    groupId: "order",
+    groupId: "app",
     topicPrefix: "run-1.",
     relayIntervalMs: 100,
     relayBatch: 50,
     timeoutMs: 3000,
-    connection: Symbol("connection"),
+    connections: [],
+}
+
+interface PingPayload {
+    readonly note: string
 }
 
 class PingEvent extends BaseEvent {
@@ -30,7 +34,7 @@ class PingEvent extends BaseEvent {
 
     constructor(
         readonly eventId: string,
-        readonly payload: { readonly note: string },
+        readonly payload: PingPayload,
     ) {
         super()
     }

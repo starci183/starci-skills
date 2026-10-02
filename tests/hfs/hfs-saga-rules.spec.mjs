@@ -30,7 +30,7 @@ const run = (declaration, mutate) => checkRepo({ repoRoot: repoOf(declaration, m
 const only = (findings, code) => findings.filter((f) => f.code === code);
 
 const SAGA = 'be/src/features/orders/saga/';
-const STEP = `${SAGA}steps/reserve.step.ts`;
+const STEP = `${SAGA}steps/reserve.saga-step.ts`;
 const COMPENSATION = `${SAGA}compensations/reserve.compensation.ts`;
 const ORCHESTRATOR = `${SAGA}place.saga.service.ts`;
 const STATE = `${SAGA}place.saga-state.ts`;
@@ -39,7 +39,7 @@ const SPEC = 'be/src/tests/e2e/orders/place.e2e-spec.ts';
 
 const STEP_TS = 'export class ReserveStep {\n  readonly event = "order.placed"\n}\n';
 const COMPENSATION_TS = 'export class ReserveCompensation {\n  readonly event = "billing.invoice-rejected"\n}\n';
-const ORCHESTRATOR_TS = "import { SagaService } from '../../../modules/platform/saga';\nimport { ReserveStep } from './steps/reserve.step';\nimport { ReserveCompensation } from './compensations/reserve.compensation';\nexport class PlaceSaga { constructor(readonly s: SagaService, readonly a: ReserveStep, readonly b: ReserveCompensation) {} }\n";
+const ORCHESTRATOR_TS = "import { SagaService } from '../../../modules/platform/saga';\nimport { ReserveStep } from './steps/reserve.saga-step';\nimport { ReserveCompensation } from './compensations/reserve.compensation';\nexport class PlaceSaga { constructor(readonly s: SagaService, readonly a: ReserveStep, readonly b: ReserveCompensation) {} }\n";
 const STATE_TS = "export interface PlaceSagaState {\n  readonly status: 'running' | 'compensated'\n  readonly version: number\n}\n";
 const CONSUMER_TS = 'export class InvoiceRejectedConsumer {\n  handle(message: { eventId: string }): string { return message.eventId }\n}\n';
 const CONTRACTS = {

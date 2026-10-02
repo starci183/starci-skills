@@ -41,12 +41,7 @@ export class AppModule {
                 }),
                 ErrorsModule.register({
                     isGlobal: true,
-                    kinds: [
-                        CONFIG_ERROR_KINDS,
-                        DATABASE_ERROR_KINDS,
-                        EVENT_BUS_ERROR_KINDS,
-                        INVOICE_ERROR_KINDS,
-                    ],
+                    kinds: [CONFIG_ERROR_KINDS, DATABASE_ERROR_KINDS, EVENT_BUS_ERROR_KINDS, INVOICE_ERROR_KINDS],
                 }),
                 CqrsModule.register({ isGlobal: true }),
                 DatabaseModule.register({
@@ -60,7 +55,7 @@ export class AppModule {
                     ],
                 }),
                 InboxModule.register({ isGlobal: true }),
-                EventBusModule.register({ isGlobal: true, ...options.eventBus, connection: BILLING_ENTITY_MANAGER }),
+                EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [BILLING_ENTITY_MANAGER] }),
                 InvoiceModule.register({ isGlobal: true, ...options.invoice }),
                 InvoicingMessageModule,
             ],

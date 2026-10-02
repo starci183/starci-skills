@@ -1,4 +1,4 @@
-// Imports of the host (resolve them to its aliases): ../application/place-order.contracts, ./compensations/reserve-order.compensation, ./place-order.saga-state, ./steps/reserve-order.step, @modules/domain/order, @modules/platform/cqrs, @modules/platform/saga, @nestjs/common.
+// Imports of the host (resolve them to its aliases): ../application/place-order.contracts, ./compensations/reserve-order.compensation, ./place-order.saga-state, ./steps/reserve-order.saga-step, @modules/domain/order, @modules/platform/cqrs, @modules/platform/saga, @nestjs/common.
 @Injectable()
 /**
  * The orchestrator of the place-order saga: the list of its steps and, for each, the compensation that undoes it. It decides

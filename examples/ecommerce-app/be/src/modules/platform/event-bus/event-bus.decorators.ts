@@ -17,8 +17,8 @@ export const EVENT_CONSUMER_REGISTRY: unique symbol = Symbol("platform.event-bus
 /** Token of the broker port; it is also the health probe token of the bus. */
 export const EVENT_TRANSPORT: unique symbol = Symbol("platform.event-bus.transport")
 
-/** Token of the shared entity manager of the connection that holds the outbox the relay reads. */
-export const EVENT_BUS_MANAGER: unique symbol = Symbol("platform.event-bus.manager")
+/** Token of the entity managers of the connections whose outbox the relay reads, in the order the options name them. */
+export const EVENT_RELAY_MANAGERS: unique symbol = Symbol("platform.event-bus.relay-managers")
 
 /** Injects the options of the event bus. Parameter type: EventBusOptions. */
 export const InjectEventBusOptions = (): TypedParameterDecorator<EventBusOptions> =>
@@ -35,6 +35,6 @@ export const InjectEventConsumerRegistry = (): TypedParameterDecorator<EventCons
 export const InjectEventTransport = (): TypedParameterDecorator<EventTransport> =>
     injector<EventTransport>(EVENT_TRANSPORT)
 
-/** Injects the entity manager of the connection whose outbox the relay reads. Parameter type: EntityManager. */
-export const InjectEventBusManager = (): TypedParameterDecorator<EntityManager> =>
-    injector<EntityManager>(EVENT_BUS_MANAGER)
+/** Injects the entity managers the relay reads the outbox of. Parameter type: ReadonlyArray<EntityManager>. */
+export const InjectEventRelayManagers = (): TypedParameterDecorator<ReadonlyArray<EntityManager>> =>
+    injector<ReadonlyArray<EntityManager>>(EVENT_RELAY_MANAGERS)

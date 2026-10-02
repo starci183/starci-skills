@@ -3,19 +3,22 @@ import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData } from "../../fixtures/e2e-views.contracts"
 import { readCount, readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import {
+    DUPLICATE_OUTBOX_ROW,
     INBOX_CLAIM_COUNT,
     INVOICES_OF_ORDER,
     INVOICE_COUNT_OF_PERSON,
+    OUTBOX_OF_EVENT,
     PLACE_ORDER_SAGA_STATE,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The async path between the services, end to end: a buyer places an order on the order service (one call across the
- * services, identity checking the session), the order service publishes `order.placed` on its Redis queue, and the billing
- * worker, a separate app with its own database, consumes it and records one invoice. A confirmation replayed with the same key
- * announces the order again; the billing inbox claims the repeated event once, so the order keeps one invoice. A second order
- * proves the repeat was consumed before it: the queue is ordered. The invoice the billing service issues is announced as
+ * services, identity checking the session), the order service writes `order.placed` in its outbox in the placement transaction,
+ * its relay hands it to Kafka, and the billing worker, a separate app with its own database, consumes it and records one
+ * invoice. The event is then delivered a second time (a second outbox row of the same event id, as a relay that crashed after
+ * sending would write); the billing inbox claims the repeated event once, so the order keeps one invoice. A second order
+ * proves the repeat was consumed before it: a topic is ordered per key. The invoice the billing service issues is announced as
  * `billing.invoice-issued`, which completes the saga run of the order at version 2.
  *
  * Run: npm run test:e2e -- billing/order-placed
@@ -50,10 +53,12 @@ describe("order.placed consumed by billing", () => {
         })
         expect(invoiced).toEqual({ order_id: first.orderId, status: "issued", total_minor_units: 4000 })
 
-        const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: "billing-flow-1" } },
-        })
-        expect(replayed.data?.placeOrder).toMatchObject({ orderId: first.orderId, replayed: true })
+        await world.db.order.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
+        await world.waitUntil(
+            "the relay sends the duplicate of order.placed",
+            () => readRows(world.db.order, OUTBOX_OF_EVENT, [first.orderId]),
+            (rows) => rows.length === 2 && rows.every((row) => row.sent),
+        )
 
         const second = await place("billing-flow-2")
         await world.waitFor("billing records the invoice of the second order", async () => {

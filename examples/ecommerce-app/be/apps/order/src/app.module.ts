@@ -116,7 +116,7 @@ export class AppModule {
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
-                EventBusModule.register({ isGlobal: true, ...options.eventBus, connection: ORDER_ENTITY_MANAGER }),
+                EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [ORDER_ENTITY_MANAGER] }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),

@@ -2,7 +2,7 @@
 //   be/src/features/<feature>/saga/
 //     <saga>.saga.service.ts              the orchestrator: the list of its steps and compensations (a service, unit-tested beside it)
 //     <saga>.saga-state.ts                the persisted state of a run, typed with its `status` and its `version` fence
-//     steps/<step>.step.ts                one step, dispatching one command, naming the event it puts on the wire
+//     steps/<step>.saga-step.ts                one step, dispatching one command, naming the event it puts on the wire
 //     compensations/<step>.compensation.ts  the compensation of that step, naming the failure event that triggers it
 //   be/src/features/<feature>/transport/message/<event>.consumer.ts   the consumers that advance it, through the inbox
 //   be/contracts/<service>/events.json   every event, a compensating one declaring `compensates: "<step event>"`
@@ -27,10 +27,10 @@ export const SAGA_CONSUMER_DEDUPE = 'BE_SAGA_CONSUMER_DEDUPE';
 export const SAGA_E2E_MISSING = 'BE_SAGA_E2E_MISSING';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SAGA_FILE = /^be\/src\/features\/([^/]+)\/saga\/(?:(?:steps|compensations)\/)?[^/]+\.(?:saga\.service|saga-state|step|compensation)\.ts$/;
+const SAGA_FILE = /^be\/src\/features\/([^/]+)\/saga\/(?:(?:steps|compensations)\/)?[^/]+\.(?:saga\.service|saga-state|saga-step|compensation)\.ts$/;
 const ORCHESTRATOR = /^be\/src\/features\/([^/]+)\/saga\/([^/]+)\.saga\.service\.ts$/;
 const STATE = /^be\/src\/features\/([^/]+)\/saga\/([^/]+)\.saga-state\.ts$/;
-const STEP = /^be\/src\/features\/([^/]+)\/saga\/steps\/([^/]+)\.step\.ts$/;
+const STEP = /^be\/src\/features\/([^/]+)\/saga\/steps\/([^/]+)\.saga-step\.ts$/;
 const COMPENSATION = /^be\/src\/features\/([^/]+)\/saga\/compensations\/([^/]+)\.compensation\.ts$/;
 const CONSUMER = /^be\/src\/features\/([^/]+)\/transport\/message\/[^/]+\.consumer\.ts$/;
 const E2E_SPEC = /^be\/src\/tests\/e2e\/[^/]+\/[^/]+\.e2e-spec\.ts$/;
@@ -117,7 +117,7 @@ export function sagaFindings({ repoRoot, files }) {
     const folder = `be/src/features/${feature}/saga/`;
     // R149
     for (const [stem, file] of steps) if (!compensations.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a saga step with no compensation: add ${folder}compensations/${stem}.compensation.ts, the command that undoes it; every forward step of a saga has one.`, { step: stem }));
-    for (const [stem, file] of compensations) if (!steps.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a compensation of no step: ${folder}steps/${stem}.step.ts does not exist; a compensation undoes the step of the same name.`, { step: stem }));
+    for (const [stem, file] of compensations) if (!steps.has(stem)) findings.push(found(SAGA_STEP_COMPENSATION, file, `${file} is a compensation of no step: ${folder}steps/${stem}.saga-step.ts does not exist; a compensation undoes the step of the same name.`, { step: stem }));
     if (orchestrators.length === 0 && (steps.size > 0 || compensations.size > 0)) findings.push(found(SAGA_STEP_COMPENSATION, folder, `${folder} holds steps or compensations but no orchestrator: add <saga>.saga.service.ts, the list of the steps and their compensations.`));
     for (const orchestrator of orchestrators) {
       const text = readText(repoRoot, orchestrator);

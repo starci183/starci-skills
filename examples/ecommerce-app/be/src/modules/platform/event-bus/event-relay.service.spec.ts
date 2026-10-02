@@ -4,7 +4,7 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { EVENT_BUS_MANAGER, EVENT_BUS_OPTIONS, EVENT_TRANSPORT } from "./event-bus.decorators"
+import { EVENT_BUS_OPTIONS, EVENT_RELAY_MANAGERS, EVENT_TRANSPORT } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
 import type { EventBusOptions } from "./event-bus.options"
 import { EventRelayService } from "./event-relay.service"
@@ -15,19 +15,19 @@ const AT = "2026-02-03T04:05:06.000Z"
 
 const options: EventBusOptions = {
     brokers: ["localhost:9094"],
-    groupId: "order",
+    groupId: "app",
     topicPrefix: "",
     relayIntervalMs: 100,
     relayBatch: 2,
     timeoutMs: 3000,
-    connection: Symbol("connection"),
+    connections: [],
 }
 
 const row = (id: string) => ({
     id,
-    topic: "events.order",
+    topic: "events.probe",
     message_key: `o-${id}`,
-    envelope: { eventId: `o-${id}`, eventName: "order.placed", payload: {} },
+    envelope: { eventId: `o-${id}`, eventName: "probe.ping", payload: {} },
 })
 
 const build = async (manager: MockEntityManager) => {
@@ -37,7 +37,7 @@ const build = async (manager: MockEntityManager) => {
         providers: [
             EventRelayService,
             { provide: EVENT_BUS_OPTIONS, useValue: options },
-            { provide: EVENT_BUS_MANAGER, useValue: manager },
+            { provide: EVENT_RELAY_MANAGERS, useValue: [manager] },
             { provide: EVENT_TRANSPORT, useValue: transport },
             { provide: CLOCK, useValue: new FakeClock(AT) },
             { provide: LOGGER, useValue: logger },
@@ -63,8 +63,8 @@ describe("EventRelayService", () => {
 
             expect(tx.em.query).toHaveBeenNthCalledWith(1, SELECT_WAITING_ROWS, [2])
             expect(transport.send).toHaveBeenCalledWith([
-                { topic: "events.order", key: "o-1", value: JSON.stringify(row("1").envelope), headers: {} },
-                { topic: "events.order", key: "o-2", value: JSON.stringify(row("2").envelope), headers: {} },
+                { topic: "events.probe", key: "o-1", value: JSON.stringify(row("1").envelope), headers: {} },
+                { topic: "events.probe", key: "o-2", value: JSON.stringify(row("2").envelope), headers: {} },
             ])
             expect(tx.em.query).toHaveBeenNthCalledWith(2, MARK_ROWS_SENT, [["1", "2"], new Date(AT)])
             expect(tx.commits).toBe(1)

@@ -1,6 +1,5 @@
-import { BaseEvent } from "@modules/platform/event-bus"
+import { BaseEvent, readEnvelope } from "@modules/platform/event-bus"
 import type { ParsedEvent } from "@modules/platform/event-bus"
-import { isRecord } from "@modules/platform/primitives"
 
 /** The payload of `order.placed` (the contract `be/contracts/order/events.json`). */
 export interface OrderPlacedPayload {
@@ -33,10 +32,11 @@ export class OrderPlacedEvent extends BaseEvent {
 
     /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
     static parse(envelope: unknown): ParsedEvent<OrderPlacedEvent> {
-        if (!isRecord(envelope) || typeof envelope.eventId !== "string" || !isRecord(envelope.payload)) return null
-        const { orderId, personId, totalMinorUnits } = envelope.payload
+        const read = readEnvelope(envelope)
+        if (read === null) return null
+        const { orderId, personId, totalMinorUnits } = read.payload
         return typeof orderId === "string" && typeof personId === "string" && typeof totalMinorUnits === "number"
-            ? new OrderPlacedEvent(envelope.eventId, { orderId, personId, totalMinorUnits })
+            ? new OrderPlacedEvent(read.eventId, { orderId, personId, totalMinorUnits })
             : null
     }
 }

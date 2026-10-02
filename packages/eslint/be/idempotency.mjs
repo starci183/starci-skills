@@ -24,7 +24,7 @@
  */
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
-import { baseName, isOwnedType } from "./lib/ports.mjs"
+import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
 import { typed } from "./lib/types.mjs"
 
 /** The `Inbox` port of `platform/inbox`. */
@@ -100,7 +100,7 @@ export const inboxDedupeRequired = {
         const slot = hfs.slotOf(filename)
         if (!baseName(filename).endsWith(".service.ts") || !slot || slot.startsWith("be.tests.")) return {}
         // The event bus publishes events (their shape carries an `eventId`) and its runtime claims the inbox before a consumer runs: no delivery method here.
-        if (slot === "be.platform" && hfs.classify(filename).bindings?.capability === "event-bus") return {}
+        if (slot.startsWith("be.platform") && ownerNameOf(hfs, filename) === "event-bus") return {}
         return {
             MethodDefinition(node) {
                 if (node.kind !== "method" || node.static || node.key.type === "PrivateIdentifier" || !node.value.body) return

@@ -9,6 +9,7 @@ import { EVENT_BUS_OPTIONS, EVENT_TRANSPORT } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventConsumer } from "./event-bus.port"
+import { readEnvelope } from "./event-envelope.policy"
 import { EventRunnerService } from "./event-runner.service"
 import type { EventSubscription, EventTransport, InboundMessage } from "./event-transport.port"
 
@@ -17,51 +18,58 @@ const NOW = new Date(AT).getTime()
 
 const options: EventBusOptions = {
     brokers: ["localhost:9094"],
-    groupId: "billing",
+    groupId: "app",
     topicPrefix: "run-1.",
     relayIntervalMs: 100,
     relayBatch: 50,
     timeoutMs: 3000,
-    connection: Symbol("connection"),
+    connections: [],
 }
 
-class PlacedEvent extends BaseEvent {
-    static readonly eventName = "order.placed"
+interface PingPayload {
+    readonly ref: string
+}
+
+class PingEvent extends BaseEvent {
+    static readonly eventName = "probe.ping"
     static readonly version = 1
 
-    readonly eventName = PlacedEvent.eventName
+    readonly eventName = PingEvent.eventName
 
     constructor(
         readonly eventId: string,
-        readonly payload: { readonly orderId: string },
+        readonly payload: PingPayload,
     ) {
         super()
     }
 
-    static parse(envelope: unknown): ParsedEvent<PlacedEvent> {
-        if (typeof envelope !== "object" || envelope === null) return null
-        const { eventId, payload } = envelope as { eventId?: unknown; payload?: { orderId?: unknown } }
-        return typeof eventId === "string" && typeof payload?.orderId === "string"
-            ? new PlacedEvent(eventId, { orderId: payload.orderId })
+    static parse(envelope: unknown): ParsedEvent<PingEvent> {
+        const read = readEnvelope(envelope)
+        return read !== null && typeof read.payload.ref === "string"
+            ? new PingEvent(read.eventId, { ref: read.payload.ref })
             : null
     }
 }
 
 const message = (overrides: Partial<InboundMessage> = {}): InboundMessage => ({
-    topic: "run-1.events.order",
+    topic: "run-1.events.probe",
     partition: 0,
     offset: "4",
     key: "o-1",
-    value: JSON.stringify({ eventId: "o-1", eventName: "order.placed", payload: { orderId: "o-1" } }),
+    value: JSON.stringify({ eventId: "o-1", eventName: "probe.ping", payload: { ref: "o-1" } }),
     headers: {},
     ...overrides,
 })
 
-const build = async () => {
+const build = async (register = true) => {
     const transport = mock<EventTransport>()
     const logger = mock<Logger>()
     const handle = jest.fn<Promise<void>, Array<never>>()
-    const consumer: EventConsumer<PlacedEvent> = { event: PlacedEvent, handle }
+    const subscriptions: Array<EventSubscription> = []
+    transport.subscribe.mockImplementation((subscription) => {
+        subscriptions.push(subscription)
+        return Promise.resolve()
+    })
     const moduleRef = await Test.createTestingModule({
         providers: [
             EventRunnerService,
@@ -72,44 +80,39 @@ const build = async () => {
         ],
     }).compile()
     const runner = moduleRef.get(EventRunnerService)
-    runner.add(consumer)
-    return { runner, transport, logger, handle }
+    if (register) {
+        const consumer: EventConsumer<PingEvent> = { event: PingEvent, handle }
+        runner.add(consumer)
+    }
+    return { runner, transport, logger, handle, subscriptions }
 }
 
 describe("EventRunnerService", () => {
     describe("onApplicationBootstrap", () => {
         it("subscribes to the main and retry topic of every registered event", async () => {
-            const { runner, transport } = await build()
+            const { runner, subscriptions } = await build()
 
             await runner.onApplicationBootstrap()
 
-            const subscription = transport.subscribe.mock.calls[0]?.[0] as EventSubscription
-            expect(subscription.topics).toEqual(["run-1.events.order", "run-1.events.order.retry"])
+            expect(subscriptions.map((subscription) => subscription.topics)).toEqual([
+                ["run-1.events.probe", "run-1.events.probe.retry"],
+            ])
         })
 
         it("subscribes to nothing when no consumer registered", async () => {
-            const { transport } = await build()
-            const moduleRef = await Test.createTestingModule({
-                providers: [
-                    EventRunnerService,
-                    { provide: EVENT_BUS_OPTIONS, useValue: options },
-                    { provide: EVENT_TRANSPORT, useValue: transport },
-                    { provide: CLOCK, useValue: new FakeClock(AT) },
-                    { provide: LOGGER, useValue: mock<Logger>() },
-                ],
-            }).compile()
+            const { runner, transport } = await build(false)
 
-            await moduleRef.get(EventRunnerService).onApplicationBootstrap()
+            await runner.onApplicationBootstrap()
 
             expect(transport.subscribe).not.toHaveBeenCalled()
         })
 
         it("hands what the transport delivers to receive", async () => {
-            const { runner, transport, handle } = await build()
+            const { runner, subscriptions, handle } = await build()
+            handle.mockResolvedValue(undefined)
             await runner.onApplicationBootstrap()
-            const subscription = transport.subscribe.mock.calls[0]?.[0] as EventSubscription
 
-            await subscription.onMessage(message())
+            await subscriptions[0]?.onMessage(message())
 
             expect(handle).toHaveBeenCalledTimes(1)
         })
@@ -124,7 +127,7 @@ describe("EventRunnerService", () => {
 
             expect(handle).toHaveBeenCalledWith({
                 eventId: "o-1",
-                event: new PlacedEvent("o-1", { orderId: "o-1" }),
+                event: new PingEvent("o-1", { ref: "o-1" }),
                 attempt: 1,
             })
             expect(transport.send).not.toHaveBeenCalled()
@@ -134,7 +137,7 @@ describe("EventRunnerService", () => {
             const { runner, handle, transport, logger } = await build()
 
             await runner.receive(
-                message({ value: JSON.stringify({ eventId: "x", eventName: "order.shipped", payload: {} }) }),
+                message({ value: JSON.stringify({ eventId: "x", eventName: "probe.other", payload: {} }) }),
             )
 
             expect(handle).not.toHaveBeenCalled()
@@ -149,26 +152,29 @@ describe("EventRunnerService", () => {
             await runner.receive(message({ value: JSON.stringify([1]) }))
 
             expect(handle).not.toHaveBeenCalled()
-            expect(logger.warn).toHaveBeenCalledTimes(2)
-            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, { topic: "run-1.events.order" })
+            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, expect.any(SyntaxError), {
+                topic: "run-1.events.probe",
+            })
+            expect(logger.warn).toHaveBeenCalledTimes(1)
+            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.MessageSkipped, { topic: "run-1.events.probe" })
         })
 
         it("buries an envelope the event class cannot read, without retrying it", async () => {
             const { runner, handle, transport } = await build()
-            const value = JSON.stringify({ eventId: "o-2", eventName: "order.placed", payload: {} })
+            const value = JSON.stringify({ eventId: "o-2", eventName: "probe.ping", payload: {} })
 
             await runner.receive(message({ key: "o-2", value }))
 
             expect(handle).not.toHaveBeenCalled()
             expect(transport.send).toHaveBeenCalledWith([
                 {
-                    topic: "run-1.events.order.dlq",
+                    topic: "run-1.events.probe.dlq",
                     key: "o-2",
                     value,
                     headers: {
                         attempt: "1",
                         reason: "the envelope does not have the shape of the event",
-                        "origin-topic": "run-1.events.order",
+                        "origin-topic": "run-1.events.probe",
                     },
                 },
             ])
@@ -176,22 +182,27 @@ describe("EventRunnerService", () => {
 
         it("puts a failed delivery on the retry topic with the next attempt and a doubled backoff", async () => {
             const { runner, handle, transport, logger } = await build()
-            handle.mockRejectedValue(new Error("order database down"))
+            const failure = new Error("the database is down")
+            handle.mockRejectedValue(failure)
 
             await runner.receive(message({ headers: { attempt: "2" } }))
 
             expect(transport.send).toHaveBeenCalledWith([
                 {
-                    topic: "run-1.events.order.retry",
+                    topic: "run-1.events.probe.retry",
                     key: "o-1",
                     value: message().value,
                     headers: { attempt: "3", "not-before": String(NOW + 1000) },
                 },
             ])
-            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryRetried, {
-                event: "order.placed",
+            expect(logger.error).toHaveBeenCalledWith(EventBusLogEvent.DeliveryFailed, failure, {
+                event: "probe.ping",
                 attempt: 2,
-                reason: "order database down",
+            })
+            expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryRetried, {
+                event: "probe.ping",
+                attempt: 2,
+                reason: "the database is down",
             })
         })
 
@@ -203,14 +214,14 @@ describe("EventRunnerService", () => {
 
             expect(transport.send).toHaveBeenCalledWith([
                 {
-                    topic: "run-1.events.order.dlq",
+                    topic: "run-1.events.probe.dlq",
                     key: "o-1",
                     value: message().value,
-                    headers: { attempt: "5", reason: "a text, not an error", "origin-topic": "run-1.events.order" },
+                    headers: { attempt: "5", reason: "a text, not an error", "origin-topic": "run-1.events.probe" },
                 },
             ])
             expect(logger.warn).toHaveBeenCalledWith(EventBusLogEvent.DeliveryBuried, {
-                event: "order.placed",
+                event: "probe.ping",
                 attempts: 5,
                 reason: "a text, not an error",
             })
@@ -222,7 +233,7 @@ describe("EventRunnerService", () => {
 
             await runner.receive(
                 message({
-                    topic: "run-1.events.order.retry",
+                    topic: "run-1.events.probe.retry",
                     headers: { attempt: "2", "not-before": String(NOW + 800) },
                 }),
             )

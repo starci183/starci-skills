@@ -67,7 +67,9 @@ describe("InvoiceService", () => {
 
         it("records a total above the limit as rejected, announces it in the same transaction and refuses", async () => {
             const tx = fakeTransaction(
-                mockEntityManager({ save: [InvoiceEntity, invoiceRow({ status: "rejected", totalMinorUnits: 20_000 })] }),
+                mockEntityManager({
+                    save: [InvoiceEntity, invoiceRow({ status: "rejected", totalMinorUnits: 20_000 })],
+                }),
             )
             const { service, bus } = await build(tx.em)
 

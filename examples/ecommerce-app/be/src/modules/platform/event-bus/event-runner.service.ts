@@ -4,12 +4,12 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { isRecord } from "@modules/platform/primitives"
 import type { BaseEvent } from "./event-bus.contracts"
 import { InjectEventBusOptions, InjectEventTransport } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventConsumer, EventConsumerRegistry } from "./event-bus.port"
+import { readEnvelopeText } from "./event-envelope.policy"
 import type { EventTransport, InboundMessage } from "./event-transport.port"
 import {
     ATTEMPTS,
@@ -22,16 +22,6 @@ import {
     retryTopicOf,
     topicOf,
 } from "./event.policy"
-
-/** The name an envelope text carries, or an empty text when the value is not an envelope. */
-const envelopeOf = (value: string): { readonly eventName: string; readonly envelope: unknown } => {
-    try {
-        const envelope: unknown = JSON.parse(value)
-        return { eventName: isRecord(envelope) && typeof envelope.eventName === "string" ? envelope.eventName : "", envelope }
-    } catch {
-        return { eventName: "", envelope: null }
-    }
-}
 
 @Injectable()
 /**
@@ -66,10 +56,12 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
 
     /** Hands one message to the consumer of its event; the events of the topic nobody here consumes are left alone. */
     async receive(message: InboundMessage): Promise<void> {
-        const { eventName, envelope } = envelopeOf(message.value)
+        const { eventName, envelope, cause: unreadable } = readEnvelopeText(message.value)
         const consumer = this.consumers.get(eventName)
         if (consumer === undefined) {
-            if (eventName === "") this.logger.warn(EventBusLogEvent.MessageSkipped, { topic: message.topic })
+            if (unreadable !== null)
+                this.logger.error(EventBusLogEvent.MessageSkipped, unreadable, { topic: message.topic })
+            else if (eventName === "") this.logger.warn(EventBusLogEvent.MessageSkipped, { topic: message.topic })
             return
         }
         const attempt = Number(message.headers[ATTEMPT_HEADER] ?? 1)
@@ -84,6 +76,7 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         try {
             await consumer.handle({ eventId: event.eventId, event, attempt })
         } catch (cause) {
+            this.logger.error(EventBusLogEvent.DeliveryFailed, cause, { event: eventName, attempt })
             await this.failed(message, eventName, attempt, cause instanceof Error ? cause.message : String(cause))
         }
     }

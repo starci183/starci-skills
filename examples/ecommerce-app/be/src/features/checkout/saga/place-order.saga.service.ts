@@ -6,7 +6,7 @@ import type { SagaService, SagaTransition } from "@modules/platform/saga"
 import type { PlaceOrderRequest, PlaceOrderResult } from "../application/place-order.contracts"
 import type { FindPlaceOrderSagaResult } from "./place-order.saga-state"
 import { ReserveOrderCompensation } from "./compensations/reserve-order.compensation"
-import { ReserveOrderStep } from "./steps/reserve-order.step"
+import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
 
 @Injectable()
 /**

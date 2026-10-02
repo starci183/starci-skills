@@ -16,7 +16,6 @@ import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
 import { PLACE_ORDER_SAGA } from "./order.contracts"
 import { OrderService } from "./order.service"
-import { ReceiptService } from "./receipt.service"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { CANCEL_ORDER_IF_PENDING, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
@@ -27,7 +26,6 @@ const mug = productView({ id: "sku-2", name: "Mug", priceMinorUnits: 250, stock:
 const build = async (entityManager: MockEntityManager) => {
     const cart = mock<CartService>()
     const catalog = mock<CatalogService>()
-    const receipts = mock<ReceiptService>()
     const bus = mock<EventBus>()
     const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
@@ -36,12 +34,11 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: ORDER_ENTITY_MANAGER, useValue: entityManager },
             { provide: CART_SERVICE, useValue: cart },
             { provide: CATALOG_SERVICE, useValue: catalog },
-            { provide: ReceiptService, useValue: receipts },
             { provide: EVENT_BUS, useValue: bus },
             { provide: SAGA_SERVICE, useValue: sagas },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, receipts, bus, sagas }
+    return { orders: moduleRef.get(OrderService), cart, catalog, bus, sagas }
 }
 
 describe("OrderService", () => {
@@ -103,7 +100,7 @@ describe("OrderService", () => {
                     insert: [OrderLineEntity, {}],
                 }),
             )
-            const { orders, cart, catalog, receipts, bus, sagas } = await build(tx.em)
+            const { orders, cart, catalog, bus, sagas } = await build(tx.em)
             cart.list.mockResolvedValue([
                 { productId: "sku-1", quantity: 2 },
                 { productId: "sku-2", quantity: 1 },
@@ -133,7 +130,6 @@ describe("OrderService", () => {
             ])
             expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)
-            expect(receipts.archive).toHaveBeenCalledWith("o-7")
             expect(sagas.begin).toHaveBeenCalledWith({
                 manager: expect.anything(),
                 saga: PLACE_ORDER_SAGA,
@@ -149,7 +145,7 @@ describe("OrderService", () => {
             const tx = fakeTransaction(
                 mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-6" }]], insert: [OrderLineEntity, {}] }),
             )
-            const { orders, cart, catalog, bus, receipts } = await build(tx.em)
+            const { orders, cart, catalog, bus } = await build(tx.em)
             cart.list.mockResolvedValue([{ productId: "sku-2", quantity: 4 }])
             catalog.byIds.mockResolvedValue({ "sku-2": mug })
             catalog.reserveStock.mockResolvedValue(true)
@@ -160,7 +156,6 @@ describe("OrderService", () => {
 
             expect(tx.rollbacks).toBe(1)
             expect(tx.commits).toBe(0)
-            expect(receipts.archive).not.toHaveBeenCalled()
         })
 
         it("places an order without a replay key and claims no key", async () => {
@@ -206,7 +201,7 @@ describe("OrderService", () => {
                     query: [INSERT_ORDER_IF_NEW, []],
                 }),
             )
-            const { orders, cart, catalog, receipts } = await build(tx.em)
+            const { orders, cart, catalog } = await build(tx.em)
             cart.list.mockResolvedValue([{ productId: "sku-1", quantity: 1 }])
             catalog.byIds.mockResolvedValue({ "sku-1": shirt })
 
@@ -215,7 +210,6 @@ describe("OrderService", () => {
             )
 
             expect(catalog.reserveStock).not.toHaveBeenCalled()
-            expect(receipts.archive).not.toHaveBeenCalled()
         })
 
         it("fails with the placement failed error when the key was claimed but no order explains it", async () => {
