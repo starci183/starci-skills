@@ -41,7 +41,7 @@ test('the shipped pins document is valid and every @starci pin equals its packag
 
 test('the brief\'s dependencies are all pinned, one version each', () => {
   const pins = loadPins(ROOT).pins;
-  for (const name of ['@starci/grammar', '@starci/eslint-canon-be', '@starci/eslint-canon-fe', '@starci/tsconfig', '@starci/prettier-config',
+  for (const name of ['@starci/cli', '@starci/grammar', '@starci/eslint-canon-be', '@starci/eslint-canon-fe', '@starci/tsconfig', '@starci/prettier-config',
     'jest', 'next', '@nestjs/core', '@heroui/react', 'prettier', 'typescript']) {
     assert.ok(pins[name], `${name} is pinned`);
   }
@@ -78,6 +78,7 @@ test('a @starci pin that differs from its package, or names no source, is refuse
 test('the schema itself accepts a minimal valid document and pins the required names', () => {
   const doc = loadPins(ROOT);
   assert.deepEqual(validateAgainstSchema(doc, schema()), []);
+  assert.ok(schema().properties.pins.required.includes('@starci/cli'));
   assert.ok(schema().properties.pins.required.includes('@heroui/react'));
 });
 

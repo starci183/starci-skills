@@ -198,7 +198,7 @@ ARCH_TYPESCRIPT_INVALID:
   meaning_vi: "Gói `typescript` trong kho được kiểm không cung cấp API trình biên dịch mà bộ kiểm kiến trúc cần."
   causes_vi:
     - "Gói `typescript` bị cài hỏng hoặc bị thay bằng gói khác cùng tên."
-  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `hfs check`."
+  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `starci app check`."
   owner: op-retry
   kind: check-finding
 
@@ -208,7 +208,7 @@ ARCH_TYPESCRIPT_MISSING:
   meaning_vi: "Bộ kiểm kiến trúc chỉ dùng TypeScript cài trong chính kho được kiểm, không thay bằng bộ phân tích khác, nên không kiểm được."
   causes_vi:
     - "Kho thiếu `package.json` hoặc chưa chạy `npm ci` nên `node_modules/typescript` không có."
-  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `hfs check`."
+  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `starci app check`."
   owner: op-retry
   kind: check-finding
 
@@ -425,7 +425,7 @@ BE_EVENT_CLASS_CONTRACT:
   meaning_vi: "Một lớp sự kiện dưới `be/src/modules/events/<service>/` không khai báo đúng một lớp với `eventName` và `version` là literal, không đặt tên tệp theo sự kiện của nó, không có mục tương ứng (cùng tên và phiên bản) trong `be/contracts/<service>/events.json`, hoặc một mục của hợp đồng không có lớp."
   causes_vi:
     - "Vi phạm luật R151: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
-    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `hfs emit-contracts`, hoặc thêm mục hợp đồng bằng tay."
+    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `starci app emit`, hoặc thêm mục hợp đồng bằng tay."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
   owner: op-retry
   kind: check-finding
@@ -490,8 +490,8 @@ BE_KIND_DECLARATION:
   meaning_vi: "`sides.be.kinds` của hfs.json không khớp với các loại feature đang có: thiếu một loại đang dùng, khai báo một loại không có feature nào, thiếu pattern mà loại đó cần, hoặc thiếu platform capability của pattern đó."
   causes_vi:
     - "Vi phạm luật R179: mỗi loại chỉ được sinh ra khi dùng đến (không có boilerplate rỗng), và loại nào đang dùng thì hạ tầng platform của nó phải có (jobs cần platform/jobs và platform/queue, reactors cần platform/event-bus)."
-    - "Feature được tạo tay thay vì bằng `hfs add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `hfs add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
+    - "Feature được tạo tay thay vì bằng `starci app add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `starci app add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
   owner: op-retry
   kind: check-finding
 
@@ -500,9 +500,9 @@ BE_KIND_EMPTY:
   title_vi: "Thư mục loại feature rỗng hoặc thành viên không có mã"
   meaning_vi: "Một tệp nằm trực tiếp trong `be/src/features/<loại>/` (ví dụ `.gitkeep` hay một feature trùng tên loại), hoặc một thư mục thành viên `<loại>/<tên>/` không có tệp TypeScript nào."
   causes_vi:
-    - "Vi phạm luật R180: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `hfs add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
+    - "Vi phạm luật R180: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `starci app add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
     - "Tạo sẵn thư mục cho loại chưa dùng hoặc đổi tên feature api thành tên một loại."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `hfs add`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `starci app add`."
   owner: op-retry
   kind: check-finding
 
@@ -921,7 +921,7 @@ FE_NO_TESTS:
     - "Viết spec hoặc e2e cho component, hook hay trang"
     - "Thêm vitest, Playwright, jest, testing-library hoặc axe vào package.json"
     - "Thêm script test hoặc cấu hình test vào repository front end"
-  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và hfs check."
+  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và starci app check."
   owner: op-retry
   kind: check-finding
 
@@ -1187,11 +1187,11 @@ HFS_CANON_PIN_DRIFT:
   kind: check-finding
 
 HFS_CI_MISSING_CANON:
-  title: "CI runs the pinned `hfs lint`; pre-push runs typecheck and lint"
+  title: "CI runs the pinned `starci app lint`; pre-push runs typecheck and lint"
   title_vi: "CI thiếu bước canon"
   meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
   causes_vi:
-    - "Vi phạm luật R13: CI phải chạy `hfs lint` (`npm run lint` hoặc `npx @starci/hfs lint`, bản pin); pre-push phải có `typecheck` + `lint`."
+    - "Vi phạm luật R13: CI phải chạy `starci app lint` (`npm run lint` hoặc `npx @starci/cli@<pin> app lint`); pre-push phải có `typecheck` + `lint`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1201,7 +1201,7 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
   title_vi: "Bản hợp đồng lệch bản thật"
   meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` ở gốc app rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
-    - "Vi phạm luật R23: phía be: `be/contracts/<app>/schema.graphql` và `be/contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. Phía fe đọc thẳng `be/contracts/` (đường đọc chéo duy nhất khai trong hfs.json `sides.fe.reads`), không giữ bản sao."
+    - "Vi phạm luật R23: phía be: `be/contracts/<app>/schema.graphql` và `be/contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `starci app emit` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. Phía fe đọc thẳng `be/contracts/` (đường đọc chéo duy nhất khai trong hfs.json `sides.fe.reads`), không giữ bản sao."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1374,7 +1374,7 @@ HFS_FORMAT_TOOL_MISSING:
   causes_vi:
     - "Chưa chạy `npm ci` trong kho"
     - "prettier không nằm trong devDependencies của kho"
-  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `hfs check`."
+  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `starci app check`."
   owner: op-retry
   kind: input-invalid
 
@@ -1391,7 +1391,7 @@ HFS_GHOST_TREE:
 HFS_GITIGNORE_BLOCK_DRIFT:
   title: "The managed `.gitignore` block equals its render"
   title_vi: "Khối .gitignore lệch bản render"
-  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `hfs sync`."
+  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `starci app sync`."
   causes_vi:
     - "Vi phạm luật R04: Khối `.gitignore` do `.claude` quản lý phải trùng bản render (never-tracked list, deny `.env*`, cache)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -1431,7 +1431,7 @@ HFS_LINT_SUPPRESSION_FILE:
 HFS_MANAGED_FILE_DRIFT:
   title: "A managed file equals its template render"
   title_vi: "Tệp do .claude quản lý bị lệch"
-  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
+  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `starci app sync --write`, không sửa tay."
   causes_vi:
     - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -1486,7 +1486,7 @@ HFS_MODULE_TIER_INVALID:
 HFS_MONO_FE_WORKSPACE:
   title: "An fe workspace manifest breaks the workspace shape"
   title_vi: "Manifest của một workspace fe sai hình dạng"
-  meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`hfs lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
+  meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`starci app lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
   causes_vi:
     - "Vi phạm luật R144: turbo chạy các task theo script của từng workspace; tên, script hoặc cờ private sai khiến build, lint hoặc typecheck của app bị bỏ qua hoặc chạy khác chuẩn."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt tên `@<project>/<app>`, `\"private\": true` và đúng bộ script trong `package.json` của workspace đó."
@@ -1506,10 +1506,10 @@ HFS_MONO_NEST_PROJECTS:
 HFS_MONO_WORKSPACES:
   title: "The app root is not the monorepo root"
   title_vi: "Gốc app không phải gốc monorepo"
-  meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do hfs sync sinh ra."
+  meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do starci app sync sinh ra."
   causes_vi:
     - "Vi phạm luật R143: mọi sản phẩm luôn là monorepo, kể cả khi chỉ có một service, nên hình dạng hfs đồng nhất; thiếu workspaces hoặc turbo thì các app fe không được build qua turbo."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx hfs sync --write` để sinh `turbo.json`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx starci app sync --write` để sinh `turbo.json`."
   owner: op-retry
   kind: check-finding
 
@@ -1589,7 +1589,7 @@ HFS_README_DESCRIPTION_INVALID:
 HFS_README_DEVELOPMENT_INCOMPLETE:
   title: "README Development section incomplete"
   title_vi: "Mục Development trong README chưa đủ lệnh"
-  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint, build và test (các script do hfs sync quản lý; test chạy bằng npm test)."
+  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint, build và test (các script do starci app sync quản lý; test chạy bằng npm test)."
   causes_vi:
     - "Quên một hoặc vài lệnh"
     - "Viết bằng lệnh của trình quản lý khác"
@@ -1657,7 +1657,7 @@ HFS_REPO_LOCAL_CHECK:
   title_vi: "Kho tự giữ bộ kiểm tra riêng"
   meaning_vi: "Kho có nguồn kiểm tra hoặc luật lint cục bộ ở `<f>`: tệp `check-*` trong `scripts/` hay `tools/`, tệp `eslint-local-rules*`, plugin eslint cục bộ, hoặc script npm chạy một tệp `check-*`."
   causes_vi:
-    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
+    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (starci app check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp và script trỏ tới nó; nếu luật còn cần thì đề xuất vào canon trong runtime `.claude`, không giữ bản sao trong kho."
   owner: op-retry
   kind: check-finding
@@ -1732,7 +1732,7 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
 HFS_RULE_OFF_WITHOUT_REPLACEMENT:
   title: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository"
   title_vi: "Cấu hình ESLint hoặc stylelint lệch bản render"
-  meaning_vi: "`eslint.config.mjs` (hoặc `stylelint.config.mjs` của front end) khác bản render (một dòng gọi `starciBeConfig`, `starciFeConfig` hoặc `starciStylelintConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
+  meaning_vi: "`eslint.config.mjs` (hoặc `stylelint.config.mjs` của front end) khác bản render (một dòng gọi `starciBeConfig`, `starciFeConfig` hoặc `starciStylelintConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `starci app sync --write`, không sửa tay."
   causes_vi:
     - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -1822,7 +1822,7 @@ HFS_SONAR_CONFIG:
   title_vi: "Cấu hình Sonar lệch"
   meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra và nhập báo cáo độ phủ lcov của be, chỉ tính các service."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không phải service (SonarQube không có coverage inclusions; hfs sync sinh phần bù từ COVERAGE_SOURCES và bộ hậu tố của slot manifest, gồm cả fe/**) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không phải service (SonarQube không có coverage inclusions; starci app sync sinh phần bù từ COVERAGE_SOURCES và bộ hậu tố của slot manifest, gồm cả fe/**) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry

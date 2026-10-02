@@ -113,7 +113,7 @@ test('HFS_LINT_SUPPRESSION_FILE: a suppressions file, the lint:suppressions scri
 
 test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:fix': 'hfs lint --fix' } }));
+    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:fix': 'starci app lint --fix' } }));
   }) });
   assert.deepEqual(only(result, 'HFS_LINT_SUPPRESSION_FILE'), []);
 });

@@ -1,6 +1,6 @@
 // fe-contract-documents.mjs - FE_GRAPHQL_CONTRACT (R113): every GraphQL document a front end sends is one its back end
 // serves. An app keeps the contract of each GraphQL service it runs as a snapshot, `be/contracts/<service>/schema.graphql`
-// (`hfs emit-contracts`, HFS_CONTRACT_SNAPSHOT_DRIFT keeps it current), and its front end keeps every operation it sends
+// (`starci app emit`, HFS_CONTRACT_SNAPSHOT_DRIFT keeps it current), and its front end keeps every operation it sends
 // in a `.graphql` file under `fe/`. Each operation is judged against the contract of the service that serves its first
 // root field (the one snapshot whose root type declares it): a root field no contract declares, a field, argument or input
 // field the contract does not declare, a required argument left out, a variable of another type, a leaf with a selection or

@@ -15,10 +15,11 @@ import { braceVariants } from '../../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { declaredSonarKeys, readDeclaredSonarKey } from '../../packages/hfs/sync/sonar-key.mjs';
 import { hygieneFindings, runWorkHygiene } from '../../packages/hfs/sync/hygiene.mjs';
+import { appCliTemplateFindings } from '../../scripts/hfs/runtime-rules/app-cli-templates.mjs';
 
-// hfs sync renders the managed files of an app: the root's (the one package.json's scripts, prettier, Sonar, the hooks, the
+// starci app sync renders the managed files of an app: the root's (the one package.json's scripts, prettier, Sonar, the hooks, the
 // workflows, the .gitignore block and .starciwork/.gitignore) and each side's (be: tsconfig, tsconfig.build, the tests tsconfig,
-// the eslint one-liner and jest; fe: tsconfig and the eslint and stylelint one-liners). `hfs scaffold app` writes the first tree.
+// the eslint one-liner and jest; fe: tsconfig and the eslint and stylelint one-liners). `starci app scaffold` writes the first tree.
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const require = createRequire(import.meta.url);
@@ -45,6 +46,20 @@ const run = async (args, dir) => {
 };
 
 describe('the template renderer', () => {
+  it('RT_CLI_APP_ONLY_TEMPLATES: managed templates invoke product actions only through starci app', () => {
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory() ? walk(full) : [path.relative(ROOT, full).replaceAll(path.sep, '/')];
+    });
+    const files = walk(path.join(ROOT, 'packages', 'hfs', 'templates'));
+    const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert.deepEqual(appCliTemplateFindings({ files, read }), []);
+    const bad = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => 'npx hfs work-hygiene\n' });
+    assert.deepEqual(bad.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
+    const wrongGroup = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => 'starci runtime check\n' });
+    assert.deepEqual(wrongGroup.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
+  });
+
   it('fills {{names}} and expands partial lines', () => {
     const read = name => ({ 'a/base': 'one {{x}}\ntwo\n' })[name];
     assert.equal(render('head\n{{> a/base}}\ntail {{x}}\n', { x: 'X' }, read), 'head\none X\ntwo\ntail X\n');
@@ -111,7 +126,7 @@ describe('the generated file set', () => {
 describe('.husky/pre-commit', () => {
   it('runs work hygiene, typecheck, the staged eslint of each side from its folder, stylelint over the staged fe css, prettier and the be unit specs of staged files, never integration, e2e or contract', () => {
     const hook = rendered()['.husky/pre-commit'];
-    for (const step of ['npx hfs work-hygiene', 'npm run typecheck', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted', 'npm run test:affected -- --findRelatedTests $specs']) assert.ok(hook.includes(step), step);
+    for (const step of ['npx starci app hygiene', 'npm run typecheck', '(cd be && npx eslint $be)', '(cd fe && npx eslint --max-warnings=0 --no-warn-ignored $fe)', '(cd fe && npx stylelint $styles)', 'npx prettier --check --ignore-unknown $formatted', 'npm run test:affected -- --findRelatedTests $specs']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright|vitest/);
   });
 });
@@ -138,7 +153,7 @@ describe('.github/workflows', () => {
     assert.deepEqual(doc.on.push.branches, ['main']);
     const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
     for (const command of ['npm ci', 'npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(command), command);
-    assert.ok(!runs.some(command => command.includes('hfs sync')), 'hfs check is the one drift gate; there is no second sync step');
+    assert.ok(!runs.some(command => command.includes('starci app sync')), 'starci app check is the one drift gate; there is no second sync step');
     assert.doesNotMatch(text, /starci link|STARCI_HOME|starci-runtime/);
     const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
     assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
@@ -194,7 +209,7 @@ describe('sonar-project.properties', () => {
     assert.equal(app['sonar.sources'], 'be/apps,be/src,fe/apps');
     assert.equal(app['sonar.tests'], 'be/apps,be/src');
     assert.equal(app['sonar.typescript.tsconfigPaths'], 'be/tsconfig.json,fe/apps/app/tsconfig.json,fe/apps/admin/tsconfig.json');
-    // One import path for every engine (hfs lint): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
+    // One import path for every engine (starci app lint): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
     assert.ok(!('sonar.eslint.reportPaths' in app));
     assert.equal(app['sonar.externalIssuesReportPaths'], 'reports/lint.sonar.json');
     assert.ok(!('sonar.host.url' in app), 'the host is SONAR_HOST_URL, never a property (R11)');
@@ -358,7 +373,7 @@ describe('the drift check', () => {
     const dir = repo(t);
     assert.equal((await run([], dir)).code, 2);
     assert.equal((await run(['--check', '--write'], dir)).code, 2);
-    assert.equal((await run(['--init'], dir)).code, 2, 'hfs sync --init is gone: hfs scaffold app writes the first tree');
+    assert.equal((await run(['--init'], dir)).code, 2, 'starci app sync --init is gone: starci app scaffold writes the first tree');
     fs.writeFileSync(path.join(dir, 'hfs.json'), '{"hfs":1,"profile":"be"}');
     assert.equal((await run(['--check'], dir)).code, 1);
   });
@@ -387,7 +402,7 @@ describe('the be side tool configuration', () => {
   });
   it('the root .prettierignore is the template, headed as generated', () => {
     const text = rendered()['.prettierignore'];
-    assert.match(text, /^# Generated by hfs sync \(app root\)/);
+    assert.match(text, /^# Generated by starci app sync \(app root\)/);
     assert.deepEqual(text.split('\n').filter(line => line && !line.startsWith('#')), ['node_modules/', 'dist/', 'coverage/', 'reports/', '.next/', '.starci/', 'package-lock.json', 'contracts/', '.starcistacks/', '.starciwork/', '**/__generated__/', '**/messages/**']);
   });
   it('the presets the templates name exist and export what they call', () => {
@@ -412,11 +427,11 @@ describe('the package.json scripts of the app', () => {
     assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && turbo run dev --filter=@nivo/app', 'turbo runs the workspace @<project>/<app> after the packages it imports');
     assert.equal(scripts['start:app'], 'npm run start -w @nivo/app');
     assert.equal(scripts.test, 'cd be && jest --selectProjects unit --coverage');
-    assert.equal(scripts['test:stack'], 'cd be && starci-test-stack');
+    assert.equal(scripts['test:stack'], 'starci app stack');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts[`test:${project}`], `npm run typecheck:tests && cd be && jest --selectProjects ${project}`);
     assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');
-    assert.equal(scripts.lint, 'npm run codegen --silent && hfs lint', 'one lint gate over both sides, stylelint and the app checks');
-    assert.equal(scripts['lint:fix'], scripts.lint.replace('hfs lint', 'hfs lint --fix'));
+    assert.equal(scripts.lint, 'npm run codegen --silent && starci app lint', 'one lint gate over both sides, stylelint and the app checks');
+    assert.equal(scripts['lint:fix'], scripts.lint.replace('starci app lint', 'starci app lint --fix'));
     assert.equal(scripts['build:fe'], 'npm run codegen --silent && turbo run build --filter=./fe/apps/*', 'turbo builds every fe app workspace, the packages first (^build)');
     assert.doesNotMatch(Object.values(scripts).join('\n'), /--rule|--no-inline-config|--no-eslintrc|--ignore-pattern|vitest|playwright|scripts\/check-/);
   });
@@ -530,7 +545,7 @@ describe('work-hygiene', () => {
   });
 });
 
-describe('hfs scaffold app: the first tree', () => {
+describe('starci app scaffold: the first tree', () => {
   const scaffold = (t, name = 'nivo') => {
     const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));
     t.after(() => fs.rmSync(into, { recursive: true, force: true }));
@@ -564,7 +579,7 @@ describe('hfs scaffold app: the first tree', () => {
     }
     for (const pkg of ['ui', 'i18n']) {
       const manifest = JSON.parse(read(root, `fe/packages/nivo-${pkg}/package.json`));
-      assert.deepEqual([manifest.name, manifest.private, manifest.scripts, manifest.exports['.'], manifest.types], [`@nivo/${pkg}`, true, { build: 'tsc -p tsconfig.build.json', lint: 'hfs lint --workspace .', typecheck: 'tsc --noEmit -p tsconfig.json' }, { types: './dist/index.d.ts', default: './dist/index.js' }, './dist/index.d.ts'], `@nivo/${pkg} is a private package built to dist`);
+      assert.deepEqual([manifest.name, manifest.private, manifest.scripts, manifest.exports['.'], manifest.types], [`@nivo/${pkg}`, true, { build: 'tsc -p tsconfig.build.json', lint: 'starci app lint --workspace .', typecheck: 'tsc --noEmit -p tsconfig.json' }, { types: './dist/index.d.ts', default: './dist/index.js' }, './dist/index.d.ts'], `@nivo/${pkg} is a private package built to dist`);
     }
     assert.deepEqual(JSON.parse(read(root, 'hfs.json')).sides.fe.optionalSlots, ['fe.package.ui', 'fe.package.i18n'], 'the shared packages are declared slots');
     const rootManifest = JSON.parse(read(root, 'package.json'));
@@ -578,10 +593,12 @@ describe('hfs scaffold app: the first tree', () => {
     const stacks = parseYaml(read(root, '.starcistacks/application-stacks.yaml'));
     assert.deepEqual([stacks.services.sonar.stack.owner, stacks.services.sonar.stack.root], ['host', '.claude/ext/sonar'], 'a host-owned Sonar, the standard shape');
     assert.equal(JSON.parse(read(root, 'hfs.json')).kind, 'app');
-    // The managed test:stack script runs the starci-test-stack bin, so the root pins its package, @starci/test-world, at its canon pin.
+    // The managed test:stack script runs through starci app, while @starci/test-world remains pinned as the implementation.
     const manifest = JSON.parse(read(root, 'package.json'));
-    assert.match(manifest.scripts['test:stack'], /starci-test-stack/);
+    assert.equal(manifest.scripts['test:stack'], 'starci app stack');
     assert.equal(manifest.devDependencies['@starci/test-world'], parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins['@starci/test-world'].version);
+    assert.equal(manifest.devDependencies['@starci/cli'], '1.0.0', 'the public CLI is an exact app devDependency');
+    assert.equal(manifest.devDependencies['@starci/hfs'], undefined, 'the HFS implementation remains transitive through @starci/cli');
     // The Work tree names the two sides of the app as its repositories, the form of the examples and the work-layout contract.
     const workspace = parseYaml(read(root, '.starciwork/workspace.yaml'));
     assert.deepEqual(workspace.repositories, [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }]);

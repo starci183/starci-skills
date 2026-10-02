@@ -53,7 +53,7 @@ test('FE_NO_TESTS: a test script and a test dependency in any package.json are f
 });
 
 test('FE_NO_TESTS: a package.json with only build and lint scripts and no test dependency is clean', (t) => {
-  const manifest = { name: 'demo', scripts: { build: 'next build', lint: 'eslint . --max-warnings=0', typecheck: 'tsc --noEmit', 'lint:fix': 'hfs lint --fix' }, devDependencies: { typescript: '6.0.3', eslint: '9.18.0' }, dependencies: { next: '16.1.6', react: '19.2.3' } };
+  const manifest = { name: 'demo', scripts: { build: 'next build', lint: 'eslint . --max-warnings=0', typecheck: 'tsc --noEmit', 'lint:fix': 'starci app lint --fix' }, devDependencies: { typescript: '6.0.3', eslint: '9.18.0' }, dependencies: { next: '16.1.6', react: '19.2.3' } };
   assert.deepEqual(feNoTestsFindings({ repoRoot: tree(t, { 'package.json': manifest }), files: ['package.json'] }), []);
 });
 

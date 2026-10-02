@@ -29,8 +29,8 @@
     "access": "public"
   },
   "scripts": {
-    "sync": "node scripts/sync-runtime.mjs",
-    "sync:check": "node scripts/sync-runtime.mjs --check",
+    "sync": "node ../../scripts/hfs/sync-runtime.mjs",
+    "sync:check": "node ../../scripts/hfs/sync-runtime.mjs --check",
     "test": "node --test \"src/*.spec.mjs\""
   }
 }

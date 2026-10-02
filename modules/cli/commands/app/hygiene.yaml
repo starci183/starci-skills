@@ -1,0 +1,12 @@
+group: app
+verb: hygiene
+owner: "@starci/hfs"
+summary: judge staged worktree metadata, stack files and plaintext secrets
+impl: null
+flags: []
+exit: {"0": clean, "1": findings, "2": refusal or bad usage}
+json: none
+examples: ['starci app hygiene']
+editions: [full]
+since: 1.0.0
+removed: ['hfs work-hygiene', 'npx hfs work-hygiene']

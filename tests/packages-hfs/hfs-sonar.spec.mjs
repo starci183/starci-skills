@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { anchorOf, linterReport, sonarReport, sourceRootsOf } from '../../packages/hfs/report/sonar.mjs';
 import { renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
@@ -12,7 +12,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { loadSonarGate, serverConditions } from '../../scripts/gates/sonar-gate.mjs';
 import { APP, TWO_FE_APPS, FORMATTED, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
-// One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `hfs check` and the eslint and stylelint
+// One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `starci app check` and the eslint and stylelint
 // results become Sonar Generic Issue Import documents through one placement rule; the managed configuration names the reports; the gate holds them at zero.
 const root = path.resolve(import.meta.dirname, '..', '..');
 const made = [];
@@ -48,7 +48,7 @@ function schemaProblems(document) {
   return problems;
 }
 
-const finding = (over) => ({ code: 'HFS_MANAGED_FILE_DRIFT', level: 'error', path: 'src/a.ts', message: 'a.ts drifted', title: 'A managed file differs from its render', titleVi: 'T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay', whyVi: 'T\u1ec7p l\u1ec7ch b\u1ea3n render.', nextStepVi: 'Ch\u1ea1y l\u1ea1i hfs sync.', ...over });
+const finding = (over) => ({ code: 'HFS_MANAGED_FILE_DRIFT', level: 'error', path: 'src/a.ts', message: 'a.ts drifted', title: 'A managed file differs from its render', titleVi: 'T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay', whyVi: 'T\u1ec7p l\u1ec7ch b\u1ea3n render.', nextStepVi: 'Ch\u1ea1y l\u1ea1i starci app sync.', ...over });
 
 test('the report maps a finding to an issue and its code to a rule with the catalog text, in the 10.3+ format', () => {
   const report = sonarReport([finding({ path: 'src/a.ts', line: 7, message: 'a.ts line 7' })]);
@@ -57,7 +57,7 @@ test('the report maps a finding to an issue and its code to a rule with the cata
   const [rule] = report.rules;
   assert.deepEqual([rule.id, rule.engineId, rule.name, rule.cleanCodeAttribute], ['HFS_MANAGED_FILE_DRIFT', 'starci-hfs', 'A managed file differs from its render', 'CONVENTIONAL']);
   assert.deepEqual(rule.impacts, [{ softwareQuality: 'MAINTAINABILITY', severity: 'HIGH' }]);
-  assert.match(rule.description, /A managed file differs from its render\. T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay: T\u1ec7p l\u1ec7ch b\u1ea3n render\. C\u00e1ch s\u1eeda: Ch\u1ea1y l\u1ea1i hfs sync\./);
+  assert.match(rule.description, /A managed file differs from its render\. T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay: T\u1ec7p l\u1ec7ch b\u1ea3n render\. C\u00e1ch s\u1eeda: Ch\u1ea1y l\u1ea1i starci app sync\./);
   assert.deepEqual(report.issues, [{ ruleId: 'HFS_MANAGED_FILE_DRIFT', effortMinutes: 5, primaryLocation: { message: 'a.ts line 7', filePath: 'src/a.ts', textRange: { startLine: 7, endLine: 7 } } }]);
 });
 
@@ -189,8 +189,8 @@ const scratch = () => {
 test('the superseded Sonar commands are gone, not aliased: hfs check --sonar and hfs report are refused', async () => {
   const out = scratch();
   const violating = repo(APP, (dir) => fs.appendFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.host.url=https://sonar.example.org\n'));
-  assert.equal((await cli(['check', '--repo', violating, '--sonar', path.join(out, 'x.json')], PRESETS)).code, 2, 'hfs check --sonar is gone');
-  assert.equal((await cli(['report', 'eslint', 'a.json', 'b.json', '--repo', violating])).code, 2, 'hfs report is gone');
+  assert.equal((await cli(['check', '--cwd', violating, '--sonar', path.join(out, 'x.json')], PRESETS)).code, 2, 'app check --sonar is gone');
+  assert.equal((await cli(['report', 'eslint', 'a.json', 'b.json', '--cwd', violating])).code, 2, 'app report is gone');
   assert.equal(fs.existsSync(path.join(out, 'x.json')), false);
 });
 

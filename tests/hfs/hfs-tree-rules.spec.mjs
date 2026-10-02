@@ -136,18 +136,18 @@ test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (s
 
 const CI_STEP = '      - name: lint\n        run: npm run lint -- --sonar reports/lint.sonar.json\n';
 
-test('HFS_CI_MISSING_CANON: a CI without the hfs lint, another version, a script that is not the lint and a pre-push without typecheck or lint are refused', () => {
+test('HFS_CI_MISSING_CANON: a CI without starci app lint, another version, a non-lint script and an incomplete pre-push are refused', () => {
   const ci = fs.readFileSync(path.join(repoOf(APP), '.github/workflows/ci.yml'), 'utf8');
   assert.ok(ci.includes(CI_STEP), 'the rendered CI runs the one lint through the lint script');
   const withStep = (line) => ci.replace('run: npm run lint -- --sonar reports/lint.sonar.json', `run: ${line}`);
   const missing = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace(CI_STEP, ''))) });
   assert.deepEqual(only(missing, 'HFS_CI_MISSING_CANON').map((f) => f.path), ['.github/workflows/ci.yml']);
-  const check = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx hfs check'))) });
-  assert.equal(only(check, 'HFS_CI_MISSING_CANON').length, 1, 'hfs check is not the lint entry');
-  const drifted = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx @starci/hfs@0.0.1 lint'))) });
-  assert.match(only(drifted, 'HFS_CI_MISSING_CANON')[0].message, new RegExp(`pinned at ${pins['@starci/hfs'].version.replace(/\./g, '\.')}`));
+  const check = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.github/workflows/ci.yml', withStep('starci app check'))) });
+  assert.equal(only(check, 'HFS_CI_MISSING_CANON').length, 1, 'starci app check is not the lint entry');
+  const drifted = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx @starci/cli@0.0.1 app lint'))) });
+  assert.match(only(drifted, 'HFS_CI_MISSING_CANON')[0].message, new RegExp(`pinned at ${pins['@starci/cli'].version.replace(/\./g, '\.')}`));
   const hollow = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, 'package.json', json({ name: 'demo', private: true, dependencies: { 'next-intl': pins['next-intl'].version }, scripts: { lint: 'echo ok' } }))) });
-  assert.equal(only(hollow, 'HFS_CI_MISSING_CANON').length, 1, 'a script that does not run hfs lint is no lint');
+  assert.equal(only(hollow, 'HFS_CI_MISSING_CANON').length, 1, 'a script that does not run starci app lint is no lint');
   const prePush = checkRepo({ repoRoot: repoOf(APP, (dir) => put(dir, '.husky/pre-push', '# gate\nnpm run typecheck\nnpm run format:check\n')) });
   assert.deepEqual(only(prePush, 'HFS_CI_MISSING_CANON').map((f) => f.step), ['lint']);
 });
@@ -155,7 +155,7 @@ test('HFS_CI_MISSING_CANON: a CI without the hfs lint, another version, a script
 test('HFS_CI_MISSING_CANON: the rendered CI and pre-push, and the pinned version spelled out, are clean', () => {
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP) }), 'HFS_CI_MISSING_CANON'), []);
   const ci = fs.readFileSync(path.join(repoOf(TWO_FE_APPS), '.github/workflows/ci.yml'), 'utf8');
-  const pinned = checkRepo({ repoRoot: repoOf(TWO_FE_APPS, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('run: npm run lint -- --sonar reports/lint.sonar.json', `run: npx @starci/hfs@${pins['@starci/hfs'].version} lint`))) });
+  const pinned = checkRepo({ repoRoot: repoOf(TWO_FE_APPS, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('run: npm run lint -- --sonar reports/lint.sonar.json', `run: npx @starci/cli@${pins['@starci/cli'].version} app lint`))) });
   assert.deepEqual(only(pinned, 'HFS_CI_MISSING_CANON'), []);
 });
 

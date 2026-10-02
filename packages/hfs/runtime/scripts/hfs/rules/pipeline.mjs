@@ -1,7 +1,7 @@
-// pipeline.mjs - HFS_CI_MISSING_CANON (R13): CI runs the pinned `hfs lint`; pre-push runs typecheck and lint.
-//   .github/workflows/ci.yml   a `run:` step that runs `hfs lint` (the one lint entry: eslint, the repository check, stylelint): `npx hfs lint`,
-//                              `npx @starci/hfs[@<version>] lint`, or `npm run <script>` of the root package.json whose command runs `hfs lint`
-//                              (`npm run lint`, arguments after `--` allowed); a version named in the step is the @starci/hfs pin of
+// pipeline.mjs - HFS_CI_MISSING_CANON (R13): CI runs the pinned `starci app lint`; pre-push runs typecheck and lint.
+//   .github/workflows/ci.yml   a `run:` step that runs the one lint entry: `starci app lint`,
+//                              `npx @starci/cli[@<version>] app lint`, or `npm run <script>` whose command runs `starci app lint`
+//                              (`npm run lint`, arguments after `--` allowed); a version named in the step is the @starci/cli pin of
 //                              canon-pins.yaml (an installed one is pinned by the pin check, R15)
 //   .husky/pre-push            `npm run typecheck` and `npm run lint`, each on a line of its own
 // A missing file is the slot manifest's finding (HFS_SLOT_REQUIRED_MISSING); a file that is present and lacks the step is this rule's.
@@ -11,9 +11,9 @@ import { found, readJson, readText } from './read.mjs';
 export const CI_MISSING_CANON = 'HFS_CI_MISSING_CANON';
 export const CI_FILE = '.github/workflows/ci.yml';
 export const PRE_PUSH_FILE = '.husky/pre-push';
-export const hfsPackage = '@starci/hfs';
+export const hfsPackage = '@starci/cli';
 const RUN_LINE = /^\s*(?:-\s+)?run:\s*(.+?)\s*$/;
-const HFS_LINT = /^(?:npx\s+(?:--no-install\s+|-y\s+)?)?(?:@starci\/hfs|hfs)(?:@(\S+))?\s+lint(\s.*)?$/;
+const HFS_LINT = /^(?:npx\s+(?:--no-install\s+|-y\s+)?)?(?:@starci\/cli(?:@(\S+))?|starci)\s+app\s+lint(\s.*)?$/;
 const NPM_RUN = /^npm run ([\w:.-]+)(?:\s+--\s+(.*))?$/;
 
 const commandsOf = (text) => text.split(/\r?\n/).map((line) => RUN_LINE.exec(line)?.[1]).filter(Boolean).map((command) => command.replace(/^["']|["']$/g, ''));
@@ -34,9 +34,9 @@ export function pipelineFindings({ repoRoot, files, pins }) {
   if (ci !== null) {
     const scripts = readJson(repoRoot, 'package.json')?.scripts ?? {};
     const lints = commandsOf(ci).flatMap((command) => expanded(command, scripts).split(/\s*&&\s*/)).map((command) => HFS_LINT.exec(command)).filter(Boolean);
-    if (!lints.length) findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} has no step that runs \`hfs lint\` (\`npm run lint\`, or \`npx hfs lint\`); CI runs the one lint entry, which includes the repository check`, { step: 'hfs lint' }));
+    if (!lints.length) findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} has no step that runs \`starci app lint\` (directly or through \`npm run lint\`); CI runs the one lint entry, which includes the repository check`, { step: 'starci app lint' }));
     else if (pinned && !lints.some((match) => match[1] === undefined || match[1] === pinned)) {
-      findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} runs hfs lint at ${lints[0][1]}, but ${hfsPackage} is pinned at ${pinned}; run the pinned version`, { step: 'hfs lint', pinned }));
+      findings.push(found(CI_MISSING_CANON, CI_FILE, `${CI_FILE} runs starci app lint at ${lints[0][1]}, but ${hfsPackage} is pinned at ${pinned}; run the pinned version`, { step: 'starci app lint', pinned }));
     }
   }
   const prePush = files.includes(PRE_PUSH_FILE) ? readText(repoRoot, PRE_PUSH_FILE) : null;

@@ -149,7 +149,7 @@ async function runCheck({ repoRoot, fast = false, base, only, presets, prettier 
   // Managed files of the root and both sides, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier
   // through the app's own install (R19, never under --fast).
   const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
-  // R23 against the be side itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
+  // R23 against the be side itself (full pass only): committed snapshots equal what `starci app emit` writes now.
   let contracts = null;
   let be = null;
   try { be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be ?? null; } catch { /* checkRepository reports the unreadable declaration */ }
@@ -236,9 +236,9 @@ async function installedStackMain(cwd) {
   return candidate;
 }
 
-/** `cwd`, `presets`, `prettier` and `stackMain` are test seams; stdout and stderr never have to be process globals. */
+/** `cwd`, `presets`, `prettier`, `lock` and `stackMain` are test seams; stdout and stderr never have to be process globals. */
 export async function main(argv, {
-  cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, stackMain,
+  cwd: baseCwd = process.cwd(), stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier, lock, stackMain,
 } = {}) {
   try {
     const global = globalOptions(argv, path.resolve(baseCwd));
@@ -306,7 +306,7 @@ export async function main(argv, {
     if (verb === 'scaffold') {
       const [name, ...extra] = opts.positional;
       if (!name || extra.length) throw new Error('starci app scaffold takes `<name> [--into <dir>]`');
-      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), presets: presets ?? await scaffoldPresets() });
+      const { root: created, files } = scaffoldApp({ name, into: path.resolve(global.cwd, opts.into ?? '.'), presets: presets ?? await scaffoldPresets(), ...(lock ? { lock } : {}) });
       out(`starci app scaffold: created ${created} (${files.length} files); next: npm ci, then starci app lint\n`);
       return 0;
     }

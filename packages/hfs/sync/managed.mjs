@@ -1,4 +1,4 @@
-// The managed-file findings of `hfs check` (BE-CONVENTION 1.17, 3.1 principle 4): the rendered set of `hfs sync`, compared
+// The managed-file findings of `starci app check`: the rendered set of `starci app sync`, compared
 // with the tracked repository, and the tool configuration nothing may add to it.
 //   HFS_MANAGED_FILE_DRIFT (R05)  a managed file that exists but differs from its render: tsconfig*.json (but see R22),
 //                                 jest.config.js (back end), .prettierrc, .prettierignore, husky hooks, both workflows and sonar

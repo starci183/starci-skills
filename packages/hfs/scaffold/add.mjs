@@ -1,4 +1,4 @@
-// hfs add <noun> <name> - generates exactly one kind's file tree FROM the pattern knowledge files.
+// starci app add <noun> <name> - generates exactly one kind's file tree FROM the pattern knowledge files.
 //
 // The `files:` tree of a pattern topic (knowledge/patterns/be/<topic>.yaml) is the single source of what the pattern places: its paths, the
 // slot that owns each, the rules that judge it, and the one content body (`template`, a file under templates/be/patterns/) of each. This
@@ -7,10 +7,10 @@
 // kind in hfs.json (`sides.be.patterns`, `sides.be.kinds`). There is no second list of files and no second copy of a body: a kind is only
 // generated when it is used, so an empty kind folder never exists.
 //
-//   hfs add job send-receipt                      features/jobs/send-receipt: module, processor, one step; the platform jobs and queue capabilities
-//   hfs add reactor payment-status --event payment-settled --from payment --service PaymentStatusService=@modules/domain/order
-//   hfs add queue receipt                          modules/queues/receipt: the typed producer
-//   hfs add projection order-summary --connection order
+//   starci app add job send-receipt                      features/jobs/send-receipt: module, processor, one step; the platform jobs and queue capabilities
+//   starci app add reactor payment-status --event payment-settled --from payment --service PaymentStatusService=@modules/domain/order
+//   starci app add queue receipt                          modules/queues/receipt: the typed producer
+//   starci app add projection order-summary --connection order
 //
 // Body placeholders: for each variable `v` of the tree (job, step, event, ...) `@@v@@` is its kebab name, `@@V@@` its PascalCase and
 // `@@vCamel@@` its camelCase, `@@vUpper@@` its UPPER_SNAKE and `@@vSnake@@` its snake_case; the option `--service Class=module` gives `@@service@@` (the class) and `@@serviceModule@@`.
@@ -72,7 +72,7 @@ function variablesOf({ spec, noun, name, options }) {
   const values = { [spec.variable]: name };
   for (const need of spec.needs ?? []) {
     const value = options[need];
-    if (typeof value !== 'string' || !value) throw new ScaffoldError('HFS_ADD_OPTION_MISSING', `hfs add ${noun} needs --${need}`);
+    if (typeof value !== 'string' || !value) throw new ScaffoldError('HFS_ADD_OPTION_MISSING', `starci app add ${noun} needs --${need}`);
     if (need === 'service') {
       const [className, module] = value.split('=');
       if (!className || !module) throw new ScaffoldError('HFS_ADD_OPTION_INVALID', '--service takes <ServiceClass>=<module specifier>');
@@ -97,9 +97,9 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   const manifest = loadSlotManifest();
   const params = ruleParams(manifest, 'be');
   const spec = params.addKinds[noun];
-  if (!spec) throw new ScaffoldError('HFS_ADD_NOUN_UNKNOWN', `hfs add knows ${Object.keys(params.addKinds).join(', ')}; ${noun} is none of them`);
+  if (!spec) throw new ScaffoldError('HFS_ADD_NOUN_UNKNOWN', `starci app add knows ${Object.keys(params.addKinds).join(', ')}; ${noun} is none of them`);
   const declarationFile = path.join(repoRoot, 'hfs.json');
-  if (!fs.existsSync(declarationFile)) throw new ScaffoldError('HFS_ADD_NOT_AN_APP', 'hfs add runs at the app root (the folder of hfs.json)');
+  if (!fs.existsSync(declarationFile)) throw new ScaffoldError('HFS_ADD_NOT_AN_APP', 'starci app add runs at the app root (the folder of hfs.json)');
   const repo = readRepoDeclaration(manifest, repoRoot);
   if (!repo.sides?.be) throw new ScaffoldError('HFS_ADD_NO_BACK_END', 'this app has no back-end side');
   const nouns = [noun, ...(spec.also ?? [])];
@@ -147,7 +147,7 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
  */
 function wire({ beRoot, wire: target, forms, noun, name }) {
   const file = path.join(beRoot, ...target.file.split('/'));
-  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `hfs add ${noun} ${name} registers the member in ${target.file}, which does not exist`);
+  if (!fs.existsSync(file)) throw new ScaffoldError('HFS_ADD_WIRE_MISSING', `starci app add ${noun} ${name} registers the member in ${target.file}, which does not exist`);
   const fill = (text) => text.replace(PLACEHOLDER, (whole, key) => forms[key] ?? whole);
   const symbol = fill(target.symbol);
   let text = fs.readFileSync(file, 'utf8');

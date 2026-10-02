@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { APP, cleanup, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
-// `hfs new service | spec` (unit test standard): a service and its spec skeleton, the skeleton built from the constructor with the
-// kit double the slot manifest names for each token. The specs generate into a temporary app (hfs new runs at the app root and writes
+// `starci app new service | spec` (unit test standard): a service and its spec skeleton, the skeleton built from the constructor with the
+// kit double the slot manifest names for each token. The specs generate into a temporary app (starci app new runs at the app root and writes
 // under be/) and read the files back.
 const ts = createRequire(import.meta.url)('typescript');
 const made = [];
@@ -37,7 +37,7 @@ const DIR = 'be/src/modules/domain/commission';
 
 test('a new service is written with a spec whose providers are exactly its constructor dependencies, each double from the kit table', async () => {
   const dir = repo();
-  const result = await cli(['new', 'service', DIR, 'commission', '--repo', dir,
+  const result = await cli(['new', 'service', DIR, 'commission', '--cwd', dir,
     '--inject', 'InjectPrimaryEntityManager=@modules/platform/database:EntityManager',
     '--inject', 'InjectClock=@modules/platform/clock:Clock',
     '--inject', 'InjectCommissionOptions=./commission.decorators:CommissionOptions',
@@ -159,7 +159,7 @@ export class PayoutPlannerService {
     protected shared(): void {}
 }
 `);
-  const result = await cli(['new', 'spec', `${DIR}/payout-planner.service.ts`, '--repo', dir]);
+  const result = await cli(['new', 'spec', `${DIR}/payout-planner.service.ts`, '--cwd', dir]);
   assert.deepEqual([result.code, result.err, result.out], [0, '', `created ${DIR}/payout-planner.service.spec.ts\n`]);
   const spec = read(dir, `${DIR}/payout-planner.service.spec.ts`);
   assert.equal(spec, `import { Test } from "@nestjs/testing"
@@ -207,7 +207,7 @@ describe("PayoutPlannerService", () => {
 
 test('the skeleton satisfies the unit law by construction: kit-only doubles, no cast, no ambient clock, no module mock, no new of the service', async () => {
   const dir = repo();
-  await cli(['new', 'service', DIR, 'settlement', '--repo', dir, '--inject', 'InjectPrimaryEntityManager=@modules/platform/database:EntityManager', '--inject', 'InjectClock=@modules/platform/clock:Clock']);
+  await cli(['new', 'service', DIR, 'settlement', '--cwd', dir, '--inject', 'InjectPrimaryEntityManager=@modules/platform/database:EntityManager', '--inject', 'InjectClock=@modules/platform/clock:Clock']);
   const spec = read(dir, `${DIR}/settlement.service.spec.ts`);
   assert.doesNotMatch(spec, / as |!\.|!\)|Date\.now|new Date|process\.env|jest\.(mock|fn|doMock)|overrideProvider|imports:|new SettlementService/);
   assert.match(spec, /from "@starci\/jest-preset"/);
@@ -217,7 +217,7 @@ test('the skeleton satisfies the unit law by construction: kit-only doubles, no 
 
 test('a service without dependencies gets a providers list of the service alone', async () => {
   const dir = repo();
-  await cli(['new', 'service', DIR, 'rounding', '--repo', dir]);
+  await cli(['new', 'service', DIR, 'rounding', '--cwd', dir]);
   const spec = read(dir, `${DIR}/rounding.service.spec.ts`);
   assert.match(spec, /providers: \[\n {12}RoundingService,\n {8}\],/);
   assert.doesNotMatch(spec, /FakeClock|mock\b|jest-preset/, 'no dependency, so no kit import');
@@ -226,28 +226,28 @@ test('a service without dependencies gets a providers list of the service alone'
 
 test('nothing is written outside a slot, over an existing file, for a bad name, for a front end or for a non-service file', async () => {
   const dir = repo();
-  const stray = await cli(['new', 'service', 'be/src/stray', 'thing', '--repo', dir]);
+  const stray = await cli(['new', 'service', 'be/src/stray', 'thing', '--cwd', dir]);
   assert.equal(stray.code, 2);
   assert.match(stray.err, /^HFS_NEW_NO_SLOT: src\/stray\/thing\.service\.ts is owned by no slot/);
   assert.equal(fs.existsSync(path.join(dir, 'be/src/stray')), false);
 
-  assert.equal((await cli(['new', 'service', DIR, 'commission', '--repo', dir])).code, 0);
-  const again = await cli(['new', 'service', DIR, 'commission', '--repo', dir]);
+  assert.equal((await cli(['new', 'service', DIR, 'commission', '--cwd', dir])).code, 0);
+  const again = await cli(['new', 'service', DIR, 'commission', '--cwd', dir]);
   assert.equal(again.code, 2);
-  assert.match(again.err, /^HFS_NEW_EXISTS: .*commission\.service\.ts already exists; hfs new never overwrites/);
-  const specAgain = await cli(['new', 'spec', `${DIR}/commission.service.ts`, '--repo', dir]);
+  assert.match(again.err, /^HFS_NEW_EXISTS: .*commission\.service\.ts already exists; starci app new never overwrites/);
+  const specAgain = await cli(['new', 'spec', `${DIR}/commission.service.ts`, '--cwd', dir]);
   assert.match(specAgain.err, /^HFS_NEW_EXISTS: .*commission\.service\.spec\.ts already exists/);
 
-  const bad = await cli(['new', 'service', DIR, 'Bad_Name', '--repo', dir]);
+  const bad = await cli(['new', 'service', DIR, 'Bad_Name', '--cwd', dir]);
   assert.match(bad.err, /^HFS_NEW_NAME_INVALID/);
-  const notService = await cli(['new', 'spec', `${DIR}/commission.contracts.ts`, '--repo', dir]);
+  const notService = await cli(['new', 'spec', `${DIR}/commission.contracts.ts`, '--cwd', dir]);
   assert.match(notService.err, /^HFS_NEW_NOT_A_SERVICE/);
-  const missing = await cli(['new', 'spec', `${DIR}/nothing.service.ts`, '--repo', dir]);
+  const missing = await cli(['new', 'spec', `${DIR}/nothing.service.ts`, '--cwd', dir]);
   assert.match(missing.err, /^HFS_NEW_NO_SERVICE/);
 
-  const fe = await cli(['new', 'service', 'fe/apps/web/src/modules/x', 'x', '--repo', dir]);
+  const fe = await cli(['new', 'service', 'fe/apps/web/src/modules/x', 'x', '--cwd', dir]);
   assert.match(fe.err, /^HFS_NEW_BACKEND_ONLY/);
-  const root = await cli(['new', 'service', 'src/modules/domain/x', 'x', '--repo', dir]);
+  const root = await cli(['new', 'service', 'src/modules/domain/x', 'x', '--cwd', dir]);
   assert.match(root.err, /^HFS_NEW_BACKEND_ONLY/, 'a path outside be/ is refused, even one shaped like a back-end path');
 });
 
@@ -260,10 +260,10 @@ export class OddService {
     constructor(private readonly names: string) {}
 }
 `);
-  const odd = await cli(['new', 'spec', `${DIR}/odd.service.ts`, '--repo', dir]);
+  const odd = await cli(['new', 'spec', `${DIR}/odd.service.ts`, '--cwd', dir]);
   assert.equal(odd.code, 2);
   assert.match(odd.err, /^HFS_NEW_DEPENDENCY_UNKNOWN: .*parameter names is neither an @Inject\*\(\) token nor an imported class/);
-  assert.match((await cli(['new', 'service', DIR, 'x', '--repo', dir, '--inject', 'InjectCache=@modules/x'])).err, /^HFS_NEW_INJECT_INVALID/);
-  assert.equal((await cli(['new', 'thing', '--repo', dir])).code, 2);
-  assert.equal((await cli(['new', 'service', DIR, '--repo', dir])).code, 2);
+  assert.match((await cli(['new', 'service', DIR, 'x', '--cwd', dir, '--inject', 'InjectCache=@modules/x'])).err, /^HFS_NEW_INJECT_INVALID/);
+  assert.equal((await cli(['new', 'thing', '--cwd', dir])).code, 2);
+  assert.equal((await cli(['new', 'service', DIR, '--cwd', dir])).code, 2);
 });

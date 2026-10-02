@@ -48,7 +48,7 @@ export const RULES_README = 'knowledge/hfs/README.md';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
 export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
-  hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
+  hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
   runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/cli/gen-catalog.mjs'],
 });

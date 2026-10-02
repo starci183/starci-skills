@@ -1,7 +1,7 @@
-// hfs work-hygiene: the guard for the two trees an app tracks besides source. A file under the app root's .starciwork must be
+// starci app hygiene: the guard for the two trees an app tracks besides source. A file under the app root's .starciwork must be
 // product content (the .starciwork/.gitignore allowlist admits it, so agent output is refused), and a file under the app root's
 // .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
-// any tree, is read from the index and judged with the one secret judgement of `hfs check` (scripts/hfs/rules/secrets.mjs: a secret by
+// any tree, is read from the index and judged with the one secret judgement of `starci app check` (scripts/hfs/rules/secrets.mjs: a secret by
 // being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
 // .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. The pre-commit hook judges the staged
 // files; scripts/gates/hfs-sync.mjs judges every tracked file.
@@ -18,7 +18,7 @@ import { pathToFileURL } from 'node:url';
 import { secretFileFindings } from '../runtime/scripts/hfs/rules/secrets.mjs';
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
-/** The app root's work tree and stack tree, app-relative (hfs work-hygiene runs at the app root). */
+/** The app root's work tree and stack tree, app-relative (`starci app hygiene` runs at the app root). */
 const WORK = '.starciwork/';
 const STACKS = '.starcistacks/';
 const GUARDED = file => file.startsWith(WORK) || file.startsWith(STACKS);
@@ -99,7 +99,7 @@ const ledgerHygieneScript = cwd => {
 /**
  * The state-root ledger findings (LEDGER_ORPHAN_STATE_ROOT, LEDGER_LEGACY_WORK_SQLITE) of the checkout containing
  * `cwd`, as {code, file, message} entries; [] when that checkout carries no ledger-hygiene script. Never throws: a
- * report failure is one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `hfs work-hygiene`.
+ * report failure is one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `starci app hygiene`.
  */
 export async function ledgerHygieneFindings(cwd = process.cwd()) {
   const script = ledgerHygieneScript(cwd);
@@ -116,7 +116,7 @@ export async function ledgerHygieneFindings(cwd = process.cwd()) {
   }
 }
 
-/** `hfs work-hygiene`: checks the staged files, plus the state-root ledger findings when reachable; returns the exit code. */
+/** `starci app hygiene`: checks staged files plus state-root ledger findings when reachable; returns the exit code. */
 export async function runWorkHygiene({ cwd = process.cwd(), out = line => process.stdout.write(`${line}\n`), files } = {}) {
   const { checked, findings } = judge(cwd, files ?? stagedFiles(cwd));
   const ledgerFindings = await ledgerHygieneFindings(cwd);

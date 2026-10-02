@@ -7,8 +7,8 @@
     "codegen": "node scripts/codegen.mjs",
     "typecheck": "{{typecheck}}",
     "typecheck:tests": "tsc -p be/src/tests/tsconfig.json",
-    "lint": "npm run codegen --silent && hfs lint",
-    "lint:fix": "npm run codegen --silent && hfs lint --fix",
+    "lint": "npm run codegen --silent && starci app lint",
+    "lint:fix": "npm run codegen --silent && starci app lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "cd be && jest --selectProjects unit --coverage",
@@ -16,7 +16,7 @@
     "test:integration": "npm run typecheck:tests && cd be && jest --selectProjects integration",
     "test:e2e": "npm run typecheck:tests && cd be && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && cd be && jest --selectProjects contract",
-    "test:stack": "cd be && starci-test-stack",
-    "contract:emit": "hfs emit-contracts"
+    "test:stack": "starci app stack",
+    "contract:emit": "starci app emit"
   }
 }

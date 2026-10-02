@@ -1,0 +1,22 @@
+group: app
+verb: add
+owner: "@starci/hfs"
+summary: add one canonical backend capability and register its patterns
+impl: null
+positional:
+  - {name: noun, enum: [api, webhook, realtime, saga, job, reactor, queue, projection, cli], required: true, variadic: false}
+  - {name: name, required: true, variadic: false}
+flags:
+  - {name: event, type: string, summary: event consumed by a reactor}
+  - {name: from, type: string, summary: source service of an event}
+  - {name: service, type: string, summary: service binding as Class=module}
+  - {name: connection, type: string, summary: declared connection used by a projection}
+  - {name: owner, type: string, summary: service that owns a saga}
+  - {name: failed, type: string, summary: failure event consumed by a saga}
+  - {name: done, type: string, summary: completion event consumed by a saga}
+exit: {"0": capability created, "1": findings, "2": refusal or bad usage}
+json: none
+examples: ['starci app add api checkout --service CheckoutService=@modules/domain/order']
+editions: [full]
+since: 1.0.0
+removed: ['hfs add', 'npx hfs add']

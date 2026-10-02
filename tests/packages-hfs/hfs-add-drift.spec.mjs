@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 
-// The platform capabilities of the patterns (event-bus, queue, jobs) have ONE source: the template bodies `hfs add` writes
+// The platform capabilities of the patterns (event-bus, queue, jobs) have ONE source: the template bodies `starci app add` writes
 // (packages/hfs/templates/be/patterns, named by the files: tree of each pattern topic). The reference example (examples/ecommerce-app) holds
 // the generated copy, so this spec renders every template of a capability the example carries and holds each file to it: a hand edit of
 // the example's copy, or an edit of a template that was not regenerated into the example, is a drift. The migration stamp is read from the

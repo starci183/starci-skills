@@ -23,8 +23,8 @@ export const MONO_WORKSPACE_DEP = 'HFS_MONO_WORKSPACE_DEP';
 
 /** The npm workspaces of every app, in this order. */
 export const WORKSPACES = Object.freeze(['fe/apps/*', 'fe/packages/*']);
-/** The lint script of every fe workspace: the one lint of the app, scoped to the workspace (`hfs lint --workspace`). */
-export const WORKSPACE_LINT = 'hfs lint --workspace .';
+/** The lint script of every fe workspace: the one lint of the app, scoped to the workspace. */
+export const WORKSPACE_LINT = 'starci app lint --workspace .';
 /** The scripts of every fe app workspace, exactly: turbo runs build, dev, lint and typecheck; start serves a build. */
 export const FE_APP_SCRIPTS = Object.freeze({ build: 'next build', dev: 'next dev', lint: WORKSPACE_LINT, start: 'next start', typecheck: 'tsc --noEmit' });
 /** The scripts every fe package workspace has (its build and typecheck commands are its own; its lint is the workspace lint). */

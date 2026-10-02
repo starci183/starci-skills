@@ -1,0 +1,18 @@
+group: app
+verb: stack
+owner: "@starci/hfs"
+summary: start, stop or inspect the shared local test-world infrastructure
+impl: null
+positional:
+  - {name: action, enum: [up, down, status], required: true, variadic: false}
+flags:
+  - {name: stack, type: string, summary: stack definition directory}
+  - {name: services, type: list, summary: comma-separated infrastructure services to keep warm}
+  - {name: k3d, type: boolean, summary: also warm the k3d cluster and registry}
+  - {name: force, type: boolean, summary: stop the stack even while leases exist}
+exit: {"0": action completed, "1": infrastructure failure, "2": refusal or bad usage}
+json: flag
+examples: ['starci app stack up', 'starci app stack status --json', 'starci app stack down --force']
+editions: [full]
+since: 1.0.0
+removed: ['starci-test-stack', 'npx starci-test-stack']

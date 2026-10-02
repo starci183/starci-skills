@@ -78,7 +78,7 @@ export const hashOf = text => createHash('sha256').update(lf(text)).digest('hex'
 
 /**
  * The hfs.json sync reads: an app declaration valid for the manifest it pins (both sides, their apps, connections, optional slots,
- * reads). Sync never renders configs for a declaration the eslint canons and hfs check would refuse, so a pin bump cannot leave
+ * reads). Sync never renders configs for a declaration the eslint canons and starci app check would refuse, so a pin bump cannot leave
  * lint unable to start. Answers the resolved app.
  */
 export function validateHfs(hfs, manifest = loadSlotManifest()) {
@@ -236,7 +236,7 @@ export function imageMatrix(app) {
 const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/worker', cli: 'be/image/cli', next: 'fe/image/next' });
 
 /**
- * The Dockerfile of every declared app, [{ path, content }] (app-relative): written once by hfs scaffold from templates/<side>/image/<kind>
+ * The Dockerfile of every declared app, [{ path, content }] (app-relative): written once by starci app scaffold from templates/<side>/image/<kind>
  * and then the app's own, judged by the docker rules (R187-R191). A Next image copies the fe packages only when the fe side opts into
  * them and the be contracts only when the fe side reads them, so each COPY names a folder the app has.
  */
