@@ -19,10 +19,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { performance } from 'node:perf_hooks';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
+import { runNpmAsync } from '../helpers/hfs-hfs-scaffold-app.e2e-fixture.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
@@ -30,6 +32,12 @@ const require_ = createRequire(import.meta.url);
 const jestPreset = require_('../../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
+
+const elapsed = (started) => Math.round(performance.now() - started);
+const timed = async (label, action) => {
+  const started = performance.now();
+  try { return await action(); } finally { console.log(`# scaffold e2e ${label}: ${elapsed(started)}ms`); }
+};
 
 /** The checkout's @starci/test-world, built (dist is build output, never committed; the build runs once when it is absent). */
 const TEST_WORLD = path.join(RUNTIME, 'packages', 'test-world');
@@ -56,9 +64,10 @@ const skipReason = dockerProbe.status === 0 ? false
 test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, the be unit run and cli migrate run over a real Postgres', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
   const into = mkdtemp(t, 'hfs-scaffold-e2e-');
   const app = path.join(into, 'demo');
-  const registry = await startSourceCanonRegistry();
+  const registry = await timed('source registry', () => startSourceCanonRegistry());
   t.after(() => registry.close());
-  assert.equal(scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: registry.lock }).root, app, 'the scaffold wrote the app');
+  const scaffolded = await timed('scaffold and lock', () => scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: registry.lock }));
+  assert.equal(scaffolded.root, app, 'the scaffold wrote the app');
 
   // The real install over the app's own lockfile: the @starci scope answers from the source-canon registry for the one
   // call (the lockfile's resolved tarball URLs already name it; the .npmrc covers any packument fetch); removed after.
@@ -66,7 +75,7 @@ test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, 
   fs.writeFileSync(npmrc, `@starci:registry=${registry.origin}/\n`);
   let ci;
   try {
-    ci = runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: app, timeout: 1_200_000 });
+    ci = await timed('npm ci', () => runNpmAsync(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: app, timeout: 1_200_000 }));
   } finally {
     fs.rmSync(npmrc, { force: true });
   }
@@ -78,16 +87,20 @@ test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, 
   execFileSync('git', ['init', '-q'], { cwd: app });
   execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: app });
 
-  const step = (label, args, options = {}) => {
-    const run = runNpm(args, { cwd: app, timeout: 600_000, ...options });
+  const step = async (label, args, options = {}) => {
+    const started = performance.now();
+    const run = await runNpmAsync(args, { cwd: app, timeout: 600_000, ...options });
+    console.log(`# scaffold e2e ${label}: ${elapsed(started)}ms`);
     assert.equal(run.status, 0, `${label} failed (${run.status ?? run.error?.message}):\n${tail(run)}`);
     return run;
   };
-  step('npm run typecheck', ['run', 'typecheck']);
-  step('npm run lint', ['run', 'lint']);
-  // Jest's default cache lives in the OS temp root, which this suite keeps empty: the app's run keeps it inside the fixture.
-  step('npm run test', ['test', '--', `--cacheDirectory=${path.join(into, '.jest-cache')}`], { timeout: 900_000 });
-  step('npm run build:be', ['run', 'build:be']);
+  await Promise.all([
+    step('npm run typecheck', ['run', 'typecheck']),
+    step('npm run lint', ['run', 'lint']),
+    // Jest's default cache lives in the OS temp root, which this suite keeps empty: the app's run keeps it inside the fixture.
+    step('npm run test', ['test', '--', `--cacheDirectory=${path.join(into, '.jest-cache')}`], { timeout: 900_000 }),
+    step('npm run build:be', ['run', 'build:be']),
+  ]);
   assert.ok(fs.existsSync(path.join(app, 'be', 'dist', 'apps', 'cli', 'src', 'main.js')), 'the cli app is built');
 
   // The real Postgres the migrate runs against: the shared warm stack, attached the way the jest world setup attaches -
@@ -97,19 +110,19 @@ test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, 
   const { namespaceOf, runToken } = requireTestWorld('./dist/stack/namespace.js');
   const namespace = namespaceOf(app, 1);
   const runId = runToken(4);
-  const infra = await stack.attach({
+  const infra = await timed('postgres attach', () => stack.attach({
     namespace,
     runId,
     services: [{ service: 'postgresql', image: POSTGRES_IMAGE }],
     postgresql: { connections: [{ name: 'primary', schema: 'primary' }] },
-  });
+  }));
   t.after(async () => { await stack.detach({ namespace, runId, infra }).catch(() => undefined); });
   const postgres = infra.postgresql;
   const login = postgres.schemas.primary ?? postgres;
   const url = `postgres://${encodeURIComponent(login.user)}:${encodeURIComponent(login.password)}@${postgres.host}:${postgres.port}/${postgres.databases.primary}`;
 
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('STARCI_'))), PRIMARY_DB_URL: url };
-  const migrate = step('npm run migrate (cli migrate run)', ['run', 'migrate'], { env, timeout: 300_000 });
+  const migrate = await step('npm run migrate (cli migrate run)', ['run', 'migrate'], { env, timeout: 300_000 });
   const output = `${migrate.stdout}\n${migrate.stderr}`;
   assert.match(output, /"event":"migrations\.applied"/, `the cli logged the applied migrations: ${output}`);
   assert.ok(output.includes('InitNote1790000000000'), `the init-note migration ran on the real database: ${output}`);
