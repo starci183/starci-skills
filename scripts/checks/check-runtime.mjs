@@ -58,6 +58,7 @@ export function checkRuntime({ root = skillRoot, json = false } = {}) {
   for (const check of selfChecks) {
     const status = runScript(path.join(root, check.run), check.args ?? [], { cwd: root });
     if (status !== 0) { failed.push(check.id); err(`self-check ${check.id} (${check.run}) failed with exit ${status}`); }
+    else out(`self-check ${check.id}: ok`);
   }
   out(`self-checks: ${selfChecks.length - failed.length} of ${selfChecks.length} passed${failed.length ? ` (failed: ${failed.join(', ')})` : ''}`);
   return { ok: bad.length === 0 && runtime.ok && failed.length === 0, syntax: { files: files.length, failed: bad.length }, runtime, selfChecks: { run: selfChecks.length, failed } };
