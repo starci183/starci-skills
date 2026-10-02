@@ -5,7 +5,6 @@ import { readRows, readStock } from "../../fixtures/persistence/e2e-verification
 import {
     CANCELLED_ORDER,
     INVOICES_OF_ORDER,
-    PAYMENTS_OF_PERSON,
     PLACE_ORDER_SAGA_STATE,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
@@ -17,7 +16,7 @@ const OUTAGE_POLLS = 10
  * The place-order saga with its compensation, end to end on the real services: a buyer places an order whose total is above
  * what the billing service invoices (`order.placed`), billing records a rejected invoice and announces
  * `billing.invoice-rejected`, and the order service, whose message transport is the compensating step, cancels the order, gives
- * the stock of its lines back and refunds its payment, settling the saga run as compensated. A confirmation replayed with the
+ * the stock of its lines back, settling the saga run as compensated. A confirmation replayed with the
  * same key announces the order again; billing announces the rejection again; the saga finds the run settled and changes
  * nothing, so the stock comes back once. The second path injects the failure: the order database is cut while the rejection is
  * delivered, the compensation fails on its first deliveries, the queue retries them with its backoff and the run settles once
@@ -50,12 +49,12 @@ describe("billing.invoice-rejected compensates order.placed", () => {
             return rows[0] ?? null
         })
 
-    it("cancels the order, restores the stock and refunds the payment once, whatever the redeliveries", async () => {
+    it("cancels the order, restores the stock once, whatever the redeliveries", async () => {
         const session = await world.signedInPerson("saga-flow")
         const buyer = world.apps.order.api.bearing(session.sessionToken)
 
         const first = await placeYacht(buyer, "saga-flow-1")
-        expect(first).toMatchObject({ status: "confirmed", totalMinorUnits: 200_000, replayed: false })
+        expect(first).toMatchObject({ status: "pending", totalMinorUnits: 200_000, replayed: false })
         expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toHaveLength(1)
 
         expect(await cancelled(first.orderId)).toEqual({ status: "cancelled", total_minor_units: 200_000 })
@@ -80,10 +79,6 @@ describe("billing.invoice-rejected compensates order.placed", () => {
         expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
         expect(await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])).toEqual([
             { status: "compensated", version: 3 },
-        ])
-        expect(await readRows(world.db.order, PAYMENTS_OF_PERSON, [session.personId])).toEqual([
-            expect.objectContaining({ order_id: first.orderId, status: "refunded", amount_minor_units: 200_000 }),
-            expect.objectContaining({ order_id: second.orderId, status: "refunded", amount_minor_units: 200_000 }),
         ])
     })
 

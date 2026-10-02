@@ -1,8 +1,6 @@
 import { Test } from "@nestjs/testing"
 import { mock, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
-import { PAYMENT_SERVICE } from "@modules/domain/payment"
-import type { PaymentService } from "@modules/domain/payment"
 import { RECEIPT_STORAGE } from "@modules/integrations/receipt-storage"
 import type { ReceiptStorage } from "@modules/integrations/receipt-storage"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
@@ -34,24 +32,21 @@ const DOCUMENT = {
     ],
     totalMinorUnits: 1250,
     currency: "USD",
-    paymentId: "pay-1",
     placedAt: "2026-01-01T00:00:00.000Z",
 }
 
 const build = async (entityManager: MockEntityManager) => {
     const storage = mock<ReceiptStorage>()
-    const payments = mock<PaymentService>()
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             ReceiptService,
             { provide: ORDER_ENTITY_MANAGER, useValue: entityManager },
             { provide: RECEIPT_STORAGE, useValue: storage },
-            { provide: PAYMENT_SERVICE, useValue: payments },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { receipts: moduleRef.get(ReceiptService), storage, payments, logger }
+    return { receipts: moduleRef.get(ReceiptService), storage, logger }
 }
 
 describe("ReceiptService", () => {
@@ -62,8 +57,7 @@ describe("ReceiptService", () => {
                 find: [OrderLineEntity, LINES],
                 update: [OrderEntity, {}],
             })
-            const { receipts, storage, payments } = await build(em)
-            payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
+            const { receipts, storage } = await build(em)
 
             await expect(receipts.archive("o-1")).resolves.toBe(KEY)
 
@@ -81,9 +75,8 @@ describe("ReceiptService", () => {
 
         it("logs a storage failure, records no key and answers null", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, ORDER], find: [OrderLineEntity, LINES] })
-            const { receipts, storage, payments, logger } = await build(em)
+            const { receipts, storage, logger } = await build(em)
             const failure = new Error("storage unavailable")
-            payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
             storage.store.mockRejectedValue(failure)
 
             await expect(receipts.archive("o-1")).resolves.toBeNull()
@@ -92,23 +85,6 @@ describe("ReceiptService", () => {
             expect(em.update).not.toHaveBeenCalled()
         })
 
-        it("logs an order without its payment as the payment-missing error and stores nothing", async () => {
-            const em = mockEntityManager({ findOneBy: [OrderEntity, ORDER], find: [OrderLineEntity, LINES] })
-            const { receipts, storage, payments, logger } = await build(em)
-            payments.findByOrder.mockResolvedValue(null)
-
-            await expect(receipts.archive("o-1")).resolves.toBeNull()
-
-            expect(logger.error).toHaveBeenCalledWith(
-                OrderLogEvent.ReceiptArchiveFailed,
-                expect.objectContaining({ code: OrderErrorCode.PaymentMissing }),
-                { orderId: "o-1" },
-            )
-            expect(storage.store).not.toHaveBeenCalled()
-        })
-    })
-
-    describe("link", () => {
         it("answers the link of an archived receipt without storing it again", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ ...ORDER, receiptKey: KEY })] })
             const { receipts, storage } = await build(em)
@@ -122,14 +98,13 @@ describe("ReceiptService", () => {
         })
 
         it("archives a receipt the order does not have yet, then answers its link", async () => {
-            const { receipts, storage, payments } = await build(
+            const { receipts, storage } = await build(
                 mockEntityManager({
                     findOneBy: [OrderEntity, ORDER],
                     find: [OrderLineEntity, LINES],
                     update: [OrderEntity, {}],
                 }),
             )
-            payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
             storage.linkOf.mockReturnValue(LINK)
 
             expect(await receipts.link({ personId: "p-1", orderId: "o-1" })).toSucceedWith(LINK)
@@ -149,8 +124,7 @@ describe("ReceiptService", () => {
 
         it("refuses as not ready when the receipt cannot be archived now", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, ORDER], find: [OrderLineEntity, LINES] })
-            const { receipts, storage, payments } = await build(em)
-            payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
+            const { receipts, storage } = await build(em)
             storage.store.mockRejectedValue(new Error("storage unavailable"))
 
             expect(await receipts.link({ personId: "p-1", orderId: "o-1" })).toBeRefused({

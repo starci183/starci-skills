@@ -83,7 +83,7 @@ the step it undoes>"`. Five checks keep it honest: `BE_SAGA_STEP_COMPENSATION` (
 `BE_SAGA_EVENT_CONTRACT` (R145), `BE_SAGA_CONSUMER_DEDUPE` (R146) and `BE_SAGA_E2E_MISSING` (R147: every compensation path has an e2e
 spec that names its event and injects a failure through the world). In the example, `order.placed` starts the billing service's
 invoice; when the invoice is above the limit `billing.invoice-rejected` (which compensates `order.placed`) makes the order service
-cancel the order, release its stock and refund its payment, and `billing.invoice-issued` completes the run. The e2e spec
+cancel the order and release its stock, and `billing.invoice-issued` completes the run. The e2e spec
 `order/invoice-rejected` also cuts the order database while the rejection is delivered and proves the compensation resumes on the retry.
 
 ## Specs

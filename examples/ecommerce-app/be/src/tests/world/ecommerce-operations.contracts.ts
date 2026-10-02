@@ -10,7 +10,7 @@ export const ECOMMERCE_OPERATIONS = {
         "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }",
     clearCart: "mutation { clearCart { cleared } }",
     placeOrder:
-        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
+        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency replayed } }",
     buyerStatus: "query { buyerStatus { personId hasOrders } }",
     orderReceipt: "query OrderReceipt($input: OrderReceiptInput!) { orderReceipt(input: $input) { url expiresAt } }",
 } as const

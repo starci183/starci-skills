@@ -109,7 +109,11 @@ describe("EventBusService", () => {
             expect(consumer.queue.name).toBe("probe.ping")
             await consumer.handle({ id: "j-1", eventId: "e-1", payload: { note: "hi" }, attempt: 2 })
 
-            expect(handle).toHaveBeenCalledWith({ eventId: "e-1", event: new PingEvent("e-1", { note: "hi" }), attempt: 2 })
+            expect(handle).toHaveBeenCalledWith({
+                eventId: "e-1",
+                event: new PingEvent("e-1", { note: "hi" }),
+                attempt: 2,
+            })
         })
 
         it("reads the queue payload only when it is an object", async () => {
@@ -130,4 +134,3 @@ describe("EventBusService", () => {
         })
     })
 })
-

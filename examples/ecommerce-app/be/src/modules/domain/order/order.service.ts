@@ -4,8 +4,6 @@ import { InjectCartService } from "@modules/domain/cart"
 import type { CartService } from "@modules/domain/cart"
 import { InjectCatalogService } from "@modules/domain/catalog"
 import type { CatalogService } from "@modules/domain/catalog"
-import { InjectPaymentService } from "@modules/domain/payment"
-import type { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
 import { InjectSagaService } from "@modules/platform/saga"
 import type { SagaService } from "@modules/platform/saga"
@@ -36,21 +34,20 @@ import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
 import { ReceiptService } from "./receipt.service"
 import type { OrderCountRow, OrderIdRow } from "./persistence/order.rows"
-import { CANCEL_ORDER_IF_CONFIRMED, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
+import { CANCEL_ORDER_IF_PENDING, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
 @Injectable()
 /**
  * Confirms orders. `placeOrder` answers a replayed key with the first order, otherwise prices the cart against the
- * catalog and, when it can be confirmed, runs `confirm` in one transaction: it claims the idempotency key, takes the stock with
- * guarded decrements, writes the lines, captures the payment and clears the cart, so a failure at any step rolls the
- * whole confirmation back and the buyer keeps the cart.
+ * catalog and, when it can be placed, runs `confirm` in one transaction: it claims the idempotency key, takes the stock with
+ * guarded decrements, writes the lines, clears the cart and begins the saga run, so a failure at any step rolls the
+ * whole placement back and the buyer keeps the cart. The order stays pending: the payment arrives later as an event.
  */
 export class OrderService {
     constructor(
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectCartService() private readonly cart: CartService,
         @InjectCatalogService() private readonly catalog: CatalogService,
-        @InjectPaymentService() private readonly payments: PaymentService,
         private readonly receipts: ReceiptService,
         @InjectEventBus() private readonly bus: EventBus,
         @InjectLogger() private readonly logger: Logger,
@@ -59,7 +56,7 @@ export class OrderService {
 
     /**
      * Confirms the cart of a person. A replayed key answers the first order; an empty cart, an unknown product or too
-     * little stock is a refusal; otherwise the order, stock, payment and cart clear all happen in one transaction.
+     * little stock is a refusal; otherwise the order, stock and cart clear all happen in one transaction and the order is pending.
      */
     async placeOrder(request: PlaceOrderRequest): Promise<Outcome<PlacedOrder, OrderErrorCode>> {
         const { personId, idempotencyKey } = request
@@ -101,12 +98,12 @@ export class OrderService {
 
     /**
      * Compensates an order whose invoice the billing service rejected, in one transaction: the order is cancelled, the
-     * stock its lines took is released and its payment is refunded. An order that is not confirmed any more (already
+     * stock its lines took is released. An order that is not pending any more (already
      * cancelled, or unknown) changes nothing, so the redelivery of the rejection is a no-op.
      */
     async cancelOrder(params: CancelOrderParams): Promise<CancelledOrder> {
         const cancelled = await this.entityManager.transaction(async (manager) => {
-            const rows: Array<OrderIdRow> = await manager.query(CANCEL_ORDER_IF_CONFIRMED, [params.orderId])
+            const rows: Array<OrderIdRow> = await manager.query(CANCEL_ORDER_IF_PENDING, [params.orderId])
             if (toOrderId(rows) === null) return false
             const lines = await manager.find(OrderLineEntity, {
                 where: { orderId: params.orderId },
@@ -115,7 +112,6 @@ export class OrderService {
             for (const line of lines) {
                 await this.catalog.releaseStock({ manager, productId: line.productId, quantity: line.quantity })
             }
-            await this.payments.refund({ manager, orderId: params.orderId })
             return true
         })
         return { orderId: params.orderId, cancelled }
@@ -134,7 +130,7 @@ export class OrderService {
             personId: params.personId,
             idempotencyKey: params.idempotencyKey,
         })
-        return order ? this.snapshot(order, manager) : null
+        return order ? this.snapshot(order) : null
     }
 
     /** Confirms an evaluated cart in the caller transaction. */
@@ -170,20 +166,13 @@ export class OrderService {
                 unitPriceMinorUnits: line.unitPriceMinorUnits,
             })),
         )
-        const payment = await this.payments.capture({
-            manager,
-            personId,
-            orderId,
-            amountMinorUnits: plan.totalMinorUnits,
-        })
         await this.cart.clear({ manager, personId })
         await this.sagas.begin({ manager, saga: PLACE_ORDER_SAGA, correlationId: orderId })
         return {
             orderId,
-            status: "confirmed",
+            status: "pending",
             totalMinorUnits: plan.totalMinorUnits,
             currency: plan.currency,
-            paymentId: payment.paymentId,
             replayed: false,
         }
     }
@@ -202,15 +191,12 @@ export class OrderService {
         return existing
     }
 
-    private async snapshot(order: OrderEntity, manager: EntityManager): Promise<PlacedOrder> {
-        const payment = await this.payments.findByOrder({ orderId: order.id, manager })
-        if (payment === null) throw new OrderError({ code: OrderErrorCode.PaymentMissing })
+    private snapshot(order: OrderEntity): PlacedOrder {
         return {
             orderId: order.id,
             status: order.status,
             totalMinorUnits: order.totalMinorUnits,
             currency: "USD",
-            paymentId: payment.paymentId,
             replayed: true,
         }
     }

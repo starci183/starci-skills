@@ -96,7 +96,6 @@ export const ConfirmOrderBase = (props: ConfirmOrderBaseProps) => {
                             orderId: confirmed.orderId,
                             status: confirmed.status,
                             total: values.confirmedTotal,
-                            paymentId: confirmed.paymentId,
                         })}
                     </Text>
                     {confirmed.replayed ? (

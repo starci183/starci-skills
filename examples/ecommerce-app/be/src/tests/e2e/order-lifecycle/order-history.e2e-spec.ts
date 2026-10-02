@@ -8,21 +8,15 @@ import type {
     BuyerStatusData,
 } from "../../fixtures/e2e-views.contracts"
 import { readRows, readCount } from "../../fixtures/persistence/e2e-verification.rows"
-import {
-    ORDER_COUNT,
-    ORDERS_OF_PERSON,
-    LINES_OF_ORDER,
-    PAYMENTS_OF_PERSON,
-    PAYMENT_COUNT,
-} from "../../fixtures/persistence/e2e-verification.sql"
+import { ORDER_COUNT, ORDERS_OF_PERSON, LINES_OF_ORDER } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The order lifecycle past the first confirmation: one buyer places several orders and the history they produce is
  * verified end to end. The api has no order list or detail door: the only order reads are the placeOrder answer and the
  * buyerStatus flag the identity service reads. So "list" and "detail" are asserted where the truth lives, out-of-band on
- * this run databases (orders, order_lines and payments rows), cross-checked against the live cross-service reads. The
- * status transitions the schema models are covered too: a confirmation lands confirmed with its payment captured, a
+ * this run databases (orders and order_lines rows), cross-checked against the live cross-service reads. The
+ * status transitions the schema models are covered too: a placement lands pending, a
  * refusal appends nothing, and a key replay returns the first answer without appending either.
  *
  * Run: npm run test:e2e -- order-lifecycle/order-history
@@ -40,7 +34,7 @@ describe("order lifecycle: order history", () => {
             id,
         )
 
-    it("a buyer placing several orders builds a confirmed, paid history both services can read", async () => {
+    it("a buyer placing several orders builds a pending history both services can read", async () => {
         const session = await world.signedInPerson("hist-a")
         const { personId } = session
         const buyer = world.apps.order.api.bearing(session.sessionToken)
@@ -69,7 +63,7 @@ describe("order lifecycle: order history", () => {
         expect(first.errorCode).toBeNull()
         const firstOrder = present(first.data, "first order").placeOrder
         expect(firstOrder).toMatchObject({
-            status: "confirmed",
+            status: "pending",
             totalMinorUnits: firstTotal,
             currency: "USD",
             replayed: false,
@@ -86,23 +80,22 @@ describe("order lifecycle: order history", () => {
         })
         expect(second.errorCode).toBeNull()
         const secondOrder = present(second.data, "second order").placeOrder
-        expect(secondOrder).toMatchObject({ status: "confirmed", totalMinorUnits: secondTotal, replayed: false })
+        expect(secondOrder).toMatchObject({ status: "pending", totalMinorUnits: secondTotal, replayed: false })
         expect(secondOrder.orderId).not.toBe(firstOrder.orderId)
-        expect(secondOrder.paymentId).not.toBe(firstOrder.paymentId)
 
         // list: two orders in creation order, each confirmed and priced as answered.
         const orders = await readRows(world.db.order, ORDERS_OF_PERSON, [personId])
         expect(orders).toHaveLength(2)
         expect(orders[0]).toMatchObject({
             id: firstOrder.orderId,
-            status: "confirmed",
+            status: "pending",
             total_minor_units: firstTotal,
             currency: "USD",
             idempotency_key: `${personId}-1`,
         })
         expect(orders[1]).toMatchObject({
             id: secondOrder.orderId,
-            status: "confirmed",
+            status: "pending",
             total_minor_units: secondTotal,
             idempotency_key: `${personId}-2`,
         })
@@ -115,22 +108,6 @@ describe("order lifecycle: order history", () => {
             { product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits },
             { product_id: "sku-thermos", quantity: 1, unit_price_minor_units: thermos.priceMinorUnits },
         ])
-
-        // ...and each order has exactly one captured payment, keyed by the order id.
-        const payments = await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])
-        expect(payments).toHaveLength(2)
-        expect(payments[0]).toMatchObject({
-            id: firstOrder.paymentId,
-            order_id: firstOrder.orderId,
-            status: "captured",
-            amount_minor_units: firstTotal,
-        })
-        expect(payments[1]).toMatchObject({
-            id: secondOrder.paymentId,
-            order_id: secondOrder.orderId,
-            status: "captured",
-            amount_minor_units: secondTotal,
-        })
 
         // The guarded stock moved by exactly the confirmed quantities, and the cart stayed empty.
         const after = await buyer.read<CartData>("cart")
@@ -178,11 +155,9 @@ describe("order lifecycle: order history", () => {
         expect(replayed.errorCode).toBeNull()
         expect(replayed.data?.placeOrder).toMatchObject({
             orderId: order.orderId,
-            paymentId: order.paymentId,
             replayed: true,
         })
         expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(1)
-        expect(await readCount(world.db.order, PAYMENT_COUNT, personId)).toBe(1)
 
         // Refusal 2: beyond stock. Nothing changes: the order count stays 1, the cart keeps its line, the stock did not move.
         const thermos = productOf((await buyer.read<CartData>("cart")).data, "sku-thermos")
