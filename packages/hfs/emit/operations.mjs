@@ -14,7 +14,7 @@
 import { createSchemaBuilder, stable } from './type-schema.mjs';
 
 /** The export of `apps/<app>/src/operations.ts` that holds the table. */
-export const OPERATIONS_EXPORT = 'OPERATIONS';
+const OPERATIONS_EXPORT = 'OPERATIONS';
 
 /** The repository-relative path of an app's operation table. */
 export const operationsPath = (app) => `apps/${app}/src/operations.ts`;

@@ -8,7 +8,7 @@ import { indexFilesUnder, list, readYamlOrNull } from './work-io.mjs';
 const recordsUnder = (dir) => (fs.existsSync(dir) ? indexFilesUnder(dir).filter((f) => path.dirname(f) !== dir).map(readYamlOrNull).filter(Boolean) : []);
 
 /** The shapes a ui record declares (`ui.shapes[]`, modules/schemas/work-ui-screen.schema.yaml), each as XBase#state. */
-export const shapesOfUiRecord = (record) => list(record?.ui?.shapes).filter((s) => s?.base && s?.state).map((s) => `${s.base}#${s.state}`);
+const shapesOfUiRecord = (record) => list(record?.ui?.shapes).filter((s) => s?.base && s?.state).map((s) => `${s.base}#${s.state}`);
 
 /** {frs, shapes} over the domains (feature ids) under `<repo>/.starciwork/features`. */
 export function workGraphContext(repo, domains) {

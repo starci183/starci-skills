@@ -59,8 +59,8 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 ...managers,
                 MigrationRunnerService,
                 SeedRunnerService,
-                { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
-                { provide: READ_SEED_FILES, useValue: readSeedFiles },
+                { provide: CONNECTION_SOURCE, useValue: { open: openConnectionSource } },
+                { provide: READ_SEED_FILES, useValue: { read: readSeedFiles } },
             ],
             exports: [
                 DATABASE_OPTIONS,

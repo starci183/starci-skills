@@ -6,8 +6,9 @@
  * waiting, counted logically by their callers, not by the wall clock) cost milliseconds and the run no longer
  * depends on machine load. Unset in production.
  */
+import { readEnv } from './env.mjs';
 const scaleOf = () => {
-  const raw = process.env.STARCI_SLEEP_SCALE;
+  const raw = readEnv('STARCI_SLEEP_SCALE');
   if (raw === undefined || raw === '') return 1;
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : 1;

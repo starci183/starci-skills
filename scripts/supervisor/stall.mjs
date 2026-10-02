@@ -59,25 +59,26 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../lib/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { conditionLabel, evaluateCondition, lineageHeadById, typedIncidents } from '../kernel/gate-conditions.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
+import { parseJsonOr, jsonFromStdout } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 
-export const DEFAULT_STALL_MINUTES = 30;
+const DEFAULT_STALL_MINUTES = 30;
 /** A gate younger than this is not judged: the Kernel may still be parking the ask that justifies it. */
 export const GATE_GRACE_MS = 10 * 60_000;
 /** Ledger events that are the workflow moving (not the Kernel or the watchdog merely looking at it). */
-export const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'plan-derived',
+const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'plan-derived',
   'job-enqueued', 'incident-resolved', 'ask-answered', 'dispatch-reconciled', 'phase-transition', 'run-created', 'goal-defined'];
 /** Incident kinds that hold queued jobs (scripts/kernel/cli.mjs OWNER_GATE_KINDS). */
 export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'supervisor-gate'];
 /** The typed wait on a peer workflow (scripts/kernel/cli.mjs PEER_WAIT, openPeerWaits). */
-export const PEER_WAIT_KIND = 'peer-wait';
+const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
-export const WORKING_LIVENESS = ['active', 'active-unclassified'];
+const WORKING_LIVENESS = ['active', 'active-unclassified'];
 const SETTLED = SETTLED_JOB_LIST;
 /** The non-Kernel jobs of one workflow the ledger holds running (a worker's op in flight). */
 const runningJobs = (db, wf) => {
@@ -159,7 +160,7 @@ export const queuedJobs = (db, workflowId) => db.prepare(
  * settleReadyJobs, before any wait holds them). An open gate or peer-wait naming one defers that
  * settle deliberately, and holds it the way it holds a queued job (api status heldSettleJobs).
  */
-export const settleOwedJobs = (db, workflowId) => db.prepare(
+const settleOwedJobs = (db, workflowId) => db.prepare(
   `SELECT j.job_id, j.op_id, j.status, j.payload_json, j.created_at, j.updated_at FROM jobs j
     WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status IN ('running','answering','reported') AND EXISTS (
       SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.consumed_at IS NOT NULL)
@@ -191,14 +192,14 @@ export const openAskDispatches = (db, workflowId) => db.prepare(
 export const namedPaths = (text) => [...new Set((String(text ?? '').match(/\.starciwork\/[A-Za-z0-9._@\-/]+/g) ?? [])
   .map((p) => p.replace(/[./-]+$/, '')).filter((p) => p.length > '.starciwork/'.length))];
 /** A gate that waits on an owner ask or decision (only such a gate is released by the ask closing). */
-export const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
+const ASK_GATE = /\bask\b|\bowner(?:'s)? (?:decision|answer|choice|approval|ruling)\b|\bdecision pending\b/i;
 /** Workflow ids an incident names. */
 export const namedWorkflows = (text) => [...new Set(String(text ?? '').match(/\bwf-[a-z0-9][a-z0-9-]*[a-z0-9]\b/gi) ?? [])];
 /** Job ids an incident names (op-<op>-<10 hex>). */
-export const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
+const namedJobs = (text) => [...new Set(String(text ?? '').match(/\bop-[a-z0-9.-]+-[0-9a-f]{10}\b/gi) ?? [])];
 
 /** Record states that mean the thing a gate waited for has landed. */
-export const LANDED_STATES = ['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready'];
+const LANDED_STATES = ['done', 'settled', 'decided', 'approved', 'accepted', 'final', 'complete', 'completed', 'passed', 'ready'];
 
 /**
  * What a path an incident names looks like now, against the time the gate was raised:
@@ -208,7 +209,7 @@ export const LANDED_STATES = ['done', 'settled', 'decided', 'approved', 'accepte
  * record state is not landed yet - the gate still has something to wait for. A path that already
  * existed unchanged is neither.
  */
-export function pathEvidence(repo, rel, raisedAt) {
+function pathEvidence(repo, rel, raisedAt) {
   const none = { path: rel, exists: false, landed: false, waiting: true, at: null, born: null, written: null, created: false, state: null };
   if (!repo) return { ...none, waiting: false };
   let file = path.join(repo, rel);
@@ -229,13 +230,13 @@ export function pathEvidence(repo, rel, raisedAt) {
 }
 
 /** Peer messages delivered to `workflowId` after `since`, from one of `peers` (ledger inbox rows). */
-export const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
+const peerDeliveries = (db, workflowId, peers, since) => (peers.length ? db.prepare(
   "SELECT key, payload_json, status, created_at, applied_at FROM inbox WHERE workflow_id=? AND kind='peer-message' AND created_at>? ORDER BY inbox_id").all(workflowId, since)
   .map((row) => ({ key: row.key, status: row.status, at: row.created_at, appliedAt: row.applied_at, ...(({ from, kind, subject }) => ({ from, kind, subject }))(parse(row.payload_json)) }))
   .filter((m) => peers.includes(m.from)) : []);
 
 /** A gate whose release is a peer's message itself (a heads-up, a reply, a notice), not a record. */
-export const MESSAGE_GATE = /\bheads?-?up\b|\bmessage\b|\bnotif(?:y|ies|ied|ication)\b|\breply\b|\bnotice\b/i;
+const MESSAGE_GATE = /\bheads?-?up\b|\bmessage\b|\bnotif(?:y|ies|ied|ication)\b|\breply\b|\bnotice\b/i;
 
 /**
  * Is one owner gate still justified? {stale, young, reasons, asks, waits, peers, unread}. Past the
@@ -354,15 +355,6 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
 
 /* ------------------------------------------------------------ the frontier */
 
-const jsonFrom = (stdout) => {
-  const text = String(stdout ?? '').trim();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { /* fall through */ }
-  const first = text.indexOf('{'), last = text.lastIndexOf('}');
-  if (first >= 0 && last > first) { try { return JSON.parse(text.slice(first, last + 1)); } catch { /* not json */ } }
-  return null;
-};
-
 /**
  * `api status --json` for one workflow — the frontier the watchdog reads every tick (a read
  * projection: it writes nothing). {ok, frontier, workers} or {ok:false, error}.
@@ -372,7 +364,7 @@ export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   delete env.ORCA_TERMINAL_HANDLE;
   const r = runNode([API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
     { cwd: skillRoot, timeout: timeoutMs, env });
-  const value = jsonFrom(r.stdout);
+  const value = jsonFromStdout(r.stdout);
   if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
   return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, kernelRev: value.kernelRev ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],
     progress: value.progress ?? null, rca: value.rca ?? null };
@@ -387,7 +379,7 @@ const gateLabel = (gate, held) => `${gate.incidentId} [${gate.kind}] holds ${hel
  * never reaches a real Orca (NODE_TEST_CONTEXT).
  */
 export function kernelTurnState(db, workflowId, { show = terminalShow, read = terminalRead, env = process.env } = {}) {
-  if (env.NODE_TEST_CONTEXT && show === terminalShow) return null;
+  if (isSpecRun(env) && show === terminalShow) return null;
   try {
     const terminal = parse(db?.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId)?.value_json, null)?.terminal;
     if (!terminal) return null;

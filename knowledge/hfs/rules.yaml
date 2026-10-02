@@ -1731,6 +1731,14 @@ rules:
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
     enforcers:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
+  - id: R202
+    code: "CI_UPLOAD_NOT_SILENT"
+    law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CI_UPLOAD_NOT_SILENT"]
+    enforcers:
+      - {kind: runtime, id: ci-upload, at: scripts/hfs/runtime-rules/ci-upload.mjs}
   - id: R203
     code: "BE_FEATURE_THIN"
     law: "A feature file (a role of ruleParams.be.thinRoles inside a slot of tier feature: handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no branch, loop, ternary, try or throw and no computation. Business logic lives in modules/**, where every logic file owes 100 per file; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*; the feature layer is proven by integration and e2e. The gate calls a kind requires are not delegation: a webhook's `verify` and a job step's `JobClaims` fence (`advance`, `runKey`); a logger call, a pure mapper function and a modules function in argument position are free too."
@@ -1748,6 +1756,11 @@ rules:
     enforcers:
       - {kind: hfs, id: coverage-scope-drift, at: packages/hfs/sync/managed.mjs}
 retired:
+  - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R199, reason: "reserved for the CLI lane (RT_CLI_VERB_PARITY); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R200, reason: "reserved for the CLI lane (RT_CLI_APP_ONLY_TEMPLATES); the id returns to the catalog when that lane lands, never a rule of this block"}
+  - {id: R201, reason: "reserved for the CLI lane (CLI_ONLY_ENTRY); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}

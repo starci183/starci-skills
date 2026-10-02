@@ -33,8 +33,8 @@ import { DRAW_TOOL } from './ui/ui-shapes.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
 
-export const COMPOSITOR = 'scripts/work/compose-direction.mjs';
-export const DEFAULT_SCRIM = 0.5;
+const COMPOSITOR = 'scripts/work/compose-direction.mjs';
+const DEFAULT_SCRIM = 0.5;
 const CANVAS = { light: [255, 255, 255, 255], dark: [18, 18, 18, 255] };
 
 
@@ -110,7 +110,7 @@ export function resolveHost(uiRecords, host) {
 }
 
 /** The host's page composite at bp/theme (the named flow state, else the selected one, else the first). */
-export function hostCompositeOf(host, bp, theme, state = null) {
+function hostCompositeOf(host, bp, theme, state = null) {
   const pages = assetsOf(host.record).filter((a) => a.composite?.presentation === 'page' && a.composite.breakpoint === bp && a.composite.theme === theme);
   return (state ? pages.find((a) => a.composite.flowState === state) : null) ?? pages.find((a) => a.selected === true) ?? pages[0] ?? null;
 }

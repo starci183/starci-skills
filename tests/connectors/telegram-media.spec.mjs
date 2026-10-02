@@ -286,12 +286,8 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     assert.ok(!warned.join('\n').includes(TOKEN));
     const noLedger=await sendSettleMedia({ledgerFile:path.join(machineHome,'missing.sqlite'),repo:repoRoot,...DRAW},deps(machineHome,{warn:w=>warned.push(w)}));
     assert.deepEqual([noLedger.ok,noLedger.error],[false,'ledger unreadable']);
-    // The settle tail queues the send after the settled state is written, inside its own try.
-    const api=fs.readFileSync(new URL('../../scripts/kernel/cli.mjs',import.meta.url),'utf8');
-    const hook=api.indexOf('try { queueSettleMedia(');
-    assert.ok(hook>api.indexOf('async function runSettleTail('),'the settle tail queues media');
-    const settle=fs.readFileSync(new URL('../../scripts/kernel/verbs/settle.mjs',import.meta.url),'utf8');
-    assert.ok(settle.indexOf('await runSettleTail(')<settle.indexOf('emit(out, `settled ${jobId}'),'the synchronous test tail finishes before the settle reports');
+    assert.equal(ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(DRAW.jobId).status,'succeeded',
+      'the persisted settle remains successful after every synchronous and asynchronous Telegram failure');
   });
 });
 

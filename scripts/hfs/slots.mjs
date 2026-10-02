@@ -26,10 +26,10 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, roleListProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, kindShapeProblems, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
-
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
 export const RUNTIME_MANIFEST_FILE = 'knowledge/hfs/runtime-slots.yaml';
@@ -74,7 +74,7 @@ const SCOPES = [APP_SCOPE, ...PROFILES];
 // ------------------------------------------------------------------------------------------------ patterns
 
 const VAR = /<([A-Za-z][A-Za-z0-9-]*)>/g;
-const varsOf = (text) => [...String(text).matchAll(VAR)].map((m) => m[1]);
+const varsOf = (text) => captureNames(text, VAR);
 const hasWildcard = (segment) => /[*?]/.test(segment);
 
 /** Weight of one pattern segment: literal 4, literal mixed with a variable 3, a bare variable 2, a wildcard 1, `**` 0. */
@@ -774,10 +774,10 @@ export function openHfs({ root = skillRoot, repoRoot, declaration, side = null, 
 
 // ------------------------------------------------------------------------------------------ rule catalog
 
-export const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
-export const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
-export const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-export const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
+const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
+const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
+const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
+const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];

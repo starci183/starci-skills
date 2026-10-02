@@ -1,5 +1,5 @@
 import type { DatabaseConnectionOptions } from "./database.options"
-import type { OpenConnection } from "./database.port"
+import type { ConnectionOpener } from "./database.port"
 
 /** What a migrate run applied: the migration names it ran, by connection. */
 export interface AppliedMigrations {
@@ -13,11 +13,11 @@ export interface AppliedMigrations {
  */
 export async function migrateConnections(
     connections: ReadonlyArray<DatabaseConnectionOptions>,
-    open: OpenConnection,
+    opener: ConnectionOpener,
 ): Promise<AppliedMigrations> {
     const applied: Record<string, ReadonlyArray<string>> = {}
     for (const connection of connections) {
-        const source = open(connection)
+        const source = opener.open(connection)
         await source.initialize()
         try {
             const ran = await source.runMigrations()

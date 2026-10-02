@@ -37,7 +37,7 @@ import { machineFileFor, openMachineReader } from '../../engine/db/machine.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
-export const RETENTION = Object.freeze({ graceMs: 86_400_000, passMs: 30 * 86_400_000, failMs: 90 * 86_400_000, seatMs: 90 * 86_400_000 });
+const RETENTION = Object.freeze({ graceMs: 86_400_000, passMs: 30 * 86_400_000, failMs: 90 * 86_400_000, seatMs: 90 * 86_400_000 });
 const SHA = /^[a-f0-9]{64}$/;
 const ARCHIVE_PART_BYTES = 1024 ** 3;
 
@@ -77,7 +77,7 @@ function machineRefSql(db, table, col) {
 }
 
 /** One DB's marks: {marks: Set, pinned: Set, rows: Map sha -> row, refs: [{table, column, count}], error?}. */
-export function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
+function markSource(db, { kind, now = Date.now(), retention = RETENTION } = {}) {
   const out = { marks: new Set(), pinned: new Set(), rows: new Map(), refs: [], error: null };
   if (!hasLedgerTable(db, 'blob_ref_columns')) { out.error = 'no blob_ref_columns table (an old-schema DB): nothing marked from it'; return out; }
   const params = { now, pass: retention.passMs, fail: retention.failMs, seat: retention.seatMs };
@@ -101,7 +101,7 @@ export function markSource(db, { kind, now = Date.now(), retention = RETENTION }
 }
 
 /** The ledgers the machine registry enrols (state <> retired): [{ledgerId, name, file}]. */
-export function enrolledLedgers(machineDb) {
+function enrolledLedgers(machineDb) {
   if (!hasLedgerTable(machineDb, 'ledgers')) return [];
   const cols = columnsOf(machineDb, 'ledgers');
   const where = cols.includes('state') ? "WHERE state <> 'retired'" : '';
@@ -109,7 +109,7 @@ export function enrolledLedgers(machineDb) {
 }
 
 /** Every blob file in the store: Map sha -> {file, size, createdAt}. */
-export function storeBlobs(root = artifactRoot()) {
+function storeBlobs(root = artifactRoot()) {
   const out = new Map();
   let shards = [];
   try { shards = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory() && /^[a-f0-9]{2}$/.test(e.name)); } catch { return out; }
@@ -180,7 +180,7 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
  * openLedger, markBlobArchived(db, {sha256, archivedAt, archiveRef}), pruneAttemptSnapshots(db, {now, passMs, failMs})
  * - the ledger two are run inside the handle's transaction.
  */
-export async function gcWriters() {
+async function gcWriters() {
   const missing = [];
   let machine = null, ledger = null;
   try { machine = await import('../../engine/db/machine.mjs'); } catch { missing.push('engine/db/machine.mjs'); }
@@ -210,7 +210,7 @@ function archiveBlobs(items, dir) {
 }
 
 /** Run one sweep. Dry by default; apply needs the writers and the host GC lock. */
-export async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = archiveRootOf({ env }), retention = RETENTION, writers = null } = {}) {
+async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = archiveRootOf({ env }), retention = RETENTION, writers = null } = {}) {
   const plan = await planBlobGc({ env, now, retention });
   if (!apply) return { ...plan, apply: false };
   if (plan.blocked.length) return { ...plan, apply: true, ok: false, refused: `a source could not be read, so nothing is swept: ${plan.blocked.join('; ')}` };

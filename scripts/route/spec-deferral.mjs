@@ -32,13 +32,13 @@ import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 import { enqueueJob, recordJobResult, setJobStatus } from '../../engine/db/ledger.mjs';
 import { explicitAsk } from './explicit-ask.mjs';
 
-export const SPECS_CLASSES = Object.freeze(['unit', 'e2e']);
+const SPECS_CLASSES = Object.freeze(['unit', 'e2e']);
 /** Every kind a leg can be deferred under: the owner's two switches and the explicit-ask-only ops. */
 export const DEFERRAL_KINDS = Object.freeze([...SPECS_CLASSES, 'integration']);
-export const SPECS_TOGGLE_VALUES = Object.freeze(['defer-leg', 'skip', 'not-counted']);
-export const TESTS_DEFERRED_EVENT = 'tests-deferred';
-export const TESTS_REQUEUED_EVENT = 'tests-requeued';
-export const DEFERRED_VERDICT = 'deferred';
+const SPECS_TOGGLE_VALUES = Object.freeze(['defer-leg', 'skip', 'not-counted']);
+const TESTS_DEFERRED_EVENT = 'tests-deferred';
+const TESTS_REQUEUED_EVENT = 'tests-requeued';
+const DEFERRED_VERDICT = 'deferred';
 /** The reason a deferral carries: the owner key that caused it. */
 export const deferReasonOf = (kind) => (SPECS_CLASSES.includes(kind) ? `specs.${kind}=false` : `${kind} verification runs only on an explicit ask or before release, and this goal did not ask for it`);
 
@@ -47,7 +47,7 @@ const E2E_PATH = /(?:^|[\\/._-])e2e(?:[\\/._-]|$)|playwright/i;
 
 const briefCache = new Map();
 /** The op's `policy.specsToggle` ({unit?, e2e?} of SPECS_TOGGLE_VALUES), {} when it declares none or the brief is unreadable. */
-export function opSpecsToggle({ skillRoot, op }) {
+function opSpecsToggle({ skillRoot, op }) {
   if (!op) return {};
   const file = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   let stamp;
@@ -93,7 +93,7 @@ export const specsOff = (settings) => SPECS_CLASSES.filter((kind) => settings?.[
  * The class a defer-leg job tests. An op that defers on one class only is that class; one that defers on both
  * (test.author authors unit and e2e specs) is e2e when every owned path it writes is an e2e path, else unit.
  */
-export function deferClassOf({ toggle, payload = {} }) {
+function deferClassOf({ toggle, payload = {} }) {
   const classes = SPECS_CLASSES.filter((kind) => toggle[kind] === 'defer-leg');
   if (classes.length <= 1) return classes[0] ?? null;
   const paths = (Array.isArray(payload.owned_paths) ? payload.owned_paths : []).map((p) => String(p?.path ?? p ?? '')).filter(Boolean);

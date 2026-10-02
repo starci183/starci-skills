@@ -17,6 +17,7 @@
 // unit, however the retry chain was spelled. Ledger reads plus the answer receipt file; never writes.
 import { KERNEL_ONLY_OPS } from './reported-jobs.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { normalizeText } from '../lib/normalize.mjs';
 import { JOB_ROW } from './job-row.mjs';
 
 const parse = parseJsonOr;
@@ -87,7 +88,7 @@ export function ownerAnswersOf(db, job) {
   return answers;
 }
 
-const norm = (text) => String(text ?? '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').replace(/[\s.?!:;,]+$/, '').trim();
+const norm = (text) => normalizeText(text, { form: 'NFKC', punct: true });
 
 /**
  * The answered ask `question` repeats, or null. It repeats one when its text is the same (case,

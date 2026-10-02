@@ -60,7 +60,7 @@ export function importClosure(entries) {
 }
 
 /** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `hfs add` generates a kind from them, so the hfs bundle carries them. */
-export function patternTopicFiles() {
+function patternTopicFiles() {
   const dir = path.join(runtimeRoot, 'knowledge', 'patterns', 'be');
   return fs.readdirSync(dir).filter((name) => name.endsWith('.yaml') && Array.isArray(parseYaml(fs.readFileSync(path.join(dir, name), 'utf8'))?.files)).sort().map((name) => `knowledge/patterns/be/${name}`);
 }
@@ -80,7 +80,7 @@ export const BUNDLES = Object.freeze({
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
-export function catalogSlice(text, codes) {
+function catalogSlice(text, codes) {
   const blocks = text.replace(/\r\n/g, '\n').split(/\n(?=[A-Z][A-Z0-9_]+:\n)/);
   const byCode = new Map(blocks.map((b) => [b.slice(0, b.indexOf(':')), b.replace(/\s+$/, '')]));
   return `${[...codes].sort().map((code) => {
@@ -90,7 +90,7 @@ export function catalogSlice(text, codes) {
 }
 
 /** {relative path: expected text} of one bundle. */
-export function expectedBundle(bundle) {
+function expectedBundle(bundle) {
   const spec = BUNDLES[bundle];
   if (!spec) throw new Error(`no bundle ${bundle}`);
   const out = new Map();

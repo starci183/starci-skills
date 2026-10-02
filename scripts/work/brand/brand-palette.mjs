@@ -61,20 +61,20 @@ import { isPartName } from '../direction-part.mjs';
 import { appNamesOf, captureFileOf, capturesAt, matrixOf, nodesOf, treeOf } from '../layout-tree.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull, slash } from '../work-io.mjs';
 
-export const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
+const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
 export const TOKEN_TOLERANCE = 6;
-export const HUE_TOLERANCE = 18;
-export const CHROMA_SLACK = 0.012;
-export const VIVID_CHROMA = 0.08;
-export const INK_LIGHTNESS = 0.3;
+const HUE_TOLERANCE = 18;
+const CHROMA_SLACK = 0.012;
+const VIVID_CHROMA = 0.08;
+const INK_LIGHTNESS = 0.3;
 export const MAX_LIGHTNESS = 0.97;
-export const MIN_GROUP_SHARE = 0.03;
-export const MIN_AREA_SHARE = 0.00005;
-export const MIN_PIXELS = 60;
-export const STATUS_HUE_TOLERANCE = 30;
-export const STATUS_LIGHTNESS_BAND = 0.12;
-export const STRONG_CHROMA = 0.12;
-export const STRONG_PIXELS = 150;
+const MIN_GROUP_SHARE = 0.03;
+const MIN_AREA_SHARE = 0.00005;
+const MIN_PIXELS = 60;
+const STATUS_HUE_TOLERANCE = 30;
+const STATUS_LIGHTNESS_BAND = 0.12;
+const STRONG_CHROMA = 0.12;
+const STRONG_PIXELS = 150;
 const CHROMATIC_TOKEN = 0.04;
 const SAMPLE_BUDGET = 4000000;
 const ALPHA_FLOOR = 128;
@@ -84,7 +84,7 @@ const round = (v, places = 4) => Number.parseFloat(Number(v).toFixed(places));
 const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
 
 /** A readable name for an OKLCH hue, so a finding says "blue" and not "259 degrees". */
-export function hueName(h) {
+function hueName(h) {
   const x = ((h % 360) + 360) % 360;
   if (x < 12 || x >= 345) return 'pink-red';
   if (x < 45) return 'red';
@@ -129,7 +129,7 @@ const shaOf = (file) => { try { return sha256File(file); } catch { return null; 
 const RENDER_SCHEMA = 'starci/draw-render@1';
 
 /** The draw-render capture record of an image: the same-stem .json, else any record in its directory whose image sha256 is the file's. */
-export function renderRecordFor(file) {
+function renderRecordFor(file) {
   const sha = shaOf(file);
   if (!sha) return null;
   const read = (f) => { try { const d = JSON.parse(fs.readFileSync(f, 'utf8')); return d?.schema === RENDER_SCHEMA && d.image?.sha256 === sha ? d : null; } catch { return null; } };
@@ -149,7 +149,7 @@ const pngSize = (file) => {
 };
 
 /** The registered-artwork boxes of one capture record, in the capture's image pixels (grown by one pixel for the antialiased edge). */
-export function artworkRectsOf(record, palette) {
+function artworkRectsOf(record, palette) {
   if (!palette?.artwork?.size || !Array.isArray(record?.layout?.artwork)) return [];
   const dpr = Number(record?.viewport?.deviceScaleFactor ?? 1) || 1;
   return record.layout.artwork
@@ -329,7 +329,7 @@ export function measurePalette(image, palette, { exclude = null } = {}) {
  * slot and the noise it leaves inside it are skipped with it. Null when the image carries no solid slot (a
  * drawn part, a composite whose content already filled the slot).
  */
-export function slotExclusion(image, { key = [255, 0, 255], tolerance = 8, minFill = 0.9, grow = 2 } = {}) {
+function slotExclusion(image, { key = [255, 0, 255], tolerance = 8, minFill = 0.9, grow = 2 } = {}) {
   const found = keyRect(image, key, tolerance);
   if (!found || found.fill < minFill) return null;
   const { x, y, width, height } = found.rect;
@@ -337,12 +337,12 @@ export function slotExclusion(image, { key = [255, 0, 255], tolerance = 8, minFi
 }
 
 /** `measurePalette` over an image with its keyed page slot (and any registered-artwork boxes) excluded: what the gate measures, findings or scan. */
-export const measureImage = (image, palette, artwork = []) => measurePalette(image, palette, { exclude: [slotExclusion(image), ...artwork].filter(Boolean) });
+const measureImage = (image, palette, artwork = []) => measurePalette(image, palette, { exclude: [slotExclusion(image), ...artwork].filter(Boolean) });
 
 const pct = (v) => `${(v * 100).toFixed(v < 0.01 ? 2 : 1).replace(/\.0$/, '')}%`;
 
 /** One offender, as the finding names it: colour, hue, area share and the nearest brand token. */
-export const describeOffender = (o) => `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${o.nearest ? `${o.nearest.token} ${o.nearest.hex}${o.nearest.role ? ` (${o.nearest.role})` : ''} at deltaE ${o.nearest.deltaE}` : '(none)'}`;
+const describeOffender = (o) => `${o.name} ${o.hex} on ${pct(o.share)} of the coloured area (${pct(o.area)} of the image), nearest brand token ${o.nearest ? `${o.nearest.token} ${o.nearest.hex}${o.nearest.role ? ` (${o.nearest.role})` : ''} at deltaE ${o.nearest.deltaE}` : '(none)'}`;
 
 /**
  * shell-conformance findings for one image. `subject` says what the image is (a drawn part, a composite, a layout
@@ -424,7 +424,7 @@ export async function scanTargets(workRoot) {
   return targets;
 }
 
-export async function scanWork(workRoot) {
+async function scanWork(workRoot) {
   const b = brandOf(workRoot);
   if (!b.brand) return { workRoot: slash(workRoot), brand: null, error: b.error, results: [] };
   const palette = brandPalette(b.brand, { brandDir: b.dir });

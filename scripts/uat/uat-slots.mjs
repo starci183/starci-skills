@@ -148,7 +148,7 @@ export async function acquireUatSlot({runId=null,env=process.env,limit=maxConcur
 }
 
 /** Holders, queue and ceiling, for `status`. */
-export const slotStatus=({env=process.env}={})=>({store:machineFileFor(env),limit:maxConcurrent({env}),holders:slotHolders({env}),queue:slotQueue({env})});
+const slotStatus=({env=process.env}={})=>({store:machineFileFor(env),limit:maxConcurrent({env}),holders:slotHolders({env}),queue:slotQueue({env})});
 
 // An op's run records into its own folder (playwright-recording.mjs defaultRecordRoot), which settle indexes as its proof.
 async function runHolding(command,{recordDir=defaultRecordRoot()}={}){

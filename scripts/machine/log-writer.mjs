@@ -23,9 +23,9 @@ import { appendLog, beginImmediate, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVE
 import { isBusyError } from '../../engine/db/machine.mjs';
 import { guardWrites } from '../../engine/db/authorizer.mjs';
 
-export const LOG_FLUSH_MS = 250;
-export const LOG_FLUSH_ROWS = 200;
-export const LOG_WRITABLE_TABLES = Object.freeze(['logs', 'log_cursors', 'sqlite_sequence', 'logs_fts', 'logs_fts_data', 'logs_fts_idx', 'logs_fts_docsize', 'logs_fts_config']);
+const LOG_FLUSH_MS = 250;
+const LOG_FLUSH_ROWS = 200;
+const LOG_WRITABLE_TABLES = Object.freeze(['logs', 'log_cursors', 'sqlite_sequence', 'logs_fts', 'logs_fts_data', 'logs_fts_idx', 'logs_fts_docsize', 'logs_fts_config']);
 const TRUNCATED = 'log.truncated';
 const writers = new Map();
 const keyOf = (file) => { const p = path.resolve(file); return process.platform === 'win32' ? p.toLowerCase() : p; };
@@ -204,7 +204,7 @@ export function logWriterFor(file, options = {}) {
 }
 
 /** Flush every writer of this process (on exit: the rows a CLI queued are durable before it ends). */
-export function flushAllLogWriters({ force = true } = {}) {
+function flushAllLogWriters({ force = true } = {}) {
   for (const w of [...writers.values()]) { try { w.flush({ force }); } catch (error) { process.stderr.write(`log-writer exit flush failed: ${error?.message ?? error}\n`); } }
 }
 process.once('exit', () => flushAllLogWriters());

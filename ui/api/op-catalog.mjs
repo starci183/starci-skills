@@ -9,7 +9,7 @@ const OPS_DIR = new URL('../../modules/ops/ops/', import.meta.url);
 const tr = translator('vi');
 
 /** One-line English summaries, written from each op's yaml goal; the owner reads their Vietnamese through the i18n catalog. */
-export const GOAL_EN = {
+const GOAL_EN = {
   'request.analyze': 'Reads the owner\'s request, picks the matching workflow and writes a scope summary — nothing real is done yet.',
   'task.execute': 'Analyzes a request and picks an evidence-based workflow, with no side effects.',
   'scope.define': 'Turns the request into a bounded scope: what may be touched, dependencies and exclusions. Analysis only; nothing written beyond records.',

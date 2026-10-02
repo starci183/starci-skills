@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** Files above this size are not read by a tree check (a tracked binary or a generated dump is no source of these laws). */
-export const MAX_READ_BYTES = 1024 * 1024;
+const MAX_READ_BYTES = 1024 * 1024;
 
 /** The text of `rel` under `repoRoot`, or null when it is absent, unreadable, over MAX_READ_BYTES or binary. */
 export function readText(repoRoot, rel) {

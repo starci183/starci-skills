@@ -24,10 +24,12 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { opGateRules } from '../lib/op-gate.mjs';
 
 export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
-export const WORLD_PROJECTS = Object.freeze({
+const WORLD_PROJECTS = Object.freeze({
   e2e: { dir: 'be/src/tests/e2e', suffix: '.e2e-spec.ts', mode: 'apps' },
   integration: { dir: 'be/src/tests/integration', suffix: '.integration-spec.ts', mode: 'modules' },
   contract: { dir: 'be/src/tests/contract', suffix: '.contract-spec.ts', mode: 'sandbox' },
@@ -39,12 +41,11 @@ const USAGE = 'usage: test-world-run.mjs --root <app> --project e2e|integration|
 
 /** op-gate.yaml testWorld: {required[], forbidden[], outage[]}. */
 export function testWorldRules(runtime = runtimeRoot) {
-  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
-  return { required: doc?.testWorld?.required ?? [], forbidden: doc?.testWorld?.forbidden ?? [], outage: doc?.testWorld?.outage ?? [] };
+  return opGateRules(runtime, 'testWorld');
 }
 
 /** The harness of the app: {jestConfig, preset, declaration, defineTestWorld}. */
-export function harnessOf(root) {
+function harnessOf(root) {
   const jestConfig = JEST_CONFIGS.find((rel) => fs.existsSync(path.join(root, rel))) ?? null;
   const text = jestConfig ? fs.readFileSync(path.join(root, jestConfig), 'utf8') : '';
   const declared = fs.existsSync(path.join(root, DECLARATION)) ? fs.readFileSync(path.join(root, DECLARATION), 'utf8') : null;
@@ -102,7 +103,7 @@ export function reduceJest(report) {
 }
 
 /** Run the managed `npm run test:<project>` with jest's JSON report; {command, exit, ...reduceJest, error}. */
-export function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
+function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-world-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const args = ['run', `test:${project}`, '--', '--json', `--outputFile=${outFile}`, ...(tests ? ['--testPathPattern', tests] : [])];
@@ -145,15 +146,8 @@ export function buildTestWorldRun({ root, project, tests = null, rules = testWor
   return summary;
 }
 
-export function parseTestWorldArgs(argv) {
-  const opts = { root: null, project: null, tests: null, out: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (['--root', '--project', '--tests', '--out'].includes(arg)) {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
-    } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
-  }
+function parseTestWorldArgs(argv) {
+  const opts = { root: null, project: null, tests: null, out: null, ...valueFlags(argv, ['--root', '--project', '--tests', '--out'], USAGE) };
   if (!opts.project) throw new Error(`--project is required; ${USAGE}`);
   return opts;
 }

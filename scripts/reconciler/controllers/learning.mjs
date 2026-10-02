@@ -12,22 +12,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../engine/yaml.mjs';
+import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { clipLine } from '../../lib/clip.mjs';
 import { translator } from '../../lib/i18n.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const LEARNING_FILE = path.join(ROOT, 'modules', 'reconciler', 'learning.yaml');
+const LEARNING_FILE = path.join(ROOT, 'modules', 'reconciler', 'learning.yaml');
 export const KEY = 'learning:tick';
 // resyncMs is the tick cadence (30 min); a runtime-invariant-violated event runs the pass at once. It is idempotent.
 export const DEFAULTS = Object.freeze({ resyncMs: 1_800_000, concurrency: 1, windowMs: 86_400_000, decisionDueMs: 3_600_000 });
 
-export function learningControllerSettings(file = LEARNING_FILE) {
-  let doc = {};
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
-  const out = { ...DEFAULTS };
-  for (const k of Object.keys(DEFAULTS)) if (Number.isFinite(Number(doc[k])) && Number(doc[k]) > 0) out[k] = Number(doc[k]);
-  return out;
+function learningControllerSettings(file = LEARNING_FILE) {
+  return yamlNumberSettings(file, DEFAULTS);
 }
 
 /**

@@ -10,7 +10,7 @@ import { relativeImports } from './source-ast.mjs';
 export const CODES = Object.freeze({ direction: 'RT_TIER_DIRECTION', cycle: 'ARCH_OWNER_CYCLE' });
 
 /** The import graph of the runtime sources: {resolver, profile, edges, unit} in the shape checkTiers reads. */
-export function runtimeImportGraph(ctx) {
+function runtimeImportGraph(ctx) {
   const edges = [];
   for (const { path: from } of ctx.sources) {
     for (const ref of relativeImports(ctx.parsed(from))) {

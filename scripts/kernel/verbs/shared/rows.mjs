@@ -19,8 +19,7 @@ export const ownedPathsOf = (payload) => (payload?.owned_paths ?? []).map((p) =>
 export const jobResultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 /** The job row by id through JOB_ROW, or undefined. */
 export const jobRowOf = (db, jobId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
-/** The newest op_attempts row of a job (its current or last dispatch), or null. */
-export const latestAttemptOf = (db, jobId) => db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId) ?? null;
+
 /** The reports row of a job's newest attempt, or null. */
 export const latestReportOf = (db, jobId) => db.prepare('SELECT r.* FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
@@ -45,3 +44,20 @@ export const operationDispatchOf = (payload) => payload?.managed?.dispatchId
   ?? null;
 
 export const contractDispatchIdOf = (db, job) => latestContractOf(db, job.job_id)?.dispatch_id ?? null;
+
+/**
+ * The { db, workflowId, workflow } prelude a workflow-scoped api verb opens with: the workflow of args.workflow,
+ * or a workflow-unknown throw.
+ */
+export function verbWorkflow(ledger, args) {
+  const db = ledger.db, workflowId = args.workflow;
+  const workflow = getWorkflow(db, workflowId);
+  if (!workflow) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+  return { db, workflowId, workflow };
+}
+
+/**
+ * The `export default` a workflow-scoped api verb shares: { verb, required: ['workflow'], kernelOnly, usageInCore,
+ * run }. `run(ctx)` is the verb's body.
+ */
+export const workflowVerb = (verb, run) => ({ verb, required: ['workflow'], kernelOnly: true, usageInCore: true, run });

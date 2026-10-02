@@ -22,9 +22,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-export const VERBS_DIR = 'scripts/kernel/verbs';
-export const STATUS_DIR = 'scripts/kernel/status';
-export const FLAGS_FILE = 'scripts/kernel/api-boolean-flags.txt';
+const VERBS_DIR = 'scripts/kernel/verbs';
+const STATUS_DIR = 'scripts/kernel/status';
+const FLAGS_FILE = 'scripts/kernel/api-boolean-flags.txt';
 const SLUG = /^[a-z][a-z0-9-]*$/;
 
 const modulesIn = (dir) => {

@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -55,7 +56,7 @@ test('the dry route prints the same picks (route-model.mjs)', () => {
   assert.match(route('brand.decide').stdout, /PICK claude-agent\s+model=claude-opus-5-5[\s\S]*-> codex-agent/);
 });
 
-test('the critic is a different model from the drawer: Codex when Devin draws, Claude when Codex draws', () => {
+test('the critic is a different model from the drawer: Codex when Devin draws, Claude when Codex draws', async (t) => {
   const s = runtimes.allocation.drawLoop;
   assert.equal(s.critic.provider, 'codex');
   assert.equal(criticFor(s, 'devin').critic.provider, 'codex');
@@ -66,6 +67,38 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
   assert.match(criticFor({ critic: s.critic }, 'codex').error, /different model from the drawer/);
   assert.equal(alt.critic.model, 'claude-opus-5-5');
   for (const c of [s.critic, alt.critic]) assert.equal(c.command, undefined, 'a critic names its provider, never a CLI to spawn');
-  const loop = fs.readFileSync(path.join(ROOT, 'scripts', 'work', 'draw-loop.mjs'), 'utf8');
-  assert.match(loop, /opContextOf\(\)\?\.provider/, 'the loop knows the drawer from the op its Orca terminal is bound to');
+  // The loop resolves the drawer from the op its Orca terminal is bound to (guards/op-context.mjs): with a Devin op
+  // on this terminal the critique the round writes names drawer 'devin' and critic 'codex' — no --drawer passed.
+  const { withLedger, seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  const { guardsRoot } = await import('../../scripts/guards/guards-root.mjs');
+  const { critiqueRound } = await import('../../scripts/work/draw-loop.mjs');
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    const handle = `term-draw-${process.pid}-${Date.now()}`;
+    seedWorkflow(ledger, { id: 'wf-draw', jobs: [{ jobId: 'job-draw-1', opId: 'interface.draw', status: 'running',
+      payload: { opId: 'interface.draw', owned_paths: ['x/'], managed: { agentTerminalHandle: handle } }, terminalHandle: handle }] });
+    ledger.db.prepare("UPDATE op_attempts SET provider='devin' WHERE job_id='job-draw-1'").run();
+    fs.mkdirSync(path.join(guardsRoot(), 'terminals'), { recursive: true });
+    fs.writeFileSync(path.join(guardsRoot(), 'terminals', `${handle}.json`),
+      JSON.stringify({ schema: 'starci/op-guard@1', role: 'op', jobId: 'job-draw-1', workflowId: 'wf-draw', ledgerRepo: repoRoot }));
+    const saved = process.env.ORCA_TERMINAL_HANDLE;
+    process.env.ORCA_TERMINAL_HANDLE = handle;
+    t.after(() => { if (saved === undefined) delete process.env.ORCA_TERMINAL_HANDLE; else process.env.ORCA_TERMINAL_HANDLE = saved; });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-critique-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
+    const html = path.join(dir, 'screen.html');
+    fs.writeFileSync(html, '<p>x</p>');
+    const started = [];
+    const critique = await critiqueRound({ loop: {}, n: 1, roundDir: dir, captures: [], html, settings: s, orca: {
+      criticWorkspace: () => ({ ok: true, dir }), removeCriticWorkspace: () => ({ ok: true }),
+      runCreate: () => ({ ok: true, runId: 'run-critic' }), runShow: () => ({ ok: false, error: 'none' }), workerList: () => ({ ok: true, workers: [] }),
+      trust: () => ({ ok: true }), terminalRename: () => ({ ok: true }), workerShow: () => ({ ok: false, error: 'none' }),
+      workerStart: (o) => { started.push(o); return { ok: false, error: 'no critic worker in a spec' }; },
+      workerStop: () => ({ ok: true }), workerRelease: () => ({ ok: true }),
+    } });
+    assert.equal(critique.critic.drawer, 'devin', 'the bound op\'s provider is the drawer');
+    assert.equal(critique.critic.provider, 'codex', 'the critic is a different provider than the drawer');
+    assert.equal(started[0]?.agent, 'codex', 'the worker-start launch routes the critic to codex');
+    assert.equal(critique.outcome, 'launch-failed', 'the fake Orca never launches a real critic');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'critique.json'), 'utf8')).critic.drawer, 'devin', 'written to the round');
+  });
 });

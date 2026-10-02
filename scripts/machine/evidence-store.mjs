@@ -21,19 +21,20 @@ import { redactBytes } from '../lib/redact.mjs';
 import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript,
   JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/db/ledger.mjs';
 import { newSpanId } from '../../engine/db/machine.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 
-export const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
+const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
 export const ARTIFACT_KINDS = JOB_ARTIFACT_KINDS;
 export const ARTIFACT_SUBKINDS = JOB_ARTIFACT_SUBKINDS;
-export const ARTIFACT_ORIGINS = Object.freeze(['op', 'settler', 'checker', 'kernel']);
-export const CHECK_PHASES = Object.freeze(['before', 'after', 'verify', 'parity', 'integrate']);
-export const CHECK_RUNNERS = Object.freeze(['op', 'settler', 'kernel', 'parity', 'integrate']);
+const ARTIFACT_ORIGINS = Object.freeze(['op', 'settler', 'checker', 'kernel']);
+const CHECK_PHASES = Object.freeze(['before', 'after', 'verify', 'parity', 'integrate']);
+const CHECK_RUNNERS = Object.freeze(['op', 'settler', 'kernel', 'parity', 'integrate']);
 export const CHECK_STATUSES = Object.freeze(['pass', 'fail', 'unavailable', 'error', 'skipped']);
 /** A check whose status counts as red. 'unavailable' (the checker could not run: infra) and 'skipped' never do (H7). */
-export const RED_CHECK_STATUSES = Object.freeze(['fail', 'error']);
+const RED_CHECK_STATUSES = Object.freeze(['fail', 'error']);
 export const TRANSCRIPT_SNAPSHOT_MS = 60_000;
 
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const slash = (p) => String(p).replace(/\\/g, '/');
 
 const IMAGE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
@@ -141,7 +142,7 @@ export function attemptOf(db, { workflowId = null, dispatchId = null, jobId = nu
  * The status of one check run. `unavailable` (the checker could not run: missing tool, host down, spawn error)
  * is infra, never red (H7); a runner-observed non-zero exit is never 'pass' (H8).
  */
-export function checkStatusOf({ exitCode = null, declaredExitCode = null, unavailable = false, error = false, skipped = false, status = null } = {}) {
+function checkStatusOf({ exitCode = null, declaredExitCode = null, unavailable = false, error = false, skipped = false, status = null } = {}) {
   if (status && !CHECK_STATUSES.includes(status)) throw refuse(`check status must be ${CHECK_STATUSES.join('|')}, got '${status}'`, 'check-status-unknown');
   if (skipped || status === 'skipped') return 'skipped';
   if (unavailable || status === 'unavailable') return 'unavailable';

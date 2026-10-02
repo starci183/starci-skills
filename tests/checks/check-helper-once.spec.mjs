@@ -78,3 +78,29 @@ test("a helper bound to its own module's state is not a copy of another module's
   };
   assert.equal(run(copies).filter((f) => f.code === 'RT_HELPER_REDEFINED').length, 1);
 });
+
+const LONG_HELPER = (name, extra = '') => `export const ${name} = (items, key) => {\n  const out = new Map();\n  for (const item of items) {\n    const value = item[key];\n    if (value === undefined || value === null) continue;\n    if (!out.has(value)) out.set(value, []);\n    out.get(value).push(item);${extra}\n  }\n  return out;\n};\n`;
+
+test('a near copy of a helper in another file is flagged, naming the home; the first path is the home', () => {
+  const findings = run({
+    'scripts/kernel/group.mjs': LONG_HELPER('groupBy'),
+    'scripts/work/bucket.mjs': LONG_HELPER('bucketBy', '\n    void 0;'),
+  });
+  assert.deepEqual(summary(findings), [['RT_HELPER_NEAR_COPY', 'scripts/work/bucket.mjs']]);
+  assert.match(findings[0].message, /bucketBy is a near copy of groupBy in scripts\/kernel\/group\.mjs/);
+});
+
+test('a near copy prefers an exported lib helper as the home', () => {
+  const findings = run({
+    'scripts/a/copy.mjs': LONG_HELPER('groupBy'),
+    'scripts/lib/group.mjs': LONG_HELPER('groupBy', '\n    void 0;'),
+  });
+  assert.deepEqual(summary(findings), [['RT_HELPER_NEAR_COPY', 'scripts/a/copy.mjs']]);
+});
+
+test('two different long helpers are not near copies', () => {
+  assert.deepEqual(run({
+    'scripts/kernel/group.mjs': LONG_HELPER('groupBy'),
+    'scripts/work/other.mjs': "export const total = (rows) => {\n  let sum = 0;\n  for (const row of rows) {\n    if (typeof row.amount !== 'number') throw new Error('amount missing');\n    sum += row.amount * (row.quantity ?? 1);\n  }\n  return Math.round(sum * 100) / 100;\n};\n",
+  }), []);
+});

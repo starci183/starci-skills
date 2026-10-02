@@ -15,8 +15,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseJsonOr } from '../../lib/json.mjs';
 import { blockingDecisions, claimDecision, decisionsFirstText, escalateDecision, listDecisions, openDecisionRow, refuse, resolutionOf, resolveDecision, sweepDecisions } from '../../machine/decisions.mjs';
+import { readEnv } from '../../lib/env.mjs';
+import { splitList } from '../../lib/list.mjs';
 
-const csv = (v) => [...new Set(String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+const csv = (v) => splitList(v, { dedupe: true });
 const evidenceOf = (args) => {
   if (args['evidence-json']) { const v = parseJsonOr(args['evidence-json'], null); if (!Array.isArray(v)) throw refuse('--evidence-json must be a JSON array', 'decision-evidence-invalid'); return v; }
   if (args['evidence-file']) {
@@ -38,7 +40,7 @@ export default {
   usage: '  decisions --workflow <id> [--list] [--all] [--next] | --open --workflow <id> --kind <k> --summary <t> --by <actor> [...] | --claim <id> --by <a> | --resolve <id> --by <a> --verb <v> [--decision <id>] | --escalate <id> [--to supervisor]   Decision Items: read them first every wake',
   run({ ledger, args, repo, emit }) {
     const db = ledger.db;
-    const by = args.by ?? process.env.STARCI_ACTOR ?? (args.workflow ? `kernel:${args.workflow}` : null);
+    const by = args.by ?? readEnv('STARCI_ACTOR') ?? (args.workflow ? `kernel:${args.workflow}` : null);
     if (args.open) {
       const r = openDecisionRow(ledger, {
         workflowId: args.workflow, kind: args.kind, decider: args.decider, summary: args.summary,

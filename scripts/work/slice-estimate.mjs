@@ -4,7 +4,7 @@
 import { allocationSettings, slicingGears } from '../../engine/config.mjs';
 
 // The plural `from:` keys of allocation.slicing.size.<class> against the singular count names the weights use.
-export const SIZE_MEASURE_KEYS = Object.freeze({ files: 'file', assertions: 'assertion', components: 'component', records: 'record' });
+const SIZE_MEASURE_KEYS = Object.freeze({ files: 'file', assertions: 'assertion', components: 'component', records: 'record' });
 // Size classes that never fan out, whatever the gear: the owner's table applies to the declared classes only.
 const SINGLE_AGENT_SIZES = ['s', 'm'];
 

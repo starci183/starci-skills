@@ -23,9 +23,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitEvents, eventServices, eventsSnapshotPath } from './events.mjs';
 import { openapiPath } from './operations.mjs';
+import { readEnv } from '../runtime/scripts/lib/env.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
-export const STAND_IN = 'stand-in ';
+const STAND_IN = 'stand-in ';
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema-worker.mjs');
 const OPERATIONS_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'operations-worker.mjs');
 
@@ -56,7 +57,7 @@ export const snapshotText = (printed) => `${printed.replace(/\n+$/, '')}\n`;
 
 /** Runs one worker of one app; answers its stdout, or null when the app has nothing of that kind (exit 3). */
 function runWorker(worker, repoRoot, app) {
-  const result = spawnSync(process.execPath, [worker, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: process.env.PATH ?? '' }, maxBuffer: 256 * 1024 * 1024 });
+  const result = spawnSync(process.execPath, [worker, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: readEnv('PATH') ?? '' }, maxBuffer: 256 * 1024 * 1024 });
   if (result.status === 3) return { text: null, lines: [] };
   const lines = (result.stderr ?? '').split(/\r?\n/).filter(Boolean);
   if (result.status !== 0) throw new Error(`hfs emit-contracts: ${app} failed (exit ${result.status}): ${(lines.join('\n') || result.stdout).trim()}`);

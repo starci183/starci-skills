@@ -94,7 +94,7 @@ export function checkRepoPins({ repo, root = skillRoot }) {
 
 const merged = (pins, bindings) => ({ ...pins, ok: pins.ok && bindings.ok, errors: [...pins.errors, ...bindings.errors], profiles: bindings.profiles });
 
-export function canonPinsMain(argv = []) {
+function canonPinsMain(argv = []) {
   const json = argv.includes('--json');
   const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
   const repo = flag('--repo');

@@ -14,10 +14,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readText } from './read.mjs';
 
-export const INTEGRATION_SPEC_MISSING = 'BE_INTEGRATION_SPEC_MISSING';
+const INTEGRATION_SPEC_MISSING = 'BE_INTEGRATION_SPEC_MISSING';
 
 const CONFIG_FILE = /^((?:[^/]+\/)*?)src\/modules\/integrations\/([^/]+)\/\2\.config\.ts$/;
 const SPEC_SUFFIX = '.integration-spec.ts';
@@ -27,10 +27,7 @@ const INFRA_OUTAGES = new Set(['cut', 'latency', 'during', 'connection']);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The compiler options of the side (its tsconfig.json, `extends` and `paths` resolved by TypeScript itself). */
 function optionsOf(ts, sideRoot) {

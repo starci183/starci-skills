@@ -7,10 +7,14 @@
 // (one entry per code: title, meaning, causes, next step, owner). This checker refuses:
 //   - an emitted code that has no catalog entry (a new code must be explained the day it is added),
 //   - a catalog entry no code emits any more (a retired code leaves the catalog),
-//   - an entry with a missing or malformed field, or an owner outside the closed set.
+//   - an entry with a missing or malformed field, or an owner outside the closed set,
+//   - a code whose only literal source is the rule catalog (knowledge/hfs/rules.yaml) and that no lint plugin or Sonar enforcer of
+//     a rule reports: a catalog line is not an emitter, so a rule code needs a built plugin enforcer or a literal in code.
+// The findings carry stable codes (scripts/lib/failure-code-findings.mjs): RT_CODE_UNCATALOGUED, RT_CODE_STALE, RT_CODE_MALFORMED,
+// RT_CODE_SOLE_EMITTER.
 // What counts as an emitted code (see `emittedCodes`):
 //   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
-//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var;
+//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var (`env.X`, `env['X']`, `readEnv('X')`);
 //   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
 //          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
 import fs from 'node:fs';
@@ -20,12 +24,13 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
+import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
-export const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']);
+const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']);
 /** other-op:<op> is also an owner: the finding is another op's to fix. */
-export const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
+const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
 const SCAN_DIRS = ['scripts', 'engine', 'modules'];
 // The HFS rule catalog names the code of every rule, including rules whose checker is still owed, so it emits them too.
 const SCAN_FILES = ['knowledge/hfs/rules.yaml'];
@@ -64,7 +69,7 @@ const KEBAB_RES = [
 const LIST_RE = /\b[A-Z][A-Z0-9_]*_(?:REASONS|CODES|KINDS|CLASSES)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]/g;
 
 /** Closed vocabularies that are verdict reasons too: blocker kinds, failure classes, route verdicts (modules/models/kinds.yaml) and the ledger's own attempt/check enums (0001-init.sql). Keyed `<family>:<value>`. */
-export function vocabularyCodes(base = root) {
+function vocabularyCodes(base = root) {
   const out = [];
   const kinds = parseYaml(fs.readFileSync(path.join(base, 'modules/models/kinds.yaml'), 'utf8'))?.vocabularies ?? {};
   const fam = (prefix, list, file) => { for (const v of Array.isArray(list) ? list : []) out.push({ code: `${prefix}:${v}`, kind: 'vocab', sites: [{ file, line: 1 }] }); };
@@ -116,7 +121,7 @@ export function emittedCodes(base = root) {
     if (SKIP_FILES.has(rel)) continue;
     const text = fs.readFileSync(file, 'utf8');
     texts.push([rel, text]);
-    for (const m of text.matchAll(/\b(?:process\.)?env(?:\.|\[\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
+    for (const m of text.matchAll(/\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
   }
   for (const [rel, text] of texts) {
     for (const m of text.matchAll(UPPER_RE)) {
@@ -144,7 +149,7 @@ export function emittedCodes(base = root) {
 
 // The entry's scalar fields. Its Vietnamese fields (FAILURE_CODE_VIETNAMESE_FIELDS) are the one declared exception of the English-only document law (HFS_DOC_NOT_ENGLISH); causes_vi is their list companion.
 const FIELDS = ['title', ...FAILURE_CODE_VIETNAMESE_FIELDS.filter((field) => field !== 'causes_vi'), 'owner', 'kind'];
-export const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
+const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
 
 /** Read the catalog: a flat map code -> entry. */
 export function readCatalog(base = root) {
@@ -159,6 +164,9 @@ export function catalogProblems(base = root) {
   const emittedSet = new Set(emitted.map((e) => e.code));
   const missing = emitted.filter((e) => !Object.hasOwn(catalog, e.code));
   const stale = Object.keys(catalog).filter((code) => !emittedSet.has(code));
+  const rules = parseYaml(fs.readFileSync(path.join(base, 'knowledge/hfs/rules.yaml'), 'utf8'))?.rules ?? [];
+  const pluginReported = new Set(rules.filter((r) => (r.enforcers ?? []).some((e) => PLUGIN_ENFORCERS.includes(e.kind) && !e.status)).flatMap((r) => [r.code, ...(r.failureCodes ?? [])]));
+  const soleEmitter = emitted.filter((e) => e.kind === 'upper' && e.sites.every((site) => site.file === 'knowledge/hfs/rules.yaml') && !pluginReported.has(e.code));
   const malformed = [];
   const ops = new Set(fs.readdirSync(path.join(base, 'modules/ops/ops')).filter((n) => n.endsWith('.yaml')).map((n) => n.slice(0, -5)));
   for (const [code, entry] of Object.entries(catalog)) {
@@ -170,7 +178,7 @@ export function catalogProblems(base = root) {
     if (!Array.isArray(entry?.causes_vi) || !entry.causes_vi.length || entry.causes_vi.some((c) => typeof c !== 'string' || !c.trim())) bad.push('causes_vi must be a non-empty list of strings');
     if (bad.length) malformed.push({ code, problems: bad });
   }
-  return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed };
+  return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed, soleEmitter };
 }
 
 if (isMain(import.meta.url)) {
@@ -179,13 +187,14 @@ if (isMain(import.meta.url)) {
     process.exit(0);
   }
   const p = catalogProblems();
-  const ok = !p.missing.length && !p.stale.length && !p.malformed.length;
+  const ok = !p.missing.length && !p.stale.length && !p.malformed.length && !p.soleEmitter.length;
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok, ...p }, null, 2));
   else if (ok) console.log(`OK: ${p.emitted} emitted codes, all in ${CATALOG_FILE} (${p.catalog} entries).`);
   else {
-    for (const m of p.missing) console.error(`MISSING ${m.code} (${m.sites[0].file}:${m.sites[0].line}): an emitted code with no entry in ${CATALOG_FILE}; add title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind`);
-    for (const c of p.stale) console.error(`STALE ${c}: in ${CATALOG_FILE} but no code emits it; remove the entry`);
-    for (const m of p.malformed) console.error(`MALFORMED ${m.code}: ${m.problems.join('; ')}`);
+    for (const m of p.missing) console.error(`${CODE_FINDINGS.uncatalogued} ${m.code} (${m.sites[0].file}:${m.sites[0].line}): an emitted code with no entry in ${CATALOG_FILE}; add title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind`);
+    for (const c of p.stale) console.error(`${CODE_FINDINGS.stale} ${c}: in ${CATALOG_FILE} but no code emits it; remove the entry`);
+    for (const e of p.soleEmitter) console.error(`${CODE_FINDINGS.soleEmitter} ${e.code} (${e.sites[0].file}:${e.sites[0].line}): the rule catalog is its only source; build a lint or Sonar enforcer that reports it, or spell it where a check emits it`);
+    for (const m of p.malformed) console.error(`${CODE_FINDINGS.malformed} ${m.code}: ${m.problems.join('; ')}`);
   }
   process.exit(ok ? 0 : 1);
 }

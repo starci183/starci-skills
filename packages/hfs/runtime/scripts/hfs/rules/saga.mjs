@@ -17,14 +17,14 @@
 //                                   (an outage of an infra service, an app or a fake: `during`, `cut`, `latency`, `failNext`, `interruptDatabase`).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
 
-export const SAGA_STEP_COMPENSATION = 'BE_SAGA_STEP_COMPENSATION';
-export const SAGA_STATE_VERSIONED = 'BE_SAGA_STATE_VERSIONED';
-export const SAGA_EVENT_CONTRACT = 'BE_SAGA_EVENT_CONTRACT';
-export const SAGA_CONSUMER_DEDUPE = 'BE_SAGA_CONSUMER_DEDUPE';
-export const SAGA_E2E_MISSING = 'BE_SAGA_E2E_MISSING';
+const SAGA_STEP_COMPENSATION = 'BE_SAGA_STEP_COMPENSATION';
+const SAGA_STATE_VERSIONED = 'BE_SAGA_STATE_VERSIONED';
+const SAGA_EVENT_CONTRACT = 'BE_SAGA_EVENT_CONTRACT';
+const SAGA_CONSUMER_DEDUPE = 'BE_SAGA_CONSUMER_DEDUPE';
+const SAGA_E2E_MISSING = 'BE_SAGA_E2E_MISSING';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAGA_FILE = /^be\/src\/features\/saga\/([^/]+)\/(?:(?:steps|compensations)\/)?[^/]+\.(?:saga\.service|saga-state|saga-step|compensation)\.ts$/;
@@ -40,10 +40,7 @@ const INJECTION = /\.(?:during|cut|latency|failNext|interruptDatabase)\s*\(/;
 const STORE_MODULE = /(?:^|\/)platform\/saga$/;
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 const parse = (ts, text) => ts.createSourceFile('saga.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 

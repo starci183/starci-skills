@@ -12,16 +12,18 @@ import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kind
 import { subkindOf } from '../../artifact-subkind.mjs';
 import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
+import { refuse } from '../../../../engine/refuse.mjs';
+import { resolvedKey } from '../../../lib/path-key.mjs';
 
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const slash = (s) => String(s).replace(/\\/g, '/');
-const keyOf = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+
 const inside = (root, file) => {
-  const rel = path.relative(keyOf(root), keyOf(file));
+  const rel = path.relative(resolvedKey(root), resolvedKey(file));
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };
-export const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'], ['stderrPath', 'check-stderr', 'stderr'], ['outputPath', 'check-output', 'output']]);
+const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'], ['stderrPath', 'check-stderr', 'stderr'], ['outputPath', 'check-output', 'output']]);
 
 /**
  * The attempt's scratch directory: op_attempts.scratch_dir. It must be an existing directory
@@ -62,7 +64,7 @@ export function attachedArgs(argv = process.argv.slice(2)) {
 
 const ATTACH_MAX_FILES = 2000;
 /** Scratch folders api report attaches by itself when present. */
-export const AUTO_ATTACH = Object.freeze(['draw-loop', 'captures']);
+const AUTO_ATTACH = Object.freeze(['draw-loop', 'captures']);
 /** Every file under a directory (bounded), sorted. */
 function filesUnder(dir, out = []) {
   let entries = [];
@@ -79,7 +81,7 @@ function filesUnder(dir, out = []) {
  * runs/<runId>/** is a UAT run (role uat-run, run_id), captures/** an app capture (capture | dom), round-<n>/ a draw
  * or audit round (round n), interface-audit.json the audit verdict; anything else by its file kind (roleOf).
  */
-export function attachmentFacts(rel) {
+function attachmentFacts(rel) {
   const parts = slash(rel).split('/');
   const run = parts.indexOf('runs');
   const runId = run >= 0 && parts.length > run + 2 ? parts[run + 1] : null;
@@ -162,8 +164,8 @@ export function fileReportEvidence(db, { attempt, reportId, report, staged, now 
   return { artifacts, checks, ...(audit ? { audit } : {}) };
 }
 
-export const INTERFACE_AUDIT_FILE = 'interface-audit.json';
-export const INTERFACE_AUDIT_SCHEMA = 'starci/interface-audit-operation@1';
+const INTERFACE_AUDIT_FILE = 'interface-audit.json';
+const INTERFACE_AUDIT_SCHEMA = 'starci/interface-audit-operation@1';
 /**
  * interface.audit's verdict (ARCHITECTURE-DB §5.2: features/<f>/operations/** → interface_audits): an attached
  * interface-audit.json {schema starci/interface-audit-operation@1, id operation.<feature>.<name>, feature?, scope |

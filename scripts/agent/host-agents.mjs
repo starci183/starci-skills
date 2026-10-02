@@ -13,6 +13,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { isSpecRun } from '../lib/env.mjs';
+import { appDataBase } from '../lib/app-data.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const readYaml = (rel) => { try { return parseYaml(fs.readFileSync(path.join(root, rel), 'utf8')); } catch { return null; } };
@@ -21,9 +23,7 @@ const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8
 /** Orca's userData folder (STARCI_ORCA_USER_DATA re-roots it, as for Orca's CODEX_HOME in agent/trust.mjs). */
 export function orcaUserData({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
   if (env.STARCI_ORCA_USER_DATA) return env.STARCI_ORCA_USER_DATA;
-  const base = platform === 'win32' ? (env.APPDATA || path.join(home, 'AppData', 'Roaming'))
-    : platform === 'darwin' ? path.join(home, 'Library', 'Application Support') : (env.XDG_CONFIG_HOME || path.join(home, '.config'));
-  return path.join(base, 'orca');
+  return path.join(appDataBase({ env, platform, home }), 'orca');
 }
 
 /** The settings file of Orca's active profile: <userData>/profiles/<activeProfileId>/orca-data.json. */
@@ -47,8 +47,8 @@ export function modelsOfProvider(provider) {
   return found;
 }
 
-const onPath = (binary, { pathDirs, platform }) => {
-  const exts = platform === 'win32' ? ['', ...(process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';').map((e) => e.toLowerCase())] : [''];
+const onPath = (binary, { pathDirs, platform, env = process.env }) => {
+  const exts = platform === 'win32' ? ['', ...(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').map((e) => e.toLowerCase())] : [''];
   return pathDirs.some((dir) => exts.some((ext) => { try { return fs.statSync(path.join(dir, binary + ext)).isFile(); } catch { return false; } }));
 };
 
@@ -57,7 +57,7 @@ const onPath = (binary, { pathDirs, platform }) => {
  * platform, env, models (a Set replacing the declared models).
  */
 export function hostAgentVerdict({ provider, model = null, card, env = process.env, platform = process.platform, settingsFile = null, pathDirs = null, models = null }) {
-  if (!settingsFile && !pathDirs && env.NODE_TEST_CONTEXT) return { ok: true, skipped: 'a test process does not read the host agents' };
+  if (!settingsFile && !pathDirs && isSpecRun(env)) return { ok: true, skipped: 'a test process does not read the host agents' };
   const agent = card?.start?.agentArgument ?? provider;
   const settings = readJson(settingsFile ?? orcaSettingsFile({ env, platform }))?.settings ?? {};
   if ((settings.disabledTuiAgents ?? []).includes(agent)) {
@@ -70,7 +70,7 @@ export function hostAgentVerdict({ provider, model = null, card, env = process.e
   const override = settings.agentCmdOverrides?.[agent];
   const binary = (typeof override === 'string' && override.trim() ? override.trim().split(/\s+/)[0] : null) ?? card?.start?.cli ?? agent;
   const dirs = pathDirs ?? String(env.PATH || env.Path || '').split(path.delimiter).filter(Boolean);
-  if (!path.isAbsolute(binary) && !onPath(binary, { pathDirs: dirs, platform })) {
+  if (!path.isAbsolute(binary) && !onPath(binary, { pathDirs: dirs, platform, env })) {
     return { ok: false, code: 'agent-binary-missing', error: `agent '${agent}' needs the CLI binary '${binary}', which is not on PATH: install it or route the role to another agent` };
   }
   if (card?.start?.modelArgument !== false && model) {

@@ -21,7 +21,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 
 export const HOST_EVENT_WINDOW_MS = 20 * 60_000;
 export const HOST_EVENT_MIN_WORKFLOWS = 3;
-export const HOST_DEAD_REASON = /^(?:terminal_handle_stale|terminal (?:disconnected|not in the Orca listing|listed disconnected)\b)/;
+const HOST_DEAD_REASON = /^(?:terminal_handle_stale|terminal (?:disconnected|not in the Orca listing|listed disconnected)\b)/;
 
 
 // A dead worker terminal is host evidence too: a worker Orca calls disconnected, or gone with a stale handle

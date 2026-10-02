@@ -23,9 +23,10 @@ import { getWorkflow } from './shared/rows.mjs';
 import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot-run.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from '../ask-server.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 function ensureAskConnectors() {
-  if (process.env.STARCI_CONNECTORS_OFF === '1') return null;
+  if (readEnv('STARCI_CONNECTORS_OFF') === '1') return null;
   let cf = null;
   try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
   if (!cf || cf.mode === 'off') return null;

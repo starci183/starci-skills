@@ -25,7 +25,7 @@ import { fileOf, inSlot } from "./lib/scope.mjs"
  * - a single class covering both trips the misleading-character-class rule, and a rule that has to
  * be silenced to exist is one nobody trusts.
  */
-export const hasEmoji = (text) =>
+const hasEmoji = (text) =>
   typeof text === "string" &&
   (/\p{Extended_Pictographic}/u.test(text) || /[\u{1F1E6}-\u{1F1FF}]{2}/u.test(text))
 

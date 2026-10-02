@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, examplesCiMain, exampleApps, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
-import { readProperties } from '../../scripts/gates/sonar-local.mjs';
+import { readProperties } from '../../scripts/lib/properties.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
 import { isMeasured } from '../../scripts/hfs/coverage-scope.mjs';
@@ -99,8 +99,10 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   }
   const upload = steps.find((entry) => String(entry.uses ?? '').startsWith('codecov/codecov-action@'));
   assert.equal(upload.with.flags, '${{ matrix.app }}');
-  assert.match(upload.if, /env\.CODECOV_TOKEN != ''/);
-  assert.ok(steps.some((entry) => /CODECOV_TOKEN is not set/.test(String(entry.run ?? '')) && /env\.CODECOV_TOKEN == ''/.test(entry.if)), 'a missing token is said in the log');
+  assert.equal(upload.with.use_oidc, true, 'the upload authenticates with the OIDC token');
+  assert.equal(upload.with.token, undefined);
+  assert.doesNotMatch(String(upload.if ?? ''), /secrets|env\./, 'the upload is not guarded by the presence of a secret');
+  assert.equal(workflow.jobs.app.permissions['id-token'], 'write');
   assert.ok(steps.some((entry) => String(entry.uses ?? '').startsWith('SonarSource/sonarqube-scan-action')));
   assert.ok(steps.some((entry) => /no Sonar server is configured/.test(String(entry.run ?? ''))));
   assert.ok(steps.findIndex((entry) => entry.run === 'npm test -- --ci') < steps.indexOf(upload));

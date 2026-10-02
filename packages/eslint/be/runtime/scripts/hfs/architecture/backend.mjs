@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
 import { slotAdmitsFile } from '../allows.mjs';
-import { reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
+import { reachableViolation, relativePath } from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
 const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
@@ -73,6 +74,18 @@ function roleEvidence(ts, sourceFile) {
 
 function transportFrameworkEvidence(ts, sourceFile, checker) {
   const found = [];
+  // The destructured binding elements naming a transport export (or a computed binding, which cannot be
+  // proved to exclude one): `const { Controller, [x]: y } = ...`. `rest` elements are always opaque.
+  const destructuredBindings = (elements, detail) => elements.flatMap(element => {
+    const selected = element.dotDotDotToken
+      ? null
+      : ts.isIdentifier(element.propertyName ?? element.name)
+        ? (element.propertyName ?? element.name).text
+        : ts.isStringLiteralLike(element.propertyName)
+          ? element.propertyName.text
+          : null;
+    return selected === null || NEST_COMMON_TRANSPORT.has(selected) ? [{ node: element, detail: selected ?? detail }] : [];
+  });
   const namespaceUsages = binding => {
     const usages = [];
     const alias = binding.text;
@@ -90,18 +103,7 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
         if (!ts.isObjectBindingPattern(node.name)) {
           usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
         } else {
-          for (const element of node.name.elements) {
-            const selected = element.dotDotDotToken
-              ? null
-              : ts.isIdentifier(element.propertyName ?? element.name)
-                ? (element.propertyName ?? element.name).text
-                : ts.isStringLiteralLike(element.propertyName)
-                  ? element.propertyName.text
-                  : null;
-            if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) {
-              usages.push({ node: element, detail: selected ?? 'computed @nestjs/common namespace destructuring' });
-            }
-          }
+          usages.push(...destructuredBindings(node.name.elements, 'computed @nestjs/common namespace destructuring'));
         }
       }
       ts.forEachChild(node, visit);
@@ -168,16 +170,7 @@ function transportFrameworkEvidence(ts, sourceFile, checker) {
         if (ts.isIdentifier(node.name)) {
           found.push(...namespaceUsages(node.name).map(item => ({ ...item, specifier })));
         } else if (ts.isObjectBindingPattern(node.name)) {
-          for (const element of node.name.elements) {
-            const selected = element.dotDotDotToken
-              ? null
-              : ts.isIdentifier(element.propertyName ?? element.name)
-                ? (element.propertyName ?? element.name).text
-                : ts.isStringLiteralLike(element.propertyName)
-                  ? element.propertyName.text
-                  : null;
-            if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) found.push({ node: element, specifier, detail: selected ?? 'computed @nestjs/common require destructuring' });
-          }
+          found.push(...destructuredBindings(node.name.elements, 'computed @nestjs/common require destructuring').map(item => ({ ...item, specifier })));
         }
       }
     }

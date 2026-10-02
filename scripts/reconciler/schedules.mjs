@@ -20,8 +20,8 @@
 // file) makes nothing due: a duty never runs on a guess.
 import { withMachine, readMachine, pidAlive } from '../../engine/db/machine.mjs';
 
-export const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning', 'sla']);
-export const SCHEDULE_RESULTS = Object.freeze(['done', 'failed', 'unknown', 'skipped']);
+const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning', 'sla']);
+const SCHEDULE_RESULTS = Object.freeze(['done', 'failed', 'unknown', 'skipped']);
 
 const memories = new WeakMap();
 const globalMemory = new Map();
@@ -40,7 +40,7 @@ function check(controller, duty, intervalMs) {
 }
 
 /** The pure due rule over a stored row (or null): {due, reason} or {due: false, nextAt}. */
-export function dueOf(row, { intervalMs, now, earlyAfterMs = null, force = false, pid = process.pid, alive = pidAlive }) {
+function dueOf(row, { intervalMs, now, earlyAfterMs = null, force = false, pid = process.pid, alive = pidAlive }) {
   if (force) return { due: true, reason: 'forced' };
   if (!row || row.last_started_at == null) return { due: true, reason: 'first-run' };
   const last = Number(row.last_started_at);

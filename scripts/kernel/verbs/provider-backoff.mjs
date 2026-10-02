@@ -14,9 +14,9 @@ import { allocationMs } from '../../../engine/config.mjs';
 import { openMachine, poolBackoff } from '../../../engine/db/machine.mjs';
 import { readProviderCircuit, writeProviderCircuit } from '../../machine/provider-circuit.mjs';
 import { refuse } from '../kernel-authority.mjs';
+import { normalizeProvider } from '../../lib/provider.mjs';
 
 const KINDS = new Set(['quota', 'rate-limited']);
-const providerKey = (p) => String(p ?? '').trim().toLowerCase().replace(/-agent$/, '');
 
 export default {
   verb: 'provider-backoff',
@@ -26,14 +26,14 @@ export default {
   usage: '  provider-backoff --provider <p> --open-circuit [--kind quota|rate-limited] --reason <text> --by <actor>   open the provider circuit a persisting rate limit calls for (idempotent)',
   run({ args, emit, machine = null }) {
     const now = Date.now();
-    const key = providerKey(args.provider);
+    const key = normalizeProvider(args.provider);
     if (!key) throw refuse('--provider names no provider', 'provider-missing');
     if (!args['open-circuit']) throw refuse('provider-backoff needs --open-circuit', 'action-missing');
     const kind = String(args.kind ?? 'quota');
     if (!KINDS.has(kind)) throw refuse(`--kind must be one of ${[...KINDS].join(', ')}`, 'kind-invalid');
     const m = machine ?? openMachine();
     try {
-    const pools = (poolBackoff(m) ?? []).filter((r) => providerKey(r.pool) === key).map((r) => ({ pool: r.pool, untilAt: r.until_at, strikes: r.strikes, reason: r.reason }));
+    const pools = (poolBackoff(m) ?? []).filter((r) => normalizeProvider(r.pool) === key).map((r) => ({ pool: r.pool, untilAt: r.until_at, strikes: r.strikes, reason: r.reason }));
     const stored = readProviderCircuit(key, { machine: m });
     const open = stored && stored.value?.status === 'unavailable' && (stored.expiresAt == null || stored.expiresAt > now)
       ? { ...stored.value, expiresAt: stored.expiresAt } : null;

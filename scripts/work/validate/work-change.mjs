@@ -34,7 +34,7 @@ import {list} from '../../lib/list.mjs';
  */
 export const RESULT='starci/work-change@1';
 export const CHANGE_KINDS=['initial','editorial','clarifying','breaking'];
-export const CHANGE_FIELDS=['rev','kind','at','withdraws','reason','retains'];
+const CHANGE_FIELDS=['rev','kind','at','withdraws','reason','retains'];
 const MAX_INPUT_BYTES=4*1024*1024;
 const SKIP_DIRECTORY=/^[._]|^(?:assets|node_modules)$/;
 

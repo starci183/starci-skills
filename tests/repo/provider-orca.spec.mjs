@@ -131,7 +131,7 @@ test('every scripts/api/orca wrapper is backed by a calls.yaml entry',()=>{
   assert.ok(wrappers.length>0,'scripts/api/orca holds no verb wrappers');
   for(const file of wrappers){
     const source=fs.readFileSync(path.join(WRAPPERS_DIR,file),'utf8');
-    const verbs=[...source.matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1]);
+    const verbs=[...source.matchAll(/\b(?:orcaCall|workerVerb)\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1]);
     assert.ok(verbs.length>0,`${file}: builds no orcaCall(<verb>) — argv must come from calls.yaml`);
     for(const verb of verbs)assert.ok(declared.has(verb),`${file}: calls.yaml has no calls.${verb} entry`);
     assert.doesNotMatch(source,/\borcaRun\(/,`${file}: calls orcaRun directly — argv belongs to calls.yaml via orcaCall`);
@@ -180,7 +180,7 @@ test('calls.yaml declares the live agent-context guard the runner executes',()=>
 // api dispatch writes (modules/kernel/start-workflow.yaml orcaTree.titles).
 test('every call the Orca host index names is one a scripts/api/orca wrapper issues',()=>{
   const issued=new Set(fs.readdirSync(WRAPPERS_DIR).filter(f=>f.endsWith('.mjs'))
-    .flatMap(f=>[...fs.readFileSync(path.join(WRAPPERS_DIR,f),'utf8').matchAll(/orcaCall\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1])));
+    .flatMap(f=>[...fs.readFileSync(path.join(WRAPPERS_DIR,f),'utf8').matchAll(/\b(?:orcaCall|workerVerb)\(\s*'([a-z][a-z-]*)'/g)].map(m=>m[1])));
   const named=[];
   const walk=(node,at)=>{
     if(!node||typeof node!=='object')return;

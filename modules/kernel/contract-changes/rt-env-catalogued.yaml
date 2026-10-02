@@ -1,0 +1,22 @@
+id: rt-env-catalogued
+effectiveAt: '2026-10-02T18:00:00+07:00'
+summary: >-
+  Smell wave S8-01, S8-02, S11-04: `npm run check` runs scripts/checks/check-env.mjs against the new catalog
+  modules/schemas/env.yaml (every environment variable the runtime reads or sets, with purpose and kind) and the one reader
+  scripts/lib/env.mjs (readEnv, isSpecRun). RT_ENV_UNCATALOGUED: a variable read or named in production code and absent from
+  the catalog. RT_ENV_READ_OUTSIDE_OWNER: a direct read of one name from process.env outside the reader. RT_TEST_ENV_IN_PRODUCTION:
+  production code reading NODE_TEST_CONTEXT instead of isSpecRun. RT_ENV_STALE_ENTRY: an entry nothing reads. scripts/lib/env.mjs
+  is a declared base env seam (ruleParams.runtime.baseEnvSeams). Every finding in the tree is fixed with the check.
+reach: new-legs
+adds:
+  checks: [check-env]
+  codes: [RT_ENV_UNCATALOGUED, RT_ENV_READ_OUTSIDE_OWNER, RT_TEST_ENV_IN_PRODUCTION, RT_ENV_STALE_ENTRY]
+paths:
+  - modules/kernel/contract-changes/rt-env-catalogued.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/schemas/env.yaml
+  - modules/schemas/index.yaml
+  - knowledge/hfs/runtime-slots.yaml
+  - scripts/checks/check-env.mjs
+  - scripts/lib/env.mjs
+  - tests/checks/check-env.spec.mjs

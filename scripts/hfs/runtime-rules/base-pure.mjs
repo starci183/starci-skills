@@ -4,51 +4,18 @@
 //             binding: a named import (aliases kept), the module itself (fs.writeFileSync, fs.promises.rm), a require()
 //   an env    a read of process.env outside the seams
 // The tier comes from the file's slot (resolver.tierOf), never from its path. Pure.
-import { lineOf, ts } from './source-ast.mjs';
+import { fsBindings, fsMemberAccess, lineOf, ts } from './source-ast.mjs';
 
 export const CODE = 'RT_BASE_IMPURE';
-const FS_MODULES = new Set(['fs', 'node:fs', 'fs/promises', 'node:fs/promises']);
 
 /** The RT_BASE_IMPURE findings of one base-tier source. */
 export function fileBaseFindings({ path: file, source, writeMembers, envSeam }) {
   const t = ts();
   const members = new Set(writeMembers);
-  const namespaces = new Set();
-  const functions = new Map();
+  const { namespaces, members: functions } = fsBindings(source, (imported) => members.has(imported));
   const found = [];
-  const fsModule = (node) => Boolean(node && t.isStringLiteralLike(node) && FS_MODULES.has(node.text));
-  const requireOf = (node) => node && t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'require' && fsModule(node.arguments[0]);
-  const bind = (node) => {
-    if (t.isImportDeclaration(node) && fsModule(node.moduleSpecifier)) {
-      const c = node.importClause;
-      if (c?.name) namespaces.add(c.name.text);
-      const b = c?.namedBindings;
-      if (b && t.isNamespaceImport(b)) namespaces.add(b.name.text);
-      if (b && t.isNamedImports(b)) for (const el of b.elements) {
-        const imported = (el.propertyName ?? el.name).text;
-        if (imported === 'promises') namespaces.add(el.name.text);
-        else if (members.has(imported)) functions.set(el.name.text, imported);
-      }
-    }
-    if (t.isVariableDeclaration(node) && requireOf(node.initializer)) {
-      if (t.isIdentifier(node.name)) namespaces.add(node.name.text);
-      else if (t.isObjectBindingPattern(node.name)) for (const el of node.name.elements) {
-        const imported = el.propertyName && t.isIdentifier(el.propertyName) ? el.propertyName.text : t.isIdentifier(el.name) ? el.name.text : null;
-        if (imported && members.has(imported) && t.isIdentifier(el.name)) functions.set(el.name.text, imported);
-      }
-    }
-    t.forEachChild(node, bind);
-  };
-  bind(source);
   /** The fs write member `callee` reaches, or null: fs.X, fs.promises.X, a named import of X. */
-  const writeOf = (callee) => {
-    if (t.isIdentifier(callee)) return functions.get(callee.text) ?? null;
-    if (!t.isPropertyAccessExpression(callee) || !members.has(callee.name.text)) return null;
-    const target = callee.expression;
-    if (t.isIdentifier(target) && namespaces.has(target.text)) return callee.name.text;
-    if (t.isPropertyAccessExpression(target) && target.name.text === 'promises' && t.isIdentifier(target.expression) && namespaces.has(target.expression.text)) return callee.name.text;
-    return null;
-  };
+  const writeOf = (callee) => t.isIdentifier(callee) ? functions.get(callee.text) ?? null : fsMemberAccess(t, callee, namespaces, (name) => members.has(name));
   const visit = (node) => {
     if (t.isCallExpression(node)) {
       const member = writeOf(node.expression);

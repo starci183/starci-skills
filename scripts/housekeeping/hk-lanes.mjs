@@ -38,6 +38,7 @@ import { pathKey } from '../lib/path-key.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { lanesRoot } from '../machine/home.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, liveLaneOwners } from '../machine/lane-owner.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -147,7 +148,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   // The live owners (scripts/machine/lane-owner.mjs, the same rule gc.mjs applies), read once when a lane gets that far.
   // A spec process with no owners passed reads none (never the live host's Orca).
   let ownerInfo = owners ?? null;
-  const ownersNow = () => (ownerInfo ??= (process.env.NODE_TEST_CONTEXT ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
+  const ownersNow = () => (ownerInfo ??= (isSpecRun() ? { workers: [], sup: { jobs: [] } } : liveLaneOwners({ env })));
   const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
   for (const w of worktrees) {
     const key = pathKey(w.path);

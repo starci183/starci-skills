@@ -17,6 +17,7 @@ import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { insidePath } from '../lib/path-key.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SETTINGS_FILE = path.join(SKILL_ROOT, 'modules', 'kernel', 'product-land.yaml');
@@ -27,7 +28,7 @@ export const ENDED_WORKFLOW_PHASES = Object.freeze(['stopped', 'finished', 'arch
 export const TERMINAL_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 export const SETTLED_JOBS = new Set(SETTLED_JOB_LIST);
-export const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000, rebaseMilestoneBehind: 20 });
+const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000, rebaseMilestoneBehind: 20 });
 
 /** worktrees.{capPerRepo, ownerGoneMs, gcEveryMs, gcBudgetMs, rebaseMilestoneBehind} of modules/kernel/product-land.yaml over the defaults. */
 export function worktreeSettings(file = SETTINGS_FILE) {
@@ -43,7 +44,7 @@ export function worktreeSettings(file = SETTINGS_FILE) {
 /** A tree's comparable identity: resolved, real where it exists, case-folded on Windows. */
 export const treeKey = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; };
 export const sameTree = (a, b) => treeKey(a) === treeKey(b);
-export const insideTree = (child, parent) => { const rel = path.relative(treeKey(parent), treeKey(child)); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
+export const insideTree = (child, parent) => insidePath(parent, child, { key: treeKey });
 export const isGone = (p) => { try { fs.lstatSync(p); return false; } catch { return true; } };
 export const worktreesRootOf = (repoRoot) => path.join(repoRoot, ...WORKTREES_REL.split('/'));
 

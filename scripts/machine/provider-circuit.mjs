@@ -7,14 +7,14 @@
 // provider_health_events row (engine/db/machine.mjs setProviderHealth). Reads never throw: no machine, no circuit.
 import { openMachine, openMachineReader, providerHealth, setProviderHealth } from '../../engine/db/machine.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 
-export const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
-export const providerKeyOf = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
+const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
 const STATUS_OF = { unavailable: 'unavailable', recovered: 'recovered', healthy: 'healthy', striking: 'striking' };
 
 /** The stored circuit of `provider` as {value, at, expiresAt}, or null. */
 export function readProviderCircuit(provider, { machine = null } = {}) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   if (!CIRCUIT_PROVIDERS.includes(key)) return null;
   let m = machine, own = false;
   try {
@@ -28,7 +28,7 @@ export function readProviderCircuit(provider, { machine = null } = {}) {
 
 /** Store the circuit of `provider` (value.status unavailable|recovered|striking|healthy). Returns true when written. */
 export function writeProviderCircuit(provider, { value, expiresAt = null, ledgerId = null, attemptId = null, machine = null } = {}) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   if (!CIRCUIT_PROVIDERS.includes(key)) return false;
   let m = machine, own = false;
   try {

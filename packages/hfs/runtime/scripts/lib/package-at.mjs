@@ -23,3 +23,9 @@ export function findPackage(dirs, names) {
 
 /** The CommonJS entry of a package found by findPackage. */
 export const requirePackage = (found) => createRequire(found.packageFile)(found.name);
+
+/** The TypeScript compiler resolvable from the first of `dirs` (an app root, then the caller's own), or null. */
+export const loadTypescript = (...dirs) => {
+  const located = findPackage(dirs, ['typescript']);
+  return located ? requirePackage(located) : null;
+};

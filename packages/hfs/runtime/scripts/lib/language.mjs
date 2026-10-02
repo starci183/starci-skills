@@ -58,11 +58,11 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
  * The Vietnamese catalog of owner-visible messages (scripts/lib/i18n.mjs): modules/i18n/messages/<area>.yaml, a list of
  * `{en, vi}` entries keyed from the English source. The `vi` field (block or inline flow) is the declared Vietnamese.
  */
-export const I18N_CATALOG_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']), flowFields: Object.freeze(['vi']) });
+const I18N_CATALOG_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']), flowFields: Object.freeze(['vi']) });
 const I18N_CATALOG_DIR = 'modules/i18n/messages/';
 
 /** The `vi` field of an op manifest's text objects (modules/schemas/op.schema.yaml $defs text). */
-export const OP_MANIFEST_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']) });
+const OP_MANIFEST_VIETNAMESE_FIELDS = Object.freeze({ fields: Object.freeze(['vi']) });
 const OP_MANIFEST_DIR = 'modules/ops/ops/';
 /** The declared Vietnamese fields of `rel`: its own entry, or the op-manifest text field for a manifest of modules/ops/ops. */
 export const declaredVietnameseFieldsOf = (rel) => DECLARED_VIETNAMESE_FIELDS[rel]
@@ -74,7 +74,7 @@ export const declaredVietnameseFieldsOf = (rel) => DECLARED_VIETNAMESE_FIELDS[re
  * fixture reproduces a real localized string a parser or formatter must accept. Placement is the whole marker - there is no
  * comment pragma and no path pattern. The slots are declared in knowledge/hfs/slots.yaml.
  */
-export const LOCALIZED_TEXT_SLOTS = Object.freeze([
+const LOCALIZED_TEXT_SLOTS = Object.freeze([
   'be.domain.messages', 'be.feature.messages', 'be.tests.fixtures.i18n',
   'fe.modules.i18n', 'fe.package.i18n',
 ]);
@@ -86,7 +86,7 @@ export const isLocalizedDataFile = (rel, slot) => LOCALIZED_TEXT_SLOTS.includes(
  * The key each line of a YAML text belongs to: a `key:` line owns itself, and every deeper-indented line after it (a list item,
  * a folded block, a wrapped scalar) belongs to the same key. A line at or above the key's indent that is not a key belongs to none.
  */
-export function yamlKeyOfEachLine(text) {
+function yamlKeyOfEachLine(text) {
   let key = null;
   let keyIndent = -1;
   return String(text).split(/\r?\n/).map((raw) => {
@@ -119,7 +119,7 @@ export function documentLanguageHits(rel, text) {
 }
 
 /** The file extensions of a prose document (Markdown and YAML). */
-export const DOCUMENT_EXTENSIONS = Object.freeze(['.md', '.yaml', '.yml']);
+const DOCUMENT_EXTENSIONS = Object.freeze(['.md', '.yaml', '.yml']);
 
 /** Whether `rel` is a document a language check reads. */
 export const isDocument = (rel) => DOCUMENT_EXTENSIONS.includes(path.posix.extname(rel));

@@ -22,8 +22,7 @@ the `ruleParams.be.logicRoles` roles inside the `coverage: required` slots (the 
 app, so the one scope covers every service; the fe has no tests. Each example's `codecov.yml`, its `be/jest.config.js` and the complement
 in its `sonar-project.properties` are all rendered from the one derivation by `node scripts/checks/check-examples-ci.mjs --write` (`npm run check` refuses drift, R204);
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
-only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
-Actions); each product monorepo adds its own for its app-repository `codecov.yml`. Before a release, run the local dashboard gate
+only. The coverage upload authenticates with GitHub's OIDC token (`use_oidc: true`, job permission `id-token: write`), so no repository secret exists to forget and no upload step skips silently (rule CI_UPLOAD_NOT_SILENT); the owner activates the repository on Codecov once. Before a release, run the local dashboard gate
 per example app against the local SonarQube after `npm test` and a project scan:
 
 ```sh

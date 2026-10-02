@@ -32,7 +32,8 @@ import {
 } from './grammar-geometry.mjs';
 import { contrastRatio as wcagRatio } from '../brand/brand.mjs';
 import { flag as argOf } from '../work-io.mjs';
-import { collapse as oneLine } from '../../lib/terminal-liveness.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { squash } from '../../lib/clip.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { alphaOver } from '../../lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge', 'ui');
@@ -88,7 +89,7 @@ const RUN_ONLY = /^(the )?run\b|\bthe run (reaches|is driven|completes|submits|p
 const flatText = (v) => (v == null ? '' : typeof v === 'string' ? v : Array.isArray(v) ? v.map(flatText).join('\n') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => `${k}: ${flatText(x)}`).join('\n') : String(v));
 
 /** The ui record file for a path (the index.yaml itself or its directory). */
-export function surfaceFile(p) {
+function surfaceFile(p) {
   const abs = path.resolve(p);
   if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) return path.join(abs, 'index.yaml');
   return abs;
@@ -330,7 +331,6 @@ function fontPx(knowledge, ruleId, scope) {
   return v?.px ?? null;
 }
 
-
 /** The brief as text. */
 export function briefText(b) {
   const lines = [];
@@ -349,15 +349,15 @@ export function briefText(b) {
       if (!t.cases.length && !t.skipped.length) continue;
       lines.push('');
       lines.push(`# ${t.path} - ${t.title} (${t.cases.length} applicable, ${t.skipped.length} not)`);
-      if (t.scaleNotes) lines.push(`  scale: ${oneLine(t.scaleNotes)}`);
+      if (t.scaleNotes) lines.push(`  scale: ${squash(t.scaleNotes)}`);
       for (const c of t.cases) {
-        lines.push(`- ${t.path} ${c.rule} ${c.case} [${c.title ? oneLine(c.title) : ''}] when: ${oneLine(c.when)}`);
-        if (c.observe) lines.push(`    observe: ${oneLine(c.observe)}`);
-        if (c.assert) lines.push(`    assert: ${oneLine(c.assert)}`);
-        if (c.owner || c.render) lines.push(`    owner ${oneLine(c.owner) || '-'}; render: ${oneLine(c.render) || '-'}`);
+        lines.push(`- ${t.path} ${c.rule} ${c.case} [${c.title ? squash(c.title) : ''}] when: ${squash(c.when)}`);
+        if (c.observe) lines.push(`    observe: ${squash(c.observe)}`);
+        if (c.assert) lines.push(`    assert: ${squash(c.assert)}`);
+        if (c.owner || c.render) lines.push(`    owner ${squash(c.owner) || '-'}; render: ${squash(c.render) || '-'}`);
         if (c.numbers?.length) lines.push(`    numbers: ${c.numbers.map((n) => n.text).join('; ')}`);
       }
-      for (const gd of t.guidance) lines.push(`- ${t.path} guidance ${gd.id}: ${oneLine(gd.requirement)}`);
+      for (const gd of t.guidance) lines.push(`- ${t.path} guidance ${gd.id}: ${squash(gd.requirement)}`);
       if (t.skipped.length) lines.push(`  not applicable: ${t.skipped.map((s) => `${s.id} (${s.reason})`).join('; ')}`);
     }
   }
@@ -388,7 +388,7 @@ export function briefText(b) {
 // ---------------------------------------------------------------------------------------------------------
 
 const contrastRatio = (a, b) => wcagRatio({ rgb: a.slice(0, 3) }, { rgb: b.slice(0, 3) });
-const blend = (top, under) => { const a = top[3]; return [0, 1, 2].map((k) => Math.round(top[k] * a + under[k] * (1 - a))).concat([1]); };
+
 const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 const numberWord = (w) => (WORDS[String(w).toLowerCase()] ?? Number(w));
 const r1 = (n) => Math.round(n * 10) / 10;
@@ -454,7 +454,7 @@ function hairlines(v, card) {
 }
 
 /** The page box a top-level card sits in and the card's inline inset from it (see spacingChecks page-inset). */
-export function pageInsetOf(v, card, width) {
+function pageInsetOf(v, card, width) {
   const anc = v.ancestors(card);
   const padded = anc.filter((a) => a.style.padding[1] > 0.5 || a.style.padding[3] > 0.5);
   const page = anc.find((a) => a.comp === 'PageContainer') ?? padded[padded.length - 1] ?? null;
@@ -469,7 +469,7 @@ export function pageInsetOf(v, card, width) {
 }
 
 /** Full-width disclosure triggers of a card: a <details> root's <summary>, or a Grammar accordion trigger. */
-export function disclosureTriggers(v, card) {
+function disclosureTriggers(v, card) {
   const isTrigger = (e) => e.tag === 'summary' || /(?:^|\s)starci-core-accordion-trigger(?:\s|$)/.test(e.cls ?? '');
   const full = (e) => e.visible && isTrigger(e) && e.rect.w >= card.rect.w - 1.5 && v.ancestors(e).some((a) => a.i === card.i);
   const all = v.els.filter(full);
@@ -760,7 +760,7 @@ function textContrast(v, ctx, large) {
   const isLarge = (e) => e.style.fontSize >= big || (e.style.fontSize >= bigBold && e.style.fontWeight >= 700);
   const runs = v.texts.filter((e) => isLarge(e) === large && e.style.color);
   if (!runs.length) return NONE(`no ${large ? 'large' : 'normal'} text rendered`);
-  const measured = runs.map((e) => { const bg = v.bgOf(e); const fg = blend(e.style.color, bg); return { e, ratio: contrastRatio(fg, bg) }; });
+  const measured = runs.map((e) => { const bg = v.bgOf(e); const fg = alphaOver(e.style.color, bg); return { e, ratio: contrastRatio(fg, bg) }; });
   const bad = measured.filter((x) => x.ratio < floor - 0.005).sort((a, b) => a.ratio - b.ratio);
   return bad.length ? FAIL(`${bad.length} run(s) under ${floor}:1, worst ${bad.slice(0, 3).map((x) => `${tag(x.e)} ${x.ratio.toFixed(2)}:1`).join(', ')}`) : PASS(`${runs.length} run(s) >= ${floor}:1 (lowest ${Math.min(...measured.map((x) => x.ratio)).toFixed(2)}:1)`);
 }
@@ -826,7 +826,7 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
   return { schema: 'starci/ui-proof-score@1', ok: summary.fail === 0, file: html, htmlSha256, viewport, summary, cases: results, spacing: ctx.spacing };
 }
 
-export function scoreText(s) {
+function scoreText(s) {
   const lines = [`UI PROOF SCORE - ${s.file} at ${s.viewport.width}x${s.viewport.height}: ${s.summary.pass} pass, ${s.summary.fail} fail, ${s.summary.unmeasurable} unmeasurable.`, '', 'SPACING / PADDING'];
   for (const r of s.spacing) lines.push(`  ${r.status.toUpperCase().padEnd(12)} ${r.id}: ${typeof r.got === 'number' ? `${r.got}px` : r.got} (want ${typeof r.exp === 'number' ? `${r.exp}px` : r.exp}) - ${r.source}${r.evidence ? ` - ${r.evidence}` : ''}`);
   lines.push('', 'CASES');

@@ -1,10 +1,9 @@
 // auth-seat-churn (wf-nivo-auth-mum8xr9a, DI di-5827b9ee, SEAT_QUARANTINED sdi-70ade9d2): on 2026-09-29 the
 // watchdog's H11 idle-replace closed the nivo-auth Kernel 5 times while it was writing its own records behind an ask
 // it could not serve, and a replace whose tab close timed out was counted as a restart, which quarantined the seat.
-import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { idleWakesOf, startAnswerOf, WAKE_IDLE_WINDOW_MS } from '../../scripts/kernel/kernel-watchdog.mjs';
+import { idleWakesOf, replaceIdleKernel, replaceWakeDeadKernel, startAnswerOf, WAKE_IDLE_WINDOW_MS } from '../../scripts/kernel/kernel-watchdog.mjs';
 import { REPLACED, seatStateOf } from '../../scripts/reconciler/controllers/host.mjs';
 
 const at = (hhmmss) => Date.parse(`2026-09-29T${hhmmss}Z`);
@@ -56,15 +55,27 @@ test('B: a start answer that replaced nothing is not counted as a restart', () =
 });
 
 test('B: an idle or wake-dead replace whose terminal close failed answers kernel-terminal-close-failed before start-workflow', () => {
-  const src = fs.readFileSync(new URL('../../scripts/kernel/kernel-watchdog.mjs', import.meta.url), 'utf8');
-  for (const fn of ['replaceIdleKernel', 'replaceWakeDeadKernel']) {
-    const body = src.slice(src.indexOf(`const ${fn} = `), src.indexOf('};', src.indexOf(`const ${fn} = `)));
-    const guard = body.indexOf('if (!terminalClosed.ok) return closeFailed(');
-    assert.ok(guard > 0, `${fn} honours terminalClosed.ok`);
-    assert.ok(guard < body.indexOf('replaceKernel('), `${fn} checks the close before start-workflow`);
+  for (const [name, fn, input] of [
+    ['replaceIdleKernel', replaceIdleKernel, { idle: { wakes: 3 } }],
+    ['replaceWakeDeadKernel', replaceWakeDeadKernel, { misses: 3, firstAt: at('10:00:00') }],
+  ]) {
+    const calls = [];
+    const result = fn({ phase: 'running', terminal: 'term-k', stale: {}, outputAgeMs: 120_000, ...input }, {
+      closeKernelTerminal: () => { calls.push('close'); return { ok: false, error: 'tab close timed out' }; },
+      replaceKernel: () => { calls.push('replace'); return { ok: true }; },
+      withKernelLedger: () => { calls.push('event'); },
+    });
+    assert.equal(result.action, 'kernel-terminal-close-failed', name);
+    assert.deepEqual(calls, ['close'], `${name} never starts a replacement or records success after a refused close`);
   }
-  const idle = src.slice(src.indexOf('const replaceIdleKernel = '));
-  assert.ok(idle.indexOf('closeFailed(') < idle.indexOf('KERNEL_IDLE_REPLACED_EVENT'), 'an idle replace is recorded only after its terminal closed');
+  const calls = [];
+  const replaced = replaceIdleKernel({ phase: 'running', terminal: 'term-k', stale: {}, outputAgeMs: 120_000, idle: { wakes: 3 } }, {
+    closeKernelTerminal: () => { calls.push('close'); return { ok: true }; },
+    withKernelLedger: (fn) => fn({ transaction: (work) => work(), appendEvent: ({ kind }) => calls.push(kind) }),
+    replaceKernel: () => { calls.push('replace'); return { ok: true, action: 'restarted' }; },
+  });
+  assert.equal(replaced.action, 'restarted');
+  assert.deepEqual(calls, ['close', 'kernel-replaced-idle', 'replace'], 'a successful idle replacement is recorded only after close proof');
   assert.equal(seatStateOf('kernel-terminal-close-failed'), 'replacing');
   assert.equal(REPLACED.has('kernel-terminal-close-failed'), false);
 });
