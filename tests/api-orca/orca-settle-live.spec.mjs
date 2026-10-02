@@ -5,8 +5,8 @@
 // Orca call. Every agent the spec starts is stopped and released in its own teardown; it never resets or touches
 // another Run.
 //   E3  the no-op agent runs scripts/api/orca/send.mjs with its own ids - the exact path `api report` uses to send
-//       worker_done - then: does the Dispatch settle (worker-show state succeeded), and is a later task-update of its Task
-//       refused (it is, only when Orca settled the Task)?
+//       worker_done - then: does the Dispatch settle (worker-show state succeeded), and does Orca itself read the Task
+//       completed (task-list, read BEFORE any update: Orca accepts a later same-state task-update, so a refusal proves nothing)?
 //   E1  worker-release on a settled Claude, Codex and Devin worker: does any agent process remain afterwards?
 // The result of a run is printed as one JSON line per smoke (SMOKE-E3 / SMOKE-E1) for the lane report.
 import test from 'node:test';
@@ -18,13 +18,13 @@ import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
 import { workerRelease } from '../../scripts/api/orca/worker-release.mjs';
-import { taskUpdate } from '../../scripts/api/orca/task-update.mjs';
+import { taskList } from '../../scripts/api/orca/task-list.mjs';
 import { processList as listHostProcesses } from '../../scripts/api/process/process-list.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const AGENTS = ['claude', 'codex', 'devin'];
 const AGENT_PROCESS_WHERE = "Name='claude.exe' OR Name='codex.exe' OR Name='devin.exe'";
-const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --outcome succeeded --report-path smoke . Do not send worker_done any other way. Then stay idle and never exit.`;
+const NOOP_SPEC = `This is a smoke test. Do not read, edit, create or delete anything. Run exactly one shell command, with your own ids from your Orca worker preamble (your task id, your dispatch id, and your terminal handle as --from): node ${ROOT}scripts/api/orca/send.mjs --task-id <your task id> --dispatch-id <your dispatch id> --from <your terminal handle> --dispatch-capability <the dcap_ value of the --dispatch-capability flag in your Orca preamble> --outcome succeeded --report-path smoke . Do not send worker_done any other way. Then stay idle and never exit.`;
 const SETTLED = ['succeeded', 'failed'];
 
 const unavailable = () => {
@@ -63,16 +63,16 @@ async function until(read, done, ms = 240_000) {
 }
 const teardown = (dispatchId) => { workerStop({ dispatch: dispatchId }); return workerRelease({ dispatch: dispatchId }); };
 
-test('E3: worker_done settles the Task; a later task-update is refused', { skip, timeout: 600_000 }, async () => {
+test('E3: worker_done settles the Dispatch and Orca completes its Task', { skip, timeout: 600_000 }, async () => {
   const a = await startNoop('claude', 'e3');
   try {
     const shown = await until(() => workerShow({ dispatch: a.dispatchId }), (r) => SETTLED.includes(r.state));
     diagnose('e3', a);
-    const afterUpdate = taskUpdate({ id: a.taskId, status: 'completed', run: a.runId });
-    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, laterTaskUpdateOk: afterUpdate.ok, laterTaskUpdateError: afterUpdate.error ?? null };
+    const listed = taskList({ run: a.runId });
+    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, taskStatusAfterWorkerDone: listed.tasks.find((t) => t.id === a.taskId)?.status ?? null };
     console.log(`SMOKE-E3 ${JSON.stringify(out)}`);
     assert.equal(out.dispatchStateAfterOrchSend, 'succeeded', 'send.mjs worker_done did not settle the Dispatch');
-    assert.equal(out.laterTaskUpdateOk, false, 'task-update after worker_done was accepted: Orca did not settle the Task');
+    assert.equal(out.taskStatusAfterWorkerDone, 'completed', 'Orca did not complete the Task when the worker_done settled the Dispatch');
   } finally { teardown(a.dispatchId); }
 });
 

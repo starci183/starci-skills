@@ -5,17 +5,13 @@ import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus
 import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../engine/admission.mjs';
 import { settleCheckpoint } from '../workflow-settle.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
-import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { workRecordFilesOf } from './shared/work-record-files.mjs';
-import { jobOpOf, jobPayloadOf, jobRowOf, operationDispatchOf } from './shared/rows.mjs';
+import { jobOpOf, jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { independentChecksOf } from './shared/check-evidence.mjs';
 import { WORKER_QUESTION } from './shared/worker-messages.mjs';
 import { releaseTypedWaits } from './shared/peer-waits.mjs';
-import { closeOperationTerminal } from '../close-op-terminal.mjs';
-import { closeAndVerify, orcaAgents, processTable, reapOrphaned } from '../../machine/close-verify.mjs';
 import { queueTail as queueSettleTail, startTail as startSettleTail } from '../settle/job-settle.mjs';
-import { quitAgent } from '../quit-agent.mjs';
 import { OP_REV_DRIFT, opRevDrift, shortRev } from '../runtime-rev.mjs';
 import { HANDOVER_APPROVED, HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
@@ -23,7 +19,7 @@ import { SEAM_RECONCILED_EVENT } from '../seam-policy.mjs';
 import { EVIDENCE_HOST_PATH } from '../job-artifacts.mjs';
 import { isMeasurementLeg, measurementSplit } from '../verify-failure.mjs';
 import { citeRecords } from '../../work/validate/work-citations.mjs';
-import { captureWorker, finalizeAttemptTranscript } from '../transcripts.mjs';
+import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { recordWhy } from '../why-record.mjs';
@@ -62,7 +58,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, heldDispatchOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -385,55 +381,15 @@ export default {
   // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
   const settledPayload = jobPayloadOf(job);
-  const managed = settledPayload?.managed ?? null;
+  const managed = heldDispatchOf(settledPayload);
   // A worker released while this settle was held (reconcile --release-worker) is already gone: its
   // recorded proof is the release, and nothing is quit, closed or released again.
   const releasedEarlier = releasedWhileHeldOf(settledPayload);
-  let terminalClosed = null;
-  if (releasedEarlier && !managed) {
-    terminalClosed = { ...(settledPayload.terminalClosed ?? { handle: job.worker_id ?? null, ok: true }), releasedWhileHeld: true,
-      custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } };
-  } else if ((job.worker_id || settledPayload.launchTerminal?.handle) && !managed) {
-    // A job settled before its dispatch bound a worker still closes the terminal that dispatch created.
-    const workerHandle = job.worker_id ?? settledPayload.launchTerminal.handle;
-    // The agents inside Orca terminals before the close: one that lingers outside Orca afterwards ran in this one.
-    let agentsBefore = null;
-    try { const t = processTable(); agentsBefore = t ? orcaAgents(t) : null; } catch { agentsBefore = null; }
-    // The attempt's final output, read by Dispatch before the quit and the close (a terminal close is not a
-    // worker-release, so Orca keeps no archive of it), becomes op_attempts.transcript_sha.
-    const captured = settledAttemptId != null ? captureWorker(operationDispatchOf(settledPayload)) : null;
-    const quit = quitAgent({ handle: workerHandle, agent: agentOfJob(settledPayload) });
-    const closed = closeOperationTerminal(workerHandle);
-    terminalClosed = { handle: workerHandle, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
-    if (captured) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, captured });
-    const reaped = reapIfStillLive(db, job, settledPayload, workerHandle, repo);
-    if (reaped) terminalClosed.reaped = reaped;
-    terminalClosed.custody = custodyOf({ release: { ok: closed.ok === true }, agentHandle: workerHandle });
-    // The close is verified, never assumed (owner 2026-09-28, gc.mjs): a worker terminal that still reads connected
-    // after the close is closed again and read back (close-verify.mjs), and the proof or the failure is the receipt.
-    const connectedAfter = terminalClosed.custody?.state === 'retained'
-      || (closed.ok === true && (() => { try { const s = terminalShow({ terminal: workerHandle }); return s?.ok && s.connected === true; } catch { return false; } })());
-    if (connectedAfter) {
-      const verified = closeAndVerify(workerHandle, { tree: false });
-      terminalClosed.verified = verified;
-      terminalClosed.ok = verified?.ok === true;
-      if (verified?.ok) terminalClosed.custody = { state: 'released', proof: `verified-${verified.proof}` };
-    } else terminalClosed.verified = { ok: terminalClosed.custody?.state === 'released', proof: terminalClosed.custody?.proof ?? null };
-    // A closed tab whose agent process lingers does not count (owner 2026-09-28): the lingering tree is killed and read back.
-    try {
-      const tree = reapOrphaned(agentsBefore);
-      if (tree.checked) {
-        terminalClosed.tree = tree;
-        if (tree.remaining !== 0) { terminalClosed.ok = false; terminalClosed.verified = { ...terminalClosed.verified, ok: false, reason: 'process-tree-lingers' }; }
-      }
-    } catch { /* the terminal proof stands; the tick GC reaps a lingering tree */ }
-  }
-
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
   const managedWorker = !managed?.dispatchId ? null
     : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }
-    : releaseManagedWorker(db, job, settledPayload, repo);
+    : releaseManagedWorker(settledPayload);
   // A released worker's output stays readable from Orca's archive: the fullest read becomes op_attempts.transcript_sha.
   if (managedWorker && !releasedEarlier && settledAttemptId != null) finalizeAttemptTranscript(ledger, { attemptId: settledAttemptId, dispatch: managed.dispatchId });
   // The worker's terminal guard binding (<guards root>/terminals/<handle>.json) dies with its
@@ -447,9 +403,9 @@ export default {
   // The worker receipt is kept on the job (with the Dispatch state releaseManagedWorker read): settle's
   // stdout is the only other place it lived, and an orphaned op terminal left no trace. The op's Orca Task
   // is not closed here: the op's worker_done settled it with the Dispatch (orca-deep-map REPLACE #9).
-  if (managedWorker || terminalClosed) {
+  if (managedWorker) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
-    ledger.transaction(() => updateJob(db, { jobId, payload: { ...stored, ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) } }));
+    ledger.transaction(() => updateJob(db, { jobId, payload: { ...stored, ...(managedWorker ? { managedWorker } : {}), } }));
   }
 
   // LIGHT SETTLE, HEAVY WORK ASYNC (owner ruling settle-runtime-service): everything above is the settle's
@@ -482,13 +438,13 @@ export default {
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;
   if (typedReleased.length) out.autoResolved = typedReleased.map(({ incidentId, workflowId: waiter, evidence, wake }) => ({ incidentId, workflowId: waiter, evidence, ...(wake ? { wake } : {}) }));
-  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${terminalClosed ? `, terminal ${terminalClosed.handle} closed=${terminalClosed.ok}` : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} dispatch=${managedWorker.dispatch?.state ?? '?'} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
+  emit(out, `settled ${jobId} verdict=${verdict}${awaitingOwner ? ` (${AWAITING_OWNER}: no business attempt spent)` : ''}${peerBlocked ? ` (peer-blocked ${peerBlocked.checks.join(', ')}${verdict === 'pass' ? '' : ': no business attempt spent'}; hand it to the peer: ${peerBlocked.routes.join(' ; ')})` : ''} status=${status}${nextStep ? ` next=${nextStep.kind}${nextStep.jobs?.length ? ` ${nextStep.jobs.join(',')}` : ''}${nextStep.incidentId ? ` ${nextStep.incidentId}` : ''} (${nextStep.reason})` : ''} (leases released: ${released}${reportsConsumed ? ', report consumed' : ''}${managedWorker ? `, worker ${managedWorker.dispatchId} dispatch=${managedWorker.dispatch?.state ?? '?'} stop=${managedWorker.stop?.ok ?? '-'} release=${managedWorker.release?.ok ?? '-'} custody=${managedWorker.custody?.state ?? 'unknown'}${managedWorker.custody?.proof ? ` (${managedWorker.custody.proof})` : ''}` : ''}${sessionReleased ? `, session ${sessionReleased.released ? `archived ${sessionReleased.files?.length ?? 0} file(s)` : `release skipped (${sessionReleased.reason})`}` : ''}${out.cutSet ? `, cut ${out.cutSet.id} ${out.cutSet.closesSet ? 'CLOSED' : `open ${out.cutSet.open.join(',')}`}` : ''})`, args.json);
 
   },
 };

@@ -1,5 +1,5 @@
 report:
-  args: '--job <job_id> --report <scratch-file> [--attach <file>...] [--outcome <done|partial|failed|ask|blocked>]'
+  args: '--job <job_id> --report <scratch-file> [--attach <file>...] [--outcome <done|partial|failed|ask|blocked>] [--dispatch-capability <cap>]'
   reads: 'the job row and its OPEN attempt (op_attempts: latest dispatch, no end_state, not settled) with its contracts row; the report file under the attempt''s STARCI_JOB_SCRATCH (op_attempts.scratch_dir) - a starci/op-report@1 JSON envelope {outcome, summary, files[], checks[{name, command, exitCode, phase?, cwd?, unavailable?, stdoutPath?, stderrPath?, outputPath?}], open|question|blocker per outcome}; each --attach file, also under the scratch'
   writes: >-
     One transaction under api_requests idempotency (request id = sha(verb, dispatch, job + report digest + attachment

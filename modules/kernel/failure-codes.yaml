@@ -9326,15 +9326,6 @@ probe-failed:
   nextStep_vi: "Mạch vẫn ngắt cho tới hạn ghi trong thông báo. Chủ dự án kiểm tra khóa hoặc gói cước rồi thử lại."
   owner: owner
   kind: verb-refusal
-process-tree-lingers:
-  title: "Worker processes still running"
-  title_vi: "Tiến trình của thợ vẫn còn chạy"
-  meaning_vi: "Sau khi đóng terminal của thợ, vẫn còn tiến trình con chưa tắt hết."
-  causes_vi:
-    - "Tiến trình nền do thợ khởi chạy không thoát"
-  nextStep_vi: "Việc đóng terminal không được ghi nhận là sạch; lượt dọn định kỳ (tick GC) sẽ thu dọn tiến trình còn sót."
-  owner: runtime-core
-  kind: runtime-fault
 progress-stall:
   title: "Workflow progress has stalled"
   title_vi: "Tiến độ luồng công việc bị đứng"
@@ -9460,25 +9451,6 @@ real-money:
   nextStep_vi: "Ở chế độ tự lái, câu hỏi được để dành đến cuối luồng và chờ chủ dự án trả lời."
   owner: owner
   kind: blocker
-reap-no-terminal:
-  title: "Job names no op terminal"
-  title_vi: "Job không có terminal để dọn"
-  meaning_vi: "Lệnh dọn terminal còn sót của job không tìm thấy terminal nào gắn với job."
-  causes_vi:
-    - "Job chưa từng có terminal"
-    - "Thông tin terminal không được lưu"
-  nextStep_vi: "Không dọn gì. Không có terminal thì không cần làm thêm."
-  owner: supervisor
-  kind: verb-refusal
-reap-not-settled:
-  title: "Reap on a job not yet settled"
-  title_vi: "Dọn terminal của job chưa chốt"
-  meaning_vi: "Lệnh dọn chỉ áp dụng cho job đã chốt nhưng job này chưa chốt."
-  causes_vi:
-    - "Job còn đang chạy hoặc chờ"
-  nextStep_vi: "Không dọn gì. Đợi job được chốt rồi dọn."
-  owner: supervisor
-  kind: verb-refusal
 reason-missing:
   title: "Autopilot action needs a reason"
   title_vi: "Lệnh tự lái thiếu lý do"
@@ -10544,6 +10516,16 @@ model-not-listed:
   nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; sửa model trong config.yaml hoặc khai báo model trong modules/models."
   owner: supervisor
   kind: dispatch-refusal
+managed-unproven:
+  title: "Managed worker release is not proven"
+  title_vi: "Chưa chứng minh được việc giải phóng worker do Orca quản lý"
+  meaning_vi: "Job đã chốt nhưng biên nhận worker-release của Dispatch chưa cho thấy trạng thái released, nên bước chuyển sang released chưa được ghi."
+  causes_vi:
+    - "worker-release bị Orca từ chối hoặc không trả lời lần đầu và lần lặp lại"
+    - "Dispatch vẫn do Orca giữ (retained)"
+  nextStep_vi: "Job giữ nguyên trạng thái settled; api reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
+  owner: runtime-core
+  kind: settle-reason
 worker-died-no-report:
   title: "Worker died without report"
   title_vi: "Worker chết mà chưa báo cáo"

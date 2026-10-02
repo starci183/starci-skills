@@ -92,9 +92,9 @@ spawnAgent({provider, model, effort, worktree, title, spec, run, from, request})
   ensureLaunchTrust(agent, worktree)   → the owner never answers a trust prompt
   worker-start(spec, worktree, --agent, [--model, --effort], run, from, --retry-request)
                                        → dispatchId + taskId (Orca filed the Task from --spec and injected it)
-                                         + result.worker.agentTerminalHandle
+                                         (+ result.worker.agentTerminalHandle when present: live 1.4.209 has no `worker` key)
   worker-show(dispatch)                → attestation: effective agent (and model, when pinned) = the route;
-                                         result.dispatch.assigneeHandle when the start receipt named no terminal
+                                         result.dispatch.assigneeHandle: the agent terminal when the start receipt named none (live: always)
   terminal rename(terminal, title)     → [Op] … / [Kernel] … / [Supervisor] main / [Worker] …
 startAgent({…, prompt, objective, entry, priorRunId, request})
   run-create(objective, from = entry, --retry-request)

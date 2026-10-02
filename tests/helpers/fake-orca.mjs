@@ -556,8 +556,6 @@ else if (verb === 'orchestration worker-start' && (arg('task') != null || arg('p
   fail({ ok: false, error: { code: 'runtime_error', message: 'the runtime starts every worker with --spec (no --task, --parent or --retry-of)' } });
 else if (verb === 'orchestration task-update' && !['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'].includes(arg('status')))
   fail({ ok: false, error: { code: 'invalid_argument', message: 'invalid status ' + arg('status') + ', expected one of: pending, ready, dispatched, completed, failed, blocked' } });
-else if (verb === 'orchestration task-update' && state.settledTasks?.[arg('id')])
-  fail({ ok: false, error: { code: 'task_settled', message: 'Task ' + arg('id') + ' was settled by worker_done.' } });
 else if (verb === 'orchestration task-update') {
   // state.tasks[runId] = [{id, status, task_title, display_name}] seeds task-list; an update closes the row.
   const rows = state.tasks?.[arg('run')];
@@ -740,10 +738,12 @@ else if (verb === 'orchestration check') {
   out({ ok: true, result: { runId: run, deliveryId: open ? open[0] : null, messages, count: messages.length, acknowledged: ack || null } });
 }
 // A worker_done settles the exact Dispatch (worker state = its outcome) and its Task (completed/failed), as Orca does;
-// state.workerDone records each one, and a later task-update of that Task is refused task_settled (smoke E3).
+// state.workerDone records each one, and Orca (live E3) reads the Task completed/failed and accepts a later task-update (smoke E3).
 else if (verb === 'orchestration send' && arg('type') === 'worker_done') {
   const dispatchId = arg('dispatch-id'), taskId = arg('task-id'), outcome = arg('outcome');
   if (!['succeeded', 'failed'].includes(outcome)) fail({ ok: false, error: { code: 'invalid_argument', message: 'worker_done requires --outcome succeeded or --outcome failed' } });
+  // Orca authenticates a worker_done with the worker's own Dispatch capability (live E3, 2026-10-02: dispatch_capability_invalid without it).
+  if (!/^dcap_/.test(arg('dispatch-capability') ?? '')) fail({ ok: false, error: { code: 'dispatch_capability_invalid', message: 'The dispatch capability is missing or invalid.' } });
   state.workerStates = { ...(state.workerStates || {}), [dispatchId]: outcome };
   state.settledTasks = { ...(state.settledTasks || {}), [taskId]: outcome === 'succeeded' ? 'completed' : 'failed' };
   for (const rows of Object.values(state.tasks || {})) for (const t of (Array.isArray(rows) ? rows : [])) if (t.id === taskId) t.status = state.settledTasks[taskId];

@@ -136,9 +136,10 @@ test('a frozen Working frame a nudge cannot reach reads disconnected and reconci
   const r=json(reconciled.stdout);
   assert.ok(['requeued','settled-failed'].includes(r.recovery),JSON.stringify(r));
   assert.equal(fx.read(db=>db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(fx.jobId).n),0,'the lease is released');
-  assert.deepEqual([r.terminalClosed?.closed,r.terminalClosed?.proof],[true,'unwritable']);
+  assert.deepEqual([r.managedWorker?.custody?.state,r.managedWorker?.custody?.proof],['released','release-ok'],'worker-release alone is the custody of the dead worker');
   assert.equal(fx.orcaState().refusedSends,refusedBefore,'no quit input is typed into a terminal Orca refuses');
-  assert.ok((fx.orcaState().closed??[]).includes(fx.handle));
+  assert.equal(fx.orcaState().workerStates?.[r.dispatchId],'released','the Dispatch is released, the terminal is not closed by hand');
+  assert.equal((fx.orcaState().closed??[]).length,0,'no tab close is issued');
 });
 
 test('output or a heartbeat after the refusal voids it',t=>{
