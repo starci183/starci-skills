@@ -1,5 +1,5 @@
 schema: starci/knowledge-source@1
-id: be.realtime
+id: be.feature.realtime
 title: Realtime channels
 purpose: |-
   Given a state change a connected client must see without asking, how is it pushed? Realtime is a feature KIND:
@@ -28,10 +28,10 @@ rules:
   - id: BE-REALTIME-1
     title: A channel is a kind folder with one door, its module and its own spec
     kind: mandatory
-    hfsRules: [R01, R02, R47, R138]
+    hfsRules: [R01, R02, R47, R139]
     requirement: |-
-      A push channel lives in `be/src/features/realtime/<channel>/` (slot `be.realtime`), enabled by declaring the pattern
-      `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `<channel>-realtime.module.ts`, ONE door and its spec: either
+      A push channel lives in `be/src/features/realtime/<channel>/` (slot `be.feature.realtime`), enabled by declaring the pattern
+      `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `<channel>-realtime.module.ts`, ONE door and its spec: either
       `<channel>.gateway.ts` (one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`) with
       `<channel>.gateway.spec.ts`, or `<x>.subscription.ts` (one `@Resolver` class whose operations are `@Subscription`) with
       `<x>.subscription.spec.ts`, plus optional `dto/` (`<name>.{args,type}.ts`). A door carries no query, mutation, field
@@ -42,7 +42,7 @@ rules:
     cases:
       - id: case-1
         when: A GraphQL subscription of order status
-        write: 'features/realtime/order-status/order-status-realtime.module.ts, order-status.subscription.ts and order-status.subscription.spec.ts.'
+        write: 'features/realtime/order-status/index.ts, order-status-realtime.module.ts, order-status.subscription.ts and order-status.subscription.spec.ts.'
       - id: case-2
         when: A socket gateway
         write: 'features/realtime/chat/chat-realtime.module.ts, chat.gateway.ts and chat.gateway.spec.ts.'
@@ -59,7 +59,7 @@ rules:
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
     kind: mandatory
-    hfsRules: [R139]
+    hfsRules: [R140]
     requirement: |-
       The only value a realtime door injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
       iterable of frames, `publish(topic, payload)` pushes one). No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
@@ -92,7 +92,7 @@ rules:
   - id: BE-REALTIME-3
     title: The topic is built from the principal
     kind: mandatory
-    hfsRules: [R140, R41]
+    hfsRules: [R141, R41]
     requirement: |-
       Every `@SubscribeMessage` and `@Subscription` handler takes `@CurrentPrincipal()` of `domain/identity` and builds the topic it
       passes to `hub.subscribe` from the principal's id (plus a client-supplied id only inside that prefix), so one client cannot
@@ -136,31 +136,34 @@ rules:
         - Confirm the e2e client waits with the world's waitFor and never sleeps.
     relatedExamples: [realtime]
 files:
+  - path: src/features/realtime/<channel>/index.ts
+    slot: be.feature.realtime
+    role: The public surface of the kind folder, the module class an api-kind app composes.
   - path: src/features/realtime/<channel>/<channel>-realtime.module.ts
-    slot: be.realtime
+    slot: be.feature.realtime
     role: Nest module of the door, composed only by an api-kind app.
   - path: src/features/realtime/<channel>/<channel>.gateway.ts
-    slot: be.realtime
+    slot: be.feature.realtime
     role: A socket door (one WebSocketGateway class); exactly one of gateway or subscription per channel file name.
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
     spec: src/features/realtime/<channel>/<channel>.gateway.spec.ts
     optional: true
   - path: src/features/realtime/<channel>/<channel>.gateway.spec.ts
-    slot: be.realtime
+    slot: be.feature.realtime
     role: Unit spec of the gateway beside it.
     optional: true
   - path: src/features/realtime/<channel>/<x>.subscription.ts
-    slot: be.realtime
+    slot: be.feature.realtime
     role: A GraphQL subscription door (one Resolver class).
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE]
     spec: src/features/realtime/<channel>/<x>.subscription.spec.ts
     optional: true
   - path: src/features/realtime/<channel>/<x>.subscription.spec.ts
-    slot: be.realtime
+    slot: be.feature.realtime
     role: Unit spec of the subscription beside it.
     optional: true
   - path: src/features/realtime/<channel>/dto/<name>.type.ts
-    slot: be.realtime.dto
+    slot: be.feature.realtime.dto
     role: The typed frame or the typed arguments of the door.
     rules: [BE_INPUT_BOUNDED]
     optional: true

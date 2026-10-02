@@ -748,21 +748,22 @@ slots:
   # the kind and holds one folder per provider or channel; a kind imports only modules/* (never another kind) and only an
   # api-kind app composes it. Their doors answer to the same door laws as every transport (default deny, bounded input,
   # no envelope), plus the kind laws of knowledge/patterns/be/webhooks.yaml and realtime.yaml.
-  - id: be.webhooks
+  - id: be.feature.webhooks
     profiles: [be]
     path: "src/features/webhooks/<provider>/"
     presence: opt-in              # a provider webhook intake: verifies the signature and replay window, then hands the delivery to ONE domain intake method
     pattern: webhooks             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/webhooks.yaml)
+    trigger: webhooks
     tracked: tracked
     tier: feature
     owner: true
-    requires: ["<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
-    allows: ["<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
+    requires: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
+    allows: [index.ts, "<provider>-webhook.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
     tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
     composedBy: [api]
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
-  - id: be.webhooks.dto
+  - id: be.feature.webhooks.dto
     profiles: [be]
     path: "src/features/webhooks/<provider>/dto/"
     presence: opt-in
@@ -774,21 +775,22 @@ slots:
     composedBy: [api]
     rules: [BE_INPUT_BOUNDED]
     since: 1.0.0
-  - id: be.realtime
+  - id: be.feature.realtime
     profiles: [be]
     path: "src/features/realtime/<channel>/"
     presence: opt-in              # a push channel: reads and pushes only (a socket gateway or a GraphQL subscription), no domain write
     pattern: realtime             # declaring the pattern (hfs.json sides.be.patterns) enables the kind (knowledge/patterns/be/realtime.yaml)
+    trigger: realtime
     tracked: tracked
     tier: feature
     owner: true
-    requires: ["<channel>-realtime.module.ts"]
-    allows: ["<channel>-realtime.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
+    requires: [index.ts, "<channel>-realtime.module.ts"]
+    allows: [index.ts, "<channel>-realtime.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
     tests: unit-beside            # the door's own spec beside the door (a gateway or a subscription has no service of its own)
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
-  - id: be.realtime.dto
+  - id: be.feature.realtime.dto
     profiles: [be]
     path: "src/features/realtime/<channel>/dto/"
     presence: opt-in

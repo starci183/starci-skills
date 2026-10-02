@@ -1,16 +1,16 @@
 /**
- * The rules that hold the realtime kind (R133 `BE_REALTIME_SHAPE`, R134 `BE_REALTIME_WRITES`, R135 `BE_REALTIME_TOPIC_SCOPE`).
+ * The rules that hold the realtime kind (R139 `BE_REALTIME_SHAPE`, R140 `BE_REALTIME_WRITES`, R141 `BE_REALTIME_TOPIC_SCOPE`).
  *
  * A realtime door (`src/features/realtime/<channel>/<channel>.gateway.ts` for a socket, `<x>.subscription.ts` for a GraphQL
- * subscription, slot `be.realtime`) READS and PUSHES. It never writes: the push is fed by a reactor that calls the `RealtimeHub`
+ * subscription, slot `be.feature.realtime`) READS and PUSHES. It never writes: the push is fed by a reactor that calls the `RealtimeHub`
  * of `platform/realtime`, and the door only subscribes a client to a topic of that hub.
  *
- *   - `realtime-shape` (R133): a `.gateway.ts` holds one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`; a
+ *   - `realtime-shape` (R139): a `.gateway.ts` holds one `@WebSocketGateway` class whose handlers are `@SubscribeMessage`; a
  *     `.subscription.ts` holds one `@Resolver` class whose operations are `@Subscription`. Each is the door its file role names, and
  *     neither carries a query, a mutation or a REST route.
- *   - `realtime-read-only` (R134): the only value injected into a realtime door is the `RealtimeHub` of `platform/realtime`. No
+ *   - `realtime-read-only` (R140): the only value injected into a realtime door is the `RealtimeHub` of `platform/realtime`. No
  *     `EntityManager`, bus, queue, event bus or domain service reaches it.
- *   - `realtime-topic-scope` (R135): the topic passed to `hub.subscribe` is built from the principal parameter of the handler
+ *   - `realtime-topic-scope` (R141): the topic passed to `hub.subscribe` is built from the principal parameter of the handler
  *     (`@CurrentPrincipal()` of `domain/identity`), so a client can only listen to what the principal owns.
  *
  * What a receiver is comes from its TYPE, what a decorator is from the import that binds it, and where a parameter comes
@@ -23,7 +23,7 @@ import { decoratorCallee } from "./lib/import-source.mjs"
 import { baseName, isOwnedType, ownerNameOf } from "./lib/ports.mjs"
 
 /** The slot of realtime doors. */
-const SLOT = "be.realtime"
+const SLOT = "be.feature.realtime"
 
 /** The `RealtimeHub` port of `platform/realtime`. */
 const isHubType = (context, node) => isOwnedType(context, node, { name: "RealtimeHub", capability: "realtime", tier: "platform" })

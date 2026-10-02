@@ -26,7 +26,7 @@ const GRAPHQL_OPERATIONS = ["Query", "Mutation", "Subscription", "ResolveField"]
 const HTTP_SLOT = "be.transport.http"
 
 /** The slot of provider webhook doors (the REST doors of the webhook kind). */
-const WEBHOOK_SLOT = "be.webhooks"
+const WEBHOOK_SLOT = "be.feature.webhooks"
 
 /** Slots whose classes are entered through a method the framework calls on a schedule, a queue or a command line. */
 const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.transport.schedule", "be.feature.transport.cli"])
@@ -355,7 +355,7 @@ export const doorLivesInFeatures = {
         docs: { description: "A `@Controller` is declared in the `transport/http` slot of a feature." },
         schema: [],
         messages: {
-            wrongSlot: "A `@Controller` belongs in `src/features/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/` (slot `be.webhooks`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
+            wrongSlot: "A `@Controller` belongs in `src/features/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/` (slot `be.feature.webhooks`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
         },
     },
     create(context) {
