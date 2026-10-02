@@ -3,7 +3,7 @@ verb: cut
 owner: runtime
 summary: cut the release, the only push of main with its annotated release tag
 impl:
-  script: scripts/cli/lib/release-cut.mjs
+  script: scripts/supervisor/release-cut-cli.mjs
 flags:
   - {name: repo, type: string, summary: the repository to release (default is the current directory)}
   - {name: remote, type: string, summary: the remote to push to (default origin)}

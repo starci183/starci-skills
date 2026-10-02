@@ -2,8 +2,8 @@
 // `starci release cut`: the entry of cutRelease (scripts/supervisor/release-cut.mjs), the only path that pushes main and a release tag.
 import path from 'node:path';
 import process from 'node:process';
-import { isMain } from '../../lib/is-main.mjs';
-import { cutRelease } from '../../supervisor/release-cut.mjs';
+import { isMain } from '../lib/is-main.mjs';
+import { cutRelease } from './release-cut.mjs';
 
 const VALUE_FLAGS = new Set(['--repo', '--remote', '--branch', '--tag']);
 

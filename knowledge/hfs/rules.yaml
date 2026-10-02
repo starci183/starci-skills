@@ -1878,6 +1878,7 @@ rules:
   - id: R221
     code: "CI_TRIGGERS_RELEASE_ONLY"
     law: "The only workflow triggers are a push of release tags and a person dispatching it: every tracked workflow of the runtime, its examples and the hfs app templates (so every scaffolded app inherits it) declares an `on` that holds only `push` filtered to `tags: ['v*']` (no branches, paths or ignore filter beside it) and `workflow_dispatch`. A branch push, a pull_request, a schedule, a workflow_call or any other event refuses the workflow: CI runs once per release, on its tag, and Codecov and Sonar upload only from that run."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["CI_TRIGGERS_RELEASE_ONLY"]
@@ -1886,6 +1887,7 @@ rules:
   - id: R222
     code: "RELEASE_NOTES"
     law: "A release tag `v<version>` on HEAD has its CHANGELOG.md section `## [<version>]` with no TODO, PENDING or TBD left in it and no `in preparation` mark: the tag message and the GitHub Release are that section, so a tag is never cut over an unfinished or missing section."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RELEASE_NOTES"]

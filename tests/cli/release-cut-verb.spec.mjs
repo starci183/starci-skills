@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
-import { main, parseArgs } from '../../scripts/cli/lib/release-cut.mjs';
+import { main, parseArgs } from '../../scripts/supervisor/release-cut-cli.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const capture = () => {
@@ -15,7 +15,7 @@ const capture = () => {
 
 test('the catalog resolves release cut to its entry and declares exactly the flags the entry parses', () => {
   const verb = CATALOG.groups.release.verbs.cut;
-  assert.equal(verb.impl.script, 'scripts/cli/lib/release-cut.mjs');
+  assert.equal(verb.impl.script, 'scripts/supervisor/release-cut-cli.mjs');
   assert.ok(fs.existsSync(path.join(repoRoot, verb.impl.script)));
   assert.deepEqual(verb.flags.map((flag) => flag.name).sort(), ['branch', 'remote', 'repo', 'tag']);
   assert.deepEqual(parseArgs(['--repo', 'r', '--remote', 'o', '--branch', 'b', '--tag', 'v1', '--json']), { json: true, repo: 'r', remote: 'o', branch: 'b', tag: 'v1' });
