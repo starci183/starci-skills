@@ -4646,6 +4646,49 @@ RT_SPEC_SKIP_UNEXPLAINED:
   owner: supervisor
   kind: check-finding
 
+RT_CODE_UNCATALOGUED:
+  title: "Emitted failure code has no catalog entry"
+  title_vi: "Mã lỗi được phát ra nhưng chưa có trong danh mục"
+  meaning_vi: "Mã nguồn trong scripts/, engine/ hoặc modules/ phát ra một mã lỗi (chuỗi UPPER_SNAKE hoặc kebab ở vị trí mã) mà modules/kernel/failure-codes.yaml chưa có mục. Mỗi mã phải được giải thích đúng ngày nó được thêm."
+  causes_vi:
+    - "Thêm một mã mới trong mã nguồn mà không ghi vào danh mục"
+    - "Một chuỗi giống mã nhưng thật ra là tên biến môi trường hoặc khóa"
+  nextStep_vi: "Người giám sát thêm mục (title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind) vào danh mục, hoặc đưa tên không phải mã vào failure-codes.not-codes, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_STALE:
+  title: "Catalogued failure code nothing emits"
+  title_vi: "Mã lỗi trong danh mục không còn ai phát ra"
+  meaning_vi: "modules/kernel/failure-codes.yaml có một mục cho một mã mà không tệp nguồn nào còn viết ra; mã đã nghỉ hưu phải rời danh mục."
+  causes_vi:
+    - "Mã nguồn phát ra mã đã bị xóa hoặc đổi tên mà mục danh mục còn lại"
+  nextStep_vi: "Người giám sát xóa mục khỏi danh mục, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_MALFORMED:
+  title: "Failure code entry is malformed"
+  title_vi: "Mục mã lỗi sai khuôn"
+  meaning_vi: "Một mục của modules/kernel/failure-codes.yaml thiếu hoặc sai một trường (title, title_vi, meaning_vi, nextStep_vi, owner, kind, causes_vi), hoặc owner/kind nằm ngoài tập đóng, hoặc owner other-op: trỏ tới op không có tệp manifest."
+  causes_vi:
+    - "Thêm mục mà quên một trường tiếng Việt"
+    - "Owner hoặc kind gõ sai"
+  nextStep_vi: "Người giám sát điền hoặc sửa trường bị nêu, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_CODE_SOLE_EMITTER:
+  title: "Failure code whose only source is the rule catalog"
+  title_vi: "Mã lỗi chỉ có danh mục luật làm nguồn"
+  meaning_vi: "Một mã chỉ xuất hiện dạng chữ trong knowledge/hfs/rules.yaml và luật chứa nó không có enforcer nào của eslint, stylelint hoặc Sonar đã xây: một dòng danh mục không phải là nơi phát ra mã, nên mã sẽ không bao giờ được báo."
+  causes_vi:
+    - "Luật liệt kê mã nhưng enforcer chưa được xây hoặc đã bị xóa"
+    - "Mã được thêm vào failureCodes của luật mà không có check nào phát ra"
+  nextStep_vi: "Người giám sát xây enforcer báo mã đó, hoặc viết mã ở nơi một check thật sự phát ra nó, hoặc xóa mã khỏi luật, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_EXTERNAL_OWNER:
   title: "External system reached outside its owner"
   title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"

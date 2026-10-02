@@ -49,3 +49,30 @@ test('a bracketed code in a message, a multi-line template or a comment is still
   ]);
   for (const code of ['TARGET_MISSING', 'PLAN_STALE', 'DOC_CODE']) assert.ok(found.includes(code), `${code} in ${found.join(', ')}`);
 });
+
+// RT_CODE_SOLE_EMITTER: the rule catalog is not an emitter; a rule code needs a built lint or Sonar enforcer, or a literal in code.
+import { catalogProblems } from '../../scripts/checks/check-failure-codes.mjs';
+const ENTRY = (code) => `${code}:\n  title: "t"\n  title_vi: "t"\n  meaning_vi: "m"\n  causes_vi:\n    - "c"\n  nextStep_vi: "n"\n  owner: supervisor\n  kind: check-finding\n`;
+function catalogFixture(t, { source, rules, catalogCodes }) {
+  const base = fixture(t, source);
+  const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
+  write('modules/ops/ops/x.yaml', 'schema: op\n');
+  write('modules/kernel/failure-codes.yaml', catalogCodes.map(ENTRY).join('\n'));
+  write('knowledge/hfs/rules.yaml', `rules:\n${rules}`);
+  return base;
+}
+const RULE = (code, kind) => `  - id: R01\n    code: "${code}"\n    failureCodes: ["${code}"]\n    enforcers:\n      - {kind: ${kind}, id: x${kind === 'runtime' ? ', at: scripts/x.mjs' : ''}}\n`;
+
+test('a rule code that only the rule catalog spells is a sole-emitter finding unless a lint plugin enforcer reports it', (t) => {
+  const lint = catalogProblems(catalogFixture(t, { source: '// nothing\n', rules: RULE('BE_SAMPLE_RULE', 'eslint-be'), catalogCodes: ['BE_SAMPLE_RULE'] }));
+  assert.deepEqual(lint.soleEmitter, []);
+  const runtime = catalogProblems(catalogFixture(t, { source: '// nothing\n', rules: RULE('BE_SAMPLE_RULE', 'runtime'), catalogCodes: ['BE_SAMPLE_RULE'] }));
+  assert.deepEqual(runtime.soleEmitter.map((e) => e.code), ['BE_SAMPLE_RULE']);
+});
+
+test('a code a check spells in code is emitted whatever the rule catalog says; an unlisted or unemitted code is missing or stale', (t) => {
+  const spelled = catalogProblems(catalogFixture(t, { source: "export const A = 'RT_SAMPLE_CODE';\n", rules: RULE('RT_SAMPLE_CODE', 'runtime'), catalogCodes: ['RT_SAMPLE_CODE'] }));
+  assert.deepEqual([spelled.soleEmitter, spelled.missing, spelled.stale], [[], [], []]);
+  const drift = catalogProblems(catalogFixture(t, { source: "export const A = 'RT_NEW_CODE';\n", rules: RULE('BE_X_RULE', 'eslint-be'), catalogCodes: ['RT_OLD_CODE'] }));
+  assert.deepEqual([drift.missing.map((e) => e.code), drift.stale], [['BE_X_RULE', 'RT_NEW_CODE'], ['RT_OLD_CODE']]);
+});

@@ -7,7 +7,11 @@
 // (one entry per code: title, meaning, causes, next step, owner). This checker refuses:
 //   - an emitted code that has no catalog entry (a new code must be explained the day it is added),
 //   - a catalog entry no code emits any more (a retired code leaves the catalog),
-//   - an entry with a missing or malformed field, or an owner outside the closed set.
+//   - an entry with a missing or malformed field, or an owner outside the closed set,
+//   - a code whose only literal source is the rule catalog (knowledge/hfs/rules.yaml) and that no lint plugin or Sonar enforcer of
+//     a rule reports: a catalog line is not an emitter, so a rule code needs a built plugin enforcer or a literal in code.
+// The findings carry stable codes (scripts/checks/failure-code-findings.mjs): RT_CODE_UNCATALOGUED, RT_CODE_STALE, RT_CODE_MALFORMED,
+// RT_CODE_SOLE_EMITTER.
 // What counts as an emitted code (see `emittedCodes`):
 //   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
 //          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var;
@@ -20,6 +24,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
+import { CODE_FINDINGS, PLUGIN_ENFORCERS } from './failure-code-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
@@ -159,6 +164,9 @@ export function catalogProblems(base = root) {
   const emittedSet = new Set(emitted.map((e) => e.code));
   const missing = emitted.filter((e) => !Object.hasOwn(catalog, e.code));
   const stale = Object.keys(catalog).filter((code) => !emittedSet.has(code));
+  const rules = parseYaml(fs.readFileSync(path.join(base, 'knowledge/hfs/rules.yaml'), 'utf8'))?.rules ?? [];
+  const pluginReported = new Set(rules.filter((r) => (r.enforcers ?? []).some((e) => PLUGIN_ENFORCERS.includes(e.kind) && !e.status)).flatMap((r) => [r.code, ...(r.failureCodes ?? [])]));
+  const soleEmitter = emitted.filter((e) => e.kind === 'upper' && e.sites.every((site) => site.file === 'knowledge/hfs/rules.yaml') && !pluginReported.has(e.code));
   const malformed = [];
   const ops = new Set(fs.readdirSync(path.join(base, 'modules/ops/ops')).filter((n) => n.endsWith('.yaml')).map((n) => n.slice(0, -5)));
   for (const [code, entry] of Object.entries(catalog)) {
@@ -170,7 +178,7 @@ export function catalogProblems(base = root) {
     if (!Array.isArray(entry?.causes_vi) || !entry.causes_vi.length || entry.causes_vi.some((c) => typeof c !== 'string' || !c.trim())) bad.push('causes_vi must be a non-empty list of strings');
     if (bad.length) malformed.push({ code, problems: bad });
   }
-  return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed };
+  return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed, soleEmitter };
 }
 
 if (isMain(import.meta.url)) {
@@ -179,13 +187,14 @@ if (isMain(import.meta.url)) {
     process.exit(0);
   }
   const p = catalogProblems();
-  const ok = !p.missing.length && !p.stale.length && !p.malformed.length;
+  const ok = !p.missing.length && !p.stale.length && !p.malformed.length && !p.soleEmitter.length;
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok, ...p }, null, 2));
   else if (ok) console.log(`OK: ${p.emitted} emitted codes, all in ${CATALOG_FILE} (${p.catalog} entries).`);
   else {
-    for (const m of p.missing) console.error(`MISSING ${m.code} (${m.sites[0].file}:${m.sites[0].line}): an emitted code with no entry in ${CATALOG_FILE}; add title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind`);
-    for (const c of p.stale) console.error(`STALE ${c}: in ${CATALOG_FILE} but no code emits it; remove the entry`);
-    for (const m of p.malformed) console.error(`MALFORMED ${m.code}: ${m.problems.join('; ')}`);
+    for (const m of p.missing) console.error(`${CODE_FINDINGS.uncatalogued} ${m.code} (${m.sites[0].file}:${m.sites[0].line}): an emitted code with no entry in ${CATALOG_FILE}; add title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind`);
+    for (const c of p.stale) console.error(`${CODE_FINDINGS.stale} ${c}: in ${CATALOG_FILE} but no code emits it; remove the entry`);
+    for (const e of p.soleEmitter) console.error(`${CODE_FINDINGS.soleEmitter} ${e.code} (${e.sites[0].file}:${e.sites[0].line}): the rule catalog is its only source; build a lint or Sonar enforcer that reports it, or spell it where a check emits it`);
+    for (const m of p.malformed) console.error(`${CODE_FINDINGS.malformed} ${m.code}: ${m.problems.join('; ')}`);
   }
   process.exit(ok ? 0 : 1);
 }

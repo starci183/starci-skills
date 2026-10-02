@@ -39,6 +39,7 @@ import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, REFUSAL_CODES } from '../hfs/check.mjs';
+import { INFRASTRUCTURE_CODES } from '../hfs/infrastructure-codes.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
@@ -177,7 +178,7 @@ export async function pluginRuleIds(root, kind) {
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
  * codes: {machine, hfs, refusals}, every code the architecture machine and `hfs check` can emit and the refusal codes among them.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge, codes }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge, codes, infrastructure }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -272,6 +273,18 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       }
     }
   }
+  if (infrastructure !== undefined) {
+    // S7-02: every HFS_/BE_/FE_/ARCH_ code of the failure catalog is a code of a rule, a "cannot judge" refusal, or declared
+    // infrastructure (the harness's own tools reporting about themselves, scripts/hfs/infrastructure-codes.mjs).
+    const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
+    const exempt = new Set([...(codes?.refusals ?? []), ...Object.keys(infrastructure)]);
+    for (const code of Object.keys(failureCodes ?? {}).filter((c) => /^(HFS|BE|FE|ARCH)_/.test(c)).sort()) {
+      if (!owned.has(code) && !exempt.has(code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is in ${FAILURE_CODES_FILE} but no rule of knowledge/hfs/rules.yaml lists it in failureCodes and it is not declared infrastructure (scripts/hfs/infrastructure-codes.mjs): list it under the one rule whose law it serves, declare it infrastructure with its emitter, or delete it`);
+    }
+    for (const code of Object.keys(infrastructure).sort()) {
+      if (owned.has(code) || !Object.hasOwn(failureCodes ?? {}, code)) add('HFS_RULE_CODE_UNOWNED', '-', `${code} is declared infrastructure but ${owned.has(code) ? 'a rule owns it' : `${FAILURE_CODES_FILE} has no entry for it`}: delete it from scripts/hfs/infrastructure-codes.mjs`);
+    }
+  }
   if (knowledge !== undefined) {
     // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
     const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
@@ -296,7 +309,7 @@ export async function checkHfsRules(root = skillRoot) {
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
   return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root), knowledge: readKnowledgeFiles(root),
-    codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] } }) };
+    codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] }, infrastructure: INFRASTRUCTURE_CODES }) };
 }
 
 if (isMain(import.meta.url)) {
