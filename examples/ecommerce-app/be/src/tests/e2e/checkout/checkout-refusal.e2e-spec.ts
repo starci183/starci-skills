@@ -1,15 +1,14 @@
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
-import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import { ORDER_COUNT, PAYMENTS_OF_PERSON, PAYMENT_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
+import { readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
+import { ORDER_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import type { TestCaller } from "@starci/test-world"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
- * The refusal half of the checkout. There is no external PSP and no pending or declined order state: payment capture
- * runs inside the same transaction as the guarded stock decrement, so the refusal is named and its honest outcome is
- * the full rollback: no order row, no payment row, stock unmoved, cart kept. Retry is a fresh placeOrder once the cart is
+ * The refusal half of the checkout. The guarded stock decrement runs inside the placement transaction, so a refusal is
+ * named and its honest outcome is the full rollback: no order row, stock unmoved, cart kept. Retry is a fresh placeOrder once the cart is
  * corrected; cancel is clearCart, after which a confirmation is refused as an empty cart.
  *
  * A refusal is a GraphQL error whose extensions carry the code, the kind and the params (productId, requested,
@@ -20,9 +19,9 @@ interface FreshBuyer {
     buyer: TestCaller
 }
 
-describe("payment failure", () => {
+describe("checkout refusal", () => {
     const freshBuyer = async (tag: string): Promise<FreshBuyer> => {
-        const session = await world.signedInPerson(`payment-${tag}`)
+        const session = await world.signedInPerson(`refusal-${tag}`)
         return { personId: session.personId, buyer: world.apps.order.api.bearing(session.sessionToken) }
     }
 
@@ -32,7 +31,7 @@ describe("payment failure", () => {
         await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
-    it("a refused confirmation rolls back atomically; the corrected retry captures exactly once", async () => {
+    it("a refused confirmation rolls back atomically; the corrected retry places exactly one order", async () => {
         const { buyer, personId } = await freshBuyer("retry")
 
         // sku-thermos is seeded at stock 2: asking for one more is a guaranteed refusal.
@@ -64,7 +63,6 @@ describe("payment failure", () => {
             { productId: "sku-thermos", quantity: stock + 1 },
         ])
         expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
-        expect(await readCount(world.db.order, PAYMENT_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-thermos")).toBe(stock)
 
         // Correct the cart and retry with the same key: this time the confirmation lands.
@@ -76,14 +74,11 @@ describe("payment failure", () => {
         const retried = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
         expect(retried.errorCode).toBeNull()
         expect(retried.data?.placeOrder).toMatchObject({
-            status: "confirmed",
+            status: "pending",
             totalMinorUnits: thermos.priceMinorUnits * stock,
             currency: "USD",
             replayed: false,
         })
-        expect(await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
-            expect.objectContaining({ status: "captured", amount_minor_units: thermos.priceMinorUnits * stock }),
-        ])
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
         expect(await readStock(world.db.order, "sku-thermos")).toBe(0)
     })
@@ -114,7 +109,6 @@ describe("payment failure", () => {
         expect(empty.errors?.[0]?.extensions).toMatchObject({ code: "ORDER_CART_EMPTY", kind: "invalid" })
 
         expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
-        expect(await readCount(world.db.order, PAYMENT_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-thermos")).toBe(thermos.stock)
     })
 })

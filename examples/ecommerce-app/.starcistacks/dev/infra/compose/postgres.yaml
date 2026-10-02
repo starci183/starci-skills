@@ -4,7 +4,7 @@ services:
     # (metadata.json's shared-postgres resolution is 5432 + offset 69 = 5501; the host binding below
     # is that resolved number, never the docker-internal default). The init script creates one
     # database per connection: ecommerce_identity and ecommerce_order.
-    image: postgres:16
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     environment:
       POSTGRES_USER: postgres
       POSTGRES_HOST_AUTH_METHOD: trust

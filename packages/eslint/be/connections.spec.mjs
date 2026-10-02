@@ -57,7 +57,7 @@ test("R84: an EntityManager injector is the one injector of a declared connectio
             },
             {
                 // the same name declared a second time in another file
-                filename: at("src/modules/platform/lease/lease.decorators.ts"),
+                filename: at("src/modules/platform/jobs/jobs.decorators.ts"),
                 code: declaration("InjectPrimaryEntityManager"),
                 errors: [{ messageId: "injectorHome" }, { messageId: "rawInjector" }],
             },
@@ -174,7 +174,10 @@ test("R88: an EntityManager is injected only in application handlers, domain ser
             { filename: HANDLER, code: injected },
             { filename: SERVICE, code: injected },
             { filename: at("src/modules/platform/inbox/inbox.service.ts"), code: injected },
-            { filename: at("src/modules/platform/lease/lease.ts"), code: injected },
+            { filename: at("src/modules/platform/jobs/job-claim.service.ts"), code: injected },
+            { filename: at("src/modules/platform/event-bus/event-bus.service.ts"), code: injected },
+            { filename: at("src/modules/platform/queue/queue.service.ts"), code: injected },
+            { filename: at("src/modules/projections/user-xp/user-xp.projection.ts"), code: injected },
             // no manager, no finding
             { filename: RESOLVER, code: "class R { constructor(private readonly commandBus: CommandBus) {} }" },
         ],
@@ -186,6 +189,10 @@ test("R88: an EntityManager is injected only in application handlers, domain ser
             // a handler's own folder is not enough: only `*.handler.ts`, and a spec beside it is not one
             { filename: at("src/features/api/checkout/application/place.command.ts"), code: injected, errors: [{ messageId: "slot" }] },
             { filename: OTHER, code: injected, errors: [{ messageId: "slot" }] },
+            // a projection holds the manager in its `*.projection.ts` only
+            { filename: at("src/modules/projections/user-xp/user-xp.contracts.ts"), code: injected, errors: [{ messageId: "slot" }] },
+            // a platform capability that is not a persistence capability holds none
+            { filename: at("src/modules/platform/clock/clock.service.ts"), code: injected, errors: [{ messageId: "slot" }] },
             // property injection of the manager is refused in the same places
             { filename: RESOLVER, code: `${manager}class R { @InjectPrimaryEntityManager() private readonly entityManager: EntityManager }`, errors: [{ messageId: "slot" }] },
             // an alias of the type is the same type

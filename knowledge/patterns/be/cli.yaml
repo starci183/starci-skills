@@ -170,6 +170,98 @@ rules:
         - Confirm the deploy runs `cli migrate run` to completion before the api and worker apps start.
     relatedExamples: []
 files:
+  - path: apps/cli/Dockerfile
+    slot: repo.app-image
+    role: the one cli image, run as `cli <group> <command>`
+    rules:
+      - BE_CLI_REQUIRED
+  - path: apps/cli/src/main.ts
+    slot: be.app.cli
+    role: CommandFactory.run(AppModule, logger); never serves
+    rules:
+      - BE_CLI_BOOTSTRAP
+      - BE_ENTRYPOINT_ONLY_IN_APPS
+  - path: apps/cli/src/app.module.ts
+    slot: be.app.cli
+    role: composes the platform modules and CliModule; no business code
+    rules:
+      - BE_APP_COMPOSITION_ONLY
+      - BE_CLI_BOOTSTRAP
+  - path: apps/cli/src/cli.options.ts
+    slot: be.app.cli
+    role: what the cli reads from the environment, the connection list it migrates among them
+    rules:
+      - BE_CLI_REQUIRED
+      - BE_SCHEMA_AUTHORITY
+  - path: src/features/cli/index.ts
+    slot: be.cli
+    role: exports CliModule to the cli app
+    rules:
+      - BE_PUBLIC_SURFACE
+  - path: src/features/cli/cli.module.ts
+    slot: be.cli
+    role: the cli feature root module; imports each group module
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/cli.module-definition.ts
+    slot: be.cli
+    role: the configurable module builder of the root module
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/migrate/migrate.cli.ts
+    slot: be.cli
+    role: the migrate group @Command and its subCommands
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_CLI_OWNER
+    spec: src/features/cli/migrate/migrate.cli.spec.ts
+  - path: src/features/cli/migrate/migrate.module.ts
+    slot: be.cli
+    role: registers the migrate group and its sub-commands
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/migrate/migrate.module-definition.ts
+    slot: be.cli
+    role: the configurable module builder of the group
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/migrate/subs/run.cli.ts
+    slot: be.cli
+    role: "`cli migrate run`: runs the migrations of every connection; the only migration runner"
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_SCHEMA_AUTHORITY
+    spec: src/features/cli/migrate/subs/run.cli.spec.ts
+  - path: src/features/cli/seed/seed.cli.ts
+    slot: be.cli
+    role: the seed group @Command and its subCommands
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_CLI_OWNER
+    spec: src/features/cli/seed/seed.cli.spec.ts
+  - path: src/features/cli/seed/seed.module.ts
+    slot: be.cli
+    role: registers the seed group and its sub-commands
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/seed/seed.module-definition.ts
+    slot: be.cli
+    role: the configurable module builder of the group
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+      - BE_MODULE_SHAPE
+  - path: src/features/cli/seed/subs/demo.cli.ts
+    slot: be.cli
+    role: "`cli seed demo`: writes the demo rows through the domain services"
+    rules:
+      - BE_CLI_COMMAND_SHAPE
+    spec: src/features/cli/seed/subs/demo.cli.spec.ts
+iles:
   root: be/
   tree: |-
     be/

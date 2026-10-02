@@ -9,16 +9,16 @@ const FRAMEWORK_EXPORTS = new Map([
   ['typeorm', new Set(['Entity', 'EntitySchema', 'MigrationInterface', 'ViewEntity'])],
 ]);
 const APPLICATION_ROLES = new Set(['command', 'contracts', 'handler', 'query']);
-const TRANSPORT_ROLES = new Set(['args', 'cli', 'consumer', 'controller', 'gateway', 'input', 'job', 'request', 'resolver', 'response', 'type']);
+const TRANSPORT_ROLES = new Set(['args', 'cli', 'consumer', 'controller', 'gateway', 'input', 'processor', 'request', 'resolver', 'response', 'type']);
 const APPLICATION_LAYER_ROLES = new Set([...APPLICATION_ROLES, 'mapper']);
 const TRANSPORT_LAYER_ROLES = new Set([...TRANSPORT_ROLES, 'enum', 'filter', 'guard', 'interceptor', 'mapper']);
 // Class-bearing roles of the CLOSED suffix list of BE-CONVENTION 1.15 (class name = PascalCase of file + role). A role that is
-// not in that list (adapter, exception, processor, provider, repository, strategy, use-case) is never an allowed role here.
+// not in that list (adapter, exception, provider, repository, strategy, use-case) is never an allowed role here.
 const CLASS_ROLE_SUFFIX = new Map([
   ['args', 'Args'], ['cli', 'Cli'], ['client', 'Client'], ['command', 'Command'], ['consumer', 'Consumer'],
   ['controller', 'Controller'], ['entity', 'Entity'], ['error', 'Error'], ['filter', 'Filter'], ['gateway', 'Gateway'],
-  ['guard', 'Guard'], ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['job', 'Job'],
-  ['mapper', 'Mapper'], ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['query', 'Query'],
+  ['guard', 'Guard'], ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['processor', 'Processor'],
+  ['event', 'Event'], ['queue', 'Queue'], ['projection', 'Projection'], ['projection-entity', 'ProjectionEntity'], ['step', 'Step'], ['mapper', 'Mapper'], ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['query', 'Query'],
   ['request', 'Request'], ['resolver', 'Resolver'], ['response', 'Response'], ['service', 'Service'], ['type', 'Type'],
 ]);
 // Transport object contracts (interfaces and object aliases) named by their file role: <Action>Input in *.input.ts,

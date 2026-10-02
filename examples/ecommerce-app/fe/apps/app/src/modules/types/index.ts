@@ -4,7 +4,6 @@ export type OrderConfirmation = {
     readonly status: string
     readonly totalMinorUnits: number
     readonly currency: string
-    readonly paymentId: string
     readonly replayed: boolean
 }
 

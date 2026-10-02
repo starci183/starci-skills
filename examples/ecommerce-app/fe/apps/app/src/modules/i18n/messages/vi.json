@@ -69,7 +69,7 @@
       "confirmingCta": "Đang xác nhận…",
       "confirmed": {
         "title": "Đơn đã xác nhận",
-        "detail": "Đơn {orderId} — {status} — {total}. Thanh toán {paymentId}.",
+        "detail": "Đơn {orderId} — {status} — {total}.",
         "replayedNote": "Xác nhận này đã được gửi — order service trả lại cùng một đơn thay vì ghi đơn thứ hai.",
         "receipt": {
           "cta": "Tải hóa đơn",

@@ -69,7 +69,7 @@
       "confirmingCta": "Confirming…",
       "confirmed": {
         "title": "Order confirmed",
-        "detail": "Order {orderId} is {status} — {total}. Payment {paymentId}.",
+        "detail": "Order {orderId} is {status} — {total}.",
         "replayedNote": "This confirmation was already sent — the order service returned the same order instead of writing a second one.",
         "receipt": {
           "cta": "Download receipt",

@@ -1,0 +1,14 @@
+{
+  "events": {
+    "order.placed": {
+      "payload": {
+        "orderId": "string",
+        "personId": "string",
+        "totalMinorUnits": "number"
+      },
+      "version": 1
+    }
+  },
+  "schema": "starci/event-contract@1",
+  "service": "order"
+}

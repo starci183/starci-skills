@@ -3,7 +3,13 @@ import type { EntityManager } from "typeorm"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectOrderEntityManager } from "@modules/platform/database"
-import type { CapturePaymentParams, FindPaymentParams, FindPaymentResult, PaymentView } from "./payment.contracts"
+import type {
+    CapturePaymentParams,
+    FindPaymentParams,
+    FindPaymentResult,
+    PaymentView,
+    RefundPaymentParams,
+} from "./payment.contracts"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
 
 const toPaymentView = (row: PaymentEntity): PaymentView => ({
@@ -36,6 +42,16 @@ export class PaymentService {
             }),
         )
         return toPaymentView(saved)
+    }
+
+    /** Marks the captured payment of an order as given back in the caller transaction: the compensation of a capture; false when no captured payment remained. */
+    async refund(params: RefundPaymentParams): Promise<boolean> {
+        const result = await params.manager.update(
+            PaymentEntity,
+            { orderId: params.orderId, status: "captured" },
+            { status: "refunded" },
+        )
+        return (result.affected ?? 0) > 0
     }
 
     /** The payment of an order, or null when none was captured. */

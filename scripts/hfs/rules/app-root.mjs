@@ -6,7 +6,9 @@
 //   BE_TEST_TOPOLOGY (R47, test-topology.mjs), HFS_PROOF_COMMAND_FILE_MISSING (R105, proof-commands.mjs), the app front-end
 //   tree (FE_WIRE_GENERATED, FE_I18N_PLACEMENT, frontend-tree.mjs) and HFS_STACKS_SHAPE (R10, stacks.mjs).
 import { cliFindings } from './cli.mjs';
+import { contractCompatFindings } from './contract-compat.mjs';
 import { depFindings } from './deps.mjs';
+import { eventClassContractFindings, patternSpecFindings } from './event-bus.mjs';
 import { feContractFindings } from './fe-contract-documents.mjs';
 import { appFrontendFindings } from './frontend-tree.mjs';
 import { integrationSpecFindings } from './integration-specs.mjs';
@@ -14,6 +16,8 @@ import { monorepoFindings } from './monorepo.mjs';
 import { peerIntegrationFindings } from './peer-integrations.mjs';
 import { pipelineFindings } from './pipeline.mjs';
 import { proofCommandFindings } from './proof-commands.mjs';
+import { sagaFindings } from './saga.mjs';
+import { serviceFindings } from './services.mjs';
 import { stacksFindings } from './stacks.mjs';
 import { testTopologyFindings } from './test-topology.mjs';
 
@@ -27,6 +31,11 @@ export function appRootFindings({ repoRoot, files, all, repo, resolver, pins }) 
     ...peerIntegrationFindings({ repoRoot, files: all }),
     ...monorepoFindings({ repoRoot, files: all, repo }),
     ...cliFindings({ files: all, repo, resolver }),
+    ...contractCompatFindings({ repoRoot, files: all }),
+    ...eventClassContractFindings({ repoRoot, files: all, repo }),
+    ...patternSpecFindings({ repoRoot, files: all, repo }),
+    ...serviceFindings({ repoRoot, files: all, repo }),
+    ...sagaFindings({ repoRoot, files: all }),
     ...integrationSpecFindings({ repoRoot, files: all }),
     ...feContractFindings({ repoRoot, files: all }),
     ...pipelineFindings({ repoRoot, files, pins }),

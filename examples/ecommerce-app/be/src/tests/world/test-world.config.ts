@@ -1,8 +1,8 @@
 /**
  * The declaration of the ecommerce test world: selection and overrides only. The service list and the image versions come
  * from the stack definition (`.starcistacks/dev`); the library runs Postgres (one database per connection, seeded with the
- * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the two real apps
- * in process, each wired to the other. The stack calls no third party, so the world declares no fake.
+ * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the three real apps
+ * in process: identity and order are wired to each other and talk to billing, a worker with no listener, over Kafka. The stack calls no third party, so the world declares no fake.
  */
 import { defineTestWorld } from "@starci/test-world"
 import type { IdentityWorld, TestApi } from "@starci/test-world"
@@ -12,12 +12,16 @@ import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
 import { parseCliAppOptions } from "../../../apps/cli/src/cli.options"
 import { migrateConnections, openConnection } from "@features/cli"
+import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
+import { EVENT_TOPICS } from "./test-apps.options"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
+    BILLING_ENTITIES,
     IDENTITY_ENTITIES,
     KEYCLOAK_SIGN_IN_CLIENT,
     ORDER_ENTITIES,
     RECEIPTS_BUCKET,
+    billingOptions,
     identityOptions,
     orderOptions,
     platformBase,
@@ -43,20 +47,28 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
             connections: [
                 { name: "identity", entities: IDENTITY_ENTITIES, seeds: [".starcistacks/dev/seeds/identity-demo.sql"] },
                 { name: "order", entities: ORDER_ENTITIES, seeds: [".starcistacks/dev/seeds/order-catalog.sql"] },
+                { name: "billing", entities: BILLING_ENTITIES },
             ],
         },
         redis: {},
+        kafka: { topics: EVENT_TOPICS },
         minio: { buckets: [RECEIPTS_BUCKET] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_SIGN_IN_CLIENT },
     },
     apps: {
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },
         order: { module: OrderApp, operations: ECOMMERCE_OPERATIONS, options: orderOptions },
+        billing: { module: BillingApp, listen: false, options: billingOptions },
     },
     migrate: {
         // the one migration runner: the cli migrate command's, over the cli app's connections
         module: (env: EnvSource) => migrateConnections(parseCliAppOptions(env).connections, openConnection),
-        options: (w) => new EnvSource({ IDENTITY_DB_URL: w.db.identity.url, ORDER_DB_URL: w.db.order.url }),
+        options: (w) =>
+            new EnvSource({
+                IDENTITY_DB_URL: w.db.identity.url,
+                ORDER_DB_URL: w.db.order.url,
+                BILLING_DB_URL: w.db.billing.url,
+            }),
     },
     identity: {
         emailDomain: "ecommerce.dev",

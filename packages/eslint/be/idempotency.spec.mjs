@@ -4,6 +4,7 @@ import { inboxDedupeRequired } from "./idempotency.mjs"
 
 const tester = typedTester()
 const SERVICE = at("src/modules/domain/order/billing.service.ts")
+const BUS = at("src/modules/platform/event-bus/event-bus.service.ts")
 const CONSUMER = at("src/features/api/checkout/transport/message/payment-captured.consumer.ts")
 const SPEC = at("src/modules/domain/order/billing.service.spec.ts")
 const PRELUDE = [
@@ -16,6 +17,11 @@ const withPrelude = (body) => `${PRELUDE}\n${body}`
 test("a service method that takes a delivery claims the event on the Inbox port first and returns on false", () => {
     tester.run("inbox-dedupe-required", inboxDedupeRequired, {
         valid: [
+            // the event bus publishes an event (its shape carries an eventId); it receives no delivery
+            {
+                name: "event bus publishes", filename: BUS,
+                code: withPrelude("class C { async publish(event: Delivery) { await this.send(event) }\n private async send(e: Delivery) { return e } }"),
+            },
             // the claim as the negated test of an early return
             {
                 name: "case 1", filename: SERVICE,

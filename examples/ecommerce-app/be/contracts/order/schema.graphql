@@ -48,7 +48,6 @@ input PlaceOrderInput {
 type PlaceOrderType {
   currency: String!
   orderId: ID!
-  paymentId: ID!
   replayed: Boolean!
   status: String!
   totalMinorUnits: Int!

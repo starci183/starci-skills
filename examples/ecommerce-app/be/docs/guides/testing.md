@@ -64,7 +64,7 @@ Everything else lives under `src/tests/`:
   (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`); `global-setup.ts` and `global-teardown.ts`
   re-export the library's hooks. The library runs the services `.starcistacks/dev` declares, real and behind toxiproxy:
   Postgres with one database per connection (identity, order), the Redis of the cache, Keycloak with the stack's
-  `realm-ecommerce.json` and MinIO with the receipts bucket. It runs the real `apps/migrate`
+  `realm-ecommerce.json` and MinIO with the receipts bucket. It runs the real `cli migrate run`
   bootstrap once and applies the dev seeds; `use-test-world.ts` re-exports `useTestWorld({ apps } | { modules })`, which
   boots the real identity and order apps in the spec process, wired to each other over real GraphQL, and returns
   `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.infra.redis` (the real Redis:

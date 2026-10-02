@@ -16,7 +16,7 @@
  *
  * Two kinds of file are uniform by design and are not compared, both found through the slot resolver: the entry main.ts of
  * an app (slot appKind + its required main.ts) and the transport doors of a feature (a *.controller.ts, *.resolver.ts,
- * *.gateway.ts, *.consumer.ts, *.job.ts or *.cli.ts of a slot that a protocol app composes). This is not a loophole: logic
+ * *.gateway.ts, *.consumer.ts, *.processor.ts or *.cli.ts of a slot that a protocol app composes). This is not a loophole: logic
  * cannot live in either. A door body is dispatch only (eslint transport-is-thin, R88), and main.ts cannot share a
  * helper because NestFactory is allowed only in main.ts (BE_ENTRYPOINT_ONLY_IN_APPS), so what repeats there is the
  * canonical shape of section 5 of BE-CONVENTION. A door or main.ts that grows logic is refused by those enforcers, not
@@ -25,7 +25,7 @@
 export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
 const MAX_VIOLATIONS = 200;
-const DOOR_ROLES = new Set(['controller', 'resolver', 'gateway', 'consumer', 'job', 'cli']);
+const DOOR_ROLES = new Set(['controller', 'resolver', 'gateway', 'consumer', 'processor', 'cli']);
 const APP_ENTRY = 'main.ts';
 const ID = -1;
 const LIT = -2;

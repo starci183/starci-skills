@@ -20,7 +20,7 @@ export const connectionFiles = (name, prefix, constant) => ({
 
 /** archFixture options: two declared connections, with the cli app that migrates them. */
 export const TWO_CONNECTIONS = {
-  declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }, { name: 'agentos', envPrefix: 'AGENTOS' }] },
+  declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS', owner: 'core', isolation: 'database' }] },
   apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }],
 };
 

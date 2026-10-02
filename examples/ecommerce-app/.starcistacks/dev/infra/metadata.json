@@ -8,6 +8,7 @@
         "redis": 6448,
         "keycloak": 8149,
         "minio": 9069,
+        "kafka": 9161,
         "landing": 3069,
         "app": 4069
     },
@@ -39,6 +40,10 @@
         "minio": {
             "scope": "shared",
             "basePort": 9000
+        },
+        "kafka": {
+            "scope": "shared",
+            "basePort": 9092
         },
         "landing": {
             "scope": "application",

@@ -56,10 +56,12 @@ $defs:
                     items:
                       type: object
                       additionalProperties: false
-                      required: [name, envPrefix]
+                      required: [name, envPrefix, owner, isolation]
                       properties:
                         name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
                         envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
+                        owner: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'The api or worker app that owns this bounded context (the connection is the context): only it composes the connection (R160).'}
+                        isolation: {enum: [database, schema], description: 'The context is its own logical database, or its own schema of a shared database (<PREFIX>_SCHEMA); splitting a schema out into a database is an env-only change.'}
           fe:
             allOf:
               - {$ref: '#/$defs/side'}
@@ -84,6 +86,11 @@ $defs:
         type: array
         uniqueItems: true
         items: {type: string, pattern: '^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      patterns:
+        type: array
+        uniqueItems: true
+        description: The design patterns this side applies (event-bus, queue, fenced-job, projection, saga); each enables the opt-in slots that name it, and the checks require its proof scenarios.
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       connections: true
       reads:
         type: array

@@ -1,5 +1,6 @@
 /**
- * `hfs emit-contracts`: writes `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
+ * `hfs emit-contracts`: writes `contracts/<service>/events.json` for every service that declares typed event classes under
+ * `src/modules/events/<service>/` (events.mjs: the async contract, R151), `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
  * `contracts/<app>/openapi.json` for every api app whose `apps/<app>/src/operations.ts` exports the typed operation table
  * `OPERATIONS` (operations.mjs: OpenAPI 3.1 read from the TypeScript checker; nothing is executed).
  *
@@ -20,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { emitEvents, eventServices, eventsSnapshotPath } from './events.mjs';
 import { openapiPath } from './operations.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
@@ -92,6 +94,15 @@ export function emitContracts({ repoRoot, declaration, outDir = repoRoot }) {
       written.push(relative);
     }
     if (emitted.standIns.length) standIns[app] = emitted.standIns;
+  }
+  for (const service of eventServices(repoRoot)) {
+    const events = emitEvents({ repoRoot, service });
+    if (events === null) continue;
+    const relative = eventsSnapshotPath(service);
+    const target = path.join(outDir, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, events);
+    written.push(relative);
   }
   return { written, skipped, standIns };
 }

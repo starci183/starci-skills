@@ -193,3 +193,31 @@ rules:
       manual:
         - Confirm the app that composes a feature is the one that should serve it.
     relatedExamples: []
+  - id: BE-ARCHITECTURE-6
+    title: No trigger kind imports another; the kinds meet through the event bus
+    kind: mandatory
+    hfsRules: [R141, R28, R31]
+    requirement: |-
+      Features are grouped by what starts their work: `api`, `webhooks`, `realtime`, `saga`, `reactors`, `jobs` and `cli` (the slot
+      field `trigger` of the kind's owner slot). Business logic stays in `modules/domain` and a feature is a thin door. No kind imports
+      another kind; each imports only downward into `modules/*`, and only `be/apps/*` compose features. Every cross-kind call is an
+      event: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it (api to saga or jobs, saga to jobs,
+      jobs to saga, cli to jobs or saga). Type-only imports count, and an import inside one owner is always fine.
+    rationale: |-
+      A direct import couples two failure domains and runs the callee inside the caller's process and transaction. An event is durable,
+      retried and observable, so the kinds can be deployed and scaled apart.
+    cases:
+      - id: case-1
+        when: A request must start a background job
+        write: The domain service the api handler calls enqueues the job inside its transaction (queues.yaml); the jobs feature never appears in an api import.
+      - id: case-2
+        when: A saga step needs a job's result
+        write: The job's domain service publishes a completion event; a saga consumer advances the saga.
+    verification:
+      automated:
+        - BE_KIND_ISOLATION
+        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_FEATURE_NOT_COMPOSED
+      manual:
+        - Confirm a shared helper two kinds need sits in modules/*, not in a feature.
+    relatedExamples: [event-bus]

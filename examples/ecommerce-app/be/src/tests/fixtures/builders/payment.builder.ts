@@ -9,7 +9,7 @@ export interface PaymentRow {
     /** The captured amount in minor units. */
     amountMinorUnits: number
     /** The ledger state. */
-    status: "captured"
+    status: "captured" | "refunded"
     /** When the payment was captured. */
     createdAt: Date
 }

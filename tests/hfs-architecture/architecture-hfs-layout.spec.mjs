@@ -85,7 +85,7 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: an app-root Markdown file other than README.m
 // The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
 const CLI_APPS = [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }];
 const CORE_FILES = {};
-const withCli = (t, files) => runArch(archFixture(t, { profile: 'be', apps: CLI_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
+const withCli = (t, files) => runArch(archFixture(t, { profile: 'be', apps: CLI_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
 
 test('HFS_APP_LAYOUT_INVALID: the cli app needs main.ts and app.module.ts, like an api app', t => {
   const cli = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n' });

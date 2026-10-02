@@ -4,7 +4,7 @@ services:
     # only postgres/redis here (`docker compose up -d`) and drives the API on the host with
     # `npm run start:identity`, exactly the split nivo's example uses so migrations and env stay
     # one-command reproducible without a container build in the loop.
-    image: ecommerce-app/identity
+    image: ecommerce-app/identity:1.0.0
     profiles: [app]
     depends_on:
       - postgres

@@ -77,8 +77,8 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 | --- | --- | --- |
 | Helper or type used by one feature only | `be/src/features/api/<feature>/application/support/<name>.<role>.ts` (`be.feature.application.support`, optional); another feature cannot import it, a second user moves it to a `domain` capability | minor |
 | One-off action (migrate, seed, sync, backup, operator command) | a sub-command `be/src/features/cli/<group>/subs/<name>.cli.ts` with its `<name>.cli.spec.ts` in the cli feature root (`be.cli`), compiled into the one app `be/apps/cli` (`be.app.cli`, kind `cli`), run as `cli <group> <command>` | none |
-| Queue consumer | `transport/message/` in the api feature, composed by the api app that owns it (or a `worker` app scaled apart) | none, declared in `hfs.json` |
-| Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts`, composed the same way | none |
+| Event consumer | `transport/message/<event>.consumer.ts` in the api feature, composed by the api app that owns it (or a `worker` app scaled apart); declares the pattern `event-bus` | none, declared in `hfs.json` |
+| Background job, sweep, recurring task | `features/jobs/<job>/<job>.processor.ts` plus a typed queue `modules/queues/<queue>/<queue>.queue.ts` with a BullMQ job scheduler; declares the patterns `queue` and `fenced-job` | none, declared in `hfs.json` |
 | Another api app, or a worker app to scale background work apart | `be/apps/<name>` plus its kind in `hfs.json` `sides.be.apps` | none |
 | Another Next app | `fe/apps/<name>` plus kind `next` in `hfs.json` `sides.fe.apps` | none |
 | New app kind or protocol | new slot `be.app.<kind>` or `be.transport.<protocol>` | minor |
@@ -108,8 +108,8 @@ reads and (back end only) the database connections.
       ],
       "optionalSlots": ["be.transport.message", "be.transport.schedule", "be.contract.graphql", "repo.docs"],
       "connections": [
-        { "name": "primary", "envPrefix": "PRIMARY_DB" },
-        { "name": "agentos", "envPrefix": "AGENTOS_DB" }
+        { "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "core", "isolation": "database" },
+        { "name": "agentos", "envPrefix": "AGENTOS_DB", "owner": "core", "isolation": "database" }
       ]
     },
     "fe": {
@@ -123,8 +123,10 @@ reads and (back end only) the database connections.
 
 `sides.be.apps` lists every `be/apps/<name>` with its kind (`api`, `worker`, `cli`; at most one cli app, named `cli`, required once a connection is declared, R132); `sides.fe.apps` every
 `fe/apps/<name>` (`next`). App names are unique across both sides. `connections` (back end only) lists every physical
-database as `{ name, envPrefix }`: the logical name (never the engine) and the prefix of its `<PREFIX>_*` environment
-keys. `reads` is a subset of the manifest's `sides.<side>.reads`. A missing `hfs.json`, or a machine run that analysed
+database or schema as `{ name, envPrefix, owner, isolation }`: the logical name (never the engine; the connection IS the bounded
+context), the prefix of its `<PREFIX>_*` environment keys, the one api or worker app that owns it (only that app composes it)
+and whether the context is its own `database` or its own `schema` of a shared database (`<PREFIX>_SCHEMA`; splitting a schema
+out into a database is an env change only). `reads` is a subset of the manifest's `sides.<side>.reads`. A missing `hfs.json`, or a machine run that analysed
 zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailable". Owners are derived from slots;
 `hfs.json` holds no owner list, path or disabled rule. `hfs scaffold app <name>` writes a new app with its declaration.
 
@@ -191,7 +193,6 @@ be/src/features/api/<feature>/           an api feature (features are grouped by
   transport/http/                        opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (webhooks, OAuth, health, byte streams)
   transport/websocket/                   opt-in: <feature>-websocket.module.ts, <channel>.gateway.ts
   transport/message/                     opt-in: <feature>-message.module.ts, <event>.consumer.ts; composed by the owning api app or a worker app
-  transport/schedule/                    opt-in: <feature>-schedule.module.ts, <job>.job.ts; composed by the owning api app or a worker app
   messages/                              opt-in: <feature>.messages.ts (vi and en copy)
 be/src/features/cli/                     the cli feature root, compiled only into apps/cli (R134, R135)
   index.ts, cli.module.ts, cli.module-definition.ts
@@ -289,13 +290,13 @@ with `src` or `.starcistacks`.
 
 ### 5.7 Background work (R46)
 
-Background work is a transport. `transport/schedule/<job>.job.ts` (a `ScheduledJob` with `run(at)`) and
-`transport/message/<event>.consumer.ts` dispatch one command exactly as a resolver does. Mechanisms live in
-`platform/scheduling` and `platform/messaging` (adapters over the queue and stream libraries, with lease and fencing).
-The api app of the service that owns the feature composes them (the lease of `platform/scheduling` lets one replica run
-a tick); a `worker` app composes them instead only when the background load must scale apart (R46). A method named `sweep*`, `deliver*`,
-`reconcile*`, `retry*` or `relay*` that no job or consumer calls is a failure. Producers publish through typed queues, and
-a publish that must be atomic with a write goes through the outbox inside the transaction.
+Background work is a transport. `transport/message/<event>.consumer.ts` (an `EventConsumer` of `platform/event-bus`) and
+`features/jobs/<job>/<job>.processor.ts` (a `FencedProcessor` of `platform/jobs`) dispatch one command exactly as a resolver does.
+Mechanisms live in `platform/event-bus` (Kafka behind a transactional outbox, with inbox, retry and dead letter), `platform/queue`
+(BullMQ with the outbox relay and job schedulers) and `platform/jobs` (the fencing token). An app of kind `api` or `worker`
+composes them; `@Cron`, `@Interval` and `@Timeout` exist nowhere, a schedule is a BullMQ job scheduler. A method named
+`sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` that no processor or consumer calls is a failure. A domain service
+publishes `eventBus.publish(event, tx)` or enqueues `enqueueX(payload, tx)` inside its own transaction (knowledge/patterns/be/event-bus.yaml, queues.yaml, jobs.yaml).
 
 ### 5.8 Modules, features and injection (R29 to R33, R45, R85, R87, R88)
 
@@ -351,6 +352,27 @@ expression of the service method a consumer or signed-webhook handler dispatches
 `platform/retry` (bounded attempts, exponential backoff with jitter, an abort signal), never a loop written at the call
 site (R81). No transaction spans an external call: commit first and call out after, or enqueue an outbox message inside
 the transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
+
+### 5.11 Services of one product (R148 to R153)
+
+A product with more than one back-end service keeps every service as a Nest app at `be/apps/<service>/` of the one repository
+(R148): the apps share the `be/src` libraries and the one `package.json`, each has its own `Dockerfile` and builds its own
+image, and no file of one service app imports a file of another (R153). In `.starcistacks/application-stacks.yaml` every api or
+worker app is a `role: service` component (R150) and every image of the stack, own or third-party, is pinned: a digest or an
+exact version, never a moving tag (R149); an own image is `<repo>/<service>:<x.y.z>` built from the app's Dockerfile, a service
+the product does not own stays a pinned third-party image. The wire between services is a contract the consumer judges
+itself against: a service keeps the snapshot of its GraphQL schema (R23, R113) and, for the messages it publishes, the literal
+table `apps/<service>/src/events.ts` and its snapshot `be/contracts/<service>/events.json`; a consumer lists what it reads
+in `apps/<app>/src/consumes.ts` and each entry must exist in the provider's snapshot at that version (R151). Messages travel
+on the queues of `platform/messaging` (BullMQ over the stack's Redis): a publisher appends after its commit, a consumer is a
+`transport/message/<event>.consumer.ts` of a worker app, the receiver dedupes on the event id (inbox claim or an idempotent
+state check) and a message that runs out of attempts waits in the dead letters. A saga is a chain of services reacting to each
+other's events, never an in-process event: the failure is an event whose contract declares `compensates: "<event>"` and its
+consumer undoes that step. Every consumed event is named by an e2e spec that boots the real apps through `useTestWorld`, and the
+spec of a saga step also names the compensated event, so it drives the whole flow (R152). A saga is a declared pattern
+(`patterns: ["saga"]` in hfs.json): its folder `be/src/features/api/<feature>/saga/` holds an orchestrator, a versioned state, steps and a
+compensation for every step (R154 to R158; `knowledge/patterns/be/saga.yaml`). See `docs/microservices.md` and the
+`ecommerce-app` example (`identity`, `order`, `billing`).
 
 ## 6. Frontend
 
@@ -578,7 +600,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; an app is proven by the e2e world (`useTestWorld({ apps })`), never by a unit spec. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `be/apps/*/src`. |
 | R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority, run only by the cli migrate command and the test world; `synchronize` is `false`. |
-| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias). |
+| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias); only a platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) registers on several. |
 | R36 | `BE_SQL_OUTSIDE_PERSISTENCE` | Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder. |
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
@@ -610,7 +632,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, the cli (`be/apps/cli`, `be/src/features/cli`) and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object. |
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface. |
-| R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
+| R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of its own context (its own capability's, or a same-context capability it may import; a cross-context JOIN is refused), and every multi-row SELECT is bounded. |
 | R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events (`EventBus`, `EventEmitter`, an RxJS `Subject`, a stored listener list); a message and an injected dependency are `readonly`. |
 | R88 | `BE_TRANSPORT_SHAPE` | A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R134) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`. |
 | R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source. |
@@ -687,3 +709,31 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R133 | `BE_CLI_BOOTSTRAP` | The cli app boots in its `main.ts` with `CommandFactory.run(...)` of nest-commander and never serves: `NestFactory.create*` of `@nestjs/core`, a `.listen()`, a microservice connection, an `@nestjs/platform-*` adapter or `@nestjs/microservices` in the cli app is refused (by the import that binds each name). |
 | R134 | `BE_CLI_COMMAND_SHAPE` | A nest-commander command (`@Command` or `@SubCommand`, by the import that binds the decorator) is declared only in the cli feature root `src/features/cli/`: a group `@Command` in `<group>/<group>.cli.ts`, a `@SubCommand` extending `CommandRunner` in `<group>/subs/<name>.cli.ts`, one command per file, and every sub-command has its unit spec `<name>.cli.spec.ts` beside it (a command is an action runner, not a thin transport: R88 does not apply to it). `.cli.ts`, because `.command.ts` is the CQRS message. |
 | R135 | `BE_CLI_OWNER` | `nest-commander` is imported only by the cli app and the cli feature root, and no back-end source parses command-line arguments itself: `process.argv` and the parsers commander, yargs and minimist are refused everywhere; a one-off action anywhere but a cli command is a door the rule closes. |
+| R136 | `BE_EVENT_CLASS_CONTRACT` | Every typed event class `be/src/modules/events/<service>/<event>.event.ts` (one class with literal `static readonly eventName` and `version`, in a file named after its event: dots become dashes) equals an entry of the vendored contract `be/contracts/<service>/events.json` at the same name and version, and every entry of a vendored contract has its class; a class the contract does not list, a version mismatch, a contract entry with no class or a misnamed file is a finding (pattern event-bus). |
+| R137 | `BE_OUTBOX_WRITE_TX` | The outbox is written only by a domain service, with the manager of its own transaction: `eventBus.publish(event, tx)` and a queue producer's `enqueueX(payload, tx)` are called only in a file of `modules/domain` (the test world, e2e and fixtures aside), and `tx` is the `manager` parameter of a `.transaction(async (manager) => ...)` callback or a function parameter typed `EntityManager`; the injected shared manager, an alias, an outer manager or a missing argument is a finding. The call is found by the receiver's TYPE (the `EventBus` port of platform/event-bus) or by the resolved signature's declaring tier (queues), never by a name. |
+| R138 | `BE_EVENT_CONSUMER_SHAPE` | A class that implements the `EventConsumer` port of platform/event-bus (by type origin) is `transport/message/<event>.consumer.ts` (slot be.transport.message), its file stem is the kebab form of its event class's literal `eventName` (dots become dashes), and its `handle` reads `delivery.eventId` so the dispatched command carries the id the domain service claims in platform/inbox; a `.consumer.ts` that implements no `EventConsumer` is a finding. |
+| R139 | `BE_QUEUE_PRODUCER_SHAPE` | In `modules/queues/<queue>/<queue>.queue.ts` every exported function or class method that writes the `QueueOutbox` port of platform/queue declares a `tx` parameter typed `EntityManager` and passes that parameter as the first argument of the write; a write with another manager, an outer manager or none is a finding (pattern queue). |
+| R140 | `BE_PATTERN_SPEC_MISSING` | Every pattern a back end declares (hfs.json sides.be.patterns) is proven on the test world: each scenario id of ruleParams.be.patternScenarios.<pattern> has a test titled `<pattern>/<scenario>: ...` (the first argument of `it(` or `test(`) in an e2e or integration spec under be/src/tests; a declared pattern with a missing scenario is a finding. |
+| R141 | `BE_KIND_ISOLATION` | No trigger kind imports another: a feature whose owner slot names one `trigger` (api, webhooks, realtime, saga, reactors, jobs, cli) never imports (static, dynamic, re-export or type-only) a feature of another kind; each kind imports only `modules/*` and only be/apps/* compose features. The kinds meet through the event bus: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it. The importing and imported owners are read from the slot view (slot field `trigger`), never from a folder name; the finding replaces BE_FEATURE_IMPORTS_FEATURE when both features name different kinds. |
+| R142 | `BE_JOB_WRITE_OUTSIDE_OWNER` | The job entity (the class `platform/jobs` declares in its persistence) is written only by `platform/jobs`: an `update`, `increment`, `decrement`, `save`, `insert`, `upsert`, `delete`, `remove`, `softDelete` or a query-builder write on it in any other file (the test world, e2e and fixtures aside) is a finding. The entity is found by the type origin of the call's arguments or builder chain, never by a name; raw SQL is judged by BE_SQL_TABLE_OWNER (pattern fenced-job). |
+| R143 | `BE_JOB_FENCE_REQUIRED` | Every `JobClaims` method that takes a job (a parameter type with `jobId`) declares a required, non-nullable `expectedFencingToken: number`; no call on `JobClaims` outside `platform/jobs` casts around it (`as`, a type assertion or `!` in an argument); and a `catch` around a `JobClaims` write rethrows, so a `JobFencedOut` stops the zombie with no further effect (pattern fenced-job). |
+| R144 | `BE_JOB_RUN_KEY` | In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job). |
+| R145 | `BE_JOB_SHAPE` | A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job). |
+| R146 | `BE_PROJECTION_WRITE_OWNER` | A projection's entity (a class of `<name>.projection-entity.ts` in `modules/projections/<name>/`) is written only by the `<name>.projection.ts` of the same folder (the test world, e2e and fixtures aside): a write on it from a domain service, a handler, another projection or another file of the folder is a finding. The entity is found by the type origin of the write's arguments or builder chain (pattern projection). |
+| R147 | `BE_PROJECTION_SHAPE` | Every public method of a `<name>.projection.ts` class is `recompute*` (idempotent write from the source facts) or `get*` (read); the `index.ts` of a projection exports nothing from a `.projection-entity` file; and a feature whose kind is api calls no `recompute*` method of a projection (it reads through `get*`). The kind is read from the owner slot's `trigger` (pattern projection). |
+| R148 | `HFS_SERVICE_PLACEMENT` | A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app's own and a `fe/packages/<pkg>` workspace's, outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile. |
+| R149 | `HFS_IMAGE_UNPINNED` | In a product with more than one service (two or more be apps of kind api or worker) every component `image` of `.starcistacks/application-stacks.yaml` is pinned: a digest (`@sha256:<64 hex>`) or an exact version tag (`x.y.z`, optionally with a suffix); no tag, `latest`, a branch word or a major or minor-only tag is a finding. An own service image is `<repo>/<service>:<x.y.z>`, built from `be/apps/<service>/Dockerfile`; a service the product does not own stays a pinned third-party image. |
+| R150 | `HFS_SERVICE_STACK_DECLARATION` | Every api or worker app `be/apps/<service>` of a product with more than one service is a component of the same name with `role: service` in `.starcistacks/application-stacks.yaml`. |
+| R151 | `HFS_EVENT_CONTRACT` | The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: "<event>"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and every queue a consumer defines with `defineQueue` of `platform/messaging` must be listed in a consumes table; a missing or stale snapshot, an unknown event, a version mismatch or an unlisted consumer queue is a finding. |
+| R152 | `BE_ASYNC_SPEC_MISSING` | Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps through `useTestWorld` (it publishes the event, reads the effect back and redelivers it); when the contract of the event declares `compensates: "<event>"` it is a saga step, and a spec naming it also names the compensated event, so the spec drives the whole flow: the step, the failure, then the compensated state. |
+| R153 | `BE_SERVICE_ISOLATION` | A service app (`be/apps/<service>/`) imports no file of a sibling service app: the app that owns the importing file and the app that owns the file a specifier resolves to (a relative path or an alias of the program's own `compilerOptions.paths`) are read from the HFS slot view, and two different apps is a finding; services share only the `be/src` libraries and meet through the wire (a client of the sibling's API, or the events of its vendored contract under `be/contracts/<service>/`). |
+| R154 | `BE_SAGA_STEP_COMPENSATION` | In a product that declares the `saga` pattern (`patterns: ["saga"]` in hfs.json sides.be) a saga is the folder `be/src/features/api/<feature>/saga/` (`<saga>.saga.ts` the orchestrator, `steps/<step>.step.ts`, `compensations/<step>.compensation.ts`): every step has a compensation of the same name and every compensation a step, the orchestrator imports every step and every compensation of its folder, and a folder of steps or compensations has an orchestrator; the folders themselves are slots enabled only by the declared pattern, so an undeclared saga is `HFS_SLOT_NOT_ENABLED`. |
+| R155 | `BE_SAGA_STATE_VERSIONED` | Every saga orchestrator has `<saga>.saga-state.ts` beside it, whose exported state type declares `status` and `version: number`, and imports the fenced store of `platform/saga`: the persisted state of a run moves only through the store, every transition naming the version it read, so a zombie delivery cannot move a run twice. |
+| R156 | `BE_SAGA_EVENT_CONTRACT` | A saga step and a saga compensation each name their event (`readonly event = "<name>"`), both events are declared in a vendored contract (`be/contracts/<service>/events.json`), and the contract of the compensation's event declares `compensates: "<event of the step of the same name>"`. |
+| R157 | `BE_SAGA_CONSUMER_DEDUPE` | A consumer of a feature that holds a saga (`transport/message/<event>.consumer.ts`) passes the id of the delivery on (`message.eventId`) to the command it dispatches: the saga takes every event through the inbox (R80), so the consumer must hand it the dedupe key. |
+| R158 | `BE_SAGA_E2E_MISSING` | Every compensation path of a saga has an e2e spec (`be/src/tests/e2e/<area>/*.e2e-spec.ts` through `useTestWorld`) that names the event of the compensation and injects a failure through the world (an outage of an infra service or an app with `during`, `cut` or `latency`, a fake's `failNext`, `interruptDatabase`): the compensation is proven under a fault, not only on the happy flow. |
+| R159 | `BE_CONTEXT_OWNER` | A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection). |
+| R160 | `BE_CONTEXT_COUPLING` | Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context. |
+| R161 | `BE_CONTEXT_TRANSACTION` | One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga. |
+| R162 | `BE_CONTRACT_BREAKING` | An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key. |
+| R163 | `BE_CONTEXT_PLATFORM_TABLES` | A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it. |

@@ -11,14 +11,19 @@ import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
+import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { EventBusModule } from "@modules/platform/event-bus"
+import { InboxModule } from "@modules/platform/inbox"
 import {
     cacheOptionsOf,
+    eventBusOptionsOf,
     identityApiOptionsOf,
     keycloakAdminOptionsOf,
     keycloakOptionsOf,
     orderApiOptionsOf,
     receiptStorageOptionsOf,
 } from "./test-apps.options"
+import { ProbeConsumerModule } from "./probe-consumer.module"
 
 /** The catalog capability over the order database: stock, reservations. */
 export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
@@ -28,6 +33,18 @@ export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 /** The cache client over the run's Redis. */
 export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => CacheModule.register({ isGlobal: true, ...cacheOptionsOf(w) }),
+]
+
+/** The event bus over the run's Kafka and the outbox of the order database (publisher, relay, consumer registry), the inbox of the billing database, and the consumer of the probe event. */
+export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) =>
+        EventBusModule.register({
+            isGlobal: true,
+            ...eventBusOptionsOf(w, "probe"),
+            connections: [ORDER_ENTITY_MANAGER],
+        }),
+    () => InboxModule.register({ isGlobal: true }),
+    () => ({ module: ProbeConsumerModule }),
 ]
 
 /** The password-grant client over the run's realm. */

@@ -118,8 +118,33 @@ topics:
   - id: be.background
     title: Background work
     path: background.yaml
-    decides: Jobs and consumers as transports composed by the owning api app or a worker app, runners for every sweep, typed queues and the outbox, lease and fencing
-    rules: BE-BACKGROUND-1 … BE-BACKGROUND-5
+    decides: Jobs and consumers as transports composed by the owning api app or a worker app, runners for every sweep, producers through the bus or a typed queue
+    rules: BE-BACKGROUND-1 … BE-BACKGROUND-4
+  - id: be.event-bus
+    title: Event bus
+    path: event-bus.yaml
+    decides: Synchronous work inside one context, typed event classes equal to the vendored contract, publish(event, tx) from a domain transaction, the transactional outbox, relay, Kafka, consumers with retry, dead letter and the inbox
+    rules: BE-EVENT-BUS-1 … BE-EVENT-BUS-5
+  - id: be.queues
+    title: Queues and schedulers
+    path: queues.yaml
+    decides: Typed queue producers that write the outbox in the caller's transaction, the BullMQ owner and relay, job schedulers instead of cron
+    rules: BE-QUEUES-1 … BE-QUEUES-4
+  - id: be.jobs
+    title: Fenced background jobs
+    path: jobs.yaml
+    decides: The job row with one owner and one atomic claim, the required expectedFencingToken in the type, the run key of an external effect, the processor and steps shape
+    rules: BE-JOBS-1 … BE-JOBS-5
+  - id: be.projections
+    title: Projections (read models)
+    path: projections.yaml
+    decides: Read models that replace cross-context joins, one writer per table, recompute and get, replay
+    rules: BE-PROJECTIONS-1 … BE-PROJECTIONS-4
+  - id: be.reactors
+    title: Reactors
+    path: reactors.yaml
+    decides: Features that consume events of another context and keep a local copy or trigger a projection, thin doors, no cross-kind imports
+    rules: BE-REACTORS-1 … BE-REACTORS-4
   - id: be.messages
     title: Messages catalog and locale
     path: messages.yaml
@@ -135,6 +160,16 @@ topics:
     path: idempotency.yaml
     decides: A webhook or consumer claims the event through InjectInbox before it acts, detected by receiver type, the inbox_claims table
     rules: BE-IDEMPOTENCY-1, BE-IDEMPOTENCY-2
+  - id: be.services
+    title: Services of one product
+    path: services.yaml
+    decides: A service only at be/apps/<service> with its own Dockerfile and image, pinned images in a multi-service stack, the vendored event contract and consumer tables, e2e specs for every consumer and saga
+    rules: BE-SERVICES-1 … BE-SERVICES-4
+  - id: be.saga
+    title: Sagas
+    path: saga.yaml
+    decides: A saga as a declared-pattern feature folder, an orchestrator listing steps and compensations, the versioned and fenced state of a run, the events in the vendored contract, e2e specs that inject a failure per compensation path
+    rules: BE-SAGA-1 … BE-SAGA-4
   - id: be.resilience
     title: Retry through the shared helper
     path: resilience.yaml

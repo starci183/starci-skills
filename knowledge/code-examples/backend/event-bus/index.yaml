@@ -1,0 +1,41 @@
+schema: starci/code-example@1
+id: event-bus
+title: Publish an event in the domain transaction and consume it
+purpose: |
+  Show the one durable path of an event: a typed event class, a domain service that publishes it with the manager of its own
+  transaction, and a thin consumer door that dispatches one command and forwards the event id.
+appliesTo: [backend]
+relatedRules:
+  - BE-EVENT-BUS-1
+  - BE-EVENT-BUS-2
+  - BE-EVENT-BUS-3
+  - BE-EVENT-BUS-4
+files:
+  - path: order-placed.event.ts
+    role: Typed event class, one per file, named after the event.
+  - path: place-order.service.ts
+    role: Domain service publishing inside its transaction.
+  - path: order-placed.consumer.ts
+    role: Consumer door in transport/message.
+entrypoint: place-order.service.ts
+adapt:
+  - Event classes live in modules/events/<service>/ and equal be/contracts/<service>/events.json.
+  - Only a domain service publishes, and only with the manager of its transaction.
+  - A consumer dispatches one command; the service the command reaches claims the event id in platform/inbox.
+dependencies:
+  packages: []
+  assumptions: |
+    The platform event-bus capability, the CQRS buses and the named EntityManager injector exist in the host; this folder shows
+    the interaction and is not a runnable app.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Does not show the broker, the relay or the dead-letter topic; see knowledge/patterns/be/event-bus.yaml.
+provenance:
+  sources:
+    - knowledge/patterns/be/event-bus.yaml
+  simplifications: |
+    Synthetic order and invoice names; persistence entities and the module wiring are omitted.

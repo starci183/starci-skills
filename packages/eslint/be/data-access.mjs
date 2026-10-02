@@ -25,6 +25,7 @@
 import ts from "typescript"
 import { walk } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
+import { resolveVariable, transactionCallback } from "./lib/transactions.mjs"
 import {
     declaredInjectorNames,
     inDatabaseCapability,
@@ -285,26 +286,6 @@ export const requireEntityTableName = {
 }
 
 // -- transactions ----------------------------------------------------------------------------------
-
-/** The callback of a `.transaction(...)` call on a manager or data source, or null. */
-const transactionCallback = (context, node) => {
-    const callee = node.callee
-    if (callee.type !== "MemberExpression" || callee.computed) return null
-    if (callee.property.type !== "Identifier" || callee.property.name !== "transaction") return null
-    const receiver = infraTypeOf(context, callee.object)
-    if (receiver !== "EntityManager" && receiver !== "DataSource") return null
-    const callback = node.arguments[node.arguments.length - 1]
-    return callback && (callback.type === "ArrowFunctionExpression" || callback.type === "FunctionExpression") ? callback : null
-}
-
-/** The variable an identifier resolves to, looking outward from the identifier's own scope. */
-const resolveVariable = (sourceCode, node) => {
-    for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) {
-        const variable = scope.set.get(node.name)
-        if (variable) return variable
-    }
-    return null
-}
 
 /** The leftmost expression of a member chain: `this.deps.em` gives the `this`. */
 const rootOf = (expression) => {

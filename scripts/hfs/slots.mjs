@@ -28,7 +28,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
+import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -154,7 +155,7 @@ function manifestShapeProblems(m) {
   if (!isPlainObject(m)) return ['the manifest is not a map'];
   if (!MANIFEST_KINDS.includes(manifestKind(m))) return [`kind must be one of ${MANIFEST_KINDS.join(', ')}`];
   if (manifestKind(m) === RUNTIME_KIND) return runtimeShapeProblems(m);
-  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
+  const allowed = new Set(['schema', 'kind', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'triggerKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -167,6 +168,7 @@ function manifestShapeProblems(m) {
     const def = m.sides[side];
     if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^(be|fe)\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <side>/<dir>/ paths]}`);
   }
+  if (m.triggerKinds !== undefined && (!Array.isArray(m.triggerKinds) || !m.triggerKinds.length || !m.triggerKinds.every((k) => NAME.test(String(k))) || new Set(m.triggerKinds).size !== m.triggerKinds.length)) bad.push('triggerKinds must be a non-empty list of unique names');
   for (const key of ['appKinds', 'tiers']) {
     if (!isPlainObject(m[key])) { bad.push(`${key} must be a map with be and fe`); continue; }
     for (const extra of Object.keys(m[key])) if (!PROFILES.includes(extra)) bad.push(`${key}.${extra} is not a profile`);
@@ -184,7 +186,8 @@ function manifestShapeProblems(m) {
   const rp = m.ruleParams;
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 8) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper} and unitRoles'); else bad.push(...unitRolesProblems(rp.be));
+    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 9) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper}, unitRoles and patternScenarios'); else bad.push(...unitRolesProblems(rp.be));
+    bad.push(...scenarioProblem(rp.be.patternScenarios));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
@@ -224,6 +227,7 @@ function manifestSemanticProblems(m) {
         const tiers = m.tiers[profile];
         if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
         if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
+        bad.push(...triggerProblems(slot, m.triggerKinds));
       }
       if (slot.appKind === undefined) {
         for (const variant of braceVariants(slot.path)) {
@@ -303,7 +307,7 @@ function declarationShapeProblems(d) {
     const s = d.sides[side];
     const at = `sides.${side}`;
     if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
     if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
     else s.apps.forEach((app, i) => {
       if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
@@ -312,12 +316,12 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
+    bad.push(...patternShapeProblems(s, at, NAME));
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
-      const list = Array.isArray(s.connections) ? s.connections : null;
-      if (!list || !list.every((c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
+      const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
+      if (shape.length) bad.push(...shape);
       else {
         if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
         for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
@@ -333,12 +337,7 @@ const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `
 function sideProblems(manifest, side, s) {
   const bad = [];
   for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  for (const id of s.optionalSlots ?? []) {
-    const slot = manifest.slots.find((candidate) => candidate.id === id);
-    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
-    else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
-    else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
-  }
+  bad.push(...optionalSlotProblems(manifest, side, s));
   for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
   const connections = s.connections ?? [];
   for (const slot of manifest.slots) {
@@ -389,7 +388,8 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       profile: name,
       apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
       optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
-      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
+      patterns: Object.freeze([...(s.patterns ?? [])]),
+      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation }))),
       reads: Object.freeze([...(s.reads ?? [])]),
       manifestVersion: manifest.version,
     })];
@@ -453,7 +453,7 @@ function createScopeResolver(manifest, repo) {
 
   const slotEnabled = (slot) => {
     if (slot.presence !== 'opt-in') return true;
-    return slot.appKind !== undefined ? repo.apps.some((a) => a.kind === slot.appKind) : repo.optionalSlots.includes(slot.id);
+    return declaredSlotEnabled(slot, repo);
   };
   const clean = (p) => posixPath(p).replace(/\/+$/, '');
 

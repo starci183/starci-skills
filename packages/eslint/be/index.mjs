@@ -26,6 +26,9 @@ import { recommended as connectionsRecommended, rules as connectionsRules } from
 import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
 import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
+import { recommended as eventBusRecommended, rules as eventBusRules } from "./event-bus.mjs"
+import { recommended as jobsRecommended, rules as jobsRules } from "./jobs.mjs"
+import { recommended as projectionsRecommended, rules as projectionsRules } from "./projections.mjs"
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
 import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as idempotencyRecommended, rules as idempotencyRules } from "./idempotency.mjs"
@@ -43,6 +46,7 @@ import { recommended as resilienceRecommended, rules as resilienceRules } from "
 import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
 import { recommended as cliRecommended, rules as cliRules } from "./cli.mjs"
 import { recommended as serviceDepsRecommended, rules as serviceDepsRules } from "./service-deps.mjs"
+import { recommended as serviceIsolationRecommended, rules as serviceIsolationRules } from "./service-isolation.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
 import { recommended as specNoSkipRecommended, rules as specNoSkipRules } from "./spec-no-skip.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
@@ -69,6 +73,9 @@ const CONTRIBUTIONS = [
     { law: "cqrs", rules: cqrsRules, recommended: cqrsRecommended },
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
     { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },
+    { law: "event-bus", rules: eventBusRules, recommended: eventBusRecommended },
+    { law: "jobs", rules: jobsRules, recommended: jobsRecommended },
+    { law: "projections", rules: projectionsRules, recommended: projectionsRecommended },
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
     { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "idempotency", rules: idempotencyRules, recommended: idempotencyRecommended },
@@ -85,6 +92,7 @@ const CONTRIBUTIONS = [
     { law: "resilience", rules: resilienceRules, recommended: resilienceRecommended },
     { law: "schema-authority", rules: schemaAuthorityRules, recommended: schemaAuthorityRecommended },
     { law: "service-deps", rules: serviceDepsRules, recommended: serviceDepsRecommended },
+    { law: "service-isolation", rules: serviceIsolationRules, recommended: serviceIsolationRecommended },
     { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
     { law: "spec-no-skip", rules: specNoSkipRules, recommended: specNoSkipRecommended },
     { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },

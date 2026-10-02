@@ -47,6 +47,10 @@ versioning:
 #   tests       unit-beside | e2e | none.
 #   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
 #   budget      size budgets (lines per file, files per slot, exports).
+#   trigger     the trigger kind (triggerKinds) of a feature-tier slot: api, webhooks, realtime, saga, reactors, jobs or cli. A feature of one kind
+#               never imports a feature of another (BE_KIND_ISOLATION); the two meet only through the event bus.
+#   pattern     the design pattern whose declaration (hfs.json sides.<side>.patterns) enables this opt-in slot; a path in the slot of an
+#               undeclared pattern is HFS_SLOT_NOT_ENABLED, and a declared pattern's proof scenarios are ruleParams.be.patternScenarios.
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
@@ -64,6 +68,10 @@ sides:
   be: {reads: []}
   fe: {reads: [be/contracts/]}     # the back end's committed contract snapshots, the input of the front end's codegen
 
+# The trigger kinds of the back end's features: what starts the work of a feature. A feature slot names its kind in `trigger`; no kind imports another
+# (BE_KIND_ISOLATION), every cross-kind call is an event on the bus, and only be/apps/* compose features.
+triggerKinds: [api, webhooks, realtime, saga, reactors, jobs, cli]
+
 appKinds:
   be: [api, worker, cli]
   fe: [next]
@@ -74,13 +82,16 @@ appKinds:
 # ---------------------------------------------------------------------------------------------------------
 tiers:
   be:
-    app:          {mayImport: [feature, domain, platform, integrations, package]}
-    feature:      {mayImport: [domain, platform, integrations, package]}          # never another feature
-    domain:       {mayImport: [domain, platform, integrations, package], acyclic: true}
+    app:          {mayImport: [feature, domain, events, queues, projections, platform, integrations, package]}
+    feature:      {mayImport: [domain, events, queues, projections, platform, integrations, package]}          # never another feature
+    domain:       {mayImport: [domain, events, queues, platform, integrations, package], acyclic: true}      # a domain service writes the outbox: it publishes events and enqueues queue jobs inside its own transaction
+    events:       {mayImport: [events, platform, package], acyclic: true}          # modules/events/<service>: typed event classes (pattern event-bus)
+    queues:       {mayImport: [queues, events, platform, package], acyclic: true}  # modules/queues/<queue>: typed producers and schedulers (pattern queue)
+    projections:  {mayImport: [projections, domain, events, platform, integrations, package], acyclic: true}   # modules/projections/<name>: read models (pattern projection)
     integrations: {mayImport: [platform, package]}
     platform:     {mayImport: [platform, package], acyclic: true}
-    e2e:          {mayImport: [e2e, app, feature, domain, platform, integrations, fixtures, package]}
-    fixtures:     {mayImport: [domain, platform, integrations, package]}          # public contracts only
+    e2e:          {mayImport: [e2e, app, feature, domain, events, queues, projections, platform, integrations, fixtures, package]}
+    fixtures:     {mayImport: [domain, events, queues, projections, platform, integrations, package]}          # public contracts only
     package:      {mayImport: [package]}
   fe:
     route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
@@ -120,14 +131,15 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/messaging]
-      "@nestjs/bullmq": [platform/messaging]
-      kafkajs: [platform/messaging]
-      "@nestjs/schedule": [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      setInterval: [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      setTimeout: [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      "node:timers": [platform/scheduling, platform/retry, platform/messaging, platform/http]
-      "node:timers/promises": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      bullmq: [platform/queue, platform/messaging]   # platform/messaging: interim BullMQ transport of the ecommerce example until platform/event-bus lands; pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
+      "@nestjs/bullmq": [platform/queue, platform/messaging]
+      kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
+      "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
+      eventemitter2: []
+      setInterval: [platform/retry, platform/event-bus, platform/queue, platform/http]
+      setTimeout: [platform/retry, platform/event-bus, platform/queue, platform/http]
+      "node:timers": [platform/retry, platform/event-bus, platform/queue, platform/http]
+      "node:timers/promises": [platform/retry, platform/event-bus, platform/queue, platform/http]
       winston: [platform/logging]
       dayjs: [platform/clock, platform/primitives]
       moment: [platform/clock, platform/primitives]
@@ -155,7 +167,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga-step, saga, contracts, port, resolver, controller, gateway, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -168,7 +180,14 @@ ruleParams:
     unitRoles:
       - {role: service, spec: service.spec, coverage: "src/**/*.service.ts"}
       - {role: cli, spec: cli.spec, slot: be.cli, coverage: "src/features/cli/**/*.cli.ts", exempt: [BE_TRANSPORT_SHAPE]}
-    bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
+    # BE_PATTERN_SPEC_MISSING: a declared pattern (hfs.json sides.be.patterns) is proven on the test world. Each id below needs a test titled
+    # "<pattern>/<id>: ..." in an e2e or integration spec (be/src/tests/e2e, be/src/tests/integration).
+    patternScenarios:
+      event-bus: [atomic-with-transaction, relay-only-after-commit, redelivery-then-dead-letter, duplicate-delivery-is-a-noop]
+      queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
+      fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
+      projection: [recompute-is-idempotent, replay-rebuilds]
+    bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
@@ -596,6 +615,24 @@ slots:
     tests: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: be.contract.events
+    profiles: [be]
+    path: "contracts/<app>/events.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R151 HFS_EVENT_CONTRACT)
+    rules: [HFS_EVENT_CONTRACT]
+  - id: be.contract.events.pin
+    profiles: [be]
+    path: "contracts/<app>/events.pin.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R162 BE_CONTRACT_BREAKING)
+    rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   - id: be.app.api
@@ -611,11 +648,11 @@ slots:
     allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
-    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
+    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER]
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
-    appKind: worker               # composes transport/schedule and transport/message modules only (an api app may compose them too: a worker app is for separate scaling)
+    appKind: worker               # composes transport/message modules and job processors only (an api app may compose them too: a worker app is for separate scaling)
     presence: opt-in
     tracked: tracked
     tier: app
@@ -623,7 +660,7 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
-    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
+    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
   - id: be.app.cli
     profiles: [be]
     # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
@@ -650,6 +687,7 @@ slots:
     profiles: [be]
     path: "src/features/api/<feature>/"
     presence: required
+    trigger: api                  # a request-driven feature (graphql, http); the other trigger kinds have their own roots below
     tracked: tracked
     tier: feature
     owner: true
@@ -661,7 +699,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/api/<feature>/application/"
+    path: "src/features/{api/,jobs/,reactors/}<feature>/application/"     # inside a trigger kind (jobs, reactors) the feature folder is one level down
     presence: required
     tracked: tracked
     tier: feature
@@ -669,9 +707,40 @@ slots:
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
+  - id: be.feature.saga
+    profiles: [be]
+    path: "src/features/api/<feature>/saga/"
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R154 to R158); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts"]   # the orchestrator (a step list plus compensations, a `*.service.ts` because a handler injects only services, unit-tested beside it) and the typed, versioned state of a run
+    forbids: [graphql/, http/, message/, schedule/, transport/]
+    tests: unit-beside            # <saga>.saga.service.spec.ts beside the orchestrator; the state machine and its fence are platform/saga's service; each compensation path has an e2e spec
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
+  - id: be.feature.saga.steps
+    profiles: [be]
+    path: "src/features/api/<feature>/saga/steps/"
+    pattern: saga
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.saga-step.ts"]    # one step, dispatching one command and naming the event it puts on the wire
+    tests: none
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
+  - id: be.feature.saga.compensations
+    profiles: [be]
+    path: "src/features/api/<feature>/saga/compensations/"
+    pattern: saga
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.compensation.ts"]   # REQUIRED for every step: the command that undoes it, naming the failure event that triggers it
+    tests: none
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/api/<feature>/application/support/"
+    path: "src/features/{api/,jobs/,reactors/}<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -704,26 +773,16 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
-    path: "src/features/api/<feature>/transport/message/"
+    path: "src/features/{api/,reactors/}<feature>/transport/message/"
     presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
+    pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
     tier: feature
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
     composedBy: [api, worker]
-    rules: [BE_BACKGROUND_UNOWNED]
-  - id: be.transport.schedule
-    profiles: [be]
-    path: "src/features/api/<feature>/transport/schedule/"
-    presence: opt-in              # cron job, sweep or outbox publisher: composed by the service that owns it (an api app) or by a worker app scaled apart
-    tracked: tracked
-    tier: feature
-    requires: ["<feature>-schedule.module.ts"]
-    allows: ["<job>.job.ts"]
-    tests: none
-    composedBy: [api, worker]
-    rules: [BE_BACKGROUND_UNOWNED]
+    rules: [BE_BACKGROUND_UNOWNED, BE_SAGA_CONSUMER_DEDUPE]
   - id: be.transport.websocket
     profiles: [be]
     path: "src/features/api/<feature>/transport/websocket/"
@@ -765,7 +824,7 @@ slots:
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_TRANSACTION]
   - id: be.errors
     profiles: [be]
     path: "src/modules/{domain,integrations}/<capability>/errors/"
@@ -797,7 +856,10 @@ slots:
     since: 1.0.0
   - id: be.persistence
     profiles: [be]
-    path: "src/modules/{domain,platform}/<capability>/persistence/"
+    path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
+    # R163: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the job table); their arrays may be
+    # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
+    perConnection: [event-bus, jobs]
     presence: optional
     tracked: tracked
     tier: inherit
@@ -805,7 +867,7 @@ slots:
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
     tests: none
-    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE]
+    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
   - id: be.platform
     profiles: [be]
     path: "src/modules/platform/<capability>/"
@@ -826,6 +888,115 @@ slots:
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
+  # ----- BE: pattern slots (opt-in; enabled by hfs.json sides.be.patterns). A path under one is HFS_SLOT_NOT_ENABLED unless its pattern is declared.
+  - id: be.platform.event-bus
+    profiles: [be]
+    path: "src/modules/platform/event-bus/"
+    presence: opt-in
+    pattern: event-bus            # the ONE durable event transport: transactional outbox, relay, Kafka, inbox, retry and dead letter (knowledge/patterns/be/event-bus.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, event-bus.module.ts, event-bus.port.ts, event-bus.contracts.ts, event-bus.service.ts, event-bus.service.spec.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
+  - id: be.platform.queue
+    profiles: [be]
+    path: "src/modules/platform/queue/"
+    presence: opt-in
+    pattern: queue                # the ONE BullMQ owner: the outbox relay into queues (jobId = outbox id) and job schedulers (knowledge/patterns/be/queues.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, queue.module.ts, queue.port.ts, queue.contracts.ts, queue.service.ts, queue.service.spec.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
+  - id: be.events
+    profiles: [be]
+    path: "src/modules/events/<service>/"
+    presence: opt-in
+    pattern: event-bus            # typed event classes of one service; each equals an entry of be/contracts/<service>/events.json
+    tracked: tracked
+    tier: events
+    owner: true
+    requires: [index.ts]
+    allows: ["<event>.event.ts", index.ts]
+    tests: none
+    rules: [BE_EVENT_CLASS_CONTRACT, BE_TIER_DIRECTION]
+  - id: be.queues
+    profiles: [be]
+    path: "src/modules/queues/<queue>/"
+    presence: opt-in
+    pattern: queue                # a typed producer of one queue: enqueueX(payload, tx) writes the outbox; its schedulers live beside it
+    tracked: tracked
+    tier: queues
+    owner: true
+    requires: [index.ts, "<queue>.queue.ts"]
+    allows: ["<queue>.queue.ts", "<queue>.contracts.ts", index.ts]
+    tests: none
+    rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
+  - id: be.feature.reactors
+    profiles: [be]
+    path: "src/features/reactors/<reactor>/"
+    presence: opt-in
+    pattern: event-bus            # a reactor consumes events of another context and keeps a local copy or triggers a projection
+    trigger: reactors
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<reactor>.module.ts", transport/]
+    allows: [index.ts, "<reactor>.module.ts", application/, transport/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.feature.jobs
+    profiles: [be]
+    path: "src/features/jobs/<job>/"
+    presence: opt-in
+    pattern: fenced-job           # a background job: a processor with a fenced claim, steps and the application it dispatches to
+    trigger: jobs
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.ts, "<job>.module.ts", "<job>.processor.ts", steps/]
+    allows: [index.ts, "<job>.module.ts", "<job>.processor.ts", application/, steps/]
+    tests: none
+    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.jobs.steps
+    profiles: [be]
+    path: "src/features/jobs/<job>/steps/"
+    presence: opt-in
+    pattern: fenced-job           # one external effect per step; it takes the claimed job and writes through the guarded methods
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.step.ts"]
+    tests: none
+    rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
+  - id: be.platform.jobs
+    profiles: [be]
+    path: "src/modules/platform/jobs/"
+    presence: opt-in
+    pattern: fenced-job           # the ONE fencing primitive: the job entity, the claim that bumps the token, guarded writes (knowledge/patterns/be/jobs.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, jobs.module.ts, jobs.port.ts, jobs.contracts.ts, job-claim.service.ts, job-claim.service.spec.ts, fenced.processor.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
+  - id: be.projections
+    profiles: [be]
+    path: "src/modules/projections/<name>/"
+    presence: opt-in
+    pattern: projection           # a read model: only its projection writes its table; recompute is idempotent and replayable; readers use get*
+    tracked: tracked
+    tier: projections
+    owner: true
+    requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
+    allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
+    tests: none
+    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"

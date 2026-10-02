@@ -354,7 +354,7 @@ rules:
       - {kind: eslint-be, id: no-runtime-schema}
   - id: R35
     code: "BE_SCHEMA_OWNER"
-    law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias)."
+    law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias); only a platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) registers on several."
     kinds: [lint, codemod, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SCHEMA_OWNER"]
@@ -875,7 +875,7 @@ rules:
       - {kind: eslint-be, id: injection-token-exported}
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
-    law: "SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded."
+    law: "SQL writes only the tables of its own capability's entities, reads only tables of its own context (its own capability's, or a same-context capability it may import; a cross-context JOIN is refused), and every multi-row SELECT is bounded."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SQL_TABLE_OWNER"]
@@ -1345,3 +1345,228 @@ rules:
     failureCodes: ["BE_CLI_OWNER"]
     enforcers:
       - {kind: eslint-be, id: cli-owner}
+  - id: R136
+    code: "BE_EVENT_CLASS_CONTRACT"
+    law: "Every typed event class `be/src/modules/events/<service>/<event>.event.ts` (one class with literal `static readonly eventName` and `version`, in a file named after its event: dots become dashes) equals an entry of the vendored contract `be/contracts/<service>/events.json` at the same name and version, and every entry of a vendored contract has its class; a class the contract does not list, a version mismatch, a contract entry with no class or a misnamed file is a finding (pattern event-bus)."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_EVENT_CLASS_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: event-class-contract, at: scripts/hfs/rules/event-bus.mjs}
+  - id: R137
+    code: "BE_OUTBOX_WRITE_TX"
+    law: "The outbox is written only by a domain service, with the manager of its own transaction: `eventBus.publish(event, tx)` and a queue producer's `enqueueX(payload, tx)` are called only in a file of `modules/domain` (the test world, e2e and fixtures aside), and `tx` is the `manager` parameter of a `.transaction(async (manager) => ...)` callback or a function parameter typed `EntityManager`; the injected shared manager, an alias, an outer manager or a missing argument is a finding. The call is found by the receiver's TYPE (the `EventBus` port of platform/event-bus) or by the resolved signature's declaring tier (queues), never by a name."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_OUTBOX_WRITE_TX"]
+    enforcers:
+      - {kind: eslint-be, id: outbox-write-tx}
+  - id: R138
+    code: "BE_EVENT_CONSUMER_SHAPE"
+    law: "A class that implements the `EventConsumer` port of platform/event-bus (by type origin) is `transport/message/<event>.consumer.ts` (slot be.transport.message), its file stem is the kebab form of its event class's literal `eventName` (dots become dashes), and its `handle` reads `delivery.eventId` so the dispatched command carries the id the domain service claims in platform/inbox; a `.consumer.ts` that implements no `EventConsumer` is a finding."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_EVENT_CONSUMER_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: event-consumer-shape}
+  - id: R139
+    code: "BE_QUEUE_PRODUCER_SHAPE"
+    law: "In `modules/queues/<queue>/<queue>.queue.ts` every exported function or class method that writes the `QueueOutbox` port of platform/queue declares a `tx` parameter typed `EntityManager` and passes that parameter as the first argument of the write; a write with another manager, an outer manager or none is a finding (pattern queue)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_QUEUE_PRODUCER_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: queue-producer-shape}
+  - id: R140
+    code: "BE_PATTERN_SPEC_MISSING"
+    law: "Every pattern a back end declares (hfs.json sides.be.patterns) is proven on the test world: each scenario id of ruleParams.be.patternScenarios.<pattern> has a test titled `<pattern>/<scenario>: ...` (the first argument of `it(` or `test(`) in an e2e or integration spec under be/src/tests; a declared pattern with a missing scenario is a finding."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_PATTERN_SPEC_MISSING"]
+    enforcers:
+      - {kind: hfs, id: pattern-spec-missing, at: scripts/hfs/rules/event-bus.mjs}
+  - id: R141
+    code: "BE_KIND_ISOLATION"
+    law: "No trigger kind imports another: a feature whose owner slot names one `trigger` (api, webhooks, realtime, saga, reactors, jobs, cli) never imports (static, dynamic, re-export or type-only) a feature of another kind; each kind imports only `modules/*` and only be/apps/* compose features. The kinds meet through the event bus: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it. The importing and imported owners are read from the slot view (slot field `trigger`), never from a folder name; the finding replaces BE_FEATURE_IMPORTS_FEATURE when both features name different kinds."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_KIND_ISOLATION"]
+    enforcers:
+      - {kind: eslint-be, id: kind-isolation}
+      - {kind: machine, id: tiers, at: scripts/hfs/architecture/tiers.mjs}
+  - id: R142
+    code: "BE_JOB_WRITE_OUTSIDE_OWNER"
+    law: "The job entity (the class `platform/jobs` declares in its persistence) is written only by `platform/jobs`: an `update`, `increment`, `decrement`, `save`, `insert`, `upsert`, `delete`, `remove`, `softDelete` or a query-builder write on it in any other file (the test world, e2e and fixtures aside) is a finding. The entity is found by the type origin of the call's arguments or builder chain, never by a name; raw SQL is judged by BE_SQL_TABLE_OWNER (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_WRITE_OUTSIDE_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: job-write-owner}
+  - id: R143
+    code: "BE_JOB_FENCE_REQUIRED"
+    law: "Every `JobClaims` method that takes a job (a parameter type with `jobId`) declares a required, non-nullable `expectedFencingToken: number`; no call on `JobClaims` outside `platform/jobs` casts around it (`as`, a type assertion or `!` in an argument); and a `catch` around a `JobClaims` write rethrows, so a `JobFencedOut` stops the zombie with no further effect (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_FENCE_REQUIRED"]
+    enforcers:
+      - {kind: eslint-be, id: job-fence-required}
+  - id: R144
+    code: "BE_JOB_RUN_KEY"
+    law: "In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_RUN_KEY"]
+    enforcers:
+      - {kind: eslint-be, id: job-run-key}
+  - id: R145
+    code: "BE_JOB_SHAPE"
+    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: job-shape}
+  - id: R146
+    code: "BE_PROJECTION_WRITE_OWNER"
+    law: "A projection's entity (a class of `<name>.projection-entity.ts` in `modules/projections/<name>/`) is written only by the `<name>.projection.ts` of the same folder (the test world, e2e and fixtures aside): a write on it from a domain service, a handler, another projection or another file of the folder is a finding. The entity is found by the type origin of the write's arguments or builder chain (pattern projection)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_PROJECTION_WRITE_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: projection-write-owner}
+  - id: R147
+    code: "BE_PROJECTION_SHAPE"
+    law: "Every public method of a `<name>.projection.ts` class is `recompute*` (idempotent write from the source facts) or `get*` (read); the `index.ts` of a projection exports nothing from a `.projection-entity` file; and a feature whose kind is api calls no `recompute*` method of a projection (it reads through `get*`). The kind is read from the owner slot's `trigger` (pattern projection)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_PROJECTION_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: projection-shape}
+  - id: R148
+    code: "HFS_SERVICE_PLACEMENT"
+    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app's own and a `fe/packages/<pkg>` workspace's, outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_SERVICE_PLACEMENT"]
+    enforcers:
+      - {kind: hfs, id: services-placement, at: scripts/hfs/rules/services.mjs}
+  - id: R149
+    code: "HFS_IMAGE_UNPINNED"
+    law: "In a product with more than one service (two or more be apps of kind api or worker) every component `image` of `.starcistacks/application-stacks.yaml` is pinned: a digest (`@sha256:<64 hex>`) or an exact version tag (`x.y.z`, optionally with a suffix); no tag, `latest`, a branch word or a major or minor-only tag is a finding. An own service image is `<repo>/<service>:<x.y.z>`, built from `be/apps/<service>/Dockerfile`; a service the product does not own stays a pinned third-party image."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_IMAGE_UNPINNED"]
+    enforcers:
+      - {kind: hfs, id: services-image-pins, at: scripts/hfs/rules/services.mjs}
+  - id: R150
+    code: "HFS_SERVICE_STACK_DECLARATION"
+    law: "Every api or worker app `be/apps/<service>` of a product with more than one service is a component of the same name with `role: service` in `.starcistacks/application-stacks.yaml`."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_SERVICE_STACK_DECLARATION"]
+    enforcers:
+      - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
+  - id: R151
+    code: "HFS_EVENT_CONTRACT"
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and every queue a consumer defines with `defineQueue` of `platform/messaging` must be listed in a consumes table; a missing or stale snapshot, an unknown event, a version mismatch or an unlisted consumer queue is a finding."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["HFS_EVENT_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: services-event-contract, at: scripts/hfs/rules/services.mjs}
+  - id: R152
+    code: "BE_ASYNC_SPEC_MISSING"
+    law: "Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps through `useTestWorld` (it publishes the event, reads the effect back and redelivers it); when the contract of the event declares `compensates: \"<event>\"` it is a saga step, and a spec naming it also names the compensated event, so the spec drives the whole flow: the step, the failure, then the compensated state."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_ASYNC_SPEC_MISSING"]
+    enforcers:
+      - {kind: hfs, id: services-async-specs, at: scripts/hfs/rules/services.mjs}
+  - id: R153
+    code: "BE_SERVICE_ISOLATION"
+    law: "A service app (`be/apps/<service>/`) imports no file of a sibling service app: the app that owns the importing file and the app that owns the file a specifier resolves to (a relative path or an alias of the program's own `compilerOptions.paths`) are read from the HFS slot view, and two different apps is a finding; services share only the `be/src` libraries and meet through the wire (a client of the sibling's API, or the events of its vendored contract under `be/contracts/<service>/`)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SERVICE_ISOLATION"]
+    enforcers:
+      - {kind: eslint-be, id: service-isolation}
+  - id: R154
+    code: "BE_SAGA_STEP_COMPENSATION"
+    law: "In a product that declares the `saga` pattern (`patterns: [\"saga\"]` in hfs.json sides.be) a saga is the folder `be/src/features/api/<feature>/saga/` (`<saga>.saga.ts` the orchestrator, `steps/<step>.step.ts`, `compensations/<step>.compensation.ts`): every step has a compensation of the same name and every compensation a step, the orchestrator imports every step and every compensation of its folder, and a folder of steps or compensations has an orchestrator; the folders themselves are slots enabled only by the declared pattern, so an undeclared saga is `HFS_SLOT_NOT_ENABLED`."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SAGA_STEP_COMPENSATION"]
+    enforcers:
+      - {kind: hfs, id: saga-step-compensation, at: scripts/hfs/rules/saga.mjs}
+  - id: R155
+    code: "BE_SAGA_STATE_VERSIONED"
+    law: "Every saga orchestrator has `<saga>.saga-state.ts` beside it, whose exported state type declares `status` and `version: number`, and imports the fenced store of `platform/saga`: the persisted state of a run moves only through the store, every transition naming the version it read, so a zombie delivery cannot move a run twice."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SAGA_STATE_VERSIONED"]
+    enforcers:
+      - {kind: hfs, id: saga-state-versioned, at: scripts/hfs/rules/saga.mjs}
+  - id: R156
+    code: "BE_SAGA_EVENT_CONTRACT"
+    law: "A saga step and a saga compensation each name their event (`readonly event = \"<name>\"`), both events are declared in a vendored contract (`be/contracts/<service>/events.json`), and the contract of the compensation's event declares `compensates: \"<event of the step of the same name>\"`."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SAGA_EVENT_CONTRACT"]
+    enforcers:
+      - {kind: hfs, id: saga-event-contract, at: scripts/hfs/rules/saga.mjs}
+  - id: R157
+    code: "BE_SAGA_CONSUMER_DEDUPE"
+    law: "A consumer of a feature that holds a saga (`transport/message/<event>.consumer.ts`) passes the id of the delivery on (`message.eventId`) to the command it dispatches: the saga takes every event through the inbox (R80), so the consumer must hand it the dedupe key."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SAGA_CONSUMER_DEDUPE"]
+    enforcers:
+      - {kind: hfs, id: saga-consumer-dedupe, at: scripts/hfs/rules/saga.mjs}
+  - id: R158
+    code: "BE_SAGA_E2E_MISSING"
+    law: "Every compensation path of a saga has an e2e spec (`be/src/tests/e2e/<area>/*.e2e-spec.ts` through `useTestWorld`) that names the event of the compensation and injects a failure through the world (an outage of an infra service or an app with `during`, `cut` or `latency`, a fake's `failNext`, `interruptDatabase`): the compensation is proven under a fault, not only on the happy flow."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SAGA_E2E_MISSING"]
+    enforcers:
+      - {kind: hfs, id: saga-e2e, at: scripts/hfs/rules/saga.mjs}
+  - id: R159
+    code: "BE_CONTEXT_OWNER"
+    law: "A connection of hfs.json is a bounded context owned by one api or worker app (`owner`, `isolation` database or schema): an app composes only the connections and capabilities of the contexts it owns, and the migrate and cli apps compose every declared connection (migrations run only through them, once per connection)."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: context-owner}
+  - id: R160
+    code: "BE_CONTEXT_COUPLING"
+    law: "Contexts are coupled only by events: no entity relation, no migration foreign key and no import (entities, services or SQL) of a domain or projection capability reaches a capability of another context."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_COUPLING"]
+    enforcers:
+      - {kind: eslint-be, id: context-coupling}
+  - id: R161
+    code: "BE_CONTEXT_TRANSACTION"
+    law: "One transaction touches one context's connection: inside `transaction(async (manager) => ...)` of a connection's entity manager no entity manager of another connection is used and no capability of another context is called; work across contexts is a saga."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_TRANSACTION"]
+    enforcers:
+      - {kind: eslint-be, id: context-transaction}
+  - id: R162
+    code: "BE_CONTRACT_BREAKING"
+    law: "An event contract evolves only additively: `be/contracts/<service>/events.json` against its pinned previous copy `events.pin.json` keeps every event, stream, version, payload field and type, adds only optional fields, and a breaking change is a new `<event>.v2` key."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTRACT_BREAKING"]
+    enforcers:
+      - {kind: hfs, id: contract-compat, at: scripts/hfs/rules/contract-compat.mjs}
+  - id: R163
+    code: "BE_CONTEXT_PLATFORM_TABLES"
+    law: "A platform capability the manifest lists as `perConnection` (the event-bus outbox, the job table) has its entities and migrations registered on every connection whose entity manager is passed to it."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CONTEXT_PLATFORM_TABLES"]
+    enforcers:
+      - {kind: eslint-be, id: context-platform-tables}

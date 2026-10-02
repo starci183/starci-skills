@@ -1,0 +1,28 @@
+id: hfs-microservice-policy
+effectiveAt: '2026-10-02T09:00:00+07:00'
+summary: >-
+  Lane MICRO (lead C0, item 6.3): the policy for a product that runs more than one service. A back-end service is a Nest app at
+  `be/apps/<service>/` with its own Dockerfile; R148 HFS_SERVICE_PLACEMENT refuses a service root anywhere else, R149
+  HFS_IMAGE_UNPINNED requires every image of a multi-service stack to be a digest or an exact version, R150
+  HFS_SERVICE_STACK_DECLARATION requires each api or worker app to be a `role: service` component of the stack, R151
+  HFS_EVENT_CONTRACT vendors the async contract (`be/contracts/<service>/events.json`, emitted by `hfs emit-contracts` from the
+  literal `EVENTS` table of `apps/<service>/src/events.ts`) and judges every consumer table (`apps/<app>/src/consumes.ts`) against
+  it, R152 BE_ASYNC_SPEC_MISSING requires an e2e spec for every consumed event (an event whose contract says `compensates` is a saga step and its spec drives the whole flow), and R153 BE_SERVICE_ISOLATION (ESLint
+  `service-isolation`) refuses an import between service apps. New slot be.contract.events, `events.ts` and `consumes.ts` allowed in
+  the api and worker app slots. The reference
+  example is ecommerce-app with a billing worker app.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-microservice-policy.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/slots.yaml
+  - knowledge/patterns/be/services.yaml
+  - knowledge/patterns/be/index.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/lib/event-contract.mjs
+  - scripts/hfs/rules/services.mjs
+  - scripts/hfs/check.mjs
+  - packages/hfs/emit/events.mjs
+  - packages/hfs/emit/contracts.mjs
+  - packages/eslint/be/service-isolation.mjs

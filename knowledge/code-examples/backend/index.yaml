@@ -8,3 +8,18 @@ examples:
   - id: named-exception
     path: named-exception
     title: AbstractException declaration shape
+  - id: saga
+    path: saga
+    title: A saga with steps, compensations and a fenced state
+  - id: event-bus
+    path: event-bus
+    title: Publish an event in the domain transaction and consume it
+  - id: queue
+    path: queue
+    title: A typed queue producer called inside the domain transaction
+  - id: fenced-job
+    path: fenced-job
+    title: A fenced background job - claim, guarded writes and a run key
+  - id: projection
+    path: projection
+    title: A projection kept current by a reactor

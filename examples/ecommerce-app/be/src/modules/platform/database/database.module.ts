@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
+import { BILLING_CONNECTION } from "./billing.connection"
+import { BILLING_ENTITY_MANAGER } from "./billing.decorators"
 import { DATABASE_MANAGERS, DatabaseProbe } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { IDENTITY_CONNECTION } from "./identity.connection"
@@ -10,9 +12,10 @@ import { ORDER_CONNECTION } from "./order.connection"
 import { ORDER_ENTITY_MANAGER } from "./order.decorators"
 
 /** The token each declared connection provides its shared EntityManager under. */
-type EntityManagerToken = typeof IDENTITY_ENTITY_MANAGER | typeof ORDER_ENTITY_MANAGER
+type EntityManagerToken = typeof BILLING_ENTITY_MANAGER | typeof IDENTITY_ENTITY_MANAGER | typeof ORDER_ENTITY_MANAGER
 
 const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, EntityManagerToken> = new Map<string, EntityManagerToken>([
+    [BILLING_CONNECTION, BILLING_ENTITY_MANAGER],
     [IDENTITY_CONNECTION, IDENTITY_ENTITY_MANAGER],
     [ORDER_CONNECTION, ORDER_ENTITY_MANAGER],
 ])
