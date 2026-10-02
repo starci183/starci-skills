@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-generated-untracked.mjs - the GENERATED_UNTRACKED law as a standalone self-check (part of `npm run check`).
-//   node scripts/checks/check-generated-untracked.mjs [--json]
+//   runs in the check stage (self-check generated-untracked); --json prints the findings as JSON
 //
 // A generated root (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml) holds only what its
 // generatedBy writes and is git-ignored: a checkout regenerates it and the index can never pin a stale copy.

@@ -32,7 +32,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { lineOf, runReportMain } from '../lib/check-scan.mjs';
 
-const HELP = `Usage: node scripts/checks/check-example-coupling.mjs [--root <tree>] [--json]
+const HELP = `Usage: check-example-coupling [--root <tree>] [--json]
 
 Refuses a literal examples/<name>, a product repo name, a product-prefixed inc-<hash>
 and a host drive path in runtime sources (scripts/, engine/, ui/src, ui/api,

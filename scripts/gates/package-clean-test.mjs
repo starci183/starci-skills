@@ -12,7 +12,7 @@
 //      stylelint vocabulary reads the grammar CSS); only TRACKED files are copied (copyTracked), so nothing installed,
 //      hoisted, junctioned or built in this checkout can satisfy it, while committed fixture stubs come along. The one
 //      exception is the generated runtime copies (ruleParams.runtime.generated): untracked, but shipped content the
-//      packages' own tests read - the proof regenerates them first (node scripts/hfs/sync-runtime.mjs) and carries what
+//      packages' own tests read - the proof regenerates them first (the runtime copy generator) and carries what
 //      the fresh sync wrote;
 //   2. installs it from its own manifest: `npm ci` on its own lockfile, or `npm install` when it carries none (the
 //      report says `npm install (no lockfile)`, so a package that ships without a lock is visible);

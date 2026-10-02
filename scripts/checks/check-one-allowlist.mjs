@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-one-allowlist.mjs - the ONE allowlist law (RT_ALLOWLIST_SPRAWL; part of `npm run check`).
-//   node scripts/checks/check-one-allowlist.mjs [--json]
+//   runs in the check stage (self-check one-allowlist); --json prints the findings as JSON
 //
 // modules/kernel/allowlist.yaml (schema starci/allowlist@1, read through scripts/lib/allowlist.mjs) is the ONE explicit
 // allowlist of the runtime: every exception a check keeps is a reasoned entry of one of its named sections and every

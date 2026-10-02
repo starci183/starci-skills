@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-default-once.mjs — DEFAULT_ONCE (R209, RT_CONFIG_DEFAULT_TWICE; part of `npm run check`).
-//   node scripts/checks/check-default-once.mjs [--json]
+//   runs in the check stage (self-check default-once); --json prints the findings as JSON
 //
 // A default for a key that config.example.yaml documents is stated once, by its owner, and every other reader
 // asks the owner. The owners today:

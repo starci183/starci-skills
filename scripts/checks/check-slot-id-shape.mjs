@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-slot-id-shape.mjs — SLOT_ID_SHAPE (R211, RT_SLOT_ID_SHAPE; part of `npm run check`).
-//   node scripts/checks/check-slot-id-shape.mjs [--json]
+//   runs in the check stage (self-check slot-id-shape); --json prints the findings as JSON
 //
 // A slot id names a place, once, in one grammar; the manifests state the grammar and the check enforces it.
 // The vocabulary is read from the manifests, never restated here:

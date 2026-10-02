@@ -22,7 +22,6 @@ import { mergeBase } from '../api/git/merge-base.mjs';
 import { show } from '../api/git/show.mjs';
 import { checkRepo, readWhy, trackedFiles } from './check.mjs';
 import { GENERATED_DRIFT, driftOfRuntime, syncRuntime } from './sync-runtime.mjs';
-import { runScript } from '../api/node/run-script.mjs';
 import { generatedUntrackedFindings } from './runtime-rules/generated-untracked.mjs';
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from './slots.mjs';
 import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
@@ -125,12 +124,6 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     // missing/stale/extra file afterwards is true drift. A sync failure reports as drift.
     try { syncRuntime(); } catch (error) { driftList = [`the generator could not regenerate the copies: ${String(error?.message ?? error).split('\n')[0]}`]; }
     driftList ??= driftOfRuntime();
-    // Every other generated root of ruleParams.runtime.generated is rewritten by running its declared generatedBy
-    // (spawned, not imported: the hfs tier may not import a domain script like scripts/i18n/). A failed run is drift.
-    for (const g of params.generated.filter((entry) => entry.generatedBy !== 'scripts/hfs/sync-runtime.mjs')) {
-      const status = runScript(path.join(repoRoot, ...g.generatedBy.split('/')), [], { cwd: repoRoot });
-      if (status !== 0) findings.push({ code: GENERATED_DRIFT, level: 'error', path: g.root, message: `${GENERATED_DRIFT} ${g.root}: the declared generator ${g.generatedBy} exited ${status}` });
-    }
   }
   for (const problem of driftList ?? []) findings.push({ code: GENERATED_DRIFT, level: 'error', path: problem.replace(/^\S+\s+/, ''), message: `${GENERATED_DRIFT} ${problem}: a generated copy differs from what scripts/hfs/sync-runtime.mjs writes - run it` });
   findings.push(...(typeof extraFindings === 'function' ? extraFindings() : extraFindings));

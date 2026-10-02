@@ -442,7 +442,7 @@ schemas:
     subsystem: kernel
     governs: "The one Vietnamese message catalog for runtime and UI text: modules/i18n/messages/<area>.yaml, scoped messages[] lists of {en, vi} entries keyed from the English source."
     binds: "modules/i18n/messages/*.yaml messages[] entries"
-    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs, scripts/i18n/generate-ui-catalog.mjs]
+    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs, scripts/hfs/sync-runtime.mjs]
     business:
       question: "What does the owner read in Vietnamese for this English runtime or UI message?"
       whenNeeded: Translating a Telegram notice, why line, progress report or browser label; the only declared catalog home of Vietnamese outside the failure-code, op and archetype fields.

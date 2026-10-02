@@ -4774,7 +4774,7 @@ RT_GENERATED_DRIFT:
   causes_vi:
     - "Sửa một tệp nguồn được đóng gói mà quên chạy sync-runtime"
     - "Sửa tay một tệp trong thư mục runtime/ của gói"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/sync-runtime.mjs; các bản sao là kết quả sinh tự động đã gitignore nên không commit, và không sửa tay thư mục runtime/ của gói."
+  nextStep_vi: "Người giám sát chạy bước sinh bản sao runtime của kiểm tra (sync-runtime); các bản sao là kết quả sinh tự động đã gitignore nên không commit, và không sửa tay thư mục runtime/ của gói."
   owner: supervisor
   kind: check-finding
 

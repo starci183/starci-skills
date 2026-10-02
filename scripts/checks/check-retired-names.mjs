@@ -23,7 +23,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { RETIRED_PATHS_FILE, generatedRootsOf, isHistoryPath, lineOf, runReportMain } from '../lib/check-scan.mjs';
 
-const HELP = `Usage: node scripts/checks/check-retired-names.mjs [--root <tree>] [--json]
+const HELP = `Usage: check-retired-names [--root <tree>] [--json]
 
 Refuses every retired name of modules/kernel/retired-paths.yaml (retired[].path,
 moved[].from, retiredNames[].name) in a live tracked file. Exit 0 clean, 1 lists

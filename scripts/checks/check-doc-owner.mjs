@@ -13,7 +13,7 @@
 // share two or more topic words while at least 30% of the shorter document's sentences appear in
 // the other — two such documents are one document merged, not two.
 //
-//   node scripts/checks/check-doc-owner.mjs [--root <tree>] [--json]
+//   runs in the check stage (self-check doc-owner); --json prints the findings as JSON; --root <tree> judges another tree
 // Exit 0 clean, 1 lists every finding as file or file pair, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +24,7 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { parseCheckArgs } from '../lib/check-scan.mjs';
 
-const HELP = `Usage: node scripts/checks/check-doc-owner.mjs [--root <tree>] [--json]
+const HELP = `Usage: check-doc-owner [--root <tree>] [--json]
 
 Refuses a docs/*.md without exactly one ownership header on its first line
 ("Owner: <knowledge/|modules/ path that exists>" or "Task: <one task>"), a task

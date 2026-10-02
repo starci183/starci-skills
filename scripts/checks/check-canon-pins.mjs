@@ -72,7 +72,7 @@ export function checkCanonBindings({ root = skillRoot, pack = packedFiles } = {}
     const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
     if (fs.existsSync(syncScript)) {
       const status = runScript(syncScript, [], { cwd: root });
-      if (status !== 0) errors.push(`${BINDING.invalid} the generated runtime copies could not be regenerated (node scripts/hfs/sync-runtime.mjs exited ${status})`);
+      if (status !== 0) errors.push(`${BINDING.invalid} the generated runtime copies could not be regenerated (the runtime copy generator exited ${status})`);
     }
   }
   const pins = loadPins(root).pins ?? {};

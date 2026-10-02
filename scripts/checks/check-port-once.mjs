@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-port-once.mjs — PORT_ONCE (part of `npm run check`).
-//   node scripts/checks/check-port-once.mjs [--json]
+//   runs in the check stage (self-check port-once); --json prints the findings as JSON
 //
 // A port number is stated once, by its owner, and every other file references the owner — the literal never
 // restates it. The runtime owns three ports today:

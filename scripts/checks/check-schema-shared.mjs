@@ -18,7 +18,7 @@
 //     the fragment's leaf just the same. A path kept literal beside a shared purpose is the
 //     documented marker pattern, not a violation: the merge needs the literal.
 //
-//   node scripts/checks/check-schema-shared.mjs [--json]
+//   runs in the check stage (self-check schema-shared); --json prints the findings as JSON
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
@@ -155,7 +155,7 @@ export function checkSchemaShared({ root = skillRoot } = {}) {
 
 if (isMain(import.meta.url)) {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log('Usage: node scripts/checks/check-schema-shared.mjs [--json]\n\nRefuses a work-schema block of 5+ lines repeated in 3+ schemas (it belongs in work-common.schema.yaml behind a $ref) and an op field that restates a _common.yaml shared fragment the `shared` markers would render identically. Exit 0 is clean, 1 reports findings.');
+    console.log('Usage: check-schema-shared [--json]\n\nRefuses a work-schema block of 5+ lines repeated in 3+ schemas (it belongs in work-common.schema.yaml behind a $ref) and an op field that restates a _common.yaml shared fragment the `shared` markers would render identically. Exit 0 is clean, 1 reports findings.');
     process.exit(0);
   }
   const result = checkSchemaShared();

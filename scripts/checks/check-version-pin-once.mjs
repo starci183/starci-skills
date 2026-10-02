@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-version-pin-once.mjs — VERSION_PIN_ONCE (R210, RT_VERSION_RESTATED; part of `npm run check`).
-//   node scripts/checks/check-version-pin-once.mjs [--json]
+//   runs in the check stage (self-check version-pin-once); --json prints the findings as JSON
 //
 // knowledge/hfs/canon-pins.yaml owns the version of every @starci package and every canon-pinned
 // dependency; a product's package.json files are the declared install sites. Anywhere else, a semver
