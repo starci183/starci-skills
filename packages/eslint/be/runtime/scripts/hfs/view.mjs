@@ -32,6 +32,7 @@ export function hfsView(opened, repoRoot) {
     repoRoot,
     profile: opened.repo.profile,
     side: opened.repo.side ?? null,
+    edition: opened.repo.edition ?? 'full',
     apps: opened.repo.apps,
     connections: opened.repo.connections,
     ruleParams: opened.ruleParams(),

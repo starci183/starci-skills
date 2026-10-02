@@ -65,8 +65,11 @@ export function triggerProblems(slot, triggerKinds) {
   return bad;
 }
 
-/** Whether an opt-in slot is enabled for the repository: by its app kind, by name in optionalSlots, or by its declared pattern. */
+/** Whether an opt-in slot is enabled for the repository: by its app kind, by a connection's provider, by name in optionalSlots, or by its declared pattern. */
 export function declaredSlotEnabled(slot, repo) {
   if (slot.appKind !== undefined) return repo.apps.some((app) => app.kind === slot.appKind);
+  // A provider declared on any connection (be owns them all today) enables the provider slots of every profile: repo.providers
+  // is the app-wide union the declaration resolver computed; a hand-built repo falls back to its own connections.
+  if (slot.provider !== undefined) return (repo.providers ?? (repo.connections ?? []).map((connection) => connection.provider)).includes(slot.provider);
   return repo.optionalSlots.includes(slot.id) || (slot.pattern !== undefined && (repo.patterns ?? []).includes(slot.pattern));
 }

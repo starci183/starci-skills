@@ -1324,6 +1324,28 @@ HFS_E2E_IN_AUTOMATIC_GATE:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_EDITION_FORBIDDEN_PRESENT:
+  title: "Content the lite edition does not have"
+  title_vi: "Nội dung ấn bản lite không có"
+  meaning_vi: "Kho ghim edition lite nhưng vẫn giữ thứ chỉ ấn bản full mới có: script hay dependency kiểm thử, cấu hình jest/vitest/playwright, ứng dụng worker, pattern sự kiện (event-bus, queue, fenced-job, projection, saga) hay các loại trigger saga/reactors/jobs/realtime. Lite không có thế giới kiểm thử và không có bus sự kiện."
+  causes_vi:
+    - "package.json còn script test*, typecheck:tests hoặc dependency jest/vitest/playwright"
+    - "Tệp cấu hình công cụ kiểm thử không ô nào cấm riêng vẫn nằm trong cây"
+    - "hfs.json khai ứng dụng worker, một pattern sự kiện hoặc một loại trigger mà lite đã bỏ"
+  nextStep_vi: "Xoá phần thuộc ấn bản full (không có gì thay thế trong lite), hoặc nâng kho lên edition full khi nội dung này là thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_EDITION_INVALID:
+  title: "hfs.json edition is not one the manifest knows"
+  title_vi: "Ấn bản HFS trong hfs.json không hợp lệ"
+  meaning_vi: "Trường edition của hfs.json chỉ nhận một giá trị thuộc danh sách editions của bảng kê ô (full, lite); vắng mặt nghĩa là full. Một giá trị khác là lỗi khai báo, kiểm tra bị từ chối."
+  causes_vi:
+    - "hfs.json ghi edition với giá trị ngoài full/lite (gõ sai, hoặc một ấn bản bảng kê không biết)"
+  nextStep_vi: "Sửa edition thành một giá trị trong danh sách editions của bảng kê, hoặc bỏ trường để về full. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_EMPTY_DIR:
   title: "No empty directory outside an `ignored` slot"
   title_vi: "Thư mục rỗng còn sót lại"

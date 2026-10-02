@@ -13,9 +13,12 @@ $defs:
   appManifest:
     type: object
     additionalProperties: false
-    required: [schema, version, versioning, presenceValues, trackedValues, testValues, sides, appKinds, tiers, ruleParams, slots]
+    required: [schema, version, versioning, presenceValues, trackedValues, testValues, editions, sides, appKinds, tiers, ruleParams, slots]
     properties:
       schema: {const: starci/hfs-slots@2}
+      editions:
+        const: [full, lite]
+        description: The editions an app declaration may name in hfs.json (absent means full); slots and rules carry `editions` subsets of this list.
       kind: {const: app}
       version:
         type: string
@@ -181,6 +184,13 @@ $defs:
                 description: R47 BE_CONTRACT_UNGUARDED. The world vocabulary of a contract spec; helper is the imported function that erases payload values (shapeOf).
                 properties:
                   helper: {type: string, pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'}
+              schemaAuthority:
+                enum: [typeorm, supabase]
+                description: 'Where the schema authority lives (R34/R35): TypeORM migrations under persistence/, or supabase/migrations (a connection with provider: supabase).'
+              lite:
+                type: object
+                minProperties: 1
+                description: 'The ruleParams.be keys edition lite overrides (each shaped as above; schemaAuthority: supabase makes supabase/migrations the one schema authority).'
           fe:
             type: object
             additionalProperties: false
@@ -188,6 +198,10 @@ $defs:
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
+              lite:
+                type: object
+                minProperties: 1
+                description: 'The ruleParams.fe keys edition lite overrides (each shaped as above).'
       crossOwner: {type: string}
       crossApp: {type: string}
       slots:
@@ -370,7 +384,10 @@ $defs:
       reads:
         type: array
         uniqueItems: true
-        items: {type: string, pattern: '^(be|fe)/([^/]+/)+$'}
+        items:
+          type: string
+          pattern: '^[a-z][a-z0-9-]*/([^/]+/)+$'
+          description: A path of the other side (be/contracts/) or of an app-root slot tree the side may read (supabase/types/).
   fileLines:
     type: object
     additionalProperties: false
@@ -440,6 +457,39 @@ $defs:
       tracked: {enum: [tracked, ignored, external]}
       tier: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'a tier of the matrix, none, or inherit (the tier of the enclosing owner)'}
       tests: {enum: [unit-beside, e2e, none]}
+      editions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {enum: [full, lite]}
+        description: 'the editions the slot exists in (default: the manifest editions); a slot outside the declared edition owns no path'
+      litePresence:
+        description: 'the presence under edition lite (default: presence); a bare value or a per-side map (an app-root slot takes the bare value); forbidden demands goesTo'
+        anyOf:
+          - {enum: [required, optional, opt-in, forbidden]}
+          - type: object
+            minProperties: 1
+            additionalProperties: false
+            properties:
+              be: {enum: [required, optional, opt-in, forbidden]}
+              fe: {enum: [required, optional, opt-in, forbidden]}
+      lite:
+        type: object
+        minProperties: 1
+        additionalProperties: false
+        description: 'the fields the slot carries under edition lite (same shapes as the slot body); lite.path re-binds no variable the path does not have'
+        properties:
+          path: {type: string, minLength: 1}
+          requires: {$ref: '#/$defs/stringList'}
+          allows: {$ref: '#/$defs/stringList'}
+          forbids: {$ref: '#/$defs/stringList'}
+          minInstances: {type: integer, minimum: 1}
+          requiredInstances:
+            type: object
+            additionalProperties: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+      provider:
+        enum: [postgres, supabase]
+        description: 'the connection provider that enables this opt-in slot (a connection in hfs.json with that provider); never an app kind'
       owner: {type: boolean}
       trigger: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'the trigger kind of a feature-tier slot (one of the manifest triggerKinds); a feature of one kind never imports a feature of another'}
       pattern: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'the design pattern a product declares in hfs.json sides.<side>.patterns to enable this opt-in slot (event-bus, queue, fenced-job, projection, saga); a path in the slot of an undeclared pattern is HFS_SLOT_NOT_ENABLED'}
