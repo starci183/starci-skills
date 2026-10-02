@@ -1,15 +1,20 @@
 {{header}}
-# Builds the image of every app, so a Dockerfile that no longer builds fails the pull request that broke it. An entry builds only
-# when a path it depends on changed. It never pushes: publishing an image is the product's decision, not this file's.
+# Builds the image of every app on the release tag, so a Dockerfile that no longer builds fails the release (or a manual dispatch) that carries it.
+# It never pushes: publishing an image is the product's decision, not this file's.
 name: images
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# One run per ref.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   image:
@@ -21,15 +26,8 @@ jobs:
 {{imageMatrix}}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: changed
-        with:
-          filters: |
-            image: ${{ matrix.paths }}
       - uses: docker/setup-buildx-action@v3
-        if: steps.changed.outputs.image == 'true'
       - uses: docker/build-push-action@v6
-        if: steps.changed.outputs.image == 'true'
         with:
           context: .
           file: ${{ matrix.file }}

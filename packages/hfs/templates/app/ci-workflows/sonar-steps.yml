@@ -1,9 +1,9 @@
       - uses: SonarSource/sonarqube-scan-action@v7
-        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
       - uses: SonarSource/sonarqube-quality-gate-action@v1
-        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
+        if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && env.SONAR_TOKEN != '' }}
         timeout-minutes: 10
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

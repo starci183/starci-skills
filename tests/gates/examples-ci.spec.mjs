@@ -96,7 +96,8 @@ test('the root codecov.yml holds one component per service app of each example p
 
 test('integration and e2e run on workflow_dispatch only; the automatic steps hold coverage, the upload and Sonar', () => {
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
-  assert.ok(workflow.on.push && workflow.on.pull_request && workflow.on.workflow_dispatch);
+  assert.deepEqual(Object.keys(workflow.on).sort(), ['push', 'workflow_dispatch'], 'CI runs once per release (CI_TRIGGERS_RELEASE_ONLY): a release tag or a person, never a branch push or a pull request');
+  assert.deepEqual(workflow.on.push, { tags: ['v*'] });
   const steps = workflow.jobs.app.steps;
   for (const layer of ['test:integration', 'test:e2e']) {
     const step = steps.find((entry) => String(entry.run ?? '').includes(layer));
@@ -106,6 +107,8 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   assert.equal(upload.with.flags, '${{ matrix.app }}');
   assert.equal(upload.with.use_oidc, true, 'the upload authenticates with the OIDC token');
   assert.equal(upload.with.token, undefined);
+  assert.ok(String(upload.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Codecov uploads only from the release-tag run');
+  for (const step of steps.filter((entry) => String(entry.uses ?? '').startsWith('SonarSource/'))) assert.ok(String(step.if).includes("startsWith(github.ref, 'refs/tags/v')"), 'Sonar runs only in the release-tag run');
   assert.doesNotMatch(String(upload.if ?? ''), /secrets|env\./, 'the upload is not guarded by the presence of a secret');
   assert.equal(workflow.jobs.app.permissions['id-token'], 'write');
   assert.match(upload.if, /steps.policy.outputs.tests == 'true'/, 'only an example with generated tests uploads coverage');

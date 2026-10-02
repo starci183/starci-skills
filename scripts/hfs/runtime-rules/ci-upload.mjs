@@ -5,10 +5,9 @@
 //   fail the job           `with.fail_ci_if_error: true`, and no `continue-on-error` on the step
 //   never be gated         no `if:` that reads a secret or CODECOV_TOKEN: a missing token must not turn the upload into a skipped step
 // A template's `{{placeholder}}` lines are blanked before the YAML is parsed. Pure apart from ctx.read.
-import { parseYaml } from '../../../engine/yaml.mjs';
+import { parseWorkflow, workflowFindings } from './workflow-source.mjs';
 
 export const CODE = 'CI_UPLOAD_NOT_SILENT';
-const WORKFLOW = /(?:^|\/)\.?(?:github\/)?workflows\/[^/]+\.ya?ml$/;
 const UPLOAD = /^codecov\/codecov-action(?:@|$)/;
 const SECRET_GATE = /\bsecrets\.|\bCODECOV_TOKEN\b/;
 
@@ -18,8 +17,8 @@ const grantsIdToken = (permissions) => permissions !== null && typeof permission
 /** The CI_UPLOAD_NOT_SILENT findings of one workflow text; a text that is not YAML yields none (the other checks name it). */
 function workflowUploadFindings({ path: file, text }) {
   if (!text.includes('codecov/codecov-action')) return [];
-  let doc;
-  try { doc = parseYaml(text.replace(/^\{\{\w+\}\}\s*$/gm, '').replace(/\{\{\w+\}\}/g, 'x')); } catch { return []; }
+  const doc = parseWorkflow(text);
+  if (!doc) return [];
   const found = [];
   const at = (job, step) => `${file} job ${job} step ${step.name ?? step.uses}`;
   const refuse = (job, step, why) => found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${at(job, step)}: ${why}` });
@@ -38,9 +37,4 @@ function workflowUploadFindings({ path: file, text }) {
 }
 
 /** CI_UPLOAD_NOT_SILENT over every tracked workflow (ctx of scripts/hfs/runtime-check.mjs). */
-export function ciUploadFindings(ctx) {
-  return ctx.files.filter((file) => WORKFLOW.test(file) && !file.startsWith('tests/')).flatMap((file) => {
-    const text = ctx.read(file);
-    return text === null || text === undefined ? [] : workflowUploadFindings({ path: file, text });
-  });
-}
+export const ciUploadFindings = (ctx) => workflowFindings(ctx, workflowUploadFindings);

@@ -221,20 +221,12 @@ function imageEntries(app) {
 }
 
 /**
- * The build matrix of the images workflow: one entry per declared app (be then fe), each with the image name, its Dockerfile and the paths
- * its build depends on (a be image: its own app, the shared be source, the build config and every workspace manifest; a Next image:
- * its own app, the fe packages, the be contracts codegen reads, the task graph and the codegen script), both with the root manifests and
- * the context filter. A YAML block mapping per entry, indented for `strategy.matrix.include`.
+ * The build matrix of the images workflow: one entry per declared app (be then fe), each with the image name and its Dockerfile. The workflow
+ * runs on the release tag, so every image is built there; no path filter narrows it. A YAML block mapping per entry, indented for
+ * `strategy.matrix.include`.
  */
 export function imageMatrix(app) {
-  const shared = ['package.json', 'package-lock.json', '.dockerignore'];
-  const entry = (side, item) => {
-    const own = `${side}/apps/${item.name}/**`;
-    const paths = side === 'be'
-      ? [own, 'be/src/**', 'be/tsconfig*.json', 'fe/**/package.json', ...shared]
-      : [own, 'fe/packages/**', 'fe/tsconfig.json', 'be/contracts/**', 'turbo.json', 'scripts/**', ...shared];
-    return `          - name: ${item.name}\n            file: ${dockerfilePath(side, item.name)}\n            paths: '${JSON.stringify(paths)}'`;
-  };
+  const entry = (side, item) => `          - name: ${item.name}\n            file: ${dockerfilePath(side, item.name)}`;
   return imageEntries(app).map(image => entry(image.side, image.entry)).join('\n');
 }
 
