@@ -28,7 +28,7 @@ test('a processor composed by a worker app and a background method reachable fro
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
   const coverage = report.coverage.hfsMachine.backgroundUnowned;
   assert.equal(coverage.status, 'checked');
-  assert.equal(coverage.workers, 2, 'the api app and the worker app both compose background transports');
+  assert.equal(coverage.workers, 1, 'only the worker app composes background transports in this fixture');
   assert.equal(coverage.composed, 1);
   assert.equal(coverage.backgroundMethods, 1);
   assert.ok(report.coverage.checkedRuleIds.includes('BE_BACKGROUND_UNOWNED'));

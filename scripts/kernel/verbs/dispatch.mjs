@@ -481,7 +481,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
   const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, spec, taskTitle: `${op} #${job.try_no}`,
     run: runId, from: kernelHandle, preflight, request: { job: jobId, lease: reserve.leaseToken },
-    onCreated: (handle) => recordLaunchTerminal(ledger, jobId, handle), io: { cleanup: cleanupManagedWorker } });
+    onCreated: (handle, dispatchId) => recordLaunchTerminal(ledger, jobId, handle, dispatchId), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
   if (!launched.ok) {
     return reject({ step: launched.step, dispatchId: launched.dispatchId, incident: launched.incident === true,

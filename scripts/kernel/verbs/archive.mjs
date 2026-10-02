@@ -101,8 +101,8 @@ export default {
   if (racedAt != null) return alreadyArchived(racedAt);
   // After the durable record: each dropped operation's worker is released, then the Run's Tasks close.
   const jobsDropped = dropped.map(({ job, leasesReleased }) => {
-    const worker = releaseDroppedWorker(db, job, jobPayloadOf(job), repo, internals);
-    if (worker.managedWorker || worker.terminalClosed) {
+    const worker = releaseDroppedWorker(jobPayloadOf(job), internals);
+    if (worker.managedWorker) {
       const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id)?.payload_json) ?? {};
       updateJob(db, { jobId: job.job_id, payload: { ...stored, ...worker } });
     }

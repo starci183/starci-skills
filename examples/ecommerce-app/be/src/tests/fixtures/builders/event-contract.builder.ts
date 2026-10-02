@@ -2,13 +2,10 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { isRecord } from "@modules/platform/primitives"
 
-/** The type of one payload field in an event contract; a trailing `?` marks an optional field. */
-export type FieldType = string
-
 /** One event of a service's published contract. */
 export interface EventContract {
     /** The payload fields and their types. */
-    readonly payload: Readonly<Record<string, FieldType>>
+    readonly payload: Readonly<Record<string, string>>
     /** The contract version of the event. */
     readonly version: number
 }
@@ -27,7 +24,7 @@ const NO_EVENT: EventContract = { payload: {}, version: -1 }
 
 const readEvent = (value: unknown): EventContract => {
     if (!isRecord(value) || typeof value.version !== "number" || !isRecord(value.payload)) return NO_EVENT
-    const payload: Record<string, FieldType> = {}
+    const payload: Record<string, string> = {}
     for (const [field, type] of Object.entries(value.payload)) {
         if (typeof type === "string") payload[field] = type
     }
@@ -50,7 +47,7 @@ export const readContractFile = (service: string, file: "events.json" | "events.
 }
 
 /** A value of the contract type `type`. */
-export const sampleOf = (type: FieldType): string | number => (type.startsWith("number") ? 1 : "x")
+export const sampleOf = (type: string): string | number => (type.startsWith("number") ? 1 : "x")
 
 /** A payload carrying every required field of `contract`. */
 export const samplePayload = (contract: EventContract): Record<string, string | number> =>
@@ -60,24 +57,21 @@ export const samplePayload = (contract: EventContract): Record<string, string | 
             .map(([field, type]) => [field, sampleOf(type)]),
     )
 
-/** The problems that make `current` break the consumers of `pinned`: a removed event, a version change, a removed or retyped field, a new required field. */
-export const breakingChanges = (pinned: EventContractFile, current: EventContractFile): Array<string> => {
+const eventProblems = (name: string, event: EventContract, next: EventContract | undefined): Array<string> => {
+    if (!next) return [`${name} was removed; publish ${name}.v2 instead`]
     const problems: Array<string> = []
-    for (const [name, event] of Object.entries(pinned.events)) {
-        const next = current.events[name]
-        if (!next) {
-            problems.push(`${name} was removed; publish ${name}.v2 instead`)
-            continue
-        }
-        if (next.version !== event.version) problems.push(`${name} changed version; publish ${name}.v2 instead`)
-        for (const [field, type] of Object.entries(event.payload)) {
-            if (next.payload[field] !== type)
-                problems.push(`${name}.${field} was removed or retyped; publish ${name}.v2 instead`)
-        }
-        for (const [field, type] of Object.entries(next.payload)) {
-            if (!(field in event.payload) && !type.endsWith("?"))
-                problems.push(`${name}.${field} is new and must be optional`)
-        }
+    if (next.version !== event.version) problems.push(`${name} changed version; publish ${name}.v2 instead`)
+    for (const [field, type] of Object.entries(event.payload)) {
+        if (next.payload[field] !== type)
+            problems.push(`${name}.${field} was removed or retyped; publish ${name}.v2 instead`)
+    }
+    for (const [field, type] of Object.entries(next.payload)) {
+        if (!(field in event.payload) && !type.endsWith("?"))
+            problems.push(`${name}.${field} is new and must be optional`)
     }
     return problems
 }
+
+/** The problems that make `current` break the consumers of `pinned`: a removed event, a version change, a removed or retyped field, a new required field. */
+export const breakingChanges = (pinned: EventContractFile, current: EventContractFile): Array<string> =>
+    Object.entries(pinned.events).flatMap(([name, event]) => eventProblems(name, event, current.events[name]))

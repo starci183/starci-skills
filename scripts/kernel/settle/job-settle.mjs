@@ -16,7 +16,7 @@
 //   reported --(a checker that could not run)---------------------> stays reported, retried; after tail.maxAttempts
 //                                                                    one runtime-defect Decision Item (H7: never red)
 //   reported --(judgment: not re-verifiable, owner act, refusal)--> kernel    event job-settle-needs-kernel
-//   settled  --(worker close proven, or closed and verified now)--> released  event job-settle-released
+//   settled  --(managed worker release proven)--> released  event job-settle-released
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
@@ -457,19 +457,17 @@ function handToKernel(ledger, item, verdict, { now }) {
 
 /** The proof a settled job's worker is gone, from its payload; null when unproven. */
 export function releaseProofOf(payload) {
-  const tc = payload?.terminalClosed, wr = payload?.workerReleased, mw = payload?.managedWorker;
-  if (tc?.verified?.ok === true) return `settle-verified:${tc.verified.proof ?? 'ok'}`;
-  if (tc?.custody?.state === 'released' && tc?.ok === true) return `settle-custody:${tc.custody.proof ?? 'released'}`;
-  if (wr?.custody?.state === 'closed-verified') return `report-close:${wr.custody.proof ?? 'verified'}`;
+  const wr = payload?.workerReleased, mw = payload?.managedWorker;
+  if (wr?.custody?.state === 'released') return `held-release:${wr.custody.proof ?? 'released'}`;
   if (mw?.custody?.state === 'released') return `managed:${mw.custody.proof ?? 'released'}`;
   return null;
 }
 
 /**
- * settled -> released for every settled op job of the scope inside releaseWindowMs with no release event: the proof
- * from its payload, else a verified close of its terminal now (close-verify.mjs, the gc's close). Seam: close.
+ * settled -> released for every settled op job of the scope inside releaseWindowMs with no release event, on the proof
+ * of its managed release in its payload (settle's worker-release receipt). A job whose release is unproven stays settled.
  */
-export async function releaseSettled(ledger, { workflowId = null, jobId = null, now = Date.now(), settings = settlerSettings(), close = null, dryRun = false } = {}) {
+export async function releaseSettled(ledger, { workflowId = null, jobId = null, now = Date.now(), settings = settlerSettings(), dryRun = false } = {}) {
   const where = ["kind='op'", `status IN (${SETTLED.map(() => '?').join(',')})`, 'updated_at>?'];
   const args = [...SETTLED, now - settings.releaseWindowMs];
   if (workflowId) { where.push('workflow_id=?'); args.push(workflowId); }
@@ -477,26 +475,18 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
   const rows = ledger.db.prepare(`SELECT job_id, workflow_id, op_id, try_no AS attempt, worker_id, payload_json, status FROM jobs j WHERE ${where.join(' AND ')}
     AND NOT EXISTS (SELECT 1 FROM events e WHERE e.kind=? AND e.entity_id=j.job_id)`).all(...args, EVENTS.released);
   const out = [];
-  let closer = close;
   for (const row of rows) {
     const payload = parse(row.payload_json) ?? {};
-    const handle = payload.managed ? null : (row.worker_id ?? payload.orca?.agentTerminalHandle ?? payload.launchTerminal?.handle ?? null);
     const item = { jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, dispatchId: null };
     // A job that never bound a worker has nothing to release: no transition, no event.
-    if (!handle && !payload.managed) continue;
-    let proof = releaseProofOf(payload), closed = null;
-    if (!proof && handle) {
-      if (dryRun) { out.push({ jobId: row.job_id, state: STATES.settled, wouldClose: handle }); continue; }
-      if (!closer) closer = (await import('../../machine/close-verify.mjs')).closeAndVerify;
-      try { closed = closer(handle, { tree: true }); } catch (error) { closed = { ok: false, reason: String(error?.message ?? error) }; }
-      if (closed?.ok) proof = `closed-verified:${closed.proof ?? 'ok'}`;
-    }
-    if (!proof) { out.push({ jobId: row.job_id, state: STATES.settled, released: false, reason: closed?.reason ?? closed?.error ?? (payload.managed ? 'managed-unproven' : 'unproven') }); continue; }
+    if (!payload.managed) continue;
+    const proof = releaseProofOf(payload);
+    if (!proof) { out.push({ jobId: row.job_id, state: STATES.settled, released: false, reason: 'managed-unproven' }); continue; }
     if (!dryRun) {
-      event(ledger, item, EVENTS.released, { from: STATES.settled, to: STATES.released, status: row.status, handle, proof, ...(closed ? { closedNow: true } : {}) });
+      event(ledger, item, EVENTS.released, { from: STATES.settled, to: STATES.released, status: row.status, handle: null, proof });
       markAttempt(ledger, item, { releasedAt: now });
     }
-    out.push({ jobId: row.job_id, state: STATES.released, proof, ...(closed ? { closedNow: true } : {}) });
+    out.push({ jobId: row.job_id, state: STATES.released, proof });
   }
   return out;
 }
@@ -507,10 +497,10 @@ const lockName = (repo, id) => `job-settle-${repoKey(repo)}-${slug(id)}`;
 
 /**
  * One reconcile pass over a ledger (optionally one workflow or one job). Returns {ok, repo, settled[], kernel[],
- * released[], skipped[], errors[]}. Seams: verify (verifyReported), api (runApi), close (for releaseSettled), now.
+ * released[], skipped[], errors[]}. Seams: verify (verifyReported), api (runApi), now.
  */
 export async function reconcileJobSettle({ repo, workflowId = null, jobId = null, dryRun = false, now = Date.now, env = process.env,
-  settings = settlerSettings(), verify = verifyReported, api = runApi, close = null, locks = true } = {}) {
+  settings = settlerSettings(), verify = verifyReported, api = runApi, locks = true } = {}) {
   await loadDecisions();
   const out = { ok: true, repo: path.resolve(repo), workflowId, jobId, settled: [], kernel: [], released: [], skipped: [], errors: [] };
   const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
@@ -559,7 +549,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         out.errors.push({ jobId: item.jobId, error: String(error?.stack ?? error).slice(0, 400) });
       } finally { held.release(); }
     }
-    try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, close, dryRun }); }
+    try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, dryRun }); }
     catch (error) { out.ok = false; out.errors.push({ step: 'release', error: String(error?.message ?? error).slice(0, 300) }); }
     // The async settle tail (api settle-tail): a failed or never-started tail run is retried here.
     if (!dryRun) {

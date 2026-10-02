@@ -234,13 +234,15 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
     files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
-  const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--dispatch-capability','dcap_fake','--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
   const sends=fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')==='orchestration send');
   assert.equal(sends.length,1,'exactly one worker_done');
   const flagOf=(argv,name)=>argv[argv.indexOf(`--${name}`)+1];
   assert.deepEqual(['type','task-id','dispatch-id','from','outcome'].map(n=>flagOf(sends[0],n)),['worker_done','task-fake-1','dispatch-fake-1','fake-terminal-1','succeeded']);
   assert.ok(sends[0].includes('--retry-request'),'a lost receipt replays, never a second worker_done');
+  assert.equal(flagOf(sends[0],'dispatch-capability'),'dcap_fake','the op\'s own Dispatch capability authenticates the worker_done');
+  assert.equal(JSON.stringify(jobRow(fx.repo,jobId)).includes('dcap_fake'),false,'the capability is never stored on the job');
   assert.deepEqual([json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.outcome,json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone?.ok],['succeeded',true],'api report sent the worker_done and the job keeps its receipt');
   fx.env.STARCI_CALLER='runtime-settler';
   const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
@@ -259,6 +261,28 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const worker=json(s.stdout)?.managedWorker;
   assert.deepEqual([worker?.dispatch?.state,worker?.dispatch?.workerDone,worker?.stop],['succeeded',true,null],'the receipt keeps the Dispatch state it released');
   assert.equal('taskClosed' in (json(s.stdout)??{}),false);
+});
+
+test('api report without the op\'s Dispatch capability sends no worker_done, records dispatch_capability_missing, and settle fences the Dispatch with worker-stop then releases it',t=>{
+  const fx=fixture(t);
+  const jobId='job-managed-no-capability';
+  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-nocap',workflowId:'wf-nocap',kind:'kernel',role:'kernel',payload:{}});
+    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-nocap'").run();
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-nocap',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+  }finally{ledger.close();}
+  const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
+  assert.equal(d.status,0,d.stderr||d.stdout);
+  const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
+    schema:'starci/op-report@1',outcome:'done',summary:'no capability',head:'abc1234def',
+    files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
+  }));
+  const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
+  assert.equal(filed.status,0,filed.stderr||filed.stdout);
+  assert.equal(fx.calls().includes('orchestration send'),false,'no capability, no worker_done attempt');
+  const done=json(jobRow(fx.repo,jobId)?.payload_json)?.workerDone;
+  assert.deepEqual([done?.ok,done?.errorCode,done?.code],[false,'dispatch_capability_missing','worker-done-unsent']);
 });
 
 test('managed settle: a Dispatch with no worker_done (the op filed no report) is fenced with worker-stop, then released',t=>{
@@ -285,7 +309,7 @@ test('managed settle: a Dispatch with no worker_done (the op filed no report) is
 // Two settled nivo business.decide ops kept their Claude terminals live:
 // worker-release answered release_unknown ("the agent terminal was closed but
 // its process could not be confirmed stopped") and settle recorded nothing.
-for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x repeats the release and never leaves the agent terminal live`,t=>{
+for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x repeats the release once and records its custody`,t=>{
   const fx=fixture(t);fx.env.STARCI_FAKE_ORCA_RELEASE_UNKNOWN=String(unknown);
   const jobId='job-managed-release';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
@@ -300,7 +324,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
-  assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json').status,0);
+  assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--dispatch-capability','dcap_fake','--json').status,0);
   fx.env.STARCI_CALLER='runtime-settler';
   assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
   delete fx.env.STARCI_CALLER;
@@ -309,13 +333,14 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   const releases=fx.calls().filter(c=>c==='orchestration worker-release').length;
   assert.equal(releases,2,'an unknown release is repeated once, as Orca\'s recovery says');
   const worker=json(s.stdout)?.managedWorker;
-  assert.equal(worker?.agentTerminal?.handle,'fake-terminal-1');
-  assert.equal(worker?.agentTerminal?.connected,false,'the settled op leaves no connected agent terminal');
-  const closes=fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close');
-  // Either way the agent's own tab is closed once, so Orca cannot bring the
-  // session back under a new handle (tests/kernel/close-op-terminal.spec.mjs).
-  assert.deepEqual(closes.map(a=>[a[a.indexOf('--terminal')+1],a.includes('--tab')]),[['fake-terminal-1',true]],'only the exact agent terminal, with its tab');
-  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.agentTerminal?.connected,false,'the ledger keeps the worker receipt');
+  assert.equal(worker?.retryRelease?.state!==undefined,true,'the repeat is on the receipt');
+  // worker-release alone ends the agent: nothing is typed into the terminal and no tab is closed by hand.
+  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close').length,0,'no terminal close');
+  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal send').length,0,'no quit input');
+  // Orca\'s own recovery repeats the release once: the first unknown is settled by it; two unknowns leave the worker retained,
+  // which the receipt says (custody) and --release-worker retries later.
+  assert.equal(worker?.custody?.state,unknown===1?'released':'retained',JSON.stringify(worker?.custody));
+  assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.custody?.state,worker?.custody?.state,'the ledger keeps the worker receipt');
 });
 
 test('finish closes the kernel terminal and never issues task-update (the Task of an op belongs to Orca)',t=>{
@@ -897,12 +922,3 @@ test('a dead managed worker settles with custody released from its disconnected 
   assert.notEqual(refused.status,0,'a job still running is settle\'s to release');
 });
 
-test('a managed worker quits with its own agent CLI, not always Claude\'s input',()=>{
-  const src=fs.readFileSync(API,'utf8');
-  assert.doesNotMatch(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: 'claude' \}\)/);
-  assert.match(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: agentOfJob\(settledPayload\) \?\? 'claude' \}\)/);
-  // agentOfJob is the one shared definition (scripts/lib/job-agent.mjs) cli.mjs imports.
-  assert.match(src,/import \{ agentOfJob \} from '\.\.\/lib\/job-agent\.mjs'/);
-  const jobAgent=fs.readFileSync(path.join(ROOT,'scripts','lib','job-agent.mjs'),'utf8');
-  assert.match(jobAgent,/\^\(claude\|codex\|devin\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
-});

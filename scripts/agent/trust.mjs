@@ -26,8 +26,7 @@
 //              trusts it by (codex app-server hooks/list, then config/batchWrite
 //              hooks.state - the way Orca trusts its own hooks).
 //     devin  → <cwd>/.devin/config.local.json (Devin's local project config): the
-//              guard hook and agent.model pinned to the routed model, which
-//              worker-start cannot pass to Devin.
+//              guard hook only: Devin has no per-worker model pin through Orca.
 //   Returns the receipt the launch event records:
 //     {agent, paths, status: written|already|skipped|failed, written[], already[], …}
 //
@@ -453,9 +452,9 @@ const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandl
 /**
  * Ensure hooks.PreToolUse of a Claude-format JSON config (Claude's settings.json, Devin's config.json) holds exactly
  * one command-guard group: {matcher?, hooks: [{type: command, command, timeout}]}. An older guard group (another
- * runtime path) is replaced; every other hook is kept. `edit(doc)` -> true when it changed doc, in the same write.
+ * runtime path) is replaced; every other hook is kept.
  */
-export function assertJsonToolGuard({ file, command, matcher = null, edit = null, hooks }) {
+export function assertJsonToolGuard({ file, command, matcher = null, hooks }) {
   const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: TOOL_GUARD_TIMEOUT_S }] };
   const holds = (d) => {
     const list = Array.isArray(d?.hooks?.PreToolUse) ? d.hooks.PreToolUse.filter(isGuardGroup) : [];
@@ -466,28 +465,21 @@ export function assertJsonToolGuard({ file, command, matcher = null, edit = null
     const d = text == null ? {} : jsonOf(text);
     if (d === undefined || !d || typeof d !== 'object' || Array.isArray(d)) throw new Error(`${file} is not a JSON object`);
     if (d.hooks != null && (typeof d.hooks !== 'object' || Array.isArray(d.hooks))) throw new Error(`${file} hooks is not an object`);
-    const edited = edit ? edit(d) : false;
-    if (holds(d) && !edited) return { text: null, result: null };
+    if (holds(d)) return { text: null, result: null };
     d.hooks = { ...(d.hooks ?? {}) };
     const others = Array.isArray(d.hooks.PreToolUse) ? d.hooks.PreToolUse.filter((g) => !isGuardGroup(g)) : [];
     d.hooks.PreToolUse = [...others, group];
     const next = JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : '');
     if (text && !numbersSurvive(text, next)) throw new Error(`${file} holds a number JSON cannot round-trip; refusing to rewrite it`);
     return { text: next, result: null };
-  }, (text) => { const d = jsonOf(text ?? ''); return !!d && holds(d) && (!edit || !edit(structuredClone(d))); }, { hooks }); }
+  }, (text) => { const d = jsonOf(text ?? ''); return !!d && holds(d); }, { hooks }); }
   catch (e) { return { file, ok: false, state: 'failed', error: String(e?.message ?? e) }; }
   return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
 }
 
-/** Devin's config.json: agent.model pinned to `model` (worker-start passes no model to Devin) and the command guard. */
-export function writeDevinProfile({ file, command, model = null, hooks }) {
-  const pin = (d) => {
-    if (!model || d.agent?.model === model) return false;
-    if (d.agent != null && (typeof d.agent !== 'object' || Array.isArray(d.agent))) throw new Error(`${file} agent is not an object`);
-    d.agent = { ...(d.agent ?? {}), model };
-    return true;
-  };
-  return { ...assertJsonToolGuard({ file, command, edit: pin, hooks }), ...(model ? { model } : {}) };
+/** Devin's project config: the command guard only. LIVE E7 (2026-10-02): Devin honours agent.model only in the user config (--config) or DEVIN_MODEL, never in <project>/.devin/config*.json, and Orca refuses a launch-time model for Devin, so no model is written here (an external limitation, see the CHANGELOG). */
+export function writeDevinProfile({ file, command, hooks }) {
+  return assertJsonToolGuard({ file, command, hooks });
 }
 
 // A Codex hook lives in the home's config.toml as an array-of-tables block the runtime owns, marked on its first line.
@@ -571,7 +563,7 @@ function launchDirectory(worktree) {
  * recorded (the gate auto-answer in lib.mjs is the fallback). Returns null for
  * an agent with no trust prompt.
  */
-export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
+export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
   const dir = launchDirectory(cwd);
   if (!dir) return { agent, paths: [], status: 'skipped', reason: `launch cwd is not a directory: ${cwd ?? 'none'}` };
@@ -589,15 +581,13 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
   const excluded = (file) => { const x = guard(file, () => excludeFromGit(dir, file)); if (x) (receipt.gitExclude ??= []).push(x); if (x?.ok === false) receipt.errors.push({ file, error: x.error }); };
   const command = toolGuardCommand();
   if (agent === 'devin') {
-    // Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook, and the routed model pinned for
-    // this worktree alone (worker-start passes Devin no --model).
+    // Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook.
     const file = project.devinConfig;
-    const profile = guard(file, () => writeDevinProfile({ file, command, model, hooks }));
+    const profile = guard(file, () => writeDevinProfile({ file, command, hooks }));
     receipt.toolGuard = [{ file, state: profile.state ?? 'failed' }];
-    if (model) receipt.modelPin = { file, model, state: profile.state ?? 'failed' };
     if (!profile.ok) receipt.errors.push({ file, error: profile.error ?? profile.state });
-    else if (profile.state === 'written') receipt.written.push({ file, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
-    else receipt.already.push({ file, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+    else if (profile.state === 'written') receipt.written.push({ file, key: 'hooks.PreToolUse' });
+    else receipt.already.push({ file, key: 'hooks.PreToolUse' });
     if (profile.ok) excluded(file);
   } else if (agent === 'claude') {
     // The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's

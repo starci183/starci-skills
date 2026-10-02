@@ -1,7 +1,7 @@
 // process-list.mjs — the ONE read of the host's process table (Windows: Get-CimInstance Win32_Process; elsewhere `ps`).
 //
 // Every runtime census reads it: close-verify processTable, host-health listProcesses (with per-process CPU),
-// reap-agent-process listAgentProcesses, git-index-lock listGitProcesses, resume-all listWatchdogs,
+// git-index-lock listGitProcesses, resume-all listWatchdogs,
 // and connectors/tunnel tunnelProcesses. Each keeps its own filter and row shape;
 // the query and the row parsing live in lib.mjs (processListScript, processRowsOfJson, processRowsOfPs), the failure
 // rule (null = the table could not be read) here. Its sibling kill-tree.mjs is the one forced stop.

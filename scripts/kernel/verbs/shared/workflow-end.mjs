@@ -64,10 +64,6 @@ export const closeKernelTerminal = (kernelTerminal, { owner = 'kernel' } = {}) =
   if (!kernelTerminal) return null;
   try { return closeSelfSafe(kernelTerminal, { owner }); } catch { return null; /* the ledger state stands; the tick GC reconciles host cleanup */ }
 };
-// The worker of a dropped operation: a managed Dispatch is stopped and released, a plain terminal
-// quits and closes. A queued job holds no worker.
-export const releaseDroppedWorker = (db, job, payload, repo, internals) => {
-  if (payload.managed?.dispatchId) return { managedWorker: internals.releaseManagedWorker(db, job, payload, repo) };
-  const handle = internals.operationTerminalHandleOf(job, payload);
-  return handle ? { terminalClosed: internals.quitWorkerTerminal(handle, payload) } : {};
-};
+// The worker of a dropped operation: a managed Dispatch is stopped (when it did not settle itself) and released.
+// A queued job holds no worker.
+export const releaseDroppedWorker = (payload, internals) => (internals.heldDispatchOf(payload) ? { managedWorker: internals.releaseManagedWorker(payload) } : {});

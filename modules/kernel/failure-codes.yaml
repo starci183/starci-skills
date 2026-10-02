@@ -9466,15 +9466,6 @@ probe-failed:
   nextStep_vi: "Mạch vẫn ngắt cho tới hạn ghi trong thông báo. Chủ dự án kiểm tra khóa hoặc gói cước rồi thử lại."
   owner: owner
   kind: verb-refusal
-process-tree-lingers:
-  title: "Worker processes still running"
-  title_vi: "Tiến trình của thợ vẫn còn chạy"
-  meaning_vi: "Sau khi đóng terminal của thợ, vẫn còn tiến trình con chưa tắt hết."
-  causes_vi:
-    - "Tiến trình nền do thợ khởi chạy không thoát"
-  nextStep_vi: "Việc đóng terminal không được ghi nhận là sạch; lượt dọn định kỳ (tick GC) sẽ thu dọn tiến trình còn sót."
-  owner: runtime-core
-  kind: runtime-fault
 progress-stall:
   title: "Workflow progress has stalled"
   title_vi: "Tiến độ luồng công việc bị đứng"
@@ -9600,25 +9591,6 @@ real-money:
   nextStep_vi: "Ở chế độ tự lái, câu hỏi được để dành đến cuối luồng và chờ chủ dự án trả lời."
   owner: owner
   kind: blocker
-reap-no-terminal:
-  title: "Job names no op terminal"
-  title_vi: "Job không có terminal để dọn"
-  meaning_vi: "Lệnh dọn terminal còn sót của job không tìm thấy terminal nào gắn với job."
-  causes_vi:
-    - "Job chưa từng có terminal"
-    - "Thông tin terminal không được lưu"
-  nextStep_vi: "Không dọn gì. Không có terminal thì không cần làm thêm."
-  owner: supervisor
-  kind: verb-refusal
-reap-not-settled:
-  title: "Reap on a job not yet settled"
-  title_vi: "Dọn terminal của job chưa chốt"
-  meaning_vi: "Lệnh dọn chỉ áp dụng cho job đã chốt nhưng job này chưa chốt."
-  causes_vi:
-    - "Job còn đang chạy hoặc chờ"
-  nextStep_vi: "Không dọn gì. Đợi job được chốt rồi dọn."
-  owner: supervisor
-  kind: verb-refusal
 reason-missing:
   title: "Autopilot action needs a reason"
   title_vi: "Lệnh tự lái thiếu lý do"
@@ -10715,6 +10687,16 @@ model-not-listed:
   nextStep_vi: "Không có worker nào được khởi động và không tốn lượt thử; sửa model trong config.yaml hoặc khai báo model trong modules/models."
   owner: supervisor
   kind: dispatch-refusal
+managed-unproven:
+  title: "Managed worker release is not proven"
+  title_vi: "Chưa chứng minh được việc giải phóng worker do Orca quản lý"
+  meaning_vi: "Job đã chốt nhưng biên nhận worker-release của Dispatch chưa cho thấy trạng thái released, nên bước chuyển sang released chưa được ghi."
+  causes_vi:
+    - "worker-release bị Orca từ chối hoặc không trả lời lần đầu và lần lặp lại"
+    - "Dispatch vẫn do Orca giữ (retained)"
+  nextStep_vi: "Job giữ nguyên trạng thái settled; api reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
+  owner: runtime-core
+  kind: settle-reason
 worker-died-no-report:
   title: "Worker died without report"
   title_vi: "Worker chết mà chưa báo cáo"
@@ -14127,4 +14109,26 @@ HFS_DOCKER_SECRETS:
     - "Vi phạm luật R191: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
   owner: op-retry
+  kind: check-finding
+
+EXAMPLES_CI_IMAGES_NOT_DERIVED:
+  title: "The examples workflow does not build every image from a derived matrix"
+  title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
+  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `node scripts/checks/check-examples-ci.mjs --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
+  causes_vi:
+    - "Danh sách image viết tay trong workflow, hoặc thiếu job images"
+    - "Một bước build có push: true hoặc docker push"
+  nextStep_vi: "Dựng lại job `images` với include: fromJSON của đầu ra `--images` và bỏ mọi thao tác push."
+  owner: runtime-core
+  kind: check-finding
+
+EXAMPLES_CI_APP_QUALITY_DRIFT:
+  title: "An example's codecov.yml or sonar-project.properties differs from its render"
+  title_vi: "codecov.yml hoặc sonar-project.properties của ví dụ lệch khỏi bản sinh"
+  meaning_vi: "Hai tệp chất lượng của mỗi ví dụ được sinh từ jest preset nguồn của repo này, cùng phạm vi coverage với cờ trong codecov.yml gốc; phạm vi loại trừ của Sonar là phần bù của nó."
+  causes_vi:
+    - "Preset nguồn đổi mà các tệp chưa được sinh lại"
+    - "Sửa tay tệp sinh ra"
+  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
+  owner: runtime-core
   kind: check-finding

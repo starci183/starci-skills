@@ -21,9 +21,9 @@
 // Collectors:
 //   agents    Orca's own worker accounting (orchestration worker-list, scripts/api/orca/worker-list.mjs), read Run by
 //             Run for every Orca Run the ledgers and the Supervisor's jobs name and paged past 100 rows: a worker Orca
-//             holds as reclaimable (settled, terminal not released) whose liveness is live or exited and whose literal
+//             holds as reclaimable (settled, terminal not released) whose liveness is live, exited or unverifiable and whose literal
 //             nextAction is `worker-release --dispatch <id>` is released (worker-release archives its output, then
-//             closes only that terminal). A row whose liveness is unverifiable, whose next action is anything else, or
+//             closes only that terminal). A row with no liveness verdict, whose next action is anything else, or
 //             whose release Orca could not confirm (release_unknown) is reported and never touched (lib/
 //             worker-accounting.mjs releasePlan). A terminal the ledgers bind to a settled job, an ended workflow or a
 //             finished [Worker] job that Orca does not account for as a worker is closed and verified; a terminal Orca
@@ -67,7 +67,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { workerListAll, activeWorkersAllRuns } from '../machine/worker-list-all.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../machine/close-verify.mjs';
+import { closeAndVerify, isAgentProcess, processTable } from '../machine/close-verify.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { parseWorktreeList, laneActivity, treeBytes, laneGit } from '../housekeeping/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
@@ -640,7 +640,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const ledgers = (deps.ledgers ?? (() => repos.map((r) => { try { return ledgerView(r); } catch { return null; } }).filter(Boolean)))();
   const freeBefore = (deps.freemem ?? os.freemem)();
 
-  let agentsBeforeOuter = null, lastListedCount = 0;
+  let lastListedCount = 0;
   // Orca's worker accounting for the runtime's Runs: the agents collector releases from it, and every terminal it
   // accounts for is Orca's (the terminal decisions below leave it alone).
   let workerRows = [];
@@ -649,7 +649,6 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     workerRows = w.rows;
     if (w.errors.length) { report.ok = false; report.errors.push(...w.errors); }
   }
-  if (want.has('agents') && apply) { try { const t = (deps.table ?? processTable)(); agentsBeforeOuter = t ? orcaAgents(t) : null; } catch { agentsBeforeOuter = null; } }
   if (want.has('agents')) {
     // When the job that held a worker's terminal last changed (its settle): the age of a worker Orca still holds.
     const settledAt = new Map([...ledgers.flatMap((l) => l.jobs.flatMap((j) => j.handles.map((h) => [h, j.updatedAt ?? null]))),
@@ -709,19 +708,12 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   }
 
   // Processes (owner 2026-09-28: closing a tab while the agent process lingers doesn't count; free orphan PowerShell
-  // under the Orca daemon): after the closes, (1) every agent that ran in an Orca terminal and now lingers outside it is
-  // killed (reapOrphaned); (2) agent CLIs whose parent is gone, older than minAgeMs, are killed; (3) child-less
+  // under the Orca daemon): after the closes, (1) agent CLIs whose parent is gone, older than minAgeMs, are killed; (2) child-less
   // `powershell -NoExit` shells under the Orca daemon beyond the number of terminals Orca lists (no tab owns them),
   // older than minAgeMs, oldest first, are killed.
   if (want.has('shells') || want.has('agents')) {
     try {
       const tableFn = deps.table ?? processTable;
-      if (apply && agentsBeforeOuter) {
-        const r = (deps.reap ?? reapOrphaned)(agentsBeforeOuter, { table: tableFn });
-        if (r.checked && r.lingering) report.items.push({ class: 'process', action: 'kill-tree', target: `${r.lingering} lingering agent process(es)`, verdict: 'collect', reason: 'agent of a closed terminal still alive outside Orca', ok: r.remaining === 0, leftover: true });
-        if (r.checked && r.remaining) report.errors.push(`${r.remaining} agent process(es) of closed terminals still alive after taskkill`);
-        report.counts.processes += r.killed ?? 0;
-      }
       const table = tableFn();
       const listedNow = apply ? (deps.list ?? (() => terminalList({})))() : null;
       if (table) {

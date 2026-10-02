@@ -1,4 +1,4 @@
-import { Button, Heading, PageContainer, SectionHeader, SurfaceCard, Text } from "@starci/grammar/common"
+import { Button, Heading, PageContainer, Region, SectionHeader, SurfaceCard, Text } from "@starci/grammar/common"
 import { CatalogueTile, DuckMascot } from "@ecommerce/ui"
 import { landingPageClassNames } from "./classNames"
 
@@ -64,7 +64,7 @@ export const LandingPageBase = (props: LandingPageProps) => (
             </div>
         </div>
 
-        <div id="catalogue" role="region" className={landingPageClassNames.section} aria-labelledby="catalogue-heading">
+        <Region id="catalogue" className={landingPageClassNames.section} labelledBy="catalogue-heading">
             <SectionHeader
                 id="catalogue-heading"
                 title={props.props.catalogueTitle}
@@ -81,9 +81,9 @@ export const LandingPageBase = (props: LandingPageProps) => (
                     <CatalogueTile key={product.id} name={product.name} price={product.price} blurb={product.blurb} />
                 ))}
             </div>
-        </div>
+        </Region>
 
-        <div id="about" role="region" aria-labelledby="about-heading">
+        <Region id="about" labelledBy="about-heading">
             <SectionHeader id="about-heading" title={props.props.pillarsTitle} level={2} />
             <div className={landingPageClassNames.grid}>
                 {props.props.pillars.map((pillar) => (
@@ -94,6 +94,6 @@ export const LandingPageBase = (props: LandingPageProps) => (
                     </SurfaceCard>
                 ))}
             </div>
-        </div>
+        </Region>
     </PageContainer>
 )

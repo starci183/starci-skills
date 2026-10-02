@@ -1,10 +1,11 @@
 services:
   identity:
-    # The api container is a placeholder image with no build context: the canonical dev run keeps
-    # only postgres/redis here (`docker compose up -d`) and drives the API on the host with
-    # `npm run start:identity`, exactly the split nivo's example uses so migrations and env stay
-    # one-command reproducible without a container build in the loop.
+    # The api image is built from this repository (the context is the app root, the Dockerfile the app's own). The canonical dev run
+    # keeps only the infra here and drives the API on the host with `npm run start:identity`; the app profile runs the image.
     image: ecommerce-app/identity:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/identity/Dockerfile
     profiles: [app]
     depends_on:
       - postgres

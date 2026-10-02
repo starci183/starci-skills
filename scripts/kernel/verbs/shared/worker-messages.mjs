@@ -13,8 +13,8 @@
 //   question, escalation  inbox row kind worker-question (the Kernel answers it with api reply)
 //   heartbeat             counted on the Delivery's event only: Orca keeps dispatch.lastHeartbeatAt (worker-show), which
 //                         is what lease renewal reads, and one nivo Run held 2616 of them
-//   every other type      one event kind orchestration-message per message; worker_done rows are settlement's
-//                         hand-off (workerDoneOf)
+//   every other type      one event kind orchestration-message per message (worker_done included: the Orca-side echo, kept for
+//                         audit; settlement reads the Dispatch state with worker-show, never these rows)
 // The ledger rows are what survives Orca's inbox and what the Kernel reads through api (status, questions, messages).
 import { JOB_STATUSES, postInbox, setInboxStatusByKey } from '../../../../engine/db/ledger.mjs';
 import { parseJson } from '../../../lib/json.mjs';
@@ -114,14 +114,6 @@ export const orchestrationMessagesOf = (db, workflowId, { type = null } = {}) =>
   .prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(workflowId, ORCHESTRATION_MESSAGE)
   .map((row) => parseJson(row.payload_json, {}) ?? {})
   .filter((m) => !type || m.type === type);
-
-/**
- * The worker_done messages the workflow's workers sent, joined to the job that sent them: settlement's trigger (map
- * REPLACE #9). [{messageId, runId, dispatchId, taskId, jobId, opId, attempt, outcome, reportPath, createdAt}].
- */
-export const workerDoneOf = (db, workflowId) => orchestrationMessagesOf(db, workflowId, { type: 'worker_done' })
-  .map(({ messageId, runId, dispatchId, taskId, jobId, opId, attempt, outcome, reportPath, createdAt }) =>
-    ({ messageId, runId, dispatchId, taskId, jobId, opId, attempt, outcome, reportPath, createdAt }));
 
 /**
  * The workflow's worker questions, from the ledger alone: every question and escalation bridged from its Runs. A

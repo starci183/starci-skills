@@ -12,7 +12,7 @@ questions:
     inbox row kind worker-question per new question or escalation {key: <message id>, payload {messageId, type,
     runId, jobId, opId, attempt, dispatchId, taskId, question, options[], subject, askedAt, from}} with event
     'worker-question-bridged'; an event 'orchestration-message' per other message (worker_done, status, handoff,
-    ...; worker_done is settlement's hand-off, api-lib/messages.mjs workerDoneOf); heartbeats counted on the event
+    ...; worker_done is the audit echo of the op's own worker_done: settle reads the Dispatch with worker-show); heartbeats counted on the event
     'orchestration-delivery-bridged' {runId, deliveryId, count, types, heartbeats}; a replayed Delivery writes
     nothing twice (keyed by message id). Then a pending question whose job settled or reported, that got a reply
     threaded in Orca, or that matches no job is closed status done {reason}

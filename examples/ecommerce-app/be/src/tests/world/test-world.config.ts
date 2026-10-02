@@ -15,10 +15,10 @@ import { parseCliAppOptions } from "../../../apps/cli/src/cli.options"
 import { migrateConnections } from "@features/cli"
 import { openConnectionSource } from "@modules/platform/database"
 import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
-import { EVENT_TOPICS } from "./test-apps.options"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
     BILLING_ENTITIES,
+    EVENT_TOPICS,
     IDENTITY_ENTITIES,
     KEYCLOAK_SIGN_IN_CLIENT,
     ORDER_ENTITIES,

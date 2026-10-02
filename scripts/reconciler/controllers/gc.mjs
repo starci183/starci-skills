@@ -325,7 +325,6 @@ export function createGcController(overrides = {}) {
       ctx.log(WOULD, `sweep: ${report.line}`, { controller: NAME, action: 'gc-sweep', counts: report.counts,
         items: collect.slice(0, 300).map((i) => ({ class: i.class, action: i.action, target: String(i.target), owner: i.owner ?? null })), truncated: collect.length > 300 });
       await leaseDecisionsOf(ctx, report);
-      await unverifiableWorkersDecision(ctx, report);
       finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
@@ -339,33 +338,9 @@ export function createGcController(overrides = {}) {
     ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5), progress: report.progress ?? null });
     if (report.stopped) await stoppedDecision(ctx, report.stopped);
     await leaseDecisionsOf(ctx, report);
-    await unverifiableWorkersDecision(ctx, report);
     await record(ctx, 'sweep', report.items.map(sweepItem), report);
     finishDuty(ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
     return { counts: report.counts, ok: report.ok };
-  }
-
-  /**
-   * The settled workers Orca holds reclaimable but cannot verify (liveness unverifiable): the GC never releases them on
-   * its own, so they go to the owner as ONE incident (key gc-unverifiable-workers) listing each worker's terminal handle,
-   * Run and age, never silently left in the sweep report.
-   */
-  async function unverifiableWorkersDecision(ctx, report) {
-    const rows = report.items.filter((i) => i.class === 'worker' && i.verdict === 'refuse' && i.liveness === 'unverifiable');
-    if (!rows.length) return 0;
-    const age = (ms) => (ms == null ? 'age unknown' : `${Math.round(ms / 3_600_000)}h`);
-    const line = (i) => `${i.terminal ?? i.target} (Run ${i.run ?? '?'}, ${age(i.ageMs)})`;
-    const summary = `WORKER_RELEASE_REFUSED: ${rows.length} settled worker(s) Orca holds but cannot verify, never released automatically: ${rows.slice(0, 5).map(line).join(', ')}${rows.length > 5 ? ', ...' : ''}`;
-    ctx.log('reconciler.gc.unverifiable-workers', summary, { controller: NAME, workers: rows.map((i) => ({ dispatch: i.target, terminal: i.terminal ?? null, run: i.run ?? null, ageMs: i.ageMs ?? null })) });
-    await ctx.openDecision({
-      schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'owner', ledger: 'supervisor',
-      idempotencyKey: 'gc-unverifiable-workers', entity: { type: 'gc', id: 'unverifiable-workers' }, summary,
-      evidence: rows.slice(0, 20).map((i) => ({ ref: `worker:${i.target}`, why: `terminal ${i.terminal ?? '?'}, Run ${i.run ?? '?'}, ${age(i.ageMs)}` })),
-      options: [{ key: 'release', verb: 'orca orchestration worker-release --dispatch <id> for each worker you confirm has exited' },
-        { key: 'keep', title: 'Keep them; Orca keeps reporting them reclaimable' }],
-      allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
-    });
-    return rows.length;
   }
 
   async function leaseDecisionsOf(ctx, report) {

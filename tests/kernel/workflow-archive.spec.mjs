@@ -38,7 +38,7 @@ const world=(t,fn)=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
     {jobId:`kernel-${WF}`,kind:'kernel',role:'kernel',status:'running',workerId:KERNEL_TERM,
       payload:{hierarchy:{role:'kernel',runtime:{host:'orca',agent:'codex',terminalHandle:KERNEL_TERM}}}},
     {jobId:'job-running',opId:'docs.author',kind:'op',status:'running',workerId:OP_TERM,leaseToken:'tok-running',
-      payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:OP_TERM,agentTerminalHandle:OP_TERM,taskId:'task-running',runId:'run-archive'}}},
+      payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:OP_TERM,agentTerminalHandle:OP_TERM,taskId:'task-running',runId:'run-archive'},managed:{dispatchId:OP_TERM,agentTerminalHandle:OP_TERM}}},
     {jobId:'job-queued',opId:'docs.author',kind:'op',status:'queued',attempt:2,payload:{opId:'docs.author',owned_paths:['src/']}},
     {jobId:'job-done',opId:'docs.author',kind:'op',status:'succeeded',attempt:3,payload:{opId:'docs.author'},result:{verdict:'pass'}},
     {jobId:'job-ask',opId:'business.decide',kind:'op',status:'awaiting_owner',dispatchId:'ask-open',
@@ -81,9 +81,10 @@ test('archive stops a running workflow: asks retired, open jobs dropped, Kernel 
   assert.deepEqual([kernel.status,kernel.worker_id,jobResult(db,`kernel-${WF}`).reason],['cancelled',null,'workflow-archived']);
   assert.deepEqual(events('ask-superseded').map(e=>[e.dispatchId,e.reason,e.retired]),[['ask-open','workflow-archived',true]]);
   const running=JSON.parse(db.prepare("SELECT payload_json FROM jobs WHERE job_id='job-running'").get().payload_json);
-  assert.equal(running.terminalClosed?.handle,OP_TERM,'the dropped worker terminal is released and recorded');
+  assert.deepEqual([running.managedWorker?.dispatchId,running.managedWorker?.custody?.state],[OP_TERM,'released'],'the dropped worker is released and recorded');
   const argv=calls();
-  assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='terminal close'&&a.includes(OP_TERM)),'the worker terminal is closed');
+  assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='orchestration worker-release'&&a.includes(OP_TERM)),'the worker is released with worker-release');
+  assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='terminal close'&&a.includes(OP_TERM)),false,'no tab close is issued for a managed worker');
   assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='orchestration task-update'),false,'archive closes no Task: the Task of an op belongs to Orca');
   const closes=argv.filter(a=>a.slice(0,2).join(' ')==='terminal close');
   assert.ok(closes.at(-1).includes(KERNEL_TERM),'the Kernel terminal is closed, and closed last');

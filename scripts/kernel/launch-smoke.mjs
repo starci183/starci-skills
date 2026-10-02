@@ -364,7 +364,7 @@ function observe(show) {
 }
 // A valid worker_done settles the Dispatch (Orca's completion accounting): its status is the outcome the worker sent. A
 // Dispatch the smoke itself stopped settles too, but its worker reads stopped: that one never reported.
-const workerDoneOf = (o) => SETTLED_STATUS.has(String(o?.status)) && String(o?.state) !== 'stopped';
+const dispatchSettledOf = (o) => SETTLED_STATUS.has(String(o?.status)) && String(o?.state) !== 'stopped';
 const settledOf = (o) => SETTLED_STATUS.has(String(o?.status)) || ENDED_STATE.has(String(o?.state));
 
 /** The workflow's Orca worktree in `orca worktree list` (by its Orca id, else its path), or null. */
@@ -575,7 +575,7 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
         launched: a.ok === true, dispatchId: a.dispatchId, terminal: a.terminal ?? null, runId: a.runId ?? o.runId, taskId: a.taskId ?? o.taskId,
         creatorTerminal: a.creatorTerminal ?? null, effective: a.effective ?? null, ...(a.workspace ? { workspace: slash(a.workspace) } : {}),
         depth: o.depth, expectedDepth: ROLES[role].depth, creatorDispatchId: o.creatorDispatchId, expectedCreatorDispatchId: creatorExpected,
-        status: o.status, state: o.state, workerDone: workerDoneOf(o),
+        status: o.status, state: o.state, workerDone: dispatchSettledOf(o),
         result, read: { ok: read?.ok === true, source: read?.source ?? null, liveness: read?.status?.liveness ?? null, rows: read?.rows?.length ?? 0, ...(read?.ok ? {} : { error: read?.error ?? null }) },
         ...(a.ok ? {} : { error: a.error ?? null, step: a.step ?? null }),
       };

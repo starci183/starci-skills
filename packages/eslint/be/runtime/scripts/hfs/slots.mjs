@@ -290,17 +290,16 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 function declarationShapeProblems(d) {
   const bad = [];
   if (!isPlainObject(d)) return ['hfs.json is not an object'];
+  if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
+  if (!NAME.test(String(d.project))) bad.push('project must be a project name');
   if (d.kind === RUNTIME_KIND) {
     // The StarCi runtime repository: no sides and no apps; its tree is the runtime manifest's.
     for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project'].includes(key)) bad.push(`unknown key ${key} (a runtime declaration is {hfs, kind, project})`);
-    if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
-    if (!NAME.test(String(d.project))) bad.push('project must be a project name');
     return bad;
   }
-  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'sides'].includes(key)) bad.push(`unknown key ${key}`);
-  if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
+  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'sides', 'browser'].includes(key)) bad.push(`unknown key ${key}`);
+  if (d.browser !== undefined && d.browser !== true) bad.push('browser is `true` when the app has a browser journey (slot app.browser), and is left out otherwise');
   if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND} (a product is one app repository with a be and an fe side) or ${RUNTIME_KIND} (the StarCi runtime repository)`);
-  if (!NAME.test(String(d.project))) bad.push('project must be a project name');
   if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
   const names = new Map();
   for (const side of PROFILES) {
@@ -401,9 +400,9 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
     project: declaration.project,
     side: null,
     profile: APP_SCOPE,
-    // The root declares no app, opt-in slot or connection of its own: each side does.
+    // The root declares no app or connection of its own (each side does); its one opt-in slot is the browser journey (`browser: true`).
     apps: Object.freeze([]),
-    optionalSlots: Object.freeze([]),
+    optionalSlots: Object.freeze(declaration.browser === true ? ['app.browser'] : []),
     connections: Object.freeze([]),
     reads: Object.freeze([]),
     sides: Object.freeze(sides),
