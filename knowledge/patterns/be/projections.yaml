@@ -131,6 +131,14 @@ files:
     template: projections/projection.index.ts.tpl
     role: Exports the projection class and its contracts, never the entity.
     rules: [BE_PROJECTION_SHAPE]
+  - path: src/modules/projections/<name>/<name>.options.ts
+    slot: be.projections
+    template: projections/projection.options.ts.tpl
+    role: The empty options of the projection (the configurable module base needs a type).
+  - path: src/modules/projections/<name>/<name>.module-definition.ts
+    slot: be.projections
+    template: projections/projection.module-definition.ts.tpl
+    role: The configurable-module base; isGlobal is the app root's decision.
   - path: src/modules/projections/<name>/<name>.module.ts
     slot: be.projections
     template: projections/projection.module.ts.tpl

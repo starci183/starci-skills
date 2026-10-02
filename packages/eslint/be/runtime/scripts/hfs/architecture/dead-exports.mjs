@@ -17,7 +17,8 @@
  * every name used. A file outside the owner that re-exports the name (`export { n as m } from`) uses it when `m` is itself
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with one exception (unit test
- * standard): a `<name>.service.spec.ts` (the only unit spec kind) and a `*.builder.ts` under src/tests/fixtures/builders read from
+ * standard): a `<name>.service.spec.ts`, the unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`,
+ * `.subscription.spec.ts`: a door has no service of its own) and a `*.builder.ts` under src/tests/fixtures/builders read from
  * disk count as consumers, because a spec can only provide an Inject*() token or a param type the entry exports. An integration
  * spec (slot be.tests.integration, `src/tests/integration/<capability>/*.integration-spec.ts`) counts as a consumer of exactly one
  * owner: the integration (slot be.integrations, `src/modules/integrations/<provider>/`) whose provider folder is its capability
@@ -171,7 +172,7 @@ function deadFiles(graph, config) {
   return { violations, judged, roots: roots.size };
 }
 
-const TEST_CONSUMER = /^(?:(?:src|apps)\/.+\.service\.spec\.ts|src\/tests\/fixtures\/builders\/.+\.builder\.ts)$/u;
+const TEST_CONSUMER = /^(?:(?:src|apps)\/.+\.(?:service|webhook|gateway|subscription)\.spec\.ts|src\/tests\/fixtures\/builders\/.+\.builder\.ts)$/u;
 /** The slot of integration specs and the slot of the integrations they pair with by folder (knowledge/hfs/slots.yaml). */
 const INTEGRATION_SPEC_SLOT = 'be.tests.integration';
 const INTEGRATION_SLOT = 'be.integrations';

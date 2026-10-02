@@ -11,7 +11,7 @@ import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
-import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { BILLING_ENTITY_MANAGER, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { EventBusModule } from "@modules/platform/event-bus"
 import { InboxModule } from "@modules/platform/inbox"
 import { JobsModule } from "@modules/platform/jobs"
@@ -52,7 +52,7 @@ export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
             ...eventBusOptionsOf(w, "probe"),
             connections: [ORDER_ENTITY_MANAGER],
         }),
-    () => InboxModule.register({ isGlobal: true }),
+    () => InboxModule.register({ isGlobal: true, connection: BILLING_ENTITY_MANAGER }),
     () => ({ module: ProbeConsumerModule }),
 ]
 
@@ -62,7 +62,7 @@ export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 ]
 
 /** The order-summary projection over the order database. */
-export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => ({ module: OrderSummaryModule })]
+export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => OrderSummaryModule.register({ isGlobal: true })]
 
 /** The password-grant client over the run's realm. */
 export const KEYCLOAK_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [

@@ -143,10 +143,10 @@ export class AppModule {
                 EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [ORDER_ENTITY_MANAGER] }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
-                InboxModule.register({ isGlobal: true }),
+                InboxModule.register({ isGlobal: true, connection: ORDER_ENTITY_MANAGER }),
                 RealtimeModule.register({ isGlobal: true }),
                 LoyaltyModule.register({ isGlobal: true }),
-                OrderSummaryModule,
+                OrderSummaryModule.register({ isGlobal: true }),
                 SagaModule.register({ isGlobal: true }),
                 QueueModule.register({
                     isGlobal: true,

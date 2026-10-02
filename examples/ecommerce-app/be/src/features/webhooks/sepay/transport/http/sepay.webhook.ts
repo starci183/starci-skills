@@ -3,7 +3,8 @@ import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { Public, PublicReason } from "@modules/domain/identity"
 import { PaymentService } from "@modules/domain/payment"
-import { RateLimit, RateTier, WebhookSignatureService } from "@modules/platform/http-security"
+import { InjectWebhookSignature, RateLimit, RateTier } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { SepayTransferRequest } from "./dto/sepay-transfer.request"
 
 @Controller("webhooks/sepay")
@@ -13,7 +14,7 @@ import { SepayTransferRequest } from "./dto/sepay-transfer.request"
  */
 export class SepayWebhook {
     constructor(
-        private readonly signature: WebhookSignatureService,
+        @InjectWebhookSignature() private readonly signature: WebhookSignatureService,
         private readonly payments: PaymentService,
     ) {}
 

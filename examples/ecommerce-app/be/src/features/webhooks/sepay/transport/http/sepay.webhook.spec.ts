@@ -1,9 +1,8 @@
 import { mock } from "@starci/jest-preset"
-import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
-import type { Request } from "express"
 import { PaymentService } from "@modules/domain/payment"
-import { WebhookSignatureService } from "@modules/platform/http-security"
+import { HttpSecurityError, HttpSecurityErrorCode, WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { SepayTransferRequest } from "./dto/sepay-transfer.request"
 import { SepayWebhook } from "./sepay.webhook"
 
@@ -11,8 +10,8 @@ import { SepayWebhook } from "./sepay.webhook"
 const noticeOf = (): SepayTransferRequest => {
     const request = new SepayTransferRequest()
     request.id = 92704
-    request.gateway = "MBBank"
-    request.transactionDate = "2026-09-01 10:00:00"
+    request.gateway = "Vietcombank"
+    request.transactionDate = "2026-10-02 10:00:00"
     request.accountNumber = "0123456789"
     request.code = "1f0c1f26-6d55-4c1b-9d36-1c2f3a5b7a11"
     request.content = "Thanh toan"
@@ -27,13 +26,13 @@ const noticeOf = (): SepayTransferRequest => {
 
 const NOTICE = noticeOf()
 const RAW_BODY = Buffer.from(JSON.stringify(NOTICE))
-const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
+const REQUEST = { rawBody: RAW_BODY } as never
 
 const build = async (signature: WebhookSignatureService, payments: PaymentService) => {
     const moduleRef = await Test.createTestingModule({
         controllers: [SepayWebhook],
         providers: [
-            { provide: WebhookSignatureService, useValue: signature },
+            { provide: WEBHOOK_SIGNATURE, useValue: signature },
             { provide: PaymentService, useValue: payments },
         ],
     }).compile()
@@ -60,7 +59,7 @@ describe("SepayWebhook", () => {
         })
 
         it("never reaches the intake when the proof throws", async () => {
-            const refusal = new Error("the signature is not the provider's")
+            const refusal = new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
             const signature = mock<WebhookSignatureService>({
                 verify: jest.fn(() => {
                     throw refusal

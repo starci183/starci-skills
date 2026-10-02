@@ -1139,7 +1139,7 @@ slots:
     tier: projections
     owner: true
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
-    allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
+    allows: [index.ts, "<name>.module.ts", "<name>.module-definition.ts", "<name>.options.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
     tests: none
     rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations

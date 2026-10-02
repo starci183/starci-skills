@@ -61,7 +61,7 @@ rules:
       `this.<signature>.verify({ provider, rawBody, signature, timestamp })` of the `WebhookSignatureService` of `platform/http-security`
       (HMAC-SHA256 over `<timestamp>.<raw body>` with the provider's secret, a constant-time comparison and a replay window on the signed timestamp; it throws before anything else runs). The provider key and its secret and tolerance are options of `platform/http-security` (`options.webhooks[provider]`). The
       second and last call is one method of a domain service, the intake. The door injects only that service and the signature
-      service (injected by its class), holds no branch, loop or `try`, calls nothing else (no parsing, mapping or publishing) and returns nothing: the
+      service (injected with `@InjectWebhookSignature()`), holds no branch, loop or `try`, calls nothing else (no parsing, mapping or publishing) and returns nothing: the
       provider gets its status code and an empty body. `@RateLimit(RateTier.Strict)` is required by the signed-webhook reason.
     rationale: |-
       The signature is the authentication of a public door. Making the proof the first statement removes every path to the intake
@@ -73,7 +73,7 @@ rules:
           @Controller("webhooks/payment-gateway")
           export class PaymentGatewayWebhook {
               constructor(
-                  private readonly signature: WebhookSignatureService,
+                  @InjectWebhookSignature() private readonly signature: WebhookSignatureService,
                   private readonly payments: PaymentService,
               ) {}
 

@@ -1,11 +1,18 @@
-import { mock } from "@starci/jest-preset"
+import { createHmac } from "node:crypto"
+import { FakeClock, mock } from "@starci/jest-preset"
 import type { RawBodyRequest } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import type { Request } from "express"
 import { @@service@@ } from "@@serviceModule@@"
-import { WebhookSignatureService } from "@modules/platform/http-security"
+import { CLOCK } from "@modules/platform/clock"
+import { Secret } from "@modules/platform/config"
+import { HttpSecurityModule } from "@modules/platform/http-security"
 import { @@Event@@Request } from "./dto/@@event@@.request"
 import { @@Provider@@Webhook } from "./@@provider@@.webhook"
+
+const AT = "2026-01-02T03:04:05.000Z"
+const SECRET = "spec-webhook-secret"
+const SIGNED_AT = String(new Date(AT).getTime())
 
 /** The delivery the notifier sends: the validated request class, as the pipe builds it. */
 const deliveryOf = (): @@Event@@Request => {
@@ -18,11 +25,21 @@ const DELIVERY = deliveryOf()
 const RAW_BODY = Buffer.from(JSON.stringify(DELIVERY))
 const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
 
-const build = async (signature: WebhookSignatureService, deliveries: @@service@@) => {
+const sign = (rawBody: Buffer, timestamp: string): string =>
+    `sha256=${createHmac("sha256", SECRET).update(`${timestamp}.`).update(rawBody).digest("hex")}`
+
+const build = async (deliveries: @@service@@) => {
     const moduleRef = await Test.createTestingModule({
+        imports: [
+            HttpSecurityModule.register({
+                allowedOrigins: [],
+                rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
+                webhooks: { "@@provider@@": { secret: new Secret(SECRET), toleranceMs: 300_000 } },
+            }),
+        ],
         controllers: [@@Provider@@Webhook],
         providers: [
-            { provide: WebhookSignatureService, useValue: signature },
+            { provide: CLOCK, useValue: new FakeClock(AT) },
             { provide: @@service@@, useValue: deliveries },
         ],
     }).compile()
@@ -32,33 +49,22 @@ const build = async (signature: WebhookSignatureService, deliveries: @@service@@
 describe("@@Provider@@Webhook", () => {
     describe("receive", () => {
         it("proves the delivery on its raw body and headers, then hands it to the intake once", async () => {
-            const signature = mock<WebhookSignatureService>()
             const deliveries = mock<@@service@@>()
-            const door = await build(signature, deliveries)
+            const door = await build(deliveries)
 
-            await door.receive(REQUEST, "sha256=abc", "1790899200000", DELIVERY)
+            await door.receive(REQUEST, sign(RAW_BODY, SIGNED_AT), SIGNED_AT, DELIVERY)
 
-            expect(signature.verify).toHaveBeenCalledWith({
-                provider: "@@provider@@",
-                rawBody: RAW_BODY,
-                signature: "sha256=abc",
-                timestamp: "1790899200000",
-            })
             expect(deliveries.accept@@Provider@@Delivery).toHaveBeenCalledTimes(1)
             expect(deliveries.accept@@Provider@@Delivery).toHaveBeenCalledWith(DELIVERY)
         })
 
-        it("never reaches the intake when the proof throws", async () => {
-            const refusal = new Error("the signature is not the provider's")
-            const signature = mock<WebhookSignatureService>({
-                verify: jest.fn(() => {
-                    throw refusal
-                }),
-            })
+        it("never reaches the intake when the signature is not the provider's", async () => {
             const deliveries = mock<@@service@@>()
-            const door = await build(signature, deliveries)
+            const door = await build(deliveries)
 
-            await expect(door.receive(REQUEST, undefined, undefined, DELIVERY)).rejects.toBe(refusal)
+            await expect(
+                door.receive(REQUEST, sign(Buffer.from("other body"), SIGNED_AT), SIGNED_AT, DELIVERY),
+            ).rejects.toMatchObject({ code: "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID" })
 
             expect(deliveries.accept@@Provider@@Delivery).not.toHaveBeenCalled()
         })

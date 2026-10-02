@@ -3,7 +3,8 @@ import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { Public, PublicReason } from "@modules/domain/identity"
 import { PaymentService } from "@modules/domain/payment"
-import { RateLimit, RateTier, WebhookSignatureService } from "@modules/platform/http-security"
+import { InjectWebhookSignature, RateLimit, RateTier } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { PaymentNotificationRequest } from "./dto/payment-notification.request"
 
 @Controller("webhooks/payment-gateway")
@@ -13,7 +14,7 @@ import { PaymentNotificationRequest } from "./dto/payment-notification.request"
  */
 export class PaymentGatewayWebhook {
     constructor(
-        private readonly signature: WebhookSignatureService,
+        @InjectWebhookSignature() private readonly signature: WebhookSignatureService,
         private readonly payments: PaymentService,
     ) {}
 

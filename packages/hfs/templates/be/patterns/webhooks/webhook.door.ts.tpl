@@ -3,7 +3,8 @@ import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { Public, PublicReason } from "@modules/domain/identity"
 import { @@service@@ } from "@@serviceModule@@"
-import { RateLimit, RateTier, WebhookSignatureService } from "@modules/platform/http-security"
+import { InjectWebhookSignature, RateLimit, RateTier } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { @@Event@@Request } from "./dto/@@event@@.request"
 
 @Controller("webhooks/@@provider@@")
@@ -14,7 +15,7 @@ import { @@Event@@Request } from "./dto/@@event@@.request"
  */
 export class @@Provider@@Webhook {
     constructor(
-        private readonly signature: WebhookSignatureService,
+        @InjectWebhookSignature() private readonly signature: WebhookSignatureService,
         private readonly deliveries: @@service@@,
     ) {}
 
