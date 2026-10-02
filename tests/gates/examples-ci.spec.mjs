@@ -17,9 +17,9 @@ const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
-  assert.deepEqual(apps, ['ecommerce-app']);
+  assert.deepEqual(apps, ['ecommerce-app', 'shape-slot']);
   for (const app of apps) assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', app, 'hfs.json'), 'utf8')).kind, 'app');
-  assert.ok(!apps.includes('shape-slot') && !apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
+  assert.ok(!apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   assert.deepEqual(flags.map((flag) => flag.name), apps);
