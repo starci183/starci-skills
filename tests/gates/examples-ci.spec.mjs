@@ -138,7 +138,11 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
 });
 
 test('every image of every example is derived from its hfs.json (one per be and fe app) and the images job builds from that output without pushing', (t) => {
-  assert.deepEqual(exampleImages(ROOT).map((image) => image.file), ['be/apps/identity/Dockerfile', 'be/apps/order/Dockerfile', 'be/apps/billing/Dockerfile', 'be/apps/cli/Dockerfile', 'fe/apps/landing/Dockerfile', 'fe/apps/app/Dockerfile']);
+  assert.deepEqual(exampleImages(ROOT).map((image) => `${image.app}:${image.file}`), [
+    'ecommerce-app:be/apps/identity/Dockerfile', 'ecommerce-app:be/apps/order/Dockerfile', 'ecommerce-app:be/apps/billing/Dockerfile', 'ecommerce-app:be/apps/cli/Dockerfile',
+    'ecommerce-app:fe/apps/landing/Dockerfile', 'ecommerce-app:fe/apps/app/Dockerfile',
+    'shape-slot:be/apps/core/Dockerfile', 'shape-slot:be/apps/cli/Dockerfile', 'shape-slot:fe/apps/shape-slot/Dockerfile',
+  ]);
   const root = fixture(t, ['alpha']);
   let printed = '';
   examplesCiMain(['--images'], { root, out: (s) => { printed += s; } });
