@@ -20,6 +20,21 @@ fresh clone or on main after a land; an install in a worktree someone else is ed
 A red at L2 or L3 refuses the land. It is re-run once, alone: green on the re-run is a recorded flake (evidence in the land log and a follow-up to fix it), red again is fixed at
 the cause. There are no skip lists, no allowlists and no weakened specs.
 
+## What runs at each level
+
+| Level | Specs | Lint | Checks | tsc |
+|---|---|---|---|---|
+| L0 commit | none | the staged files and format | work hygiene | none |
+| L1 working (op gate, worker) | the specs of the change and their importers | the changed files | `hfs lint --changed` (apps), the self-checks touching the change (`.claude`) | the project(s) holding the changed files |
+| L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`npm run check` / `starci runtime check`): fast and structural | every affected project |
+| L3 land touching IO | L2 plus the affected integration, contract and e2e specs | as L2 | as L2 | as L2 |
+| L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `hfs check` of every example, Sonar at zero and the coverage per component | every project |
+| L5 tag CI (Linux, once) | as L4 | as L4 | as L4 | as L4 |
+
+Checks run in full from L2 because they are fast and catch structure errors early; the specs are the expensive part, so only L4 runs all of them. L4 is exactly the row above, each
+step to a recorded log; every skipped test is reported with its reason, a skip from missing infrastructure (Docker, Postgres, Supabase, a port) fails it, and only the declared
+browser-conditional skips (draw-render, draw-rationale, draw-layer) may remain, listed by name. On demand: `unit.verify` (all unit specs of an app) and `e2e.verify` (all e2e of an app).
+
 ## Rights by role
 
 | Action | Worker / op | Lead / Kernel | Coordinator / Supervisor | Release cut | Owner |
@@ -46,6 +61,22 @@ with its tag atomically; L5 confirms; the GitHub Release is made from the CHANGE
 lands into the app's local main with L2 (and L3 for touched IO). The app release (the owner) runs L4 (full unit, integration, e2e, build, images, Sonar), pushes main with its tag
 atomically, and L5 confirms. Images and deploys come from the TAG (the images workflow runs on tags), never from a branch push.
 
+## The three change paths
+
+| Step | 1. The owner edits `.claude` by prompt | 2. The supervisor self-upgrades `.claude` | 3. Ops work on an app |
+|---|---|---|---|
+| Where | a lane worktree on its own branch | its own lane worktree; the protected zone is forbidden | the app's workflow worktree; `.claude` is forbidden |
+| Commit | the lead commits (L0) | the supervisor commits (L0) | the runtime commits a passed slice (L0) |
+| While working | workers (L1) | L1 | the op gate (L1) |
+| Into local main | the coordinator lands (L2, and L3 for IO) | lands at L2, one revertable ref per upgrade | the workflow finish lands (L2, and L3 for touched IO) |
+| Release | the owner approves; the release cut runs L4 once and pushes main with its tag | NEVER releases, pushes, tags or publishes: its lands ride the next owner-approved release and are listed in the CHANGELOG as self-upgrades | the owner approves; L4 plus the images, the tag, a deploy from the tag |
+| Full run on demand | no | no | `unit.verify` or `e2e.verify` when the owner or the goal asks |
+
+The **protected zone**, which path 2 may not edit (changes there come only through path 1): the guard and its role rights, the release cut and the git hooks, the CI workflow triggers,
+the test policy (spec selection, budgets, the `specs.*` switches), the host lock, the rule-catalog entries that enforce these, and the supervisor's own permission and model settings. A
+self-upgrade that needs a change there files a proposal for the owner. Path 3 never edits `.claude`: an op that finds a harness defect records a lesson or an upgrade request, which
+path 2 or 1 picks up.
+
 ## Enforcement
 
 Shipped, as checks and code:
@@ -55,7 +86,7 @@ Shipped, as checks and code:
 - The release flow (`starci release cut`, `scripts/supervisor/release-cut.mjs`) is the only path that pushes main, behind one lock function; it refuses a push of main without a new
   annotated `v*` tag, a non-release tag, and a dirty tree, and it runs L4 once.
 
-Planned, in alpha.4 and owned by their own lanes (rule ids are claimed in their lanes, not here):
+Planned for alpha.4, owned by their own lanes (rule ids are claimed in their lanes, not here):
 
 1. Role rights in the PreToolUse command guard: deny a push, a tag, a publish and a commit to the worker and op roles; deny whole-suite test patterns outside the release cut and the
    verify ops; deny an install without the host lock. The role comes from the seat or dispatch the guard already knows (the RIGHTS lane).

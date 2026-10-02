@@ -18,6 +18,7 @@ paths:
   - scripts/hfs/runtime-rules/git-triggers.mjs
   - scripts/hfs/runtime-rules/release-notes.mjs
   - scripts/supervisor/release-cut.mjs
+  - scripts/supervisor/release-l4.mjs
   - docs/git-governance.md
   - docs/source-process.md
   - .github/workflows/ci.yml
