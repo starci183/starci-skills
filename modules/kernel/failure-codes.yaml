@@ -9538,8 +9538,8 @@ record-change-uncommitted:
   title_vi: "Thay đổi hồ sơ chưa được commit"
   meaning_vi: "Chỉ khai được thay đổi đã commit, nhưng nội dung hồ sơ hiện khác bản đã commit."
   causes_vi:
-    - "Sửa hồ sơ xong nhưng chưa commit"
-  nextStep_vi: "Khai báo bị từ chối. Commit thay đổi trước rồi khai lại."
+    - "Op viết hồ sơ chưa settle xanh nên runtime chưa commit nó (checkpoint)"
+  nextStep_vi: "Khai báo bị từ chối. Chờ op viết hồ sơ settle xanh (runtime commit nó làm checkpoint) rồi khai lại."
   owner: op-retry
   kind: verb-refusal
 recut-empty:
@@ -10930,6 +10930,15 @@ workflow-unknown:
   nextStep_vi: "Lệnh bị từ chối; dùng đúng mã workflow."
   owner: op-retry
   kind: input-invalid
+workflow-work-record-not-owner:
+  title: "A green op changed a Work record another workflow owns"
+  title_vi: "Op xanh đã sửa hồ sơ Work của workflow khác"
+  meaning_vi: "Settle từ chối vì op đã sửa một hồ sơ .starciwork mà một workflow khác đang sống sở hữu; chỉ workflow chủ được commit hồ sơ (trên nhánh workflow của nó), các workflow khác thấy hồ sơ khi chủ đưa vào main."
+  causes_vi:
+    - "Op viết vào hồ sơ dùng chung của một foundation, scope hoặc cut thuộc workflow khác"
+  nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng api notify --kind request."
+  owner: op-retry
+  kind: settle-reason
 workflow-worktree-missing:
   title: "The op's workflow has no worktree"
   title_vi: "Workflow của op không có cây làm việc"

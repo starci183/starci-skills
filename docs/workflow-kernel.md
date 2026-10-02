@@ -219,6 +219,17 @@ never commit keep the shared tree.
   `refs/heads/preserved/<workflowId>/rebase-<main sha>`, and opens one
   `rebase-conflict` Decision Item (the Kernel's, escalated on the usual
   ladder); the same main tip is never tried twice. It never refuses the settle.
+- **Work records.** A Work record is committed only by the runtime, on the
+  workflow branch of its owner workflow (`scripts/kernel/work-ownership.mjs`
+  `ownerOf`): an op that writes a record commits nothing, and its green
+  checkpoint carries the record like any other owned file. A workflow that is
+  not the record's owner may not change it: settle refuses the op
+  (`workflow-work-record-not-owner`; a record no rule but the repo-owner
+  fallback names is the writer's). The owner reads its own records at its
+  workflow branch (`workflowCommittedReader`), so its later settles see them
+  before it lands; every other workflow reads main, so a peer sees the record
+  when the owner lands. `api record-change` reads the owner's records in its
+  workflow worktree.
 - **Failure.** A failed or blocked op's uncommitted work is preserved to
   `refs/heads/preserved/<workflowId>/<op>` (a snapshot commit that never holds
   `node_modules`), and the worktree is reset to the last checkpoint. The tree is

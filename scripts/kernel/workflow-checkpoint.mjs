@@ -56,6 +56,7 @@ import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
+import { createOwnership } from './work-ownership.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { claimManager } from '../connectors/lib.mjs';
@@ -353,11 +354,27 @@ export function milestoneRebase(ctx, { workflowId, opId }) {
 }
 
 /**
+ * The one rule for Work records (WFWT2 2.8): a record is committed only by the runtime, on the workflow branch of its owner
+ * workflow (work-ownership.mjs ownerOf). A green op that changed a .starciwork record another live workflow definitely
+ * owns (any rule but the repo-owner fallback) is refused workflow-work-record-not-owner: the owner changes it, peers see
+ * it when the owner lands. ctx.ownerOf replaces the ledger's ownership in a spec.
+ */
+export function requireWorkOwner(ctx, { workflowId, opId }) {
+  const rec = recordOf(ctx, workflowId);
+  const records = splitChanges(rec.path, leasesOf(ctx, { workflowId, opId })).mine.filter((f) => f.startsWith('.starciwork/'));
+  if (!records.length) return;
+  const ownerOf = ctx?.ownerOf ?? createOwnership(ctx.db, { repo: ctx.repo });
+  const foreign = records.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId && o.workflowId !== workflowId && o.by !== 'repo-owner');
+  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ')}): only the owner's workflow commits a record - ask it (api notify --kind request)`), { files: foreign.slice(0, 40) });
+}
+
+/**
  * What api settle does in a workflow worktree, as the ledger event it records: a green op is a checkpoint followed by the
  * milestone rebase; a failed or blocked op is preserved and reset. Throws the typed refusal of checkpointOp/preserveAndReset.
  */
 export function settleCheckpoint(ctx, { workflowId, opId, pass }) {
   if (!pass) return { kind: CHECKPOINT_EVENTS.preserved, ...preserveAndReset(ctx, { workflowId, opId }) };
+  requireWorkOwner(ctx, { workflowId, opId });
   const checkpoint = { kind: CHECKPOINT_EVENTS.checkpoint, ...checkpointOp(ctx, { workflowId, opId }) };
   return { ...checkpoint, milestone: milestoneRebase(ctx, { workflowId, opId }) };
 }

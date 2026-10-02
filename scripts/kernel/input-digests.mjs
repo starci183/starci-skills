@@ -43,7 +43,7 @@ import path from 'node:path';
 import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { admittedContractOf } from '../machine/contract-version.mjs';
-import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { changeNoteOf, committedMatches, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges, workflowCommittedReader } from './work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
@@ -386,11 +386,11 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
       }
     }
   }
-  // Only committed revisions count: one read of HEAD for every changed record file of this call. A
+  // Only committed revisions count (its own records at its workflow branch, others at main: workflowCommittedReader). A
   // file whose committed bytes are still the ones the job read is an in-flight rewrite, never a change.
   const perFile = workChanged.filter((item) => item.then);
-  const heads = perFile.length && repo ? (committed === undefined ? committedReader(repo, { workDir }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
   const ownerOf = perFile.length ? (ownership ?? createOwnership(db, { repo, workDir })) : null;
+  const heads = perFile.length && repo ? (committed === undefined ? workflowCommittedReader({ repo, workDir, workflowId, ownerOf }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
   let declarations;
   const textOf = (file) => {
     if (heads) return heads.get(file)?.toString('utf8') ?? null;
