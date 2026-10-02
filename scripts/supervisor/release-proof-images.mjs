@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { proofBuild as realBuild } from '../api/docker/proof-build.mjs';
-import { proofContainerRemove as realContainerRemove } from '../api/docker/proof-container-remove.mjs';
+import { containerRm as realContainerRemove } from '../api/docker/container-rm.mjs';
 import { proofImageInspect as realImageInspect } from '../api/docker/proof-image-inspect.mjs';
-import { proofImageRemove as realImageRemove } from '../api/docker/proof-image-remove.mjs';
+import { resourceRemove } from '../api/docker/resource-remove.mjs';
 import { proofRun as realRun } from '../api/docker/proof-run.mjs';
 import { containerInspect as realContainerInspect } from '../api/docker/container-inspect.mjs';
 import { asList } from '../lib/list.mjs';
@@ -54,7 +54,7 @@ export async function releaseProofImages(ctx, deps = {}) {
   const run = deps.proofRun ?? realRun;
   const inspect = deps.containerInspect ?? realContainerInspect;
   const removeContainer = deps.proofContainerRemove ?? realContainerRemove;
-  const removeImage = deps.proofImageRemove ?? realImageRemove;
+  const removeImage = deps.proofImageRemove ?? ((tag) => resourceRemove('image', [tag]));
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const waitSeconds = Number(ctx.args?.['wait-seconds'] ?? 90);
   if (!Number.isFinite(waitSeconds) || waitSeconds < 10) return { code: 2, stderr: 'starci release images: --wait-seconds must be at least 10' };
