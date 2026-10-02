@@ -1,70 +1,59 @@
-# OPENSOURCE GOAL — StarCi
+# GOAL - StarCi
 
-> **Status: DRAFT / EXPERIMENTAL** — this document and everything it references
-> (`modules/`, `engine/`, `scripts/`, `docs/quality-bar.md`,
-> `benchmark/findings/`) is in trial until every S* row below holds with
-> fresh evidence. Nothing is official until the goal is
-> met; treat all contracts as provisional and expect them to be revised by
-> practice.
+> **Status: pre-1.0.** The runtime is in alpha. Every contract named here may be revised by practice until each S*
+> row below holds with fresh evidence; then `1.0.0` freezes them.
 
-> Living target state for this project. Every workflow, every op chain, every verdict
-> should be measured against this file. Update `S*` when the owner sharpens the target —
-> never silently reinterpret it.
+The living target state of this runtime. Every workflow, every op chain and every verdict is measured against this
+file. Change an `S*` row only when the owner sharpens the target; never reinterpret it silently.
 
 ## Mission
 
-Make StarCi a runtime good enough to **open-source and publish content about**.
-Not "tests pass" — *a stranger can clone it, run it, understand it, and trust it*.
+Make StarCi a runtime good enough to **open-source and publish content about**. Not "tests pass": a stranger can
+clone it, run it, understand it and trust it.
 
 ## Target state S*
 
 | Dimension | Done means |
 |---|---|
-| **Architecture** | `.claude/` is the canonical runtime tree: `modules/` holds contracts (including `reconciler`), `engine/` holds shared mechanisms, and `scripts/reconciler/` owns the host's idempotent controllers. Kernel and Supervisor agents make decisions through durable items; controllers perform the mechanical work. `scripts/` holds executables, with `skills/`, `knowledge/`, `docs/` and `bin/starci.mjs` as the public entry surfaces. `node` reads the tree directly. |
-| **Operating model** | Chat → goal → `[Kernel]` agent (1/project) → `[Op]` agents (1 op = 1 agent) → spine settle → re-plan. Works on any project, not just this repo. |
-| **Durability** | `.starciwork/runtime.sqlite` is the single truth — state survives worktree deletion, reboots, agent churn. Zero input loss, zero lease drift. |
-| **Correctness** | Work-correction policy enforced: wrong business flow → re-run from affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |
-| **Test quality** | E2E via real HTTP/GraphQL clients over real `TestingModule` stacks on BOTH example apps. Unit tests cover real business journeys, not stub assertions. Sonar + Codecov wired and green. |
-| **Product quality** | Output projects meet `docs/quality-bar.md` — interface.draw renders are genuinely beautiful, UX complete (skeleton/error/validate/motion), code that follows the design and the grammar closely, evidence proves every claim. |
-| **Determinism** | Model/op routing is declarative and reproducible — same inputs → same selection, with cited reasons. Spine code (not agent prose) settles truth. |
-| **Docs** | CONTEXT.md load order is accurate; a new agent cold-starts correctly from `AGENTS.md` alone. Architecture docs match what the code actually does. |
-| **Demonstrability** | The whole loop is showable: prompt → plan → dispatched ops → evidence → settled verdict. This is the content story. |
+| **Architecture** | The runtime follows its own standard layout (`knowledge/hfs/runtime-slots.yaml`): every tracked path matches exactly one slot, imports obey the tier matrix, and an external system (git, orca, npm, docker, sonar, telegram, http) is called only from `scripts/api/<system>`. `modules/` holds contracts, `engine/` the shared mechanisms and databases, `scripts/reconciler/` the idempotent controllers, `scripts/kernel/` the Kernel verbs, `scripts/checks/` the gates. `bin/starci.mjs` is the one entry. State never lives in the source tree. |
+| **Operating model** | Chat, goal, one Kernel agent per workflow, one ephemeral Op agent per job, spine settle, re-plan. Orca is the only place the runtime launches agents (`orca orchestration worker-start`), the Kernel nests its Ops, and every worktree is created by the runtime, one per op, removed at settle and capped. Works on any project, not just this repo. |
+| **Durability** | The ledger (`runtime.sqlite` per project, `machine.sqlite` per host) is the single truth. State survives worktree deletion, reboots and agent churn. Zero input loss, zero lease drift. |
+| **Correctness** | Work-correction policy enforced: a wrong business flow re-runs from the affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |
+| **Test quality** | End-to-end tests fake every third party at the network edge and keep the project's own infrastructure real; unit tests cover pure logic with few mocks. Sonar and Codecov are wired and green through the shared `starci-quality` gate. |
+| **Product quality** | Output projects meet `docs/quality-bar.md`: designed renders, complete UX states, code that follows the design and the grammar, evidence for every claim. |
+| **Determinism** | Model and op routing is declarative and reproducible: same inputs, same selection, with cited reasons. Spine code, not agent prose, settles truth. |
+| **Release** | `npm run check` (one `starci check` entry that reports every step) and the land gate are green before anything lands; a release is gated by one release check and publishing stays an explicit human step. |
+| **Docs** | `CONTEXT.md` load order is accurate; a new agent cold-starts correctly from it alone. Architecture docs match what the code does, and docs are English only. |
+| **Demonstrability** | The whole loop is showable: prompt, plan, dispatched ops, evidence, settled verdict. This is the content story. |
 
 ## Continuous verification loop
 
-Not a one-shot gate — a standing loop every kernel session runs:
+A standing loop every Kernel session runs, not a one-shot gate:
 
-1. **SURVEY** — read `.starciwork` + this file's S* → compute current gap Δ
-2. **CHAIN** — plan ops closing Δ (PARSE→SURVEY→GAP→CHAIN→VALIDATE per `modules/goal/`)
-3. **DISPATCH** — one `[Op]` agent per operation, scoped ownership, fresh evidence required
-4. **SETTLE** — spine validates verdicts; stale/invalid evidence → re-verify leg, never accept
-5. **RE-PLAN** — verdict revealing wrong assumptions → invalidate state → re-plan from boundary
-6. **REPEAT** until every S* row holds with fresh evidence
+1. **SURVEY** - read the ledger and this file's S* rows, compute the current gap.
+2. **CHAIN** - plan the ops that close the gap (`modules/goal/`).
+3. **DISPATCH** - one Op agent per operation, scoped ownership, fresh evidence required.
+4. **SETTLE** - the spine validates verdicts; stale or invalid evidence re-verifies the leg, never accepted.
+5. **RE-PLAN** - a verdict that reveals a wrong assumption invalidates state and re-plans from the boundary.
+6. **REPEAT** until every S* row holds with fresh evidence.
 
-## Operating standard (the open-source bar for how work runs)
-
-How agents operate is part of the product — the standard a public demo must show:
+## Operating standard
 
 | Standard | Means |
 |---|---|
-| **Self-settling ops** | An `[Op]` agent finishes its own task *completely* — including resolving its own git/file conflicts. The kernel never hand-holds; escalation only for goal-identity or scope changes. |
-| **Main-line development** | Code lands on `main`, not per-task worktrees. Worktrees are disposable scratch, not integration branches — the ledger, not the branch, carries state. Conflicts are prevented by ownership boundaries in dispatch packets and resolved by the op agent itself when they occur. |
-| **Pattern convergence** | All source refactors toward standard StarCi patterns. Staleness is detected by `scripts/checks/` (drift, staleness, ownership), never by human re-reading. |
-| **Token discipline** | Context/token budget is allocated deterministically per dispatch — `modules/models/selection.yaml` picks the model, the packet carries the budget; agents don't self-allocate. |
-| **Practice-driven upgrade** | `benchmark/findings/` records what a session actually did and what standard was derived. The architecture upgrades from observed practice, not upfront design. |
-| **Fresh evidence only** | Every claim of done lands as a marker + report + artifact; stale evidence re-verifies, never refreshes by assertion. |
+| **Self-settling ops** | An Op agent finishes its own task completely, including its own git and file conflicts. Escalation is only for goal-identity or scope changes. |
+| **Main-line development** | Code lands on `main`. Worktrees are disposable scratch owned by the runtime, not integration branches; the ledger carries state. |
+| **Pattern convergence** | One pattern, no legacy, no aliases. A superseded mechanism is deleted and recorded in `modules/kernel/retired-paths.yaml`. Drift is detected by `scripts/checks/`, never by re-reading. |
+| **Token discipline** | Budget is allocated per dispatch: `modules/models/selection.yaml` picks the model and the packet carries the budget. |
+| **Practice-driven upgrade** | `benchmark/findings/` records what a session did and the standard derived from it. A durable finding goes to `benchmark/findings/` or `docs/`; `.experiments/` does not exist. |
+| **Fresh evidence only** | Every claim of done lands as a marker, a report and an artifact. |
 
 ## Explicitly out of scope
 
-- `knowledge/` stays untouched.
 - Feature work on the example apps beyond what testing requires.
 - Anything that optimizes for looking done instead of being done.
 
 ## Current known gaps
 
-The open drift list lives in `benchmark/findings/fable.md` (history, outside docs/) — every finding,
-its file:line and the lane that owns it. Read it there rather than keeping a
-second copy here.
-
-One gap `fable.md` does not cover: Sonar/Codecov per-project encrypted tokens
-under `.starcistacks` via SOPS are still pending.
+The open drift list lives in `benchmark/findings/fable.md` (history, outside docs/). Read it there rather than keeping
+a second copy here. Per-product Sonar and Codecov tokens for the product monorepos are still pending.
