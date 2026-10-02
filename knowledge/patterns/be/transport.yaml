@@ -51,6 +51,7 @@ rules:
       automated:
         - BE_TRANSPORT_SHAPE
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-TRANSPORT-2
@@ -74,6 +75,7 @@ rules:
       automated:
         - BE_TRANSPORT_SHAPE
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual: []
     relatedExamples: []
   - id: BE-TRANSPORT-3

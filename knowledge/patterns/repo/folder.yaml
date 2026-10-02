@@ -56,19 +56,39 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
-        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
         - HFS_FORBIDDEN_PRESENT
-        - HFS_ARCH_CONFIG_UNREAD
+        - HFS_TRACKED_MUST_BE_IGNORED
         - HFS_ROOT_ENTRY_FORBIDDEN
-        - HFS_ROOT_ENTRY_MISSING
         - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - HFS_ARCH_CONFIG_UNREAD
       manual:
         - Judge each leftover root entry by its owner and move it, never by tolerating a new root name.
     relatedExamples: []
   - id: REPO-FOLDER-2
     title: be/apps/<app> and fe/apps/<app> are the only application roots
     kind: mandatory
-    hfsRules: [R01, R32, R33, R64]
+    hfsRules: [R01, R32, R33, R64, R02]
     requirement: |
       Both sides are apps/<app>/ monorepos even with one application; each app's name and kind are declared in `hfs.json`
       `sides.<side>.apps` — a back-end app of kind api, worker or cli (slots be.app.api, be.app.worker, be.app.cli; the
@@ -90,11 +110,36 @@ rules:
         write: Generate it from be/contracts/<app>/ through the root codegen script; never import from be/src.
     verification:
       automated:
-        - HFS_APPS_REQUIRED
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
         - HFS_ROOT_SRC_FORBIDDEN_FE
-        - HFS_APP_LAYOUT_INVALID
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
+        - BE_ENTRYPOINT_ONLY_IN_APPS
         - FE_APP_ISOLATION
-        - ARCH_INTERNAL_IMPORT_OUTSIDE
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
       manual:
         - Confirm be/apps/<app> holds composition and config only and product source has a named owner.
     relatedExamples: []
@@ -118,15 +163,18 @@ rules:
         write: 'fe/packages/<pkg>/package.json, listed in the root package.json "workspaces"; one root package-lock.json.'
     verification:
       automated:
-        - HFS_PACKAGE_MANAGER_MIXED
         - HFS_DEP_VERSION_SKEW
+        - HFS_PACKAGE_MANAGER_MIXED
+        - HFS_MONO_WORKSPACES
+        - HFS_MONO_FE_WORKSPACE
+        - HFS_MONO_WORKSPACE_DEP
       manual:
         - Confirm package.json packageManager names npm and the lockfile is the one CI installs.
     relatedExamples: []
   - id: REPO-FOLDER-4
     title: .starciwork and .starcistacks live at the app root
     kind: mandatory
-    hfsRules: [R07, R10]
+    hfsRules: [R07, R10, R01]
     requirement: |
       `.starciwork/` (slot `app.starciwork`) is required at the app root: one product record tree per app, for both
       sides. `.starcistacks/` and `.sops.yaml` (slots `app.starcistacks`, `app.sops`) are required at the app root too.
@@ -141,9 +189,20 @@ rules:
         write: Read it from the app root .starciwork; do not copy it under fe/.
     verification:
       automated:
+        - HFS_AGENT_DATA_TRACKED
+        - HFS_STACKS_SHAPE
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
-        - HFS_FORBIDDEN_PRESENT
       manual:
         - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
         - node scripts/gates/starcistacks.mjs <app> exits 0.
@@ -151,7 +210,7 @@ rules:
   - id: REPO-FOLDER-5
     title: Storage states, ignored and external
     kind: mandatory
-    hfsRules: [R03, R06, R07]
+    hfsRules: [R03, R06, R07, R04]
     requirement: |
       Every slot declares the storage state of its paths in `tracked`: `tracked`, `ignored` or `external` (slots.yaml).
       Ignored, and only ignored, are the tool build outputs and the generated code that must exist in place: slots
@@ -176,9 +235,11 @@ rules:
     verification:
       automated:
         - HFS_UNTRACKED_ROOT_ENTRY
-        - HFS_GITIGNORE_BLOCK_DRIFT
-        - HFS_AGENT_DATA_TRACKED
+        - HFS_EMPTY_DIR
+        - HFS_GHOST_TREE
         - HFS_PLAINTEXT_SECRET
+        - HFS_AGENT_DATA_TRACKED
+        - HFS_GITIGNORE_BLOCK_DRIFT
       manual:
         - Confirm git status is clean with no untracked entry outside an ignored slot.
     relatedExamples: []
@@ -205,14 +266,21 @@ rules:
         write: Start from the README hfs scaffold app writes (packages/hfs/templates/app/skeleton/README.md).
     verification:
       automated:
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
         - HFS_README_TITLE_INVALID
         - HFS_README_DESCRIPTION_INVALID
-        - HFS_README_DEVELOPMENT_INCOMPLETE
         - HFS_README_SECTION_MISSING
         - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
         - HFS_README_WORK_POINTER_MISSING
         - HFS_README_PRIVATE_URL
         - HFS_README_BADGE_NOT_LIVE
+        - HFS_MANAGED_FILE_DRIFT
       manual:
         - Confirm every badge's target currently reports a live external service.
         - Review GitHub description and topics against the app's current purpose.

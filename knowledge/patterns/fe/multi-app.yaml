@@ -20,7 +20,7 @@ rules:
   - id: FE-APPS-1
     title: One independent app per audience
     kind: mandatory
-    hfsRules: [R64, R01]
+    hfsRules: [R64, R01, R02]
     requirement: |-
       Each app is `fe/apps/<app>/` — slot `fe.app.next`: an npm workspace of the app root with its own `package.json`
       (named `@<project>/<app>`) — declared in `hfs.json` `sides.fe.apps` with kind `next`. An app never imports another app. Code that two apps need is a
@@ -37,13 +37,38 @@ rules:
     verification:
       automated:
         - FE_APP_ISOLATION
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
       manual: []
     relatedExamples: []
   - id: FE-APPS-2
     title: A draft is a branch, not an app
     kind: mandatory
-    hfsRules: [R01, R64]
+    hfsRules: [R01, R64, R21]
     requirement: |-
       A design draft or a preview of an app is a branch or a preview deployment of that app, never a second app folder with
       the same routes. Two apps that serve the same routes with the same files are one app.
@@ -55,8 +80,22 @@ rules:
         write: Work on a branch of fe/apps/landing and use a preview deployment for review.
     verification:
       automated:
-        - HFS_DUPLICATE_CODE
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
         - FE_APP_ISOLATION
+        - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
       manual: []
     relatedExamples: []
   - id: FE-APPS-3

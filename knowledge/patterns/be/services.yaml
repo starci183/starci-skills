@@ -43,8 +43,8 @@ rules:
     verification:
       automated:
         - HFS_SERVICE_PLACEMENT
-        - HFS_SERVICE_STACK_DECLARATION
         - BE_SERVICE_ISOLATION
+        - HFS_SERVICE_STACK_DECLARATION
       manual:
         - Confirm the shared code a service needs belongs in be/src, not copied between apps.
     relatedExamples: []
@@ -92,6 +92,7 @@ rules:
       automated:
         - HFS_EVENT_CONTRACT
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - FE_GRAPHQL_CONTRACT
       manual:
         - Review the payload fields of a new event version for compatibility with the old consumers.
     relatedExamples: []

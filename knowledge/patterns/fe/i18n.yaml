@@ -24,7 +24,7 @@ rules:
   - id: FE-I18N-1
     title: One placement in every app
     kind: mandatory
-    hfsRules: [R59]
+    hfsRules: [R59, R02, R54]
     requirement: |-
       Every app uses `next-intl` with the route segment `app/[locale]/`, `defaultLocale` `vi` and `localePrefix`
       `as-needed`, so the default locale is served without a prefix and other locales with one. `modules/i18n/` holds
@@ -62,15 +62,37 @@ rules:
     verification:
       automated:
         - FE_I18N_PLACEMENT
-        - FE_NEXT_CONVENTIONS
+        - FE_I18N_NAVIGATION
+        - FE_I18N_FORMATTER
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
       manual:
         - Confirm the root path serves the default locale without a redirect to a 404.
     relatedExamples: []
   - id: FE-I18N-2
     title: No display text outside the catalog
     kind: mandatory
-    hfsRules: [R58]
+    hfsRules: [R58, R18]
     requirement: |-
       No display text is written in source at any tier: blocks, pages, layouts, composites, branches, leaves, overlays and
       route files, including JSX text, `aria-label`, `title`, `placeholder`, `alt` and copy objects, in any language. Text
@@ -123,7 +145,7 @@ rules:
   - id: FE-I18N-4
     title: Locale-aware navigation and metadata
     kind: mandatory
-    hfsRules: [R54, R59]
+    hfsRules: [R54, R59, R57]
     requirement: |-
       Links and redirects use the helpers of `modules/i18n/navigation.ts` (`Link`, `redirect`, `useRouter`) with hrefs from
       `modules/routes`, so the locale prefix is always right. `generateMetadata` in each page reads its title and description
@@ -136,7 +158,19 @@ rules:
         write: 'import { Link } from "@/modules/i18n/navigation"; <Link href={routes.sales.summary()} />'
     verification:
       automated:
+        - FE_ROUTE_FILES_THIN
         - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_I18N_PLACEMENT
+        - FE_I18N_NAVIGATION
+        - FE_I18N_FORMATTER
         - FE_OWNER_REACHABLE
+        - FE_ROUTE_HARDCODED
+        - FE_HREF_RESOLVES
       manual: []
     relatedExamples: []

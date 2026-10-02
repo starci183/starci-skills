@@ -13962,13 +13962,13 @@ RT_RULE_ID_GAP:
   kind: check-finding
 
 RT_GENERATED_BLOCK_STALE:
-  title: "A generated README block differs from its source"
+  title: "A generated README block or derived field differs from its source"
   title_vi: "Khối README sinh tự động khác nguồn của nó"
-  meaning_vi: "Một khối giữa các dấu hfs:generated của knowledge/hfs/README.md (bản đồ ứng dụng, cây mã backend, ma trận tầng, cây mã frontend, danh mục luật) không bằng từng byte với bản dựng từ knowledge/hfs/slots.yaml và rules.yaml. Sửa tay một khối hoặc đổi slot mà không dựng lại làm README nói khác nguồn."
+  meaning_vi: "Một khối giữa các dấu hfs:generated của knowledge/hfs/README.md (bản đồ ứng dụng, cây mã backend, ma trận tầng, cây mã frontend, danh mục luật) không bằng từng byte với bản dựng từ knowledge/hfs/slots.yaml và rules.yaml. Cùng cách đó, danh sách verification.automated của luật mẫu, slot của mục files: và mã code của mục why phải bằng đúng bản suy ra từ danh mục luật và slots.yaml. Sửa tay hoặc đổi nguồn mà không dựng lại làm văn bản nói khác nguồn."
   causes_vi:
     - "Sửa slots.yaml hoặc rules.yaml mà không chạy lại readme-blocks.mjs --write"
     - "Sửa tay nội dung bên trong một khối sinh tự động"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write rồi commit README, qua một lane đã land; không sửa tay bên trong khối."
+  nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write hoặc node scripts/hfs/derived-fields.mjs --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
   owner: supervisor
   kind: check-finding
 

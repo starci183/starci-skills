@@ -36,8 +36,17 @@ rules:
     verification:
       automated:
         - HFS_SIZE_GROWTH
-        - FE_SIZE_AND_STATE_BUDGET
+        - HFS_SIZE_SOFT_BACKLOG
         - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
       manual: []
     relatedExamples: []
   - id: REPO-BUDGET-2
@@ -58,6 +67,7 @@ rules:
     verification:
       automated:
         - HFS_SIZE_GROWTH
+        - HFS_SIZE_SOFT_BACKLOG
       manual:
         - Review that a split follows responsibility, not line count.
     relatedExamples: []
@@ -78,5 +88,7 @@ rules:
     verification:
       automated:
         - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
       manual: []
     relatedExamples: []

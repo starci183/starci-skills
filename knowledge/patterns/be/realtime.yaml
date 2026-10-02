@@ -49,17 +49,41 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
-        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_SLOT_AMBIGUOUS
         - HFS_SLOT_NOT_ENABLED
-        - BE_REALTIME_SHAPE
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_REALTIME_SHAPE
       manual:
         - Confirm a query or mutation an old subscription door carried now lives in an api feature.
     relatedExamples: [realtime]
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
     kind: mandatory
-    hfsRules: [R185]
+    hfsRules: [R185, R90]
     requirement: |-
       The only value a realtime door injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
       iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain

@@ -40,6 +40,7 @@ rules:
     verification:
       automated:
         - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
       manual: []
     relatedExamples: []
 
@@ -66,7 +67,9 @@ rules:
         write: "_key: readonly [string, string]"
     verification:
       automated:
-        - starci-fe/props-fields-readonly
+        - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
+        - FE_PROPS_MUTABLE
       manual:
         - Resolve an imported or inherited props shape and require readonly fields at the declaring source.
     relatedExamples: []
@@ -74,7 +77,7 @@ rules:
   - id: FE-TYPING-3
     title: Literal unions, not booleans, for state
     kind: mandatory
-    hfsRules: [R65]
+    hfsRules: [R65, R92]
     requirement: |
       Component state and mode vocabularies are string-literal unions with exported inventories. Truly binary flags use is or
       has booleans. Grammar closed vocabularies use unions plus `as const` maps.
@@ -92,7 +95,18 @@ rules:
         write: "readonly isLoading?: boolean, readonly isPartial?: boolean"
     verification:
       automated:
-        - starci-fe/no-data-status-shape
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual: []
     relatedExamples: []
 
@@ -110,7 +124,8 @@ rules:
         write: "ReadonlyArray<string>, Array<T> (lint @typescript-eslint/array-type with the generic option)"
     verification:
       automated:
-        - "@typescript-eslint/array-type"
+        - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
       manual: []
     relatedExamples: []
 
@@ -134,14 +149,16 @@ rules:
         when: "Narrowed literal"
         write: 'return { mode: "signIn" as const, step: "code" as const } so a switch returns a union, not string'
     verification:
-      automated: []
+      automated:
+        - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
       manual: []
     relatedExamples: []
 
   - id: FE-TYPING-6
     title: No casts
     kind: mandatory
-    hfsRules: [R18, R52]
+    hfsRules: [R18, R52, R22]
     requirement: |
       Double casts, `as GraphqlResult<T>` and any cast of a response are forbidden; `@ts-ignore` and `@ts-expect-error` do
       not exist. A component that ignores its props declares no parameter; `void props`, an underscore
@@ -157,16 +174,17 @@ rules:
         write: "Declare it with no parameter (export const EmptyState = () => ...); never void props or an unused props parameter."
     verification:
       automated:
-        - FE_WIRE_GENERATED
         - HFS_INLINE_SUPPRESSION
-        - no-double-cast
+        - FE_WIRE_GENERATED
+        - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
       manual: []
     relatedExamples: []
 
   - id: FE-TYPING-7
     title: Enums
     kind: mandatory
-    hfsRules: [R52]
+    hfsRules: [R52, R26]
     requirement: |
       Feature and presentation vocabulary uses string-literal unions or discriminated objects. Generated or wire enums remain
       inside the transport adapter and are mapped to feature and view vocabulary. A presentational props contract does not
@@ -182,14 +200,17 @@ rules:
         write: "Keep the generated enum in modules/api, then map it at the owning hook or module boundary to a presentation literal."
     verification:
       automated:
+        - FE_WIRE_GENERATED
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual: []
     relatedExamples: []
 
   - id: FE-TYPING-8
     title: Wire, feature and presentation contracts are distinct
     kind: mandatory
-    hfsRules: [R52, R23]
+    hfsRules: [R52, R23, R26, R92]
     requirement: |
       Schema-derived result and variable types and typed operation documents belong to the transport boundary and are
       generated from `be/contracts/` by the root `codegen` into the ignored `__generated__/`. A feature owns framework-neutral input,
@@ -211,7 +232,15 @@ rules:
       automated:
         - FE_WIRE_GENERATED
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
         - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm generated wire types do not become the feature or presentation source of truth.

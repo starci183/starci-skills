@@ -133,6 +133,7 @@ rules:
         write: 'catch (error) { this.logger.error(ConsumerLogEvent.MessageFailed, error, { topic }); return { kind: "refused", code: ConsumerErrorCode.Skipped } }'
     verification:
       automated:
+        - BE_ERROR_HOME
         - BE_LOGGER_REQUIRED
         - BE_ERROR_CAUSE_DROPPED
       manual:
@@ -182,13 +183,14 @@ rules:
     verification:
       automated:
         - BE_USER_COPY_LITERAL
+        - BE_ERROR_HOME
       manual:
         - Confirm the vi and en texts of a code carry the same meaning.
     relatedExamples: []
   - id: BE-ERROR-7
     title: Logging a failure
     kind: mandatory
-    hfsRules: [R40]
+    hfsRules: [R40, R71]
     requirement: |-
       A failure is logged through the `Logger` port of `platform/logging`, injected with `InjectLogger()`, with an enum member
       of the owner's `<owner>.log-events.ts` as the first argument and the error as the cause:

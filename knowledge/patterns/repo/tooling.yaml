@@ -26,7 +26,7 @@ rules:
   - id: REPO-TOOLING-1
     title: Configs are thin calls into canon packages
     kind: mandatory
-    hfsRules: [R16, R22]
+    hfsRules: [R16, R22, R05]
     requirement: |
       `be/eslint.config.mjs` calls `starciBeConfig({ hfs: loadHfs(import.meta.url) })` and `fe/eslint.config.mjs`
       `starciFeConfig({ hfs: loadHfs(import.meta.url) })`. `be/tsconfig.json` extends `@starci/tsconfig/be.json` and adds its three
@@ -50,8 +50,9 @@ rules:
     verification:
       automated:
         - HFS_TOOL_CONFIG_LOCAL
-        - HFS_MANAGED_FILE_DRIFT
         - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
+        - HFS_MANAGED_FILE_DRIFT
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-2
@@ -74,8 +75,8 @@ rules:
         write: Change the template in .claude, publish @starci/hfs at a new pin, then run hfs sync --write in each app.
     verification:
       automated:
-        - HFS_MANAGED_FILE_DRIFT
         - HFS_GITIGNORE_BLOCK_DRIFT
+        - HFS_MANAGED_FILE_DRIFT
         - HFS_SONAR_CONFIG
       manual: []
     relatedExamples: []
@@ -97,6 +98,7 @@ rules:
     verification:
       automated:
         - HFS_CI_MISSING_CANON
+        - HFS_HOOKS_PATH_REDIRECTED
         - HFS_ARCH_CONFIG_UNREAD
       manual: []
     relatedExamples: []
@@ -134,12 +136,14 @@ rules:
     verification:
       automated:
         - HFS_UNTRACKED_ROOT_ENTRY
+        - HFS_EMPTY_DIR
+        - HFS_GHOST_TREE
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-6
     title: Integration, e2e and contract are outside the automatic gates
     kind: mandatory
-    hfsRules: [R12]
+    hfsRules: [R12, R47, R97]
     requirement: |
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
       coverage, or an automatic CI trigger. The root `typecheck:tests` (`tsc -p be/src/tests/tsconfig.json`) runs first in
@@ -153,6 +157,7 @@ rules:
       automated:
         - HFS_E2E_IN_AUTOMATIC_GATE
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
         - FE_NO_TESTS
       manual: []
     relatedExamples: []

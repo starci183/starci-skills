@@ -1709,7 +1709,7 @@ rules:
       - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
   - id: R194
     code: "RT_GENERATED_BLOCK_STALE"
-    law: "The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand."
+    law: "The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand. Likewise the `verification.automated` list of a pattern rule is the failure codes of the rules its `hfsRules` names, the `slot` of a `files:` entry is the slot that owns its path, and the `code` of a why-map entry is the code of the catalog rule that lists the lint rule: scripts/hfs/derived-fields.mjs writes them and they equal the derivation byte for byte."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_GENERATED_BLOCK_STALE"]

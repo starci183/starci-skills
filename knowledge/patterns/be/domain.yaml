@@ -26,7 +26,7 @@ rules:
   - id: BE-DOMAIN-1
     title: A capability owns its rules, its tables and its transaction
     kind: mandatory
-    hfsRules: [R175, R176, R174]
+    hfsRules: [R175, R176, R174, R30]
     requirement: |-
       A capability folder holds `index.ts`, `<capability>.module.ts`, `<capability>.service.ts` with its `<capability>.service.spec.ts` beside it,
       `<capability>.contracts.ts`, `errors/`, `messages/` and `persistence/` (its entities, migrations, SQL and rows on the connection of its
@@ -45,6 +45,10 @@ rules:
         - BE_CONTEXT_TRANSACTION
         - BE_CONTEXT_OWNER
         - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Confirm the capability is named after the business capability, not after a technical layer.
     relatedExamples: [domain]
@@ -65,6 +69,7 @@ rules:
     verification:
       automated:
         - BE_OUTBOX_WRITE_TX
+        - BE_CONTEXT_COUPLING
       manual:
         - Confirm no published event is consumed by the context that published it only to tell itself something.
     relatedExamples: [domain]

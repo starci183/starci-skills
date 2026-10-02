@@ -22,7 +22,7 @@ rules:
   - id: FE-FUNCTION-1
     title: A component is a named arrow const with one props parameter
     kind: mandatory
-    hfsRules: [R55]
+    hfsRules: [R55, R54]
     requirement: |
       App components are named `export const` arrows with one props parameter: the connected X takes `(props: XProps)`, its
       pure XBase takes `(props: XBaseProps)`. They do not destructure at the signature. No app file has `export default`
@@ -48,6 +48,19 @@ rules:
           handoffId={handoffId} /> } then export default Page
     verification:
       automated:
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_ROUTE_FILES_THIN
+        - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
         - FE_ROUTE_DEFAULT_EXPORT
       manual:
         - "Confirm app components take (props: XProps) or (props: XBaseProps) without signature destructuring."
@@ -58,7 +71,7 @@ rules:
   - id: FE-FUNCTION-2
     title: The pure half takes { state, props, on } of atoms
     kind: mandatory
-    hfsRules: [R55]
+    hfsRules: [R55, R92]
     requirement: |
       A split unit's `component.tsx` exports XBase taking XBaseProps = `{ state, props, on }`. `state` is XState, a union of
       drawn shapes, each value one drawing the owner approved, and never a data status (pending, loading, failed, error,
@@ -97,9 +110,19 @@ rules:
         write: "Pass an href or an action in `on`; never a router, mutation or transport object."
     verification:
       automated:
-        - starci-fe/base-props-atom
-        - starci-fe/no-data-status-shape
-        - starci-fe/slot-status-through-slotview
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm every XState value is a shape the owner drew, and xDefaultState names one of them.
     relatedExamples:
@@ -127,7 +150,11 @@ rules:
         write: "Declare it with no parameter; do not add Record<never, never> and void props."
     verification:
       automated:
+        - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Confirm each exported contract has one owner and one public entry.
     relatedExamples:
@@ -136,7 +163,7 @@ rules:
   - id: FE-FUNCTION-4
     title: What each applicable half does
     kind: mandatory
-    hfsRules: [R55, R65]
+    hfsRules: [R55, R65, R56, R92]
     requirement: |
       When a unit owns a product or world boundary, its index.tsx is the connected X. A connected block that needs client
       interaction or client data hooks is `"use client"`; a connected block that only reads is an async server component that
@@ -189,14 +216,28 @@ rules:
           error: t(key) } per field
     verification:
       automated:
+        - FE_CLIENT_BOUNDARY
+        - FE_CLIENT_SERVER_IMPORT
+        - FE_CLIENT_REACHES_SERVER
+        - FE_SERVER_ONLY_MARK
+        - FE_STORAGE_OUTSIDE_MODULES
+        - FE_DANGEROUS_HTML
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
         - FE_WORLD_OWNER_RENDER_BOUNDARY
         - FE_CONNECTED_BLOCK_RENDER_PAIR
-        - FE_COMPONENT_WORLD_OWNERSHIP
-        - FE_CUSTOM_HOOK_LOCATION
-        - FE_CLIENT_BOUNDARY
-        - FE_SIZE_AND_STATE_BUDGET
-        - starci-fe/base-import-pair
-        - starci-fe/slot-status-through-slotview
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm the pure sibling never imports world hooks, and require a split only for a real boundary.
     relatedExamples:
@@ -205,7 +246,7 @@ rules:
   - id: FE-FUNCTION-5
     title: When a helper is extracted
     kind: mandatory
-    hfsRules: [R21, R56]
+    hfsRules: [R21, R56, R91]
     requirement: |
       Boolean predicates, string builders, repeated JSX fragments and render IIFEs stay in the same file. Class variants go
       to classNames.ts. A helper shared by several hooks of one domain goes to `<domain>.shared.ts` and is defined once; a
@@ -228,8 +269,15 @@ rules:
         write: "hooks/sales/sales.shared.ts exports salesAccessToken once; the hooks import it"
     verification:
       automated:
-        - no-helper-folder-in-components
         - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual: []
     relatedExamples:
       - connected-block
@@ -263,9 +311,14 @@ rules:
         write: "null when the input is missing; the viewer identity is part of a read key"
     verification:
       automated:
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
         - FE_SWR_KEY_IDENTITY
         - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
       manual:
         - Confirm the declared identity set includes every domain input that can change the result.
     relatedExamples:
@@ -296,7 +349,14 @@ rules:
     verification:
       automated:
         - FE_ROUTE_FILES_THIN
-        - FE_ROUTE_DEFAULT_EXPORT
         - FE_NEXT_CONVENTIONS
+        - FE_PAGE_METADATA_MISSING
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
       manual: []
     relatedExamples: []

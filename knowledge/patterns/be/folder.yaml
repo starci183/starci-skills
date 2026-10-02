@@ -23,7 +23,7 @@ rules:
   - id: BE-FOLDER-1
     title: Responsibility roots
     kind: mandatory
-    hfsRules: [R01, R02, R29, R89]
+    hfsRules: [R01, R02, R29, R89, R26]
     requirement: |-
       The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app (slots `be.app.api`,
       `be.app.worker`, `be.app.cli`; the cli app is named cli). Apps own process composition only.
@@ -53,18 +53,47 @@ rules:
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
-        - HFS_SLOT_REQUIRED_MISSING
-        - BE_TIER_DIRECTION
-        - HFS_APPS_REQUIRED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
         - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+        - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Verify the actual owner and public API, not only folder names.
     relatedExamples: []
   - id: BE-FOLDER-2
     title: Features are grouped by trigger kind
     kind: mandatory
-    hfsRules: [R29, R87, R147, R149]
+    hfsRules: [R29, R87, R147, R149, R28]
     requirement: |-
       `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a
       request triggers (api.yaml, slot `be.feature`), `features/cli/` for the one-off actions an operator runs (cli.yaml,
@@ -94,8 +123,14 @@ rules:
     verification:
       automated:
         - BE_FEATURE_SHAPE
-        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
+        - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
+        - BE_CLI_REQUIRED
         - BE_CLI_COMMAND_SHAPE
+        - BE_FEATURE_IMPORTS_FEATURE
       manual: []
     relatedExamples: []
   - id: BE-FOLDER-3
@@ -117,14 +152,18 @@ rules:
     verification:
       automated:
         - BE_FEATURE_NOT_COMPOSED
+        - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
         - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
       manual:
         - Boot the applicable app container and resolve real provider tokens.
     relatedExamples: []
   - id: BE-FOLDER-4
     title: Capability shape follows owned behavior
     kind: mandatory
-    hfsRules: [R30, R38, R85, R89]
+    hfsRules: [R30, R38, R85, R89, R01, R26]
     requirement: |-
       A domain, platform or integration capability has exactly one `index.ts` at its root, and only the parts it owns:
       the closed `requires`/`allows` of its slot (`be.domain`, `be.platform`, `be.integrations`, or the pattern tiers'
@@ -145,10 +184,30 @@ rules:
         write: Do not create an empty config file; a capability without options still declares `export type XOptions = Record<string, never>`.
     verification:
       automated:
-        - HFS_SLOT_UNDECLARED
         - BE_PUBLIC_SURFACE
-        - BE_TIER_DIRECTION
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - BE_ERROR_HOME
+        - BE_RAW_INJECT
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
+        - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Check exported contracts, state owner and lifetime.
     relatedExamples: []
@@ -194,8 +253,8 @@ rules:
         write: be/src/modules/domain/purchase/persistence/entities/purchase.entity.ts and an epoch-named migration beside it, and its SQL in persistence/purchase.sql.ts.
     verification:
       automated:
-        - BE_SCHEMA_OWNER
         - BE_SCHEMA_AUTHORITY
+        - BE_SCHEMA_OWNER
         - BE_SQL_OUTSIDE_PERSISTENCE
       manual:
         - Verify the data owner, the actual connection and the transaction boundary.
@@ -221,6 +280,8 @@ rules:
     verification:
       automated:
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_SPEC_QUALITY
       manual:
         - A mocked manager test is not database isolation, boot or remote-effect evidence.
     relatedExamples: []

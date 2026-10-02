@@ -33,7 +33,7 @@ rules:
   - id: BE-TEST-1
     title: Placement, kinds and topology
     kind: mandatory
-    hfsRules: [R12, R47, R48]
+    hfsRules: [R12, R47, R48, R149]
     requirement: |-
       Four test kinds exist and the folder and the file suffix always agree. Unit covers exactly the unit-tested roles that
       `ruleParams.be.unitRoles` of knowledge/hfs/slots.yaml lists: `<name>.service.spec.ts` beside its `<name>.service.ts`, and
@@ -79,9 +79,11 @@ rules:
         write: '`typecheck` covers app, unit specs and fixtures at pre-push and CI; `typecheck:tests` runs `tsc -p be/src/tests/tsconfig.json` and `test:integration`, `test:e2e` and `test:contract` depend on it, so they never run on code that does not compile.'
     verification:
       automated:
-        - unit-test-colocated
-        - BE_TEST_TOPOLOGY
         - HFS_E2E_IN_AUTOMATIC_GATE
+        - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_SPEC_QUALITY
+        - BE_CLI_COMMAND_SHAPE
       manual:
         - Record which transport, service, database and external boundary an e2e run actually exercised.
     relatedExamples: []
@@ -120,10 +122,8 @@ rules:
         write: 'await service.accrue(params); assert the returned Outcome with toSucceedWith or toBeRefused, never a protected hook'
     verification:
       automated:
-        - spec-builds-with-testing-module
-        - spec-no-module-mock
-        - unit-spec-providers
         - BE_SPEC_QUALITY
+        - BE_RAW_INJECT
       manual:
         - Review that a double matches the real dependency contract.
     relatedExamples: []
@@ -152,9 +152,8 @@ rules:
         write: 'export const CLOCK: unique symbol = Symbol("CLOCK") in the owner, reached by the constructor through InjectClock() in clock.decorators.ts'
     verification:
       automated:
-        - unit-spec-providers
-        - injection-token-exported
         - BE_SPEC_QUALITY
+        - BE_RAW_INJECT
       manual: []
     relatedExamples: []
   - id: BE-TEST-4
@@ -198,12 +197,10 @@ rules:
         write: 'expect(outcome).toBeRefused("COMMISSION_SELF_REFERRAL"); expect(outcome).toSucceedWith(accrual)'
     verification:
       automated:
-        - spec-infra-double-from-kit
-        - spec-exact-values
-        - spec-no-module-mock
         - BE_SPEC_QUALITY
         - BE_TYPE_ESCAPE
         - BE_AMBIENT_CLOCK
+        - BE_UNNAMED_DATA_ACCESS
       manual:
         - Review that a double matches the real dependency contract.
     relatedExamples: []
@@ -270,8 +267,10 @@ rules:
         write: 'Double: mock<Step>(). Cases: all steps in order / step N fails, so earlier steps are compensated in reverse / re-run is idempotent.'
     verification:
       automated:
-        - spec-infra-double-from-kit
         - BE_SPEC_QUALITY
+        - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_AMBIENT_CLOCK
       manual:
         - Confirm each constructor dependency of the service has its mandatory cases in the spec, not only a call count.
     relatedExamples: []
@@ -345,9 +344,9 @@ rules:
           })
     verification:
       automated:
-        - spec-builds-with-testing-module
-        - spec-infra-double-from-kit
         - BE_SPEC_QUALITY
+        - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
       manual: []
     relatedExamples: []
   - id: BE-TEST-7
@@ -377,17 +376,18 @@ rules:
         write: 'move the `if`, the loop and the EntityManager use into the service and test it in <name>.service.spec.ts'
     verification:
       automated:
-        - handler-is-thin
-        - transport-is-thin
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
         - BE_TRANSPORT_SHAPE
+        - BE_SPEC_QUALITY
+        - BE_CLI_COMMAND_SHAPE
       manual:
         - Review that a mapper called by transport holds no business rule.
     relatedExamples: []
   - id: BE-TEST-8
     title: Pure helpers are covered through their services
     kind: mandatory
-    hfsRules: [R48, R47]
+    hfsRules: [R48, R47, R149]
     requirement: |-
       A pure helper or decide function that a service calls has no spec of its own. Its branches are reached through the service
       spec, so the service's per-file 100% coverage includes them. A helper that needs its own spec to reach 100% is doing a
@@ -400,8 +400,10 @@ rules:
         write: 'decide-accrual.ts is imported by CommissionService; its branches are exercised by commission.service.spec.ts and it has no decide-accrual.spec.ts'
     verification:
       automated:
-        - unit-test-colocated
+        - BE_SPEC_QUALITY
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_CLI_COMMAND_SHAPE
       manual: []
     relatedExamples: []
   - id: BE-TEST-9
@@ -430,6 +432,8 @@ rules:
     verification:
       automated:
         - BE_SPEC_QUALITY
+        - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
       manual:
         - Review that titles and assertions describe the required behavior.
     relatedExamples: []
@@ -460,12 +464,6 @@ rules:
         write: one step proves one outcome
     verification:
       automated:
-        - no-call-only-spec
-        - e2e-asserts-persisted-state
-        - no-sleep-in-flow
-        - no-model-call-in-e2e
-        - harness-calls-provider-directly
-        - no-branch-in-flow-step
         - BE_SPEC_QUALITY
       manual: []
     relatedExamples: []
@@ -483,7 +481,8 @@ rules:
         when: describe
         write: 'describe("CommissionService", () => { ... })'
     verification:
-      automated: []
+      automated:
+        - BE_SPEC_QUALITY
       manual: []
     relatedExamples: []
   - id: BE-TEST-12
@@ -525,7 +524,10 @@ rules:
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_SPEC_QUALITY
       manual:
         - Confirm an e2e fails when a module or provider of the app is missing.
     relatedExamples: []
@@ -555,7 +557,9 @@ rules:
         write: '"test": "jest --selectProjects unit --coverage" fails when any *.service.ts or *.cli.ts is below 100 in any metric'
     verification:
       automated:
+        - HFS_SONAR_CONFIG
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
       manual:
         - Confirm a new service or cli command ships its spec in the same change and the unit project stays at 100.
     relatedExamples: []
@@ -606,6 +610,8 @@ rules:
     verification:
       automated:
         - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
+        - BE_USER_COPY_LITERAL
       manual: []
     relatedExamples: []
   - id: BE-TEST-16
@@ -646,12 +652,12 @@ rules:
         write: 'never `await world.db.primary.query("INSERT INTO orders ...")` or `em.save(Order, ...)` in the spec; extend the area builder'
     verification:
       automated:
+        - BE_TEST_BUILDER_HOME
+        - BE_TEST_ROW_BY_BUILDER
+        - BE_TEST_CONSTRAINTS_ON
+        - BE_TEST_BUILDER_ARRANGES
         - BE_SOURCE_FORM
-        - persisting-builder-in-builders-slot
-        - spec-no-raw-insert
-        - spec-no-repeated-row-literal
-        - builder-arranges-only
-        - tests-keep-constraints
+        - BE_PUBLIC_CONTRACT_FORM
       manual:
         - Confirm a persisting builder creates its parent chain through entity classes and that no unit spec builds a long object literal by hand where a builder exists.
     relatedExamples: []

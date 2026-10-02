@@ -96,13 +96,12 @@ rules:
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
-        - BE_CLI_COMMAND_SHAPE
       manual: []
     relatedExamples: []
   - id: BE-CLI-3
     title: A command is an action runner with its own unit spec
     kind: mandatory
-    hfsRules: [R149, R47]
+    hfsRules: [R149, R47, R102]
     requirement: |-
       A cli command is not a thin transport, so the thin-door rule (R88) does not apply to it: its `run` carries the action
       (it may branch, loop and call the domain or platform services the action needs). Every `.cli.ts` therefore has its unit
@@ -123,8 +122,9 @@ rules:
     verification:
       automated:
         - BE_CLI_COMMAND_SHAPE
-        - BE_SPEC_PLACEMENT
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
+        - BE_SPEC_PLACEMENT
       manual:
         - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
     relatedExamples: []

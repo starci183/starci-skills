@@ -41,6 +41,9 @@ rules:
     verification:
       automated:
         - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
       manual: []
     relatedExamples: []
   - id: FE-TRANSPORT-2
@@ -69,6 +72,7 @@ rules:
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE
+        - FE_OUTCOME_KIND_UNHANDLED
       manual:
         - Confirm every refused outcome leads somewhere the user can act, such as sign-in.
     relatedExamples: []
@@ -119,8 +123,14 @@ rules:
         write: 'useSWR(token === undefined ? null : [QUERY_SALES_SUMMARY_SWR_KEY, token], () => request(salesSummaryDocument, { token }))'
     verification:
       automated:
-        - FE_HOOKS_ARE_HOOKS
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
         - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - FE_HOOKS_ARE_HOOKS
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
       manual:
         - Confirm that a refused outcome reaches sign-in on both server and client paths.
     relatedExamples: []
@@ -141,6 +151,10 @@ rules:
     verification:
       automated:
         - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
       manual:
         - Confirm the chosen mechanism and interval fit the product need.
     relatedExamples: []

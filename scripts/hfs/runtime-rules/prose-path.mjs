@@ -57,7 +57,7 @@ export function createProseResolver(ctx, manifest) {
   const appNames = new Set([...examples, { sides: STARTER_SIDES }].flatMap((d) => ['be', 'fe'].flatMap((side) => (d.sides?.[side]?.apps ?? []).map((a) => a.name))));
   const declaredApp = (p) => { const m = /^(?:be|fe)\/apps\/([^/]+)/.exec(p); return !m || m[1] === 'x' || appNames.has(m[1]); };
   const owned = (p) => declaredApp(p) && ([p, ...FOLDERS_BELOW.map((below) => `${p}/${below}`)].some((q) => resolver.classifyPath(q).status !== 'no-slot') || aboveSlot(p.split('/'), slotPaths));
-  return { owned };
+  return { owned, classify: (p) => resolver.classifyPath(p), sample };
 }
 
 /** RT_PROSE_PATH_NO_SLOT over the prose files of the runtime (ctx of scripts/hfs/runtime-check.mjs). */
