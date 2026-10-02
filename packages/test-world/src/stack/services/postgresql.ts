@@ -1,4 +1,4 @@
-import type { RunPostgres } from "../contracts"
+import type { PostgresConnectionRequest, PostgresSchemaLogin, RunPostgres } from "../contracts"
 import { quoteIdent, withPg } from "../pg"
 import type { PgClient, PgConfig } from "../pg"
 import { randomSecret } from "./definition"
@@ -11,8 +11,35 @@ const isLedger = (table: string): boolean => /migrations/i.test(table) || table 
 
 const configOf = (target: ServiceTarget, password: string, database: string): PgConfig => ({ host: target.host, port: target.port, user: SUPERUSER, password, database })
 
-/** The stored database name of a connection: `<namespace.snake>_<connection>`. */
-export const databaseName = (snake: string, connection: string): string => `${snake}_${connection}`
+/** The stored database name of a logical database: `<namespace.snake>_<database>` (a connection's own database is named after it). */
+export const databaseName = (snake: string, database: string): string => `${snake}_${database}`
+
+/** The login role of a schema-per-context connection: `<namespace.snake>_<connection>` (roles are server-wide, so it carries the slot namespace). */
+export const schemaRoleName = (snake: string, connection: string): string => `${snake}_${connection}`
+
+/** The logical database of a connection: the one it names, or its own. */
+export const logicalDatabaseOf = (connection: PostgresConnectionRequest): string => connection.database ?? connection.name
+
+/** A SQL string literal. */
+const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`
+
+/**
+ * The statements that give a schema-per-context connection its schema and login inside its (already created) database: the
+ * role owns the schema, its `search_path` in that database is `<schema>, public` (extensions live in `public`), and it may
+ * connect and read `public`. Exposed for tests.
+ */
+export const schemaStatements = (database: string, schema: string, role: string): ReadonlyArray<string> => [
+    `CREATE SCHEMA IF NOT EXISTS ${quoteIdent(schema)} AUTHORIZATION ${quoteIdent(role)}`,
+    `ALTER ROLE ${quoteIdent(role)} IN DATABASE ${quoteIdent(database)} SET search_path = ${quoteIdent(schema)}, public`,
+    `GRANT CONNECT, TEMPORARY ON DATABASE ${quoteIdent(database)} TO ${quoteIdent(role)}`,
+    `GRANT USAGE ON SCHEMA public TO ${quoteIdent(role)}`,
+]
+
+/** The statements that create the login role of a schema-per-context connection (a stale one of a crashed run is dropped first). */
+export const roleStatements = (role: string, password: string): ReadonlyArray<string> => [
+    `DROP ROLE IF EXISTS ${quoteIdent(role)}`,
+    `CREATE ROLE ${quoteIdent(role)} LOGIN PASSWORD ${literal(password)}`,
+]
 
 const listTables = async (client: PgClient): Promise<ReadonlyArray<{ readonly schema: string; readonly table: string }>> => {
     const result = await client.query("SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND schemaname NOT LIKE 'pg_toast%' ORDER BY schemaname, tablename")
@@ -28,7 +55,13 @@ export const truncateStatements = (tables: ReadonlyArray<{ readonly schema: stri
             return { truncate: `TRUNCATE TABLE ${name} RESTART IDENTITY`, fallback: `DELETE FROM ${name}` }
         })
 
-/** Postgres: one shared superuser server per image; one database per connection of the namespace. */
+/**
+ * Postgres: one shared superuser server per image. A connection gets a database of its own (`<namespace.snake>_<connection>`),
+ * or, for a context that starts as a schema of a shared database, its schema in `<namespace.snake>_<database>` with its own
+ * login role (`<namespace.snake>_<connection>`, `search_path` = the schema). The namespace is the data slot's, so every slot
+ * has its own databases and roles. Reset empties a database-of-its-own connection's every schema, and only the schema of a
+ * schema-per-context connection.
+ */
 export const postgresService: ServiceDefinition<RunPostgres> = {
     name: "postgresql",
     port: 5432,
@@ -45,28 +78,42 @@ export const postgresService: ServiceDefinition<RunPostgres> = {
         const password = target.secrets.password ?? ""
         const connections = input.request.postgresql?.connections ?? []
         const databases: Record<string, string> = {}
+        const schemas: Record<string, PostgresSchemaLogin> = {}
+        for (const connection of connections) {
+            databases[connection.name] = databaseName(input.namespace.snake, logicalDatabaseOf(connection))
+            if (connection.schema !== undefined) {
+                schemas[connection.name] = { schema: connection.schema, user: schemaRoleName(input.namespace.snake, connection.name), password: randomSecret() }
+            }
+        }
+        const stored = [...new Set(Object.values(databases))]
         await withPg(target.net.pg, configOf(target, password, "postgres"), async (admin) => {
-            for (const connection of connections) {
-                const database = databaseName(input.namespace.snake, connection.name)
-                databases[connection.name] = database
+            for (const database of stored) {
                 await admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(database)} WITH (FORCE)`)
                 await admin.query(`CREATE DATABASE ${quoteIdent(database)}`)
             }
+            for (const login of Object.values(schemas)) for (const statement of roleStatements(login.user, login.password)) await admin.query(statement)
         })
-        for (const connection of connections) {
-            const extensions = connection.extensions ?? []
-            if (extensions.length === 0) continue
-            await withPg(target.net.pg, configOf(target, password, databases[connection.name] ?? ""), async (client) => {
-                for (const extension of extensions) await client.query(`CREATE EXTENSION IF NOT EXISTS ${quoteIdent(extension)}`)
+        for (const database of stored) {
+            const inside = connections.filter((connection) => databases[connection.name] === database)
+            const extensions = [...new Set(inside.flatMap((connection) => connection.extensions ?? []))]
+            await withPg(target.net.pg, configOf(target, password, database), async (client) => {
+                for (const extension of extensions) await client.query(`CREATE EXTENSION IF NOT EXISTS ${quoteIdent(extension)} SCHEMA public`)
+                for (const connection of inside) {
+                    const login = schemas[connection.name]
+                    if (login === undefined) continue
+                    for (const statement of schemaStatements(database, login.schema, login.user)) await client.query(statement)
+                }
             })
         }
-        return { run: { user: SUPERUSER, password, databases } }
+        return { run: { user: SUPERUSER, password, databases, schemas } }
     },
     reset: async (target, run, input) => {
         for (const [connection, database] of Object.entries(run.databases)) {
+            const only = run.schemas[connection]?.schema
             await withPg(target.net.pg, configOf(target, run.password, database), async (client) => {
                 await client.query("SET session_replication_role = replica")
-                const statements = truncateStatements(await listTables(client), input.keepTables[connection] ?? [])
+                const tables = (await listTables(client)).filter((entry) => only === undefined || entry.schema === only)
+                const statements = truncateStatements(tables, input.keepTables[connection] ?? [])
                 for (const statement of statements) {
                     try {
                         await client.query(statement.truncate)
@@ -80,7 +127,8 @@ export const postgresService: ServiceDefinition<RunPostgres> = {
     },
     deprovision: async (target, run) => {
         await withPg(target.net.pg, configOf(target, run.password, "postgres"), async (admin) => {
-            for (const database of Object.values(run.databases)) await admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(database)} WITH (FORCE)`)
+            for (const database of new Set(Object.values(run.databases))) await admin.query(`DROP DATABASE IF EXISTS ${quoteIdent(database)} WITH (FORCE)`)
+            for (const login of Object.values(run.schemas)) await admin.query(`DROP ROLE IF EXISTS ${quoteIdent(login.user)}`)
         })
     },
 }

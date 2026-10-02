@@ -16,8 +16,13 @@ export interface WiredDatabase {
     readonly user: string
     /** The password. */
     readonly password: string
-    /** The database name, prefixed per repository and connection. */
+    /** The database name, prefixed per repository (and data slot) and database. */
     readonly database: string
+    /**
+     * The schema of the connection: `public` for a database of its own, the context's schema for a schema-per-context
+     * connection (whose login's `search_path` already is that schema; pass it to the ORM as its `schema` too).
+     */
+    readonly schema: string
 }
 
 /** The Redis of the run: an own DB index, so two repositories never see each other's keys. */

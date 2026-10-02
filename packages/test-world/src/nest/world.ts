@@ -27,7 +27,7 @@ import { createProxyToxics } from "../stack/toxiproxy"
 import type { TestApi, TestCaller, TestHttp } from "./api"
 import { createTestApi } from "./graphql"
 import { createTestHttp } from "./http-client"
-import { cutDatabase, databaseOf, restoreDatabases } from "./database-outage"
+import { cutConnection, databaseOf, restoreConnections } from "./database-outage"
 import { createKeycloakAdmin } from "./keycloak"
 import { pollUntil } from "./poll"
 import { freePorts } from "./ports"
@@ -102,8 +102,8 @@ export class World {
     private lock: WorldLock | null = null
     /** The outages this world has in force (service names, plus a secret rotation); the exclusive lock is held while any is. */
     private readonly outages = new Set<string>()
-    /** The databases this world took down (`infra.postgresql.connection(name).cut()`) and has not restored yet. */
-    private readonly downDatabases = new Set<string>()
+    /** The connections this world took down (`infra.postgresql.connection(name).cut()`) and has not restored yet. */
+    private readonly downConnections = new Set<string>()
 
     constructor(
         private readonly declaration: AnyTestWorldConfig,
@@ -339,16 +339,16 @@ export class World {
         const pgConnect = this.dependencies.pgConnect
         const databaseOutage = (name: string): DatabaseOutageHandle => {
             if (postgres === undefined) throw notDeclared("infra.postgresql")
-            const database = databaseOf(postgres, name)
+            databaseOf(postgres, name)
             const key = `postgresql:${name}`
             const cut = async (): Promise<void> => {
                 await this.beginOutage(key)
-                this.downDatabases.add(database)
-                await cutDatabase(postgres, database, pgConnect)
+                this.downConnections.add(name)
+                await cutConnection(postgres, name, pgConnect)
             }
             const restore = async (): Promise<void> => {
-                await restoreDatabases(postgres, [database], pgConnect)
-                this.downDatabases.delete(database)
+                await restoreConnections(postgres, [name], pgConnect)
+                this.downConnections.delete(name)
                 this.endOutage(key)
             }
             return {
@@ -601,11 +601,11 @@ export class World {
         const { infra } = context
         const proxies = [infra.postgresql, infra.redis, infra.minio, infra.qdrant, infra.keycloak].flatMap((entry) => (entry === undefined ? [] : [entry.proxy]))
         await Promise.all(proxies.map((proxy) => createProxyToxics(infra.toxiproxyApi, proxy).restore().catch(() => undefined)))
-        // A database this world took down and a failed spec never restored accepts connections again.
-        if (infra.postgresql !== undefined && this.downDatabases.size > 0) {
-            await restoreDatabases(infra.postgresql, [...this.downDatabases], this.dependencies.pgConnect).catch(() => undefined)
+        // A connection this world took down and a failed spec never restored lets its apps in again.
+        if (infra.postgresql !== undefined && this.downConnections.size > 0) {
+            await restoreConnections(infra.postgresql, [...this.downConnections], this.dependencies.pgConnect).catch(() => undefined)
         }
-        this.downDatabases.clear()
+        this.downConnections.clear()
     }
 
     private async openDatabases(wired: Readonly<Record<string, { readonly url: string }>>): Promise<ReadonlyArray<{ name: string; dataSource: DataSource }>> {

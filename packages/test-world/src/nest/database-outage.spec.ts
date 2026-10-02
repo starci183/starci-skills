@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { RunPostgres } from "../stack/contracts"
 import type { PgClient, PgConfig, PgConnect } from "../stack/pg"
-import { cutDatabase, databaseOf, restoreDatabases } from "./database-outage"
+import { cutConnection, cutDatabase, databaseOf, restoreConnections, restoreDatabases } from "./database-outage"
 
 const RUN: RunPostgres = {
     host: "127.0.0.1",
@@ -14,6 +14,7 @@ const RUN: RunPostgres = {
     user: "su",
     password: "pw",
     databases: { identity: "shop_ab12cd_identity", order: "shop_ab12cd_order" },
+    schemas: {},
 }
 
 interface Scripted {
@@ -65,4 +66,29 @@ test("restoring lets each database accept connections again and never touches an
 
 test("a connection the run did not declare is a NotDeclared failure naming the declared ones", () => {
     assert.throws(() => databaseOf(RUN, "billing"), /infra\.postgresql\.connection\(billing\) is not a declared connection \(identity, order\)/)
+})
+
+const SHARED: RunPostgres = {
+    ...RUN,
+    databases: { identity: "shop_ab12cd_core", order: "shop_ab12cd_core", audit: "shop_ab12cd_audit" },
+    schemas: { identity: { schema: "identity", user: "shop_ab12cd_identity", password: "a" }, order: { schema: "ordering", user: "shop_ab12cd_order", password: "b" } },
+}
+
+test("cutting a schema-per-context connection stops its own login only, so the contexts beside it in the database keep serving", async () => {
+    const pg = scripted()
+    await cutConnection(SHARED, "order", pg.connect)
+    assert.deepEqual(pg.queries, [
+        `ALTER ROLE "shop_ab12cd_order" NOLOGIN`,
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'shop_ab12cd_order' AND datname = 'shop_ab12cd_core' AND pid <> pg_backend_pid()`,
+    ])
+    assert.equal(pg.queries.some((query) => query.includes("ALLOW_CONNECTIONS")), false, "the shared database stays open")
+})
+
+test("cutting a connection with a database of its own takes that database down; restoring brings back each kind", async () => {
+    const pg = scripted()
+    await cutConnection(SHARED, "audit", pg.connect)
+    assert.equal(pg.queries[0], `ALTER DATABASE "shop_ab12cd_audit" ALLOW_CONNECTIONS false`)
+    const back = scripted()
+    await restoreConnections(SHARED, ["audit", "order"], back.connect)
+    assert.deepEqual(back.queries, [`ALTER DATABASE "shop_ab12cd_audit" ALLOW_CONNECTIONS true`, `ALTER ROLE "shop_ab12cd_order" LOGIN`])
 })

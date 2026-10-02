@@ -124,4 +124,17 @@ describe("validateDeclaration", () => {
         const root = fixture(FILES)
         assert.doesNotThrow(() => validateDeclaration(config({ k3d: { enable: false, images: { api: "docker/none.Dockerfile" } } }), root))
     })
+
+    test("schema-per-context: contexts sharing a database each declare a distinct schema, never public or pg_*", () => {
+        const root = fixture(FILES)
+        const withConnections = (connections: ReadonlyArray<Record<string, unknown>>) => config({ stacks: { postgresql: { connections }, redis: {} } })
+        assert.doesNotThrow(() =>
+            validateDeclaration(withConnections([{ name: "identity", database: "core", schema: "identity" }, { name: "order", database: "core", schema: "ordering" }, { name: "audit" }]), root),
+        )
+        assert.doesNotThrow(() => validateDeclaration(withConnections([{ name: "solo", schema: "solo" }]), root))
+        assert.match(problemsOf(withConnections([{ name: "identity", database: "core", schema: "identity" }, { name: "order", database: "core" }]), root), /order share the database core with other contexts and must each declare a schema/)
+        assert.match(problemsOf(withConnections([{ name: "a", database: "core", schema: "x" }, { name: "b", database: "core", schema: "x" }]), root), /schema x is declared twice in the database core/)
+        assert.match(problemsOf(withConnections([{ name: "a", schema: "public" }]), root), /neither public nor pg_\*/)
+        assert.match(problemsOf(withConnections([{ name: "a", database: "bad-name", schema: "a" }]), root), /database: "bad-name"/)
+    })
 })

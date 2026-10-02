@@ -57,14 +57,15 @@ describe("postgresql service", () => {
             user: "postgres",
             password: "pw",
             databases: { primary: "todo_app_be_a1b2c3_primary", analytics: "todo_app_be_a1b2c3_analytics" },
+            schemas: {},
         })
         assert.deepEqual(log, [
             { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_primary" WITH (FORCE)' },
             { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_primary"' },
             { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_analytics" WITH (FORCE)' },
             { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_analytics"' },
-            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector"' },
-            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"' },
+            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector" SCHEMA public' },
+            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public' },
         ])
     })
 
@@ -88,6 +89,7 @@ describe("postgresql service", () => {
             user: "postgres",
             password: "pw",
             databases: { primary: "todo_app_be_a1b2c3_primary" },
+            schemas: {},
         }
         await postgresService.reset(targetWith({ pg: scriptedPg(log, tables, ['TRUNCATE TABLE "public"."users" RESTART IDENTITY']) }), run, { namespace, keepTables: { primary: ["roles"] }, notes: {} })
         const sql = log.map((entry) => entry.sql)
@@ -95,6 +97,76 @@ describe("postgresql service", () => {
         assert.match(sql[1] ?? "", /FROM pg_tables/)
         assert.deepEqual(sql.slice(2), ['TRUNCATE TABLE "public"."users" RESTART IDENTITY', 'DELETE FROM "public"."users"', 'TRUNCATE TABLE "public"."orders" RESTART IDENTITY'])
         assert.ok(log.every((entry) => entry.database === "todo_app_be_a1b2c3_primary"))
+    })
+
+    it("schema-per-context: connections naming one database share it, each with its schema and its own login role", async () => {
+        const log: Array<PgLog> = []
+        const result = await postgresService.provision(
+            targetWith({ pg: scriptedPg(log) }),
+            input({
+                postgresql: {
+                    connections: [
+                        { name: "identity", database: "core", schema: "identity", extensions: ["pgcrypto"] },
+                        { name: "order", database: "core", schema: "ordering" },
+                        { name: "analytics" },
+                    ],
+                },
+            }),
+        )
+        const { databases, schemas } = result.run
+        assert.deepEqual(databases, { identity: "todo_app_be_a1b2c3_core", order: "todo_app_be_a1b2c3_core", analytics: "todo_app_be_a1b2c3_analytics" })
+        assert.deepEqual(Object.keys(schemas).sort(), ["identity", "order"])
+        assert.equal(schemas.identity?.schema, "identity")
+        assert.equal(schemas.identity?.user, "todo_app_be_a1b2c3_identity")
+        assert.equal(schemas.order?.user, "todo_app_be_a1b2c3_order")
+        assert.notEqual(schemas.identity?.password, schemas.order?.password)
+        const sql = log.map((entry) => `${entry.database}: ${entry.sql.replace(/PASSWORD '[^']*'/, "PASSWORD <generated>")}`)
+        assert.deepEqual(sql, [
+            'postgres: DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_core" WITH (FORCE)',
+            'postgres: CREATE DATABASE "todo_app_be_a1b2c3_core"',
+            'postgres: DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_analytics" WITH (FORCE)',
+            'postgres: CREATE DATABASE "todo_app_be_a1b2c3_analytics"',
+            'postgres: DROP ROLE IF EXISTS "todo_app_be_a1b2c3_identity"',
+            'postgres: CREATE ROLE "todo_app_be_a1b2c3_identity" LOGIN PASSWORD <generated>',
+            'postgres: DROP ROLE IF EXISTS "todo_app_be_a1b2c3_order"',
+            'postgres: CREATE ROLE "todo_app_be_a1b2c3_order" LOGIN PASSWORD <generated>',
+            'todo_app_be_a1b2c3_core: CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public',
+            'todo_app_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "identity" AUTHORIZATION "todo_app_be_a1b2c3_identity"',
+            'todo_app_be_a1b2c3_core: ALTER ROLE "todo_app_be_a1b2c3_identity" IN DATABASE "todo_app_be_a1b2c3_core" SET search_path = "identity", public',
+            'todo_app_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "todo_app_be_a1b2c3_core" TO "todo_app_be_a1b2c3_identity"',
+            'todo_app_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "todo_app_be_a1b2c3_identity"',
+            'todo_app_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "ordering" AUTHORIZATION "todo_app_be_a1b2c3_order"',
+            'todo_app_be_a1b2c3_core: ALTER ROLE "todo_app_be_a1b2c3_order" IN DATABASE "todo_app_be_a1b2c3_core" SET search_path = "ordering", public',
+            'todo_app_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "todo_app_be_a1b2c3_core" TO "todo_app_be_a1b2c3_order"',
+            'todo_app_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "todo_app_be_a1b2c3_order"',
+        ])
+    })
+
+    it("schema-per-context reset empties only the connection's schema; deprovision drops each shared database once and the roles", async () => {
+        const tables = [
+            { schemaname: "identity", tablename: "persons" },
+            { schemaname: "ordering", tablename: "orders" },
+            { schemaname: "ordering", tablename: "typeorm_migrations" },
+        ]
+        const run: RunPostgres = {
+            host: "127.0.0.1",
+            port: 30100,
+            directPort: 5555,
+            proxy: "r1-postgresql",
+            image: "postgres:16",
+            container: "c",
+            user: "postgres",
+            password: "pw",
+            databases: { identity: "ns_core", order: "ns_core" },
+            schemas: { identity: { schema: "identity", user: "ns_identity", password: "a" }, order: { schema: "ordering", user: "ns_order", password: "b" } },
+        }
+        const log: Array<PgLog> = []
+        await postgresService.reset(targetWith({ pg: scriptedPg(log, tables) }), run, { namespace, keepTables: {}, notes: {} })
+        const truncated = log.map((entry) => entry.sql).filter((sql) => sql.startsWith("TRUNCATE"))
+        assert.deepEqual(truncated, ['TRUNCATE TABLE "identity"."persons" RESTART IDENTITY', 'TRUNCATE TABLE "ordering"."orders" RESTART IDENTITY'])
+        const dropped: Array<PgLog> = []
+        await postgresService.deprovision(targetWith({ pg: scriptedPg(dropped) }), run, { namespace, releaseRedisDb: async () => undefined })
+        assert.deepEqual(dropped.map((entry) => entry.sql), ['DROP DATABASE IF EXISTS "ns_core" WITH (FORCE)', 'DROP ROLE IF EXISTS "ns_identity"', 'DROP ROLE IF EXISTS "ns_order"'])
     })
 
     it("truncateStatements skips migration ledgers and kept tables by name or schema.name", () => {

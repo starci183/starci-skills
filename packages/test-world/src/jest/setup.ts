@@ -138,7 +138,7 @@ const attachRequest = (config: AnyTestWorldConfig, root: string, namespace: Name
         namespace,
         runId,
         services: images,
-        ...(postgres === null ? {} : { postgresql: { connections: postgres.connections.map((c) => ({ name: c.name, extensions: c.extensions })) } }),
+        ...(postgres === null ? {} : { postgresql: { connections: postgres.connections.map((c) => ({ name: c.name, extensions: c.extensions, database: c.database, schema: c.schema })) } }),
         ...(keycloak === null ? {} : { keycloak: { realmFile: resolve(root, keycloak.realm), clientId: keycloak.clientId } }),
         ...(minio === null ? {} : { minio: { buckets: minio.buckets ?? [] } }),
         ...(kafka === null ? {} : { kafka: { topics: kafka.topics ?? [] } }),

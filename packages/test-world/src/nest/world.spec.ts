@@ -377,7 +377,7 @@ test("an outage takes the run's outage lock itself: it waits for another file's 
     const toxiproxy = await fakeToxiproxy()
     const outageContext = {
         ...context,
-        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {} } },
+        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {}, schemas: {} } },
     } as RunContext
     removeRunState()
     publishSlot(outageContext)
@@ -437,7 +437,7 @@ test("one connection's database outage takes the outage lock like any outage, to
         ...context,
         infra: {
             toxiproxyApi: "http://127.0.0.1:1",
-            postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" } },
+            postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" }, schemas: {} },
         },
     } as RunContext
     removeRunState()
