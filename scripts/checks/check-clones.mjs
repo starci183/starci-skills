@@ -9,7 +9,7 @@
 // identifiers become one kind, string/template/number/regex literals one kind, keywords and operators keep their own
 // kind; import and export-from statements are dropped (imports repeat legitimately). A window is the run of tokens on 8
 // consecutive physical lines that starts at a line start; equal windows are found by hash, and hits on consecutive lines of
-// the same two locations merge into one maximal block. A block whose nodes are mostly type declarations is ignored. The
+// the same two locations merge into one maximal block. Blocks are compared inside one unit (the runtime proper, or one published package: packages/eslint/be and packages/eslint/fe are two); packages/grammar is out of scope. A block whose nodes are mostly type declarations is ignored. The
 // finding sits on the later location, names the first one and the home of the shared code.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -26,6 +26,10 @@ const SOURCE = /\.(mjs|js|ts|tsx)$/;
 const isTest = (rel) => /(^|\/)tests?\//.test(rel) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel) || /\.d\.[cm]?ts$/.test(rel);
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
 const VENDORED = /(^|\/)(node_modules|dist|reference-renders)\//;
+// packages/grammar is a published React component library judged by its own Sonar duplication gate (its markup and Storybook files repeat by design); it is not runtime code.
+const OUT_OF_SCOPE = /^packages\/grammar\//;
+/** The unit a file belongs to: a package (packages/eslint/<be|fe> is one) or the runtime proper. Blocks are compared inside one unit: two packages are published apart and cannot import each other. */
+export const unitOf = (rel) => (rel.startsWith('packages/eslint/') ? rel.split('/').slice(0, 3).join('/') : rel.startsWith('packages/') ? rel.split('/').slice(0, 2).join('/') : 'runtime');
 const MAX_FINDINGS = 400;
 
 let typescript = null;
@@ -98,7 +102,7 @@ export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE
       if (end < start) end = start;
       while (end < count && lines[end] < limit) end += 1;
       if (end === start || lines[end - 1] - lines[start] + 1 < N || end - start < T) continue;
-      const key = windowKey(kinds, start, end);
+      const key = `${unitOf(file.rel)}|${windowKey(kinds, start, end)}`;
       const list = buckets.get(key);
       if (list) list.push([fileIndex, start, end]); else buckets.set(key, [[fileIndex, start, end]]);
     }
@@ -162,7 +166,7 @@ export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE
 export function checkClones(root = skillRoot) {
   const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
   const files = tracked
-    .filter((rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && fs.existsSync(path.join(root, rel)))
+    .filter((rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && !OUT_OF_SCOPE.test(rel) && fs.existsSync(path.join(root, rel)))
     .map((rel) => ({ rel, text: fs.readFileSync(path.join(root, rel), 'utf8') }));
   return cloneFindings(files);
 }

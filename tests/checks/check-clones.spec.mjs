@@ -45,3 +45,14 @@ test('tests are not scanned', () => {
     { rel: 'tests/copy.spec.mjs', text: BLOCK('pickB', 'b') },
   ]), []);
 });
+
+test('blocks are compared inside one package: two packages published apart may repeat a block', () => {
+  assert.deepEqual(cloneFindings([
+    { rel: 'packages/eslint/be/a.mjs', text: BLOCK('pickA', 'a') },
+    { rel: 'packages/eslint/fe/b.mjs', text: BLOCK('pickB', 'b') },
+  ]), []);
+  assert.equal(cloneFindings([
+    { rel: 'packages/eslint/be/a.mjs', text: BLOCK('pickA', 'a') },
+    { rel: 'packages/eslint/be/b.mjs', text: BLOCK('pickB', 'b') },
+  ]).length, 1);
+});
