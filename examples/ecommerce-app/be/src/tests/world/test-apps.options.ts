@@ -26,7 +26,10 @@ import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modul
 import { HttpModule } from "@modules/platform/http"
 import { inboxEntities } from "@modules/platform/inbox"
 import { eventBusEntities } from "@modules/platform/event-bus"
+import { jobsEntities } from "@modules/platform/jobs"
+import { queueEntities } from "@modules/platform/queue"
 import type { EventBusConfig } from "@modules/platform/event-bus"
+import type { QueueConfig } from "@modules/platform/queue"
 import { sagaEntities } from "@modules/platform/saga"
 import { orderSummaryEntities } from "@modules/projections/order-summary"
 import { LoggingModule } from "@modules/platform/logging"
@@ -71,6 +74,8 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...inboxEntities,
     ...sagaEntities,
     ...eventBusEntities,
+    ...queueEntities,
+    ...jobsEntities,
 ]
 
 /** The entities the billing connection maps. */
@@ -228,3 +233,16 @@ export const platformBase = (w: EcommerceWiring): ReadonlyArray<DynamicModule> =
         ],
     }),
 ]
+
+/** How the queues of `service` reach the run's Redis: a prefix of its own so two runs never share a BullMQ key, a relay that polls fast. */
+export const queueOptionsOf = (w: EcommerceWiring, prefix: string): QueueConfig => {
+    const address = new URL(w.redis.url)
+    return {
+        redisHost: address.hostname,
+        redisPort: Number(address.port === "" ? "6379" : address.port),
+        prefix,
+        relayIntervalMs: 100,
+        relayBatch: 50,
+        concurrency: 2,
+    }
+}

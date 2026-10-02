@@ -13,6 +13,8 @@ import {
 } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
+import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
+import { queueEntities, queueMigrations } from "@modules/platform/queue"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
@@ -38,6 +40,8 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
                 ...inboxEntities,
                 ...sagaEntities,
                 ...eventBusEntities,
+                ...queueEntities,
+                ...jobsEntities,
             ],
             migrations: [
                 ...catalogMigrations,
@@ -48,6 +52,8 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
                 ...inboxMigrations,
                 ...sagaMigrations,
                 ...eventBusMigrations,
+                ...queueMigrations,
+                ...jobsMigrations,
             ],
         },
         {

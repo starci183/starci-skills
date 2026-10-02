@@ -19,7 +19,7 @@
  */
 const { createMock, jestFn } = require("./mock.cjs")
 
-/** The manager views handed to a transaction body; `recordingOutbox` asks whether a manager is one of them. */
+/** The manager views handed to a transaction body; `recordingEventBus` and `recordingQueueOutbox` ask whether a manager is one of them. */
 const TRANSACTION_MANAGERS = new WeakSet()
 
 /** Methods that change data; a write made inside a transaction is recorded on it. */

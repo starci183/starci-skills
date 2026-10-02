@@ -17,9 +17,8 @@ const TRANSPORT_LAYER_ROLES = new Set([...TRANSPORT_ROLES, 'enum', 'filter', 'gu
 const CLASS_ROLE_SUFFIX = new Map([
   ['args', 'Args'], ['cli', 'Cli'], ['client', 'Client'], ['command', 'Command'], ['consumer', 'Consumer'],
   ['controller', 'Controller'], ['entity', 'Entity'], ['error', 'Error'], ['filter', 'Filter'], ['gateway', 'Gateway'],
-  ['guard', 'Guard'], ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['processor', 'Processor'],
-  ['event', 'Event'], ['queue', 'Queue'], ['projection', 'Projection'], ['projection-entity', 'ProjectionEntity'], ['step', 'Step'],
-  ['mapper', 'Mapper'], ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['query', 'Query'],
+  ['guard', 'Guard'], ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['processor', 'Processor'], ['event', 'Event'], ['queue', 'Queue'],
+  ['projection', 'Projection'], ['projection-entity', 'ProjectionEntity'], ['step', 'Step'], ['mapper', 'Mapper'], ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['query', 'Query'],
   ['request', 'Request'], ['resolver', 'Resolver'], ['response', 'Response'], ['service', 'Service'], ['type', 'Type'],
 ]);
 // Transport object contracts (interfaces and object aliases) named by their file role: <Action>Input in *.input.ts,

@@ -55,7 +55,7 @@ function jsonText(value) {
 
 /** The apps a new app starts with: one api app on the be side, one Next app on the fe side, which reads the be contracts for its codegen. */
 export const STARTER_SIDES = Object.freeze({
-  be: Object.freeze({ apps: [{ name: 'api', kind: 'api' }] }),
+  be: Object.freeze({ apps: [{ name: 'api', kind: 'api' }], kinds: ['api'] }),
   fe: Object.freeze({ apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] }),
 });
 

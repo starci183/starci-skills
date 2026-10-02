@@ -118,8 +118,9 @@ export const handlerOverridesProcess = {
 /** Statements and expressions that are a decision or a repetition: none of them belongs in a handler. */
 const DECISION_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "LogicalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement"])
 
-/** True when a type annotation is a domain service: a class named `*Service` declared in a `*.service.ts` file. */
-const isServiceType = (context, annotation) => typeOrigins(context, annotation).some((origin) => origin.module === null && origin.name.endsWith("Service") && origin.file.endsWith(".service.ts"))
+/** The one collaborator a handler may hold: a domain service (a class named `*Service` declared in a `*.service.ts` file) or a projection (a class declared in a `*.projection.ts` file of slot `be.projections`). */
+const isServiceType = (context, hfs, annotation) => typeOrigins(context, annotation).some((origin) => origin.module === null
+    && ((origin.name.endsWith("Service") && origin.file.endsWith(".service.ts")) || (origin.file.endsWith(".projection.ts") && hfs.slotOf(origin.file) === "be.projections")))
 
 /** The injected members of a class: constructor parameters and decorated properties, with the type annotation of each. */
 const injectedMembers = (node) => {
@@ -140,10 +141,10 @@ const injectedMembers = (node) => {
 export const handlerIsThin = {
     meta: {
         type: "problem",
-        docs: { description: "A CQRS handler injects only `*Service` classes (and the template's Logger) and its `process` is one `return this.<service>.<method>(...)`." },
+        docs: { description: "A CQRS handler injects only `*Service` classes or projections (and the template's Logger) and its `process` is one `return this.<service>.<method>(...)`." },
         schema: [],
         messages: {
-            dependency: "`{{what}}` is injected into a handler. A handler holds services (and the Logger the `ICQRSHandler` template needs) and nothing else: an `EntityManager`, a bus, a client or any other infrastructure is the business of a `*.service.ts`, which is the one file that is unit-tested. Move the work into a service and inject that.",
+            dependency: "`{{what}}` is injected into a handler. A handler holds services or projections (and the Logger the `ICQRSHandler` template needs) and nothing else: an `EntityManager`, a bus, a client or any other infrastructure is the business of a `*.service.ts`, which is the one file that is unit-tested. Move the work into a service and inject that.",
             branch: "`{{what}}` is a decision or a loop in a handler. The `process` of a handler only maps its input and returns what one service method answers; every branch belongs in the service, where it is covered by the service spec.",
             body: "`process` of `{{name}}` must be the single statement `return this.<service>.<method>(<mapped input>)` (with or without `await`). Any other statement is logic that no unit spec covers: move it into the service.",
             call: "`process` of `{{name}}` must call exactly one method of an injected `*Service` and return its result: this makes {{count}} call(s), or calls something that is not an injected service.",
@@ -158,7 +159,7 @@ export const handlerIsThin = {
             const name = node.id?.name ?? "this handler"
             const services = new Set()
             for (const injected of injectedMembers(node)) {
-                if (injected.annotation && isServiceType(context, injected.annotation)) {
+                if (injected.annotation && isServiceType(context, hfs, injected.annotation)) {
                     if (injected.name !== null) services.add(injected.name)
                 } else if (!injected.annotation || !isLoggerType(context, injected.annotation)) {
                     context.report({ node: injected.report, messageId: "dependency", data: { what: sourceCode.getText(injected.param) } })

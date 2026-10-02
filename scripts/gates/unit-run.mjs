@@ -7,7 +7,7 @@
 // The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): only services are unit-tested, one
 // <name>.service.spec.ts beside each be/src/**/*.service.ts, the subject built by Test.createTestingModule over exactly its
 // constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock,
-// recordingOutbox, FakeClock, fakeIds, mock) and the Outcome matchers, and each service at 100 on lines, branches, functions and
+// recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock) and the Outcome matchers, and each service at 100 on lines, branches, functions and
 // statements on its own. Over the app at --root it records:
 //   run       the managed `npm test` (the unit project with --coverage) with jest's --json report and a json-summary coverage
 //             report into a private temp directory: exit, totals, failures;

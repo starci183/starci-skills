@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added (contract change `patterns-hfs-add`): `hfs add <job|reactor|queue|projection> <name>` generates exactly one kind's file tree from the `files:` tree of its pattern topic (knowledge/patterns/be/<topic>.yaml, carried by the bundled runtime) with the one template body of each entry (templates/be/patterns), adds the platform capabilities the kind needs when they are missing, and registers the patterns and the trigger kind in hfs.json (`sides.be.patterns`, `sides.be.kinds`). `hfs.json` gains `sides.be.kinds`, required for every trigger kind in use (rules BE_KIND_DECLARATION, BE_KIND_EMPTY).
 - New (microservice policy, R143 to R147): `hfs check` judges a product with more than one service: `HFS_SERVICE_PLACEMENT`, `HFS_IMAGE_UNPINNED`, `HFS_SERVICE_STACK_DECLARATION`, `HFS_EVENT_CONTRACT` and `BE_ASYNC_SPEC_MISSING`; `hfs emit-contracts` writes `be/contracts/<service>/events.json` from the literal `EVENTS` table of `apps/<service>/src/events.ts`. New slot `be.contract.events`.
 - Changed: the managed fe scripts (`dev:fe`, `start:<app>`, `build:fe`) run `next` from the app directory (`cd fe/apps/<app> && next ...`) so next-intl finds its request config; the fe skeleton reads the request locale through `next/root-params` (`experimental.rootParams`), pins the workspace root three levels above the app and uses the `.*[.].*` proxy matcher; the bundled runtime carries the `&&`/`||`-aware FE_SWR_KEY_IDENTITY check.
 ## Unreleased (C0 batch)

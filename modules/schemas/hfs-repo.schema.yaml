@@ -86,6 +86,11 @@ $defs:
         type: array
         uniqueItems: true
         items: {type: string, pattern: '^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      kinds:
+        type: array
+        uniqueItems: true
+        description: The trigger kinds of the features this back end holds (api, webhooks, realtime, saga, reactors, jobs, cli); each declared kind has at least one feature, every kind in use is declared, and the patterns and platform capabilities of each kind exist.
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       patterns:
         type: array
         uniqueItems: true

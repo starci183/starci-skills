@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Removed (breaking): `recordingOutbox()` and the `./outbox` entry, superseded by the event bus and the queue outbox. Added `recordingEventBus()` (the `EventBus` port: `publish(event, tx)`, scripted pending retries, dead letters and one-shot failures) and `recordingQueueOutbox()` (the `QueueOutbox` port: `write(tx, queue, payload)`), each recording whether `tx` was a `fakeTransaction` manager, and the `./event-bus` and `./queue` entries. Contract change `patterns-event-bus`.
+
 ## 2.2.2 - 2026-10-01
 
 - Changed: the coverage reporters are `text-summary`, `text` and `lcov`. The unit run writes `coverage/lcov.info`, which Sonar (`sonar.javascript.lcov.reportPaths`) and Codecov import with the scope `hfs sync` renders from `COVERAGE_SOURCES` (services only). Coverage is still collected from `src/**/*.service.ts` only, with the per-file threshold of 100. Contract change `sonar-services-coverage`.

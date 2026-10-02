@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CHECK_CODES } from './check.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -57,6 +58,12 @@ export function importClosure(entries) {
   return [...seen].sort();
 }
 
+/** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `hfs add` generates a kind from them, so the hfs bundle carries them. */
+export function patternTopicFiles() {
+  const dir = path.join(runtimeRoot, 'knowledge', 'patterns', 'be');
+  return fs.readdirSync(dir).filter((name) => name.endsWith('.yaml') && Array.isArray(parseYaml(fs.readFileSync(path.join(dir, name), 'utf8'))?.files)).sort().map((name) => `knowledge/patterns/be/${name}`);
+}
+
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
 /**
  * Data files the architecture machine reads at run time beside its code, which a canon bundle must carry because the
@@ -66,7 +73,7 @@ export const CATALOG = 'modules/kernel/failure-codes.yaml';
 const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml'])].sort()), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', ...patternTopicFiles()])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
 });

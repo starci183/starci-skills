@@ -15,6 +15,10 @@ export function optionalSlotProblems(manifest, side, s) {
   for (const name of s.patterns ?? []) {
     if (!manifest.slots.some((slot) => slot.profiles.includes(side) && slot.pattern === name)) bad.push(`sides.${side}.patterns names ${name}, which no ${side} slot declares as its pattern`);
   }
+  if (s.kinds !== undefined && side !== 'be') bad.push(`sides.${side}.kinds belongs to the be side`);
+  for (const kind of s.kinds ?? []) {
+    if (!(manifest.triggerKinds ?? []).includes(kind)) bad.push(`sides.${side}.kinds names ${kind}, which is not one of triggerKinds (${(manifest.triggerKinds ?? []).join(', ')})`);
+  }
   return bad;
 }
 
@@ -23,6 +27,26 @@ export function patternShapeProblems(s, at, namePattern) {
   const list = s.patterns;
   if (list === undefined) return [];
   return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? [] : [`${at}.patterns must be a unique list of pattern names`];
+}
+
+/** The problems of the shape of a side's `kinds` list (a unique list of trigger kind names). */
+export function kindShapeProblems(s, at, namePattern) {
+  const list = s.kinds;
+  if (list === undefined) return [];
+  return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? [] : [`${at}.kinds must be a unique list of trigger kind names`];
+}
+
+/** The problems of `ruleParams.be.kindPatterns` (trigger kind -> patterns) and `ruleParams.be.addKinds` (hfs add noun -> {topic, variable, patterns, trigger?, needs?, also?, defaults?}). */
+export function kindParamProblems(be, triggerKinds) {
+  const kebab = /^[a-z][a-z0-9-]*$/;
+  const names = (list) => Array.isArray(list) && list.every((value) => kebab.test(String(value))) && new Set(list).size === list.length;
+  const bad = [];
+  const patterns = be.kindPatterns;
+  if (patterns === null || typeof patterns !== 'object' || Array.isArray(patterns) || !Object.entries(patterns).every(([kind, list]) => (triggerKinds ?? []).includes(kind) && names(list))) bad.push('ruleParams.be.kindPatterns must map a trigger kind to a unique list of pattern names');
+  const nouns = be.addKinds;
+  const nounOk = (spec) => spec !== null && typeof spec === 'object' && kebab.test(String(spec.topic)) && kebab.test(String(spec.variable)) && names(spec.patterns) && (spec.trigger === undefined || kebab.test(String(spec.trigger))) && (spec.needs === undefined || names(spec.needs)) && (spec.also === undefined || names(spec.also)) && (spec.defaults === undefined || (typeof spec.defaults === 'object' && !Array.isArray(spec.defaults)));
+  if (nouns === null || typeof nouns !== 'object' || Array.isArray(nouns) || !Object.entries(nouns).every(([noun, spec]) => kebab.test(noun) && nounOk(spec))) bad.push('ruleParams.be.addKinds must map a noun to {topic, variable, patterns, trigger?, needs?, also?, defaults?}');
+  return bad;
 }
 
 /** The problems of `ruleParams.be.patternScenarios`: a pattern name to a non-empty list of unique kebab-case scenario ids. */

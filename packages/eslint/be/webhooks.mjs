@@ -1,16 +1,16 @@
 /**
- * The rules that hold the webhook kind (R159 `BE_WEBHOOK_SHAPE`, R160 `BE_WEBHOOK_UNVERIFIED`).
+ * The rules that hold the webhook kind (R161 `BE_WEBHOOK_SHAPE`, R162 `BE_WEBHOOK_UNVERIFIED`).
  *
  * A provider webhook (`src/features/webhooks/<provider>/<provider>.webhook.ts`, slot `be.feature.webhooks`) is a signed intake door. It
  * proves the delivery came from the provider, then hands it to exactly ONE domain intake method, which records it and
  * publishes the event inside its own transaction (`eventBus.publish(event, tx)` is called only from `modules/domain`). The door
  * writes nothing and decides nothing:
  *
- *   - `webhook-shape` (R159): the door is one `@Controller` with one `@Post` handler, `@Public({ reason: PublicReason.SignedWebhook })`;
+ *   - `webhook-shape` (R161): the door is one `@Controller` with one `@Post` handler, `@Public({ reason: PublicReason.SignedWebhook })`;
  *     it injects only the `WebhookSignatureService` of `platform/http-security` and services of `modules/domain`; its handler has no
  *     branch, loop or `try`, makes exactly one call on a domain service, calls on the signature service only `verify`, and returns
  *     nothing.
- *   - `webhook-verify-first` (R160): the first statement of the handler is the unconditional `verify` call, so no path reaches the
+ *   - `webhook-verify-first` (R162): the first statement of the handler is the unconditional `verify` call, so no path reaches the
  *     intake with an unproven delivery.
  *
  * What a receiver is comes from its TYPE (where the class is declared); what a decorator is comes from the import that binds it.

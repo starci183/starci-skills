@@ -4,6 +4,7 @@
   "project": "todo-app",
   "sides": {
     "be": {
+      "kinds": ["api"],
       "apps": [
         { "name": "todo", "kind": "api" },
         { "name": "worker", "kind": "worker" },

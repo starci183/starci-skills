@@ -79,6 +79,8 @@ import { CommandBus } from "@nestjs/cqrs"
 import { EntityManager } from "typeorm"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { OrderService } from "@modules/domain/order"
+import { UserXpProjection } from "@modules/projections/userxp"
+import { UserXpProjectionEntity } from "@modules/projections/userxp/user-xp.projection-entity"
 import type { Logger } from "@modules/platform/logging"
 class PlaceOrderCommand { constructor(readonly params: { id: string; flag: boolean }) {} }
 `
@@ -99,6 +101,8 @@ test("handler-is-thin: a handler maps input, calls one service method and return
             { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(`${command.params.id}`)") },
             // the Logger the template needs, and several services, are allowed dependencies
             { filename: HANDLER, code: thin("logger: Logger, private readonly a: OrderService, private readonly b: OrderService", "return this.a.open(command.params.id)") },
+            // a projection is a handler collaborator too: a reactor handler asks it to recompute, an api handler reads with get*
+            { filename: HANDLER, code: thin("logger: Logger, private readonly xp: UserXpProjection", "return this.xp.recomputeUserXp(command.params.id, 1)") },
             // a class without the cqrs handler decorator is not a handler
             { filename: HANDLER, code: `${THIN_HEAD}
 class Plain { constructor(private readonly em: EntityManager) {} async process() { if (this.em) { return 1 } return 2 } }` },
@@ -109,6 +113,8 @@ class Plain { constructor(private readonly em: EntityManager) {} async process()
             // an EntityManager (or any infrastructure) is not a handler dependency
             { filename: HANDLER, code: thin("private readonly em: EntityManager, private readonly orders: OrderService", "return this.orders.open(command.params.id)"), errors: [{ messageId: "dependency" }] },
             { filename: HANDLER, code: thin("private readonly bus: CommandBus, private readonly orders: OrderService", "return this.orders.open(command.params.id)"), errors: [{ messageId: "dependency" }] },
+            // the entity of a projection is not a collaborator
+            { filename: HANDLER, code: thin("private readonly row: UserXpProjectionEntity, private readonly orders: OrderService", "return this.orders.open(command.params.id)"), errors: [{ messageId: "dependency" }] },
             // a lookalike name that is not a service class
             { filename: HANDLER, code: `${THIN_HEAD}
 class Helper {}

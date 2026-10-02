@@ -28,7 +28,7 @@ rules:
   - id: BE-REALTIME-1
     title: A channel is a kind folder with one door, its module and its own spec
     kind: mandatory
-    hfsRules: [R01, R02, R47, R161]
+    hfsRules: [R01, R02, R47, R163]
     requirement: |-
       A push channel lives in `be/src/features/realtime/<channel>/` (slot `be.feature.realtime`), enabled by declaring the pattern
       `realtime` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `<channel>-realtime.module.ts`, ONE door and its spec: either
@@ -59,7 +59,7 @@ rules:
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
     kind: mandatory
-    hfsRules: [R162]
+    hfsRules: [R164]
     requirement: |-
       The only value a realtime door injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
       iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
@@ -93,7 +93,7 @@ rules:
   - id: BE-REALTIME-3
     title: The topic is built from the principal
     kind: mandatory
-    hfsRules: [R163, R41]
+    hfsRules: [R165, R41]
     requirement: |-
       Every `@SubscribeMessage` and `@Subscription` handler takes `@CurrentPrincipal()` of `domain/identity` and builds the topic it
       passes to `hub.subscribe` from the principal's id (plus a client-supplied id only inside that prefix) with the topic

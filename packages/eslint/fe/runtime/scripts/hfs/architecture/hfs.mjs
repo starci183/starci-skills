@@ -46,7 +46,8 @@ const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
 const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
-const MODULE_TIERS = new Set(['domain', 'integrations', 'platform']);
+/** The folders of `src/modules/` the slot manifest knows (domain, platform, integrations and the pattern tiers events, queues, projections), read from the slot paths. */
+const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean));
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
 const RETIRED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
 const RETIRED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
@@ -470,9 +471,10 @@ export function checkHfs(config) {
         finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
       }
     }
+    const moduleTiers = moduleTiersOf(resolver);
     for (const tier of tree.children('src/modules').sort()) {
-      if (!MODULE_TIERS.has(tier)) {
-        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of domain, platform, integrations.`);
+      if (!moduleTiers.has(tier)) {
+        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiers].sort().join(', ')}.`);
       }
     }
     const testChildren = slotTestChildren(resolver);
