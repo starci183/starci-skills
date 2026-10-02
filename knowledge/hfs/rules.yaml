@@ -1767,6 +1767,15 @@ rules:
     failureCodes: ["HFS_COVERAGE_SCOPE_DRIFT"]
     enforcers:
       - {kind: hfs, id: coverage-scope-drift, at: packages/hfs/sync/managed.mjs}
+  - id: R205
+    code: "RT_DOC_NO_OWNER"
+    law: "Every tracked docs/*.md declares exactly one ownership header on its first line — \"Owner: <knowledge/ or modules/ path that exists>\" when the document explains a machine-owned source, \"Task: <one task>\" for a how-to — no two documents carry the same task, and two documents whose titles share two or more topic words while at least 30% of the shorter one's sentences appear in the other are one document merged, not two."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_DOC_NO_OWNER"]
+    enforcers:
+      - {kind: runtime, id: doc-owner, at: scripts/checks/check-doc-owner.mjs}
   - id: R206
     code: "RT_EXAMPLE_COUPLING"
     law: "Runtime source never couples to a product or its example: no tracked file under scripts/, engine/, packages/, ui/src or ui/api - and no managed template under packages/hfs/templates/ - spells a literal examples/<name>, one of the product names this runtime shipped against (the closed PRODUCT_NAMES list of scripts/lib/example-refs.mjs), an inc-<hash> a product name prefixes, or a host drive path. Specs, tests, the generated runtime copies, contract-change history, changelogs and .starciwork records are out of scope; a read the runtime genuinely makes at run time is declared once in scripts/lib/example-refs.mjs and every consumer names that constant."
@@ -1821,15 +1830,6 @@ rules:
     failureCodes: ["RT_SLOT_ID_SHAPE"]
     enforcers:
       - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
-  - id: R212
-    code: "RT_DOC_NO_OWNER"
-    law: "Every tracked docs/*.md declares exactly one ownership header on its first line — \"Owner: <knowledge/ or modules/ path that exists>\" when the document explains a machine-owned source, \"Task: <one task>\" for a how-to — no two documents carry the same task, and two documents whose titles share two or more topic words while at least 30% of the shorter one's sentences appear in the other are one document merged, not two."
-    scope: runtime
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_DOC_NO_OWNER"]
-    enforcers:
-      - {kind: runtime, id: doc-owner, at: scripts/checks/check-doc-owner.mjs}
 retired:
   - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}
@@ -1852,5 +1852,4 @@ retired:
   - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-  - {id: R205, reason: "reserved by the COVERAGE lane (unused by it so far); the id returns to the catalog when a rule takes it"}
 

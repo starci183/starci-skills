@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-doc-owner.mjs — RT_DOC_NO_OWNER (rule R212): every tracked docs/*.md declares exactly one
+// check-doc-owner.mjs — RT_DOC_NO_OWNER (rule R205): every tracked docs/*.md declares exactly one
 // ownership header on its first line, and no two documents tell the same story twice.
 //
 //   Owner: <path>   the document explains a machine-owned source; the path names a knowledge/ or
