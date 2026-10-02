@@ -35,10 +35,11 @@ function fakeOrca() {
 
 /** The ledger rows the module reads: jobs (owned paths, the last settled op) and reports (the head review.verify verified). */
 const OCCUPYING = ['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
-function fakeDb(jobs, reports = {}) {
+function fakeDb(jobs, reports = {}, settled = reports) {
   return { prepare: (sql) => ({ all: (workflowId, exceptId, ...statuses) => jobs.filter((j) => j.workflow_id === workflowId && j.job_id !== exceptId && statuses.includes(j.status)),
     get: (...args) => {
     if (/FROM reports/.test(sql)) return args[0] in reports ? { head: reports[args[0]] } : null;
+    if (/FROM events/.test(sql)) return args[2] === 'workflow-checkpoint' && args[1] in settled ? { sha: settled[args[1]] } : null;
     if (/WHERE job_id=\?/.test(sql)) return jobs.find((j) => j.job_id === args[0]) ?? null;
     return jobs.filter((j) => j.workflow_id === args[0] && ['succeeded', 'failed'].includes(j.status)).sort((a, b) => b.updated_at - a.updated_at)[0] ?? null;
   } }) };
@@ -241,6 +242,14 @@ test('the default review.verify: the last settled op is a passing review.verify 
   const stale = reviewVerifiedOf(ctx(verifiedJobs()), { workflowId: WF, head: 'b'.repeat(40) });
   assert.deepEqual([stale.ok, stale.code, stale.verifiedHead], [false, 'workflow-finish-verify-stale', head]);
   assert.equal(reviewVerifiedOf(ctx(verifiedJobs(), {}), { workflowId: WF, head }).code, 'workflow-finish-verify-stale', 'a review that names no head verified nothing');
+  // Head-pinned (WFWT2 2.5): the runtime's checkpoint at the review's settle is the verified head, never the report alone.
+  const pinned = (reports, settled) => reviewVerifiedOf({ db: fakeDb(verifiedJobs(), reports, settled) }, { workflowId: WF, head });
+  assert.equal(pinned({ 'op-rv-1': head.slice(0, 12) }, { 'op-rv-1': head }).ok, true, 'an abbreviated report head of the settled tree passes');
+  const moved = pinned({ 'op-rv-1': 'b'.repeat(40) }, { 'op-rv-1': head });
+  assert.deepEqual([moved.ok, moved.code, moved.verifiedHead], [false, 'workflow-finish-verify-stale', head], 'an op checkpointed while the review ran');
+  assert.match(moved.detail, /checkpointed while it ran/);
+  assert.equal(pinned({ 'op-rv-1': head }, {}).code, 'workflow-finish-verify-stale', 'no runtime-recorded checkpoint: the report alone pins nothing');
+  assert.equal(pinned({ 'op-rv-1': 'b'.repeat(40) }, { 'op-rv-1': 'b'.repeat(40) }).code, 'workflow-finish-verify-stale', 'a review of another head');
   assert.equal(reviewVerifiedOf(ctx([...verifiedJobs(), job('op-be-2', 'code.refactor', [], { status: 'succeeded', updated_at: 3 })]), { workflowId: WF, head }).code, 'workflow-finish-verify-missing');
   assert.equal(reviewVerifiedOf(ctx([job('op-rv-1', 'review.verify', [], { status: 'failed', updated_at: 2 })]), { workflowId: WF, head }).code, 'workflow-finish-verify-missing');
   assert.equal(reviewVerifiedOf({}, { workflowId: WF, head }).ok, false);

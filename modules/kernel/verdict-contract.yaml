@@ -144,7 +144,7 @@ envelope:
     claims: "optional: [{paths?[], frs?[], cases?[], shapes?[], specs?[]}] — what the job's proof files verify (a claim without paths covers every file); indexed per artifact at settle (scripts/kernel/proof-integrity.mjs claimsProblems) and read by api coverage"
     seamAssumptions: "optional: [{symbol, assumption, file?}] - what a cut sibling that ran on a stub (packet context.cut.seamStub) assumed of its unlanded seam; the Kernel re-verifies the slice against the landed seam (cut-seam-reconcile, api cut-seam --reconcile; scripts/kernel/seam-policy.mjs)"
     owedToWire: "optional, canon slices (code.refactor params.canonFamilies): [{path, finding, file?, ruleId?}] - each residual canon finding only the cut's canon-wire leg can land (path = the shared-root, config, public-entry or consumer file outside the slice); its cut-slice-postcondition is green when every residual canon-scan finding is listed here, and settle adds each path to the queued canon-wire leg"
-    branch/head: "optional: no op commits (the runtime is the only committer, scripts/kernel/workflow-checkpoint.mjs), so no report owes a head"
+    head: "the commit the op's checks ran on (git rev-parse HEAD; no op commits, the runtime is the only committer, scripts/kernel/workflow-checkpoint.mjs); required of review.verify: the finish lands only the head its settle checkpoint recorded and its report named (reviewVerifiedOf, workflow-finish-verify-stale)"
     signal: "the Orca wake-up type must match the outcome (SIGNALS: done/partial->worker_done, failed->worker_done(failed), ask->question, blocked->escalation)"
   binding: >-
     Identity fields (run, task, dispatch, from) bind the report to the exact

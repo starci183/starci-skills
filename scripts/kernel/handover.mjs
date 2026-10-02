@@ -266,7 +266,7 @@ export function deliveriesOf(db, workflowId) {
       reportFile: result.report ?? null,
       ...(report ? {
         outcome: report.outcome ?? null, summary: report.summary ?? null, files: report.files ?? [],
-        head: report.head ?? null, branch: report.branch ?? null, credentialPending: report.credentialPending ?? [],
+        head: report.head ?? null, credentialPending: report.credentialPending ?? [],
         open: report.open ?? [], blocker: report.blocker ?? null,
         checks: (report.checks ?? []).map((check) => ({ name: check?.name ?? null, command: check?.command ?? null, exitCode: check?.exitCode ?? null })),
       } : { reportFiled: false }),

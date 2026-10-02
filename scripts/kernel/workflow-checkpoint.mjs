@@ -369,17 +369,23 @@ export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
 }
 
 /**
- * review.verify passed on what lands: the workflow's last settled op is a succeeded review.verify (no op settled after it),
- * and the head its report names is the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
+ * review.verify passed on what lands, pinned to the head (WFWT2 2.5): the workflow's last settled op is a succeeded
+ * review.verify (no op settled after it); the head the runtime recorded at its settle (its workflow-checkpoint event: a
+ * review.verify owns no path, so that checkpoint is the tree it verified) equals the head its report names (no op
+ * checkpointed while it ran), and both equal the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
  */
 export function reviewVerifiedOf(ctx, { workflowId, head }) {
   if (!ctx?.db?.prepare) return { ok: false, code: 'workflow-finish-verify-missing', detail: 'no ledger to read review.verify from' };
   const last = ctx.db.prepare("SELECT job_id, op_id, status FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('succeeded','failed') ORDER BY updated_at DESC, job_id DESC LIMIT 1").get(workflowId);
   if (!last) return { ok: false, code: 'workflow-finish-verify-missing', detail: `workflow ${workflowId} has no settled op` };
   if (last.op_id !== 'review.verify' || last.status !== 'succeeded') return { ok: false, code: 'workflow-finish-verify-missing', detail: `the last settled op is ${last.job_id} (${last.op_id} ${last.status}), not a passing review.verify` };
-  const verifiedHead = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
-  if (!verifiedHead || verifiedHead !== head) return { ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead, detail: `review.verify ${last.job_id} verified ${verifiedHead ?? 'no head'}, not the head ${head} that lands: run review.verify again` };
-  return { ok: true, jobId: last.job_id, verifiedHead };
+  const reported = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
+  const settledAt = ctx.db.prepare("SELECT json_extract(payload_json,'$.sha') AS sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, last.job_id, CHECKPOINT_EVENTS.checkpoint)?.sha ?? null;
+  const stale = (detail) => ({ ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead: settledAt ?? reported, detail });
+  if (!settledAt) return stale(`the runtime recorded no checkpoint at the settle of review.verify ${last.job_id}: run review.verify again`);
+  if (!reported || !settledAt.startsWith(reported)) return stale(`review.verify ${last.job_id} reported ${reported ?? 'no head'}, but the tree at its settle was ${settledAt}: an op checkpointed while it ran; run review.verify again`);
+  if (settledAt !== head) return stale(`review.verify ${last.job_id} verified ${settledAt}, not the head ${head} that lands: run review.verify again`);
+  return { ok: true, jobId: last.job_id, verifiedHead: settledAt };
 }
 
 function pushMain(repoRoot, main) {

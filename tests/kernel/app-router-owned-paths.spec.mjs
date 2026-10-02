@@ -232,7 +232,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
   const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',
-    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head,branch:'main'}));
+    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head}));
   const filed=fx.run('report','--job',routes,'--report',reportFile);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
   // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.
