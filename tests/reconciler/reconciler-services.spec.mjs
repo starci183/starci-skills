@@ -167,16 +167,19 @@ test('the services table round-trips a record (machine.sqlite and memory stores)
     assert.equal(store.get('nope'), null);
     assert.equal(store.all().length, 1);
   }
+  // The rows carry the fixture times 1, 2 and 7: a window wider than the epoch by a day keeps them in, however far the
+  // store's clock moved past this test's (a window of exactly Date.now() lost the at=1 row under load).
+  const ALL_HISTORY = Date.now() + 86_400_000;
   const store = machineStore(st.m);
   store.put({ ...store.get('orca'), state: 'starting', restarts: [1, 2, 7] });
   store.put({ ...store.get('orca'), state: 'healthy', restarts: [7] });
   assert.deepEqual(store.get('orca').restarts, [7], 'the quarantine window moved: earlier restarts leave the record, never the history');
-  const events = st.m.serviceEvents({ name: 'orca', sinceMs: Date.now() });
+  const events = st.m.serviceEvents({ name: 'orca', sinceMs: ALL_HISTORY });
   assert.deepEqual(events.map((e) => [e.to_state, e.action]), [['backoff', 'restart'], ['backoff', 'restart'], ['starting', 'restart'], ['healthy', null]]);
   assert.equal(st.m.services().find((r) => r.name === 'orca').state, 'healthy');
   store.remove('orca');
   assert.equal(store.get('orca'), null);
-  assert.equal(st.m.serviceEvents({ name: 'orca', sinceMs: Date.now() }).length, 5, 'a removal keeps the history');
+  assert.equal(st.m.serviceEvents({ name: 'orca', sinceMs: ALL_HISTORY }).length, 5, 'a removal keeps the history');
 });
 
 test('a seat agent is Orca agentIdentity, then the tab title, then the frame (Devin needs Esc twice)', () => {
