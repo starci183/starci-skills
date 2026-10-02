@@ -2,6 +2,7 @@
   "hfs": 2,
   "kind": "app",
   "project": "ecommerce-app",
+  "browser": true,
   "sides": {
     "be": {
       "kinds": ["api", "cli", "jobs", "reactors", "realtime", "saga", "webhooks"],
