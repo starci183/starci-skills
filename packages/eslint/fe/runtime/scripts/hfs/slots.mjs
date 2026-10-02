@@ -185,7 +185,12 @@ function manifestShapeProblems(m) {
   const rp = m.ruleParams;
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 8) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper} and patternScenarios');
+    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 10) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper}, patternScenarios, kindPatterns and addKinds');
+    const kindPatterns = rp.be.kindPatterns;
+    if (!isPlainObject(kindPatterns) || !Object.entries(kindPatterns).every(([kind, list]) => (m.triggerKinds ?? []).includes(kind) && Array.isArray(list) && list.every((p) => NAME.test(String(p))) && new Set(list).size === list.length)) bad.push('ruleParams.be.kindPatterns must map a trigger kind to a unique list of pattern names');
+    const addKinds = rp.be.addKinds;
+    const addKindOk = (spec) => isPlainObject(spec) && NAME.test(String(spec.topic)) && NAME.test(String(spec.variable)) && Array.isArray(spec.patterns) && spec.patterns.every((p) => NAME.test(String(p))) && (spec.trigger === undefined || NAME.test(String(spec.trigger))) && (spec.needs === undefined || (Array.isArray(spec.needs) && spec.needs.every((n) => NAME.test(String(n))))) && (spec.defaults === undefined || isPlainObject(spec.defaults));
+    if (!isPlainObject(addKinds) || !Object.entries(addKinds).every(([noun, spec]) => NAME.test(noun) && addKindOk(spec))) bad.push('ruleParams.be.addKinds must map a noun to {topic, variable, patterns, trigger?, needs?, defaults?}');
     const scenarios = rp.be.patternScenarios;
     if (!isPlainObject(scenarios) || !Object.entries(scenarios).every(([name, list]) => /^[a-z][a-z0-9-]*$/.test(name) && Array.isArray(list) && list.length > 0 && list.every((id) => /^[a-z][a-z0-9-]*$/.test(String(id))) && new Set(list).size === list.length)) bad.push('ruleParams.be.patternScenarios must map a pattern name to a non-empty list of unique kebab-case scenario ids');
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
@@ -308,7 +313,7 @@ function declarationShapeProblems(d) {
     const s = d.sides[side];
     const at = `sides.${side}`;
     if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'kinds', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
     if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
     else s.apps.forEach((app, i) => {
       if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
@@ -317,6 +322,7 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
+    if (s.kinds !== undefined && (!Array.isArray(s.kinds) || !s.kinds.every((v) => NAME.test(String(v))) || new Set(s.kinds).size !== s.kinds.length)) bad.push(`${at}.kinds must be a unique list of trigger kind names`);
     if (s.patterns !== undefined && (!Array.isArray(s.patterns) || !s.patterns.every((v) => NAME.test(String(v))) || new Set(s.patterns).size !== s.patterns.length)) bad.push(`${at}.patterns must be a unique list of pattern names`);
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
@@ -345,6 +351,8 @@ function sideProblems(manifest, side, s) {
     else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
     else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
   }
+  if (s.kinds !== undefined && side !== 'be') bad.push(`sides.${side}.kinds belongs to the be side`);
+  for (const kind of s.kinds ?? []) if (!(manifest.triggerKinds ?? []).includes(kind)) bad.push(`sides.${side}.kinds names ${kind}, which is not one of triggerKinds (${(manifest.triggerKinds ?? []).join(', ')})`);
   for (const name of s.patterns ?? []) if (!manifest.slots.some((slot) => slot.profiles.includes(side) && slot.pattern === name)) bad.push(`sides.${side}.patterns names ${name}, which no ${side} slot declares as its pattern`);
   for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
   const connections = s.connections ?? [];
@@ -397,6 +405,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
       optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
       patterns: Object.freeze([...(s.patterns ?? [])]),
+      kinds: Object.freeze([...(s.kinds ?? [])]),
       connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
       reads: Object.freeze([...(s.reads ?? [])]),
       manifestVersion: manifest.version,

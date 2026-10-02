@@ -65,7 +65,7 @@ $defs:
           be:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape]
+            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -102,6 +102,27 @@ $defs:
                     properties:
                       double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
                       forms: {$ref: '#/$defs/doubleForms'}
+              kindPatterns:
+                type: object
+                description: 'BE_KIND_DECLARATION. Trigger kind -> the patterns an app that uses the kind declares (and whose platform capabilities must exist).'
+                additionalProperties:
+                  type: array
+                  uniqueItems: true
+                  items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+              addKinds:
+                type: object
+                description: 'hfs add <noun> <name>. Noun -> the pattern topic whose files tree is generated, its instance variable, the patterns and trigger kind it registers, the options it needs and the defaults of the other variables.'
+                additionalProperties:
+                  type: object
+                  required: [topic, variable, patterns]
+                  additionalProperties: false
+                  properties:
+                    topic: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    variable: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    trigger: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    patterns: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
+                    needs: {type: array, uniqueItems: true, items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}}
+                    defaults: {type: object}
               patternScenarios:
                 type: object
                 description: 'BE_PATTERN_SPEC_MISSING. Declared pattern -> the scenario ids an e2e or integration spec must prove (a test titled <pattern>/<scenario>: ...).'

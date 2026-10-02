@@ -15,6 +15,7 @@ npx hfs emit-contracts [--repo <dir>]         # write be/contracts/<app>/schema.
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard: staged .starciwork / .starcistacks paths, and the secrets guard over every staged file (read from the index)
+npx hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]   # exactly that kind's file tree, generated from the pattern knowledge, plus the platform capabilities it needs and the hfs.json registration
 npx hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]   # a back-end service and its unit spec skeleton
 npx hfs new spec <file>.service.ts [--repo <dir>]                                                              # the spec skeleton of an existing service
 ```

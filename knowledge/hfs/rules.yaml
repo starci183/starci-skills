@@ -1401,3 +1401,19 @@ rules:
     failureCodes: ["BE_PROJECTION_SHAPE"]
     enforcers:
       - {kind: eslint-be, id: projection-shape}
+  - id: R143
+    code: "BE_KIND_DECLARATION"
+    law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `hfs add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_KIND_DECLARATION"]
+    enforcers:
+      - {kind: hfs, id: kind-declaration, at: scripts/hfs/rules/kinds.mjs}
+  - id: R144
+    code: "BE_KIND_EMPTY"
+    law: "A kind folder `be/src/features/<kind>/` holds only instance folders `<kind>/<name>/`, and each instance holds TypeScript source: a file directly in the kind folder (a feature named like a kind, a `.gitkeep`) and an instance with no TypeScript file are findings; an empty kind folder is never kept."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_KIND_EMPTY"]
+    enforcers:
+      - {kind: hfs, id: kind-empty, at: scripts/hfs/rules/kinds.mjs}

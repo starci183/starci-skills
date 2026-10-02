@@ -35,7 +35,12 @@
 //                                            relative to be/): the spec is built
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
 //                                            one placeholder it per public method. Never overwrites a file.
-//   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
+//   hfs new spec <file>.service.ts [--repo <dir>]
+//                                            the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
+//   hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
+//                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
+//                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
+//                                            it registers the patterns and the trigger kind in hfs.json (sides.be.patterns, sides.be.kinds). Never overwrites a file (scaffold/add.mjs).
 // Every finding names a why code and carries its Vietnamese text. check, lint and explain read the app, never write to it. Exit codes:
 // 0 clean, 1 error findings, 2 a refusal or bad usage.
 import fs from 'node:fs';
@@ -50,6 +55,7 @@ import { SyncError, loadPresets } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
+import { addKind } from '../scaffold/add.mjs';
 import { scaffoldApp } from '../scaffold/app.mjs';
 import { contractEmitFindings } from '../runtime/scripts/hfs/rules/contract.mjs';
 import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
@@ -64,9 +70,10 @@ hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
+hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
 const BOOL_FLAGS = new Set(['--json', '--fast']);
@@ -188,7 +195,7 @@ async function scaffoldPresets() {
 /** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new', 'add'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     if (verb === 'lint') return await lintMain(rest, { stdout, presets, prettier });
@@ -223,6 +230,16 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       else if (kind === 'spec' && args.length === 1 && opts.inject === undefined) written = newSpec({ repoRoot, file: args[0] });
       else throw new Error('hfs new takes `service <dir> <name> [--inject ...]` or `spec <file>.service.ts`');
       for (const file of written) stdout(`created ${file}
+`);
+      return 0;
+    }
+    if (verb === 'add') {
+      const [noun, name, ...extra] = opts.positional;
+      if (!noun || !name || extra.length) throw new Error('hfs add takes `<noun> <name>` and the options of the noun');
+      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection } });
+      for (const file of created) stdout(`created ${file}
+`);
+      stdout(`hfs add ${noun}: registered patterns ${registered.patterns.join(', ')}${registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : ''}
 `);
       return 0;
     }

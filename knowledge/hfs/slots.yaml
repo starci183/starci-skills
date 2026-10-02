@@ -179,6 +179,22 @@ ruleParams:
       queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
       fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
       projection: [recompute-is-idempotent, replay-rebuilds]
+    # BE_KIND_DECLARATION: the patterns an app that uses a trigger kind declares in hfs.json sides.be.patterns; the platform capabilities of those
+    # patterns (the slots of tier platform that name the pattern) must exist.
+    kindPatterns:
+      api: []
+      webhooks: []
+      realtime: []
+      reactors: [event-bus]
+      jobs: [fenced-job, queue]
+      cli: []
+    # hfs add <noun> <name>: the pattern topic (knowledge/patterns/be/<topic>.yaml) whose files tree is generated, the path variable of the
+    # instance, what it registers in hfs.json, the options it needs (--<option>) and the defaults of the other variables ("@name" = the name).
+    addKinds:
+      job: {topic: jobs, variable: job, trigger: jobs, patterns: [fenced-job, queue], defaults: {step: "@name"}}
+      reactor: {topic: reactors, variable: reactor, trigger: reactors, patterns: [event-bus], needs: [event, from, service], defaults: {action: "@name"}}
+      queue: {topic: queues, variable: queue, patterns: [queue]}
+      projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
