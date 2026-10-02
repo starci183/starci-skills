@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { readOpManifest } from '../lib/op-shared.mjs';
 import { asList, ROUTE_FIELDS } from './route-fields.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -113,7 +114,9 @@ function main() {
   const entries = [], problems = [];
   for (const file of files) {
     try {
-      const entry = entryFor(path.basename(file), parseYaml(fs.readFileSync(file, 'utf8')));
+      // `shared:` markers expand to the _common.yaml fragments so the registry
+      // carries the effective manifest (scripts/lib/op-shared.mjs).
+      const entry = entryFor(path.basename(file), readOpManifest(file));
       if (!entry.route) problems.push(`${path.basename(file)}: no route: block`);
       else if (entry.route.phase?.length && !STAGES[entry.route.phase[0]] && !Object.values(COARSE).includes(entry.route.phase[0]))
         problems.push(`${path.basename(file)}: route.phase[0] '${entry.route.phase[0]}' is not a known stage`);

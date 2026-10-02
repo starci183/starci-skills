@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readOpManifest } from '../lib/op-shared.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
@@ -208,7 +209,7 @@ function main() {
     console.error(`unknown op '${args.op}' — no brief at ${briefRel}`);
     process.exit(1);
   }
-  const opDoc = parseYaml(fs.readFileSync(briefAbs, 'utf8'));
+  const opDoc = readOpManifest(briefAbs);
   const model = resolveModel(args.model ?? defaultOperationTarget(modelsDir), modelsDir); // orchestration.defaultOperationTarget
   if (model.error) { console.error(model.error); process.exit(1); }
 

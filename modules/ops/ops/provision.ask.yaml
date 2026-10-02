@@ -31,7 +31,7 @@ completionProfile: business
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -182,9 +182,9 @@ blockers:
         uat.assisted.{prepare,verify}; the asking operation is sent back to re-plan through that
         lane.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
+  app: shared
+  bound-paths: shared
+  env: shared
   slug: Stable identity custody slug
 layoutPolicy:
   checks: [starci-validate, starci-starcistacks-check]

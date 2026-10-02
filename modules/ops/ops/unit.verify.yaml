@@ -21,17 +21,14 @@ sideEffects:
   - run-owned temporary files, disposed by the same run
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: shared
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+      en: shared
   - id: repo
     path: <app>/<bound-paths>
     purpose:
@@ -51,9 +48,9 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof.
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
   - id: unit-kit
     path: packages/jest-preset/README.md + knowledge/patterns/be/test.yaml + <app>/be/jest.config.js
@@ -78,16 +75,14 @@ writes:
         message, so a repair can be routed per file. The run is the repository's whole unit suite: a filtered run,
         a single project or a path selection is recorded as partial, never as this proof."
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from hfs explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
   - id: unit-run
     path: STARCI_JOB_SCRATCH/unit-run.json
@@ -165,8 +160,8 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:

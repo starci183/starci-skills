@@ -42,7 +42,7 @@ grammarInputs: component-source
 sideEffects: ['rendered shape parts with their exact brief, render source, rationale.json and annotated redline render, artwork-slot briefs for interface.asset, and the direction images composited from the parts into the real layout captures, under the owning UI node assets']
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
   workGraph: revise
@@ -867,9 +867,9 @@ blockers:
       en: A declared prerequisite or required scope is missing or not effectively done; do not weaken the
         graph.
 placeholders:
-  feature: Selected feature slug
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  feature: shared
+  app: shared
+  bound-paths: shared
   name: Selected ui record slug
   asset: Rendered part, brief, render source or raster prompt filename under the owning UI node
 layoutPolicy:

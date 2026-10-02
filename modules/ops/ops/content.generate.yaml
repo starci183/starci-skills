@@ -10,17 +10,14 @@ sideEffects:
   - scoped commits when authorized; no publication implied
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: shared
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+      en: shared
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision}/**/index.yaml
     purpose:
@@ -32,23 +29,16 @@ reads:
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-        state; read applicable instructions, manifests, owning code, callers and relevant tests.
-        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
-        request; no invented repository or fact citation. Source implementation still needs an
-        actual selected writable repository.
+      en: shared
   - id: brief
     path: selected curriculum/content brief + actual source material/style/rights
     purpose:
       en: Read audience, learning/use outcome, factual sources, language, format, approved claims and
         requested assets/examples. Unprovided facts/testimonials/results are not creative license.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: standard
     path: knowledge/op-gate.yaml + knowledge/patterns/** + knowledge/code-examples/**
     purpose:
@@ -66,10 +56,8 @@ writes:
         never add/remove them to obtain pass.
   - id: source
     path: <app>/<write-ceiling>
-    fields: [source files, tests, migration/assets/config only when selected]
     content:
-      en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
-        changes; record actual diff and commit mapping, not proposed changes as delivered.
+      en: shared
   - id: evidence
     path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -168,9 +156,9 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
+  app: shared
+  bound-paths: shared
+  write-ceiling: shared
 layoutPolicy:
   checks: [starci-validate]
 route:

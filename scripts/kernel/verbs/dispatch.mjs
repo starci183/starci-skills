@@ -26,6 +26,7 @@ import { deferredQueueCause } from '../autopilot-run.mjs';
 import { resolveWorkerLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
 import { resolveOpParams } from '../dispatch-op.mjs';
+import { readOpManifest } from '../../lib/op-shared.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
 import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
 import { opInputPaths, recordInputs, workInputPaths } from '../input-digests.mjs';
@@ -147,7 +148,7 @@ export default {
   // bound record whose dependsOn is not done where the op requires done. A
   // dispatch that can only end blocked on them is a wasted launch.
   const briefForAdmission = (() => {
-    try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8')); } catch { return null; }
+    try { return readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`)); } catch { return null; }
   })();
   const prerequisites = briefForAdmission ? checkPrerequisites({ brief: briefForAdmission, payload, repo }) : { unmet: [], unknown: [] };
   if (prerequisites.unmet.length) {
@@ -206,7 +207,7 @@ export default {
 
   // The packet's params are the brief's defaults with the overrides enqueue
   // already validated on top — dispatch resolves, it never re-decides.
-  const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
+  const briefDoc = briefForAdmission ?? readOpManifest(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   // The workflow worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca created it before the

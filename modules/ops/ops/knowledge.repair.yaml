@@ -18,25 +18,18 @@ completionProfile: implementation
 sideEffects: [exact authorized knowledge source/reference edits, scoped local commits when authorized]
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: target
-    path: N/index.yaml
+    path: shared
     purpose:
-      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
-        and validator freshness. This consumer op requires its target node to exist. An absent
-        target is a scope/graph gap: report it and propose a separately selected scope op; do not
-        create a target or invent its acceptance/graph here."
+      en: shared
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-        state; read applicable instructions, manifests, owning code, callers and relevant tests.
-        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
-        request; no invented repository or fact citation. Source implementation still needs an
-        actual selected writable repository.
+      en: shared
   - id: rule
     path: selected canonical knowledge file + affected references + applicable owner maintenance policy
       + original challenge evidence
@@ -44,16 +37,13 @@ reads:
       en: Read the actual rule identifier/case and its owner/callers, observed counterexamples and
         existing enforcement. Read relevant skill instructions fully if editing a skill.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
@@ -67,10 +57,8 @@ writes:
         never add/remove them to obtain pass.
   - id: source
     path: <app>/<write-ceiling>
-    fields: [source files, tests, migration/assets/config only when selected]
     content:
-      en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
-        changes; record actual diff and commit mapping, not proposed changes as delivered.
+      en: shared
   - id: evidence
     path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -88,10 +76,9 @@ writes:
       en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
       vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
   - id: doc-gate
-    path: STARCI_JOB_SCRATCH/doc-gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
+      en: shared
       vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
 steps:
   - reads: [standard, rule]
@@ -174,9 +161,9 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
+  app: shared
+  bound-paths: shared
+  write-ceiling: shared
 layoutPolicy:
   checks: [starci-validate]
 route:

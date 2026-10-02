@@ -20,7 +20,7 @@ sideEffects:
   - Only the selected operation contract permits effects; no union of mode permissions.
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -30,21 +30,17 @@ reads:
       en: Read the catalog and this workflow's setup entry for the selected mode - refs, assertions,
         declared targets and review - and validator freshness. Preserve unaffected accepted content.
   - id: selection
-    path: params.mode + the exact mode contract in this operator JSON
+    path: shared
     purpose:
-      en: params.mode names the one execution mode; select means the request names it. Select exactly one
-        operation, its target, scope and criteria before any effect. No automatic chain.
+      en: shared
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: worktree-api
-    path: scripts/machine/worktrees.mjs + scripts/machine/worktree-git.mjs + modules/kernel/product-land.yaml
+    path: shared
     purpose:
-      en: "The runtime's worktree API and agent launcher: scripts/machine/worktrees.mjs (createWorktree with its machine.sqlite registry row and per-repo cap from modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/machine/worktree-git.mjs (safeRemoveWorktree: every link removed as a link first, then the tree) and the Orca orchestration worker commands (worker-start, worker-show, worker-read, worker-stop, worker-release)."
+      en: shared
       vi: "API worktree và bộ khởi chạy agent của runtime: scripts/machine/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/machine/worktree-git.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
 writes:
   - id: node
@@ -62,12 +58,10 @@ writes:
         is the kernel's settled verdict on its job, and the entry's review records that outcome and the
         checks it rests on. A work/node record is retired and refused (HFS_WORK_NODE_RETIRED); this op never authors one."
   - id: evidence
-    path: evidence/**
-    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    path: shared
     artifacts: [manifest.yaml, result.yaml]
     content:
-      en: Record operation, exact scope, criteria, output artifact references, observed effects and
-        unresolved findings.
+      en: shared
 steps:
   - reads:
       - target
@@ -118,14 +112,14 @@ blockers:
     condition:
       en: Missing, unknown or multiple operations; select a single mode under existing task authority.
 placeholders:
-  feature: Selected feature slug
+  feature: shared
   workflow: The running workflow id the setup entry is keyed by
   mode: The selected execution mode (prepare, import or stacks)
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  environment: Resolved environment label
-  resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
+  app: shared
+  bound-paths: shared
+  environment: shared
+  resource: shared
+  asset: shared
 layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
 policy:

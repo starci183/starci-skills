@@ -27,6 +27,7 @@ import { operationNodeId } from './verbs/shared/agent-hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
+import { readOpManifest } from '../lib/op-shared.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { spentTriesOf } from './units.mjs';
 import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
@@ -158,7 +159,7 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
   }
   const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   try {
-    const guard = familyGuardOf(parseYaml(fs.readFileSync(briefFile, 'utf8')));
+    const guard = familyGuardOf(readOpManifest(briefFile));
     const wrong = familyViolations(guard, add);
     if (wrong.length) throw refuse(`outside ${op}'s writes: ${wrong.map((v) => `${v.path} (${v.why})`).join('; ')}`, 'owned-paths-outside-writes');
   } catch (e) { if (e.code) throw e; }

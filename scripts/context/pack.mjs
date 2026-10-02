@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
@@ -171,6 +172,9 @@ export function buildContext({
     if (!fs.existsSync(briefAbs)) return { op, error: `unknown op '${op}' — no brief at ${briefRel}` };
     briefDoc = parseYaml(fs.readFileSync(briefAbs, 'utf8'));
   }
+  // `shared:` markers in the brief expand to the modules/ops/_common.yaml fragments
+  // (scripts/lib/op-shared.mjs); callers that already merged see an idempotent no-op.
+  briefDoc = mergeOpShared(briefDoc, opSharedOf(briefAbs));
 
   const missing = [];
   const notes = [];

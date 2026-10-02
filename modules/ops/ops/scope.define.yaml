@@ -9,7 +9,7 @@ completionProfile: operations
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
   workGraph: draw
@@ -42,9 +42,9 @@ reads:
       en: Resolve the working runtime profile against actual available tools. Do not switch providers,
         invent tools or dispatch agents solely from a profile.
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
@@ -216,8 +216,8 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: The feature that owns the request, whose record carries the scope
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
 layoutPolicy:
   checks: [starci-validate]
 route:

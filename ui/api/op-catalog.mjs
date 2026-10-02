@@ -1,7 +1,9 @@
 // Op identity for the UI: Vietnamese name + goal, inputs, outputs and side effects of one op,
 // read-only from modules/ops/ops/<op>.yaml (cached by mtime) and the contract op labels.
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { mergeOpShared, opSharedOf } from '../../scripts/lib/op-shared.mjs';
 import { opLabelMap } from '../../scripts/lib/display-names.mjs';
 import { translator } from '../../scripts/lib/i18n.mjs';
 
@@ -60,7 +62,10 @@ function read(op) {
   const hit = cache.get(op);
   if (hit && hit.mtime === mtime) return hit.doc;
   let doc = null;
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { doc = null; }
+  try {
+    // `shared:` markers expand to the _common.yaml fragments (scripts/lib/op-shared.mjs).
+    doc = mergeOpShared(parseYaml(fs.readFileSync(file, 'utf8')), opSharedOf(fileURLToPath(file)));
+  } catch { doc = null; }
   cache.set(op, { mtime, doc });
   return doc;
 }

@@ -41,21 +41,15 @@ completionProfile: operations
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
   workGraph: cut
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: shared
     purpose:
-      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
-        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks check
-        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
-        additionally requires the selected real startup, persistence, recovery and application
-        checks. This conditional read grants no extra deployment or source scope.
+      en: shared
   - id: target
     path: .starciwork/features/<feature>/{impl,uat,integration}/**/index.yaml
     purpose:
@@ -84,16 +78,13 @@ reads:
       en: Read the commands, test runners and runner configs this repository already exposes, so every
         declared check is a command that can be run verbatim against the assertion it claims.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
@@ -191,10 +182,9 @@ writes:
       en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
       vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
   - id: doc-gate
-    path: STARCI_JOB_SCRATCH/doc-gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's document gate (gate.mjs --profile docs, profile docs): every docChecks result - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - its exit and every finding."
+      en: shared
       vi: "Cổng tài liệu của vòng cuối (gate.mjs --profile docs, hồ sơ docs): kết quả từng docChecks - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites, check-json-exceptions - exit và từng lỗi."
 steps:
   - reads: [standard, application-stacks, target]
