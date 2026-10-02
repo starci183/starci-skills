@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { waitUntil, withPaymentFake } from "../payment-kit/app-double.spec"
-import { sepayFake, sepayVerifyApiKey, sepayVerifyBearer, sepayVerifyBody } from "./index"
+import { sepayFake, sepayVerifyApiKey, sepayVerifyBearer, sepayVerifySignature } from "./index"
 
 type Json = Record<string, unknown>
 
@@ -39,19 +39,41 @@ test("sepay (intent style, the todo integration): create, read, settle, replay",
         assert.equal(sent?.url, "/webhooks/sepay")
         assert.deepEqual(JSON.parse(sent?.body ?? "{}"), { id, status: "paid", periodEnd: "2026-04-01T00:00:00.000Z" })
         assert.equal(sepayVerifyBearer(sent?.headers["authorization"], secret), true)
-        assert.equal(sepayVerifyBody(sent?.body ?? "", sent?.headers["x-sepay-signature"], secret), true)
+        assert.equal(sepayVerifySignature(sent?.body ?? "", sent?.headers["x-sepay-timestamp"], sent?.headers["x-sepay-signature"], secret), true)
+        assert.ok(Math.abs(Number(sent?.headers["x-sepay-timestamp"]) - Date.now()) < 60_000, "signed now")
         assert.deepEqual((await call("GET", details, apiKey)).json, { id, status: "paid", periodEnd: "2026-04-01T00:00:00.000Z" })
 
         await client.replayWebhook(id)
         assert.equal(app.received[1]?.body, sent?.body)
+        assert.equal(app.received[1]?.headers["x-sepay-timestamp"], sent?.headers["x-sepay-timestamp"], "a plain replay is byte for byte")
         assert.equal((await client.deliveries()).length, 2)
 
         await client.failNext({ badSignature: true })
         await client.settle({ gatewayIntentId: id, status: "failed" })
         const bad = app.received[2]
         assert.equal(sepayVerifyBearer(bad?.headers["authorization"], secret), false)
-        assert.equal(sepayVerifyBody(bad?.body ?? "", bad?.headers["x-sepay-signature"], secret), false)
+        assert.equal(sepayVerifySignature(bad?.body ?? "", bad?.headers["x-sepay-timestamp"], bad?.headers["x-sepay-signature"], secret), false)
         assert.equal((JSON.parse(bad?.body ?? "{}") as Json)["status"], "failed")
+    })
+})
+
+test("sepay: a stale replay carries the captured body re-signed validly at now - ageMs, so only the app's window refuses it", async () => {
+    await withPaymentFake(sepayFake(), async ({ client, values, app }) => {
+        const secret = values["webhookSecret"] ?? ""
+        app.answer(200, JSON.stringify({ ok: true }))
+        await client.settle({ reference: "SUB-OLD", status: "paid", periodEnd: "2026-04-01T00:00:00.000Z" })
+        const original = app.received[0]
+        await client.replayWebhook("SUB-OLD", { ageMs: 600_000 })
+        const stale = app.received[1]
+        assert.equal(stale?.body, original?.body)
+        const age = Number(original?.headers["x-sepay-timestamp"]) - Number(stale?.headers["x-sepay-timestamp"])
+        assert.ok(age >= 590_000 && age <= 610_000, `signed about ten minutes earlier (${age} ms)`)
+        assert.equal(sepayVerifySignature(stale?.body ?? "", stale?.headers["x-sepay-timestamp"], stale?.headers["x-sepay-signature"], secret), true)
+        await client.delayWebhook({ reference: "SUB-OLD", status: "paid", delayMs: 10, ageMs: 300_000 })
+        await waitUntil(() => app.received.length === 3)
+        const delayedAge = Date.now() - Number(app.received[2]?.headers["x-sepay-timestamp"])
+        assert.ok(delayedAge >= 290_000 && delayedAge <= 330_000, `the delayed one is signed five minutes back (${delayedAge} ms)`)
+        await assert.rejects(client.replayWebhook("SUB-OLD", { ageMs: -1 }), /non-negative/)
     })
 })
 

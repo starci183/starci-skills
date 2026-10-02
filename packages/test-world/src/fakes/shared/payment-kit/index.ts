@@ -51,6 +51,11 @@ export class DeliveryBook {
         return this.record(await sendOutgoing(outgoing))
     }
 
+    /** The last request sent for `reference`, or null. */
+    lastOf(reference: string): OutgoingDelivery | null {
+        return this.last.get(reference) ?? null
+    }
+
     /** Sends the last request of `reference` again, unchanged; null when nothing was sent for it. */
     async replay(reference: string): Promise<WebhookDelivery | null> {
         const outgoing = this.last.get(reference)

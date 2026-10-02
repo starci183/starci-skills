@@ -18,6 +18,11 @@
   stops its login only (`NOLOGIN`), so the contexts beside it keep serving. Contexts sharing a database must each declare a
   distinct schema (never `public` or `pg_*`).
 - Changed: extensions are created in `public` of each database.
+- Changed: the SePay fake signs every delivery with a timestamp: `x-sepay-timestamp: <epoch ms>` and `x-sepay-signature:
+  sha256=<hmac of "<timestamp>.<exact body>">` (`sepaySignature`, `sepayVerifySignature`; the body-only `sepayBodySignature`
+  and `sepayVerifyBody` are removed). `replayWebhook(reference, { ageMs })` and `delayWebhook({ ..., ageMs })` deliver the
+  captured body validly re-signed `ageMs` in the past, so a spec proves the app's replay window refuses a stale delivery
+  (`failNext({ badSignature })` still covers a tampered signature). For EX-KINDS (ecommerce webhook scenarios).
 
 ## 1.1.0 - 2026-10-02
 

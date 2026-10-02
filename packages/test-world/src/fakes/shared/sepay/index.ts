@@ -9,8 +9,10 @@
  *   and header `Authorization: Apikey <webhookSecret>`; `code` is the payment code (the reference of the intent). SePay only
  *   reports money received, so a failure has no webhook in this style: `fail` and a failed `settle` answer `null`.
  *
- * Both styles also carry `x-sepay-signature: sha256=<hmac of the exact body>` (an extension, see `signature.ts`). In
- * transaction style a spec may settle a reference the app never created through the API: pass `amount` to `settle`.
+ * Both styles also carry `x-sepay-timestamp` and `x-sepay-signature: sha256=<hmac of "<timestamp>.<exact body>">` (an
+ * extension, see `signature.ts`). `replayWebhook(reference, { ageMs })` and `delayWebhook({ ..., ageMs })` deliver a webhook
+ * signed `ageMs` in the past, so a spec proves the app refuses a stale delivery. In transaction style a spec may settle a
+ * reference the app never created through the API: pass `amount` to `settle`.
  */
 import type { FakeBridge, FakeClient, WebhookDelivery } from "../../framework/contracts"
 import { FakeControlRejected } from "../../framework/failures"
@@ -21,7 +23,7 @@ import type { PaymentClient } from "../payment-kit"
 import { SEPAY_ERROR_BAD_REQUEST, SEPAY_ERROR_NOT_FOUND, SEPAY_ERROR_UNAUTHORIZED } from "./fixtures"
 import type { DelayedSettleParams, SepayIntent, SettleParams } from "./payloads"
 import { sepayCreateResponse, sepayIntentWebhook, sepayTransactionPending, sepayTransactionSettled, sepayTransactionWebhook } from "./payloads"
-import { sepayApiKeyHeader, sepayBearerHeader, sepayBodySignature, sepayVerifyApiKey, sepayVerifyBearer } from "./signature"
+import { SEPAY_SIGNATURE_HEADER, SEPAY_TIMESTAMP_HEADER, sepayApiKeyHeader, sepayBearerHeader, sepaySignature, sepayVerifyApiKey, sepayVerifyBearer } from "./signature"
 
 export * from "./fixtures"
 export * from "./payloads"
@@ -57,8 +59,12 @@ export interface SepayReferenceSettle {
 
 /** A settle, by the fake's id (the todo shape) or by reference. */
 export type SepaySettleInput = SettleParams | SepayReferenceSettle
-/** A settle delivered after `delayMs`. */
-export type SepayDelayInput = (DelayedSettleParams | (SepayReferenceSettle & { readonly delayMs: number }))
+/** How old a delivery claims to be: its signature timestamp is `now - ageMs` (default 0). */
+export interface SepayAge {
+    readonly ageMs?: number
+}
+/** A settle delivered after `delayMs` (signed `ageMs` in the past at the moment it is sent). */
+export type SepayDelayInput = (DelayedSettleParams | (SepayReferenceSettle & { readonly delayMs: number })) & SepayAge
 /** What `fail` takes. */
 export interface SepayFailParams {
     /** The reference or the id the fake handed out. */
@@ -77,8 +83,11 @@ export interface SepayClient extends FakeClient {
     fail(params: SepayFailParams): Promise<WebhookDelivery | null>
     /** Settles now, delivers the webhook after `delayMs`. */
     delayWebhook(params: SepayDelayInput): Promise<void>
-    /** Sends the last webhook of an id or reference again, byte for byte. */
-    replayWebhook(reference: string): Promise<WebhookDelivery>
+    /**
+     * Sends the last webhook of an id or reference again: byte for byte, or with `ageMs` re-signed with a timestamp `ageMs`
+     * in the past (the same body, a stale signing time), as an attacker replaying a captured delivery would.
+     */
+    replayWebhook(reference: string, options?: SepayAge): Promise<WebhookDelivery>
 }
 
 type Base = PaymentClient<SepayIntent, SepaySettleInput, SepayFailParams, SepayDelayInput>
@@ -201,8 +210,22 @@ const applySettle = (context: Context, request: SettleRequest): StoredIntent => 
     return settled
 }
 
+/** The signing headers of a body: its timestamp (`ageMs` in the past) and the signature over `<timestamp>.<body>`. */
+const signed = (context: Context, body: string, secret: string, ageMs: number): Readonly<Record<string, string>> => {
+    const timestamp = context.start.now().getTime() - ageMs
+    return { [SEPAY_TIMESTAMP_HEADER]: String(timestamp), [SEPAY_SIGNATURE_HEADER]: sepaySignature(timestamp, body, secret) }
+}
+
+/** A non-negative age of a control body (default 0). */
+const ageOf = (body: unknown, action: string): number => {
+    const value = controlRecord(body, action)["ageMs"]
+    if (value === undefined) return 0
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new FakeControlRejected(400, `${action} "ageMs" must be a non-negative number`)
+    return value
+}
+
 /** Delivers the webhook of a settled intent; null in transaction style when the outcome is a failure. */
-const sendWebhook = async (context: Context, intent: StoredIntent, deliverTo: string): Promise<WebhookDelivery | null> => {
+const sendWebhook = async (context: Context, intent: StoredIntent, deliverTo: string, ageMs = 0): Promise<WebhookDelivery | null> => {
     const style = styleOf(context)
     if (style === "transaction" && intent.status !== "paid") return null
     const bad = context.takeBadSignature()
@@ -226,7 +249,7 @@ const sendWebhook = async (context: Context, intent: StoredIntent, deliverTo: st
         headers: {
             "content-type": "application/json",
             authorization: style === "intent" ? sepayBearerHeader(secret) : sepayApiKeyHeader(secret),
-            "x-sepay-signature": sepayBodySignature(body, secret),
+            ...signed(context, body, secret, ageMs),
         },
     })
 }
@@ -261,16 +284,21 @@ export const sepayFake = defineHttpFake<SepayClient, SepayOptions | undefined, S
         "delay-webhook": (body, context) => {
             const request = settleRequest(body, "delay-webhook", "paid")
             const delayMs = controlNumber(controlRecord(body, "delay-webhook"), "delayMs", "delay-webhook")
+            const ageMs = ageOf(body, "delay-webhook")
             const intent = applySettle(context, request)
-            context.schedule(delayMs, () => sendWebhook(context, intent, request.deliverTo))
+            context.schedule(delayMs, () => sendWebhook(context, intent, request.deliverTo, ageMs))
             return { scheduled: true }
         },
         "replay-webhook": async (body, context) => {
             const key = controlString(controlRecord(body, "replay-webhook"), "reference", "replay-webhook")
+            const ageMs = ageOf(body, "replay-webhook")
             const intent = findIntent(context, key)
-            const delivery = (await context.state.book.replay(intent === undefined ? key : referenceOf(intent))) ?? (await context.state.book.replay(key))
-            if (delivery === null) throw new FakeControlRejected(404, `nothing was delivered for "${key}"`)
-            return delivery
+            const reference = intent !== undefined && context.state.book.lastOf(referenceOf(intent)) !== null ? referenceOf(intent) : key
+            const last = context.state.book.lastOf(reference)
+            if (last === null) throw new FakeControlRejected(404, `nothing was delivered for "${key}"`)
+            if (ageMs === 0) return (await context.state.book.replay(reference)) as WebhookDelivery
+            // The captured body, re-signed with the real secret at a stale time: only the window can refuse it.
+            return context.state.book.deliver({ ...last, headers: { ...last.headers, ...signed(context, last.body, webhookSecretOf(context), ageMs) } })
         },
     },
     client: (bridge: FakeBridge, base: FakeClient): SepayClient => {
@@ -279,6 +307,7 @@ export const sepayFake = defineHttpFake<SepayClient, SepayOptions | undefined, S
             ...shared,
             settle: (params) => bridge.call("settle", { ...params, deliverTo: bridge.webhookTarget() }),
             fail: (params) => bridge.call("fail", { ...params, deliverTo: bridge.webhookTarget() }),
+            replayWebhook: (reference, options) => bridge.call("replay-webhook", { reference, ...(options ?? {}), deliverTo: bridge.webhookTarget() }),
         }
     },
 })
