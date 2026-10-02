@@ -79,48 +79,87 @@ const renderDocs = (cat) => {
   return out.join('\n');
 };
 
-const allFlagsOf = (cat, verb) => [...cat.global.flags.map((f) => `--${f.name}`), ...(verb.flags ?? []).map((f) => `--${f.name}`)];
-
 /** Shell completions for bash, zsh, fish, powershell. */
 const renderCompletions = (cat) => {
   const groups = cat.groups.map((g) => g.group);
-  const verbsOf = (g) => cat.groups.find((x) => x.group === g)?.verbs.map((v) => v.verb) ?? [];
-  const gwords = groups.join(' ');
-  const globalFlags = cat.global.flags.map((f) => `--${f.name}`).join(' ');
-  const bashCases = cat.groups.map((g) => `        ${g.group}) COMPREPLY=( $(compgen -W "${verbsOf(g.group).join(' ')}" -- "$cur") );;`).join('\n');
-  const verbCases = cat.groups.map((g) => `            ${g.group}) COMPREPLY=( $(compgen -W "${(cat.groups.find((x) => x.group === g)?.verbs ?? []).flatMap((v) => allFlagsOf(cat, v)).join(' ')}" -- "$cur") );;`).join('\n');
+  const completionShells = ['bash', 'zsh', 'fish', 'powershell'];
+  const topLevel = [...groups, 'help', 'completion'];
+  const flagsOf = (verb) => [...(verb.flags ?? []), ...cat.global.flags];
+  const flagNamesOf = (verb) => flagsOf(verb).map((flag) => `--${flag.name}`);
+  const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
+  const psQuote = (value) => `'${String(value).replaceAll("'", "''")}'`;
+  const psArray = (values) => `@(${values.map(psQuote).join(',')})`;
+  const bashWords = (values) => String(values.join(' ')).replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('$', '\\$').replaceAll('`', '\\`');
+  const zshDescription = (value) => String(value ?? '').replace(/[\[\]]/g, '').replace(/[\r\n]+/g, ' ');
+  const groupVerbs = cat.groups.map((group) => [group.group, group.verbs.map((verb) => verb.verb)]);
+  const commands = cat.groups.flatMap((group) => group.verbs.map((verb) => ({ group: group.group, verb })));
+  const bashVerbs = [
+    ...groupVerbs.map(([group, verbs]) => `        ${group}) COMPREPLY=( $(compgen -W "${bashWords(verbs)}" -- "$cur") );;`),
+    `        completion) COMPREPLY=( $(compgen -W "${completionShells.join(' ')}" -- "$cur") );;`,
+  ].join('\n');
+  const bashFlagCases = commands.map(({ group, verb }) => `        ${group}:${verb.verb}) COMPREPLY=( $(compgen -W "${bashWords(flagNamesOf(verb))}" -- "$cur") );;`).join('\n');
+  const bashGlobalValueCases = cat.global.flags.filter((flag) => flag.type !== 'boolean').map((flag) => flag.type === 'enum'
+    ? `        --${flag.name}) COMPREPLY=( $(compgen -W "${bashWords(flag.enum ?? [])}" -- "$cur") ); return 0;;`
+    : `        --${flag.name}) return 0;;`).join('\n');
+  const bashLocalValueCases = commands.flatMap(({ group, verb }) => (verb.flags ?? []).filter((flag) => flag.type !== 'boolean').map((flag) => flag.type === 'enum'
+    ? `        ${group}:${verb.verb}:--${flag.name}) COMPREPLY=( $(compgen -W "${bashWords(flag.enum ?? [])}" -- "$cur") ); return 0;;`
+    : `        ${group}:${verb.verb}:--${flag.name}) return 0;;`)).join('\n');
   const bash = `# ${GENERATED}
 _starci() {
-    local cur prev group
+    local cur prev group verb
     COMPREPLY=()
     cur="\${COMP_WORDS[COMP_CWORD]}"
-    prev="\${COMP_WORDS[COMP_CWORD-1]}"
+    prev=""
+    if [ "$COMP_CWORD" -gt 0 ]; then prev="\${COMP_WORDS[COMP_CWORD-1]}"; fi
     group="\${COMP_WORDS[1]}"
+    verb="\${COMP_WORDS[2]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "${gwords} help completion" -- "$cur") )
+        COMPREPLY=( $(compgen -W "${topLevel.join(' ')}" -- "$cur") )
         return 0
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case "$group" in
-${bashCases}
+${bashVerbs}
             *) COMPREPLY=();;
         esac
         return 0
     fi
-    case "$group" in
-${verbCases}
+    case "$prev" in
+${bashGlobalValueCases}
     esac
-    COMPREPLY+=( $(compgen -W "${globalFlags}" -- "$cur") )
+    case "$group:$verb:$prev" in
+${bashLocalValueCases}
+    esac
+    case "$group:$verb" in
+${bashFlagCases}
+        *) COMPREPLY=();;
+    esac
     return 0
 }
 complete -F _starci starci
 `;
-  const zsub = cat.groups.map((g) => `    '${g.group}:${(g.summary ?? '').replace(/'/g, '')}'`).join('\n');
-  const zverbs = cat.groups.map((g) => `            ${g.group}) _values 'verbs' ${verbsOf(g.group).map((v) => `'${v}[${(v.summary ?? '').replace(/'/g, '')}]'`).join(' ')} ;;`).join('\n');
+  const zsub = [
+    ...cat.groups.map((group) => `    ${shellQuote(`${group.group}:${zshDescription(group.summary)}`)}`),
+    `    ${shellQuote('help:show top-level help')}`,
+    `    ${shellQuote('completion:print a shell completion script')}`,
+  ].join('\n');
+  const zverbs = [
+    ...cat.groups.map((group) => `      ${group.group}) _values 'verbs' ${group.verbs.map((verb) => shellQuote(`${verb.verb}[${zshDescription(verb.summary)}]`)).join(' ')} ;;`),
+    `      completion) _values 'shells' ${completionShells.map(shellQuote).join(' ')} ;;`,
+    `      help) return 0 ;;`,
+  ].join('\n');
+  const zGlobalValueCases = cat.global.flags.filter((flag) => flag.type !== 'boolean').map((flag) => flag.type === 'enum'
+    ? `    --${flag.name}) _values 'values' ${(flag.enum ?? []).map(shellQuote).join(' ')}; return 0 ;;`
+    : `    --${flag.name}) return 0 ;;`).join('\n');
+  const zLocalValueCases = commands.flatMap(({ group, verb }) => (verb.flags ?? []).filter((flag) => flag.type !== 'boolean').map((flag) => flag.type === 'enum'
+    ? `    ${shellQuote(`${group}:${verb.verb}:--${flag.name}`)}) _values 'values' ${(flag.enum ?? []).map(shellQuote).join(' ')}; return 0 ;;`
+    : `    ${shellQuote(`${group}:${verb.verb}:--${flag.name}`)}) return 0 ;;`)).join('\n');
+  const zFlagCases = commands.map(({ group, verb }) => `    ${shellQuote(`${group}:${verb.verb}`)}) _values 'flags' ${flagNamesOf(verb).map(shellQuote).join(' ')} ;;`).join('\n');
   const zsh = `#compdef starci
 # ${GENERATED}
 _starci() {
   local -a groups
+  local prev
   groups=(
 ${zsub}
   )
@@ -131,28 +170,86 @@ ${zsub}
 ${zverbs}
     esac
   else
-    _values 'flags' ${globalFlags.split(' ').map((f) => `'${f}'`).join(' ')}
+    prev="$words[CURRENT-1]"
+    case "$prev" in
+${zGlobalValueCases}
+    esac
+    case "$words[2]:$words[3]:$prev" in
+${zLocalValueCases}
+    esac
+    case "$words[2]:$words[3]" in
+${zFlagCases}
+    esac
   fi
 }
 _starci "$@"
 `;
-  const fishHead = `# ${GENERATED}`;
-  const fishLines = [fishHead];
-  for (const g of groups) fishLines.push(`complete -c starci -n '__fish_use_subcommand' -a ${g}`);
-  for (const g of cat.groups) for (const v of g.verbs) fishLines.push(`complete -c starci -n '__fish_seen_subcommand_from ${g.group}' -a ${v.verb} -d '${(v.summary ?? '').replace(/'/g, '')}'`);
-  for (const f of cat.global.flags) fishLines.push(`complete -c starci -l ${f.name}${f.type === 'boolean' ? '' : ' -r'}`);
+  const fishLines = [`# ${GENERATED}`, `function __starci_needs_group
+    set -l words (commandline -opc)
+    test (count $words) -eq 1
+end`, `function __starci_needs_verb --argument-names group
+    set -l words (commandline -opc)
+    test (count $words) -eq 2
+    and test "$words[2]" = "$group"
+end`, `function __starci_using_command --argument-names group verb
+    set -l words (commandline -opc)
+    test (count $words) -ge 3
+    and test "$words[2]" = "$group"
+    and test "$words[3]" = "$verb"
+end`];
+  for (const group of cat.groups) fishLines.push(`complete -c starci -n '__starci_needs_group' -a ${shellQuote(group.group)} -d ${shellQuote(group.summary ?? '')}`);
+  fishLines.push(`complete -c starci -n '__starci_needs_group' -a 'help' -d 'show top-level help'`);
+  fishLines.push(`complete -c starci -n '__starci_needs_group' -a 'completion' -d 'print a shell completion script'`);
+  for (const group of cat.groups) for (const verb of group.verbs) fishLines.push(`complete -c starci -n '__starci_needs_verb ${group.group}' -a ${shellQuote(verb.verb)} -d ${shellQuote(verb.summary ?? '')}`);
+  for (const shell of completionShells) fishLines.push(`complete -c starci -n '__starci_needs_verb completion' -a ${shellQuote(shell)}`);
+  for (const { group, verb } of commands) for (const flag of verb.flags ?? []) fishLines.push(`complete -c starci -n '__starci_using_command ${group} ${verb.verb}' -l ${flag.name}${flag.type === 'boolean' ? '' : ' -r'}${flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : ''}${flag.summary ? ` -d ${shellQuote(flag.summary)}` : ''}`);
+  for (const flag of cat.global.flags) fishLines.push(`complete -c starci -l ${flag.name}${flag.type === 'boolean' ? '' : ' -r'}${flag.type === 'enum' ? ` -a ${shellQuote((flag.enum ?? []).join(' '))}` : ''}${flag.summary ? ` -d ${shellQuote(flag.summary)}` : ''}`);
   const fish = fishLines.join('\n') + '\n';
+  const psVerbs = [
+    ...groupVerbs.map(([group, verbs]) => `        ${psQuote(group)} = ${psArray(verbs)}`),
+    `        'completion' = ${psArray(completionShells)}`,
+    `        'help' = @()`,
+  ].join('\n');
+  const psFlags = commands.map(({ group, verb }) => `        ${psQuote(`${group} ${verb.verb}`)} = ${psArray(flagNamesOf(verb))}`).join('\n');
+  const psGlobalValues = cat.global.flags.filter((flag) => flag.type !== 'boolean').map((flag) => `        ${psQuote(`--${flag.name}`)} = ${psArray(flag.type === 'enum' ? flag.enum ?? [] : [])}`).join('\n');
+  const psLocalValues = commands.flatMap(({ group, verb }) => (verb.flags ?? []).filter((flag) => flag.type !== 'boolean').map((flag) => `        ${psQuote(`${group} ${verb.verb} --${flag.name}`)} = ${psArray(flag.type === 'enum' ? flag.enum ?? [] : [])}`)).join('\n');
   const ps = `# ${GENERATED}
 Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
-    $groups = '${gwords}'.Split(' ')
+    $groups = ${psArray(topLevel)}
     $verbs = @{
-${cat.groups.map((g) => `        '${g.group}' = @(${verbsOf(g.group).map((v) => `'${v}'`).join(',')})`).join('\n')}
+${psVerbs}
     }
-    $flags = '${globalFlags}'.Split(' ')
-    $words = $commandAst.CommandElements | ForEach-Object { $_.ToString() }
-    if ($words.Count -le 2) { $candidates = $groups } elseif ($words.Count -eq 3) { $candidates = $verbs[$words[1]] } else { $candidates = $flags }
-    $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+    $flags = @{
+${psFlags}
+    }
+    $globalValues = @{
+${psGlobalValues}
+    }
+    $localValues = @{
+${psLocalValues}
+    }
+    $words = @($commandAst.CommandElements | ForEach-Object { $_.ToString() })
+    $currentIndex = if ([string]::IsNullOrEmpty($wordToComplete)) { $words.Count } else { $words.Count - 1 }
+    $candidates = @()
+    if ($currentIndex -eq 1) {
+        $candidates = $groups
+    } elseif ($currentIndex -eq 2) {
+        $candidates = @($verbs[$words[1]])
+    } elseif ($currentIndex -ge 3) {
+        $group = $words[1]
+        $verb = $words[2]
+        $previous = if ($currentIndex -gt 3) { $words[$currentIndex - 1] } else { $null }
+        $localValueKey = "$group $verb $previous"
+        if ($null -ne $previous -and $globalValues.ContainsKey($previous)) {
+            $candidates = @($globalValues[$previous])
+        } elseif ($null -ne $previous -and $localValues.ContainsKey($localValueKey)) {
+            $candidates = @($localValues[$localValueKey])
+        } else {
+            $candidates = @($flags["$group $verb"])
+        }
+    }
+    $candidates | Where-Object { $_.StartsWith($wordToComplete, [System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
 }
 `;
   return { 'starci.bash': bash, '_starci': zsh, 'starci.fish': fish, 'starci.ps1': ps };

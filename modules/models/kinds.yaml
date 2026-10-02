@@ -1246,7 +1246,7 @@ routes:
     then: retry
     purpose: |-
       The owner approved the package: handover.review runs once more, reads the approval and files done,
-      and `starci kernel settle --verdict pass` records the handover-approved event from the answer receipt. A
+      and `starci kernel settle --job <id> --verdict pass` records the handover-approved event from the answer receipt. A
       receipt whose answeredBy is not the owner never approves, and serve-ask refuses a delegated approve
       outright; `starci kernel finish` then closes the workflow.
   - id: handover-feedback-repairs-the-build

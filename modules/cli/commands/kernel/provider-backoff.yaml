@@ -9,6 +9,9 @@ impl:
   args:
     - provider-backoff
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: provider
     type: string
     required: true
@@ -32,7 +35,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel provider-backoff --repo <path>
+  - starci kernel provider-backoff --repo <path> --provider <provider> --open-circuit --reason <reason> --by <by>
 editions:
   - full
 since: 1.0.0-alpha.4

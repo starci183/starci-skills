@@ -8,6 +8,9 @@ impl:
   args:
     - redesign
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
     required: true
@@ -28,7 +31,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel redesign --repo <path>
+  - starci kernel redesign --repo <path> --workflow <workflow> --op <op> --paths <paths> --decision <decision>
 editions:
   - full
 since: 1.0.0-alpha.4

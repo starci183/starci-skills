@@ -54,8 +54,8 @@ Test both **archives**, not only the source checkout:
 
 ```sh
 npx --yes --package=<cli-archive>.tgz starci --help
-npx --yes --package=<cli-archive>.tgz starci runtime install --dir <isolated-host>
-npx --yes --package=<cli-archive>.tgz starci runtime doctor --dir <isolated-host> --quick
+npx --yes --package=<cli-archive>.tgz starci runtime install --cwd <isolated-host>
+npx --yes --package=<cli-archive>.tgz starci runtime doctor --cwd <isolated-host> --quick
 ```
 
 Also verify an update preserving custom host instructions and a seeded `config.yaml`. Record both archive hashes and the test results with the handoff. Do not test installation against an active user's runtime.

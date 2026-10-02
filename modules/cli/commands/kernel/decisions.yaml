@@ -9,6 +9,9 @@ impl:
   args:
     - decisions
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
   - name: list

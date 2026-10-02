@@ -855,7 +855,7 @@ policy:
             - inputs
           writes: [evidence]
           action:
-            en: Execute the whole-repository starci app lint (starci app lint --repo ROOT --format json, the app's own install) for every selected
+            en: Execute the whole-repository starci app lint (starci app lint --cwd ROOT --format json, the app's own install) for every selected
               FE/BE source repository with the actual project bindings. This one lint runs the canon's
               per-file and project-graph rules and the repository checks with exact rule/file coverage;
               a repository's other package lint cannot substitute for it. Execute starci runtime validate for

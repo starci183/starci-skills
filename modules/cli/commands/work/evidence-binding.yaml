@@ -8,7 +8,7 @@ flags:
 exit: {"0": clean, "1": findings, "2": invalid arguments or an unreadable input}
 json: flag
 examples:
-  - starci work evidence-binding --work <.starciwork root>
+  - 'starci work evidence-binding --work "<.starciwork root>"'
 editions: [full]
 since: 1.0.0-alpha.4
 removed:

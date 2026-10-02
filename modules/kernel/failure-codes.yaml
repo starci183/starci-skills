@@ -12706,7 +12706,7 @@ op-doc-gate-missing:
   causes_vi:
     - "Op chưa chạy gate.mjs --profile docs sau khi viết"
     - "Tệp doc-gate.json không được đính kèm vào starci kernel report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
   owner: op-retry
   kind: settle-reason
 

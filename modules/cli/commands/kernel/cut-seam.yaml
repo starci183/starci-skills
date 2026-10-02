@@ -7,6 +7,9 @@ impl:
   args:
     - cut-seam
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: publish-interface
     type: boolean
   - name: job

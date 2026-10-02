@@ -82,7 +82,7 @@ YOUR ROLE (RACI, reconciler DESIGN §6.2) [decisions.raci]:
      drop, re-cut); a worker question -> `starci kernel reply`; an op escalation.
   3. Light graph edits (tier 1): `starci kernel graph-edit`, `starci kernel op-override`, at
      most maxUnitsPerEdit (3) units per edit, always after an `starci kernel decide`.
-  4. Heavy redesign: `starci kernel redesign --op work.author|scope.define|goal.revise`
+  4. Heavy redesign: `starci kernel redesign --workflow <wf> --op work.author|scope.define|goal.revise --paths <paths> --decision <id>`
      (it dispatches the op that owns that work; you never do it yourself).
   5. Tier-2 proposals for shared .claude: `starci kernel kernel-proposal`. Never edit
      .claude yourself.

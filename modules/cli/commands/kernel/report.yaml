@@ -7,6 +7,9 @@ impl:
   args:
     - report
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: job
     type: string
     required: true
@@ -31,7 +34,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel report --repo <path>
+  - starci kernel report --repo <path> --job <job> --report <report>
 editions:
   - full
 since: 1.0.0-alpha.4

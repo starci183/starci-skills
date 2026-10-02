@@ -7,6 +7,9 @@ impl:
   args:
     - settle
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: job
     type: string
     required: true
@@ -29,7 +32,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel settle --repo <path>
+  - starci kernel settle --repo <path> --job <job> --verdict pass
 editions:
   - full
 since: 1.0.0-alpha.4

@@ -58,7 +58,7 @@ and starts nothing (`--stop` and `--status` still work).
 ```text
 starci supervisor start            # enable or keep the seat
 starci supervisor status   # seat status
-starci supervisor start --restart  # deliberate seat reload
+starci supervisor stop && starci supervisor start  # deliberate seat reload
 starci supervisor stop     # disable and close the seat
 ```
 

@@ -10,8 +10,8 @@ reviewed version instead of assuming `latest` is safe.
 
 ```sh
 npm i -g @starci/cli
-starci runtime install --dir <host>
-starci runtime doctor --dir <host> --quick
+starci runtime install --cwd <host>
+starci runtime doctor --cwd <host> --quick
 ```
 
 Use `npx @starci/cli` in place of `starci` when a global install is not
@@ -20,7 +20,7 @@ appropriate.
 Product repositories need only `@starci/cli` as a development dependency.
 Their managed templates invoke only `starci app ...`.
 
-`--dir` always means the **host** — the directory that will own `.claude/` —
+`--cwd` always means the **host** — the directory that will own `.claude/` —
 not automatically a project backend or frontend.
 
 ## What `runtime install` does
@@ -105,8 +105,8 @@ automatically in that task's directory ancestry.
 ## Update
 
 ```sh
-starci runtime update --dir <host>
-starci runtime doctor --dir <host>
+starci runtime update --cwd <host>
+starci runtime doctor --cwd <host>
 starci runtime version
 ```
 
@@ -115,7 +115,7 @@ then record the new version only after a successful check. Locally changed or
 unowned content is preserved and reported — inspect that report; a successful
 copy is not proof a mixed installation is compatible. An install recorded
 under a different protocol is not upgraded in place: remove `.claude` by hand
-and run `starci runtime install --dir <host>`. Existing ledgers, goals, reports, receipts and local
+and run `starci runtime install --cwd <host>`. Existing ledgers, goals, reports, receipts and local
 settings are preserved.
 
 ## Troubleshooting
@@ -123,10 +123,10 @@ settings are preserved.
 | Symptom | Check |
 | --- | --- |
 | `npx @starci/cli` cannot find the release | Use a reviewed package version; it may not be published. |
-| Bootstrap entry missing or stale | Re-run `starci runtime install --dir <host>`; the managed block is regenerated from `init/AGENTS.md`. |
+| Bootstrap entry missing or stale | Re-run `starci runtime install --cwd <host>`; the managed block is regenerated from `init/AGENTS.md`. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |
-| Runtime sources inconsistent | `starci runtime doctor --dir <host> --quick`; report errors before running workflows. |
-| Interrupted install/update | Re-run the same `starci runtime install` or `starci runtime update` command, then `starci runtime doctor --dir <host> --quick`. See [runtime distribution](runtime-distribution.md). |
+| Runtime sources inconsistent | `starci runtime doctor --cwd <host> --quick`; report errors before running workflows. |
+| Interrupted install/update | Re-run the same `starci runtime install` or `starci runtime update` command, then `starci runtime doctor --cwd <host> --quick`. See [runtime distribution](runtime-distribution.md). |
 | Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |

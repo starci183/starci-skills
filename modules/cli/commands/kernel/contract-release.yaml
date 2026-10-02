@@ -7,6 +7,9 @@ impl:
   args:
     - contract-release
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: family
     type: string
     required: true
@@ -29,7 +32,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel contract-release --repo <path>
+  - starci kernel contract-release --repo <path> --family <family>
 editions:
   - full
 since: 1.0.0-alpha.4

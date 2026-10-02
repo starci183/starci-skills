@@ -7,25 +7,35 @@ const runtimeEntry = (root) => path.join(root, 'scripts', 'cli', 'main.mjs');
 const embeddedRuntimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const usableRoot = (candidate, exists) => {
-  if (!candidate) return null;
-  const root = path.resolve(String(candidate));
+  if (!candidate || typeof candidate !== 'string') return null;
+  const root = path.resolve(candidate);
   return exists(runtimeEntry(root)) ? root : null;
 };
 
-/** Locate the runtime in the binding order: env, per-user record, upward .claude. */
+/**
+ * Locate the runtime in the binding order: env, per-user record, upward .claude, embedded checkout.
+ * A source that is set but unusable (a stale record, a bad env root) never throws: it falls through to the next source
+ * and is described in `skipped` (when given) so the caller can say why the lookup came up empty.
+ */
 export function locateRuntime({ cwd = process.cwd(), env = process.env, home = os.homedir(), exists = existsSync, read = readFileSync,
-  embeddedRoot = embeddedRuntimeRoot } = {}) {
+  embeddedRoot = embeddedRuntimeRoot, skipped = [] } = {}) {
   const fromEnv = usableRoot(env.STARCI_RUNTIME, exists);
   if (fromEnv) return { root: fromEnv, source: 'STARCI_RUNTIME' };
+  if (env.STARCI_RUNTIME) skipped.push(`STARCI_RUNTIME "${env.STARCI_RUNTIME}" has no scripts/cli/main.mjs`);
 
   const record = path.join(home, '.starci', 'runtime.json');
   if (exists(record)) {
+    let recorded;
+    let readable = true;
     try {
-      const root = usableRoot(JSON.parse(read(record, 'utf8')).root, exists);
-      if (root) return { root, source: record };
+      recorded = JSON.parse(read(record, 'utf8'))?.root;
     } catch {
-      // A stale/corrupt per-user record is not authority; continue to the local tree.
+      readable = false;
+      skipped.push(`${record} is not valid JSON`);
     }
+    const root = usableRoot(recorded, exists);
+    if (root) return { root, source: record };
+    if (readable) skipped.push(`${record} points at ${JSON.stringify(recorded ?? null)}, which has no scripts/cli/main.mjs (stale record)`);
   }
 
   let directory = path.resolve(cwd);

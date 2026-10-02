@@ -274,7 +274,7 @@ kernelSeat:
   entry: |
     starci supervisor start            enable + launch (or keep the live one) + ensure its watchdog
     starci supervisor status   seat and health
-    starci supervisor start --restart  stop + start (reload after a contract change)
+    starci supervisor stop, then starci supervisor start  reload after a contract change
     starci supervisor stop     disable: the Host controller leaves it down
     In mode chat every launch answers action chat-mode and starts nothing; --stop and --status still work.
     The kernel start, like define-goal, runs only in the owner's chat.

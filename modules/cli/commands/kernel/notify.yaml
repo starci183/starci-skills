@@ -7,6 +7,9 @@ impl:
   args:
     - notify
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
     required: true
@@ -38,7 +41,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel notify --repo <path>
+  - starci kernel notify --repo <path> --workflow <workflow> --to <to> --kind request --subject <subject> --body <body>
 editions:
   - full
 since: 1.0.0-alpha.4

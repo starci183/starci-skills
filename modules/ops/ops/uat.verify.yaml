@@ -139,7 +139,7 @@ writes:
     artifacts: [manifest.yaml, result.md, screens/**/*.png, videos/**]
     content:
       en: "The run is agent data (ARCHITECTURE-DB §5.1): write it under STARCI_JOB_SCRATCH, never under .starciwork,
-        and file it with `starci kernel report --attach <scratch>/runs/<runId>` - every file becomes an artifact of this attempt
+        and file it with `starci kernel report --job <job> --report <report.json> --attach <scratch>/runs/<runId>` - every file becomes an artifact of this attempt
         (role uat-run, run_id <runId>). The flow's sibling evidence.yaml cites the run it settled on as
         run {id: <runId>, result: {artifact?, sha256}, screens: [{artifact?, sha256, label}], videos: [{artifact?, sha256}]}.
         Keep request flow order, original assertion IDs, actual locators/actions and business results,

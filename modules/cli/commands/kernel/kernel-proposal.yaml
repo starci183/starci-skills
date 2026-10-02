@@ -8,6 +8,9 @@ impl:
   args:
     - kernel-proposal
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
     required: true
@@ -29,7 +32,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel kernel-proposal --repo <path>
+  - starci kernel kernel-proposal --repo <path> --workflow <workflow>
 editions:
   - full
 since: 1.0.0-alpha.4

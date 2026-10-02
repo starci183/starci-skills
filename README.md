@@ -70,12 +70,12 @@ Install the one CLI globally, then install the runtime into a host:
 
 ```sh
 npm i -g @starci/cli
-starci runtime install --dir <host>
-starci runtime doctor --dir <host>
+starci runtime install --cwd <host>
+starci runtime doctor --cwd <host>
 ```
 
 Without a global install, use `npx @starci/cli` in place of `starci`. Use
-`starci runtime update --dir <host>` to update an installed tree and
+`starci runtime update --cwd <host>` to update an installed tree and
 `starci runtime version` to print the runtime version.
 
 The installer:

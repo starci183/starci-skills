@@ -7,6 +7,9 @@ impl:
   args:
     - provider-health
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: provider
     type: string
   - name: recover

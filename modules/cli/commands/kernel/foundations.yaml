@@ -7,6 +7,9 @@ impl:
   args:
     - foundations
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
 exit:

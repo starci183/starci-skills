@@ -9,6 +9,9 @@ impl:
   args:
     - log
 flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
   - name: workflow
     type: string
     required: true
@@ -45,7 +48,7 @@ exit:
   "2": bad usage
 json: flag
 examples:
-  - starci kernel log --repo <path>
+  - starci kernel log --repo <path> --workflow <workflow> --kind <kind> --msg <msg>
 editions:
   - full
 since: 1.0.0-alpha.4

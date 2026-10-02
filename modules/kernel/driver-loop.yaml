@@ -149,7 +149,7 @@ progress:
     it owns job.settle (the watchdog loop's own settler run then yields,
     reconciler-owned; it also runs right after `starci kernel report`), and settles
     every done report whose declared checks re-verify green through the same
-    `starci kernel record-checks` + `starci kernel settle --verdict pass` path, then proves the worker
+    `starci kernel record-checks` + `starci kernel settle --job <id> --verdict pass` path, then proves the worker
     released. Every other reported job (blocked/failed/ask/partial, or done
     but unverifiable: its reason and detail) it hands to the Kernel as
     needs-kernel-decision (starci kernel status settleDecisions). Every wake, BEFORE any
@@ -176,7 +176,7 @@ progress:
     then continue with nextActions. A stall (progress.stall.stalled) is your
     work this wake, never the Supervisor's first.
   loop:
-    - "MEASURE: close last wake's open decision first - `starci kernel decide --workflow <wf> --close <id> --result keep|revert --observed <what the metric shows now>`; a revert also undoes its edits (`starci kernel graph-edit --edit undo --undo <edit>`)."
+    - "MEASURE: close last wake's open decision first - `starci kernel decide --workflow <wf> --close <id> --result keep|revert --observed <what the metric shows now>`; a revert also undoes its edits (`starci kernel graph-edit --workflow <wf> --decision <id> --edit undo --undo <edit>`)."
     - "PICK: the highest-ranked rca.actions entry whose `tried` is null (an action tried and reverted is never repeated; the api refuses it: decision-repeats-failed)."
     - "LOG: `starci kernel decide --workflow <wf> --hypothesis <why this fixes the most> --action-key <action.key> --metric <what you will measure next wake> --command <action.command>`."
     - "RUN: the action's command with `--decision <id>`. One action per wake unless the next one is dispatch-ready."
@@ -258,10 +258,10 @@ decisions:
       - "Own your workflow's progress. Every wake read `starci kernel decisions` first, then `starci kernel status` progress + rca, and answer the three questions of progress.firstDuty."
       - "Handle every non-green item: a partial, blocked or failed report, or a red check -> choose the settle verdict (fail, retry, drop, re-cut); a worker question -> `starci kernel reply`; an op escalation."
       - "Light graph edits (tier 1): `starci kernel graph-edit`, `starci kernel op-override`; at most maxUnitsPerEdit (3) units per edit, always after an `starci kernel decide`."
-      - "Heavy redesign: `starci kernel redesign --op work.author|scope.define|goal.revise` (it dispatches the op that owns that work; the Kernel never does it itself)."
+      - "Heavy redesign: `starci kernel redesign --workflow <wf> --op work.author|scope.define|goal.revise --paths <paths> --decision <id>` (it dispatches the op that owns that work; the Kernel never does it itself)."
       - "Tier-2 proposals for shared .claude: `starci kernel kernel-proposal`. Never edit .claude yourself."
       - "Plan and enqueue: `starci kernel plan`, `starci kernel enqueue`."
-      - "Peer communication: `starci kernel notify`, `starci kernel inbox`, `starci kernel incident --kind peer-wait`."
+      - "Peer communication: `starci kernel notify`, `starci kernel inbox`, `starci kernel incident --workflow <wf> --kind peer-wait`."
       - "Acknowledge the runtime rev (`starci kernel kernel-ack-rev`) and re-read the changed files."
       - "Autopilot: keep asks inside your own contract (`starci kernel retire-ask`); never ask the owner anything except credentials and handover."
     mustNot:
@@ -343,7 +343,7 @@ tick:
   plan:
     rule: >-
       The kernel derives the plan from the surveyed goal and hands it to
-      `starci kernel plan --file <plan.json>` (shape: modules/schemas/goal-plan.yaml; the file
+      `starci kernel plan --workflow <wf> --file <plan.json>` (shape: modules/schemas/goal-plan.yaml; the file
       carries the legs' `edges` - route-plan emits them - and a file without
       provable edges is refused plan-edges-missing, nothing written). The api
       persists the digest + diff as a 'plan-derived' event and returns the
@@ -555,9 +555,9 @@ tick:
       `frontier.state=worker-question` is not a wait either: a worker asked its
       coordinator through an Orca orchestration ask and blocks until answered.
       Run `starci kernel questions --workflow <id>`, then for each
-      pending question `starci kernel reply --message <id> --body <answer>` when it is
+      pending question `starci kernel reply --workflow <wf> --message <id> --body <answer>` when it is
       technical guidance inside the job's contract and authority, or
-      `starci kernel reply --message <id> --to-owner` when only the owner can decide -
+      `starci kernel reply --workflow <wf> --message <id> --to-owner` when only the owner can decide -
       the worker then files it as an outcome ask and serve-ask carries it. A
       reply never grants scope, paths, retries or owner intent. `next-ready` is
       not a wait: run nextActions. `orphaned-frontier` (nothing open and
@@ -566,7 +566,7 @@ tick:
       --kind runtime-defect` naming the ledger state. When a next approved
       step cannot pass its preflight until a PEER workflow
       lands something (installs a dependency, writes a record), do not leave it
-      orphaned: send the peer its `starci kernel notify --kind request` and record the
+      orphaned: send the peer its `starci kernel notify --workflow <wf> --to <peer> --kind request --subject <subject> --body <body>` and record the
       wait with `starci kernel incident --kind peer-wait --peer <workflowId> --op <op>
       [--holds <ops|jobs>] [--refs <pm-keys>] [--until-message] --detail <what
       exactly must land>` (peerWait below).
@@ -617,7 +617,7 @@ tick:
       a wait, but when you consumed a report and deliberately hold its settle
       until a peer lands something (a cut-closing pass whose final gate needs
       the peer's commit) or the owner acts, record that wait naming the job
-      (`starci kernel incident --kind peer-wait --peer <wf> --holds <jobId>`, or
+      (`starci kernel incident --workflow <wf> --kind peer-wait --peer <peer-wf> --holds <jobId>`, or
       `--kind owner-gate --holds <jobId>`). The job then leaves
       `frontier.settleReadyJobs` for `frontier.heldSettleJobs`, the frontier
       reads `peer-wait` / `awaiting-owner` when nothing else is movable, and
@@ -639,7 +639,7 @@ tick:
       re-waking you for nothing. When the
       peer's message arrives (frontier peer-message; with --until-message the
       wait is already resolved) re-check the prerequisite before you enqueue:
-      it holds -> `starci kernel incident --resolve <id>` (if still open) and continue;
+      it holds -> `starci kernel incident --workflow <wf> --resolve <id>` (if still open) and continue;
       it does not -> ack the message saying so and keep or re-record the wait.
       A free-text incident of another kind never parks the frontier; replace
       one with a peer-wait and resolve it. The supervisor reports a wait as
@@ -746,7 +746,7 @@ tick:
       ownRunningOverlap: >-
         Never dispatch a job whose owned_paths overlap one of your OWN running
         jobs (shared catalogs such as messages/en.json and vi.json are the usual
-        case): sequence it with `starci kernel enqueue --after <running job>`, or narrow
+        case): sequence it with `starci kernel enqueue --workflow <wf> --op <op> --paths <paths> --after <running job>`, or narrow
         its paths so they are disjoint. If you do, starci kernel route/dispatch answer
         path-lease (waiting: true) instead of launching: the job stays queued
         path-lease naming the holder and its lease expiry, nothing is recorded
@@ -867,7 +867,7 @@ tick:
       rule: >-
         The runtime settler consumes each landed report, re-runs the op's declared
         checks via `starci kernel record-checks`, and settles a reproducibly green done report
-        through `starci kernel settle --verdict pass` (progress.settleFirst). A non-green
+        through `starci kernel settle --job <id> --verdict pass` (progress.settleFirst). A non-green
         report becomes a needs-kernel-decision item. The Kernel reads its report
         and checks, chooses the verdict and calls `starci kernel settle --job <id>
         --verdict <v> [--report <path>]`. The api validates the
@@ -903,7 +903,7 @@ tick:
         validateOpReport), not partially accepted.
     repair:
       onFail: >-
-        `starci kernel settle --verdict fail` runs the attempt's route itself
+        `starci kernel settle --job <id> --verdict fail` runs the attempt's route itself
         (modules/models/kinds.yaml routes, limit enforced): it queues the
         retry, or the repair and the re-run behind it, or a read-only root
         verify when the report names a rootCause node; past the limit it
@@ -1137,7 +1137,7 @@ autopilot:
   provisionAsk: >-
     "Limit provision asks": no provision.ask leg is opened mid-flow - starci kernel enqueue refuses it
     (autopilot-provision-deferred) and nextActions never proposes it. A credential or approval need found mid-flow
-    is recorded with `starci kernel autopilot --defer-to-handover --op <op> --class <class> --detail <owed> [--fields ...]`,
+    is recorded with `starci kernel autopilot --workflow <wf> --defer-to-handover --op <op> --class <class> --detail <owed> [--fields ...]`,
     and the build codes against the declared env var or custody key with a placeholder (credentialPending),
     provider sandbox or test stubs, unit/integration tests on mocks. The live-proof legs (integration/e2e/uat) that
     need a deferred value read queuedBecause deferred-to-handover and are neither dispatched nor failed. When every
@@ -1200,7 +1200,7 @@ handoverLoop:
     handover.review again. It reads the approval and files done; record one
     kernel check (name handover-owner-approval, command the `starci kernel status
     --workflow <id> --json` read, exit 0, evidence the ask dispatch, decision
-    and answeredBy) with `starci kernel record-checks`, then `starci kernel settle --verdict pass`. Settle
+    and answeredBy) with `starci kernel record-checks`, then `starci kernel settle --job <id> --verdict pass`. Settle
     re-reads the receipt itself and records `handover-approved {jobId,
     dispatchId, answeredBy, at}`, or refuses `handover-not-approved` when the
     receipt is not the owner's approve of the latest handover ask or a
@@ -1372,7 +1372,7 @@ peers:
   request: >-
     Work you need that belongs to a peer's scope (its goal, its records, a
     path its open job owns: phone verification in the Login workflow while
-    you build Collab) is `starci kernel notify --to <peer> --kind request`, never work
+    you build Collab) is `starci kernel notify --workflow <wf> --to <peer> --kind request --subject <subject> --body <body>`, never work
     you do yourself and never an owner question about who should do it. Carry
     on with the rest of the frontier; the reply lands in your inbox and wakes
     you.
@@ -1387,7 +1387,7 @@ peers:
     Every received message is acked with `starci kernel inbox --ack <key> --disposition
     <what you did>` (built it, queued it as <job>, adjusted the plan, declined
     because ..., answered in <key>); the sender reads that disposition back. A
-    request also gets `starci kernel notify --kind reply --reply-to <key>`.
+    request also gets `starci kernel notify --workflow <wf> --to <peer> --kind reply --reply-to <key> --subject <subject> --body <body>`.
   escalate: >-
     Only a disagreement the peers cannot settle between them goes to the
     owner (escalation.mustAskOwner PEER-DISAGREEMENT).
@@ -1497,7 +1497,7 @@ sharedWorkRecords:
     follow-up --reason <what peers must follow>` for a change whose note does not say so.
     Mark a change breaking ONLY for a record your workflow owns and only when it withdraws
     or replaces something a peer builds on; a change no peer needs to follow is
-    clarifying/editorial, or `starci kernel record-change --reach advisory` when its note must say
+    clarifying/editorial, or `starci kernel record-change --workflow <wf> --record <record> --reach advisory --reason <why>` when its note must say
     breaking. A breaking note a non-owner writes into another workflow's record binds
     nothing. When you need a peer-owned record changed, ask its owner (starci kernel notify --kind
     request) instead of rewriting it.

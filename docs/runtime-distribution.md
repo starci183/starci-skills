@@ -16,10 +16,10 @@ A failed copy or verify does **not** record a successful install or version bump
 
 | Context | Command |
 | --- | --- |
-| Install | `starci runtime install --dir <host>` |
-| Update | `starci runtime update --dir <host>` |
+| Install | `starci runtime install --cwd <host>` |
+| Update | `starci runtime update --cwd <host>` |
 | Maintainer checkout | `npm test` |
-| Verification | `starci runtime doctor --dir <host> --quick` |
+| Verification | `starci runtime doctor --cwd <host> --quick` |
 
 See [knowledge YAML](knowledge-yaml.md) for authored knowledge sources, and [releasing](releasing.md) for packing.
 
@@ -28,6 +28,6 @@ See [knowledge YAML](knowledge-yaml.md) for authored knowledge sources, and [rel
 If copy finished but verification failed, `.starci-skills.json` is absent or still on the prior version, and the installed tree may be partial.
 
 1. Inspect `<host>/.claude` and the installer error (do not treat a partial tree as healthy).
-2. Re-run `starci runtime update --dir <host>` or `starci runtime install --dir <host>` from the same reviewed package.
-3. Confirm `starci runtime doctor --dir <host> --quick` passes.
+2. Re-run `starci runtime update --cwd <host>` or `starci runtime install --cwd <host>` from the same reviewed package.
+3. Confirm `starci runtime doctor --cwd <host> --quick` passes.
 4. Keep local modifications reported by update; use `--force` only after backup and review.

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,6 +26,11 @@ const writeTo = (target, text) => {
   else target.write(text);
 };
 
+const noRuntime = (stderr, group, skipped) => {
+  for (const note of skipped) writeTo(stderr, `starci: ignored: ${note}\n`);
+  return fail(stderr, `the runtime group "${group}" needs the StarCi runtime, which is not installed (run: starci runtime install)`, 3);
+};
+
 const fail = (stderr, message, code = 2) => {
   writeTo(stderr, `starci: ${message}\n`);
   return code;
@@ -39,8 +44,9 @@ const guardFastPath = async (argv, io) => {
   if (argv.length !== 2 || argv[0] !== 'guard' || !Object.hasOwn(GUARD_FAST_PATH, argv[1])) return null;
   const stderr = io.stderr ?? process.stderr;
   const cwd = io.cwd ?? process.cwd();
-  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env: io.env ?? process.env, ...(io.home ? { home: io.home } : {}) });
-  if (!located) return fail(stderr, 'the runtime group "guard" needs the StarCi runtime, which is not installed (run: starci runtime install)', 3);
+  const skipped = [];
+  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env: io.env ?? process.env, skipped, ...(io.home ? { home: io.home } : {}) });
+  if (!located) return noRuntime(stderr, 'guard', skipped);
   try {
     const file = path.join(located.root, 'scripts', 'guards', GUARD_FAST_PATH[argv[1]]);
     const guard = await (io.importGuard ?? ((target) => import(pathToFileURL(target).href)))(file);
@@ -102,7 +108,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   const { groupHelp, topHelp, verbHelp } = helpModule;
   const { installRuntime } = installModule;
   const { linkRuntime } = linkModule;
-  const { splitCommand, validateArgs } = argsModule;
+  const { splitCommand, validateArgs, withFlagsBeforeDashes } = argsModule;
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
   const catalog = io.catalog ?? CATALOG;
@@ -121,12 +127,24 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     return 0;
   }
 
-  const removed = retiredMatch(argv, retired);
+  const split = splitCommand(argv, catalog.global ?? []);
+  const removed = split.group ? retiredMatch([split.group, ...(split.verb ? [split.verb] : []), ...split.args], retired) : null;
   if (removed) return fail(stderr, `"${removed.spelling}" was removed; use "${removed.use}"`);
 
-  const split = splitCommand(argv, catalog.global ?? []);
+  if (split.group === 'help') {
+    const [verbName] = split.args.filter((token) => !token.startsWith('-'));
+    const target = split.verb ? catalog.groups?.[split.verb] : null;
+    if (split.verb && !target) return fail(stderr, `unknown group "${split.verb}"`);
+    if (verbName && !target.verbs?.[verbName]) return fail(stderr, `unknown verb "${verbName}" for group "${split.verb}"`);
+    writeTo(stdout, !split.verb ? topHelp(catalog, version) : verbName ? verbHelp(catalog, split.verb, verbName) : groupHelp(catalog, split.verb));
+    return 0;
+  }
   if (split.group === 'completion') {
     const shell = split.verb;
+    if (split.help && !split.args.length) {
+      writeTo(stdout, `Usage: starci completion <${completionShells.join('|')}>\n`);
+      return 0;
+    }
     if (!completionShells.includes(shell) || split.args.length) {
       return fail(stderr, `completion expects one of: ${completionShells.join(', ')}`);
     }
@@ -136,8 +154,14 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     return 0;
   }
 
-  const wantsHelp = argv.includes('--help') || argv.includes('-h');
-  if (!split.group) return fail(stderr, 'missing command group');
+  const wantsHelp = split.help;
+  if (!split.group) {
+    if (wantsHelp) {
+      writeTo(stdout, topHelp(catalog, version));
+      return 0;
+    }
+    return fail(stderr, 'missing command group');
+  }
   const group = catalog.groups?.[split.group];
   if (!group) return fail(stderr, `unknown group "${split.group}"`);
   if (!split.verb) {
@@ -157,7 +181,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   const validated = validateArgs(split.args, { ...command, group: split.group, verb: split.verb }, catalog.global ?? []);
   if (!validated.ok) return fail(stderr, validated.error, validated.code);
   const cwd = path.resolve(initialCwd, validated.global.cwd ?? '.');
-  const args = handlerArgs(validated, command);
+  const args = handlerArgs(validated, command, withFlagsBeforeDashes);
 
   if (split.group === 'runtime' && split.verb === 'install') {
     const install = io.installRuntime ?? installRuntime;
@@ -199,15 +223,24 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     }
   }
 
-  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env, ...(home ? { home } : {}) });
-  if (!located) {
-    return fail(stderr, `the runtime group "${split.group}" needs the StarCi runtime, which is not installed (run: starci runtime install)`, 3);
-  }
+  const skipped = [];
+  const located = (io.locateRuntime ?? locateRuntime)({ cwd, env, skipped, ...(home ? { home } : {}) });
+  if (!located) return noRuntime(stderr, split.group, skipped);
   const spawn = io.spawn ?? spawnSync;
-  const result = spawn(process.execPath, [runtimeEntryOf(located.root), split.group, split.verb, ...args], {
-    cwd,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
-  return result?.error ? 1 : (result?.status ?? 1);
+  let result;
+  try {
+    result = spawn(process.execPath, [runtimeEntryOf(located.root), split.group, split.verb, ...args], {
+      cwd,
+      stdio: 'inherit',
+      windowsHide: true,
+    });
+  } catch (error) {
+    return fail(stderr, `cannot run the runtime: ${error?.message ?? error}`, 1);
+  }
+  if (result?.error) {
+    if (result.error.code === 'ENOENT' && !existsSync(cwd)) return fail(stderr, `--cwd "${cwd}" is not a directory`);
+    return fail(stderr, `cannot run the runtime: ${result.error.message ?? result.error}`, 1);
+  }
+  if (result?.status == null) return fail(stderr, `the runtime stopped on signal ${result?.signal ?? 'unknown'}`, 1);
+  return result.status;
 }

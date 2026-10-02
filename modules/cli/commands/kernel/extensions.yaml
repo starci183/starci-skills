@@ -8,7 +8,10 @@ impl:
   script: scripts/kernel/cli.mjs
   args:
     - extensions
-flags: []
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
 exit:
   "0": when every extension loads
   "1": when one is a problem (named in `problems`).

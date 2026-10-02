@@ -123,7 +123,7 @@ starci reconciler once --controller job --json     # then host, workflow, resour
 Compare wall time per controller; a controller that takes minutes on the engine thread starves the heartbeat. Do not
 pass `--apply`.
 
-Kernel screen (read only): `starci orca terminal-read --terminal <handle> --screen` (handle from
+Kernel screen (read only): `starci orca terminal-read --terminal <handle>` (the rendered frame; `--tail` reads raw output; handle from
 `op_attempts.terminal_handle`, `seats`, `terminals`). Never `terminal-send`.
 
 Also: `starci reconciler status`, `starci reconciler up --check`,

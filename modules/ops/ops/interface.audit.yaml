@@ -143,7 +143,7 @@ writes:
     content:
       en: The audit's verdict for this attempt, id operation.<feature>.<audit> (modules/schemas/interface-audit-operation.yaml),
         verdict pass | fail | partial, findings and routeTo interface.implement | interface.draw. File it with
-        `starci kernel report --attach <scratch>/interface-audit.json`; the api writes it as the audit's interface_audits row.
+        `starci kernel report --job <job> --report <report.json> --attach <scratch>/interface-audit.json`; the api writes it as the audit's interface_audits row.
         Never a record under .starciwork. Completion says the selected matrix has no actionable drift; it never
         completes UI, implementation, UAT or review nodes.
   - id: evidence

@@ -215,13 +215,13 @@ sections:
       - "STARCI_JOB_SCRATCH names this job attempt's private OS-temp directory outside every repository;
         your prompt gives its absolute path (it is not an environment variable). Put raw command stdout/stderr, full checker JSON, patches, browser traces,
         videos, DOM snapshots and other operational outputs there. File the transient report JSON
-        from that directory with `starci kernel report --report <scratch/report.json> --attach <absolute-scratch-file>`
+        from that directory with `starci kernel report --job <job> --report <scratch/report.json> --attach <absolute-scratch-file>`
         for each raw file the job needs retained. The API stores the report in the ledger and the
         attachments as content-addressed blobs, then removes scratch. `report.files` names authored
         owned paths, not scratch attachments. Never put operational output in `.starciwork`."
       - "`evidence/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/evidence/`), never a
         folder in `.starciwork` (ARCHITECTURE-DB §5.1: evidence/ is agent data). Write the proof manifest and its assets
-        there and file them with `starci kernel report --attach <scratch>/evidence` (a directory attaches every file under it); each
+        there and file them with `starci kernel report --job <job> --report <report.json> --attach <scratch>/evidence` (a directory attaches every file under it); each
         becomes the artifact `attachments/evidence/<path>` of this attempt (blob + job_artifacts). The same holds for a
         UAT run (`<scratch>/runs/<runId>/**`, artifacts role uat-run with the run id), app and render captures
         (`<scratch>/captures/**`, role capture/dom) and an interface.audit verdict (`<scratch>/interface-audit.json`,
