@@ -5,7 +5,7 @@ import { PAYMENT_SERVICE } from "./payment.decorators"
 import { PaymentService } from "./payment.service"
 
 @Module({})
-/** The payment capability over the order database. */
+/** The payment capability over the billing database: the intake of the bank transfer notifier. */
 export class PaymentModule extends ConfigurableModuleClass {
     /** Registers the capability once per app. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
@@ -17,7 +17,7 @@ export class PaymentModule extends ConfigurableModuleClass {
                 PaymentService,
                 { provide: PAYMENT_SERVICE, useExisting: PaymentService },
             ],
-            exports: [PAYMENT_SERVICE],
+            exports: [PaymentService, PAYMENT_SERVICE],
         }
     }
 }

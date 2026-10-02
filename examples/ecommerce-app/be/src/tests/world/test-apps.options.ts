@@ -13,6 +13,7 @@ import { invoiceEntities } from "@modules/domain/invoice"
 import { orderEntities } from "@modules/domain/order"
 import { paymentEntities } from "@modules/domain/payment"
 import { ClockModule } from "@modules/platform/clock"
+import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { EnvSource, Secret } from "@modules/platform/config"
 import {
     DatabaseModule,
@@ -33,6 +34,7 @@ import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
 import type { BillingAppOptions } from "../../../apps/billing/src/billing.options"
+import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
@@ -46,8 +48,8 @@ export const KEYCLOAK_SIGN_IN_CLIENT = "identity-api"
 /** The confidential client of the realm whose service account creates the shoppers (realm-ecommerce.json). */
 export const KEYCLOAK_ADMIN_CLIENT = "identity-admin"
 
-/** The wiring of the ecommerce world: its three apps and their three connections. */
-export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing">
+/** The wiring of the ecommerce world: its three apps, their three connections and the bank transfer notifier fake. */
+export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing", "sepay">
 
 /** The entities the identity connection maps. */
 export const IDENTITY_ENTITIES: DatabaseConnectionOptions["entities"] = accountEntities
@@ -57,12 +59,11 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...catalogEntities,
     ...cartEntities,
     ...orderEntities,
-    ...paymentEntities,
     ...sagaEntities,
 ]
 
 /** The entities the billing connection maps. */
-export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...inboxEntities]
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...paymentEntities, ...inboxEntities]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -131,9 +132,22 @@ export const receiptStorageOptionsOf = (w: EcommerceWiring): ReceiptStorageOptio
     timeoutMs: CALL_DEADLINE_MS,
 })
 
-const httpSecurity = {
+const httpSecurity: HttpSecurityOptions = {
     allowedOrigins: ALLOWED_ORIGINS,
     rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
+    webhooks: {},
+}
+
+/** The value a fake exposes for the app options; a missing one is a declaration mistake the boot must name. */
+const fakeValue = (values: Readonly<Record<string, string>>, key: string): string => {
+    const value = values[key]
+    if (value === undefined) {
+        throw new TestWorldError({
+            code: TestWorldErrorCode.NotDeclared,
+            params: { detail: `the fake exposes no value "${key}"` },
+        })
+    }
+    return value
 }
 
 /** The options of the identity app. */
@@ -160,9 +174,20 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
 /** The largest total the billing worker of the world invoices: small, so a spec can place an order it rejects. */
 export const BILLING_LIMIT_MINOR_UNITS = 100_000
 
-/** The options of the billing worker. */
+/** The replay window of the notifier signature in the world: five minutes, like the deployment default. */
+const WEBHOOK_TOLERANCE_MS = 300_000
+
+/** The options of the billing api: the notifier fake signs with the secret the fake exposes, and the app verifies with the same one. */
 export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
+    port: w.apps.billing.port,
     database: billingDatabase(w),
+    identityApi: identityApiOptionsOf(w),
+    httpSecurity: {
+        ...httpSecurity,
+        webhooks: {
+            sepay: { secret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")), toleranceMs: WEBHOOK_TOLERANCE_MS },
+        },
+    },
     messaging: messagingOptionsOf(w),
     invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },
 })

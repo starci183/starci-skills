@@ -1,6 +1,6 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
 
-/** Creates the payments table of the order database. */
+/** Creates the payments table of the billing database. */
 export class CreatePayments1789800004000 implements MigrationInterface {
     name = "CreatePayments1789800004000"
 
@@ -8,10 +8,11 @@ export class CreatePayments1789800004000 implements MigrationInterface {
     async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE payments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    person_id uuid NOT NULL,
+    invoice_id uuid NOT NULL,
     order_id uuid NOT NULL UNIQUE,
+    person_id uuid NOT NULL,
     amount_minor_units int NOT NULL CHECK (amount_minor_units >= 0),
-    status varchar(16) NOT NULL CHECK (status IN ('captured')),
+    provider_reference varchar(64) NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 )`)
     }

@@ -64,4 +64,9 @@ export class SepayTransferRequest {
     @IsString()
     @Length(0, 512)
     description!: string
+
+    /** The inbox key of the delivery: the notifier id of the transfer as text. */
+    get eventId(): string {
+        return String(this.id)
+    }
 }

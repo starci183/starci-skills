@@ -1,7 +1,7 @@
 services:
   billing:
-    # The billing worker, built from this repository: the context is the app root, the Dockerfile is the app's own. The tag is the
-    # exact version of the image (never a moving tag); it has no listener, so no port is published.
+    # The billing api, built from this repository: the context is the app root, the Dockerfile is the app's own. The tag is the
+    # exact version of the image (never a moving tag); it publishes 7070, the webhook door and the readiness probe.
     image: ecommerce-app/billing:1.0.0
     build:
       context: ../../../..
@@ -10,3 +10,5 @@ services:
     depends_on:
       - postgres
       - redis
+    ports:
+      - "7070:7070"

@@ -6,12 +6,16 @@ import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseBillingAppOptions } from "./billing.options"
 
-/** Reads the environment once and starts the billing worker: no listener, its consumers poll the streams until it is stopped. */
+/** Reads the environment once, builds the billing api from it and listens; the raw body is kept so a webhook signature is checked on the exact bytes. */
 async function bootstrap(): Promise<void> {
     const options = parseBillingAppOptions(EnvSource.fromProcess())
-    const app = await NestFactory.createApplicationContext(AppModule.register(options))
+    const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableShutdownHooks()
-    createJsonLogger(new SystemClock()).info(LoggingLogEvent.WorkerStarted, { service: "billing" })
+    await app.listen(options.port)
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
+        service: "billing",
+        port: options.port,
+    })
 }
 
 bootstrap().catch((error: unknown) => {

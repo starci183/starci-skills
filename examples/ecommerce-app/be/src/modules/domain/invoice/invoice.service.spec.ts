@@ -48,7 +48,7 @@ describe("InvoiceService", () => {
 
             expect(outcome).toEqual({
                 kind: "ok",
-                value: { invoiceId: "inv-1", orderId: "o-1", totalMinorUnits: 1500 },
+                value: { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 },
             })
             expect(inbox.claim).toHaveBeenCalledWith("order", "o-1")
             expect(manager.save).toHaveBeenCalledWith(InvoiceEntity, {
@@ -96,7 +96,7 @@ describe("InvoiceService", () => {
 
             expect(outcome).toEqual({
                 kind: "ok",
-                value: { invoiceId: "inv-1", orderId: "o-1", totalMinorUnits: 1500 },
+                value: { invoiceId: "inv-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 },
             })
             expect(manager.findOneByOrFail).toHaveBeenCalledWith(InvoiceEntity, { orderId: "o-1" })
             expect(manager.save).not.toHaveBeenCalled()
@@ -123,6 +123,40 @@ describe("InvoiceService", () => {
 
             await expect(service.issue(request)).rejects.toBe(failure)
             expect(inbox.release).toHaveBeenCalledWith("order", "o-1")
+        })
+    })
+
+    describe("findOpen", () => {
+        it("answers the issued, unpaid invoice of the order read with the manager of the caller", async () => {
+            const manager = mockEntityManager({ findOneBy: [InvoiceEntity, invoiceRow()] })
+            const { service } = await build(mockEntityManager())
+
+            const found = await service.findOpen({ manager, orderId: "o-1" })
+
+            expect(found).toEqual({ invoiceId: "inv-1", orderId: "o-1", personId: "p-1", totalMinorUnits: 1500 })
+            expect(manager.findOneBy).toHaveBeenCalledWith(InvoiceEntity, { orderId: "o-1", status: "issued" })
+        })
+
+        it("answers null when the order has no issued invoice", async () => {
+            const manager = mockEntityManager({ findOneBy: [InvoiceEntity, null] })
+            const { service } = await build(mockEntityManager())
+
+            expect(await service.findOpen({ manager, orderId: "o-9" })).toBeNull()
+        })
+    })
+
+    describe("markPaid", () => {
+        it("marks only the issued invoice of the order paid, stamped with the time the caller gives, in the caller transaction", async () => {
+            const manager = mockEntityManager()
+            const { service } = await build(mockEntityManager())
+
+            await service.markPaid({ manager, orderId: "o-1", paidAt: new Date(AT) })
+
+            expect(manager.update).toHaveBeenCalledWith(
+                InvoiceEntity,
+                { orderId: "o-1", status: "issued" },
+                { status: "paid", paidAt: new Date(AT) },
+            )
         })
     })
 })

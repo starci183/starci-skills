@@ -7,7 +7,7 @@
       "apps": [
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },
-        { "name": "billing", "kind": "worker" },
+        { "name": "billing", "kind": "api" },
         { "name": "migrate", "kind": "migrate" }
       ],
       "connections": [
@@ -16,7 +16,7 @@
         { "name": "billing", "envPrefix": "BILLING_DB" }
       ],
       "optionalSlots": ["repo.docs", "be.contract.graphql", "be.contract.events", "be.transport.message"],
-      "patterns": ["saga", "event-bus"]
+      "patterns": ["saga", "event-bus", "webhooks", "realtime"]
     },
     "fe": {
       "apps": [

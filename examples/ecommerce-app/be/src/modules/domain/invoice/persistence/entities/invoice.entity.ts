@@ -1,7 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn } from "typeorm"
 
 @Entity("invoices")
-/** One invoice per order, keyed by the order id: issued, or rejected when the total was above the limit. */
+/** One invoice per order, keyed by the order id: issued, rejected when the total was above the limit, or paid by a bank transfer. */
 export class InvoiceEntity {
     /** The invoice id. */
     @PrimaryGeneratedColumn("uuid", { name: "id" })
@@ -21,9 +21,13 @@ export class InvoiceEntity {
 
     /** The invoice state; a varchar with a CHECK in the migration, not a native enum. */
     @Column({ name: "status", type: "varchar", length: 16 })
-    status!: "issued" | "rejected"
+    status!: "issued" | "rejected" | "paid"
 
     /** When the invoice was recorded. */
     @Column({ name: "created_at", type: "timestamptz", default: () => "now()" })
     createdAt!: Date
+
+    /** When a bank transfer paid the invoice; null until it is paid. */
+    @Column({ name: "paid_at", type: "timestamptz", nullable: true })
+    paidAt!: Date | null
 }

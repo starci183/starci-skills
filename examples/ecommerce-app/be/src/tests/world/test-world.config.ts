@@ -2,10 +2,11 @@
  * The declaration of the ecommerce test world: selection and overrides only. The service list and the image versions come
  * from the stack definition (`.starcistacks/dev`); the library runs Postgres (one database per connection, seeded with the
  * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the three real apps
- * in process: identity and order are wired to each other and talk to billing, a worker with no listener, over Redis streams. The stack calls no third party, so the world declares no fake.
+ * in process: identity and order are wired to each other and talk to billing over Redis streams, and billing serves the signed webhook door of the bank transfer notifier, which is the one fake at the network edge (the SePay fake of the library, delivering to billing).
  */
 import { defineTestWorld } from "@starci/test-world"
 import type { IdentityWorld, TestApi } from "@starci/test-world"
+import { sepayFake } from "@starci/test-world/fakes"
 import { EnvSource } from "@modules/platform/config"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
@@ -52,10 +53,11 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         minio: { buckets: [RECEIPTS_BUCKET] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-ecommerce.json", clientId: KEYCLOAK_SIGN_IN_CLIENT },
     },
+    fakes: { sepay: sepayFake({ webhookPath: "/webhooks/sepay", webhookStyle: "transaction", webhookApp: "billing" }) },
     apps: {
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },
         order: { module: OrderApp, operations: ECOMMERCE_OPERATIONS, options: orderOptions },
-        billing: { module: BillingApp, listen: false, options: billingOptions },
+        billing: { module: BillingApp, rawBody: true, options: billingOptions },
     },
     migrate: {
         module: migrateMain,
