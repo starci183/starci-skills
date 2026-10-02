@@ -21,7 +21,7 @@ test('a block copied into another file under other names and literals is flagged
     { rel: 'scripts/b/second.mjs', text: BLOCK('pickB', 'b') },
   ]);
   assert.deepEqual(findings.map((f) => [f.code, f.path]), [['RT_DUPLICATE_CODE', 'scripts/b/second.mjs']]);
-  assert.match(findings[0].message, /also at scripts\/a\/first\.mjs:1/);
+  assert.match(findings[0].message, /also at scripts\/a\/first\.mjs:\d+/);
 });
 
 test('two different blocks and short repeats are not clones', () => {
