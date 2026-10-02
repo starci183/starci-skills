@@ -183,9 +183,13 @@ function manifestShapeProblems(m) {
   const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
   const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
   const rp = m.ruleParams;
-  if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
+  if (!isPlainObject(rp) || Object.keys(rp).some((k) => ![...PROFILES, 'common'].includes(k)) || !isPlainObject(rp.common) || !isPlainObject(rp.be) || (rp.fe !== undefined && !isPlainObject(rp.fe))) bad.push('ruleParams must be a map with common, be and optionally fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 12) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, patternScenarios, kindPatterns and addKinds'); else bad.push(...unitRolesProblems(rp.be));
+    // common holds the parameters both sides share; a side may restate one of them (a valid value) as an override, nothing else.
+    const sharedParam = (key, v) => (key === 'fileLines' ? fileLinesOk(v) : blockOk(v));
+    const sideOk = (side, own) => own.every((k) => side[k] !== undefined) && Object.entries(side).every(([k, v]) => own.includes(k) || (['fileLines', 'duplicateBlock'].includes(k) && sharedParam(k, v)));
+    if (Object.keys(rp.common).length !== 2 || !fileLinesOk(rp.common.fileLines) || !blockOk(rp.common.duplicateBlock)) bad.push('ruleParams.common needs exactly fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
+    if (!sideOk(rp.be, ['infraOwners', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'patternScenarios', 'kindPatterns', 'addKinds'])) bad.push('ruleParams.be needs infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, patternScenarios, kindPatterns and addKinds (fileLines and duplicateBlock live in ruleParams.common, a side may override them)'); else bad.push(...unitRolesProblems(rp.be));
     bad.push(...scenarioProblem(rp.be.patternScenarios), ...kindParamProblems(rp.be, m.triggerKinds));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
@@ -202,7 +206,7 @@ function manifestShapeProblems(m) {
     const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
     const sd = rp.be.specDoubles;
     if (!isPlainObject(sd) || Object.keys(sd).sort().join() !== 'doubles,fallback,kit' || typeof sd.kit !== 'string' || !sd.kit || !Array.isArray(sd.doubles) || !sd.doubles.length || !sd.doubles.every((e) => doubleOk(e) && regexOk(e.token) && Object.keys(e).length === 3) || !doubleOk(sd.fallback) || Object.keys(sd.fallback).length !== 2) bad.push('ruleParams.be.specDoubles must be {kit, doubles: [{token: regex, double, forms}], fallback: {double, forms}} with forms drawn from call, new, curried, object, primitive, array');
-    if (!fileLinesOk(rp.fe.fileLines) || !blockOk(rp.fe.duplicateBlock) || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
+    if (rp.fe !== undefined && !sideOk(rp.fe, [])) bad.push('ruleParams.fe may only restate fileLines and duplicateBlock of ruleParams.common');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
   m.slots.forEach((slot, index) => bad.push(...slotProblems(slot, index, APP_KIND, { appScope: APP_SCOPE, scopes: SCOPES })));
@@ -756,12 +760,12 @@ export function createSlotResolver(manifest, repo) {
   });
 }
 
-/** The rule parameters of one profile (be: fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes; fe: fileLines, duplicateBlock; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. */
+/** The rule parameters of one profile (be: infraOwners, suffixes, bannedSuffixes and the rest over the shared ruleParams.common fileLines and duplicateBlock; fe: common alone or with its overrides; runtime: ruleParams.runtime of a runtime manifest), as a frozen deep copy. A profile key overrides the same key of common. */
 export function ruleParams(manifest, profile) {
   const profiles = manifestKind(manifest) === RUNTIME_KIND ? [RUNTIME_KIND] : PROFILES;
   if (!profiles.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
   const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
-  return deepFreeze(structuredClone(manifest.ruleParams[profile]));
+  return deepFreeze(structuredClone({ ...manifest.ruleParams.common, ...manifest.ruleParams[profile] }));
 }
 
 /**

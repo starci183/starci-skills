@@ -14,7 +14,7 @@ import { locateDeclaration } from '../slots.mjs';
  *   - a connection file for a name hfs.json does not declare is refused;
  *   - `getEntityManagerToken(` and `InjectEntityManager(` (from @nestjs/typeorm) resolve their argument through the
  *     checker to a connection name and may be called only in that connection's decorators file, once; the DataSource
- *     forms only in platform/database, the migrate app and the test fixtures; an exported `Inject*EntityManager`
+ *     forms only in platform/database, the cli app and the test fixtures; an exported `Inject*EntityManager`
  *     anywhere else (a capability-specific injector, a duplicate) is refused;
  *   - inside one app every connection is passed to the platform/database module registration once;
  *   - a connection whose hfs.json `isolation` is `schema` reads `<PREFIX>_SCHEMA` in its config (a context is its own database or its own
