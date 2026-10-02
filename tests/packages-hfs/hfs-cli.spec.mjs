@@ -407,7 +407,7 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
 test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
-  const [finding] = only(result, 'BE_REQUIRED_MODULE_MISSING');
+  const [finding] = only(result, 'HFS_REQUIRED_FILE_MISSING');
   assert.equal(result.ok, false);
   assert.equal(finding.level, 'error');
   assert.equal(finding.source, 'machine');
@@ -415,7 +415,7 @@ test('hfs check runs the architecture machine: its violation is a finding under 
   assert.match(finding.whyVi, HAS_VIETNAMESE);
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
-  assert.equal(result.counts.byCode.BE_REQUIRED_MODULE_MISSING.count, 1);
+  assert.equal(result.counts.byCode.HFS_REQUIRED_FILE_MISSING.count, 1);
   assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a hfs check finding');
 });
 
@@ -584,7 +584,7 @@ test('the CLI: machine findings fail the exit code and print with their Vietname
   const text = await cli(['check', '--repo', dir]);
   assert.equal(text.code, 1);
   assert.match(text.out, /architecture machine: ran over \d+ source files/);
-  assert.match(text.out, /BE_REQUIRED_MODULE_MISSING x1/);
+  assert.match(text.out, /HFS_REQUIRED_FILE_MISSING x1/);
   assert.match(text.out, HAS_VIETNAMESE);
   const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
   assert.equal(json.machine.status, 'ran');

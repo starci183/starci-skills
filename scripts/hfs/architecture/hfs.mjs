@@ -16,6 +16,7 @@ import { isFeTestPath } from '../rules/fe-no-tests.mjs';
  */
 
 export const HFS_RULE_IDS = [
+  'BE_TEST_TOPOLOGY',
   'HFS_APPS_REQUIRED',
   'HFS_APP_LAYOUT_INVALID',
   'HFS_E2E_IN_AUTOMATIC_GATE',
@@ -36,7 +37,6 @@ export const HFS_RULE_IDS = [
   'HFS_ROOT_SRC_FORBIDDEN_FE',
   'HFS_SRC_LAYOUT_INVALID',
   'HFS_STACKS_IN_SIDE',
-  'HFS_TEST_KIND_RETIRED',
   'HFS_WORK_IN_FE',
 ];
 
@@ -487,11 +487,11 @@ export function checkHfs(config) {
   // live/; a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
   for (const file of tree.files()) {
     if (RETIRED_TEST_SUFFIX.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} uses a retired test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} uses a retired test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
     else if (backend && RETIRED_TEST_FOLDER.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
     else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 
   if (backend) testTreesOutOfDefaultProgram({ root: config.root, tree, finding });

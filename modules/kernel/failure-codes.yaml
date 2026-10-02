@@ -2951,17 +2951,6 @@ HFS_SYNC_MANIFEST_MANAGED:
   owner: runtime-core
   kind: check-finding
 
-HFS_TEST_KIND_RETIRED:
-  title: "Retired test kind or extra test config"
-  title_vi: "Dùng loại test đã bỏ hoặc cấu hình test thừa"
-  meaning_vi: "Có tệp test thuộc loại đã bị loại bỏ, hoặc một cấu hình jest hay Playwright riêng thay vì một cấu hình chung ở gốc."
-  causes_vi:
-    - "Viết spec tích hợp hoặc harness theo kiểu cũ"
-    - "Tạo thêm tệp cấu hình test cho riêng từng nhóm"
-  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải đổi tệp thành unit hoặc e2e và bỏ cấu hình thừa rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
 HFS_TRACKED_MUST_BE_IGNORED:
   title: "Tracked path that must be gitignored"
   title_vi: "Tệp bị theo dõi nhưng lẽ ra phải bị bỏ qua"
@@ -12862,17 +12851,6 @@ STACKS_QUALITY_GATE_DRIFT:
     - "Repository tự đặt tên cổng riêng"
   nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-quality vào khối services.sonar."
   owner: other-op:workspace.manage
-  kind: check-finding
-
-BE_REQUIRED_MODULE_MISSING:
-  title: "Required backend module, app or feature file is missing"
-  title_vi: "Thiếu tệp hoặc thư mục bắt buộc của một phần backend"
-  meaning_vi: "Bảng kê HFS bắt buộc mỗi ứng dụng, tính năng, module miền, tích hợp và module nền tảng (cấu hình, ghi nhật ký, lỗi, kiểu nguyên thuỷ) phải có một số tệp hoặc thư mục cố định, ví dụ index.ts, tệp .module.ts hay thư mục application/. Ở đây một mục như vậy không tồn tại, nên phần đó chưa đúng khuôn và các bộ kiểm tra khác không thể tin vào nó."
-  causes_vi:
-    - "Tạo module hoặc tính năng mới nhưng quên tệp cửa vào index.ts hoặc tệp .module.ts"
-    - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
-  owner: op-retry
   kind: check-finding
 
 FE_HREF_RESOLVES:

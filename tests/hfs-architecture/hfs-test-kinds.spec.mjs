@@ -16,7 +16,7 @@ const tree = (t, files) => {
   }
   return root;
 };
-const retired = (root, kinds) => checkHfs({ root, kinds }).violations.filter(item => item.ruleId === 'HFS_TEST_KIND_RETIRED').map(item => item.path).sort();
+const retired = (root, kinds) => checkHfs({ root, kinds }).violations.filter(item => item.ruleId === 'BE_TEST_TOPOLOGY').map(item => item.path).sort();
 
 test('the retired int-spec, harness and live test kinds are flagged; unit, integration, e2e and contract are not', t => {
   const root = tree(t, ['src/tests/e2e/checkout/flow.e2e-spec.ts', 'src/tests/world/global-setup.ts', 'src/tests/fixtures/data.json',

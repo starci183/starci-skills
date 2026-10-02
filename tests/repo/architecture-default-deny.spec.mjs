@@ -92,3 +92,26 @@ test('BE: an http-security guard that reads no origin and no door metadata, or a
     assert.match(found[0].message, /does not provide the throttler guard/);
   }
 });
+
+// A helper that builds the APP_GUARD entries outside the app root file is followed: the chain is judged where it is provided.
+const HELPER = guards => `import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';
+import { AuthGuard } from '../../../src/modules/domain/identity';
+export const guardChain = () => [${guards.map(name => `{ provide: APP_GUARD, useClass: ${name} }`).join(', ')}];
+export const GUARD_PROVIDERS = [${guards.map(name => `{ provide: APP_GUARD, useClass: ${name} }`).join(', ')}];
+`;
+const ROOT_USING_HELPER = use => `import { Module } from '@nestjs/common';
+import { guardChain, GUARD_PROVIDERS } from './guard-chain';
+@Module({ providers: [${use}] })
+export class AppModule {}
+`;
+const runHelper = (t, guards, use) => runArch(archFixture(t, { files: { ...FILES, 'apps/core/src/guard-chain.ts': HELPER(guards), 'apps/core/src/app.module.ts': ROOT_USING_HELPER(use) } }));
+
+test('BE: guards built by a helper declared outside the app root file, called or spread from it, are judged like inline ones', t => {
+  for (const use of ['...guardChain()', '...GUARD_PROVIDERS']) {
+    assert.deepEqual(hits(runHelper(t, ['ThrottlerGuard', 'CsrfOriginGuard', 'AuthGuard'], use)), [], use);
+    assert.match(hits(runHelper(t, ['ThrottlerGuard', 'CsrfOriginGuard'], use))[0].message, /does not provide AuthGuard/, use);
+    assert.equal(hits(runHelper(t, ['AuthGuard', 'ThrottlerGuard', 'CsrfOriginGuard'], use)).length, 1, use);
+  }
+});

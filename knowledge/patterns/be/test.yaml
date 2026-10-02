@@ -77,7 +77,6 @@ rules:
         - unit-test-colocated
         - BE_TEST_TOPOLOGY
         - HFS_E2E_IN_AUTOMATIC_GATE
-        - HFS_TEST_KIND_RETIRED
       manual:
         - Record which transport, service, database and external boundary an e2e run actually exercised.
     relatedExamples: []
