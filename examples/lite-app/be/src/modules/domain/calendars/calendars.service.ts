@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
-import { acceptRowDelivery, findRowIdentity, InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
+import { CalendarsError, CalendarsErrorCode } from "./errors/calendars.error"
 import type { CalendarsRow } from "./persistence/calendars.rows"
-import { FIND_CALENDARS } from "./persistence/calendars.sql"
+import { FIND_CALENDARS, FIND_DELIVERY_CALENDAR } from "./persistence/calendars.sql"
 
-interface CalendarsRequest {
+interface CalendarDelivery {
     readonly id: string
 }
 
@@ -17,13 +18,21 @@ interface CalendarsResult {
 export class CalendarsService {
     constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
-    /** Answers the requested row identity without exposing persistence types to the feature. */
-    calendars(request: CalendarsRequest): Promise<CalendarsResult> {
-        return findRowIdentity<CalendarsRow>(this.entityManager, FIND_CALENDARS, request.id)
+    /** Answers one row owned by the authenticated principal; absent and denied rows share one typed not-found result. */
+    calendars(principalId: string, id: string): Promise<CalendarsResult> {
+        return requireOwnedRow<Pick<CalendarsRow, "id">>(this.entityManager, FIND_CALENDARS, id, principalId, () => {
+            throw new CalendarsError({ code: CalendarsErrorCode.NotFound, params: { id } })
+        })
     }
 
-    /** Accepts one calendar delivery idempotently at the database boundary. */
-    async acceptCalendarDelivery(delivery: CalendarsRequest): Promise<void> {
-        await acceptRowDelivery(this.entityManager, FIND_CALENDARS, delivery.id)
+    /** Resolves one verified delivery target; the inbox generator supplies its transaction manager. */
+    async acceptCalendarDelivery(
+        delivery: CalendarDelivery,
+        entityManager: EntityManager = this.entityManager,
+    ): Promise<void> {
+        const rows = await entityManager.query<Array<Pick<CalendarsRow, "id">>>(FIND_DELIVERY_CALENDAR, [delivery.id])
+        if (rows[0] === undefined) {
+            throw new CalendarsError({ code: CalendarsErrorCode.NotFound, params: { id: delivery.id } })
+        }
     }
 }

@@ -8,21 +8,25 @@
       "title": "Home",
       "signedIn": "Signed in",
       "resources": "Resources: {count}",
+      "calendars": "Calendars: {count}",
       "bookings": "Bookings: {count}",
       "unavailable": "unavailable"
     },
     "booking": {
       "title": "Booking workspace",
-      "resource": "Resource id",
-      "booking": "Booking id",
+      "resource": "Resource UUID",
+      "booking": "Booking UUID",
+      "bookingResource": "Resource UUID for this booking",
+      "startsAt": "Starts at (UTC ISO timestamp)",
+      "endsAt": "Ends at (UTC ISO timestamp)",
       "addResource": "Add resource",
       "addBooking": "Add booking",
       "working": "Saving",
-      "created": "Saved",
-      "refused": "Sign in before changing bookings.",
-      "not-found": "The requested record was not found.",
-      "invalid": "Use a non-empty id that has not already been registered.",
-      "unavailable": "The booking service is unavailable."
+      "created": "Created.",
+      "refused": "The request was refused.",
+      "not-found": "The resource was not found.",
+      "invalid": "Use valid UUIDs and a start time before the end time.",
+      "unavailable": "The booking service is unavailable. Try again shortly."
     },
     "signIn": {
       "title": "Sign in",

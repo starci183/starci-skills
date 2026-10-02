@@ -25,13 +25,32 @@ export type Database = {
           Tables: {
             "bookings": {
                   Row: {
-                    "created_at": string,"id": string,"owner_id": string,"updated_at": string
+                    "created_at": string,"ends_at": string,"id": string,"owner_id": string,"resource_id": string,"starts_at": string,"updated_at": string
                   }
                   Insert: {
-                    "created_at"?: string,"id"?: string,"owner_id": string,"updated_at"?: string
+                    "created_at"?: string,"ends_at": string,"id"?: string,"owner_id": string,"resource_id": string,"starts_at": string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"owner_id"?: string,"updated_at"?: string
+                    "created_at"?: string,"ends_at"?: string,"id"?: string,"owner_id"?: string,"resource_id"?: string,"starts_at"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "bookings_resource_id_fkey"
+      columns: ["resource_id"]
+isOneToOne: false
+      referencedRelation: "resources"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"calendar_inbox": {
+                  Row: {
+                    "delivery_id": string,"id": string,"payload": NonNullable<Json>,"processed_at": string | null,"provider": string,"received_at": string
+                  }
+                  Insert: {
+                    "delivery_id": string,"id"?: string,"payload": NonNullable<Json>,"processed_at"?: string | null,"provider": string,"received_at"?: string
+                  }
+                  Update: {
+                    "delivery_id"?: string,"id"?: string,"payload"?: NonNullable<Json>,"processed_at"?: string | null,"provider"?: string,"received_at"?: string
                   }
                   Relationships: [
                     

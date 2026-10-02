@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server"
 import { BookingForm } from "@/components/blocks/BookingForm"
 import { SignInForm } from "@/components/blocks/SignInForm"
 import { SignOutButton } from "@/components/blocks/SignOutButton"
-import { readBookings, readResources, readSession } from "@/modules/db"
+import { readBookings, readCalendars, readResources, readSession } from "@/modules/db"
 import { AppHomePageBase } from "./component"
 
 /** The document title of the home page. */
@@ -16,7 +16,7 @@ export const appHomeMetadata = async (): Promise<Metadata> => {
 export const AppHomePage = async () => {
     const session = await readSession()
     if (session.kind !== "ok") return <SignInForm />
-    const [resources, bookings] = await Promise.all([readResources(), readBookings()])
+    const [resources, calendars, bookings] = await Promise.all([readResources(), readCalendars(), readBookings()])
     const t = await getTranslations("app.home")
     return (
         <>
@@ -26,6 +26,9 @@ export const AppHomePage = async () => {
                     principal: session.value.email ?? t("signedIn"),
                     resources: t("resources", {
                         count: resources.kind === "ok" ? resources.value.length : t("unavailable"),
+                    }),
+                    calendars: t("calendars", {
+                        count: calendars.kind === "ok" ? calendars.value.length : t("unavailable"),
                     }),
                     bookings: t("bookings", {
                         count: bookings.kind === "ok" ? bookings.value.length : t("unavailable"),

@@ -2,7 +2,9 @@
 
 import { I18nProvider } from "@heroui/react"
 import { NextIntlClientProvider } from "next-intl"
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
+import { subscribeToAuthRefresh } from "@/modules/db/browser"
+import { navigation } from "@/modules/i18n"
 
 /** What the provider stack takes from the locale layout. */
 type ProvidersProps = {
@@ -12,9 +14,13 @@ type ProvidersProps = {
     readonly children: ReactNode
 }
 
-/** The copy and React Aria locale contexts above every route. */
-export const Providers = (props: ProvidersProps) => (
-    <NextIntlClientProvider locale={props.locale} messages={props.messages} timeZone={props.timeZone}>
-        <I18nProvider locale={props.locale}>{props.children}</I18nProvider>
-    </NextIntlClientProvider>
-)
+/** The copy, React Aria and auth-refresh contexts above every route. */
+export const Providers = (props: ProvidersProps) => {
+    const router = navigation.useRouter()
+    useEffect(() => subscribeToAuthRefresh(() => router.refresh()), [router])
+    return (
+        <NextIntlClientProvider locale={props.locale} messages={props.messages} timeZone={props.timeZone}>
+            <I18nProvider locale={props.locale}>{props.children}</I18nProvider>
+        </NextIntlClientProvider>
+    )
+}

@@ -3,6 +3,12 @@
   "kind": "app",
   "edition": "lite",
   "project": "lite-app",
+  "supabase": {
+    "enableSignup": false,
+    "jwtExpiry": 3600,
+    "siteUrl": "http://127.0.0.1:3000",
+    "redirectUrls": ["http://127.0.0.1:3000/auth/callback"]
+  },
   "sides": {
     "be": {
       "apps": [

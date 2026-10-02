@@ -1,12 +1,9 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
-import { acceptRowDelivery, findRowIdentity, InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
+import { ResourcesError, ResourcesErrorCode } from "./errors/resources.error"
 import type { ResourcesRow } from "./persistence/resources.rows"
 import { FIND_RESOURCES } from "./persistence/resources.sql"
-
-interface ResourcesRequest {
-    readonly id: string
-}
 
 interface ResourcesResult {
     readonly id: string
@@ -17,13 +14,10 @@ interface ResourcesResult {
 export class ResourcesService {
     constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
-    /** Answers the requested row identity without exposing persistence types to the feature. */
-    resources(request: ResourcesRequest): Promise<ResourcesResult> {
-        return findRowIdentity<ResourcesRow>(this.entityManager, FIND_RESOURCES, request.id)
-    }
-
-    /** Accepts one resource delivery idempotently at the database boundary. */
-    async acceptResourceDelivery(delivery: ResourcesRequest): Promise<void> {
-        await acceptRowDelivery(this.entityManager, FIND_RESOURCES, delivery.id)
+    /** Answers one row owned by the authenticated principal; absent and denied rows share one typed not-found result. */
+    resources(principalId: string, id: string): Promise<ResourcesResult> {
+        return requireOwnedRow<Pick<ResourcesRow, "id">>(this.entityManager, FIND_RESOURCES, id, principalId, () => {
+            throw new ResourcesError({ code: ResourcesErrorCode.NotFound, params: { id } })
+        })
     }
 }

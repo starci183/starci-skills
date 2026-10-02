@@ -7,6 +7,8 @@ export enum HttpSecurityErrorCode {
     OriginRejected = "HTTP_SECURITY_ORIGIN_REJECTED",
     /** The caller sent more requests than its tier allows in the current window. */
     RateLimited = "HTTP_SECURITY_RATE_LIMITED",
+    /** The request body or arguments failed validation; the offending fields ride in the params. */
+    RequestInvalid = "HTTP_SECURITY_REQUEST_INVALID",
     /** A webhook did not prove the signature of its exact raw body. */
     WebhookSignatureInvalid = "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID",
     /** A webhook was signed outside its configured replay window. */
@@ -19,6 +21,7 @@ export enum HttpSecurityErrorCode {
 export const HTTP_SECURITY_ERROR_KINDS: Record<HttpSecurityErrorCode, ErrorKind> = {
     [HttpSecurityErrorCode.OriginRejected]: "forbidden",
     [HttpSecurityErrorCode.RateLimited]: "rate-limited",
+    [HttpSecurityErrorCode.RequestInvalid]: "invalid",
     [HttpSecurityErrorCode.WebhookSignatureInvalid]: "unauthenticated",
     [HttpSecurityErrorCode.WebhookReplayed]: "unauthenticated",
     [HttpSecurityErrorCode.WebhookProviderUnknown]: "internal",

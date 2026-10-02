@@ -3,11 +3,10 @@ import "server-only"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { exchangeAuthCode } from "@/modules/db"
-import { APP_ROUTES } from "@/modules/routes"
+import { safeNextPath } from "@/modules/routes"
 
 const destinationOf = (request: NextRequest): URL => {
-    const requested = request.nextUrl.searchParams.get("next")
-    const path = requested?.startsWith("/") && !requested.startsWith("//") ? requested : APP_ROUTES.home
+    const path = safeNextPath(request.nextUrl.searchParams.get("next"), request.nextUrl.origin)
     return new URL(path, request.nextUrl.origin)
 }
 

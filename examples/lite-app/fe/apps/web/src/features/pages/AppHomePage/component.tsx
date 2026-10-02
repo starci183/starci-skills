@@ -6,6 +6,7 @@ export type AppHomePageBaseProps = {
         readonly title: string
         readonly principal: string
         readonly resources: string
+        readonly calendars: string
         readonly bookings: string
     }
 }
@@ -16,6 +17,7 @@ export const AppHomePageBase = (props: AppHomePageBaseProps) => (
         <Heading level={1}>{props.props.title}</Heading>
         <Text>{props.props.principal}</Text>
         <Text>{props.props.resources}</Text>
+        <Text>{props.props.calendars}</Text>
         <Text>{props.props.bookings}</Text>
     </>
 )

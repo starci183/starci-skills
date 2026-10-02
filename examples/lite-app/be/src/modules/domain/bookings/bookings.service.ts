@@ -1,16 +1,16 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { ResourcesService } from "@modules/domain/resources"
-import { acceptRowDelivery, findRowIdentity, InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectPrimaryEntityManager, requireOwnedRow } from "@modules/platform/database"
+import { BookingsError, BookingsErrorCode } from "./errors/bookings.error"
 import type { BookingsRow } from "./persistence/bookings.rows"
 import { FIND_BOOKINGS } from "./persistence/bookings.sql"
 
-interface BookingsRequest {
-    readonly id: string
-}
-
 interface BookingsResult {
     readonly id: string
+    readonly resourceId: string
+    readonly startsAt: string
+    readonly endsAt: string
 }
 
 @Injectable()
@@ -21,14 +21,18 @@ export class BookingsService {
         private readonly resources: ResourcesService,
     ) {}
 
-    /** Answers the requested row identity without exposing persistence types to the feature. */
-    async bookings(request: BookingsRequest): Promise<BookingsResult> {
-        const resource = await this.resources.resources(request)
-        return findRowIdentity<BookingsRow>(this.entityManager, FIND_BOOKINGS, resource.id)
-    }
-
-    /** Accepts one booking delivery idempotently at the database boundary. */
-    async acceptBookingDelivery(delivery: BookingsRequest): Promise<void> {
-        await acceptRowDelivery(this.entityManager, FIND_BOOKINGS, delivery.id)
+    /** Answers one row owned by the authenticated principal; absent and denied rows share one typed not-found result. */
+    async bookings(principalId: string, id: string): Promise<BookingsResult> {
+        const row = await requireOwnedRow<Pick<BookingsRow, "id" | "resource_id" | "starts_at" | "ends_at">>(
+            this.entityManager,
+            FIND_BOOKINGS,
+            id,
+            principalId,
+            () => {
+                throw new BookingsError({ code: BookingsErrorCode.NotFound, params: { id } })
+            },
+        )
+        await this.resources.resources(principalId, row.resource_id)
+        return { id: row.id, resourceId: row.resource_id, startsAt: row.starts_at, endsAt: row.ends_at }
     }
 }

@@ -5,7 +5,8 @@ import type { Database } from "../../../../../../../supabase/types/database.type
 import { getPrincipal } from "../principal"
 import { dbFailure } from "../outcome"
 import type { DbOutcome } from "../outcome"
-import { insertRow, rowSchema } from "../server"
+import { rowSchema } from "../validation/validation.mapper"
+import { insertRow } from "../server"
 
 /** One resources row returned after a successful write. */
 type ResourcesRow = Database["public"]["Tables"]["resources"]["Row"]

@@ -3,3 +3,5 @@ export const APP_ROUTES = {
     home: "/",
     authCallback: "/auth/callback",
 } as const
+
+export { safeNextPath } from "./safe-next-path"

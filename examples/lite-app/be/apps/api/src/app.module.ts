@@ -26,11 +26,12 @@ import {
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
 import type { ApiOptions } from "./api.options"
-import { ResourcesModule } from "@modules/domain/resources"
-import { BookingsModule } from "@modules/domain/bookings"
-import { CalendarsModule } from "@modules/domain/calendars"
+import { RESOURCES_ERROR_KINDS, ResourcesModule } from "@modules/domain/resources"
+import { BOOKINGS_ERROR_KINDS, BookingsModule } from "@modules/domain/bookings"
+import { CALENDARS_ERROR_KINDS, CalendarsModule } from "@modules/domain/calendars"
 import { BookingsHttpModule } from "@features/api/bookings"
 import { CalendarHttpModule } from "@features/webhooks/calendar"
+import { CalendarInboxModule } from "@modules/domain/calendar-inbox"
 
 @Module({})
 /** Composition root of the API: every capability is registered once and the three guards run in a fixed order. */
@@ -41,6 +42,7 @@ export class AppModule {
         return {
             module: AppModule,
             imports: [
+                CalendarInboxModule.register({ isGlobal: true }),
                 CalendarHttpModule,
                 BookingsHttpModule,
                 CalendarsModule.register({ isGlobal: true }),
@@ -55,6 +57,9 @@ export class AppModule {
                 ErrorsModule.register({
                     isGlobal: true,
                     kinds: [
+                        CALENDARS_ERROR_KINDS,
+                        BOOKINGS_ERROR_KINDS,
+                        RESOURCES_ERROR_KINDS,
                         CONFIG_ERROR_KINDS,
                         DATABASE_ERROR_KINDS,
                         HTTP_SECURITY_ERROR_KINDS,

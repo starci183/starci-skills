@@ -6,4 +6,9 @@ import type { BookingsResponse } from "./dto/bookings.response"
 export const toBookingsRequest = (input: BookingsHttpRequest): BookingsRequest => ({ id: input.id })
 
 /** Maps the command result to the HTTP response. */
-export const toBookingsResponse = (result: BookingsResult): BookingsResponse => ({ id: result.id })
+export const toBookingsResponse = (result: BookingsResult): BookingsResponse => ({
+    id: result.id,
+    resourceId: result.resourceId,
+    startsAt: result.startsAt,
+    endsAt: result.endsAt,
+})

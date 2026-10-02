@@ -9,9 +9,9 @@ import { BookingFormBase } from "./component"
 type FormFailure = "refused" | "not-found" | "invalid" | "unavailable"
 type FormResult = "created" | FormFailure | undefined
 
-const idOf = (input: FormData, name: string): { readonly id: string } => ({ id: String(input.get(name) ?? "") })
+const valueOf = (input: FormData, name: string): string => String(input.get(name) ?? "")
 
-/** The connected booking block writes through principal-aware Server Actions. */
+/** The connected booking block writes resources and resource intervals through principal-aware Server Actions. */
 export const BookingForm = () => {
     const t = useTranslations("app.booking")
     const [resourcePending, startResourceTransition] = useTransition()
@@ -20,13 +20,18 @@ export const BookingForm = () => {
     const [bookingResult, setBookingResult] = useState<FormResult>()
     const addResource = (input: FormData) => {
         startResourceTransition(async () => {
-            const result = await writeResources(idOf(input, "resourceId"))
+            const result = await writeResources({ id: valueOf(input, "resourceId") })
             setResourceResult(result.kind === "ok" ? "created" : result.kind)
         })
     }
     const addBooking = (input: FormData) => {
         startBookingTransition(async () => {
-            const result = await writeBookings(idOf(input, "bookingId"))
+            const result = await writeBookings({
+                id: valueOf(input, "bookingId"),
+                resourceId: valueOf(input, "bookingResourceId"),
+                startsAt: valueOf(input, "startsAt"),
+                endsAt: valueOf(input, "endsAt"),
+            })
             setBookingResult(result.kind === "ok" ? "created" : result.kind)
         })
     }
@@ -37,6 +42,9 @@ export const BookingForm = () => {
                 title: t("title"),
                 resourceLabel: t("resource"),
                 bookingLabel: t("booking"),
+                bookingResourceLabel: t("bookingResource"),
+                startsAtLabel: t("startsAt"),
+                endsAtLabel: t("endsAt"),
                 addResourceLabel: resourcePending ? t("working") : t("addResource"),
                 addBookingLabel: bookingPending ? t("working") : t("addBooking"),
                 resourcePending,

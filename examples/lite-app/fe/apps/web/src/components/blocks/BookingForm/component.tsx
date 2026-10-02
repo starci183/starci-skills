@@ -6,6 +6,9 @@ export interface BookingFormBaseProps {
         readonly title: string
         readonly resourceLabel: string
         readonly bookingLabel: string
+        readonly bookingResourceLabel: string
+        readonly startsAtLabel: string
+        readonly endsAtLabel: string
         readonly addResourceLabel: string
         readonly addBookingLabel: string
         readonly resourcePending: boolean
@@ -34,6 +37,26 @@ export const BookingFormBase = (props: BookingFormBaseProps) => (
         </Form>
         <Form label={props.props.bookingLabel} isPending={props.props.bookingPending} onSubmit={props.on.booking}>
             <Input id="booking-id" name="bookingId" label={props.props.bookingLabel} isRequired />
+            <Input
+                id="booking-resource-id"
+                name="bookingResourceId"
+                label={props.props.bookingResourceLabel}
+                isRequired
+            />
+            <Input
+                id="booking-starts-at"
+                name="startsAt"
+                label={props.props.startsAtLabel}
+                placeholder="2026-10-04T09:00:00Z"
+                isRequired
+            />
+            <Input
+                id="booking-ends-at"
+                name="endsAt"
+                label={props.props.endsAtLabel}
+                placeholder="2026-10-04T10:00:00Z"
+                isRequired
+            />
             {props.props.bookingMessage === undefined ? null : <Text live="polite">{props.props.bookingMessage}</Text>}
             <Button type="submit" variant="primary" isPending={props.props.bookingPending}>
                 {props.props.addBookingLabel}
