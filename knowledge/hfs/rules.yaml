@@ -1707,6 +1707,14 @@ rules:
     failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP"]
     enforcers:
       - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
+  - id: R194
+    code: "RT_GENERATED_BLOCK_STALE"
+    law: "The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_GENERATED_BLOCK_STALE"]
+    enforcers:
+      - {kind: runtime, id: generated-block, at: scripts/hfs/runtime-rules/generated-block.mjs}
 retired:
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
