@@ -13,7 +13,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../../engine/config.mjs';
+import { DEFAULT_OWNER_LANGUAGE, loadConfig } from '../../engine/config.mjs';
 import { machineLog, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { headTime } from '../api/git/head-time.mjs';
 import { readEnv } from '../lib/env.mjs';
@@ -138,12 +138,15 @@ export function newestEvent(m, kind) {
  * Where the Supervisor role runs (config.yaml supervisor.mode, default 'chat'). Owner, 2026-09-25: "move the
  * supervisor back into chat so it stays persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
  * (registers and drains it with no Orca terminal), runs the 10-minute tick itself and lands its Opus lanes through
- * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + watchdog.mjs); in chat
+ * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + supervisor-watchdog.mjs); in chat
  * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
  * config (specs, a one-off CLI run).
  */
 const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
-const DEFAULT_SUPERVISOR_MODE = 'chat';
+export const DEFAULT_SUPERVISOR_MODE = 'chat';
+/** engine/config.mjs owns the owner-language default; home re-exports it so base (scripts/lib/i18n.mjs) never imports machine. */
+export { DEFAULT_OWNER_LANGUAGE };
+export const DEFAULT_AGENT = 'claude';
 export function supervisorMode({ env = process.env, config = undefined } = {}) {
   const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();
   if (SUPERVISOR_MODES.includes(fromEnv)) return fromEnv;
@@ -163,7 +166,7 @@ export function supervisorSettings({ config = undefined } = {}) {
   const pick = (...values) => values.find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
   return {
     mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
-    agent: pick(seat.agent, kernel.agent, 'claude'),
+    agent: pick(seat.agent, kernel.agent, DEFAULT_AGENT),
     model: pick(seat.model, seat.agent ? null : kernel.model),
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],
@@ -171,9 +174,9 @@ export function supervisorSettings({ config = undefined } = {}) {
     workers: { base: Number.isInteger(sup.workers?.base) ? sup.workers.base : DEFAULTS.workers.base,
       max: Math.min(DEFAULTS.workers.max, Number.isInteger(sup.workers?.max) ? sup.workers.max : DEFAULTS.workers.max) },
     landGate: { mode: sup.landGate?.mode === 'exclusive' ? 'exclusive' : DEFAULTS.landGate.mode, push: sup.landGate?.push !== false },
-    // watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
+    // supervisor-watchdog.mjs: a busy seat frame with no turn progress for this long is frozen, not busy.
     frozenMinutes: Number.isInteger(sup.frozenMinutes) && sup.frozenMinutes > 0 ? sup.frozenMinutes : DEFAULTS.frozenMinutes,
-    language: typeof cfg?.language === 'string' ? cfg.language : 'en',
+    language: typeof cfg?.language === 'string' ? cfg.language : DEFAULT_OWNER_LANGUAGE,
   };
 }
 

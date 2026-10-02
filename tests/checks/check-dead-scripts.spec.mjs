@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DYNAMIC_ROOTS, ENTRIES_FILE, deadScriptFindings, checkDeadScripts } from '../../scripts/checks/check-dead-scripts.mjs';
+import { DYNAMIC_ROOTS, deadScriptFindings, checkDeadScripts } from '../../scripts/checks/check-dead-scripts.mjs';
+import { ALLOWLIST_FILE } from '../../scripts/lib/allowlist.mjs';
+
+/** An allowlist fixture document carrying only a dead-script-entries section of {path, reason} pairs. */
+const allowlistWith = (entries) => `schema: starci/allowlist@1\ndead-script-entries:\n${entries.map(([path, reason]) => `  - {path: ${path}, reason: "${reason}"}`).join('\n')}\n`;
 
 // RED18: a runtime script is alive only when something executable names it. A doc, README, YAML prose line, retired-paths
 // entry, contract-change or benchmark finding is not a reader.
@@ -25,21 +29,21 @@ test('a script imported, spawned or run by a package script, a skill or a YAML e
 
 test('a script named only by a doc, a README, YAML prose, retired-paths, a contract-change or a comment is dead', () => {
   const findings = run({
-    'scripts/supervisor/why-backfill.mjs': 'export const x = 1;',
-    'scripts/work/migrate-ui-shapes.mjs': '',
-    'scripts/kernel/repair-rejected-attempts.mjs': '',
+    'scripts/supervisor/why-gone.mjs': 'export const x = 1;',
+    'scripts/work/gone-ui-shapes.mjs': '',
+    'scripts/kernel/repair-gone-attempts.mjs': '',
     'scripts/kernel/commented.mjs': '',
-    'docs/why.md': 'Dry-run backfill: `node scripts/supervisor/why-backfill.mjs`.\n',
-    'README.md': 'see scripts/work/migrate-ui-shapes.mjs\n',
-    'modules/kernel/api-commands/dispatch.yaml': 'reads: scripts/kernel/repair-rejected-attempts.mjs seals the rest\n',
+    'docs/why.md': 'Dry-run backfill: `node scripts/supervisor/why-gone.mjs`.\n',
+    'README.md': 'see scripts/work/gone-ui-shapes.mjs\n',
+    'modules/kernel/api-commands/dispatch.yaml': 'reads: scripts/kernel/repair-gone-attempts.mjs seals the rest\n',
     'modules/kernel/retired-paths.yaml': '  - {path: scripts/kernel/commented.mjs}\n',
     'modules/kernel/contract-changes/x.yaml': 'run: node scripts/kernel/commented.mjs\n',
     'scripts/lib/other.mjs': '// node scripts/kernel/commented.mjs\n/* scripts/kernel/commented.mjs */\n * scripts/kernel/commented.mjs\n',
     'package.json': '{}',
   });
   assert.deepEqual(codes(findings).filter(([, p]) => p !== 'scripts/lib/other.mjs'), [
-    ['RT_DEAD_SCRIPT', 'scripts/supervisor/why-backfill.mjs'], ['RT_DEAD_SCRIPT', 'scripts/work/migrate-ui-shapes.mjs'],
-    ['RT_DEAD_SCRIPT', 'scripts/kernel/repair-rejected-attempts.mjs'], ['RT_DEAD_SCRIPT', 'scripts/kernel/commented.mjs'],
+    ['RT_DEAD_SCRIPT', 'scripts/supervisor/why-gone.mjs'], ['RT_DEAD_SCRIPT', 'scripts/work/gone-ui-shapes.mjs'],
+    ['RT_DEAD_SCRIPT', 'scripts/kernel/repair-gone-attempts.mjs'], ['RT_DEAD_SCRIPT', 'scripts/kernel/commented.mjs'],
   ]);
 });
 
@@ -62,14 +66,14 @@ test('a directory the runtime loads by listing it is alive without a named reade
 test('a declared CLI entry is alive; an entry whose script is gone or that code now reads is stale', () => {
   assert.deepEqual(run({
     'scripts/checks/cli.mjs': '',
-    [ENTRIES_FILE]: '# header\nscripts/checks/cli.mjs\tCLI run by the owner\n',
+    [ALLOWLIST_FILE]: allowlistWith([['scripts/checks/cli.mjs', 'CLI run by the owner']]),
   }), []);
   assert.deepEqual(codes(run({
     'scripts/checks/gone.mjs': '',
     'scripts/checks/used.mjs': '',
     'scripts/lib/user.mjs': "import '../checks/used.mjs';",
     'package.json': '{"scripts":{"x":"node scripts/lib/user.mjs"}}',
-    [ENTRIES_FILE]: 'scripts/checks/used.mjs\tCLI\nscripts/checks/missing.mjs\tCLI\n',
+    [ALLOWLIST_FILE]: allowlistWith([['scripts/checks/used.mjs', 'CLI'], ['scripts/checks/missing.mjs', 'CLI']]),
   })), [['RT_DEAD_SCRIPT', 'scripts/checks/gone.mjs'], ['RT_DEAD_ENTRY', 'scripts/checks/used.mjs'], ['RT_DEAD_ENTRY', 'scripts/checks/missing.mjs']]);
 });
 

@@ -46,7 +46,7 @@ function wholeEventPayload(row) {
 }
 
 const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
-/** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes.yaml, reach new-legs). */
+/** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes/, reach new-legs). */
 export const PROOF_INTEGRITY_CHANGE = 'proof-integrity';
 const PROOF_VERIFY_SCHEMA = 'starci/proof-verify@1';
 const CLAIM_KINDS = ['frs', 'cases', 'shapes', 'specs'];

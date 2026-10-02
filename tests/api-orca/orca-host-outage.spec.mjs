@@ -225,7 +225,7 @@ test('watchdog: a kernel a responding Orca proves dead is fenced and replaced',t
 // exit (token usage and resume line) with the idle frame still above it.
 const EXITED_KERNEL=['• Yielding - waiting on the op report.','› Ask Codex to do anything','  gpt-6-sol high · repo','',
   'Token usage: total=1,204,331 input=1,150,002 (+ 9,876,544 cached) output=54,329 (reasoning 31,020)',
-  'To continue this session, run codex resume 0199a7c2-5b1e-7d40-9c1f-3e2a8b6d4f10','',`PS ${path.join(os.tmpdir(), 'todo-app-be')}>`].join('\n');
+  'To continue this session, run codex resume 0199a7c2-5b1e-7d40-9c1f-3e2a8b6d4f10','',`PS ${path.join(os.tmpdir(), 'shop-be')}>`].join('\n');
 const exitKernel=f=>f.writeState(s=>{s.terminals[f.kernel].screen=EXITED_KERNEL;});
 
 test('watchdog: a kernel whose agent exited to a shell is fenced and replaced by a new worker',t=>{
@@ -233,7 +233,7 @@ test('watchdog: a kernel whose agent exited to a shell is fenced and replaced by
   exitKernel(f);
   const {status,result,stderr}=tick(f);
   assert.equal(status,0,stderr||JSON.stringify(result));
-  assert.deepEqual([result.action,result.state,result.shellPrompt],['restarted','agent-exited',`PS ${path.join(os.tmpdir(), 'todo-app-be')}>`],JSON.stringify(result));
+  assert.deepEqual([result.action,result.state,result.shellPrompt],['restarted','agent-exited',`PS ${path.join(os.tmpdir(), 'shop-be')}>`],JSON.stringify(result));
   assert.equal(result.fenced?.ok,true);
   const next=result.replacementTerminal;
   assert.ok(next&&next!==f.kernel);

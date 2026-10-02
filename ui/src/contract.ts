@@ -29,7 +29,7 @@ export type Ref = { kind: 'workflow'|'unit'|'attempt'|'di'|'incident'|'service'|
 export type BlobLink = { sha: string; bytes: number; mediaType: string; href: `/api/blob/${string}`; archived: boolean };
 export type Reason = { code: string; params: Record<string, string|number>; raw?: string };
 
-export type FleetView = {
+export type WorkersView = {
   attention: { ref: Ref; ui: UiState; reason: Reason; age: number; who: 'owner'|'supervisor'|'kernel'|'controller' }[];
   workflows: WorkflowRow[];
   health: HealthSummary;
@@ -98,7 +98,7 @@ export type ReconcilerView = {
     passes: number | null; lastPassMs: number | null; lastError: string | null; ui: UiState } | null;
   starts24h: { at: number; reason: string; endedAt: number | null; exitReason: string | null; killedBy: string | null }[];
   crashLoop: boolean; startsLastHour: number; badExits24h: number; queueDepth: number; openViolations: number;
-  controllers: { name: 'job'|'workflow'|'resource'|'host'|'gc'|'fleet'|'learning'; mode: 'off'|'shadow'|'active'; modeSetAt: number | null; modeSetBy: string | null;
+  controllers: { name: 'job'|'workflow'|'resource'|'host'|'gc'|'workers'|'learning'; mode: 'off'|'shadow'|'active'; modeSetAt: number | null; modeSetBy: string | null;
     queue: { depth: number; failing: number; nextDueAt: number | null }; actions24h: { intent: number; running: number; done: number; failed: number; unknown: number; fenced: number };
     lastActionAt: number | null; lastError: { at: number; text: string } | null; ui: UiState }[];
   schedules: { controller: string; duty: string; intervalMs: number; lastStartedAt: number | null; lastResult: string | null; nextDueAt: number; runs24h: number; ui: UiState }[];
@@ -146,7 +146,7 @@ export type PipelineView = { goalRevision: number | null; chainStatus: string; l
 export type MiniPipeline = { legs: { op: string; status: LegStatus; current: boolean; tries: number; units: number; attempts: number }[];
   progress: PipelineView['progress']; current: string[]; failures: number; attempts: number; lastEventAt: number | null;
   why?: { op: string; headline: string; owner: string | null } | null };
-export type FleetSummary = { opsRunning: number; opsSettling: number; unitsQueued: number; failed24h: number; passed24h: number;
+export type WorkersSummary = { opsRunning: number; opsSettling: number; unitsQueued: number; failed24h: number; passed24h: number;
   models: { model: string | null; pool: string | null; agent: string | null; running: number }[];
   usage24h: { recorded: boolean; inputTokens: number; outputTokens: number; costUsd: number | null } };
 export type WorkflowWhere = { repos: { name: string; role: string; root: string }[]; workTree: string | null; ledgerFile: string | null; blobRoot: string; runtimeRoot: string;
@@ -168,7 +168,7 @@ export type EvidenceFile = { artifactId: number; name: string; base: string; gro
 export type AttemptDetailV2 = Omit<AttemptDetail, 'where'> & { where: AttemptWhere; input: AttemptInput | null; files: EvidenceFile[]; usage: Usage; tryBudget: number | null };
 export type WorkflowRowV2 = WorkflowRow & { pipeline: MiniPipeline };
 export type WorkflowDetailV2 = WorkflowDetail & { pipeline: MiniPipeline; where: WorkflowWhere; usage: Usage };
-export type FleetViewV2 = Omit<FleetView, 'workflows'> & { workflows: WorkflowRowV2[]; summary: FleetSummary };
+export type WorkersViewV2 = Omit<WorkersView, 'workflows'> & { workflows: WorkflowRowV2[]; summary: WorkersSummary };
 
 /* ---- v3 (2026-09-29): op identity, agents, host machine. ---- */
 /** From modules/ops/ops/<op>.yaml + the contract op labels (slice A fills it into LegRow.info). */

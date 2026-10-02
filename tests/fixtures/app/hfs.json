@@ -1,0 +1,14 @@
+{
+  "hfs": 2,
+  "kind": "app",
+  "project": "fixture",
+  "sides": {
+    "be": {
+      "kinds": ["api"],
+      "apps": [{ "name": "core", "kind": "api" }]
+    },
+    "fe": {
+      "apps": [{ "name": "web", "kind": "next" }]
+    }
+  }
+}

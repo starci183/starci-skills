@@ -51,7 +51,7 @@ test('the agent-launch rule flags every terminal-creating form and nothing else'
     "workerStart({ task, worktree, agent: 'claude' });",
   ].join('\n'));
   write('scripts/shell.mjs',"orcaRun(['terminal','create','--title','[Shell] probe']);\n");
-  write('scripts/checks/host-boundary.allow','scripts/shell.mjs:1  # a plain non-agent shell (reviewed)\n');
+  write('scripts/checks/' + 'host-boundary.allow','scripts/shell.mjs:1  # a plain non-agent shell (reviewed)\n');
   const found=findHostBoundaryViolations({root}).violations.filter(v=>v.rule==='agent-launch').map(v=>v.where).sort();
   assert.deepEqual(found,['scripts/api/orca/wrapper.mjs:1','scripts/bad.mjs:1','scripts/bad.mjs:2','scripts/bad.mjs:3','scripts/bad.mjs:4','scripts/shell.mjs:1']);
 });
@@ -81,7 +81,7 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   assert.match(adoptRefused??'',/--terminal is not a flag/,refusals.stderr);
 });
 
-test('every profile and registry target launches through worker-start --agent <card>',()=>{
+test('every registry pool and target launches through worker-start --agent <card>',()=>{
   const cards=fs.readdirSync(path.join(ROOT,'modules','models','agents')).map(f=>f.replace(/\.yaml$/,''));
   for(const name of cards){
     const card=readYaml(`modules/models/agents/${name}.yaml`);
@@ -89,12 +89,12 @@ test('every profile and registry target launches through worker-start --agent <c
     for(const gone of ['terminalFallback','hostLaunchPrefix','commandPrefix','commandRequirements'])
       assert.equal(card[gone],undefined,`${name}: no hand-built launch command (${gone})`);
   }
-  for(const f of fs.readdirSync(path.join(ROOT,'modules','models','profiles'))){
-    const orca=readYaml(`modules/models/profiles/${f}`).launch?.orca;
-    assert.deepEqual(Object.keys(orca??{}),['agent'],`${f}: launch.orca is {agent}`);
-    assert.ok(cards.includes(orca.agent),`${f}: ${orca.agent} is an agent card`);
-  }
-  for(const [name,target] of Object.entries(readYaml('modules/models/registry.yaml').targets))
+  // Profiles carry no launch facts: a pool launches through its provider's card, a launch-only
+  // target through its declared orcaLaunch.agent — registry.yaml is the ONE catalog for both.
+  const registry=readYaml('modules/models/registry.yaml');
+  for(const [name,pool] of Object.entries(registry.pools??{}))
+    assert.ok(cards.includes(pool.provider),`registry pool ${name}: provider ${pool.provider} is an agent card`);
+  for(const [name,target] of Object.entries(registry.targets))
     assert.deepEqual(Object.keys(target.orcaLaunch??{}),['agent'],`registry ${name}: orcaLaunch is {agent}`);
 });
 

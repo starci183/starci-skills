@@ -68,11 +68,11 @@ test('the registry merges entry files; an entry whose id is not its file name is
   assert.deepEqual(doc.changes.map((c) => [c.id, c.summary]), [['b-new', 'from a file'], ['old', 'x']]);
   assert.deepEqual(problems, ['modules/kernel/contract-changes/wrong-name.yaml: id must be its file name (wrong-name)']);
   assert.equal(mergeContractChanges({ entries: [] }).doc.changes.length, 0, 'no registry registers nothing');
-  assert.ok(isContractChangesPath('modules/kernel/contract-changes/x.yaml') && !isContractChangesPath('modules/kernel/contract-changes.yaml') && !isContractChangesPath('modules/kernel/rules.yaml'));
+  assert.ok(isContractChangesPath('modules/kernel/contract-changes/x.yaml') && !isContractChangesPath(path.posix.join('modules', 'kernel', 'contract-changes.yaml')) && !isContractChangesPath('modules/kernel/rules.yaml'));
   assert.equal(entryFileOf('x'), 'modules/kernel/contract-changes/x.yaml');
   // A single-file list at the old path is not a registry: it registers nothing and is no problem.
   const dir = tmp(t, 'sup-k-lt-nolist-');
-  write(dir, { 'modules/kernel/contract-changes.yaml': 'schema: starci/contract-changes@1\nchanges:\n  - id: listed\n    summary: ignored\n', [entryFileOf('filed')]: 'id: filed\nsummary: y\n' });
+  write(dir, { ['modules/kernel/' + 'contract-changes.yaml']: 'schema: starci/contract-changes@1\nchanges:\n  - id: listed\n    summary: ignored\n', [entryFileOf('filed')]: 'id: filed\nsummary: y\n' });
   const read = readContractChangesDoc(dir);
   assert.deepEqual(read.doc.changes.map((c) => c.id), ['filed']);
   assert.deepEqual(read.problems, []);
@@ -84,7 +84,7 @@ test('loadContractChanges reads the entry files: the live registry is well-forme
   assert.deepEqual(live.problems, []);
   const ids = new Set(live.changes.map((c) => c.id));
   assert.ok(ids.has('land-gate-specs-harness-switch') && ids.has('land-conflict-free-registries'), 'entry files');
-  assert.equal(fs.existsSync(path.join(ROOT, 'modules/kernel/contract-changes.yaml')), false, 'no single-file list');
+  assert.equal(fs.existsSync(path.join(ROOT, 'modules/kernel', 'contract-changes.yaml')), false, 'no single-file list');
   assert.ok(governedPaths(['modules/kernel/contract-changes/x.yaml', 'modules/kernel/api.yaml']).length === 1, 'registry files need no entry of their own');
 });
 

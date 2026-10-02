@@ -186,7 +186,7 @@ const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
-  `PS ${DRIVE}Repositories\\todo-app-be>`].join('\n');
+  `PS ${DRIVE}Repositories\\shop-be>`].join('\n');
 const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6-sol',screen:DEAD_CODEX};
 test('closeExitedTerminal closes only on proof: a bare shell or a disconnected terminal, never an agent screen or an outage',async()=>{
   const {closeExitedTerminal}=await import('../../scripts/kernel/close-op-terminal.mjs');
@@ -194,7 +194,7 @@ test('closeExitedTerminal closes only on proof: a bare shell or a disconnected t
   const up={ok:true,connected:true,writable:true};
   const probe=(shown,screen)=>closeExitedTerminal('t1',{show:()=>shown,read:()=>screen==null?{ok:false}:{ok:true,screen},close});
   let r=probe(up,DEAD_CODEX);
-  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt',`PS ${DRIVE}Repositories\\todo-app-be>`]);
+  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt',`PS ${DRIVE}Repositories\\shop-be>`]);
   r=probe({ok:true,connected:false,writable:false},null);
   assert.deepEqual([r.closed,r.proof],[true,'disconnected']);
   assert.equal(closes.length,2);

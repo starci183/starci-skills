@@ -1,7 +1,7 @@
 // scripts/reconciler/boot.mjs — the ONE way into the reconciler (DESIGN §7.7, §7.8).
 //
 //   node scripts/reconciler/boot.mjs [ensure]           a fresh leader heartbeat (< allocation.reconciler.heartbeatStaleMs)
-//                                                       -> exit 0; a draining engine or a running fleet:push inside
+//                                                       -> exit 0; a draining engine or a running workers:push inside
 //                                                       DRAIN_GRACE_MS -> left alone (MB-04); else stop a hung engine (alive, stale;
 //                                                       its process_runs row ends killed by boot-ensure, its leader_history
 //                                                       epoch released `killed`) and start one, detached, hidden,
@@ -34,9 +34,9 @@ const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs')
 const TASK_NAME = 'StarCi-Reconciler';
 const TASK_EVERY_MINUTES = 5;
 /**
- * MB-04: a draining engine (reload handover) or one whose fleet:push child still runs is left alone this long past a
+ * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
- * means a blocked event loop: then ensure stops it. 35 min > the fleet:push child's 30 min timeout (fleet.mjs PUSH_RUN_TIMEOUT_MS).
+ * means a blocked event loop: then ensure stops it. 35 min > the workers:push child's 30 min timeout (controllers/workers.mjs PUSH_RUN_TIMEOUT_MS).
  */
 export const DRAIN_GRACE_MS = 35 * 60_000;
 const selfFile = fileURLToPath(import.meta.url);
@@ -62,7 +62,7 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
   const read = readMachine((m) => {
     const row = m.leaderOf(LEADER_NAME);
     const run = row?.process_run_id != null ? m.db.prepare('SELECT * FROM process_runs WHERE run_id=?').get(row.process_run_id) ?? null : null;
-    const pushRunning = Boolean(m.db.prepare("SELECT 1 FROM engine_actions WHERE controller='fleet' AND key='fleet:push' AND state='running' AND epoch=? LIMIT 1").get(row?.epoch ?? -1));
+    const pushRunning = Boolean(m.db.prepare("SELECT 1 FROM engine_actions WHERE controller='workers' AND key='workers:push' AND state='running' AND epoch=? LIMIT 1").get(row?.epoch ?? -1));
     // Safe mode is read from the LIVE state, not from how the run started: the engine records every controller it forces
     // shadow as controller_modes reason 'safe mode: ...' (engine.mjs writeModes), and a self-reload keeps the process --safe.
     const safeModes = m.db.prepare(`SELECT c.controller FROM controller_modes c JOIN mode_changes h ON h.change_id=(SELECT MAX(change_id) FROM mode_changes WHERE controller=c.controller AND to_mode=c.mode)

@@ -55,6 +55,45 @@ record and is worse than a red check.
 - **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/db/ledger.mjs`;
   dispatch artifacts use the OS tmpdir or are deleted after delivery.
 
+## Single source of truth (no duplicates, no redundancy)
+
+A fact, a rule, a number, a path, a name or a helper has exactly one owner. Everything else reads it,
+cites its id, or is generated from it. A second copy is a defect even when both copies agree today: it
+is the one that goes stale. Eight principles, each held by a check that `npm run check` runs:
+
+1. **Facts and slots have one machine source.** The product shape is `knowledge/hfs/slots.yaml`, the rules
+   `knowledge/hfs/rules.yaml`, the claims `knowledge/hfs/facts.yaml`. Prose quotes a slot id, a rule id or a fact id and
+   never restates the claim or lists the paths a slot owns (`RT_FACT_FALSE`, `RT_PROSE_RESTATES_SLOTS`,
+   `RT_PROSE_PATH_NO_SLOT`, `RT_RULE_ID_UNKNOWN`, `RT_RULE_UNCITED`).
+2. **What can be derived is generated, never typed twice.** The README sections 4, 5.1, 5.2, 6.1 and 12, the model
+   catalog readers, the package `runtime/` copies and the ui message catalog come from their one source by a generator; a
+   generated path is git-ignored and untracked (`RT_GENERATED_BLOCK_STALE`, `RT_GENERATED_DRIFT`, `GENERATED_UNTRACKED`).
+3. **One definition of code.** A helper, a regex, a block of lines or an export exists once in `scripts/lib` or its
+   owning module; an unused export is deleted (`RT_HELPER_NEAR_COPY`, `RT_HELPER_REDEFINED`, `RT_DUPLICATE_CODE`,
+   `RT_EXPORT_UNUSED`).
+4. **A literal has one owner file.** A port, a configuration default, a pinned version and a slot id are spelled where
+   they are declared (`ui/ports.mjs`, `config.example.yaml` with `scripts/machine/home.mjs`, `knowledge/hfs/canon-pins.yaml`, the
+   slot manifest) and read everywhere else (`RT_PORT_RESTATED`, `RT_CONFIG_DEFAULT_TWICE`, `RT_VERSION_RESTATED`,
+   `RT_SLOT_ID_SHAPE`).
+5. **One catalog per kind of name.** A failure code is catalogued once in `modules/kernel/failure-codes.yaml`, an
+   environment variable once in its owner, a model, tier, price and pool once in `modules/models/registry.yaml`
+   (`RT_CODE_UNCATALOGUED`, `RT_CODE_STALE`, `RT_CODE_MALFORMED`, `RT_CODE_SOLE_EMITTER`, `RT_ENV_UNCATALOGUED`,
+   `RT_ENV_READ_OUTSIDE_OWNER`, `RT_TEST_ENV_IN_PRODUCTION`, `RT_ENV_STALE_ENTRY`).
+6. **One allowlist and one shared schema fragment.** Every exception lives in `modules/kernel/allowlist.yaml` with its
+   reason and only shrinks; a field shared by several schemas or ops is declared once and referenced
+   (`RT_ALLOWLIST_SPRAWL`, `RT_SCHEMA_NOT_SHARED`, `RT_OP_FIELD_NOT_COMMON`).
+7. **The runtime names no product, no example and no dead name.** Runtime source is generic; a path it cites exists; a
+   retired name appears only in history (`RT_EXAMPLE_COUPLING`, `RT_PRODUCT_NAME_IN_SOURCE`, `RT_HOST_PATH_IN_TEMPLATE`,
+   `RT_RETIRED_NAME_LIVE`, `RT_CITED_PATH_MISSING`).
+8. **One document and one spec per behaviour.** Every `docs/*.md` carries an `Owner:` or `Task:` line and no two docs serve
+   one task; a spec asserts behaviour, not source text, and a skip says why; a CI upload fails loudly
+   (`RT_DOC_NO_OWNER`, `RT_SPEC_ASSERTS_SOURCE_TEXT`, `RT_SPEC_SKIP_UNEXPLAINED`, `CI_UPLOAD_NOT_SILENT`).
+
+When a check names a copy: find the owner (the machine file above), keep the one definition there, and make the other
+site read, cite or generate it; delete the copy in the same commit. Do not add an allowlist entry, a baseline or a
+suppression: the first fix is always to remove the duplicate. If you cannot tell which copy is the owner, the fact has no
+owner yet: create it in the machine file first, then point both sites at it.
+
 ## Parallel lanes
 
 Kernels run `.claude` main live, so no one edits the main checkout in place. A large change is cut

@@ -1,9 +1,0 @@
-id: report-root-cause
-effectiveAt: '2026-09-27T06:15:00+07:00'
-summary: "starci/op-report@1 admits rootCause {node, self?, category, claim, evidence[], counterCheck?, expectedFix?, recheck?}, validated by scripts/kernel/report-envelope.mjs rootCauseProblems (verdict-contract.yaml envelope.fields.rootCause); before it validateOpReport refused the field, so settle's root-verify step never fired. The op prompt lists it, and the root-verify claim keeps self, claim, expectedFix and recheck beside category, evidence and counterCheck. Adds no check or finding code"
-reach: new-legs
-paths:
-  - modules/kernel/verdict-contract.yaml
-  - scripts/kernel/report-envelope.mjs
-  - scripts/kernel/op-prompt.mjs
-  - scripts/kernel/api.mjs

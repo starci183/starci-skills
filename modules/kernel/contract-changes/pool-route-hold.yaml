@@ -1,9 +1,0 @@
-id: pool-route-hold
-effectiveAt: '2026-09-28T00:31:52Z'
-summary: "Pool load (scripts/kernel/api.mjs poolLoadOf, one helper for api route capacity and api status queuedBecause pool-full): a routed-but-QUEUED job holds its pool slot only while its latest route decision (payload.routedAt, stamped by api route; else its newest route-decided event) is younger than runtimes.yaml allocation.routeHoldMs (900000, 15 min); running, leased and answering jobs hold theirs as before. Re-routing refreshes the hold; the job being routed holds nothing in its own route; status subtracts a queued job's own slot only when it holds one. api route output adds poolLoad {running, routeHoldMs}. Fixes the nivo 2026-09-28 pool-slot leak: jobs routed then parked for hours (owner/supervisor gate, peer-wait, dependency, readiness loop) kept devin-agent 10/10 and claude-agent 6/6 full with 5 and 0 ops running, starving wf-nivo-fe-canon-mujek980's ready slices (no eligible pool for role 'implement')."
-reach: new-legs
-paths:
-  - scripts/kernel/api.mjs
-  - modules/models/runtimes.yaml
-  - modules/kernel/contract-changes.yaml
-  - tests/pool-slot-route-hold.spec.mjs

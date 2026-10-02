@@ -53,7 +53,7 @@ import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { translatedPattern, translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { attemptSend, botPolite, redact } from './telegram-polite.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
@@ -305,7 +305,7 @@ function drawAlbumCaption(question, language) {
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
   const round = Number.isInteger(review.round) ? review.round : 1;
-  const answers = /(?:Round \d+|Vòng \d+);[^\[]*(.*?)(?:\.\s|$)/.exec(String(question.text ?? ''))?.[1] ?? '';
+  const answers = new RegExp(`${translatedPattern('Round {round}', 'round', '\\d+')};[^\\[]*(.*?)(?:\\.\\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
   const head = tr('[StarCi] Please review: {record}', { record: review.record ?? '' });
   const lines = [head, `${tr('Shapes')}: ${shapes.join(', ') || '-'}`, tr('Round {round}', { round })];
   if (round > 1 && answers) lines.push(`${tr('Notes addressed')}: ${answers}`);

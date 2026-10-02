@@ -56,11 +56,11 @@ const samePathAs = (a, b) => assert.equal(pathKey(a), pathKey(b));
 
 test('lanesRoot: the env override wins, then the owner config roots.lanes, then <starciLocalRoot>/lanes', () => {
   const state = path.join(os.tmpdir(), 'hk-lanes-state');
-  const fleet = path.join(os.tmpdir(), 'fleet-lanes');
+  const workers = path.join(os.tmpdir(), 'workers-lanes');
   const oneOff = path.join(os.tmpdir(), 'one-off');
   assert.equal(lanesRoot({ env: { STARCI_LOCAL_ROOT: state }, config: {} }), path.join(state, 'lanes'), 'no key anywhere: <starciLocalRoot>/lanes');
-  assert.equal(lanesRoot({ env: {}, config: { roots: { lanes: fleet } } }), path.resolve(fleet));
-  assert.equal(lanesRoot({ env: { STARCI_LANES_ROOT: oneOff }, config: { roots: { lanes: fleet } } }),
+  assert.equal(lanesRoot({ env: {}, config: { roots: { lanes: workers } } }), path.resolve(workers));
+  assert.equal(lanesRoot({ env: { STARCI_LANES_ROOT: oneOff }, config: { roots: { lanes: workers } } }),
     path.resolve(oneOff), 'a one-off/spec env still overrides the owner config');
 });
 

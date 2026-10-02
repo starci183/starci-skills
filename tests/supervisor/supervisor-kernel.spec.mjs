@@ -31,6 +31,7 @@ import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../../scripts/supervisor/status-block.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf } from '../../scripts/supervisor/seat-sessions.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { loadRuntimes } from '../../scripts/agent/models.mjs';
 import { withMachine, openMachine } from '../../engine/db/machine.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
@@ -252,7 +253,7 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
 });
 
 test('worker routing: the balanced pick skips an unavailable provider and prefers the furthest below its share', async () => {
-  const runtimes = parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
+  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
   const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
   const pick = await pickWorkerPool({ shares, runtimes, recent: { 'claude-agent': 5, 'codex-agent': 5, 'devin-agent': 0 } });
   assert.equal(pick.agent, 'devin');
@@ -265,7 +266,7 @@ test('worker routing: the balanced pick skips an unavailable provider and prefer
 test('worker readiness: a refused worker-start excludes the provider', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
-  const runtimes = parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
+  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
   const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
   const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
   const a = createJob(m, { cluster: 'r1', files: ['scripts/r1.mjs'] });
@@ -302,7 +303,7 @@ test('worker readiness: a refused worker-start excludes the provider', async (t)
 test('worker outage: an attestation refused for a provider capacity outage excludes the provider like a readiness failure', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
-  const runtimes = parseYaml(fs.readFileSync(new URL('../../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
+  const runtimes = loadRuntimes(path.join(SKILL_ROOT, 'modules', 'models'));
   const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
   const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
   const a = createJob(m, { cluster: 'q1', files: ['scripts/q1.mjs'] });
@@ -772,7 +773,7 @@ test('Telegram routing: owner text lands in the Supervisor kernel inbox; channel
   assert.ok(!plan.text.includes('restart nivo please'), 'owner text is never typed into the terminal');
   const again = planWake({ now: Date.now(), lastTickAt: Date.now(), unread: inbox, wakes: [{ at: Date.now(), payload: { inbox: [inbox[0].id], delivered: true } }] });
   assert.deepEqual(again.tags, [], 'an announced message is not re-woken inside the window');
-  assert.deepEqual(planWake({ now: 10 * 60_000 + 1 }).tags, [], 'the Fleet controller owns the clock wake');
+  assert.deepEqual(planWake({ now: 10 * 60_000 + 1 }).tags, [], 'the Workers controller owns the clock wake');
   appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'stall-alert', text: 'STALL-ALERT x' }, { env });
   assert.equal(readInbox(SUPERVISOR_ID, env).at(-1).from, 'stall-alert');
 });

@@ -13,12 +13,26 @@ export const workflowNodeId = (workflowId) => `workflow:${workflowId}`;
 export const kernelNodeId = (workflowId) => `agent:kernel:${workflowId}`;
 export const operationNodeId = (jobId) => `agent:operation:${jobId}`;
 const profileProviderCache = new Map();
+const registryCache = new Map();
+const modelRegistryOf = (skillRoot) => {
+  if (!registryCache.has(skillRoot)) {
+    const file = path.join(skillRoot, 'modules', 'models', 'registry.yaml');
+    let doc = null;
+    try { doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null; } catch { doc = null; }
+    registryCache.set(skillRoot, doc);
+  }
+  return registryCache.get(skillRoot);
+};
+// A routing target's provider: the registry pool's provider, else the launch
+// target's runtime adapter id (modules/models/registry.yaml — the ONE catalog).
 const providerForProfile = (profile, skillRoot) => {
   if (!profile) return null;
   if (profileProviderCache.has(profile)) return profileProviderCache.get(profile);
-  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${profile}.yaml`);
-  let provider = null;
-  try { provider = fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8'))?.provider ?? null) : null; } catch { provider = null; }
+  const doc = modelRegistryOf(skillRoot);
+  // A stored `profile` may be the pool/target id itself or the legacy
+  // `profiles/<target>.yaml` label — both name the registry entry.
+  const key = String(profile).replace(/^profiles\//, '').replace(/\.yaml$/, '');
+  const provider = doc?.pools?.[key]?.provider ?? doc?.targets?.[key]?.runtime ?? null;
   profileProviderCache.set(profile, provider);
   return provider;
 };

@@ -1,8 +1,0 @@
-id: api-enqueue-verb
-effectiveAt: '2026-09-28T18:00:00+07:00'
-summary: 'Move the enqueue handler and its command contract into dedicated files, preserving admission and lineage rules.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/enqueue.mjs
-  - modules/kernel/api.yaml
-  - modules/kernel/api-commands/enqueue.yaml

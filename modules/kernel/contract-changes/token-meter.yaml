@@ -6,13 +6,13 @@ summary: >-
   Claude Code JSONL message.usage, Codex rollout token_count, Qwen usageMetadata; devin and any other agent are
   unavailable, never guessed: op_attempts.usage_source 'unavailable' with usage_reason (runtime schema migration
   0003-usage-unavailable, user_version 3, applied on the first writer open of an older ledger after a VACUUM INTO backup).
-  modules/models/prices.yaml is the per-model price table (official list prices read 2026-09-29 for claude-opus-5-5,
+  modules/models/registry.yaml models.<id>.price is the per-model price table (official list prices read 2026-09-29 for claude-opus-5-5,
   claude-sonnet-5-5, gpt-6-sol, gpt-6-luna; devin and qwen stay null so their cost_usd is NULL); new read verb `api usage [--workflow <id> [--legs]]` and an `api status` usage
   field; `boot.mjs --status` prints the machine-wide tokens. Adds no op check, no finding code, no op behavior: a running
   leg reports as it was admitted.
 reach: new-legs
 paths:
-  - modules/models/prices.yaml
+  - modules/models/registry.yaml
   - modules/schemas/index.yaml
   - modules/kernel/api-commands/usage.yaml
   - modules/kernel/contract-changes/token-meter.yaml

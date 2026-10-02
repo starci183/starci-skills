@@ -221,7 +221,7 @@ export default getRequestConfig(async () => ({ locale: "vi", messages: {} }))
 **Valid** (`apps/web/src/modules/i18n/index.ts`)
 
 ```ts
-import { createAppI18n } from "@nivo/i18n"
+import { createAppI18n } from "@acme/i18n"
 export const i18n = createAppI18n({ locales: ["vi"] })
 ```
 

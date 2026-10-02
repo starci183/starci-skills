@@ -1,9 +1,0 @@
-id: shape-slot-law-lint-and-example
-effectiveAt: '2026-09-27T01:55:46+07:00'
-commit: f718d0687
-summary: "The shape-slot law: @starci/eslint-canon-fe gains starci-fe/base-props-atom, base-import-pair, no-data-status-shape and slot-status-through-slotview (packages/eslint/fe/shape-slot.mjs), XBase may take XBaseProps, and file-layout accepts features/{pages,layouts,overlays}; examples/shape-slot is the Next 15 reference across every tier; knowledge/code-examples/frontend/connected-block draws state as a shape and renders data status through Slot + SlotView, with index exporting only the connected X. Registered after landing; the four lint rules are new lint findings for code written after it, not kernel check names"
-reach: new-legs
-paths:
-  - packages/eslint/fe
-  - examples/shape-slot
-  - knowledge/code-examples/frontend/connected-block

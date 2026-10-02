@@ -139,7 +139,7 @@ export function pathspecsWithinOwned(specs, { cwd, owned, top = null }) {
 }
 
 // --pathspec-from-file=<file> (or <file> as the next word; `-` is stdin) with --pathspec-file-nul:
-// the pathspecs of add, commit, reset, restore, checkout and rm live in a file (nivo inc-d1833bc89c1f). The
+// the pathspecs of add, commit, reset, restore, checkout and rm live in a file (inc-d1833bc89c1f). The
 // guard reads the list the way git does and scopes every entry exactly like an explicit pathspec.
 const PATHSPEC_FILE = '--pathspec-from-file';
 const PATHSPEC_FILE_SUBS = new Set(['add', 'commit', 'reset', 'restore', 'checkout', 'rm', 'stash']);

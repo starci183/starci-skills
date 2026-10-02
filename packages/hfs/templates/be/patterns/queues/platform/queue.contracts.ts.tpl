@@ -1,4 +1,4 @@
-/** A recurring task: BullMQ upserts it by `id`, so every replica of an app may register it and the fleet still fires it once per interval. */
+/** A recurring task: BullMQ upserts it by `id`, so every replica of an app may register it and the deployment still fires it once per interval. */
 export interface QueueSchedulerDefinition {
     /** The queue the ticks go to; its processor handles every tick like any other job. */
     readonly queue: string

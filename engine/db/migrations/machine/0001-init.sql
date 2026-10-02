@@ -6,7 +6,7 @@
 -- process_runs/engine_*/schedules/sla_episodes/invariant_violations - reconciler; services/seats/deliveries/
 -- seat_turns/terminals/host_locks/claims/agent_sessions - machine objects; throttle_*/
 -- host_samples/provider_*/pool_backoff/quotas/guard_*/host_*/budgets - capacity and spend; gc_*/lanes/land_*/
--- pushes/worktrees/env_servers/uat_slots/connectors/ask_requests - fleet operations; machine_logs/
+-- pushes/worktrees/env_servers/uat_slots/connectors/ask_requests - worker operations; machine_logs/
 -- metrics_snapshots/notifications - observability; v_* - durable views.
 -- ############################################################################################################
 
@@ -63,7 +63,7 @@ INSERT OR IGNORE INTO blob_ref_columns VALUES
 -- ledgers: the ONLY registry of every runtime.sqlite (reconciler, GC, harness read it here; replaces config.yaml supervisor.repos).
 CREATE TABLE IF NOT EXISTS ledgers(
   ledger_id      TEXT PRIMARY KEY,               -- = meta.ledger_id inside the file (UUID)
-  name           TEXT NOT NULL UNIQUE,           -- 'nivo-backend'
+  name           TEXT NOT NULL UNIQUE,           -- 'acme-backend'
   product        TEXT,
   repo_root      TEXT NOT NULL,
   file           TEXT NOT NULL,
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS engine_queue(
 -- schedules (MB-01): the timetable of every periodic duty lives in the DB, NOT in RAM - a fresh engine rereads it,
 -- no repeated "first run" (housekeeping once/day once ran 32 times in 3.5 hours).
 CREATE TABLE IF NOT EXISTS schedules(
-  controller       TEXT NOT NULL CHECK(controller IN ('job','workflow','resource','host','gc','fleet','learning','sla')),
+  controller       TEXT NOT NULL CHECK(controller IN ('job','workflow','resource','host','gc','workers','learning','sla')),
   duty             TEXT NOT NULL,                -- housekeeping, sweep, push, digest, backup, blob-sweep, transcripts, boot ...
   interval_ms      INTEGER NOT NULL CHECK(interval_ms>0),
   last_started_at  INTEGER, last_finished_at INTEGER,
@@ -355,7 +355,7 @@ CREATE TABLE IF NOT EXISTS schedules(
 -- the full result, stdout and stderr of the child verb are blobs. id is DETERMINISTIC = sha(controller, key, verb, epoch, observed_generation).
 CREATE TABLE IF NOT EXISTS engine_actions(
   id TEXT PRIMARY KEY,
-  controller TEXT NOT NULL CHECK(controller IN ('job','workflow','resource','host','gc','fleet','learning','sla')),
+  controller TEXT NOT NULL CHECK(controller IN ('job','workflow','resource','host','gc','workers','learning','sla')),
   duty TEXT,                                     -- schedules.duty when the action is a periodic run
   key TEXT, verb TEXT, argv_digest TEXT, epoch INTEGER, observed_generation INTEGER,
   span_id TEXT CHECK(span_id IS NULL OR length(span_id)=16), trace_id TEXT,
@@ -382,7 +382,7 @@ CREATE TABLE IF NOT EXISTS action_steps(
 
 -- controller_modes: current mode; mode_changes (G6): append-only history, who changed it and why.
 CREATE TABLE IF NOT EXISTS controller_modes(
-  controller TEXT PRIMARY KEY CHECK(controller IN ('job','workflow','resource','host','gc','fleet','learning')),
+  controller TEXT PRIMARY KEY CHECK(controller IN ('job','workflow','resource','host','gc','workers','learning')),
   mode TEXT NOT NULL CHECK(mode IN ('off','shadow','active')), set_at INTEGER, set_by TEXT) STRICT;
 CREATE TABLE IF NOT EXISTS mode_changes(
   change_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -880,8 +880,8 @@ UNION ALL SELECT 'sup_decisions', COALESCE(max(max(opened_at), max(COALESCE(reso
 
 -- ---------------------------------------------------------------------------------------------------------
 -- B8. Cross-DB queries - NO durable view (SQLite forbids a main view referencing an ATTACHed DB).
---   * Fleet lists (progress, op_history, media, open_work, blocking, settle_overdue, scorecard): engine/machine-db.mjs
+--   * Cross-ledger lists (progress, op_history, media, open_work, blocking, settle_overdue, scorecard): engine/db/machine.mjs
 --     forEachLedger(fn) opens each runtime.sqlite read-only, runs the same-named view, adds the ledger column, merges in JS.
---     attachFleet(batch <= 9) is for ad-hoc queries only.
+--     attachLedgers(batch <= 9) is for ad-hoc queries only.
 --   * Blob GC: mark PER ledger into gc_marks (per each DB's blob_ref_columns) then sweep - no ATTACH-UNION.
 -- ---------------------------------------------------------------------------------------------------------

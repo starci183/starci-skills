@@ -11,7 +11,7 @@ import { postgresService, truncateStatements } from "./postgresql"
 import { s3Request } from "./minio"
 import type { ServiceNet, ServiceTarget } from "./definition"
 
-const namespace: Namespace = { snake: "todo_app_be_a1b2c3", kebab: "todo-app-be-a1b2c3", root: "/repo" }
+const namespace: Namespace = { snake: "shop_be_a1b2c3", kebab: "shop-be-a1b2c3", root: "/repo" }
 
 interface PgLog {
     readonly database: string
@@ -57,16 +57,16 @@ describe("postgresql service", () => {
         assert.deepEqual(result.run, {
             user: "postgres",
             password: "pw",
-            databases: { primary: "todo_app_be_a1b2c3_primary", analytics: "todo_app_be_a1b2c3_analytics" },
+            databases: { primary: "shop_be_a1b2c3_primary", analytics: "shop_be_a1b2c3_analytics" },
             schemas: {},
         })
         assert.deepEqual(log, [
-            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_primary" WITH (FORCE)' },
-            { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_primary"' },
-            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_analytics" WITH (FORCE)' },
-            { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_analytics"' },
-            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector" SCHEMA public' },
-            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public' },
+            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "shop_be_a1b2c3_primary" WITH (FORCE)' },
+            { database: "postgres", sql: 'CREATE DATABASE "shop_be_a1b2c3_primary"' },
+            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "shop_be_a1b2c3_analytics" WITH (FORCE)' },
+            { database: "postgres", sql: 'CREATE DATABASE "shop_be_a1b2c3_analytics"' },
+            { database: "shop_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector" SCHEMA public' },
+            { database: "shop_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public' },
         ])
     })
 
@@ -89,7 +89,7 @@ describe("postgresql service", () => {
             container: "c",
             user: "postgres",
             password: "pw",
-            databases: { primary: "todo_app_be_a1b2c3_primary" },
+            databases: { primary: "shop_be_a1b2c3_primary" },
             schemas: {},
         }
         await postgresService.reset(targetWith({ pg: scriptedPg(log, tables, ['TRUNCATE TABLE "public"."users" RESTART IDENTITY']) }), run, { namespace, keepTables: { primary: ["roles"] }, notes: {} })
@@ -97,7 +97,7 @@ describe("postgresql service", () => {
         assert.equal(sql[0], "SET session_replication_role = replica")
         assert.match(sql[1] ?? "", /FROM pg_tables/)
         assert.deepEqual(sql.slice(2), ['TRUNCATE TABLE "public"."users" RESTART IDENTITY', 'DELETE FROM "public"."users"', 'TRUNCATE TABLE "public"."orders" RESTART IDENTITY'])
-        assert.ok(log.every((entry) => entry.database === "todo_app_be_a1b2c3_primary"))
+        assert.ok(log.every((entry) => entry.database === "shop_be_a1b2c3_primary"))
     })
 
     it("schema-per-context: connections naming one database share it, each with its schema and its own login role", async () => {
@@ -115,31 +115,31 @@ describe("postgresql service", () => {
             }),
         )
         const { databases, schemas } = result.run
-        assert.deepEqual(databases, { identity: "todo_app_be_a1b2c3_core", order: "todo_app_be_a1b2c3_core", analytics: "todo_app_be_a1b2c3_analytics" })
+        assert.deepEqual(databases, { identity: "shop_be_a1b2c3_core", order: "shop_be_a1b2c3_core", analytics: "shop_be_a1b2c3_analytics" })
         assert.deepEqual(Object.keys(schemas).sort(), ["identity", "order"])
         assert.equal(schemas.identity?.schema, "identity")
-        assert.equal(schemas.identity?.user, "todo_app_be_a1b2c3_identity")
-        assert.equal(schemas.order?.user, "todo_app_be_a1b2c3_order")
+        assert.equal(schemas.identity?.user, "shop_be_a1b2c3_identity")
+        assert.equal(schemas.order?.user, "shop_be_a1b2c3_order")
         assert.notEqual(schemas.identity?.password, schemas.order?.password)
         const sql = log.map((entry) => `${entry.database}: ${entry.sql.replace(/PASSWORD '[^']*'/, "PASSWORD <generated>")}`)
         assert.deepEqual(sql, [
-            'postgres: DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_core" WITH (FORCE)',
-            'postgres: CREATE DATABASE "todo_app_be_a1b2c3_core"',
-            'postgres: DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_analytics" WITH (FORCE)',
-            'postgres: CREATE DATABASE "todo_app_be_a1b2c3_analytics"',
-            'postgres: DROP ROLE IF EXISTS "todo_app_be_a1b2c3_identity"',
-            'postgres: CREATE ROLE "todo_app_be_a1b2c3_identity" LOGIN PASSWORD <generated>',
-            'postgres: DROP ROLE IF EXISTS "todo_app_be_a1b2c3_order"',
-            'postgres: CREATE ROLE "todo_app_be_a1b2c3_order" LOGIN PASSWORD <generated>',
-            'todo_app_be_a1b2c3_core: CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public',
-            'todo_app_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "identity" AUTHORIZATION "todo_app_be_a1b2c3_identity"',
-            'todo_app_be_a1b2c3_core: ALTER ROLE "todo_app_be_a1b2c3_identity" IN DATABASE "todo_app_be_a1b2c3_core" SET search_path = "identity", public',
-            'todo_app_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "todo_app_be_a1b2c3_core" TO "todo_app_be_a1b2c3_identity"',
-            'todo_app_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "todo_app_be_a1b2c3_identity"',
-            'todo_app_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "ordering" AUTHORIZATION "todo_app_be_a1b2c3_order"',
-            'todo_app_be_a1b2c3_core: ALTER ROLE "todo_app_be_a1b2c3_order" IN DATABASE "todo_app_be_a1b2c3_core" SET search_path = "ordering", public',
-            'todo_app_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "todo_app_be_a1b2c3_core" TO "todo_app_be_a1b2c3_order"',
-            'todo_app_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "todo_app_be_a1b2c3_order"',
+            'postgres: DROP DATABASE IF EXISTS "shop_be_a1b2c3_core" WITH (FORCE)',
+            'postgres: CREATE DATABASE "shop_be_a1b2c3_core"',
+            'postgres: DROP DATABASE IF EXISTS "shop_be_a1b2c3_analytics" WITH (FORCE)',
+            'postgres: CREATE DATABASE "shop_be_a1b2c3_analytics"',
+            'postgres: DROP ROLE IF EXISTS "shop_be_a1b2c3_identity"',
+            'postgres: CREATE ROLE "shop_be_a1b2c3_identity" LOGIN PASSWORD <generated>',
+            'postgres: DROP ROLE IF EXISTS "shop_be_a1b2c3_order"',
+            'postgres: CREATE ROLE "shop_be_a1b2c3_order" LOGIN PASSWORD <generated>',
+            'shop_be_a1b2c3_core: CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public',
+            'shop_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "identity" AUTHORIZATION "shop_be_a1b2c3_identity"',
+            'shop_be_a1b2c3_core: ALTER ROLE "shop_be_a1b2c3_identity" IN DATABASE "shop_be_a1b2c3_core" SET search_path = "identity", public',
+            'shop_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "shop_be_a1b2c3_core" TO "shop_be_a1b2c3_identity"',
+            'shop_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "shop_be_a1b2c3_identity"',
+            'shop_be_a1b2c3_core: CREATE SCHEMA IF NOT EXISTS "ordering" AUTHORIZATION "shop_be_a1b2c3_order"',
+            'shop_be_a1b2c3_core: ALTER ROLE "shop_be_a1b2c3_order" IN DATABASE "shop_be_a1b2c3_core" SET search_path = "ordering", public',
+            'shop_be_a1b2c3_core: GRANT CONNECT, TEMPORARY ON DATABASE "shop_be_a1b2c3_core" TO "shop_be_a1b2c3_order"',
+            'shop_be_a1b2c3_core: GRANT USAGE ON SCHEMA public TO "shop_be_a1b2c3_order"',
         ])
     })
 
@@ -185,7 +185,7 @@ describe("postgresql service", () => {
 })
 
 describe("kafka service", () => {
-    const PREFIX = "todo-app-be-a1b2c3."
+    const PREFIX = "shop-be-a1b2c3."
     /** A scripted broker: `--list` of topics and of groups answer the given listings; `failing` groups refuse deletion. */
     const broker = (listing: { readonly topics: string; readonly groups: string; readonly describe?: string }, failing: ReadonlyArray<string> = []) => {
         const calls: Array<ReadonlyArray<string>> = []
@@ -213,8 +213,8 @@ describe("kafka service", () => {
 
     it("deprovision deletes only the slot's groups and topics, never another slot's or repository's", async () => {
         const { calls, docker } = broker({
-            topics: `other.topic\n${PREFIX}orders\n${PREFIX}mail\ntodo-app-be-a1b2c3-w2.orders\n`,
-            groups: `${PREFIX}billing\nother.group\ntodo-app-be-a1b2c3-w2.billing\n`,
+            topics: `other.topic\n${PREFIX}orders\n${PREFIX}mail\nshop-be-a1b2c3-w2.orders\n`,
+            groups: `${PREFIX}billing\nother.group\nshop-be-a1b2c3-w2.billing\n`,
         })
         const run = { listener: 1, topicPrefix: PREFIX, groupPrefix: PREFIX, topics: {} } as unknown as RunKafka
         await kafkaService.deprovision(targetWith({ docker }), run, { namespace, releaseRedisDb: async () => undefined })
@@ -231,7 +231,7 @@ describe("kafka service", () => {
         let clock = 0
         Date.now = () => (clock += 5000)
         try {
-            await assert.rejects(kafkaService.deprovision(target, run, { namespace, releaseRedisDb: async () => undefined }), /still have members .* todo-app-be-a1b2c3\.stuck/)
+            await assert.rejects(kafkaService.deprovision(target, run, { namespace, releaseRedisDb: async () => undefined }), /still have members .* shop-be-a1b2c3\.stuck/)
         } finally {
             Date.now = realNow
         }
@@ -247,7 +247,7 @@ describe("kafka service", () => {
         const described = calls.find((args) => args.includes("--describe"))
         assert.equal(described?.[described.indexOf("--topic") + 1], `${PREFIX}orders`)
         const written = calls.find((args) => args[2] === "sh")
-        assert.match(written?.[4] ?? "", /"partitions":\[\{"topic":"todo-app-be-a1b2c3\.orders","partition":0,"offset":-1\},\{"topic":"todo-app-be-a1b2c3\.orders","partition":1,"offset":-1\}\]/)
+        assert.match(written?.[4] ?? "", /"partitions":\[\{"topic":"shop-be-a1b2c3\.orders","partition":0,"offset":-1\},\{"topic":"shop-be-a1b2c3\.orders","partition":1,"offset":-1\}\]/)
         assert.ok(calls.some((args) => args.join(" ").includes("kafka-delete-records.sh")))
     })
 
@@ -271,15 +271,15 @@ describe("kafka service", () => {
 describe("keycloak realm preparation", () => {
     const file = JSON.stringify({
         id: "abc",
-        realm: "todo-app",
+        realm: "shop",
         clients: [{ clientId: "backend", directAccessGrantsEnabled: false }, { clientId: "web", directAccessGrantsEnabled: true }],
         users: [{ username: "Admin" }],
     })
 
     it("re-targets the realm name, drops the id, detects the password client and lists seed users", () => {
-        const prepared = prepareRealm(file, "todo-app-be-a1b2c3", "realm.json")
-        assert.equal(prepared.stored, "todo-app-be-a1b2c3-todo-app")
-        assert.equal(prepared.body.realm, "todo-app-be-a1b2c3-todo-app")
+        const prepared = prepareRealm(file, "shop-be-a1b2c3", "realm.json")
+        assert.equal(prepared.stored, "shop-be-a1b2c3-shop")
+        assert.equal(prepared.body.realm, "shop-be-a1b2c3-shop")
         assert.equal("id" in prepared.body, false)
         assert.equal(prepared.passwordClientId, "web")
         assert.deepEqual(prepared.seedUsers, ["admin"])
@@ -341,10 +341,10 @@ describe("minio s3 client", () => {
             seen = { url: String(url), headers: init?.headers as Record<string, string> }
             return new Response("<ListAllMyBucketsResult/>", { status: 200 })
         }) as typeof fetch
-        const result = await s3Request(targetWith({ fetch: fake }), { accessKey: "ak", secretKey: "sk" }, "GET", "/todo-app-be-a1b2c3-uploads", { "list-type": "2" }, new Date("2026-01-02T03:04:05Z"))
+        const result = await s3Request(targetWith({ fetch: fake }), { accessKey: "ak", secretKey: "sk" }, "GET", "/shop-be-a1b2c3-uploads", { "list-type": "2" }, new Date("2026-01-02T03:04:05Z"))
         assert.equal(result.status, 200)
         const captured = seen as unknown as { url: string; headers: Record<string, string> }
-        assert.equal(captured.url, "http://127.0.0.1:5555/todo-app-be-a1b2c3-uploads?list-type=2")
+        assert.equal(captured.url, "http://127.0.0.1:5555/shop-be-a1b2c3-uploads?list-type=2")
         assert.equal(captured.headers["x-amz-date"], "20260102T030405Z")
         assert.match(captured.headers.authorization ?? "", /^AWS4-HMAC-SHA256 Credential=ak\/20260102\/us-east-1\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/)
     })

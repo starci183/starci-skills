@@ -3,7 +3,7 @@
 //
 // Orca's `terminal read` answers the text sitting unsubmitted in an agent's input box as `draft` and
 // leaves it out of the frame (scripts/lib/orca-terminal.mjs draftText). Anything typed next is appended to
-// that text: on the nivo collab Kernel (2026-09-25) a dropped Enter left a wake in the box and each
+// that text: on a product's collab Kernel (2026-09-25) a dropped Enter left a wake in the box and each
 // later wake piled onto it. Ctrl+U deletes one input row back to its start in the Claude, Codex and
 // Devin TUIs, so a multi-row draft needs several; the draft is re-read after each and the helper stops
 // the moment it reads empty, after `attempts` Ctrl+U at most.

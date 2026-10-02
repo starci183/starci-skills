@@ -10,7 +10,10 @@
 //   1. copies the package to a fresh temp directory with no node_modules above it, at its runtime-relative path, with the
 //      SOURCES of every other published package beside it at theirs (a parity test may read a sibling's source, as the
 //      stylelint vocabulary reads the grammar CSS); only TRACKED files are copied (copyTracked), so nothing installed,
-//      hoisted, junctioned or built in this checkout can satisfy it, while committed fixture stubs come along;
+//      hoisted, junctioned or built in this checkout can satisfy it, while committed fixture stubs come along. The one
+//      exception is the generated runtime copies (ruleParams.runtime.generated): untracked, but shipped content the
+//      packages' own tests read - the proof regenerates them first (the runtime copy generator) and carries what
+//      the fresh sync wrote;
 //   2. installs it from its own manifest: `npm ci` on its own lockfile, or `npm install` when it carries none (the
 //      report says `npm install (no lockfile)`, so a package that ships without a lock is visible);
 //   3. runs its declared `test` script there. A package that declares none is red (PACKAGE_NO_TEST): a published
@@ -34,6 +37,8 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
 import { loadPins } from './canon-pins.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { runScript } from '../api/node/run-script.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -59,6 +64,15 @@ export function publishSet(root = runtimeRoot) {
   return Object.entries(loadPins(root)?.pins ?? {})
     .filter(([, pin]) => pin?.group === 'starci' && pin.source)
     .map(([name, pin]) => ({ name, dir: posixPath(path.dirname(pin.source)) }));
+}
+
+/** The generated roots of the runtime manifest under `root` (ruleParams.runtime.generated), runtime-relative posix; [] when the runtime has no manifest. */
+function generatedRoots(root = runtimeRoot) {
+  const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
+  if (!fs.existsSync(file)) return [];
+  return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? [])
+    .map((g) => String(g.root ?? '').replace(/\/+$/, ''))
+    .filter(Boolean);
 }
 
 /** The member folders (absolute) a workspace root's `workspaces` names: `x/*` is every child holding a package.json, else the folder itself. */
@@ -184,7 +198,15 @@ function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = npmRun, 
     for (const dir of own) copyTracked(dir, at(dir));
     // the other published packages' sources, never inside a folder copied above
     const inside = (dir, parent) => { const rel = path.relative(parent, dir); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
-    for (const dir of sources.map((d) => path.resolve(root, d))) if (!own.some((o) => inside(dir, o) || inside(o, dir))) copyTracked(dir, at(dir));
+    const sourcesCopied = sources.map((d) => path.resolve(root, d)).filter((d) => !own.some((o) => inside(d, o) || inside(o, d)));
+    for (const dir of sourcesCopied) copyTracked(dir, at(dir));
+    // The generated runtime copies are untracked but shipped content the packages' own tests read; the fresh sync's
+    // output is carried like the tracked files (a copied dir's generated root inside it, or a generated root holding it).
+    const copied = [...own, ...sourcesCopied];
+    for (const g of generatedRoots(root)) {
+      const abs = path.resolve(root, g);
+      if (copied.some((d) => inside(abs, d) || inside(d, abs)) && fs.existsSync(abs)) fs.cpSync(abs, at(abs), { recursive: true });
+    }
     const placed = new Map(unit.packages.map((pkg) => [pkg.name, at(path.resolve(root, pkg.dir))]));
     const locked = LOCKFILES.some((name) => fs.existsSync(path.join(installRoot, name)));
     const install = locked ? 'npm ci' : 'npm install (no lockfile)';
@@ -234,6 +256,13 @@ function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) => proc
       if (names.status !== 0) { out(`package-clean-test: git diff ${range} failed: ${String(names.stderr || names.error?.message || '').trim()}\n`); return PROOF_EXIT.unrun; }
       changed = [...(changed ?? []), ...String(names.stdout).split(/\r?\n/).filter(Boolean)];
     } else { out(`${USAGE}\n`); return PROOF_EXIT.unrun; }
+  }
+  // The proof copies tracked files plus the generated runtime copies; the copies are refreshed first so what the temp
+  // install reads is what a pack would ship.
+  const syncScript = path.join(root, 'scripts', 'hfs', 'sync-runtime.mjs');
+  if (fs.existsSync(syncScript) && generatedRoots(root).length) {
+    const status = runScript(syncScript, [], { cwd: root });
+    if (status !== 0) { out(`package-clean-test: the runtime sync failed (exit ${status}); the generated copies cannot be trusted\n`); return PROOF_EXIT.unrun; }
   }
   const set = publishSet(root);
   const packages = changed ? packagesChanged(changed, set, root) : set;

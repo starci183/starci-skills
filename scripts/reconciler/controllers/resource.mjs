@@ -3,7 +3,7 @@
 // It wraps scripts/machine/ram-throttle.mjs (and ram-cap.mjs keeps its prioritize/setPriority path), never re-implements
 // the math:
 //   key resource:host, every resyncMs (30 s):
-//     fleetCensus (every ledger the machine registry names) + machineLoad + memoryProbe (host-resources) → nextMode
+//     workersCensus (every ledger the machine registry names) + machineLoad + memoryProbe (host-resources) → nextMode
 //     (hysteresis: minFreeRamPct 10 / heavyResumeAbovePct 15, landSpecPauseBelowPct 2.5 / landSpecResumeAbovePct 5,
 //     CPU 0.95 / 0.85) → machine.sqlite throttle_state (publishThrottle → setThrottle: a mode change appends its
 //     throttle_events row first) + one host_samples row kind 'host': in active this controller is the single writer
@@ -62,7 +62,7 @@ const poolCapsOf = (entries) => Object.fromEntries(Object.entries(entries ?? {})
 /* ------------------------------------------------------------ fair share (pure) */
 
 /**
- * Per-workflow slot targets. `ops`: the fleet census [{workflowId, status}] (queued rows included); `priorities`:
+ * Per-workflow slot targets. `ops`: the worker census [{workflowId, status}] (queued rows included); `priorities`:
  * priorityTable(); `maxParallelOps`: the owner's ceiling (null: the total demand). Only workflows with ready (queued)
  * work get a target; the slots that workflows without ready work already hold are taken off the top. Reserve first
  * (weight order), then one slot at a time to the unsaturated workflow with the lowest target/weight (ties: higher
@@ -170,7 +170,7 @@ const liveDeps = {
   pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
     .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
   load: async () => { try { return (await import('../../machine/host-resources.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
-  census: async () => (await import('../../machine/ram-throttle.mjs')).fleetCensus({}),
+  census: async () => (await import('../../machine/ram-throttle.mjs')).workersCensus({}),
   footprints: async (limit, env) => { try { return (await import('../../machine/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
   // async: the sync process-table read blocks the engine's one thread for minutes on a loaded host (ENGINE-STALL)
   owners: async () => { const h = await import('../../supervisor/host-health.mjs'); return h.groupByOwner(await h.listProcessesAsync(), { limit: Infinity }); },
@@ -307,7 +307,7 @@ export function createResourceController(overrides = {}) {
    * the last pass: provider-rate-limited events of every product ledger (payload pool / model / target, else the
    * job's routed pool, else every pool of payload.provider) and provider-health rows of failureKind rate-limited
    * observed since. Halve on a signal (floor backoffFloor, at most once per backoffDecreaseCooldownMs), +1 per
-   * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's runtimes.yaml maxParallel. Active:
+   * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's registry.yaml maxParallel. Active:
    * machine.sqlite pool_backoff rows (route reads them and prefers the next eligible pool); shadow: a would-row
    * when the caps change. A pool held at its floor while the rate limit persists for backoffPersistMs opens the
    * provider circuit (api provider-backoff) on every product ledger, once per floor episode.
@@ -362,7 +362,7 @@ export function createResourceController(overrides = {}) {
         hitSignal({ ...p, jobPool: e.jobPool }, e.at);
       }
     }
-    // The provider circuits: one fleet-wide row per provider in machine.sqlite provider_health (a3-4, provider-circuit.mjs).
+    // The provider circuits: one worker-wide row per provider in machine.sqlite provider_health (a3-4, provider-circuit.mjs).
     for (const c of (deps.providerCircuits ?? providerCircuits)()) {
       const v = c.value ?? {};
       const at = Number(v.observedAt) || Number(c.at) || 0;

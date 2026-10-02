@@ -12,7 +12,7 @@ import { collectRegistrations, isPerConnection, persistenceOfFactory } from './c
  *     folder named `entities` or `migrations` outside be.persistence is refused too;
  *   - `persistence/connection.ts` declares `<c>Entities` / `<c>Migrations`, the arrays the apps register; a capability has no
  *     `CONNECTION` alias (C0 lead decision 2026-09-30): its connection is the one those arrays are REGISTERED on, in the
- *     `entities` / `migrations` of a connection literal of `DatabaseModule.register` and of the migrate app. The arrays are
+ *     `entities` / `migrations` of a connection literal of `DatabaseModule.register` and of the cli app. The arrays are
  *     registered under exactly one connection across all apps, that connection is declared in hfs.json, and every
  *     `Inject<Conn>EntityManager()` used inside the capability is that same connection;
  *   - the capability's `index.ts` exports `<c>Entities` when it has entities and `<c>Migrations` when it has migrations
@@ -109,7 +109,7 @@ export function checkSchemaOwner(input) {
     }
   }
   for (const [key, kinds] of found) {
-    if (!registered.get(key)?.connections.size) plain(`${key}/persistence/connection.ts`, `The ${kinds.name} capability has entities or migrations but no app registers them; add ${camel(kinds.name)}Entities and ${camel(kinds.name)}Migrations to a connection of DatabaseModule.register and of the migrate app.`, { capability: kinds.name });
+    if (!registered.get(key)?.connections.size) plain(`${key}/persistence/connection.ts`, `The ${kinds.name} capability has entities or migrations but no app registers them; add ${camel(kinds.name)}Entities and ${camel(kinds.name)}Migrations to a connection of DatabaseModule.register and of the cli app.`, { capability: kinds.name });
     const connectionFile = graph.files.get(`${key}/persistence/connection.ts`);
     const declared = new Set((connectionFile?.sourceFile.statements.filter(ts.isVariableStatement).flatMap(statement => statement.declarationList.declarations) ?? []).map(item => item.name.text));
     for (const [kind, has] of [['Entities', kinds.entities], ['Migrations', kinds.migrations]]) {

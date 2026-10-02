@@ -25,7 +25,8 @@ import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from '../machine/home.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { opLabel, opLabelMap } from '../lib/display-names.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { WORKFLOW_ALIASES } from '../lib/example-refs.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
 
@@ -34,11 +35,9 @@ const TZ = 'Asia/Ho_Chi_Minh';
 export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
 // The label in the report's language (modules/ops/_labels.yaml carries vi and en), the vi one when neither is declared.
 const legLabel = (op, language) => opLabel(op, language);
-// English alias sources; the i18n catalog carries the owner's wording for each.
-const ALIASES = { 'nivo-app-auth': 'AUTH (sign-in)', 'nivo-workspace-provision': 'WSPV (buy & provision workspace)',
-  'nivo-modules-agentos': 'Modules (AgentOS)', 'nivo-collab-group-chat': 'Collab (group chat)',
-  'starci-next-work-and-stacks': 'StarCi Next – work & stacks', 'starci-next-base-repos': 'StarCi Next – base repos',
-  'miamia-work-and-stacks': 'Mia Mia – work & stacks', 'miamia-base-repos': 'Mia Mia – base repos' };
+// English alias sources; the i18n catalog carries the owner's wording for each. The product-keyed slugs
+// themselves are declared once in scripts/lib/example-refs.mjs (R206).
+const ALIASES = WORKFLOW_ALIASES;
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
 // The workflow's display name (api rename / define-goal: workflows.display_name) when the ledger has one,
 // else the older alias, else the goal slug.
@@ -64,7 +63,7 @@ const publicBaseOf = (config) => {
  * Jobs of one workflow that are DONE but held: the worker filed its report, the Kernel consumed it,
  * and an open peer-wait or owner-gate incident naming the job (--holds, else --op) keeps its settle
  * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "nobody messages
- * when a job finishes or gets stuck" (2026-09-25; nivo op-integration.verify-25532858e7 sat done behind peer-wait
+ * when a job finishes or gets stuck" (2026-09-25; a product's op-integration.verify-25532858e7 sat done behind peer-wait
  * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
  * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).
  */
@@ -99,7 +98,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 }
 
 /** One running workflow's progress, read from its ledger. */
-export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = 'vi' } = {}) {
+export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parseJson(goalRow?.json, {}) ?? {};
@@ -157,7 +156,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   };
 }
 
-export function collectProgress(repos, { now = Date.now(), language = 'vi', config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
+export function collectProgress(repos, { now = Date.now(), language = ownerLanguage(), config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
   const publicBase = publicBaseOf(config);
   const out = [];
   for (const repo of repos) {
@@ -178,7 +177,7 @@ const OUTCOME = { done: 'done', partial: 'partially done', failed: 'failed', ask
 const outcomeText = (outcome, tr) => tr(OUTCOME[outcome] ?? outcome);
 
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
-function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
+function holdLine(h, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const on = h.heldBecause === 'peer-wait'
     ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`
@@ -189,7 +188,7 @@ function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
 }
 
 /** One readable section for one workflow (HTML). */
-export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
+export function workflowSection(r, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const line = [];
   line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: escapeHtml(r.name), done: r.done, total: r.total }));
@@ -218,7 +217,7 @@ export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
 }
 
 /** The report as Telegram messages (HTML), split under the message size limit. */
-export function progressMessages(rows, { now = Date.now(), language = 'vi' } = {}) {
+export function progressMessages(rows, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const ok = rows.filter((r) => !r.error);
   const creds = ok.reduce((n, r) => n + r.asks.filter((a) => a.askClass === 'credential').length, 0);

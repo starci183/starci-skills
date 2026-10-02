@@ -3,7 +3,7 @@ id: be.folder
 title: Backend folder
 purpose: |-
   Given backend code, which directory does it live in? Apply the HFS backend tree: the `be.*` slots of
-  knowledge/hfs/slots.yaml are its machine form, and docs/backend-source-pattern.md states the code forms.
+  knowledge/hfs/slots.yaml are its machine form, and docs/architecture.md states the code forms.
 appliesTo:
   - backend
 family: be
@@ -13,7 +13,7 @@ provenance:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/fundamentals/dynamic-modules
   limitations: |-
@@ -23,7 +23,7 @@ rules:
   - id: BE-FOLDER-1
     title: Responsibility roots
     kind: mandatory
-    hfsRules: [R01, R02, R29, R89, R26]
+    hfsRules: [R01, R02, R29, R89, R26, R145]
     requirement: |-
       The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app (slots `be.app.api`,
       `be.app.worker`, `be.app.cli`; the cli app is named cli). Apps own process composition only.
@@ -87,13 +87,14 @@ rules:
         - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
+        - HFS_MONO_NEST_PROJECTS
       manual:
         - Verify the actual owner and public API, not only folder names.
     relatedExamples: []
   - id: BE-FOLDER-2
     title: Features are grouped by trigger kind
     kind: mandatory
-    hfsRules: [R29, R87, R147, R149, R28]
+    hfsRules: [R29, R87, R147, R149, R28, R179, R180]
     requirement: |-
       `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a
       request triggers (api.yaml, slot `be.feature`), `features/cli/` for the one-off actions an operator runs (cli.yaml,
@@ -131,6 +132,8 @@ rules:
         - BE_CLI_REQUIRED
         - BE_CLI_COMMAND_SHAPE
         - BE_FEATURE_IMPORTS_FEATURE
+        - BE_KIND_DECLARATION
+        - BE_KIND_EMPTY
       manual: []
     relatedExamples: []
   - id: BE-FOLDER-3

@@ -1,3 +1,5 @@
+Task: move work to the remote once per release, with its annotated tag and finished notes
+
 # Git governance
 
 How work reaches the remote, for this runtime repository and for every app that `hfs scaffold` creates. The rules are enforced by checks, not by this page

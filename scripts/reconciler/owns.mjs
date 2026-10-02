@@ -10,7 +10,7 @@ export const CONCERN_OWNER = Object.freeze({
   'resource.throttle': 'resource', 'resource.quota': 'resource',
   'gc.sweep': 'gc', 'gc.housekeeping': 'gc',
   'workflow.stall-wake': 'workflow', 'workflow.progress': 'workflow', 'workflow.ask-repark': 'workflow',
-  'fleet.owed': 'fleet', 'fleet.push': 'fleet', 'fleet.deps': 'fleet', 'notify.owner': 'fleet',
+  'workers.owed': 'workers', 'workers.push': 'workers', 'workers.deps': 'workers', 'notify.owner': 'workers',
   'learning.tick': 'learning',
   'sla.report': 'workflow',
 });

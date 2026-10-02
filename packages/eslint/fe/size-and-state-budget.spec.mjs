@@ -56,7 +56,7 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
     invalid: [
       { filename: HOOK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
       { filename: at("apps/web/src/modules/feed/index.ts"), code: lines(401), errors: [{ messageId: "lines", data: { count: 401, max: 400 } }] },
-      { filename: at("packages/todo-app-ui/src/leaves/Chip/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
+      { filename: at("packages/shop-ui/src/leaves/Chip/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
       { filename: DRAWING, code: lines(301), errors: [{ messageId: "lines", data: { count: 301, max: 300 } }] },
       // the connected entry has the smaller budget
       { filename: BLOCK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
@@ -86,7 +86,7 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
     invalid: [
       { filename: BLOCK, code: unit("Feed", 7, 0), errors: [{ messageId: "state" }] },
       { filename: HOOK, code: unit("useFeed", 7, 0), errors: [{ messageId: "state" }] },
-      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: unit("Chip", 0, 7), errors: [{ messageId: "data" }] },
+      { filename: at("packages/shop-ui/src/leaves/Chip/index.tsx"), code: unit("Chip", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 8, 8), errors: [{ messageId: "state" }, { messageId: "data" }] },
       { filename: at("apps/admin/src/components/leaves/Chip/component.tsx"), code: unit("Chip", 7, 0), errors: [{ messageId: "state" }] },

@@ -14,5 +14,3 @@ paths:
   - modules/schemas/work-layout.yaml
   - modules/schemas/work-uat-flow.schema.yaml
   - modules/schemas/interface-audit-operation.yaml
-  - modules/kernel/contract-changes/operations-family.yaml
-  - modules/kernel/contract-changes/operations-record-legacy.yaml

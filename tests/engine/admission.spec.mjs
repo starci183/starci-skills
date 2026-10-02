@@ -8,29 +8,29 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
 test('owned paths normalize to concrete workspace-relative prefixes',()=>{
-  assert.equal(normalizeOwnedPath('.\\todo-app-fe//apps/landing/**'),'todo-app-fe/apps/landing');
+  assert.equal(normalizeOwnedPath('.\\shop-fe//apps/landing/**'),'shop-fe/apps/landing');
   assert.equal(ownedPathLeaseKey('./.starciwork/migration/'),'path:.starciwork/migration');
-  assert.throws(()=>normalizeOwnedPath('../todo-app-fe'),/must not traverse/);
-  assert.throws(()=>normalizeOwnedPath('todo-app-fe/apps/*'),/concrete prefix/);
+  assert.throws(()=>normalizeOwnedPath('../shop-fe'),/must not traverse/);
+  assert.throws(()=>normalizeOwnedPath('shop-fe/apps/*'),/concrete prefix/);
   assert.throws(()=>normalizeOwnedPath(`${path.parse(process.cwd()).root}repo\\file`),/repository-relative/);
 });
 
 test('owned path sets collapse duplicate descendants but preserve disjoint product slices',()=>{
-  assert.deepEqual(normalizeOwnedPaths(['todo-app-fe/apps/landing/src','todo-app-fe/apps/landing','todo-app-fe/apps/landing/**','.starciwork/migration']),[
-    '.starciwork/migration','todo-app-fe/apps/landing',
+  assert.deepEqual(normalizeOwnedPaths(['shop-fe/apps/landing/src','shop-fe/apps/landing','shop-fe/apps/landing/**','.starciwork/migration']),[
+    'shop-fe/apps/landing','.starciwork/migration',
   ]);
-  assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','todo-app-fe/apps/landing/src/page.tsx'),true);
-  assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','.starciwork/migration'),false);
+  assert.equal(ownedPathsIntersect('shop-fe/apps/landing','shop-fe/apps/landing/src/page.tsx'),true);
+  assert.equal(ownedPathsIntersect('shop-fe/apps/landing','.starciwork/migration'),false);
 });
 
 // Two declared ceilings meet at one line: budgets.maxOps (owner, per workflow)
-// and modules/models/runtimes.yaml maxParallelOps (fleet). The lower admits and
+// and modules/models/runtimes.yaml maxParallelOps (workers). The lower admits and
 // the refusal string is `max-ops`.
-test('the concurrent-operation ceiling is the lower of the owner budget and the fleet ceiling',()=>{
+test('the concurrent-operation ceiling is the lower of the owner budget and the worker ceiling',()=>{
   assert.deepEqual(opSlotCeiling({maxOps:1,maxParallelOps:20}),{ceiling:1,source:'budgets.maxOps'});
   assert.deepEqual(opSlotCeiling({maxOps:40,maxParallelOps:20}),{ceiling:20,source:'maxParallelOps'});
   assert.deepEqual(opSlotCeiling({maxOps:20,maxParallelOps:20}),{ceiling:20,source:'budgets.maxOps'},'a tie names the owner budget — the one the owner can move');
-  assert.deepEqual(opSlotCeiling({maxOps:null,maxParallelOps:20}),{ceiling:20,source:'maxParallelOps'},'no owner budget still meets the fleet ceiling');
+  assert.deepEqual(opSlotCeiling({maxOps:null,maxParallelOps:20}),{ceiling:20,source:'maxParallelOps'},'no owner budget still meets the worker ceiling');
   assert.deepEqual(opSlotCeiling({maxOps:8,maxParallelOps:null}),{ceiling:8,source:'budgets.maxOps'});
   assert.deepEqual(opSlotCeiling({}),{ceiling:null,source:null},'two absent ceilings are unbounded, not zero');
   assert.deepEqual(opSlotCeiling({maxOps:0,maxParallelOps:-3}),{ceiling:null,source:null},'a non-positive ceiling is not a ceiling');
@@ -44,7 +44,7 @@ test('admitOpSlot refuses max-ops at the ceiling and never above or below it',()
   assert.deepEqual(admitOpSlot({running:5,maxOps:1,maxParallelOps:20}).reason,'max-ops','drift above the ceiling stays refused');
   assert.equal(admitOpSlot({running:19,maxParallelOps:20}).ok,true);
   assert.deepEqual(admitOpSlot({running:20,maxParallelOps:20}),
-    {ok:false,running:20,ceiling:20,ceilingSource:'maxParallelOps',reason:'max-ops'},'the fleet ceiling admits alone when the owner declared none');
+    {ok:false,running:20,ceiling:20,ceilingSource:'maxParallelOps',reason:'max-ops'},'the worker ceiling admits alone when the owner declared none');
   assert.equal(admitOpSlot({running:9999}).ok,true,'unbounded is unbounded');
 });
 
@@ -52,15 +52,15 @@ test('durable prefix leases serialize parent and child scopes across workflows w
   seedWorkflow(ledger,{id:'wf-landing',jobs:[{jobId:'landing',opId:'interface.implement'}]});
   seedWorkflow(ledger,{id:'wf-other',jobs:[{jobId:'landing-child',opId:'test.author'}]});
   seedWorkflow(ledger,{id:'wf-canonicalize',jobs:[{jobId:'canonicalize',opId:'workspace.manage'}]});
-  for(const key of ['path:todo-app-fe/apps/landing','path:todo-app-fe/apps/landing/src','path:.starciwork/migration'])
+  for(const key of ['path:shop-fe/apps/landing','path:shop-fe/apps/landing/src','path:.starciwork/migration'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   const landing=reserveTwoPhase(ledger,machine,{job:{jobId:'landing',workflowId:'wf-landing',opId:'interface.implement',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:todo-app-fe/apps/landing',units:1}]});
+    leases:[{resourceKey:'path:shop-fe/apps/landing',units:1}]});
   assert.equal(landing.ok,true);
   const child=reserveTwoPhase(ledger,machine,{job:{jobId:'landing-child',workflowId:'wf-other',opId:'test.author',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:todo-app-fe/apps/landing/src',units:1}]});
+    leases:[{resourceKey:'path:shop-fe/apps/landing/src',units:1}]});
   assert.equal(child.ok,false);
-  assert.match(child.reason,/overlaps durable lease path:todo-app-fe\/apps\/landing held by landing/);
+  assert.match(child.reason,/overlaps durable lease path:shop-fe\/apps\/landing held by landing/);
   const migration=reserveTwoPhase(ledger,machine,{job:{jobId:'canonicalize',workflowId:'wf-canonicalize',opId:'workspace.manage',generation:1,kind:'op'},
     leases:[{resourceKey:'path:.starciwork/migration',units:1}]});
   assert.equal(migration.ok,true,'disjoint product and Work migration paths may run concurrently');
@@ -69,13 +69,13 @@ test('durable prefix leases serialize parent and child scopes across workflows w
 test('an expired path lease stays a fence until its attempt is explicitly settled',t=>withLedger(t,({ledger,machine})=>{
   seedWorkflow(ledger,{id:'wf-old',jobs:[{jobId:'old',opId:'op'}]});
   seedWorkflow(ledger,{id:'wf-next',jobs:[{jobId:'next',opId:'op'}]});
-  for(const key of ['path:todo-app-fe/apps/landing','path:todo-app-fe/apps/landing/src'])
+  for(const key of ['path:shop-fe/apps/landing','path:shop-fe/apps/landing/src'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   assert.equal(reserveTwoPhase(ledger,machine,{job:{jobId:'old',workflowId:'wf-old',opId:'op',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:todo-app-fe/apps/landing',units:1}],ttlMs:1}).ok,true);
+    leases:[{resourceKey:'path:shop-fe/apps/landing',units:1}],ttlMs:1}).ok,true);
   ledger.db.prepare("UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id='old'").run();
   const next=reserveTwoPhase(ledger,machine,{job:{jobId:'next',workflowId:'wf-next',opId:'op',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:todo-app-fe/apps/landing/src',units:1}]});
+    leases:[{resourceKey:'path:shop-fe/apps/landing/src',units:1}]});
   assert.equal(next.ok,false);
   assert.match(next.reason,/overlaps durable lease/);
 }));

@@ -30,7 +30,7 @@ function world(t) {
 
 test('a clock past its SLA is exactly one violation event (deduped across passes); clearing it is one cleared event', async (t) => {
   const w = world(t);
-  await setClock(w.ctx, { entity: 'workflow:todo-app-be:wf-todo-app-a', state: 'STALL_UNOWNED', slaMs: 30 * MIN, ledgerId: 'todo-app-be', enteredAt: w.at() - 10 * MIN });
+  await setClock(w.ctx, { entity: 'workflow:shop-be:wf-shop-a', state: 'STALL_UNOWNED', slaMs: 30 * MIN, ledgerId: 'shop-be', enteredAt: w.at() - 10 * MIN });
   let r = await slaPass(w.ctx);
   assert.equal(r.violated.length, 0, 'inside its SLA');
   w.advance(25 * MIN);
@@ -39,8 +39,8 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
   const [ev] = r.violated;
   assert.equal(ev.code, 'STALL_UNOWNED');
   assert.equal(ev.severity, 'warn');
-  assert.deepEqual(ev.entity, { type: 'workflow', id: 'wf-todo-app-a', ledger: 'todo-app-be', workflowId: 'wf-todo-app-a' });
-  assert.equal(ev.dedupeKey, 'STALL_UNOWNED|workflow:todo-app-be:wf-todo-app-a');
+  assert.deepEqual(ev.entity, { type: 'workflow', id: 'wf-shop-a', ledger: 'shop-be', workflowId: 'wf-shop-a' });
+  assert.equal(ev.dedupeKey, 'STALL_UNOWNED|workflow:shop-be:wf-shop-a');
   assert.equal(ev.ageMs, 35 * MIN);
   assert.equal(ev.owner, 'kernel');
   assert.equal(w.events(VIOLATED_KIND).length, 1);
@@ -52,7 +52,7 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
   assert.equal(r.violated.length, 0, 'deduped: the episode is marked violated');
   assert.equal(w.events(VIOLATED_KIND).length, 1);
   assert.equal(w.m.db.prepare('SELECT COUNT(*) AS n FROM invariant_violations WHERE cleared_at IS NULL').get().n, 1, 'one open invariant violation');
-  await clearClock(w.ctx, { entity: 'workflow:todo-app-be:wf-todo-app-a', state: 'STALL_UNOWNED' });
+  await clearClock(w.ctx, { entity: 'workflow:shop-be:wf-shop-a', state: 'STALL_UNOWNED' });
   r = await slaPass(w.ctx);
   assert.equal(r.cleared.length, 1);
   assert.equal(w.events(CLEARED_KIND).length, 1);
@@ -64,7 +64,7 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
   assert.equal(openViolations({ env: w.env }).length, 0);
 
   // Re-entering the state later is a new episode: one new violation.
-  await setClock(w.ctx, { entity: 'workflow:todo-app-be:wf-todo-app-a', state: 'STALL_UNOWNED', slaMs: 30 * MIN, ledgerId: 'todo-app-be', enteredAt: w.at() - 31 * MIN });
+  await setClock(w.ctx, { entity: 'workflow:shop-be:wf-shop-a', state: 'STALL_UNOWNED', slaMs: 30 * MIN, ledgerId: 'shop-be', enteredAt: w.at() - 31 * MIN });
   r = await slaPass(w.ctx);
   assert.equal(r.violated.length, 1);
   assert.equal(w.events(VIOLATED_KIND).length, 2);
@@ -72,18 +72,18 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
 
 test('a critical code opens exactly one runtime-defect DI for the Supervisor', async (t) => {
   const w = world(t);
-  await setClock(w.ctx, { entity: 'workflow:todo-app-be:wf-todo-app-x', state: 'GOAL_TEXT_MISSING', slaMs: 0, ledgerId: 'todo-app-be', enteredAt: w.at() - 1000 });
-  await setClock(w.ctx, { entity: 'stuck:todo-app-be:wf-todo-app-x:peer-wait:inc-1', state: 'PEER_WAIT_OVERDUE/critical', slaMs: 4 * 60 * MIN, ledgerId: 'todo-app-be', enteredAt: w.at() - 5 * 60 * MIN });
+  await setClock(w.ctx, { entity: 'workflow:shop-be:wf-shop-x', state: 'GOAL_TEXT_MISSING', slaMs: 0, ledgerId: 'shop-be', enteredAt: w.at() - 1000 });
+  await setClock(w.ctx, { entity: 'stuck:shop-be:wf-shop-x:peer-wait:inc-1', state: 'PEER_WAIT_OVERDUE/critical', slaMs: 4 * 60 * MIN, ledgerId: 'shop-be', enteredAt: w.at() - 5 * 60 * MIN });
   const r = await slaPass(w.ctx);
   assert.equal(r.violated.length, 2);
   assert.equal(r.decisions, 2);
   const goal = w.decisions.find((d) => d.code === 'GOAL_TEXT_MISSING');
   assert.equal(goal.kind, 'runtime-defect');
   assert.equal(goal.decider, 'supervisor');
-  assert.equal(goal.idempotencyKey, 'runtime-defect:GOAL_TEXT_MISSING|workflow:todo-app-be:wf-todo-app-x');
+  assert.equal(goal.idempotencyKey, 'runtime-defect:GOAL_TEXT_MISSING|workflow:shop-be:wf-shop-x');
   const peer = w.decisions.find((d) => d.code === 'PEER_WAIT_OVERDUE');
   assert.equal(peer.severity, 'critical', 'a /critical clock is the critical threshold of its code');
-  assert.equal(peer.workflowId, 'wf-todo-app-x');
+  assert.equal(peer.workflowId, 'wf-shop-x');
   w.advance(MIN);
   await slaPass(w.ctx);
   assert.equal(w.decisions.length, 2, 'no second DI on the next pass');
@@ -103,7 +103,7 @@ test('the catalogue covers Appendix A and cites runtimes.yaml keys instead of co
   assert.deepEqual(codeOf('stalled', cat).code, 'STALL_UNOWNED', 'a mapped state');
   assert.deepEqual(codeOf('SOMETHING_NEW', cat), { code: 'SOMETHING_NEW', severity: 'warn', spec: null, critical: false });
   assert.equal(codeOf('WAIT_OVERDUE/critical', cat).severity, 'critical');
-  assert.deepEqual(entityOf('job:todo-app-be:op-x', 'todo-app-be').type, 'job');
+  assert.deepEqual(entityOf('job:shop-be:op-x', 'shop-be').type, 'job');
 });
 
 test('no machine.sqlite is a skipped pass, never a throw', async (t) => {
@@ -116,45 +116,45 @@ test('no machine.sqlite is a skipped pass, never a throw', async (t) => {
 });
 
 // Coordinator 2026-09-28 (live, every controller active): SERVICE_DOWN service:harness-ui and DECISION_OVERDUE
-// job:todo-app-be:op-code.refactor-df7f8417b9 stayed violated after their condition was gone - the clear waited on the
+// job:shop-be:op-code.refactor-df7f8417b9 stayed violated after their condition was gone - the clear waited on the
 // owning controller's next transition (the host's probe timed out on the first request after idle). Every pass now
 // re-checks each open clock against current truth and clears it with ONE cleared event and ONE invariant.cleared row.
 test('truth: a violated clock whose condition is gone is cleared by the pass itself, once, with one invariant.cleared row', async (t) => {
   const { withLedger, seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
   await withLedger(t, async ({ ledger, ledgerFile }) => {
     const w = world(t);
-    seedWorkflow(ledger, { id: 'wf-todo-app-fe', jobs: [
+    seedWorkflow(ledger, { id: 'wf-shop-fe', jobs: [
       { jobId: 'op-code.refactor-df7f8417b9', opId: 'code.refactor', status: 'running' },
       { jobId: 'op-code.refactor-0000000001', opId: 'code.refactor', status: 'running' },
       { jobId: 'op-code.refactor-0000000002', opId: 'code.refactor', status: 'succeeded' },
     ] });
     let probeOk = false;
     let dis = [{ id: 'di-1', status: 'open', entity: { type: 'job', id: 'op-code.refactor-df7f8417b9' } }];
-    const ctx = { ...w.ctx, ledgers: [{ ledgerId: 'todo-app-be', file: ledgerFile }],
+    const ctx = { ...w.ctx, ledgers: [{ ledgerId: 'shop-be', file: ledgerFile }],
       serviceRegistry: async () => [{ name: 'harness-ui', probe: async () => (probeOk ? { ok: true, status: 200 } : { ok: false, error: 'TimeoutError' }) }],
       decisionsModule: { listDecisions: () => dis } };
     const past = w.at() - 20 * MIN;
     await setClock(ctx, { entity: 'service:harness-ui', state: 'SERVICE_DOWN', slaMs: 2 * MIN, ledgerId: 'supervisor', enteredAt: past });
-    await setClock(ctx, { entity: 'job:todo-app-be:op-code.refactor-df7f8417b9', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'todo-app-be', enteredAt: past });
-    await setClock(ctx, { entity: 'job:todo-app-be:op-code.refactor-0000000001', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'todo-app-be', enteredAt: past });
-    await setClock(ctx, { entity: 'job:todo-app-be:op-code.refactor-0000000002', state: 'SETTLE_OVERDUE', slaMs: 3 * MIN, ledgerId: 'todo-app-be', enteredAt: past });
+    await setClock(ctx, { entity: 'job:shop-be:op-code.refactor-df7f8417b9', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'shop-be', enteredAt: past });
+    await setClock(ctx, { entity: 'job:shop-be:op-code.refactor-0000000001', state: 'DECISION_OVERDUE', slaMs: 15 * MIN, ledgerId: 'shop-be', enteredAt: past });
+    await setClock(ctx, { entity: 'job:shop-be:op-code.refactor-0000000002', state: 'SETTLE_OVERDUE', slaMs: 3 * MIN, ledgerId: 'shop-be', enteredAt: past });
 
     let r = await slaPass(ctx);
     assert.deepEqual(r.violated.map((e) => e.code).sort(), ['DECISION_OVERDUE', 'DECISION_OVERDUE', 'SERVICE_DOWN'], 'still true: violated; the settled job never violates');
-    assert.deepEqual(r.truthCleared.map((c) => c.clock), ['job:todo-app-be:op-code.refactor-0000000002 SETTLE_OVERDUE']);
+    assert.deepEqual(r.truthCleared.map((c) => c.clock), ['job:shop-be:op-code.refactor-0000000002 SETTLE_OVERDUE']);
 
     // Truth changes with no controller transition: the service answers, the decision is resolved.
     probeOk = true;
     dis = [{ id: 'di-1', status: 'resolved', entity: { type: 'job', id: 'op-code.refactor-df7f8417b9' } }];
     w.advance(MIN);
     r = await slaPass(ctx);
-    assert.deepEqual(r.cleared.map((e) => e.dedupeKey).sort(), ['DECISION_OVERDUE|job:todo-app-be:op-code.refactor-df7f8417b9', 'SERVICE_DOWN|service:harness-ui']);
+    assert.deepEqual(r.cleared.map((e) => e.dedupeKey).sort(), ['DECISION_OVERDUE|job:shop-be:op-code.refactor-df7f8417b9', 'SERVICE_DOWN|service:harness-ui']);
     assert.ok(r.cleared.every((e) => e.clearedBy === 'sla-truth'));
     const rows = w.logs().filter((l) => l.kind === 'invariant.cleared');
     assert.equal(rows.length, 2, 'one invariant.cleared row each');
     assert.match(rows.map((l) => l.msg).join('\n'), /SERVICE_DOWN service harness-ui \(sla-truth: probe ok \(http 200\)\)/);
     assert.equal(w.events(CLEARED_KIND).length, 2);
-    assert.deepEqual(openViolations({ env: w.env }).map((v) => v.dedupeKey), ['DECISION_OVERDUE|job:todo-app-be:op-code.refactor-0000000001'], 'a job with no decision yet keeps its clock');
+    assert.deepEqual(openViolations({ env: w.env }).map((v) => v.dedupeKey), ['DECISION_OVERDUE|job:shop-be:op-code.refactor-0000000001'], 'a job with no decision yet keeps its clock');
 
     // A controller that re-sets the cleared clock from its stale view is cleared again before it can re-violate.
     await setClock(ctx, { entity: 'service:harness-ui', state: 'SERVICE_DOWN', slaMs: 2 * MIN, ledgerId: 'supervisor', enteredAt: past });

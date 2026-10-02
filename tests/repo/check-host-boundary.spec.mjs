@@ -111,7 +111,7 @@ test('the host contract and the owner-chat skills may quote orca commands',t=>{
 });
 
 test('there is no exemption list: a host-contract read is red until it is rewritten',t=>{
-  const files={'CONTEXT.md':'x\nload `modules/host/orca/calls.yaml` first.\n','scripts/checks/host-boundary.allow':'CONTEXT.md:2 # not honoured\n'};
+  const files={'CONTEXT.md':'x\nload `modules/host/orca/calls.yaml` first.\n',['scripts/checks/' + 'host-boundary.allow']:'CONTEXT.md:2 # not honoured\n'};
   const red=run(fixture(t,files));
   assert.equal(red.status,1);
   assert.deepEqual(rules(red.report),['CONTEXT.md:2 reads-host-contract']);

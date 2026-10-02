@@ -80,7 +80,7 @@ export default function LogsPage() {
   const regionRef = useRef<HTMLDivElement | null>(null);
   const oldestRef = useRef<number | null>(null);
   const knownRef = useRef<Set<string>>(new Set());
-  const workflowList = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=100', { topics: ['fleet'], intervalMs: 60_000 });
+  const workflowList = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=100', { topics: ['workers'], intervalMs: 60_000 });
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting');
   const [streamed, setStreamed] = useState<LogRow[]>([]);
   const [older, setOlder] = useState<LogRow[]>([]);

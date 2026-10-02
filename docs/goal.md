@@ -1,3 +1,4 @@
+Owner: modules/goal/
 # GOAL - StarCi
 
 > **Status: pre-1.0.** The runtime is in alpha. Every contract named here may be revised by practice until each S*

@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: be.index
 title: Backend code patterns
 purpose: |-
-  Read knowledge/hfs/README.md (HFS) and docs/backend-source-pattern.md first. The standard defines ownership, the
+  Read knowledge/hfs/README.md (HFS) and docs/architecture.md first. The standard defines ownership, the
   tier direction, features grouped by trigger kind (api features with a CQRS application layer, the cli feature root of
   one-off actions), one schema authority, one connection per database, injected infrastructure, default-deny,
   per-capability configuration and background work as a transport, then the concrete Nest and TypeScript code forms
@@ -17,8 +17,7 @@ provenance:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
-    - docs/portable-source-architecture.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
   limitations: |-
     Patterns place code and shape it. They do not approve business requirements or architecture, which belong to

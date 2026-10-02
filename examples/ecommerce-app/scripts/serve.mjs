@@ -1,9 +1,9 @@
 /**
  * Launch one app on its projected port - the only way `dev`/`start` learn a port number.
  *
- *   node scripts/serve.mjs <landing|app> <dev|start> [extra next args...]
+ *   node examples/ecommerce-app/scripts/serve.mjs <landing|app> <dev|start> [extra next args...]
  *
- * The port is read from the product's runtime projection (`scripts/projection.mjs`), never from a
+ * The port is read from the product's runtime projection (`examples/ecommerce-app/scripts/projection.mjs`), never from a
  * literal in this repository, and handed to the app's own `next` binary as `-p <port>`. The same
  * projection also fills the public env the apps' config modules fall back to, so the listener and
  * the URLs the pages render always come from one resolution. Any `NEXT_PUBLIC_*`/`PORT` the caller

@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { checkShellConformance, isPlannedLayoutDrawing } from '../../scripts/work/ui/shell-conformance.mjs';
 import { composeDirection } from '../../scripts/work/compose-direction.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { captureFileOf, layoutTreeMain, lockupSourceOf } from '../../scripts/work/layout-tree.mjs';
 import { blankImage, cropImage, decodePng, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { buildProduct, layoutCapture, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
@@ -15,7 +16,7 @@ import { buildProduct, layoutCapture, settledProduct, uiSkeleton } from '../fixt
 // planned layout's own drawing is exempt, and brand.decide crops the lockup from its accepted composite.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
+const validateTree = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
 const APP = '/(app)';
 const DESIGN = 'ui.home.app-layout';
 const CHROME = [20, 40, 160, 255];

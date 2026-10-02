@@ -1,3 +1,5 @@
+Task: choose the test scope, the change path and the rights of each role for a change
+
 # Source management process
 
 Who may do what, and which test scope runs when, for `.claude` upgrades and for product coding (apps scaffolded by `hfs scaffold` / `starci app scaffold`, worked by

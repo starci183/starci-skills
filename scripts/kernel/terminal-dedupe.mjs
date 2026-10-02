@@ -1,7 +1,7 @@
 // terminal-dedupe.mjs — close the StarCi terminals Orca restored that no ledger owns.
 //
 // After the 2026-09-24 reboot Orca 1.4.209 restored its previous tabs: four
-// old nivo Claude kernel sessions with their conversation history (idle
+// old Claude kernel sessions of a product with their conversation history (idle
 // prompts, one still showing the old AUTH kernel's last message) and six bare
 // PowerShell tabs (old op tabs). The watchdogs found the ledger's kernel
 // terminals gone and started eight new kernels, so every workflow had two
@@ -38,7 +38,7 @@ import { kernelSignalRows, ledgerJobs, jobTerminalHandles, pathUnder, WORKER_HOL
 // (op-backend.implement-ed43628b07).
 export const STARCI_MARKER = /\[(?:Kernel|Op)\]|\bop-[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+-[0-9a-f]{6,}\b/i;
 // "kernel" counts in a title only: a Claude kernel's pane title reads
-// "✳ Nivo app auth kernel workflow"; a frame may mention the word anywhere.
+// "✳ Acme app auth kernel workflow"; a frame may mention the word anywhere.
 const KERNEL_TITLE = /\bkernel\b/i;
 
 /** handle -> tab title, from a `terminal list --include-visual-layouts` visualLayouts array. */

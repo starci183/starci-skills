@@ -12,7 +12,7 @@ const foundationBriefOf = (db, foundation) => ({
  * A workflow's foundation duty. With running peers it declares what it owns and needs (or none)
  * before its first leg. The declaration is REQUIRED of a workflow created after the
  * shared-foundation-planning contract change; an older, already-running one is advised, never held
- * (the versioned-contract rule, modules/kernel/contract-changes.yaml).
+ * (the versioned-contract rule, modules/kernel/contract-changes/).
  */
 export const foundationDutyFor = (db, wf, skillRoot, { foundations = readFoundations(db), registry = loadContractChanges(skillRoot) } = {}) => {
   const peers = peerWorkflowsOf(db, wf).map((peer) => peer.workflow_id);
@@ -23,7 +23,7 @@ export const foundationDutyFor = (db, wf, skillRoot, { foundations = readFoundat
   // a ledger whose workflows never registered one is advised, so no workflow is held by a registry
   // nobody started.
   const ledgerPlans = foundations.length > 0 || Boolean(db.prepare("SELECT 1 FROM signals WHERE scope='foundation-declared' LIMIT 1").get());
-  const required = owed && ledgerPlans && Boolean(change) && wf.created_at >= change.effectiveAt;
+  const required = owed && ledgerPlans && (!change || wf.created_at >= change.effectiveAt);
   return {
     peers, declared: declared.declared, none: declared.none,
     owns: declared.owns.map((f) => foundationBriefOf(db, f)), needs: declared.needs.map((f) => foundationBriefOf(db, f)),

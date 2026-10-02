@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // draw-source.mjs — owner ruling 2026-09-27 ("locked"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS. The
-// drawer writes each shape as a React `XBase` in `<XBase>.draw.tsx` (the shape-slot pattern of examples/shape-slot:
-// the XBase takes {state, props, on} of atoms) composing ONLY @starci/grammar components with their real props and
+// drawer writes each shape as a React `XBase` in `<XBase>.draw.tsx` (the drawing law: the XBase takes {state, props,
+// on} of atoms) composing ONLY @starci/grammar components with their real props and
 // variants, plus fixture JSON per state (and optionally per viewport); scripts/work/draw-render.mjs --component
 // renders it with the product's own CSS. This file is the source gate that runs BEFORE the render:
 //
@@ -30,7 +30,7 @@
 //                                   spacing|layout names with a rule id (the rationale evidence of lane
 //                                   draw-devin-rationale).
 //   DRAW_BASE_SIGNATURE             the file exports no `<X>Base`, or a fixture is not {state, props, on} (the
-//                                   shape-slot law: every XBase takes exactly those three).
+//                                   drawing law: every XBase takes exactly those three).
 //
 // Rendered-DOM ownership (draw-render.mjs measures it, record `ownership`): every element that paints must sit in a
 // grammar component (data-component, a data-grammar-* hook or a starci-core-* class nearer than any drawn layout
@@ -185,7 +185,7 @@ export function sourceFindings(text, { file = 'source.draw.tsx', rationale = [],
     }
     if (ts.isExportDeclaration(st) && st.exportClause && ts.isNamedExports(st.exportClause)) for (const el of st.exportClause.elements) exported.push(el.name.text);
   }
-  if (!exported.some((n) => /^[A-Z]\w*Base$/.test(n))) add(DRAW_BASE_SIGNATURE, null, 'exports no <X>Base: the drawn shape is the XBase of the shape-slot pattern (examples/shape-slot)');
+  if (!exported.some((n) => /^[A-Z]\w*Base$/.test(n))) add(DRAW_BASE_SIGNATURE, null, 'exports no <X>Base: the drawn shape is the XBase of the drawing law');
 
   const layout = [];
   const classes = { token: [], free: [], paint: [] };
@@ -236,14 +236,14 @@ export function sourceFindings(text, { file = 'source.draw.tsx', rationale = [],
   return { findings, exports: exported, grammarImports, layout, classes, assetImports: [...assetImports] };
 }
 
-/** Findings of the fixtures: each one is {state, props, on} (the shape-slot XBase input). */
+/** Findings of the fixtures: each one is {state, props, on} (the drawing law's XBase input). */
 export function fixtureFindings(fixtures) {
   const out = [];
   for (const { file, value } of fixtures) {
     const label = path.basename(file);
     if (!value || typeof value !== 'object' || Array.isArray(value)) { out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} is not a props object` }); continue; }
     const keys = Object.keys(value).sort();
-    if (keys.join(',') !== 'on,props,state') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} holds {${keys.join(', ')}}: an XBase fixture is exactly {state, props, on} (examples/shape-slot)` });
+    if (keys.join(',') !== 'on,props,state') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} holds {${keys.join(', ')}}: an XBase fixture is exactly {state, props, on} (the drawing law)` });
     else if (typeof value.state !== 'string') out.push({ code: DRAW_BASE_SIGNATURE, detail: `${label} state is not a shape name` });
   }
   return out;

@@ -9,6 +9,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.feature.jobs, be.feature.jobs.steps, be.platform.jobs]
 pattern: fenced-job
 provenance:
   reviewedAt: 2026-10-02
@@ -238,7 +241,7 @@ files:
     role: 'The processor of one job; extends FencedProcessor — thin (R203 `BE_FEATURE_THIN`): `process` maps the claimed job and delegates into modules/.'
     rules: [BE_JOB_SHAPE]
   - path: src/features/jobs/<job>/steps/<step>.step.ts
-    slot: be.jobs.steps
+    slot: be.feature.jobs.steps
     template: jobs/job.step.ts.tpl
     role: 'One external effect; implements JobStep — thin (R203 `BE_FEATURE_THIN`): the fence call first, then one delegating call that hands the payload and the run key to a service of the modules; the payload guards live there.'
     rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]

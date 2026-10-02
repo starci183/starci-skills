@@ -1,0 +1,70 @@
+schema: starci/schema@1
+id: starci/allowlist@1
+title: The one runtime allowlist
+description: >-
+  The shape of modules/kernel/allowlist.yaml, the ONE explicit allowlist of the runtime: every shrink-only
+  exception list a runtime check keeps lives in one named section of it, each entry carrying the reason the
+  exception exists. A reader loads its section through scripts/lib/allowlist.mjs (readAllowlist(kind)); no
+  second allowlist, baseline, pending or entries file is allowed anywhere in the tree
+  (scripts/checks/check-one-allowlist.mjs).
+type: object
+additionalProperties: false
+required: [schema, not-codes, json-exceptions, dead-script-entries, export-used]
+properties:
+  schema:
+    const: starci/allowlist@1
+    description: The fixed doc stamp of the one allowlist.
+  not-codes:
+    type: array
+    description: >-
+      Literal tokens check-failure-codes must not count as emitted finding codes: framework tokens, flags,
+      band names and identifiers that only look like codes. Each entry is {literal, reason}; shrink-only.
+    items:
+      $ref: '#/$defs/literalReason'
+  json-exceptions:
+    type: object
+    additionalProperties: false
+    required: [exceptions]
+    description: >-
+      The JSON files check-json-exceptions admits without schema stamps: `directories` names a subtree whose
+      JSON files are all admitted, `exceptions` names single files, each as {path, reason}; shrink-only.
+    properties:
+      exceptions:
+        type: array
+        items:
+          $ref: '#/$defs/pathReason'
+      directories:
+        type: array
+        items:
+          $ref: '#/$defs/pathReason'
+  dead-script-entries:
+    type: array
+    description: >-
+      The scripts check-dead-scripts keeps despite having no reader (spec utilities, generated-baseline
+      recorders, deliberate touch points), each as {path, reason}; shrink-only.
+    items:
+      $ref: '#/$defs/pathReason'
+  export-used:
+    type: array
+    description: >-
+      Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once
+      populated.
+$defs:
+  literalReason:
+    type: object
+    additionalProperties: false
+    required: [literal, reason]
+    properties:
+      literal:
+        type: string
+      reason:
+        type: string
+  pathReason:
+    type: object
+    additionalProperties: false
+    required: [path, reason]
+    properties:
+      path:
+        type: string
+      reason:
+        type: string

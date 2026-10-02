@@ -9,6 +9,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.cli, be.tests, be.root-e2e]
 provenance:
   reviewedAt: 2026-09-30
   sources:
@@ -33,7 +36,7 @@ rules:
   - id: BE-TEST-1
     title: Placement, kinds and topology
     kind: mandatory
-    hfsRules: [R12, R47, R48, R149]
+    hfsRules: [R12, R47, R48, R149, R112]
     requirement: |-
       Four test kinds exist and the folder and the file suffix always agree. A unit spec sits beside its subject as
       `<name>.<role>.spec.ts`: REQUIRED beside every file of a spec-required role of `ruleParams.be.unitRoles` of
@@ -88,6 +91,7 @@ rules:
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_QUALITY
         - BE_CLI_COMMAND_SHAPE
+        - BE_INTEGRATION_SPEC_MISSING
       manual:
         - Record which transport, service, database and external boundary an e2e run actually exercised.
     relatedExamples: []

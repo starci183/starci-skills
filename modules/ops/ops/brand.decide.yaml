@@ -17,7 +17,7 @@ sideEffects:
   - local renders of the real frontend's layouts (page slot keyed) and brand lockup, captured under the shell record's own assets
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 params:
@@ -113,7 +113,7 @@ reads:
         the installed package and the real source files determine what a value may actually be.
   - id: direction
     path: knowledge/ui/composition/{taste,hierarchy,accent}.yaml + knowledge/ui/proof/{taste,brand}.yaml +
-      knowledge/grammars/<family>/DNA.yaml + knowledge/ui/examples/brand-direction.nivo.yaml
+      knowledge/grammars/<family>/DNA.yaml + knowledge/ui/examples/brand-direction.example.yaml
     purpose:
       en: "Read in direction mode: the owner's nine-step UX/UI discipline (DISCIPLINE-1..3, HIERARCHY-6,
         ACCENT-6 and the TASTE proof cases), the DNA components the recipes map onto, and a worked
@@ -127,9 +127,9 @@ reads:
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority.
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
@@ -537,9 +537,9 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  asset: Actual selected source asset filename/format
+  app: shared
+  bound-paths: shared
+  asset: shared
 layoutPolicy:
   checks: [starci-validate]
 route:

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// draw-review.mjs — the owner's review of a drawing, and what its answer writes (mia inc-a4b5b1abdd90).
+// draw-review.mjs — the owner's review of a drawing, and what its answer writes (inc-a4b5b1abdd90).
 //
 // Defect: brand.decide a7 could not crop the greenfield lockup. layout-tree.mjs crops only from the drawing of a
 // ui record in state done ("the layout drawing is accepted before its lockup is taken"), interface.draw had drawn
@@ -59,7 +59,7 @@ import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
 import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
@@ -70,7 +70,7 @@ import { readBrandRecord } from './brand/brand.mjs';
 export const DRAW_REVIEW_KIND = 'draw-review';
 export const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 export const DRAW_REVIEW_OP = 'interface.draw';
-/** The contract change that made a gating drawing owe its owner review (modules/kernel/contract-changes.yaml). */
+/** The contract change that made a gating drawing owe its owner review (modules/kernel/contract-changes/). */
 export const DRAW_REVIEW_CHANGE = 'interface-draw-owner-review';
 /** The contract change that refuses a done report whose ui records the guard cannot judge (draw-review-unjudged). */
 export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
@@ -78,7 +78,7 @@ export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
 export const DRAW_REVIEW_DECISIONS = Object.freeze(['accept', 'redraw']);
 const OPTIONS = ['Accept the drawn parts', 'Redraw - say in the note what to change'];
 const OWNER = 'owner';
-/** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
+/** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes/). */
 export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
 /** Autopilot (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
 export const AUTOPILOT_BY = 'autopilot';
@@ -300,7 +300,7 @@ function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
  * drawing); `ownerRequested` marks a drawing the owner asked for, which then reaches the owner. The text names each
  * part's digest prefix, so a redraw asks a new question rather than repeating an answered one.
  */
-export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false, jobId = null } = {}) {
+export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequested = false, jobId = null } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
   const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
@@ -488,7 +488,7 @@ export function drawReviewMain(argv = []) {
       const s = drawReviewStatus(ui);
       return { result: s, text: `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
     },
-    question: (ui, args) => ({ result: drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null }) }),
+    question: (ui, args) => ({ result: drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null }) }),
     apply: (ui, receipt, args) => {
       const r = applyDrawReview(ui, receipt, { write: args.includes('--write') });
       const text = r.decision === 'redraw'

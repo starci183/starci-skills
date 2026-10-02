@@ -134,7 +134,7 @@ export interface WiredCluster {
 export interface WorldWiring<TApp extends string = string, TDb extends string = string, TFake extends string = string, TService extends string = string> {
     /** The run token. */
     readonly runId: string
-    /** The isolation prefix of this repository checkout (`nivo_backend_a1b2c3`); every database, realm, bucket and namespace derives from it. */
+    /** The isolation prefix of this repository checkout (`acme_backend_a1b2c3`); every database, realm, bucket and namespace derives from it. */
     readonly namespace: string
     /** The apps of the world by name (their URL and port). */
     readonly apps: Readonly<Record<TApp, WiredApp>>

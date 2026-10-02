@@ -1,0 +1,65 @@
+# Template services block for a repository's .starcistacks/application-stacks.yaml.
+# Apply: copy the `services:` block below as the top-level `services` key of
+# <repository>/.starcistacks/application-stacks.yaml and replace every <placeholder>.
+# One entry per service id the repository's code or CI touches; a service the
+# repository does not use is still declared `mode: disabled` when its CI or
+# config mentions it. Worked per-repository blocks live in
+# tests/fixtures/starcistacks-services/.
+repository: <repository>
+apply:
+  file: .starcistacks/application-stacks.yaml
+  key: services
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Static analysis and the quality gate for every commit an implement op proves.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.example.org
+    stack:
+      owner: host
+      root: .claude/ext/sonar
+      environment: dev
+      compose: compose.yaml
+      container: <sonarqube-container>
+    auth: token
+    qualityGate: <quality-gate-name>
+    projects:
+      - {repository: <repository>, key: <repository>}
+    ci:
+      wiring: required
+      secrets:
+        - {name: SONAR_TOKEN, credential: <repository>}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.example.org}
+    credentials:
+      - id: <repository>
+        purpose: The project analysis token - local scans (sonar-local.mjs scan) and the CI secret.
+        env: SONAR_TOKEN
+        custody: {repository: <repository>, path: .starcistacks/dev/runtime/files/sonar-token.key}
+    ownerAction: none
+  container-registry:
+    provider: ghcr
+    mode: hosted
+    purpose: Image publishing for the deploy workflows.
+    host:
+      public: https://ghcr.io
+    auth: github-token
+    ci:
+      wiring: not-used
+    ownerAction: none
+  analytics:
+    provider: posthog
+    mode: disabled
+    reason: The product does not collect analytics.
+    ci:
+      wiring: not-used
+    ownerAction: none
+  error-tracking:
+    provider: sentry
+    mode: disabled
+    reason: No error tracker is wired into CI.
+    ci:
+      wiring: not-used
+    ownerAction: none

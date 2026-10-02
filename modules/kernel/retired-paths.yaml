@@ -6,9 +6,12 @@
 #
 # moved[]: a file that moved, one entry per move ({from, to, movedIn: the chunk, quiesced: true only for a pinned path moved
 # with the fleet stopped}); written by the move codemod of the runtime HFS migration. History may cite `from`, live prose
-# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again, and the pending ratchet keeps a moved file's entry.
+# cites `to`; RT_RETIRED_PRESENT refuses a `from` that is tracked again.
 # retiredSymbols[]: a name replaced by an Orca built-in or another mechanism ({symbol, replacedBy}); RT_RETIRED_PRESENT
 # refuses a declaration of it in runtime production code (scripts/hfs/runtime-rules/retired.mjs).
+# retiredNames[]: a dead naming that is not a path ({name, note}) — a deleted app, a layer naming, a verb prefix;
+# RT_RETIRED_NAME_LIVE refuses it in any live tracked file (scripts/checks/check-retired-names.mjs, which also derives the
+# name of every deleted dir/path of this file).
 schema: starci/retired-paths@2
 retired:
   - {path: scripts/supervisor/stall-alert.mjs, retiredAt: 2026-09-28, removedIn: rc-cleanup, replacedBy: 'workflow controller (stall DIs, escalation), fleet Notifier (owner digest, host-resource push), gc controller (housekeeping status); ownerPush moved to scripts/connectors/telegram.mjs'}
@@ -177,7 +180,7 @@ retired:
   - {path: .experiments/practices/2026-09-22-supervisor-round1.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'nothing: a practice note only benchmark/findings/fable.md cited; .experiments/ is forbidden in the runtime tree'}
   - {path: scripts/checks/check-layers.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs (ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml), run by scripts/hfs/runtime-check.mjs in npm run check'}
   - {path: modules/kernel/runtime-layers.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'knowledge/hfs/runtime-slots.yaml ruleParams.runtime.infraOwners and tiers.runtime'}
-  - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'the pending list of knowledge/hfs/runtime-slots.yaml (shrink-only, one entry per finding path and code, each with its chunk)'}
+  - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'modules/kernel/allowlist.yaml (the one shrink-only allowlist, each entry with its reason)'}
   - {path: tests/check-layers.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'tests/runtime-hfs-rules.spec.mjs (RT_EXTERNAL_OWNER over the runtime source, the spawn reading of scripts/lib/spawn-calls.mjs included)'}
   - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
   - {path: scripts/checks/check-db-openers.mjs, retiredAt: 2026-10-01, removedIn: C3, replacedBy: 'superseded by RT_EXTERNAL_OWNER (node:sqlite only in engine/db), scripts/hfs/runtime-rules/external-owner.mjs'}
@@ -211,6 +214,17 @@ retired:
   - {path: ui/run-cloudflared.ps1, retiredAt: 2026-10-02, removedIn: C2b, replacedBy: 'node ui/start.mjs --tunnel (the harness named tunnel through scripts/api/cloudflared/tunnel-run.mjs), registered as its scheduled task by scripts/reconciler/tunnel-task.mjs --install-task'}
   - {path: scripts/kernel/reap-agent-process.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'scripts/machine/worker-close.mjs: worker-release, the terminal close and a proof that no process of the terminal shell tree remains (worker-release alone ended claude, codex and devin in live smoke E1 but NOT a cursor worker; a process is stopped only when proven to belong to that terminal, never by name)'}
   - {path: tests/kernel/reap-agent-process.spec.mjs, retiredAt: 2026-10-02, removedIn: c0-orca2, replacedBy: 'tests/machine/worker-close.spec.mjs and tests/kernel-verbs-shared/managed-dispatch.spec.mjs (settle releases through the one close path)'}
+  - {path: scripts/hfs/runtime-rules/pending.mjs, retiredAt: 2026-10-02, removedIn: H, replacedBy: 'modules/kernel/allowlist.yaml (the one allowlist, each entry with its reason) held by scripts/checks/check-one-allowlist.mjs; the finding-level pending ratchet is superseded: a runtime finding is fixed, never allowed'}
+  - {path: docs/architecture-rules.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/architecture-sds.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/architecture-check.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/portable-source-architecture.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/backend-source-pattern.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/source-layout.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/layout-tree.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/architecture.md'}
+  - {path: docs/application-stacks-vps.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/application-stacks.md'}
+  - {path: docs/application-runtime-config-and-health.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/application-stacks.md'}
+  - {path: docs/runtime-distribution.md, retiredAt: 2026-10-02, removedIn: dv-c2-smells, replacedBy: 'docs/releasing.md'}
 moved:
   - {from: docs/opensource-goal.md, to: docs/goal.md, movedIn: c0-relops, quiesced: false}
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
@@ -850,7 +864,7 @@ moved:
   - {from: packages/eslint/fe/project-graph.routes.test.mjs, to: packages/eslint/fe/project-graph.routes.spec.mjs, movedIn: C7, quiesced: false}
   - {from: packages/eslint/fe/props-and-slots.test.mjs, to: packages/eslint/fe/props-and-slots.spec.mjs, movedIn: C7, quiesced: false}
   - {from: packages/eslint/fe/served-locale.test.mjs, to: packages/eslint/fe/served-locale.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: packages/eslint/fe/shape-slot.test.mjs, to: packages/eslint/fe/shape-slot.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: packages/eslint/fe/shape-slot.test.mjs, to: packages/eslint/fe/drawing.spec.mjs, movedIn: C7, quiesced: false}
   - {from: packages/eslint/fe/size-and-state-budget.test.mjs, to: packages/eslint/fe/size-and-state-budget.spec.mjs, movedIn: C7, quiesced: false}
   - {from: packages/eslint/fe/size-growth.test.mjs, to: packages/eslint/fe/size-growth.spec.mjs, movedIn: C7, quiesced: false}
   - {from: packages/eslint/fe/status-colors.test.mjs, to: packages/eslint/fe/status-colors.spec.mjs, movedIn: C7, quiesced: false}
@@ -974,7 +988,29 @@ moved:
   - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
   - {from: scripts/kernel/settle-landed.mjs, to: scripts/kernel/owned-path-effects.mjs, movedIn: WFWT2, quiesced: false}
   - {from: tests/kernel/settle-landed-pathspec-batches.spec.mjs, to: tests/kernel/owned-path-effects-batches.spec.mjs, movedIn: WFWT2, quiesced: false}
+  - {from: modules/kernel/failure-codes.not-codes, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: modules/schemas/json-exceptions.yaml, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: scripts/checks/dead-scripts.entries, to: modules/kernel/allowlist.yaml, movedIn: H, quiesced: false}
+  - {from: scripts/reconciler/controllers/fleet.mjs, to: scripts/reconciler/controllers/workers.mjs, movedIn: dv-c2-smells, quiesced: false}
+  - {from: modules/reconciler/fleet.yaml, to: modules/reconciler/workers.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: ui/src/pages/work/fleet.tsx, to: ui/src/pages/work/workers.tsx, movedIn: dv-c2-smells, quiesced: false}
+  - {from: tests/reconciler/reconciler-fleet.spec.mjs, to: tests/reconciler/reconciler-workers.spec.mjs, movedIn: dv-c2-smells, quiesced: false}
+  - {from: packages/eslint/fe/shape-slot.mjs, to: packages/eslint/fe/drawing.mjs, movedIn: dv-c2-smells, quiesced: false}
+  - {from: packages/eslint/fe/shape-slot.spec.mjs, to: packages/eslint/fe/drawing.spec.mjs, movedIn: dv-c2-smells, quiesced: false}
+  - {from: examples/starcistacks-services/mia-mia-backend.services.yaml, to: tests/fixtures/starcistacks-services/mia-mia-backend.services.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: examples/starcistacks-services/nivo-backend.services.yaml, to: tests/fixtures/starcistacks-services/nivo-backend.services.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: examples/starcistacks-services/starci-academy-backend.application-stacks.yaml, to: tests/fixtures/starcistacks-services/starci-academy-backend.application-stacks.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: examples/starcistacks-services/starci-next.services.yaml, to: tests/fixtures/starcistacks-services/starci-next.services.yaml, movedIn: dv-c2-smells, quiesced: false}
+  - {from: knowledge/ui/examples/brand-direction.nivo.yaml, to: knowledge/ui/examples/brand-direction.example.yaml, movedIn: dv-c2-smells, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
+retiredNames:
+  - {name: todo-app, note: 'the deleted example app; the live examples are ecommerce-app and shape-slot'}
+  - {name: transport/cli, note: 'a feature transport is never a command line — no be.feature.transport.cli slot exists'}
+  - {name: platform/cli, note: 'the platform module tree has no cli layer — cli apps live in apps/'}
+  - {name: kernel/api.mjs, note: 'scripts/kernel/api.mjs moved to scripts/kernel/cli.mjs (C8); no second kernel entry'}
+  - {name: orch-, note: 'the retired scripts/api/orca/orch-* verb prefix; Orca calls are plain object-verb names'}
+  - {name: 'migrate app', note: "no migrate app kind: the cli app's migrate command migrates (slots.yaml be.apps.cli)"}
+  - {name: fleet, note: 'the fleet naming of the reconciler controllers, module and work page is workers now (dv-c2-smells)'}
 retiredSymbols:
   - {symbol: workerDoneOf, replacedBy: 'nothing: settle reads the Dispatch with worker-show; the bridged worker_done rows stay as the audit echo (orchestrationMessagesOf)'}
   - {symbol: inventorySnapshot, replacedBy: 'nothing: the inventory_snapshots table had no writer and no reader (alpha5 item 1.8); it is gone from machine 0001-init.sql'}

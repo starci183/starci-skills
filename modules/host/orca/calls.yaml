@@ -78,7 +78,7 @@ calls:
     required: [objective]
     receipt: [result.run.id]
     creates: run
-    note: Request identity is the workflow, the coordinator terminal and the Run it replaces (api.mjs ensureWorkflowRun), or the launch the caller names (agent/lib.mjs startAgent request).
+    note: Request identity is the workflow, the coordinator terminal and the Run it replaces (scripts/kernel/cli.mjs ensureWorkflowRun), or the launch the caller names (agent/lib.mjs startAgent request).
   run-show:
     command: orchestration run-show
     kind: read

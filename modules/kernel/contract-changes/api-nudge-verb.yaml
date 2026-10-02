@@ -1,8 +1,0 @@
-id: api-nudge-verb
-effectiveAt: '2026-09-28T17:00:00+07:00'
-summary: 'Move the nudge command and contract into dedicated files while preserving terminal delivery rules.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/nudge.mjs
-  - modules/kernel/api.yaml
-  - modules/kernel/api-commands/nudge.yaml

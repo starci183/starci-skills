@@ -1,3 +1,4 @@
+Owner: modules/schemas/knowledge-source.schema.yaml
 # Authoring knowledge in YAML
 
 Humans maintain structured knowledge under `knowledge/**/*.yaml`. Agents and operators read those YAML sources directly, so each rule has one copy. Do not create a parallel JSON copy of authored rules.
@@ -34,7 +35,7 @@ From this skill directory:
 npm test
 ```
 
-Authored knowledge is validated as YAML by the test suite and readers. Rejected: unsafe `..` paths, duplicate rule/example IDs, missing referenced example files, unsupported YAML tags/duplicate keys. Install/update copies the authored sources and records success after verification; see [runtime distribution](runtime-distribution.md).
+Authored knowledge is validated as YAML by the test suite and readers. Rejected: unsafe `..` paths, duplicate rule/example IDs, missing referenced example files, unsupported YAML tags/duplicate keys. Install/update copies the authored sources and records success after verification; see [releasing](releasing.md).
 
 ## Schemas
 

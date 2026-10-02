@@ -21,9 +21,9 @@ export const RESOLVERS = Object.freeze(['kernel', 'owner', 'supervisor']);
 export const OWNER_CLAIM_UNPROVEN = 'owner-claim-unproven';
 export const OWNER_GATE_KINDS = Object.freeze(['owner-gate', 'owner-gate-pending']);
 
-/** Lower case, whitespace collapsed, Vietnamese diacritics folded (the d-with-stroke letter folds to d explicitly, since NFD never decomposes it), so an accented claim and its unaccented form read alike. */
+/** Lower case, whitespace collapsed, Vietnamese diacritics folded (the d-stroke letter, U+0110/U+0111, folds to d explicitly, since NFD never decomposes it), so an accented claim and its unaccented form read alike. */
 export const foldText = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/[đĐ]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
+  .replace(/[\u0110\u0111]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
 
 const SUBJECT_VI = '(?:owner|chu du an|chu so huu|thay)';
 const OWNER_CLAIM_PATTERNS = [
@@ -58,7 +58,7 @@ export function ownerClaimOf(text) {
 }
 
 // An owner-gate whose own text says the wait is not the owner's: a runtime limit or defect, a settle the
-// Kernel defers, a supervisor's step (nivo inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
+// Kernel defers, a supervisor's step (inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
 // viec owner thuc hien").
 const NOT_OWNER_WORK = /\bruntime limit\b|\bruntime[- ]defect\b|\bruntime fix\b|\bcho sua (?:source )?runtime\b|\bnot an? owner(?:'s)? (?:step|ask|action|work|task|wait)\b|\bnot owner work\b|\bkhong phai (?:la )?(?:viec|buoc)(?: cua)? (?:owner|chu)|\bkhong phai owner\b|\bdeferred settle\b|\bcho supervisor\b|\bwaits? (?:on|for) (?:the )?supervisor\b/;
 

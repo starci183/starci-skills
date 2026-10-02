@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 
 // An integration credential has one shape in every work schema: {name, providedBy: owner, custody:
 // identity:<slug>}; the retired `where` (a place, not a custody) is refused, and so is a declaration without custody.
@@ -11,10 +12,19 @@ const root = path.resolve(import.meta.dirname, '..', '..');
 const schemaDir = path.join(root, 'modules', 'schemas');
 const Ajv2020 = createRequire(path.join(root, 'package.json'))('ajv/dist/2020.js').default;
 
-const credentialsIn = (node, at = '', out = []) => {
+// The repeated shapes moved to modules/schemas/work-common.schema.yaml (urn:work:common:1); a $ref is
+// followed so the walked tree is the schema the validator sees.
+const common = parseYaml(fs.readFileSync(path.join(schemaDir, 'work-common.schema.yaml'), 'utf8'));
+const credentialsIn = (node, at = '', out = [], doc = null) => {
   if (!node || typeof node !== 'object') return out;
+  const ref = /^urn:work:common:1#\/\$defs\/(.+)$/.exec(node.$ref ?? '')?.[1]
+    ?? (doc && /^#\/\$defs\/(.+)$/.exec(node.$ref ?? '')?.[1]);
+  if (ref) {
+    const host = node.$ref.startsWith('urn:') ? common : doc;
+    return credentialsIn(host?.$defs?.[ref], `${at}[${node.$ref}]`, out, host);
+  }
   if (node.properties?.credential?.properties?.providedBy) out.push({ at: `${at}/properties/credential`, schema: node.properties.credential });
-  for (const [key, child] of Object.entries(node)) credentialsIn(child, `${at}/${key}`, out);
+  for (const [key, child] of Object.entries(node)) credentialsIn(child, `${at}/${key}`, out, doc ?? node);
   return out;
 };
 const blocks = fs.readdirSync(schemaDir).filter((name) => /^work.*\.schema\.yaml$/.test(name))
@@ -26,7 +36,7 @@ test('every work schema declares the integration credential with the one shape',
 });
 
 test('the credential shape requires custody and refuses the retired where', () => {
-  const validate = new Ajv2020({ strict: false, allErrors: true }).compile(blocks[0].schema);
+  const validate = addWorkCommon(new Ajv2020({ strict: false, allErrors: true })).compile(blocks[0].schema);
   const base = { name: 'TELEGRAM_BOT_TOKEN', providedBy: 'owner' };
   assert.equal(validate({ ...base, custody: 'identity:chatbot-telegram-bot' }), true, JSON.stringify(validate.errors));
   assert.equal(validate({ ...base, where: '.starcistacks/dev/runtime/env/app.env.enc' }), false, 'where is refused');

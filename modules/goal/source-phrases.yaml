@@ -1,0 +1,90 @@
+# ============================================================================
+# modules/goal/source-phrases.yaml
+#
+# The Vietnamese phrase lists runtime source matches against owner or product
+# text (scripts/lib/source-phrases.mjs). This is DATA for matchers, never
+# owner-visible messages - those live in modules/i18n/messages/ (i18n.mjs).
+# Each list holds the Vietnamese alternatives one matcher adds to its English
+# pattern (a regex fragment when the source pattern used regex syntax, a plain
+# word otherwise); the consumer is named above each group. The leaf keys are
+# declared Vietnamese fields (scripts/lib/language.mjs DECLARED_VIETNAMESE_FIELDS),
+# like the signal phrase lists of archetypes.yaml.
+# ============================================================================
+
+schema: starci/module-goal-source-phrases@1
+
+phrases:
+
+  # scripts/agent/bias.mjs extractRoutingBias - the routing markers an owner
+  # prompt types before a pool alias. Regex alternatives; syllables join with \s*.
+  bias:
+    prefer: ['ưu\s*tiên', 'uu\s*tien', 'u-u\s*tien', prefer]
+    avoid: ['không\s*dùng', 'khong\s*dung', 'tránh', 'tranh', avoid]
+
+  # scripts/checks/check-guidance-commands.mjs excusedBy - a negation or a
+  # refusal verb, in either language, excuses a refused command in guidance.
+  guidance:
+    negation: ['không', 'đừng', 'cấm', 'tránh']
+    refused: ['bị chặn', 'bị từ chối']
+
+  # scripts/kernel/ask-server.mjs drawReplyDecision - a Telegram reply made only
+  # of accept words (plus optionally "golden") accepts a drawing. accept is a
+  # word list; golden holds regex alternatives.
+  drawReply:
+    accept: ['duyệt', 'đồng', 'ý', 'chấp', 'nhận', 'được', 'đẹp', 'rồi', 'nhé', 'nha', 'ừ']
+    golden: ['(?:đặt làm |làm )?(?:mẫu|ảnh|hình) chuẩn', 'làm mẫu']
+
+  # scripts/kernel/progress-rca.mjs causesOf - the blocker/report phrases of
+  # each failure cause, whichever language the report was written in.
+  rca:
+    missingPaths: ['không tồn tại', 'vắng mặt', '0 tệp', 'quét 0']
+    grantTooNarrow: ['ngoài owned', 'ngoài allowlist', 'ngoài grant', 'ngoài own']
+    toolTimeout: ['30 giây', 'ngắt sau']
+    testGap: ['kiểm thử hồi quy']
+    checkerUnavailable: ['không khả dụng']
+
+  # scripts/supervisor/owed.mjs - notes addressed to the supervisor, conditions
+  # only the owner can meet, and the label heuristics.
+  owed:
+    supervisorVerbs: ['cho', 'cần', 'chờ', 'đợi', 'phản hồi(?: của)?', 'hỏi']
+    ownerWord: ['chủ sở hữu']
+    orWord: ['hoặc']
+    beyondAuthority: ['ngoài thẩm quyền']
+    ownerOnly: ['bàn giao', 'mật khẩu', 'thanh toán']
+    workerDied: ['không nộp report']
+    contractConflict: ['mâu thuẫn']
+    decision: ['ủy quyền', 'uỷ quyền', '\bquyết\b']
+
+  # scripts/work/draw-feedback.mjs - the owner-note classification words
+  # (GOLDEN_WORDS, product-direction, grammar, knowledge).
+  drawNote:
+    golden: ['mẫu chuẩn', 'ảnh chuẩn', 'hình chuẩn']
+    product: ['luôn', 'không bao giờ', 'mọi', 'tất cả', 'từ nay', 'màu', 'thương hiệu', 'phông', 'chữ', 'khoảng cách', 'bo góc', 'đổ bóng', 'biểu tượng']
+    grammar: ['thành phần mới', 'biến thể', 'thiếu thành phần', 'không có thành phần']
+    knowledge: ['kiến thức', 'quy tắc chung', 'nguyên tắc chung']
+
+  # scripts/work/draw/draw-quality.mjs - internal-copy jargon, actor and
+  # success words a render source's visible copy may carry in either language.
+  drawCopy:
+    sourceLabel: ['nguồn']
+    internalVocabulary: ['nguồn hiện tại', 'hệ thống lõi']
+    actor: ['người dùng', 'chủ']
+    success: ['đã cài', 'đang hoạt động', 'sẵn sàng', 'đã xác nhận', 'thành công']
+
+  # scripts/work/ui-archetype.mjs archetypeOf - surface title/intent words in
+  # either language that derive an archetype when ui.archetype is absent.
+  uiArchetype:
+    wizard: ['thiết lập', 'các bước']
+    form: ['chỉnh sửa', 'tạo mới', 'cài đặt', 'đăng nhập']
+    dashboard: ['tổng quan', 'trang chủ']
+
+  # scripts/work/grammar-proposal.mjs MD_FIELDS - the section markers of a
+  # markdown grammar proposal in either language.
+  proposal:
+    gap: ['không có', 'thiếu']
+    anatomy: ['giải phẫu']
+
+  # scripts/lib/redact.mjs - the verification-code label a secret value may sit
+  # behind (regex alternative; a separator between syllables is [ _-]?).
+  redact:
+    otpLabel: ['mã[ _-]?(?:otp|xác[ _-]?(?:thực|minh))']

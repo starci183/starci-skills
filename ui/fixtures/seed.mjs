@@ -66,7 +66,7 @@ function workflow(runtime, id, title, phase = 'running', n = 1) {
 }
 
 try {
-  const a = makeRuntime('todo-app', 1);
+  const a = makeRuntime('shop', 1);
   const b = makeRuntime('ecommerce-app', 2);
   workflow(a, 'wf-stuck', 'Blocked delivery', 'running', 1);
   workflow(a, 'wf-under-dispatched', 'Ready work', 'running', 2);
@@ -155,8 +155,8 @@ try {
   const sla = machine.openSlaEpisode({ entity:'unit:unit-failed', state:'running', code:'WORKER_SILENT', severity:'critical', ledgerId:a.id, workflowId:'wf-stuck', slaMs:120000, enteredAt:fixedNow - 600000 });
   machine.markSlaViolated(sla);
   machine.recordViolation({ code:'WORKER_SILENT', severity:'critical', entity:'unit:unit-failed', ledgerId:a.id, workflowId:'wf-stuck', episodeId:sla, detail:{cause:'silent'} });
-  machine.upsertSeat({ seatId:'kernel:todo-app:wf-stuck', role:'kernel', ledgerId:a.id, workflowId:'wf-stuck', state:'live', bootedAt:fixedNow - 3600000, lastSeenAt:fixedNow - 10000 });
-  machine.seatTranscriptSnapshot({ seatId:'kernel:todo-app:wf-stuck', text:`Kernel considered retry ${secrets[0]}` });
+  machine.upsertSeat({ seatId:'kernel:shop:wf-stuck', role:'kernel', ledgerId:a.id, workflowId:'wf-stuck', state:'live', bootedAt:fixedNow - 3600000, lastSeenAt:fixedNow - 10000 });
+  machine.seatTranscriptSnapshot({ seatId:'kernel:shop:wf-stuck', text:`Kernel considered retry ${secrets[0]}` });
   db.write.updateAttempt({ attemptId:attempt.attempt_id, terminalHandle:'term-seed', at:fixedNow - 2900000 });
   db.write.updateAttempt({ attemptId:missing.attempt_id, terminalHandle:'term-missing', at:fixedNow - 2400000 });
   machine.upsertTerminal({ handle:'term-shell-seed', title:'Terminal 3', role:'shell', openedAt:fixedNow - 2900000 });

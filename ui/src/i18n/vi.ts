@@ -1,58 +1,59 @@
 import type { ContractInfo, Reason, UiState } from '../contract';
+import { t } from './t';
 
 export const navLabels = {
-  overview: 'Tổng quan',
-  decisions: 'Quyết định',
-  system: 'Hệ thống',
-  logs: 'Nhật ký',
-  analytics: 'Phân tích',
+  overview: t('Overview'),
+  decisions: t('Decisions'),
+  system: t('System'),
+  logs: t('Logs'),
+  analytics: t('Analytics'),
 } as const;
 
 export const stateLabels: Record<UiState, string> = {
-  bad: 'Hỏng / Kẹt',
-  warn: 'Chậm / Cảnh báo',
-  running: 'Đang chạy',
-  waiting: 'Chờ',
-  ok: 'Ổn',
-  done: 'Xong',
-  unknown: 'Chưa rõ',
+  bad: t('Bad / Stuck'),
+  warn: t('Slow / Warning'),
+  running: t('Running'),
+  waiting: t('Waiting'),
+  ok: t('OK'),
+  done: t('Done'),
+  unknown: t('Unknown'),
 };
 
 export const unitStateLabels = {
-  planned: 'Đã lên kế hoạch',
-  queued: 'Đang xếp hàng',
-  running: 'Đang chạy',
-  reported: 'Đã báo cáo',
-  deciding: 'Đang quyết định',
-  done: 'Đạt',
-  failed: 'Hỏng',
-  dropped: 'Đã bỏ',
+  planned: t('Planned'),
+  queued: t('Queued unit'),
+  running: t('Running'),
+  reported: t('Reported'),
+  deciding: t('Deciding'),
+  done: t('Passed'),
+  failed: t('Failed'),
+  dropped: t('Dropped'),
 } as const;
 
 export const stepLabels = {
-  dispatch: 'Giao',
-  run: 'Chạy',
-  report: 'Báo cáo',
-  checks: 'Kiểm',
-  verdict: 'Chốt',
-  land: 'Land',
+  dispatch: t('Dispatch'),
+  run: t('Run step'),
+  report: t('Report'),
+  checks: t('Checks'),
+  verdict: t('Verdict'),
+  land: t('Land'),
 } as const;
 
 export const learningKindLabels: Record<string, string> = {
-  lesson: 'Bài học',
-  hypothesis: 'Giả thuyết',
-  experiment: 'Thí nghiệm',
-  'experiment-result': 'Kết quả thí nghiệm',
+  lesson: t('Lesson'),
+  hypothesis: t('Hypothesis'),
+  experiment: t('Experiment'),
+  'experiment-result': t('Experiment result'),
 };
 
 export const learningStateLabels: Record<string, string> = {
-  kept: 'Giữ',
-  reverted: 'Hoàn tác',
-  keep: 'Giữ',
-  revert: 'Hoàn tác',
-  proposed: 'Đề xuất',
-  running: 'Đang chạy',
-  landed: 'Đã land',
+  kept: t('Kept'),
+  reverted: t('Reverted'),
+  keep: t('Keep'),
+  revert: t('Revert'),
+  proposed: t('Proposed'),
+  running: t('Running'),
+  landed: t('Landed'),
 };
 
 export function formatOpLabel(op: string, labels: ContractInfo['opLabels']): string {
@@ -60,54 +61,54 @@ export function formatOpLabel(op: string, labels: ContractInfo['opLabels']): str
 }
 
 export const reasonLabels: Record<string, string> = {
-  OWNER_DECISION_OPEN: 'Có quyết định của chủ đang chờ',
-  DECISION_OPEN: 'Có quyết định đang chờ',
-  DECISION_OVERDUE: 'Quyết định đã quá hạn',
-  PHASE_REASON: 'Pha workflow được ghi nhận',
-  UNDER_DISPATCHED: 'Giao việc dưới mức tối thiểu',
-  READY_UNDISPATCHED: 'Có đơn vị sẵn sàng chưa được giao',
-  RAM_THROTTLED: 'Máy đang giới hạn do RAM',
-  WORKER_SILENT: 'Op chưa có tín hiệu trong hạn',
-  QUESTION_OVERDUE: 'Câu hỏi của Op đã quá hạn',
-  SEAT_VACANT: 'Ghế Kernel đang trống',
-  UpstreamNotDone: 'Đang chờ đơn vị trước hoàn thành',
-  WorkerQuestionPending: 'Op đang chờ câu trả lời',
-  SettleTailFailed: 'Bước sau settle bị lỗi',
-  SLA_CRITICAL: 'SLA ở mức nghiêm trọng',
-  SLA_WARNING: 'SLA đang cảnh báo',
-  UNIT_FAILED: 'Đơn vị bị lỗi',
-  PROGRESS: 'Tiến độ cần chú ý',
+  OWNER_DECISION_OPEN: t('An owner decision is pending'),
+  DECISION_OPEN: t('A decision is pending'),
+  DECISION_OVERDUE: t('A decision is overdue'),
+  PHASE_REASON: t('The workflow phase was recorded'),
+  UNDER_DISPATCHED: t('Dispatched below the minimum'),
+  READY_UNDISPATCHED: t('A ready unit has not been dispatched'),
+  RAM_THROTTLED: t('The machine is throttled for RAM'),
+  WORKER_SILENT: t('An op has missed its heartbeat deadline'),
+  QUESTION_OVERDUE: t('An op question is overdue'),
+  SEAT_VACANT: t('The Kernel seat is vacant'),
+  UpstreamNotDone: t('Waiting for an upstream unit'),
+  WorkerQuestionPending: t('An op is waiting for an answer'),
+  SettleTailFailed: t('A post-settlement step failed'),
+  SLA_CRITICAL: t('The SLA is critical'),
+  SLA_WARNING: t('The SLA has a warning'),
+  UNIT_FAILED: t('A unit failed'),
+  PROGRESS: t('Progress needs attention'),
 };
 
 const reasonParamLabels: Record<string, string> = {
-  kind: 'Loại quyết định',
-  phase: 'Pha',
-  count: 'Số lượng',
-  running: 'Đang chạy',
-  allowedParallel: 'Mức song song cho phép',
-  queuedReady: 'Sẵn sàng trong hàng đợi',
+  kind: t('Decision kind'),
+  phase: t('Phase'),
+  count: t('Count'),
+  running: t('Running'),
+  allowedParallel: t('Allowed parallelism'),
+  queuedReady: t('Ready in queue'),
 };
 
 const reasonParamValues: Record<string, string> = {
-  'settle-nongreen': 'Chốt kết quả chưa đạt',
-  'credential-missing': 'Thiếu thông tin truy cập',
-  decision: 'Quyết định',
-  paused: 'Tạm dừng',
-  stopped: 'Đã dừng',
-  running: 'Đang chạy',
-  queued: 'Đang xếp hàng',
-  done: 'Đã hoàn thành',
+  'settle-nongreen': t('Non-green settlement'),
+  'credential-missing': t('Missing credentials'),
+  decision: t('Decision'),
+  paused: t('Paused'),
+  stopped: t('Stopped'),
+  running: t('Running'),
+  queued: t('Queued unit'),
+  done: t('Completed'),
 };
 
 function reasonTitle(code: string): string {
   if (reasonLabels[code]) return reasonLabels[code];
-  if (code.startsWith('DecisionOpen:')) return `Quyết định đang chờ · ${reasonParamValues[code.slice(13)] ?? code.slice(13)}`;
-  if (code.startsWith('IncidentOpen:')) return `Sự cố đang mở · ${reasonParamValues[code.slice(13)] ?? code.slice(13)}`;
+  if (code.startsWith('DecisionOpen:')) return t('Decision pending · {kind}', { kind: reasonParamValues[code.slice(13)] ?? code.slice(13) });
+  if (code.startsWith('IncidentOpen:')) return t('Open incident · {kind}', { kind: reasonParamValues[code.slice(13)] ?? code.slice(13) });
   return code;
 }
 
 export function formatReason(reason: Reason | null | undefined): string {
-  if (!reason) return 'Chưa có lý do được ghi nhận';
+  if (!reason) return t('No reason recorded.');
   const title = reasonTitle(reason.code);
   const params = Object.entries(reason.params ?? {}).filter(([, value]) => value !== '' && value !== null && value !== undefined);
   if (!params.length) return title;
@@ -115,7 +116,7 @@ export function formatReason(reason: Reason | null | undefined): string {
 }
 
 export function formatAbsolute(at: number | null | undefined): string {
-  if (at == null || !Number.isFinite(at)) return 'Chưa có thời điểm';
+  if (at == null || !Number.isFinite(at)) return t('No timestamp recorded');
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
@@ -123,10 +124,10 @@ export function formatAbsolute(at: number | null | undefined): string {
 }
 
 export function formatRelative(at: number | null | undefined, now = Date.now()): string {
-  if (at == null || !Number.isFinite(at)) return 'Chưa có thời điểm';
+  if (at == null || !Number.isFinite(at)) return t('No timestamp recorded');
   const delta = Math.max(0, now - at);
-  if (delta < 60_000) return 'vừa xong';
-  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)} phút trước`;
-  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)} giờ trước`;
-  return `${Math.floor(delta / 86_400_000)} ngày trước`;
+  if (delta < 60_000) return t('just now');
+  if (delta < 3_600_000) return t('{n} minutes ago', { n: Math.floor(delta / 60_000) });
+  if (delta < 86_400_000) return t('{n} hours ago', { n: Math.floor(delta / 3_600_000) });
+  return t('{n} days ago', { n: Math.floor(delta / 86_400_000) });
 }

@@ -12,7 +12,7 @@ completionProfile: business
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -34,9 +34,9 @@ reads:
         variable name - and which identity:<identity-slug> alias in the selected backend Stack environment
         (.starcistacks/<env>/secrets/<identity-slug>.enc, app-relative) holds it. The resource metadata names the custody and variable.
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (hfs explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: decision
@@ -149,10 +149,10 @@ blockers:
     condition:
       en: The feature the question belongs to has no records to draft the decision under.
 placeholders:
-  feature: Selected feature slug
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
+  feature: shared
+  app: shared
+  bound-paths: shared
+  env: shared
   identity-slug: Identity custody slug in a credential declaration, distinct from the decision slug
   slug: Stable decision slug
 layoutPolicy:

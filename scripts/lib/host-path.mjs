@@ -1,5 +1,5 @@
 // host-path.mjs - the ONE matcher of a hard-coded absolute host path and the ONE normalizer that removes it (rule RT_ABSOLUTE_PATH of
-// knowledge/hfs/rules.yaml; the settle refusal EVIDENCE_HOST_PATH of scripts/kernel/evidence-host-path.mjs; the evidence recorder
+// knowledge/hfs/rules.yaml; the settle refusal EVIDENCE_HOST_PATH of scripts/kernel/job-artifacts.mjs; the evidence recorder
 // scripts/example/example-evidence.mjs). Pure: text in, text or hits out; the roots a caller knows come in as arguments.
 //   hostPathHits(text)                        [{kind, sample, offset}]: a drive-letter path (a letter, a colon, a slash or backslash,
 //                                             not a URL), a user-profile path (/Users/<name>/, /home/<name>/) and an expanded AppData path

@@ -42,7 +42,7 @@ properties:
             addressable by id and is indexed here under its own artifact kind."
         feature:
           oneOf:
-            - $ref: "#/$defs/featureId"
+            - $ref: "urn:work:common:1#/$defs/featureId"
             - type: "null"
           description: The feature that owns the record, or null for the tree-level records - the
             workspace, the catalog, the brand - that sit outside any feature and are therefore outside the
@@ -69,7 +69,7 @@ properties:
             reads as `blocked`. Historical proof is never rewritten to say the work was not done - it was;
             what changed is the input it was proved against."
         suspensionReason:
-          $ref: "#/$defs/slug"
+          $ref: "urn:work:common:1#/$defs/slug"
           description: Why the derivation suspended this record - the code under its owners moved, or its
             own evidence is marked stale. It appears only when `effectiveState` is suspended, because a
             reason for a state the record is not in is a sentence nobody can check.
@@ -168,7 +168,7 @@ properties:
       byFeature:
         type: object
         propertyNames:
-          $ref: "#/$defs/featureId"
+          $ref: "urn:work:common:1#/$defs/featureId"
         additionalProperties:
           $ref: "#/$defs/counts"
         description: The same counts per feature, so that one feature carrying the whole backlog is visible
@@ -191,7 +191,7 @@ properties:
               $ref: "#/$defs/recordId"
             feature:
               oneOf:
-                - $ref: "#/$defs/featureId"
+                - $ref: "urn:work:common:1#/$defs/featureId"
                 - type: "null"
             state:
               $ref: "#/$defs/state"
@@ -229,7 +229,7 @@ properties:
           $ref: "#/$defs/recordId"
         feature:
           oneOf:
-            - $ref: "#/$defs/featureId"
+            - $ref: "urn:work:common:1#/$defs/featureId"
             - type: "null"
         title:
           oneOf:
@@ -265,17 +265,6 @@ properties:
           $ref: "#/$defs/recordId"
           description: The record it points at.
 $defs:
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
-      written twice by two authors is the same string.
-  featureId:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A feature's own id - the directory name under features/ and the id its
-      features/<feature>/index.yaml carries. It has no family prefix because a feature is the owner of
-      families rather than a member of one.
   recordId:
     type: string
     pattern: ^[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*)*(?:#[A-Za-z0-9][A-Za-z0-9.-]*)?$

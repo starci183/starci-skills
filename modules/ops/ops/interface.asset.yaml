@@ -19,7 +19,7 @@ completionProfile: ui
 sideEffects: [generated artwork files inside the owned asset paths of the bound repository]
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -243,8 +243,8 @@ blockers:
         or not effectively done. Report the node/resource IDs; never author the missing record, draw
         the missing candidate or run a predecessor here.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
   asset-path: Owned asset destination declared by the allowlist
 layoutPolicy:
   checks: [starci-validate]

@@ -120,7 +120,7 @@ const RULES = testWorldRules(ROOT);
 const worldSpec = (body) => `import { useTestWorld } from "@tests/world/use-test-world"\n${body}\n`;
 
 test('test-world-run judges each spec: useTestWorld with the layer mode, forbidden infrastructure, outage calls; comments do not count', () => {
-  const e2e = judgeSpec('be/src/tests/e2e/a.e2e-spec.ts', worldSpec('const world = useTestWorld({ apps: { todo: { module: TodoApp } } })\n// no docker run here\nawait world.infra.postgresql.cut()\nawait world.infra.postgresql.restore()'), RULES);
+  const e2e = judgeSpec('be/src/tests/e2e/a.e2e-spec.ts', worldSpec('const world = useTestWorld({ apps: { shop: { module: ShopApp } } })\n// no docker run here\nawait world.infra.postgresql.cut()\nawait world.infra.postgresql.restore()'), RULES);
   assert.deepEqual([e2e.useTestWorld, e2e.modes, e2e.outage, e2e.forbidden], [true, ['apps'], 2, []]);
   const integration = judgeSpec('be/src/tests/integration/a.integration-spec.ts', worldSpec('const world = useTestWorld({ modules: CATALOG_MODULES })'), RULES);
   assert.deepEqual(integration.modes, ['modules']);
@@ -144,7 +144,7 @@ const jestRun = (over = {}) => (args) => {
 
 test('test-world: missing is op-test-world-proof-missing, a hand-rolled world op-test-world-hand-rolled, a red run op-test-world-run-red', (t) => {
   assert.equal(codeOf(judgeTestWorld(null)), 'op-test-world-proof-missing');
-  const good = { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { todo: true } })') };
+  const good = { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { shop: true } })') };
   const green = buildTestWorldRun({ root: worldApp(t, good), project: 'e2e', rules: RULES, npm: jestRun() });
   assert.equal(green.schema, TEST_WORLD_RUN_SCHEMA);
   assert.equal(green.exit, 0);
@@ -152,8 +152,8 @@ test('test-world: missing is op-test-world-proof-missing, a hand-rolled world op
   for (const [label, app, project] of [
     ['no preset', worldApp(t, good, { preset: false }), 'e2e'],
     ['no declaration', worldApp(t, good, { declaration: false }), 'e2e'],
-    ['wrong layer', worldApp(t, { 'be/src/tests/integration/a.integration-spec.ts': worldSpec('const world = useTestWorld({ apps: { todo: true } })') }), 'integration'],
-    ['docker', worldApp(t, { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { todo: true } })\nexecSync("docker run postgres")') }), 'e2e'],
+    ['wrong layer', worldApp(t, { 'be/src/tests/integration/a.integration-spec.ts': worldSpec('const world = useTestWorld({ apps: { shop: true } })') }), 'integration'],
+    ['docker', worldApp(t, { 'be/src/tests/e2e/a.e2e-spec.ts': worldSpec('const world = useTestWorld({ apps: { shop: true } })\nexecSync("docker run postgres")') }), 'e2e'],
     ['no specs', worldApp(t, {}), 'e2e'],
   ]) {
     const summary = buildTestWorldRun({ root: app, project, rules: RULES, npm: jestRun() });
@@ -178,7 +178,7 @@ test('test-world over every attached summary: each required project is owed, and
   assert.equal(codeOf(judgeTestWorlds([greenTestWorldRun('integration'), redContract], ['integration'])), 'op-test-world-run-red', 'a contract spec that skipped itself is no live proof');
   const sandbox = judgeSpec('be/src/tests/contract/sepay/a.contract-spec.ts', 'const client = useSandbox({ provider: "sepay", keys: ["SEPAY_KEY"] })', RULES);
   assert.deepEqual([sandbox.useTestWorld, sandbox.modes], [true, ['sandbox']]);
-  const appsInContract = judgeSpec('be/src/tests/contract/a.contract-spec.ts', 'const world = useTestWorld({ apps: { todo: true } })', RULES);
+  const appsInContract = judgeSpec('be/src/tests/contract/a.contract-spec.ts', 'const world = useTestWorld({ apps: { shop: true } })', RULES);
   const summary = { ...greenTestWorldRun('contract'), specs: [appsInContract] };
   assert.equal(codeOf(judgeTestWorld(summary)), 'op-test-world-hand-rolled', 'a contract spec takes the sandbox, not a booted app');
 });

@@ -28,7 +28,7 @@ test('no quit for an unknown agent or a terminal that is already gone; a busy ag
 // quit typed there would run as a shell command. Nothing is typed.
 test('no quit input is typed into a bare shell left by an exited agent', () => {
   const r = quitAgent({ handle: 'term-1', agent: 'codex', show: () => ({ ok: true, connected: true }),
-    read: () => ({ ok: true, screen: String.raw`› Ask Codex to do anything` + '\n' + String.raw`PS D:\Repositories\todo-app-be>` }),
+    read: () => ({ ok: true, screen: String.raw`› Ask Codex to do anything` + '\n' + String.raw`PS D:\work\shop-be>` }),
     send: () => { throw new Error('never typed'); }, sleep: () => {} });
   assert.deepEqual(r, { sent: false, exited: true, command: '/quit', agentExited: true });
 });

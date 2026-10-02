@@ -5,7 +5,7 @@ reads: >-
   llm_usage rows (subject attempt and kernel-turn) joined to op_attempts, and each attempt's settle state: written by
   scripts/kernel/usage-record.mjs from the agent CLI's own session file (Claude Code JSONL message.usage, Codex rollout
   token_count events; devin and any other agent have no adapter). Tokens are recorded facts;
-  cost_usd is recorded only when modules/models/prices.yaml declares every rate the model used
+  cost_usd is recorded only when modules/models/registry.yaml models.<id>.price declares every rate the model used
 writes: 'nothing - pure projection'
 returns: >-
   with --workflow: {ok, workflowId, total, byOp[{opId, attempts, ...counts, models[]}], byModel[{model, ...counts}],

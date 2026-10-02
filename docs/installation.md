@@ -1,3 +1,4 @@
+Task: install, update or bind a runtime host
 # Installation
 
 ## Requirements and trust
@@ -45,7 +46,7 @@ payload `package.json` `files[]` declares into `/absolute/host/.claude`, then:
 entry files untouched (you then owe the agent the runtime path yourself).
 `--force` can replace locally edited runtime files — back up and inspect
 before opting in. The installer does not run git commands, create project
-records, or touch product sources. See [runtime distribution](runtime-distribution.md).
+records, or touch product sources. See [releasing](releasing.md).
 
 ## Git hygiene in bound repositories
 
@@ -78,8 +79,7 @@ replace paths and remotes with verified real repositories:
 
 `be` and `fe` name directories in one app repository. The Work tree is at the
 app root. All relative paths resolve from the host. The ledger lives at
-`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md)
-and [source layout](source-layout.md).
+`%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md).
 
 Open the coding agent at the host. If a task opens in the frontend or another
 repository, explicitly provide the absolute host, the `.claude/CONTEXT.md` path
@@ -111,5 +111,5 @@ settings are preserved.
 | `config.yaml` missing | Copy `config.example.yaml`; it is seeded only when absent. |
 | No project binding | Supply backend/frontend paths and verified remotes in `work.json`. Do not initialize `.starciwork` inside the frontend. |
 | Runtime sources inconsistent | `starci doctor --dir <host> --quick`; report errors before running workflows. |
-| Interrupted init/update | Re-run from the same reviewed package, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
+| Interrupted init/update | Re-run from the same reviewed package, then `doctor --quick`. See [releasing](releasing.md). |
 | Local changes reported after update | Review kept files and run doctor; never erase them just to silence a warning. |

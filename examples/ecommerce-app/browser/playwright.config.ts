@@ -40,7 +40,7 @@ const SHOP_PORT = Number(new URL(BASE_URL).port || 80)
  * The shop journey of the example: one spec, one project, one worker. A local run serves the built app itself
  * (`npm run start` on the projected port, reused when a server already answers); a run pointed at a remote
  * SHOP_BASE_URL starts nothing. The api stack the journey reads (identity, order, the dev compose infra) is
- * the run's environment, never this config: CI provisions it (scripts/browser-stack.mjs), a developer follows
+ * the run's environment, never this config: CI provisions it (<repo>/scripts/browser-stack.mjs), a developer follows
  * the dev runbook.
  */
 export default defineConfig({

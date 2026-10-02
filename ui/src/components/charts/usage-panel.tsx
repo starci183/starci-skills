@@ -2,7 +2,7 @@ import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import { motion } from 'motion/react';
 import { EASE } from '../motion';
-import type { FleetSummary } from '../../contract';
+import type { WorkersSummary } from '../../contract';
 import { useApiQuery } from '../../api/query';
 import { ChartCard } from './chart-card';
 import { compactVi, costVi, sourceLabel, TokenBar, type UsageRow } from '../usage-view';
@@ -54,10 +54,10 @@ function PerDay({ rows }: { rows: Group[] }) {
   </div>;
 }
 
-export function UsagePanel({ metrics, window: win, summary }: { metrics: OpsMetric[] | null; window: '24h' | '7d'; summary: FleetSummary | null }) {
+export function UsagePanel({ metrics, window: win, summary }: { metrics: OpsMetric[] | null; window: '24h' | '7d'; summary: WorkersSummary | null }) {
   const project = projectOfHash();
   const url = `/api/metrics/usage?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
-  const usage = useApiQuery<UsageWindow>(url, { topics: ['fleet'], intervalMs: 30_000 }).data;
+  const usage = useApiQuery<UsageWindow>(url, { topics: ['workers'], intervalMs: 30_000 }).data;
   const list = metrics ?? [];
   const legacyIn = list.reduce((s, m) => s + (m.tokensIn ?? 0), 0), legacyOut = list.reduce((s, m) => s + (m.tokensOut ?? 0), 0);
   const legacyCost = list.some(m => m.costUsd != null) ? list.reduce((s, m) => s + (m.costUsd ?? 0), 0) : null;

@@ -1,7 +1,10 @@
-// runtime-rule-ids.spec.mjs - RT_RULE_ID_UNKNOWN and RT_RULE_ID_GAP (scripts/hfs/runtime-rules/rule-ids.mjs): every rule id
-// the tracked text names is a rule of the catalog, and the id run has no undeclared gap.
+// runtime-rule-ids.spec.mjs - RT_RULE_ID_UNKNOWN, RT_RULE_ID_GAP and RT_RULE_UNCITED (scripts/hfs/runtime-rules/rule-ids.mjs):
+// every rule id the tracked text names is a rule of the catalog, the id run has no undeclared gap, and every catalog rule is
+// cited by a pattern topic or is scope: runtime.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadRuleCatalog } from '../../scripts/hfs/slots.mjs';
 import { gapIds, retiredProblems, ruleIdFindings } from '../../scripts/hfs/runtime-rules/rule-ids.mjs';
 
@@ -30,6 +33,24 @@ test('RT_RULE_ID_UNKNOWN: a retired id is refused in live files and allowed in t
 test('RT_RULE_ID_UNKNOWN: specs, generated copies, lock files and other extensions are not read', () => {
   const text = 'R999\n';
   assert.deepEqual(live(ruleIdFindings(ctxOf({ 'tests/a.spec.mjs': text, 'packages/x/runtime/a.md': text, 'package-lock.json': text, 'assets/a.png': text }))), []);
+});
+
+test('RT_RULE_UNCITED: a product rule no knowledge/patterns topic cites is refused, a scope: runtime rule is not', () => {
+  const found = ruleIdFindings(ctxOf({ 'knowledge/patterns/x.yaml': 'hfsRules: [R01]\n' }));
+  const uncited = found.filter((f) => f.code === 'RT_RULE_UNCITED');
+  const product = catalog.rules.filter((r) => r.scope !== 'runtime').map((r) => r.id);
+  assert.equal(uncited.length, product.filter((id) => id !== 'R01').length);
+  assert.ok(uncited.some((f) => f.message.includes('R02 (')), 'R02 is named by no hfsRules here');
+  assert.ok(!uncited.some((f) => f.message.includes('R01 (')), 'R01 is cited');
+  assert.ok(!uncited.some((f) => f.message.includes('R114 (')), 'R114 is scope: runtime');
+});
+
+test('RT_RULE_UNCITED: every rule of the real catalog is cited by a pattern topic or marked scope: runtime', () => {
+  const root = process.cwd();
+  const walk = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
+  const files = walk('knowledge/patterns').filter((f) => f.endsWith('.yaml'));
+  const found = ruleIdFindings({ root, files, params: {}, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') });
+  assert.deepEqual(found.filter((f) => f.code === 'RT_RULE_UNCITED'), []);
 });
 
 test('RT_RULE_ID_GAP: a retired list that names a live rule, repeats an id or lacks a reason is refused', () => {

@@ -18,7 +18,7 @@ import { renderGrammarContext } from './grammar-context.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './seam-policy.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -38,7 +38,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
   const wf = packet.context.workflow?.id ?? '<workflow-id>';
   return [
     `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
-    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "${translator(packet.context.owner_language ?? 'en')('Run unit tests')}" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
+    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "${translator(packet.context.owner_language ?? ownerLanguage())('Run unit tests')}" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
     `  kinds: step.start {name} | step.end {name, durationMs, ok} | cmd.run {cmd, exit, durationMs, stdoutRef?, output?} | file.edit {path, added, removed, diffRef?} | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, failures:[{name, message, file}]} | render {artifactRef, label} | video {artifactRef, label} | trace {artifactRef} | decision {markdown} | narration {markdown} | error {code, message, hint}`,
     `  owed at minimum: a step.start and a step.end around each step of your brief, and one cmd.run {cmd, exit, durationMs} per check command you put in report.checks (the same command string) - settle warns ${'LOG_TYPED_MISSING'} on your job when they are missing.`,
     `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots; put operational recordings under STARCI_JOB_SCRATCH and attach them with api report. Work-record UAT proof stays at its required owned path.`,
@@ -47,7 +47,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 }
 
 // A long owned-path list rides in a file, never inline: the prompt is the Orca worker-start --spec argv,
-// and Windows caps a command line at 32,767 characters. nivo workspace-provision's leg
+// and Windows caps a command line at 32,767 characters. a product's workspace-provision leg
 // of 993 frozen paths (op-business.decide-cc63d20d87) failed the Task's creation with spawnSync ENAMETOOLONG on
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
@@ -159,7 +159,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...verificationScopeLines({ settings: specs }),
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow?.id ?? '(unbound — packet preview)'} goal_revision=${packet.context.workflow?.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow?.goal_identity ?? '(unbound)'}`,
-  `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
+  `owner_language: ${packet.context.owner_language ?? ownerLanguage()} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,
   `product_locale: ${packet.context.product_locale ? `${packet.context.product_locale.locale} (${packet.context.product_locale.source})` : '(unset - no shell or brand locale)'} — every string a product user reads (UI copy, labels, sample data in prompts, message files) is written in this locale, never in owner_language; chrome, nav labels and the demo persona come from .starciwork/shell/index.yaml verbatim`,
   ...(packet.context.owner_delegation ? [`owner_delegation: the owner delegated ask answers to ${packet.context.owner_delegation.asks} until ${packet.context.owner_delegation.until} (config.yaml delegation); an answer receipt with answeredBy ${packet.context.owner_delegation.asks} inside that window IS the owner's answer, except for the excluded classes ${JSON.stringify(packet.context.owner_delegation.excludes)} which stay owner-only`] : []),
   `records: ${packet.context.records.join(', ') || '(none bound)'}`,

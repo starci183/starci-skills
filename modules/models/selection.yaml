@@ -270,7 +270,7 @@ allocationFacts:
   # picks).
   balancedPolicy: modules/models/runtimes.yaml allocation.balanced
   # Concurrency is not restated here. modules/models/runtimes.yaml owns every
-  # slot count: maxParallelOps is the fleet ceiling, runtimes.<pool>.maxParallel
+  # slot count: maxParallelOps is the worker ceiling, runtimes.<pool>.maxParallel
   # the enforced per-pool limit.
   concurrency: modules/models/runtimes.yaml
   difficultyVocabulary:               # pool models/effort maps and tier keys

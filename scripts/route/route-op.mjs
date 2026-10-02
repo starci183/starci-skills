@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
 import { routeFields } from './route-fields.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -72,7 +73,9 @@ function loadOps(opsDir) {
     const file = path.basename(full);
     let doc;
     try {
-      doc = parseYaml(fs.readFileSync(full, 'utf8'));
+      // `shared:` markers expand to the modules/ops/_common.yaml fragments
+      // (scripts/lib/op-shared.mjs) — the catalog sees the effective manifest.
+      doc = mergeOpShared(parseYaml(fs.readFileSync(full, 'utf8')), opSharedOf(full));
     } catch (e) {
       skipped.push({ file, reason: `unparseable yaml: ${e.message}` });
       continue;

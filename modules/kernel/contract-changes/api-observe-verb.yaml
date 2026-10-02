@@ -1,8 +1,0 @@
-id: api-observe-verb
-effectiveAt: '2026-09-28T16:45:00+07:00'
-summary: 'Move the observe command and its contract into dedicated files while preserving worker screen and receipt behavior.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/observe.mjs
-  - modules/kernel/api.yaml
-  - modules/kernel/api-commands/observe.yaml

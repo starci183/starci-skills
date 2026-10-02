@@ -39,7 +39,7 @@ test('a literal workspace path that does not hold a package.json is still refuse
   assert.throws(() => loadArchitectureConfig(root), /workspace packages\/draft-ui must resolve to a regular package.json/);
 });
 
-test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (todo-app-fe packages/app-ui)', (t) => {
+test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (shop-fe packages/app-ui)', (t) => {
   const root = tree(t, ['fe/packages/*'], (r) => {
     for (const [rel, text] of [
       ['packages/web-ui/src/hooks/useToggle.ts', 'export const useToggle = () => null\n'],

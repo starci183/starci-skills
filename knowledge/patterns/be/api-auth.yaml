@@ -8,6 +8,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.transport]
 provenance:
   reviewedAt: 2026-09-30
   sources:
@@ -95,7 +98,7 @@ rules:
   - id: BE-AUTH-3
     title: CSRF, signed webhooks and constant-time comparison
     kind: mandatory
-    hfsRules: [R41]
+    hfsRules: [R41, R141]
     requirement: |-
       `platform/http-security` owns the origin and referer allowlist guard that every state-changing request passes; only
       `SignedWebhook` is exempt. A webhook (webhooks.yaml) is `@Public({ reason: PublicReason.SignedWebhook })` and verifies its signature and
@@ -110,6 +113,7 @@ rules:
     verification:
       automated:
         - BE_DEFAULT_DENY
+        - BE_COOKIE_ATTRIBUTES
       manual:
         - Review that the raw body, not a re-serialized one, is verified.
     relatedExamples: []

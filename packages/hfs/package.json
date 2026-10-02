@@ -31,8 +31,10 @@
     "access": "public"
   },
   "scripts": {
-    "sync": "node scripts/sync-runtime.mjs",
-    "sync:check": "node scripts/sync-runtime.mjs --check",
+    "sync": "node ../../scripts/hfs/sync-runtime.mjs",
+    "sync:check": "node ../../scripts/hfs/sync-runtime.mjs --check",
+    "prepack": "node prep-runtime.mjs",
+    "pretest": "node prep-runtime.mjs",
     "test": "node --test \"bin/*.spec.mjs\""
   }
 }

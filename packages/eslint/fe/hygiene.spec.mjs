@@ -244,13 +244,13 @@ test("HYGIENE-4: no console in product source", () => {
       { filename: at("apps/web/scripts/build.mjs"), code: "console.log('building')" },
       // a folder named src that no product slot owns is not product source
       { filename: at("tools/src/build.ts"), code: "console.log('building')" },
-      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: "logger.info('x')" },
+      { filename: at("packages/shop-ui/src/leaves/Chip/index.tsx"), code: "logger.info('x')" },
     ],
     invalid: [
       { filename: PLAIN_FILE, code: "console.log('x')", errors: [{ messageId: "console" }] },
       { filename: PLAIN_FILE, code: "console.error(error)", errors: [{ messageId: "console" }] },
       { filename: at("apps/web/src/modules/api/client.ts"), code: "console.warn('slow')", errors: [{ messageId: "console" }] },
-      { filename: at("packages/todo-app-ui/src/leaves/Chip/index.tsx"), code: "console.log('x')", errors: [{ messageId: "console" }] },
+      { filename: at("packages/shop-ui/src/leaves/Chip/index.tsx"), code: "console.log('x')", errors: [{ messageId: "console" }] },
     ],
   })
 })

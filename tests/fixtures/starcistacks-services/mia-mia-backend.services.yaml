@@ -1,0 +1,55 @@
+# Ready-to-apply services block for mia-mia-backend (GitHub starci-lab/miamia-be) - owner ruling 2026-09-24.
+# Apply: add `services:` below as the top-level `services` key of mia-mia-backend/.starcistacks/application-stacks.yaml.
+# Observed 2026-09-24: GitHub carries secret SONAR_TOKEN and variable SONAR_HOST_URL. The local server
+# has an older project miamia-be; sonar-project.properties now names mia-mia-backend, which
+# sonar-local.mjs ensure-project creates. No per-project token is in mia-mia-backend custody yet: BEFORE
+# applying, copy the minted twin sonarqube-mia-mia-backend-token.key.enc from the legacy source-host
+# stack into mia-mia-backend/.starcistacks/dev/runtime/files/ (or run
+#   node <Source>/.claude/scripts/gates/sonar-local.mjs ensure-project --key mia-mia-backend --with-token
+# to re-mint it) — until then check-starcistacks refuses this block with STACKS_CUSTODY_MISSING.
+# Re-set the GitHub SONAR_TOKEN from the minted token.
+# The shared server itself is a host extension (.claude/ext/sonar) - the `owner: host` stack form below,
+# so mia-mia-backend never carries SonarQube compose files of its own.
+repository: mia-mia-backend
+apply:
+  file: .starcistacks/application-stacks.yaml
+  key: services
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Static analysis and the quality gate for every commit an implement op proves.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      owner: host
+      root: .claude/ext/sonar
+      environment: dev
+      compose: compose.yaml
+      container: starci-sonarqube
+      publishedBy: cloudflared.yaml
+    auth: token
+    qualityGate: starci-quality
+    projects:
+      - {repository: mia-mia-backend, key: mia-mia-backend}
+    credentials:
+      - id: admin
+        purpose: Project creation and per-project token minting by scripts/gates/sonar-local.mjs (ensure-project --with-token); never handed to CI.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
+      - id: mia-mia-backend
+        purpose: The mia-mia-backend project analysis token - local scans and the GitHub SONAR_TOKEN secret.
+        env: SONAR_TOKEN
+        custody: {repository: mia-mia-backend, path: .starcistacks/dev/runtime/files/sonarqube-mia-mia-backend-token.key}
+    ci:
+      workflow: .github/workflows/ci.yml
+      wiring: required
+      secrets:
+        - {name: SONAR_TOKEN, credential: mia-mia-backend}
+      vars:
+        - {name: SONAR_HOST_URL, value: https://sonar.starci.org}
+      provisioning: >-
+        Set on starci-lab/miamia-be. A Kernel re-sets them from custody (gh secret set SONAR_TOKEN with
+        the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL); never the owner.
+    ownerAction: none

@@ -22,8 +22,6 @@ const RUNTIME_TEXT = fs.readFileSync(path.join(ROOT, RUNTIME_MANIFEST_FILE), 'ut
 const runtimeManifest = () => loadSlotManifest({ root: ROOT, file: path.join(ROOT, RUNTIME_MANIFEST_FILE) });
 const refused = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code);
 const edited = (edit) => { const doc = parseYaml(RUNTIME_TEXT); edit(doc); return JSON.stringify(doc); };
-/** A well-formed pending entry: the real allowlist is empty once every cut landed, so the refusals edit this one. */
-const PENDING = { path: 'scripts/a.mjs', rule: 'RT_API_SHAPE', lane: 'C2a', since: '2026-10-01', reason: 'a fixture entry the refusal cases break' };
 
 test('the runtime manifest loads as kind runtime and its schema accepts it; the product manifest is still kind app', () => {
   const m = runtimeManifest();
@@ -37,17 +35,15 @@ test('the runtime manifest loads as kind runtime and its schema accepts it; the 
   refused(() => ruleParams(m, 'be'), 'HFS_MANIFEST_INVALID');
 });
 
-test('a runtime manifest with sides, a product slot id, an unknown tier or a pending entry without its chunk is refused', () => {
+test('a runtime manifest with sides, a product slot id, an unknown tier or the deleted pending key is refused', () => {
   for (const [name, edit] of [
     ['sides', (d) => { d.sides = { be: { reads: [] }, fe: { reads: [] } }; }],
     ['product slot id', (d) => { d.slots[0].id = 'app.declaration'; }],
     ['unknown tier', (d) => { d.slots.find((s) => s.id === 'runtime.lib').tier = 'feature'; }],
-    ['pending lane', (d) => { d.pending = [{ ...PENDING, lane: 'LAYER-2' }]; }],
-    ['pending date', (d) => { const { since, ...rest } = PENDING; d.pending = [rest]; }],
+    ['pending key', (d) => { d.pending = []; }],
     ['generated without generator', (d) => { delete d.slots.find((s) => s.tracked === 'generated').generatedBy; }],
     ['schema major', (d) => { d.version = '2.0.0'; }],
   ]) {
-    assert.equal(validateManifest(JSON.parse(edited((d) => { d.pending = [PENDING]; }))), true, 'the fixture pending entry is well formed');
     const text = edited(edit);
     refused(() => loadSlotManifest({ text }), 'HFS_MANIFEST_INVALID');
     if (name !== 'schema major' && name !== 'unknown tier') assert.equal(validateManifest(JSON.parse(text)), false, `the schema accepted: ${name}`);

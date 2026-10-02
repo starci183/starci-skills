@@ -15,7 +15,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-module-studio-mudqjp5g';
-const LEDGER = 'todo-app-be';
+const LEDGER = 'shop-be';
 const DRAW = 'op-interface.draw-94355e8e00';
 const ERROR = 'status unreadable';
 

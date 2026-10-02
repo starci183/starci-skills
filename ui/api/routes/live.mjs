@@ -6,11 +6,11 @@ const perIp = new Map();
 let total = 0;
 
 function topicsOf(store, url) {
-  const requested = (url.searchParams.get('topics') ?? 'fleet,decisions,system,logs').split(',').map(x => x.trim());
+  const requested = (url.searchParams.get('topics') ?? 'workers,decisions,system,logs').split(',').map(x => x.trim());
   const names = new Set(store.projects().map(row => row.name));
   if (!requested.length || requested.length > 30) return null;
   for (const topic of requested) {
-    if (['fleet', 'decisions', 'system', 'logs'].includes(topic)) continue;
+    if (['workers', 'decisions', 'system', 'logs'].includes(topic)) continue;
     const match = /^(wf|attempt):([^:]+):([^:]+)$/.exec(topic);
     if (!match || !names.has(match[2]) || !match[3]) return null;
   }
@@ -33,7 +33,7 @@ function readMarks(store) {
 
 function related(topic, key) {
   if (topic === 'system') return key.startsWith('machine:');
-  if (topic === 'fleet') return !key.startsWith('machine:') || key === 'machine:data_version';
+  if (topic === 'workers') return !key.startsWith('machine:') || key === 'machine:data_version';
   if (topic === 'decisions') return key.endsWith(':decisions') || key === 'machine:sup_decisions'
     || key === 'machine:deliveries' || key.endsWith(':data_version');
   if (topic === 'logs') return key.endsWith(':logs') || key === 'machine:machine_logs' || key.endsWith(':data_version');

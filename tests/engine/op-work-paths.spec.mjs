@@ -68,7 +68,7 @@ function segMatch(op, lay) {
 // Segment-list unification. Layout `**`/<node> spans any run of op segments;
 // an op `**` ("some record below here") spans any run of layout segments. A
 // <node> is a record directory, so it never spans the reserved _resources/,
-// evidence/ or assets/ folders a node cannot live in (engine/index.mjs LAYOUT).
+// evidence/ or assets/ folders a node cannot live in (scripts/lib/starciwork-boundary.mjs).
 const NOT_NODE = new Set(['_resources', 'evidence', 'assets']);
 function unify(op, lay) {
   const memo = new Map();

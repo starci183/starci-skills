@@ -14,14 +14,13 @@ required:
 properties:
   schema:
     const: work/catalog@1
-    description: Record family discriminator. Every record names its own family so a file can be validated
-      without inferring its meaning from the directory it happens to sit in.
+    $ref: "urn:work:common:1#/$defs/familyDiscriminator"
   id:
-    $ref: "#/$defs/slug"
+    $ref: "urn:work:common:1#/$defs/slugId"
     description: The product's stable identifier, lowercase and hyphenated; example todo. It names the
       product, not the repository, because one product can be served by several repositories.
   description:
-    $ref: "#/$defs/prose"
+    $ref: "urn:work:common:1#/$defs/prose"
     description: What this catalog holds, in a sentence a newcomer reads first. It exists so the top of the
       tree explains its own layout rather than leaving the reader to reverse-engineer it.
   features:
@@ -39,7 +38,7 @@ properties:
         - description
       properties:
         id:
-          $ref: "#/$defs/slug"
+          $ref: "urn:work:common:1#/$defs/slugId"
           description: The feature's stable identifier, matching the id its own work/feature@1 record carries.
             It is what every record id of that feature embeds as its second segment.
         directory:
@@ -49,7 +48,7 @@ properties:
             than derived so that a reader who has only this file can open the feature directly, and so a
             renamed directory is a visible edit here instead of a silent break.
         description:
-          $ref: "#/$defs/prose"
+          $ref: "urn:work:common:1#/$defs/prose"
           description: What the feature is about, in one sentence. It is the entry a person scanning the
             catalog reads; the feature record repeats nothing it does not own.
   extensions:
@@ -105,14 +104,14 @@ $defs:
           goalIdentity: {type: string, minLength: 1}
           goalRevision: {type: integer, minimum: 0}
           source: {type: string, minLength: 1}
-          outcome: {$ref: "#/$defs/prose"}
+          outcome: {$ref: "urn:work:common:1#/$defs/prose"}
           effectCeiling:
             anyOf:
-              - {$ref: "#/$defs/prose"}
-              - {type: array, minItems: 1, items: {$ref: "#/$defs/prose"}}
-          completionCriteria: {type: array, items: {$ref: "#/$defs/prose"}}
+              - {$ref: "urn:work:common:1#/$defs/prose"}
+              - {type: array, minItems: 1, items: {$ref: "urn:work:common:1#/$defs/prose"}}
+          completionCriteria: {type: array, items: {$ref: "urn:work:common:1#/$defs/prose"}}
       description:
-        $ref: "#/$defs/prose"
+        $ref: "urn:work:common:1#/$defs/prose"
         description: The readable setup statement; an import states its pilot boundary, observed source
           mapping, approved intent, candidate scope and unknowns here.
       refs:
@@ -123,7 +122,7 @@ $defs:
       assertions:
         type: array
         minItems: 1
-        items: {$ref: "#/$defs/prose"}
+        items: {$ref: "urn:work:common:1#/$defs/prose"}
         description: The scope-review, migration or stacks assertions the mode's review proves.
       nodes:
         type: array
@@ -135,7 +134,7 @@ $defs:
             id: {type: string, minLength: 1}
             kind: {type: string, minLength: 1}
             path: {type: string, minLength: 1}
-            purpose: {$ref: "#/$defs/prose"}
+            purpose: {$ref: "urn:work:common:1#/$defs/prose"}
             grounding: {type: array, items: {type: string, minLength: 1}}
             dependsOn: {type: array, items: {type: string}}
       deps:
@@ -147,7 +146,7 @@ $defs:
           properties:
             from: {type: string, minLength: 1}
             to: {type: string, minLength: 1}
-            reason: {$ref: "#/$defs/prose"}
+            reason: {$ref: "urn:work:common:1#/$defs/prose"}
       exclusions:
         type: array
         items:
@@ -157,20 +156,20 @@ $defs:
           properties:
             subject: {type: string, minLength: 1}
             path: {type: string, minLength: 1}
-            reason: {$ref: "#/$defs/prose"}
+            reason: {$ref: "urn:work:common:1#/$defs/prose"}
       openQuestions:
         type: array
         items:
           anyOf:
-            - {$ref: "#/$defs/prose"}
+            - {$ref: "urn:work:common:1#/$defs/prose"}
             - type: object
               additionalProperties: false
               required: [question]
               properties:
                 id: {type: string, minLength: 1}
-                question: {$ref: "#/$defs/prose"}
+                question: {$ref: "urn:work:common:1#/$defs/prose"}
                 status: {type: string, minLength: 1}
-                resolution: {$ref: "#/$defs/prose"}
+                resolution: {$ref: "urn:work:common:1#/$defs/prose"}
       nativeGoal:
         type: string
         minLength: 1
@@ -181,11 +180,11 @@ $defs:
         required: [pilot, cleanup]
         description: Import only - the pilot feature and what happened to the old artifact directory.
         properties:
-          pilot: {$ref: "#/$defs/slug"}
+          pilot: {$ref: "urn:work:common:1#/$defs/slugId"}
           cleanup:
             enum: [not-requested, removed, blocked]
           cleanupTarget: {type: string, minLength: 1}
-          cleanupAssertions: {type: array, items: {$ref: "#/$defs/prose"}}
+          cleanupAssertions: {type: array, items: {$ref: "urn:work:common:1#/$defs/prose"}}
       review:
         type: object
         additionalProperties: false
@@ -199,13 +198,3 @@ $defs:
             type: array
             minItems: 1
             items: {type: string, minLength: 1}
-  prose:
-    type: string
-    minLength: 1
-    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
-      a written one, so it is refused at the type.
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
-      written twice by two authors is the same string.
