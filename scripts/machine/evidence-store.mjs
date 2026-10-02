@@ -21,7 +21,7 @@ import { redactBytes } from '../lib/redact.mjs';
 import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript,
   JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/db/ledger.mjs';
 import { newSpanId } from '../../engine/db/machine.mjs';
-import { refuse } from '../lib/refuse.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 
 const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
 export const ARTIFACT_KINDS = JOB_ARTIFACT_KINDS;

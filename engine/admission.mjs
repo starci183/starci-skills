@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { refuse } from '../scripts/lib/refuse.mjs';
+import { refuse } from './refuse.mjs';
 
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;

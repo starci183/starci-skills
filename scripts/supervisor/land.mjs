@@ -73,7 +73,7 @@ import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-g
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { withSwcCache } from '../lib/build-env.mjs';
+import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';

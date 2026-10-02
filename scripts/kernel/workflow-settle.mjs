@@ -13,7 +13,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
-import { commitShaOf } from '../lib/git.mjs';
+import { commitShaOf } from './commit-sha.mjs';
 import { createOwnership } from './work-ownership.mjs';
 import { CHECKPOINT_EVENTS, PRESERVED_WORKFLOW_PREFIX, checkpointOp, leasesOf, preserveAndReset, rebaseWorkflow, recordOf, splitChanges } from './workflow-checkpoint.mjs';
 

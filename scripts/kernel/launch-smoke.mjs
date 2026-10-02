@@ -59,7 +59,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
-import { writeJsonFile } from '../lib/json.mjs';
+import { writeJsonFile } from '../api/fs/write-json-file.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
 

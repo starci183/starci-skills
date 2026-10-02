@@ -3,7 +3,7 @@
 import { parseJson } from '../../../lib/json.mjs';
 import { jobPayloadOf } from './rows.mjs';
 
-export const KERNEL_LAUNCH_EVENTS = ['kernel-booted', 'kernel-restarted', 'kernel-adopted'];
+const KERNEL_LAUNCH_EVENTS = ['kernel-booted', 'kernel-restarted', 'kernel-adopted'];
 
 export function kernelSeatOf(db, workflowId, env = process.env) {
   // The seat's boot count lives in its payload (hierarchy.attempt, scripts/kernel/start-workflow.mjs); try_no is always 1.

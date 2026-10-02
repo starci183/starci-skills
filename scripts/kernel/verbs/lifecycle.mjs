@@ -12,7 +12,7 @@
 import { changeWorkflowPhase } from '../../../engine/db/ledger.mjs';
 import { getWorkflow } from './shared/rows.mjs';
 import { canTransition, phaseOf } from './shared/workflow-transitions.mjs';
-import { refuse } from '../../lib/refuse.mjs';
+import { refuse } from '../../../engine/refuse.mjs';
 
 const MOVES = Object.freeze({
   pause: { from: ['running'], to: 'paused', by: ['owner', 'supervisor', 'kernel'] },

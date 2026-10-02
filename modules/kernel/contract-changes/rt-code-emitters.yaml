@@ -2,7 +2,7 @@ id: rt-code-emitters
 effectiveAt: '2026-10-02T19:00:00+07:00'
 summary: >-
   Smell wave S7-01 and S7-02: the failure-code catalog check gives its findings stable codes (RT_CODE_UNCATALOGUED,
-  RT_CODE_STALE, RT_CODE_MALFORMED, spelled in scripts/checks/failure-code-findings.mjs) and adds RT_CODE_SOLE_EMITTER: a code
+  RT_CODE_STALE, RT_CODE_MALFORMED, spelled in scripts/lib/failure-code-findings.mjs) and adds RT_CODE_SOLE_EMITTER: a code
   whose only source is knowledge/hfs/rules.yaml counts as emitted only when a lint plugin or Sonar enforcer of its rule reports
   it, so a catalog line alone is not an emitter. The rule parity check (scripts/checks/check-hfs-rules.mjs) also holds every
   HFS_, BE_, FE_ and ARCH_ code of modules/kernel/failure-codes.yaml to an owner: a rule's failureCodes, a "cannot judge" refusal,
@@ -15,7 +15,7 @@ paths:
   - modules/kernel/contract-changes/rt-code-emitters.yaml
   - modules/kernel/failure-codes.yaml
   - scripts/checks/check-failure-codes.mjs
-  - scripts/checks/failure-code-findings.mjs
+  - scripts/lib/failure-code-findings.mjs
   - scripts/checks/check-hfs-rules.mjs
   - scripts/hfs/infrastructure-codes.mjs
   - tests/checks/failure-codes-scan.spec.mjs

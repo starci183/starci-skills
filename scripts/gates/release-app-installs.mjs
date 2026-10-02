@@ -18,7 +18,7 @@ import { runNpx } from '../api/npm/run-npx.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { nextBuildEnv } from '../lib/build-env.mjs';
+import { nextBuildEnv } from './build-env.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 

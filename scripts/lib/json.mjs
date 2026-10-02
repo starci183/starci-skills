@@ -1,8 +1,6 @@
 // json.mjs — the ledger's forgiving JSON read. Every one of these rows may hold text a peer wrote or a
 // truncated payload, so a malformed column is the caller's fallback, never a throw. The parse of the
 // literal 'null' is kept as null (callers that want {} instead write `parseJsonOr`).
-import fs from 'node:fs';
-import path from 'node:path';
 import { readParsedFile } from './read-text.mjs';
 
 /** `text` as JSON, or `fallback` when it does not parse. */
@@ -31,10 +29,4 @@ export const jsonFromStdout = (stdout) => {
     try { return JSON.parse(text.slice(first, last + 1)); } catch { /* not json */ }
   }
   return null;
-};
-
-/** `value` written to `file` as two-space JSON plus a trailing newline (parent directories created). */
-export const writeJsonFile = (file, value) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };

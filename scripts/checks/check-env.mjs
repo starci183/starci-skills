@@ -18,7 +18,7 @@
 // in the same file counts too.
 import fs from 'node:fs';
 import path from 'node:path';
-import { trackedTextFiles } from '../lib/tracked-files.mjs';
+import { trackedTextFiles } from '../hfs/runtime-rules/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';

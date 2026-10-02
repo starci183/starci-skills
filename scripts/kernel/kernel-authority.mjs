@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { refuse as refuseError } from '../lib/refuse.mjs';
+import { refuse as refuseError } from '../../engine/refuse.mjs';
 import { splitList } from '../lib/list.mjs';
 import { normPath } from '../lib/path-key.mjs';
 import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';

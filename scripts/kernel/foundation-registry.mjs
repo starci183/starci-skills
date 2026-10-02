@@ -15,7 +15,7 @@
 // text), written through engine/db/ledger.mjs upsertFoundation / declareFoundations.
 // Every write also appends an event on the acting workflow (entity_type 'foundation').
 import { parseJson } from '../lib/json.mjs';
-import { fail } from '../lib/refuse.mjs';
+import { fail } from '../../engine/refuse.mjs';
 import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
 const FOUNDATION_SCHEMA = 'starci/foundation@1';

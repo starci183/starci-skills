@@ -14,7 +14,7 @@
 //                                reason: a string or template literal in the call or option, or an identifier/member whose
 //                                one-hop definition in the file holds one. A silent skip passes without running; a skip
 //                                that stays says what is missing and what provisions it.
-import { trackedTextFiles } from '../lib/tracked-files.mjs';
+import { trackedTextFiles } from '../hfs/runtime-rules/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';

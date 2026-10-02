@@ -24,7 +24,7 @@ import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../lib/env.mjs';
 import { isInside } from '../lib/walk.mjs';
-import { need as refuseUnless } from '../lib/refuse.mjs';
+import { need as refuseUnless } from '../../engine/refuse.mjs';
 
 const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';

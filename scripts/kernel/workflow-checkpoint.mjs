@@ -64,7 +64,7 @@ import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
 import { splitList } from '../lib/list.mjs';
 import { underAny } from '../lib/path-key.mjs';
-import { commitShaOf } from '../lib/git.mjs';
+import { commitShaOf } from './commit-sha.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

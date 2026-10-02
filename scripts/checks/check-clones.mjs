@@ -14,7 +14,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { trackedTextFiles } from '../lib/tracked-files.mjs';
+import { trackedTextFiles } from '../hfs/runtime-rules/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';

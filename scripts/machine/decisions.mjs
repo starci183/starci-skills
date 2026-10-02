@@ -28,7 +28,7 @@ import { runNode } from '../api/node/run-node.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
-import { refuse as refuseError } from '../lib/refuse.mjs';
+import { refuse as refuseError } from '../../engine/refuse.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
 import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { oneLine } from '../lib/clip.mjs';

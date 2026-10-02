@@ -81,8 +81,8 @@ export function exampleImages(root = ROOT) {
     return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
   });
 }
-export const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
-export const IMAGES_JOB = 'images';
+const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
+const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
 export function renderCodecov(root = ROOT) {

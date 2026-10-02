@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { nextBuildEnv, swcCacheDir } from '../../scripts/lib/build-env.mjs';
+import { nextBuildEnv, swcCacheDir } from '../../scripts/gates/build-env.mjs';
 
 test('the SWC cache is under the home unless STARCI_SWC_CACHE names one', () => {
   assert.equal(swcCacheDir({}, 'home-dir'), path.join('home-dir', 'starci-swc-cache'));

@@ -12,7 +12,7 @@ import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kind
 import { subkindOf } from '../../artifact-subkind.mjs';
 import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
-import { refuse } from '../../../lib/refuse.mjs';
+import { refuse } from '../../../../engine/refuse.mjs';
 import { resolvedKey } from '../../../lib/path-key.mjs';
 
 

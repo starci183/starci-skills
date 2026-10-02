@@ -9,7 +9,7 @@
 import { AWAITING_OWNER_STATUS, UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
 import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/db/ledger.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { refuse } from '../lib/refuse.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 

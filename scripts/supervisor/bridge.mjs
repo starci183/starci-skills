@@ -40,7 +40,7 @@ import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list, splitList } from '../lib/list.mjs';
-import { fail } from '../lib/refuse.mjs';
+import { fail } from '../../engine/refuse.mjs';
 import {
   BRIDGE_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
 } from '../kernel/dependency-graph.mjs';

@@ -5,7 +5,7 @@ import { JOB_STATUSES, recordGraphVersion } from '../../engine/db/ledger.mjs';
 import { AWAITING_OWNER_STATUS } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
-import { refuse } from '../lib/refuse.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 import {
   GRAY, GREEN, RED, YELLOW, WORK_GRAPH_ID, canonicalGraph, diffGraphs, diffIsEmpty, frontierOf, graphDigest, ownedPathKey, recolor, validateGraph,
 } from './work-graph-model.mjs';

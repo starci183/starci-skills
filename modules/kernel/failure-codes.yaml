@@ -794,17 +794,6 @@ BE_TEST_BUILDER_ARRANGES:
   owner: op-retry
   kind: check-finding
 
-BLOB_REF_INVALID:
-  title: "Not a blob citation"
-  title_vi: "Không phải tham chiếu khối lưu"
-  meaning_vi: "Đoạn được đưa vào để đọc khối lưu không phải một dẫn chứng khối hợp lệ."
-  causes_vi:
-    - "Truyền đường dẫn hay chuỗi không phải blob:sha256"
-    - "Băm không có trong cơ sở dữ liệu"
-  nextStep_vi: "Việc đọc bị từ chối; bên gọi phải truyền tham chiếu đúng."
-  owner: runtime-core
-  kind: runtime-fault
-
 BLOCKER_CYCLE:
   title: "blockedBy forms a cycle"
   title_vi: "Chuỗi blockedBy tạo vòng"

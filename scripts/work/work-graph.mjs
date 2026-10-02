@@ -19,7 +19,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { diffGraphs, frontierOf, validateGraph } from './work-graph-model.mjs';
 import { latestVersion, liveColors, recordVersion, versionOf, versionsOf } from './work-graph-store.mjs';
-import { refuse } from '../lib/refuse.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 import { workGraphContext } from './work-graph-context.mjs';
 
 const USAGE = 'use: node scripts/work/work-graph.mjs show|validate|diff|propose --repo <repo> --workflow <id> [...] [--json]';

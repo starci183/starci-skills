@@ -10,7 +10,7 @@
 //   - an entry with a missing or malformed field, or an owner outside the closed set,
 //   - a code whose only literal source is the rule catalog (knowledge/hfs/rules.yaml) and that no lint plugin or Sonar enforcer of
 //     a rule reports: a catalog line is not an emitter, so a rule code needs a built plugin enforcer or a literal in code.
-// The findings carry stable codes (scripts/checks/failure-code-findings.mjs): RT_CODE_UNCATALOGUED, RT_CODE_STALE, RT_CODE_MALFORMED,
+// The findings carry stable codes (scripts/lib/failure-code-findings.mjs): RT_CODE_UNCATALOGUED, RT_CODE_STALE, RT_CODE_MALFORMED,
 // RT_CODE_SOLE_EMITTER.
 // What counts as an emitted code (see `emittedCodes`):
 //   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
@@ -24,7 +24,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { createRequire } from 'node:module';
 import { isMain } from '../lib/is-main.mjs';
-import { CODE_FINDINGS, PLUGIN_ENFORCERS } from './failure-code-findings.mjs';
+import { CODE_FINDINGS, PLUGIN_ENFORCERS } from '../lib/failure-code-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
