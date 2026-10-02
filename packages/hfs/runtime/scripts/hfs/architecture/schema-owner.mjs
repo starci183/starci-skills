@@ -2,6 +2,7 @@ import path from 'node:path';
 import { machineKit, pascal } from './machine-ast.mjs';
 import { treeOf } from './required-files.mjs';
 import { DATABASE_DIR } from './connection-map.mjs';
+import { collectRegistrations, isPerConnection, persistenceOfFactory } from './context-map.mjs';
 
 /**
  * R35 `schema-owner` (BE_SCHEMA_OWNER, BE-CONVENTION 1.4.6). Schema lives with the capability that owns the table:
@@ -36,13 +37,7 @@ export function checkSchemaOwner(input) {
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
   const plain = (rel, message, extra = {}) => violations.push({ ruleId: RULE, path: rel, line: 1, column: 1, message, ...extra });
 
-  /** {root, capability, folder, below} of a be.persistence file: `folder` is the directory below persistence/ ('' at its root). */
-  const persistenceOf = rel => {
-    const classified = resolver.classifyPath(rel);
-    if (classified.slot !== PERSISTENCE_SLOT) return null;
-    const below = rel.slice(classified.root.length + 1).split('/');
-    return { root: classified.root, capability: path.posix.basename(path.posix.dirname(classified.root)), folder: below.length > 1 ? below[0] : '', below };
-  };
+  const persistenceOf = persistenceOfFactory(resolver);
 
   let entities = 0;
   let migrations = 0;
@@ -100,111 +95,12 @@ export function checkSchemaOwner(input) {
     }
   }
 
-  // The connection of a capability is where its arrays are registered (no CONNECTION alias in persistence/connection.ts).
-  const unparen = node => { let current = node; while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression?.(current) || ts.isNonNullExpression(current))) current = current.expression; return current; };
-  const returned = declaration => {
-    const fn = ts.isVariableDeclaration(declaration) && declaration.initializer ? unparen(declaration.initializer) : declaration;
-    if (!(ts.isArrowFunction(fn) || ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isMethodDeclaration(fn)) || !fn.body) return null;
-    if (!ts.isBlock(fn.body)) return fn.body;
-    const statements = fn.body.statements.filter(ts.isReturnStatement);
-    return statements.length === 1 ? statements[0].expression ?? null : null;
-  };
-  const propertySources = new Map(); // property name -> [{declaration, initializer, checker}] over the program
-  const assignmentsOf = name => {
-    if (propertySources.has(name)) return propertySources.get(name);
-    const list = [];
-    for (const file of graph.files.values()) {
-      if (!file.sourceFile.text.includes(name)) continue;
-      const checker = kit.checkerOf(file.sourceFile);
-      kit.walk(file.sourceFile, node => {
-        if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === name && ts.isObjectLiteralExpression(node.parent)) {
-          // the property of the type the literal is checked against, so a typed const and a typed return meet the same declaration
-          const contextual = checker.getContextualType(node.parent)?.getProperty(name);
-          const symbol = contextual ?? checker.getSymbolAtLocation(node.name);
-          list.push({ declaration: symbol?.declarations?.[0] ?? null, initializer: node.initializer, checker });
-        }
-        return true;
-      });
-    }
-    propertySources.set(name, list);
-    return list;
-  };
-  const nameOfLiteral = (checker, literal, depth) => {
-    const own = kit.propertyOf(literal, 'name');
-    if (own) return kit.stringValue(checker, kit.valueOfProperty(own));
-    for (const property of literal.properties) {
-      if (!ts.isSpreadAssignment(property)) continue;
-      const value = nameOfExpression(checker, property.expression, depth + 1);
-      if (value) return value;
-    }
-    return null;
-  };
-  const nameOfExpression = (checker, expression, depth) => {
-    const node = unparen(expression);
-    if (!node || depth > 5) return null;
-    if (ts.isObjectLiteralExpression(node)) return nameOfLiteral(checker, node, depth);
-    if (ts.isCallExpression(node)) {
-      for (const declaration of kit.declarationsOf(checker, node.expression)) {
-        const body = returned(declaration);
-        const value = body ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), body, depth + 1) : null;
-        if (value) return value;
-      }
-      return null;
-    }
-    if (ts.isIdentifier(node)) {
-      const declaration = kit.declarationsOf(checker, node)[0];
-      return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer ? nameOfExpression(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, depth + 1) : null;
-    }
-    if (ts.isPropertyAccessExpression(node)) {
-      const target = kit.declarationsOf(checker, node.name)[0];
-      if (!target) return null;
-      const names = new Set(assignmentsOf(node.name.text).filter(item => item.declaration === target).map(item => nameOfExpression(item.checker, item.initializer, depth + 1)).filter(Boolean));
-      return names.size === 1 ? [...names][0] : null;
-    }
-    return null;
-  };
-  /** The capability arrays (`<c>Entities` / `<c>Migrations` of persistence/connection.ts) an expression lists. */
-  const arraysIn = (checker, expression, out, depth) => {
-    const node = unparen(expression);
-    if (!node || depth > 6) return;
-    if (ts.isArrayLiteralExpression(node)) { for (const element of node.elements) arraysIn(checker, ts.isSpreadElement(element) ? element.expression : element, out, depth + 1); return; }
-    if (!ts.isIdentifier(node) && !ts.isPropertyAccessExpression(node)) return;
-    const declaration = kit.declarationsOf(checker, ts.isPropertyAccessExpression(node) ? node.name : node)[0];
-    if (!declaration || !ts.isVariableDeclaration(declaration) || !ts.isIdentifier(declaration.name)) return;
-    const rel = kit.graphPath(declaration);
-    const owner = rel ? persistenceOf(rel) : null;
-    if (owner && owner.below.length === 1 && owner.below[0] === 'connection.ts' && [`${camel(owner.capability)}Entities`, `${camel(owner.capability)}Migrations`].includes(declaration.name.text)) {
-      out.push({ key: path.posix.dirname(owner.root), name: owner.capability });
-    } else if (declaration.initializer) arraysIn(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, out, depth + 1);
-  };
-  const registered = new Map(); // capability root -> {name, connections: Map(connection -> first site)}
-  let registrations = 0;
-  for (const file of graph.files.values()) {
-    const checker = kit.checkerOf(file.sourceFile);
-    kit.walk(file.sourceFile, node => {
-      if (!ts.isObjectLiteralExpression(node)) return true;
-      const arrays = [];
-      for (const key of ['entities', 'migrations']) {
-        const property = kit.propertyOf(node, key);
-        if (property) arraysIn(checker, kit.valueOfProperty(property), arrays, 0);
-      }
-      if (!arrays.length) return true;
-      registrations += 1;
-      const connection = nameOfLiteral(checker, node, 0);
-      if (connection === null) return true;
-      for (const { key, name } of new Map(arrays.map(item => [item.key, item])).values()) {
-        if (!registered.has(key)) registered.set(key, { name, connections: new Map() });
-        const sites = registered.get(key).connections;
-        if (!sites.has(connection)) sites.set(connection, { file, node });
-      }
-      return true;
-    });
-  }
-  for (const { name, connections: sites } of registered.values()) {
+  const { registered, registrations } = collectRegistrations({ kit, graph, persistenceOf });
+  for (const [key, { name, connections: sites }] of registered) {
     for (const [connection, site] of sites) {
       if (!connections.has(connection)) report(site.file, site.node, `The ${name} capability is registered on connection "${connection}", which hfs.json does not declare (declared: ${[...connections].sort().join(', ') || 'none'}); the tables of a capability live on one declared connection.`, { connection, capability: name });
     }
-    if (sites.size > 1) {
+    if (sites.size > 1 && !isPerConnection(resolver, key, name)) {
       const all = [...sites.keys()].sort().join(' and ');
       for (const [connection, site] of [...sites].slice(1)) report(site.file, site.node, `The ${name} capability's entities and migrations are registered on connections ${all}; a capability's tables live on exactly one connection, so register its arrays under one connection across every app.`, { connection, capability: name });
     }
@@ -217,7 +113,10 @@ export function checkSchemaOwner(input) {
       if (has && !declared.has(`${camel(kinds.name)}${kind}`)) plain(`${key}/persistence/connection.ts`, `${key}/persistence/connection.ts must export ${camel(kinds.name)}${kind}, the ${kind.toLowerCase()} of the ${kinds.name} capability, the one file that lists them for the apps.`, { capability: kinds.name });
     }
     const only = registered.get(key)?.connections;
-    if (!only || only.size !== 1) continue;
+    if (!only || only.size < 1) continue;
+    // A per-connection platform capability (event-bus, jobs) lives on every connection that uses it; any other on exactly one (reported above).
+    const perConnection = only.size > 1 && isPerConnection(resolver, key, kinds.name);
+    if (only.size > 1 && !perConnection) continue;
     const home = [...only.keys()][0];
     for (const file of graph.files.values()) {
       if (!file.rel.startsWith(`${key}/`)) continue;
@@ -227,7 +126,8 @@ export function checkSchemaOwner(input) {
         const declaration = kit.declarationsOf(checker, node.expression)[0];
         const rel = declaration ? kit.graphPath(declaration) : null;
         const used = rel ? [...connections].find(name => rel === `${DATABASE_DIR}/${name}.decorators.ts`) : null;
-        if (used && used !== home) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${home}; a capability reads only its own database, so use Inject${pascal(home)}EntityManager or move the tables.`, { connection: used, expected: home, capability: kinds.name });
+        if (used && perConnection && !only.has(used)) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${[...only.keys()].sort().join(' and ')}; register the capability on ${used} too or inject one of its connections.`, { connection: used, expected: [...only.keys()].sort().join(','), capability: kinds.name });
+        else if (used && !perConnection && used !== home) report(file, node, `${file.rel} injects the entity manager of connection ${used}, but the ${kinds.name} capability's tables are registered on ${home}; a capability reads only its own database, so use Inject${pascal(home)}EntityManager or move the tables.`, { connection: used, expected: home, capability: kinds.name });
         return true;
       });
     }

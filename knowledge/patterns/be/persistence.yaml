@@ -4,7 +4,9 @@ title: Backend persistence and migrations
 purpose: |-
   Given a table, entity or SQL statement, who owns it, how does the schema change, which connection reaches it and which
   process applies the change? Migrations are the only schema authority. Persistence lives with the capability that owns the
-  table. One database is one connection, one injector, and the shared EntityManager is called directly.
+  table. One database is one connection, one injector, and the shared EntityManager is called directly. A connection IS a
+  bounded context: it has one owning service, its tables are read and written only by its own context, and contexts
+  exchange data only through events.
 appliesTo:
   - backend
 family: be
@@ -16,6 +18,7 @@ provenance:
     - knowledge/hfs/rules.yaml
     - docs/backend-source-pattern.md
     - owner-locked BE convention 2026-09-30
+    - owner decision 2026-10-02 (bounded contexts; apps/cli is the migration runner)
     - https://typeorm.io/docs/migrations/why
     - https://www.postgresql.org/docs/16/sql-insert.html
   limitations: |-
@@ -32,7 +35,7 @@ rules:
       `synchronize` is the literal `false` everywhere, including e2e databases, and is never read from the environment.
       There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE`, `ALTER` or `DROP TABLE` string
       outside `persistence/migrations/**`, and no glob that discovers entities or migrations. E2E runs the real migrations
-      through the `be/apps/migrate` runner function, which is the evidence that they are right.
+      through the migrate runner function of `apps/cli`, which is the evidence that they are right.
     rationale: |-
       When an ORM diffs the schema at boot, the live schema is whatever the entity graph implies that day, migrations never
       run, and an enum change can crash a boot.
@@ -42,7 +45,7 @@ rules:
         write: 'DatabaseModule.register({ connection: PRIMARY_CONNECTION, entities, migrations, synchronize: false })'
       - id: case-2
         when: An e2e database
-        write: 'the setup runs the be/apps/migrate runner function against the Testcontainers database before the tests, never synchronize'
+        write: 'the setup runs the migrate runner function of apps/cli against the Testcontainers database before the tests, never synchronize'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
@@ -50,25 +53,27 @@ rules:
         - Review each migration against the accepted SDS data design and a copy of realistic data.
     relatedExamples: []
   - id: BE-PERSISTENCE-2
-    title: be/apps/migrate is the only migration runner
+    title: cli migrate is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34]
+    hfsRules: [R33, R34, R148]
     requirement: |-
-      An app of kind `migrate` is the only process that runs migrations, once per connection, before any api or worker
-      process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` `sides.be.connections` declares a connection. It has
-      `main.ts` and no business code; it builds its `DataSource` from the same `<conn>.config.ts` the
-      api uses. Api and worker apps never run migrations.
+      Migrations run only through the `migrate` command of `be/apps/cli` (`cli migrate`), once per connection, before any api
+      or worker process starts (a deploy runs it as an init job). `apps/cli` is required as soon as `hfs.json`
+      `sides.be.connections` declares a connection, and it composes EVERY declared connection with its entities and
+      migrations (BE_CONTEXT_OWNER), because the cli is the one process that may touch the schema of every context. It builds
+      its `DataSource` from the same `<conn>.config.ts` the owning api uses. Api and worker apps never run migrations.
     rationale: |-
       Two processes racing to migrate corrupt a schema, and a migration inside a module cannot be scheduled or retried on
-      its own.
+      its own. Running every context's migrations from one command keeps the schema of each context under one reviewer.
     cases:
       - id: case-1
         when: A deploy
-        write: 'run `node dist/apps/migrate/main.js` to completion, then start the api and worker.'
+        write: 'run `node dist/apps/cli/main.js migrate` to completion (one run per connection), then start the api and worker.'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
         - BE_ENTRYPOINT_ONLY_IN_APPS
+        - BE_CONTEXT_OWNER
         - HFS_SLOT_REQUIRED_MISSING
       manual:
         - Confirm the deployment runs the migrate step first and once.
@@ -79,11 +84,12 @@ rules:
     hfsRules: [R35, R37, R74]
     requirement: |-
       Entities and migrations sit in `persistence/{entities,migrations}/` of the capability that owns the table
-      (`domain/<c>/persistence/` or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` declares
+      (`domain/<c>/persistence/`, `projections/<name>/persistence/` for a read model or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` declares
       the `<c>Entities` and `<c>Migrations` arrays and no `CONNECTION` alias. The owner's `index.ts` re-exports those two
-      names, the only two, and the apps and `be/apps/migrate` concatenate them per connection into `DatabaseModule.register`;
+      names, the only two, and the apps and `be/apps/cli` concatenate them per connection into `DatabaseModule.register`;
       a capability's connection is the one its arrays are registered on, exactly one declared in `hfs.json` `sides.be.connections`
-      across all apps, and every `Inject<Conn>EntityManager` inside the capability names that same connection. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
+      across all apps (only a platform capability the manifest lists as `perConnection`, the event-bus outbox and inbox and the
+      job table, registers on several: one set of tables on every connection that uses it), and every `Inject<Conn>EntityManager` inside the capability names that same connection. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
       every `@Column` has an explicit `name` and `type`, timestamps are `timestamptz`, an enum is stored as `varchar` with a
       `CHECK` in the migration (no native PG enum), and there is no `eager`, `lazy` or `cascade`. An entity file imports
       neither `@nestjs/graphql` nor `class-validator`. A migration is `<epochMs13>-<kebab-name>.ts` with class
@@ -99,7 +105,7 @@ rules:
         write: 'be/src/modules/domain/purchase/persistence/entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts (class CreatePurchases1790000000000), and `purchaseEntities` / `purchaseMigrations` exported from purchase/index.ts.'
       - id: case-2
         when: Composition
-        write: 'be/apps/migrate/src/app.module.ts lists [...purchaseEntities, ...identityEntities] and [...purchaseMigrations, ...identityMigrations] for the primary connection.'
+        write: 'be/apps/cli/src/app.module.ts lists [...purchaseEntities, ...cartEntities] and [...purchaseMigrations, ...cartMigrations] for the order connection.'
     verification:
       automated:
         - BE_SCHEMA_OWNER
@@ -149,8 +155,10 @@ rules:
       When a database change must lead to an external message, the handler calls `outbox.enqueue(manager, message)` on an
       `InjectOutbox()` parameter inside the same transaction. The `platform/outbox` job relays the row with bounded backoff and
       an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
-      business result are different facts, and an outbox alone is not exactly-once processing. Outbox tables and migrations
-      live in the platform capability that owns them.
+      business result are different facts, and an outbox alone is not exactly-once processing. Outbox and inbox tables and migrations
+      live in the platform capability that owns them (`platform/event-bus/persistence`, `platform/inbox/persistence`) and
+      exist on EVERY connection that publishes or consumes (BE-PERSISTENCE-14): the outbox row is written in the same
+      transaction as the domain change, so it sits in the database of that change.
     rationale: |-
       Publishing straight to a broker inside a request does not prove durable delivery, and an in-process event does not
       survive a crash between commit and delivery.
@@ -201,7 +209,7 @@ rules:
       transaction callback, with the entity class passed by class and never by string name. Not used: `getRepository`,
       `@InjectRepository`, `Repository<T>`, `TypeOrmModule.forFeature`, custom repository or store classes
       (`*.repository.ts`, `*.store.ts`, `*_STORE` ports), `createQueryBuilder`, `ModuleRef.get`, an injected `DataSource` or
-      `QueryRunner` outside `platform/database` and `be/apps/migrate`. A manager is injected only in
+      `QueryRunner` outside `platform/database` and `be/apps/cli`. A manager is injected only in
       `be/src/features/<f>/application/*.handler.ts`, `be/src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
       a `persistence/` (database, inbox, outbox, lease); never in `transport/**`, `integrations/**` or `be/apps/**`.
     rationale: |-
@@ -227,15 +235,17 @@ rules:
     kind: mandatory
     hfsRules: [R84]
     requirement: |-
-      `hfs.json` `sides.be.connections` lists every physical database as `{ "name": "<kebab>", "envPrefix": "<SNAKE>" }`; the name is
-      the logical database, never the engine (`primary`, `identity`, `order`). Per connection exactly these files exist in
+      `hfs.json` `sides.be.connections` lists every bounded context as `{ "name": "<kebab>", "envPrefix": "<SNAKE>", "owner": "<api app>", "isolation": "database" | "schema" }`; the name is
+      the logical database, never the engine (`primary`, `identity`, `order`), the owner is the one service app that composes it
+      and `isolation` says whether the context is its own database or its own schema of a shared one (`<PREFIX>_SCHEMA`; the split
+      from schema to database later is an env change only, and every cross-context rule holds in both forms). Per connection exactly these files exist in
       `be/src/modules/platform/database/`: `<conn>.connection.ts` (`export const <CONN>_CONNECTION = "<conn>"`), `<conn>.config.ts`
       (reads only `<ENVPREFIX>_*` keys) and `<conn>.decorators.ts`
       (`Inject<Conn>EntityManager = (): TypedParameterDecorator<EntityManager> => injector<EntityManager>(getEntityManagerToken(<CONN>_CONNECTION))`).
       No other file declares a connection or calls `TypeOrmModule.forRoot*`, `new DataSource(`, `getEntityManagerToken(`,
-      `InjectEntityManager(` or `InjectDataSource(`, except `be/apps/migrate`. There is no
+      `InjectEntityManager(` or `InjectDataSource(`, except `be/apps/cli`. There is no
       capability-specific injector, no second connection name onto an existing database, and two connections never resolve to
-      the same (host, port, database).
+      the same (host, port, database), except two `isolation: schema` contexts with different `<PREFIX>_SCHEMA` values.
     rationale: |-
       A second pool onto the same database, or an injector named after a feature, splits transactions and hides which
       database a service really queries.
@@ -251,12 +261,16 @@ rules:
         - Confirm the stacks env of each environment points each connection at its own database.
     relatedExamples: []
   - id: BE-PERSISTENCE-9
-    title: SQL touches only tables it may, and every multi-row read is bounded
+    title: SQL touches only its own context's tables, and every multi-row read is bounded
     kind: mandatory
     hfsRules: [R86, R69, R77]
     requirement: |-
-      A `SqlText` constant writes only the tables of entities in its own capability's `persistence/entities` and reads only
-      tables of capabilities its owner may import (domain to domain, acyclic); this is checked by parsing the SQL text. Every
+      A `SqlText` constant writes only the tables of entities in its own capability's `persistence/entities` and reads and
+      writes ONLY its own context's tables: its own capability's, or those of a same-context capability its owner may import. A
+      cross-context JOIN or subquery is refused (and so are a cross-context relation or foreign key, an import of another
+      context's entities, services or SQL, and a transaction that spans two contexts: BE-PERSISTENCE-12 and 13). Data of another
+      context comes only through events: a local copy kept by a reactor, or a projection. This is checked by parsing the SQL
+      text. Every
       multi-row read states a bound: `find`, `findBy` and `findAndCount` carry `take`, and a SQL `SELECT` carries `LIMIT` unless
       it filters on a primary key or unique constraint or projects only aggregates without `GROUP BY`. The bounds are the
       `platform/database` constants `PAGE_SIZE_MAX` (client pages), `LIST_ROWS_MAX` and `BATCH_ROWS` (keyset batches). A read is
@@ -271,6 +285,9 @@ rules:
       - id: case-2
         when: Reads for several ids
         write: 'one `WHERE id = ANY($1)` statement before the loop, then a map lookup per element.'
+      - id: case-3
+        when: An order list that needs the buyer's name
+        write: 'read the order-summary projection, or the buyer_name column of a local copy filled by the identity events; never JOIN users.'
     verification:
       automated:
         - BE_SQL_TABLE_OWNER
@@ -304,4 +321,123 @@ rules:
         - BE_TRANSACTION_EXTERNAL_CALL
       manual:
         - Run a refusal-after-write case against a real database and assert the rollback.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-11
+    title: A connection is a bounded context with one owning service
+    kind: mandatory
+    hfsRules: [R148]
+    requirement: |-
+      Every `hfs.json` `sides.be.connections` entry has an `owner` (an api or worker app declared in the same file) and an
+      `isolation` (`database` or `schema`). An app passes to `DatabaseModule.register` only the connections it owns and imports
+      no domain or projection capability of a context it does not own; a monolith's one app owns every context. The
+      `apps/cli` app composes every declared connection so that `cli migrate` reaches each context. In a monolith every
+      connection may point at one Postgres server, but each stays a separate database or schema.
+    rationale: |-
+      A context that two services write is one shared schema with two owners; one owner per context keeps its tables, its
+      migrations and its events under one reviewer and lets the context move to its own database by changing only the env.
+    cases:
+      - id: case-1
+        when: Three contexts in one Postgres
+        write: 'hfs.json connections [{ "name": "identity", "envPrefix": "IDENTITY_DB", "owner": "identity", "isolation": "schema" }, { "name": "order", "envPrefix": "ORDER_DB", "owner": "order", "isolation": "schema" }, { "name": "billing", "envPrefix": "BILLING_DB", "owner": "billing", "isolation": "schema" }]; apps/order registers only the order connection.'
+    verification:
+      automated:
+        - BE_CONTEXT_OWNER
+        - BE_CONNECTION_DUPLICATE
+      manual:
+        - Confirm each stack env gives a schema context its own `<PREFIX>_SCHEMA`, or its own database.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-12
+    title: Contexts are coupled only by events
+    kind: mandatory
+    hfsRules: [R149, R86]
+    requirement: |-
+      No cross-context entity relation (`OneToOne`, `OneToMany`, `ManyToOne`, `ManyToMany` to another context's entity), no
+      cross-context foreign key (`REFERENCES` another context's table in a migration), no cross-context SQL (BE-PERSISTENCE-9) and
+      no import by a domain or projection file of another context's capability (entities, services or SQL). The other context's id
+      is a plain column. Cross-context data arrives as events: a reactor keeps a local copy (for example the payment status
+      in order), or a projection (`modules/projections/<name>`, for example `order-summary`) keeps a read model on the owning
+      context's connection, and the join happens on those local tables.
+    rationale: |-
+      A relation, a foreign key or a join makes two contexts one database in practice: neither can migrate, scale or move alone.
+      A local copy and a projection are fed by contract events and are eventually consistent by design.
+    cases:
+      - id: case-1
+        when: An order list shows the paid status
+        write: 'order keeps payment_status in its own order_payments table, written by the billing.payment-settled consumer; the list reads it from there.'
+      - id: case-2
+        when: A summary spanning identity, order and billing
+        write: 'modules/projections/order-summary/persistence/entities/order-summary.entity.ts on the order connection, updated by reactors of the three contexts events.'
+    verification:
+      automated:
+        - BE_CONTEXT_COUPLING
+        - BE_SQL_TABLE_OWNER
+      manual:
+        - Confirm every local copy and projection names its source event and tolerates redelivery and reordering.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-13
+    title: One transaction touches one context's connection
+    kind: mandatory
+    hfsRules: [R150]
+    requirement: |-
+      Inside `entityManager.transaction(async (manager) => ...)` of the manager of connection C, no entity manager of another
+      connection is used and no capability of another context is called. Work that spans contexts is a saga: one transaction per
+      context, each writing its outbox row in the same transaction as its change, linked by events with a compensation per step.
+    rationale: |-
+      A transaction cannot span two databases, and a "cross-context transaction" on one Postgres server silently becomes an
+      impossible one the day a context moves to its own database.
+    cases:
+      - id: case-1
+        when: Placing an order that must be invoiced
+        write: 'order commits the order and an order.placed outbox row in one transaction; billing consumes it and commits the invoice in its own transaction; a rejected invoice publishes billing.invoice-rejected and order cancels the order.'
+    verification:
+      automated:
+        - BE_CONTEXT_TRANSACTION
+      manual:
+        - Review each saga step for its compensation and its idempotency.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-14
+    title: Per-connection platform tables and projection placement
+    kind: mandatory
+    hfsRules: [R152]
+    requirement: |-
+      Projections keep their tables under their owning context's connection, in `modules/projections/<name>/persistence/{entities,migrations}`.
+      The outbox and inbox tables exist per connection that publishes or consumes (`platform/event-bus/persistence`,
+      `platform/inbox/persistence`) and the job table per connection that runs jobs (`platform/jobs/persistence`): these platform
+      capabilities are listed in the manifest's `perConnection` and register their entities and migrations on every connection whose
+      manager is passed to them; no other capability registers on more than one connection.
+    rationale: |-
+      The outbox row must be written in the same transaction as the business change, so it must live in that change's database;
+      a connection without the table fails at the first publish.
+    cases:
+      - id: case-1
+        when: Order publishes order.placed inside its transaction
+        write: 'the order connection registers eventBusEntities and eventBusMigrations beside orderEntities and orderMigrations; billing registers them too because it publishes billing events.'
+    verification:
+      automated:
+        - BE_CONTEXT_PLATFORM_TABLES
+        - BE_SCHEMA_OWNER
+      manual:
+        - Confirm the relay job polls every connection that registers the outbox.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-15
+    title: Event contracts evolve only additively
+    kind: mandatory
+    hfsRules: [R151]
+    requirement: |-
+      `be/contracts/<service>/events.json` is compared with its pinned previous contract `events.pin.json` (copied over when the
+      contract is published). Every pinned event keeps its stream, version, payload fields, types and optionality; a new field is
+      optional; a new event is free. A breaking change is a new event key `<event>.v2` published next to the old one, which stays until
+      its consumers have moved.
+    rationale: |-
+      Events already on the wire and consumers deployed at another time cannot be changed in one commit; only additive changes are
+      safe for both.
+    cases:
+      - id: case-1
+        when: order.placed needs the currency
+        write: 'add `currency?: string` to order.placed (optional), or publish order.placed.v2 with a required currency and move the consumers.'
+    verification:
+      automated:
+        - BE_CONTRACT_BREAKING
+      manual:
+        - Copy events.json over events.pin.json only when the new contract is published.
     relatedExamples: []

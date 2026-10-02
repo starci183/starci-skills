@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { analyzeSql, HOLE } from './sql-tokens.mjs';
 import { machineKit } from './machine-ast.mjs';
+import { contextModelOf } from './context-map.mjs';
 
 /**
  * R86 `sql-owner` (BE_SQL_TABLE_OWNER). Every `sql` tagged template (the tag declared in platform/database) of a
@@ -8,8 +9,9 @@ import { machineKit } from './machine-ast.mjs';
  * entities of the whole program:
  *   - it writes (INSERT INTO, UPDATE, DELETE FROM, MERGE INTO, TRUNCATE) only tables the file's own capability declares
  *     with `@Entity("<table>")` in its persistence;
- *   - it reads (FROM, JOIN, USING) only tables of capabilities its owner may import (the tier matrix, through
- *     `resolver.importAllowed` to the table owner's public entry) or its own;
+ *   - it reads (FROM, JOIN, USING) only tables of its own CONTEXT (the connection its capability's arrays are registered on): its own
+ *     capability's, or those of a same-context capability its owner may import (the tier matrix, through `resolver.importAllowed`
+ *     to the table owner's public entry); a table of another context is refused (cross-context data comes only by events);
  *   - every table it names is declared by some entity;
  *   - a SELECT carries LIMIT, or constrains the primary key or a unique key of its first table with `=`, or selects only
  *     aggregates without GROUP BY.
@@ -28,7 +30,7 @@ const literalStrings = (ts, node) => {
   return null;
 };
 
-function entitiesOf(kit, graph) {
+export function entitiesOf(kit, graph) {
   const { ts } = kit;
   const tables = new Map();
   let unreadable = 0;
@@ -95,6 +97,7 @@ export function checkSqlOwner(input) {
   const kit = machineKit(input);
   const { ts, resolver } = kit;
   const { tables, unreadable } = entitiesOf(kit, graph);
+  const model = contextModelOf(kit, graph);
   const violations = [];
   let templates = 0;
   let dynamic = 0;
@@ -128,6 +131,12 @@ export function checkSqlOwner(input) {
         const entity = tables.get(read.table.toLowerCase());
         if (!entity) { report(`SQL reads table ${read.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: read.table }); continue; }
         if (entity.owner === file.owner.root) continue;
+        const ownContext = model.contextOfCapability(file.owner.root);
+        const tableContext = model.contextOfCapability(entity.owner);
+        if (ownContext && tableContext && ownContext !== tableContext) {
+          report(`SQL in ${file.owner.root} (context ${ownContext}) reads table ${read.table}, owned by ${entity.owner} (context ${tableContext}); a context reads and writes only its own context's tables, so a cross-context JOIN or subquery is refused. Keep a local copy fed by the other context's events (a reactor), or read a projection.`, { table: read.table, tableOwner: entity.owner, context: ownContext, tableContext });
+          continue;
+        }
         const verdict = resolver.importAllowed(file.rel, `${entity.owner}/index.ts`);
         if (!verdict.allowed) report(`SQL in ${file.owner.root} reads table ${read.table}, owned by ${entity.owner}, which ${file.owner.root} may not import (${verdict.reason}); read it through the owner's public API.`, { table: read.table, tableOwner: entity.owner, reason: verdict.reason });
       }

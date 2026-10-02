@@ -509,12 +509,13 @@ BE_CONFIG_OWNER:
 BE_CONNECTION_DUPLICATE:
   title: "One database reached through more than one connection or injector"
   title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
-  meaning_vi: "Mỗi cơ sở dữ liệu vật lý chỉ có một kết nối và một injector Inject<Conn>EntityManager() khai báo một lần trong platform/database. Bộ kiểm tra thấy một injector thứ hai (ví dụ InjectCollabEntityManager bên cạnh InjectAgentOsEntityManager), một tên kết nối thứ hai trỏ vào cùng cơ sở dữ liệu, một lời gọi InjectEntityManager/getEntityManagerToken/InjectDataSource ngoài <conn>.decorators.ts, hoặc hfs.json, tệp kết nối và injector không khớp một-một."
+  meaning_vi: "Mỗi cơ sở dữ liệu vật lý chỉ có một kết nối và một injector Inject<Conn>EntityManager() khai báo một lần trong platform/database. Bộ kiểm tra thấy một injector thứ hai (ví dụ InjectCollabEntityManager bên cạnh InjectAgentOsEntityManager), một tên kết nối thứ hai trỏ vào cùng cơ sở dữ liệu, một lời gọi InjectEntityManager/getEntityManagerToken/InjectDataSource ngoài <conn>.decorators.ts, hoặc hfs.json, tệp kết nối và injector không khớp một-một. Một ngữ cảnh có thể là một schema riêng trong cơ sở dữ liệu dùng chung (isolation: schema): khi đó cấu hình phải đọc <PREFIX>_SCHEMA và hai ngữ cảnh chỉ được chung một cơ sở dữ liệu nếu schema khác nhau; ngữ cảnh isolation database không chung cơ sở dữ liệu với ai."
   causes_vi:
     - "Một tính năng tự tạo injector hoặc kết nối riêng cho cùng cơ sở dữ liệu"
     - "Hai tệp cùng export một tên injector nhưng trỏ tới hai kết nối"
     - "Kết nối mới chưa được khai báo trong hfs.json connections"
     - "Cấu hình kết nối đọc biến môi trường của kết nối khác"
+    - "Hai ngữ cảnh isolation: schema cùng trỏ tới một schema (hoặc cấu hình không đọc <PREFIX>_SCHEMA)"
   nextStep_vi: "Giữ đúng một <conn>.connection.ts, <conn>.config.ts và <conn>.decorators.ts cho mỗi mục hfs.json connections trong src/modules/platform/database/, xóa injector hoặc kết nối thừa cùng mọi tham chiếu và đổi nơi dùng sang injector duy nhất. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -12646,14 +12647,73 @@ BE_SQL_OUTSIDE_PERSISTENCE:
   kind: check-finding
 
 BE_SQL_TABLE_OWNER:
-  title: "SQL touches another capability's table or reads unbounded"
-  title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"
-  meaning_vi: "Bộ kiểm tra phân tích từng hằng SqlText: câu lệnh ghi (INSERT, UPDATE, DELETE) chỉ được chạm bảng của entity thuộc chính năng lực đó; câu đọc chỉ được chạm bảng của năng lực mà chủ sở hữu được phép import; SELECT nhiều dòng phải có LIMIT trừ khi lọc theo khóa chính hoặc khóa duy nhất hoặc chỉ tính tổng."
+  title: "SQL touches a table outside its capability or context, or reads unbounded"
+  title_vi: "SQL ghi bảng ngoài năng lực, đọc bảng ngoài ngữ cảnh hoặc đọc không giới hạn"
+  meaning_vi: "Bộ kiểm tra phân tích từng hằng SqlText: câu lệnh ghi (INSERT, UPDATE, DELETE) chỉ được chạm bảng của entity thuộc chính năng lực đó; câu đọc (FROM, JOIN, USING, truy vấn con) chỉ được chạm bảng của chính ngữ cảnh của nó (ngữ cảnh là kết nối mà mảng entity của năng lực được đăng ký), tức bảng của năng lực mình hoặc của năng lực cùng ngữ cảnh mà chủ sở hữu được phép import; một bảng của ngữ cảnh khác, kể cả khi JOIN, bị từ chối vì dữ liệu giữa các ngữ cảnh chỉ đi bằng sự kiện (bản sao cục bộ do reactor cập nhật hoặc projection). SELECT nhiều dòng phải có LIMIT trừ khi lọc theo khóa chính hoặc khóa duy nhất hoặc chỉ tính tổng."
   causes_vi:
     - "Service của năng lực A cập nhật bảng của năng lực B"
+    - "JOIN hoặc truy vấn con sang bảng của ngữ cảnh khác (ví dụ order đọc bảng của identity)"
     - "Truy vấn danh sách quên LIMIT"
     - "Bảng chưa có entity khai báo ở năng lực sở hữu"
-  nextStep_vi: "Chuyển câu ghi về năng lực sở hữu bảng và gọi qua API công khai của năng lực đó; thêm LIMIT theo PAGE_SIZE_MAX, LIST_ROWS_MAX hoặc BATCH_ROWS của platform/database. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  nextStep_vi: "Chuyển câu ghi về năng lực sở hữu bảng và gọi qua API công khai của năng lực đó. Với dữ liệu của ngữ cảnh khác: giữ bản sao cục bộ trong ngữ cảnh của mình do reactor cập nhật từ sự kiện, hoặc đọc một projection, rồi JOIN trên bảng cục bộ đó. Thêm LIMIT theo PAGE_SIZE_MAX, LIST_ROWS_MAX hoặc BATCH_ROWS của platform/database. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTEXT_OWNER:
+  title: "An app composes a context it does not own"
+  title_vi: "Một app lắp ghép ngữ cảnh không thuộc về nó"
+  meaning_vi: "Mỗi mục hfs.json connections là một ngữ cảnh giới hạn (bounded context) và có đúng một app chủ (owner). Bộ kiểm tra thấy một app api hoặc worker đăng ký kết nối của app khác trong module cơ sở dữ liệu, import năng lực thuộc ngữ cảnh của app khác, hoặc app migrate/cli không đăng ký đủ mọi kết nối (migration chỉ chạy qua cli migrate, mỗi kết nối một lần)."
+  causes_vi:
+    - "App order đăng ký thêm kết nối identity để đọc trực tiếp dữ liệu của identity"
+    - "App order import năng lực domain/identity thay vì gọi API hoặc nghe sự kiện của identity"
+    - "Thêm kết nối mới vào hfs.json nhưng app migrate/cli chưa đăng ký nó"
+  nextStep_vi: "Chỉ đăng ký các kết nối mà app là owner; dữ liệu của ngữ cảnh khác lấy qua API công khai của app chủ hoặc qua sự kiện (bản sao cục bộ, projection). Với app migrate/cli, đăng ký đủ mọi kết nối đã khai báo. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTEXT_COUPLING:
+  title: "Contexts are coupled by a relation, a foreign key or an import"
+  title_vi: "Các ngữ cảnh bị ghép với nhau bằng quan hệ, khóa ngoại hoặc import"
+  meaning_vi: "Các ngữ cảnh giới hạn chỉ liên lạc bằng sự kiện. Bộ kiểm tra thấy một quan hệ entity (OneToOne, OneToMany, ManyToOne, ManyToMany) trỏ sang entity của ngữ cảnh khác, một khóa ngoại (REFERENCES) trong migration trỏ sang bảng của ngữ cảnh khác, hoặc tệp của năng lực domain/projection import tệp của năng lực thuộc ngữ cảnh khác (entity, service hoặc SQL)."
+  causes_vi:
+    - "@ManyToOne(() => UserEntity) từ entity của order sang entity của identity"
+    - "Migration tạo FOREIGN KEY ... REFERENCES users trên bảng của ngữ cảnh khác"
+    - "Service của order import service của identity để lấy dữ liệu người dùng"
+  nextStep_vi: "Giữ id của ngữ cảnh kia như một cột thường, không quan hệ và không khóa ngoại; dữ liệu cần dùng thì giữ bản sao cục bộ do reactor cập nhật từ sự kiện của ngữ cảnh đó, hoặc đọc một projection trong modules/projections/<tên>. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTEXT_TRANSACTION:
+  title: "One transaction spans more than one context"
+  title_vi: "Một giao dịch trải qua nhiều hơn một ngữ cảnh"
+  meaning_vi: "Một giao dịch chỉ được chạm kết nối của một ngữ cảnh. Bên trong callback của transaction trên EntityManager của kết nối C, bộ kiểm tra thấy dùng EntityManager của kết nối khác (nhận ra qua injector Inject<Conn>EntityManager) hoặc gọi một service của năng lực thuộc ngữ cảnh khác (service đó ghi bằng kết nối riêng của nó nên không thể cùng một giao dịch)."
+  causes_vi:
+    - "Trong giao dịch của order gọi identityService.update(...)"
+    - "Giao dịch trên kết nối order dùng this.billingManager để ghi bảng của billing"
+  nextStep_vi: "Chia thành một giao dịch cho mỗi ngữ cảnh, nối với nhau bằng sự kiện qua event bus (saga có bù trừ cho từng bước); đừng cố gom nhiều ngữ cảnh vào một commit. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTEXT_PLATFORM_TABLES:
+  title: "A per-connection platform capability has no tables on a connection that uses it"
+  title_vi: "Năng lực nền tảng theo kết nối chưa có bảng trên kết nối đang dùng nó"
+  meaning_vi: "Outbox/inbox của event bus và bảng job tồn tại trên mỗi kết nối dùng chúng (manifest liệt kê chúng trong perConnection của slot be.persistence). Bộ kiểm tra thấy một lời gọi truyền EntityManager của kết nối C vào năng lực đó, nhưng mảng entity và migration của năng lực chưa được đăng ký trên C, nên dòng ghi ra không có bảng trong cơ sở dữ liệu của ngữ cảnh đó."
+  causes_vi:
+    - "Thêm ngữ cảnh mới phát sự kiện nhưng quên đăng ký entity/migration của event-bus trên kết nối của nó"
+    - "Handler gọi eventBus.publish(event, manager) với manager của kết nối chưa có bảng outbox"
+  nextStep_vi: "Đăng ký entity và migration của năng lực nền tảng đó trên kết nối của ngữ cảnh (app chủ và cli migrate), để mỗi cơ sở dữ liệu có bảng riêng của nó trong cùng giao dịch với thay đổi nghiệp vụ. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTRACT_BREAKING:
+  title: "An event contract changed in a breaking way"
+  title_vi: "Hợp đồng sự kiện bị đổi theo cách phá vỡ tương thích"
+  meaning_vi: "Hợp đồng sự kiện be/contracts/<service>/events.json chỉ được phát triển theo hướng cộng thêm so với bản đã ghim events.pin.json (bản đã công bố trước đó). Bộ kiểm tra thấy một sự kiện bị xóa, đổi stream hoặc version, một trường payload bị xóa, đổi kiểu hoặc đổi tính tùy chọn, hoặc một trường mới ở dạng bắt buộc (sự kiện đang nằm trên đường truyền không mang trường đó)."
+  causes_vi:
+    - "Xóa hoặc đổi tên trường payload của order.placed"
+    - "Đổi kiểu totalCents từ number sang string"
+    - "Thêm trường bắt buộc mới vào sự kiện đã công bố"
+  nextStep_vi: "Giữ nguyên sự kiện cũ và thêm sự kiện mới <tên>.v2 với hình dạng mới (consumer chuyển dần rồi mới bỏ bản cũ); chỉ thêm trường mới ở dạng tùy chọn (field?). Khi công bố hợp đồng mới, chép events.json đè lên events.pin.json. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 

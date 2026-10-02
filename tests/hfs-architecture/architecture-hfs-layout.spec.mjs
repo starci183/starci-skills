@@ -85,7 +85,7 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: an app-root Markdown file other than README.m
 // The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
 const MIGRATE_APPS = [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }];
 const CORE_FILES = {};
-const withMigrate = (t, files) => runArch(archFixture(t, { profile: 'be', apps: MIGRATE_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
+const withMigrate = (t, files) => runArch(archFixture(t, { profile: 'be', apps: MIGRATE_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
 
 test('HFS_APP_LAYOUT_INVALID: a migrate app needs only main.ts (no app.module.ts); an api app still needs app.module.ts', t => {
   const migrate = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n' });
