@@ -4560,6 +4560,17 @@ RT_HELPER_NEAR_COPY:
   owner: supervisor
   kind: check-finding
 
+RT_DUPLICATE_CODE:
+  title: "Block of code duplicated in the runtime"
+  title_vi: "Đoạn mã bị lặp lại trong runtime"
+  meaning_vi: "Một đoạn mã đã chuẩn hóa token (bỏ khác biệt về tên biến và giá trị chữ hoặc số, bỏ chú thích và lệnh import) dài từ 8 dòng và 60 token trở lên xuất hiện hai lần trong mã nguồn của runtime (scripts, engine, modules, bin, ext, ui, packages): ở hai tệp hoặc hai chỗ trong một tệp. Ngưỡng là ngưỡng duplicateBlock của luật R21 cho sản phẩm. Bảng lặp một hình dòng, đoạn gần như chỉ là khai báo kiểu và tệp spec không bị tính."
+  causes_vi:
+    - "Sao chép một đoạn xử lý sang tệp khác thay vì đặt trong một mô-đun dùng chung"
+    - "Hai tệp cùng viết một vòng lặp hoặc một chuỗi kiểm tra giống nhau"
+  nextStep_vi: "Người giám sát gom đoạn mã vào một mô-đun scripts/lib (hoặc mô-đun sở hữu nó) rồi import ở cả hai nơi, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_EXTERNAL_OWNER:
   title: "External system reached outside its owner"
   title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"

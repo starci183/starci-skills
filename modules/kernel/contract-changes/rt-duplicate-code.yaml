@@ -1,0 +1,18 @@
+id: rt-duplicate-code
+effectiveAt: '2026-10-02T17:10:00+07:00'
+summary: >-
+  Smell wave S4-01 to S4-06: `npm run check` runs scripts/checks/check-clones.mjs, the runtime form of product rule R21. A
+  token-normalised block of 8 or more lines and 60 or more tokens that appears twice in the runtime production source
+  (scripts, engine, modules, bin, ext, ui, packages without the generated runtime copies) is RT_DUPLICATE_CODE. A table of one
+  repeated row shape and a block that is mostly type declarations are not clones. Every finding in the tree is fixed with
+  the check: the shared code moves to one module and both places import it.
+reach: new-legs
+adds:
+  checks: [check-clones]
+  codes: [RT_DUPLICATE_CODE]
+paths:
+  - modules/kernel/contract-changes/rt-duplicate-code.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/runtime-slots.yaml
+  - scripts/checks/check-clones.mjs
+  - tests/checks/check-clones.spec.mjs
