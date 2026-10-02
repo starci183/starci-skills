@@ -21,9 +21,9 @@ export const RESOLVERS = Object.freeze(['kernel', 'owner', 'supervisor']);
 export const OWNER_CLAIM_UNPROVEN = 'owner-claim-unproven';
 export const OWNER_GATE_KINDS = Object.freeze(['owner-gate', 'owner-gate-pending']);
 
-/** Lower case, whitespace collapsed, Vietnamese diacritics folded (the d-with-stroke letter folds to d explicitly, since NFD never decomposes it), so an accented claim and its unaccented form read alike. */
+/** Lower case, whitespace collapsed, Vietnamese diacritics folded (the d-stroke letter, U+0110/U+0111, folds to d explicitly, since NFD never decomposes it), so an accented claim and its unaccented form read alike. */
 export const foldText = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/[đĐ]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
+  .replace(/[\u0110\u0111]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
 
 const SUBJECT_VI = '(?:owner|chu du an|chu so huu|thay)';
 const OWNER_CLAIM_PATTERNS = [

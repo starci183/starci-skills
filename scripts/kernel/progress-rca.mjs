@@ -33,6 +33,7 @@ import { kernelDecisionItems } from '../machine/reported-jobs.mjs';
 import { importsBrokenOf } from './status/imports.mjs';
 import { blockingDecisions, resolutionOf } from '../machine/decisions.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -230,6 +231,15 @@ export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
+// The cause matchers below read a report or blocker in whichever language it was written: the Vietnamese
+// alternatives are lexicon data (modules/goal/source-phrases.yaml rca), never source literals.
+const rcaText = (en, key) => new RegExp(`${en}|${altOf(`rca.${key}`)}`, 'i');
+const MISSING_PATHS_RE = rcaText('does not exist|do not exist|not exist(?:ing)?\\b|are absent|is absent|files=0|scanned 0', 'missingPaths');
+const GRANT_NARROW_RE = rcaText('outside (?:the )?(?:owned|allowlist|grant|binding)|beyond the grant', 'grantTooNarrow');
+const TOOL_TIMEOUT_RE = rcaText('timed? ?out|timeout|30[- ]?s(?:econd)?\\b|exit(?:code)?[=: ]*124', 'toolTimeout');
+const TEST_GAP_RE = rcaText('regression suite|no (?:existing )?regression', 'testGap');
+const CHECKER_UNAVAILABLE_RE = rcaText('status[= ]unavailable|unavailable \\(exit|checker (?:is )?unavailable', 'checkerUnavailable');
+
 /** The causes of one failed/blocked attempt, primary first. Pure. */
 export function causesOf({ status = 'failed', result = {}, report = null }) {
   const blocker = report?.blocker ?? {};
@@ -239,13 +249,13 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   const add = (c) => { if (!causes.includes(c)) causes.push(c); };
   if (!report && (result?.worker?.liveness || result?.reportFiled === false)) add('dead-worker');
   if (/guard file|bind(?:s|ing)? owned|role be, repo ledger|wrong repository/i.test(text)) add('binding-defect');
-  if (/không tồn tại|vắng mặt|does not exist|do not exist|not exist(?:ing)?\b|are absent|is absent|files=0|0 tệp|quét 0|scanned 0/i.test(text)) add('missing-paths');
-  if (kind === 'shared-change' || /ngoài owned|outside (?:the )?(?:owned|allowlist|grant|binding)|ngoài allowlist|ngoài grant|NGOÀI own|beyond the grant/i.test(text)) add('grant-too-narrow');
-  if (/timed? ?out|timeout|30[- ]?s(?:econd)?\b|30 giây|exit(?:code)?[=: ]*124|ngắt sau/i.test(text)) add('tool-timeout');
-  if (kind === 'test-gap' || /regression suite|kiểm thử hồi quy|no (?:existing )?regression/i.test(text)) add('test-gap');
+  if (MISSING_PATHS_RE.test(text)) add('missing-paths');
+  if (kind === 'shared-change' || GRANT_NARROW_RE.test(text)) add('grant-too-narrow');
+  if (TOOL_TIMEOUT_RE.test(text)) add('tool-timeout');
+  if (kind === 'test-gap' || TEST_GAP_RE.test(text)) add('test-gap');
   if (kind === 'grammar-gap' || /MONOREPO_TIER|monorepo-tier|canon rule .* forbids/i.test(text)) add('canon-conflict');
   if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
-  if (!causes.includes('broken-import') && /status[= ]unavailable|unavailable \(exit|checker (?:is )?unavailable|không khả dụng/i.test(text) && kind === 'environment') add('checker-unavailable');
+  if (!causes.includes('broken-import') && CHECKER_UNAVAILABLE_RE.test(text) && kind === 'environment') add('checker-unavailable');
   if (report?.rootCause && report.rootCause.self === false && /^wf-/.test(String(report.rootCause.node ?? ''))) add('upstream');
   if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');

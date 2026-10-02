@@ -4444,17 +4444,6 @@ HFS_SOURCE_NOT_ENGLISH:
   owner: supervisor
   kind: runtime-fault
 
-HFS_SOURCE_PENDING_STALE:
-  title: "Stale source-language pending entry"
-  title_vi: "Mục chờ chuyển ngôn ngữ đã lỗi thời"
-  meaning_vi: "Danh sách scripts/checks/source-language.pending nêu một tệp đã sạch tiếng Việt hoặc đã bị xóa, nên mục chờ phải được xóa (danh sách chỉ co lại)."
-  causes_vi:
-    - "Tệp đã được chuyển sang tiếng Anh"
-    - "Tệp đã bị xóa hoặc đổi tên"
-  nextStep_vi: "Người giám sát xóa dòng đó khỏi source-language.pending qua một lane đã land."
-  owner: supervisor
-  kind: runtime-fault
-
 RT_I18N_UNREADABLE:
   title: "I18n catalog file unreadable"
   title_vi: "Tệp danh mục i18n không đọc được"

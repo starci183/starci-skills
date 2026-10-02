@@ -924,6 +924,9 @@ moduleLocalDocumentKinds:
   - id: starci/module-goal-legality@1
     governs: "The five legality families a proposed op chain must satisfy."
     files: [modules/goal/legality.yaml]
+  - id: starci/module-goal-source-phrases@1
+    governs: "The Vietnamese phrase lists runtime source matchers read through scripts/lib/source-phrases.mjs (declared Vietnamese fields, scripts/lib/language.mjs)."
+    files: [modules/goal/source-phrases.yaml]
 
   # --- models ---------------------------------------------------------------
   - id: starci/module-models-index@1

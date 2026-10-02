@@ -496,9 +496,8 @@ slots:
     tests: none
   - id: runtime.checks-data
     profiles: [runtime]
-    # The two shrink-only declaration lists of the runtime checks: the CLIs no code imports (check-dead-scripts.mjs) and the source
-    # files not yet converted to English (check-doc-language.mjs).
-    path: "scripts/checks/{dead-scripts.entries,source-language.pending}"
+    # The shrink-only declaration list of the runtime checks: the CLIs no code imports (check-dead-scripts.mjs).
+    path: "scripts/checks/dead-scripts.entries"
     presence: required
     tracked: tracked
     tier: none

@@ -42,6 +42,7 @@ import { ALL_CHECK_CODES, REFUSAL_CODES } from '../hfs/check.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { hasSecondLanguage } from '../lib/language.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const RULES_README = 'knowledge/hfs/README.md';
@@ -134,9 +135,6 @@ export function readKnowledgeFiles(root) {
 export function readmeRuleRows(text) {
   return [...String(text).matchAll(/^\| (R\d{2,3}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
 }
-/** A Vietnamese text carries at least one letter no other language of this repository uses. */
-const VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
-
 /**
  * The rules of the stylelint canon, read from the package's source text: its peer dependencies (stylelint, postcss) are
  * installed only inside packages/stylelint, so importing the entry would make this check depend on that install.
@@ -237,7 +235,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) {
         const value = entry[field];
         if (typeof value !== 'string' || !value.trim()) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has no ${field}`);
-        else if (!VIETNAMESE.test(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
+        else if (!hasSecondLanguage(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
       }
     }
   }

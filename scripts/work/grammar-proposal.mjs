@@ -27,6 +27,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { isDir, isFile } from './work-io.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
@@ -38,9 +39,11 @@ export const PROPOSED = 'proposed';
 /** Section headings inside a proposal, never a proposal's name. */
 const SECTION_WORDS = new Set(['gap', 'why', 'anatomy', 'tokens', 'claims', 'render', 'rules', 'values', 'summary', 'notes', 'rationale', 'a11y', 'accessibility', 'usage', 'example', 'examples']);
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
+// A section marker matches in either language: the Vietnamese alternatives are lexicon data
+// (modules/goal/source-phrases.yaml proposal).
 const MD_FIELDS = {
-  gap: /\bgap\b|\bwhy\b|does not (have|publish|describe)|no (dna|component|variant)|lacks?\b|không có|thiếu/i,
-  anatomy: /\banatomy\b|\bslots?\b|\bparts?\b|giải phẫu/i,
+  gap: new RegExp(`\\bgap\\b|\\bwhy\\b|does not (have|publish|describe)|no (dna|component|variant)|lacks?\\b|${altOf('proposal.gap')}`, 'i'),
+  anatomy: new RegExp(`\\banatomy\\b|\\bslots?\\b|\\bparts?\\b|${altOf('proposal.anatomy')}`, 'i'),
   tokens: /\btokens?\b|var\(--|--[a-z][\w-]*|\b\d+px\b/i,
   claims: RULE_ID,
   render: /```\s*html|<(div|section|span|article|button|svg)\b|\.(png|html)\b|isolated render/i,

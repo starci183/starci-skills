@@ -74,6 +74,7 @@ import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -105,25 +106,36 @@ const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]
  * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.
  */
 export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
-/** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. */
-export const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
+/** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. The Vietnamese
+ * alternatives a note may carry are lexicon data (modules/goal/source-phrases.yaml owed), never source literals. */
+export const SUPERVISOR_ADDRESSED = new RegExp(
+  `\\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\\s+(?:the\\s+)?(?:supervisor|runtime monitor|source|file owner)\\b`
+  + `|\\b(?:${altOf('owed.supervisorVerbs')})\\s+supervisor\\b`
+  + `|\\bsupervisor\\s*(?:\\/|${altOf('owed.orWord')}|or)\\s*(?:${altOf('owed.ownerWord')}|owner)`
+  + `|(?:${altOf('owed.ownerWord')}|owner)\\s*(?:${altOf('owed.orWord')}|or|\\/)\\s*supervisor\\b`
+  + `|\\bruntime monitor\\b|\\boutside (?:my |the kernel'?s |kernel |its )?authority\\b|${altOf('owed.beyondAuthority')}`, 'i');
 /** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
-export const OWNER_ONLY = /\bcredentials?\b|\bcreds\b|\bsecrets?\b|\bpasswords?\b|\bapi[- ]?keys?\b|\boauth\b|\bconsent\b|\bpayments?\b|\bbilling\b|\blegal\b|\bpush(?:ing)? to (?:a |the )?remote\b|\bpublish(?:ing)?\b|\bhandover\b|bàn giao|mật khẩu|thanh toán/i;
+export const OWNER_ONLY = new RegExp(`\\bcredentials?\\b|\\bcreds\\b|\\bsecrets?\\b|\\bpasswords?\\b|\\bapi[- ]?keys?\\b|\\boauth\\b|\\bconsent\\b|\\bpayments?\\b|\\bbilling\\b|\\blegal\\b|\\bpush(?:ing)? to (?:a |the )?remote\\b|\\bpublish(?:ing)?\\b|\\bhandover\\b|${altOf('owed.ownerOnly')}`, 'i');
 /** Peer-dependency wording on an owner gate (the retired stall-alert.mjs PEER_DEPENDENCY): a misfiled peer-wait. */
 const PEER_DEPENDENCY = /\bpeer(?:[- ]dependen\w*| workflow)\b|\bnot an owner (?:step|decision|gate)\b/i;
+
+// The text rules' Vietnamese alternatives are lexicon data (modules/goal/source-phrases.yaml owed).
+const WORKER_DIED_TEXT = new RegExp(`without (?:filing )?(?:a |an )?(?:api )?report|bare PowerShell prompt|${altOf('owed.workerDied')}`, 'i');
+const CONTRACT_CONFLICT_TEXT = new RegExp(`${altOf('owed.contractConflict')}|contradict`, 'i');
+const DECISION_TEXT = new RegExp(`${altOf('owed.decision')}|\\bdelegat`, 'i');
 
 /** Labels only ever add information: [label, test(kind, text)]. */
 const LABEL_RULES = [
   ['addressed-to-supervisor', (k, t) => SUPERVISOR_ADDRESSED.test(t)],
   ['runtime', (k, t) => /runtime|source|liveness|nudge|op-boundary|provider|launch|environment|api-/.test(k) || /\b(?:scripts|engine|modules|knowledge|bin)\/[\w./-]+|\.claude\b|\bSource\b/.test(t)],
   ['liveness', (k, t) => /liveness|nudge|idle/.test(k) || /\bturn-idle\b|\bnudge-ready\b|\bliveness\b/i.test(t)],
-  ['worker-died', (k, t) => /died|exited|no-report|missing-report|without-report|turn-cap/.test(k) || /without (?:filing )?(?:a |an )?(?:api )?report|bare PowerShell prompt|không nộp report/i.test(t)],
+  ['worker-died', (k, t) => /died|exited|no-report|missing-report|without-report|turn-cap/.test(k) || WORKER_DIED_TEXT.test(t)],
   ['checker', (k, t) => /checker|lint|quality-gate/.test(k) || /status[= ]unavailable|gate.mjs|code-patterns-check|\bsonar\b/i.test(t)],
   ['knowledge-churn', (k, t) => /stale|churn|baseline|rollout/.test(k) || /staleOperations|staleInput|knowledge\/[\w.-]+\.ya?ml/i.test(t)],
-  ['contract-conflict', (k, t) => /contradict|conflict|divergence|read-race/.test(k) || /mâu thuẫn|contradict/i.test(t)],
+  ['contract-conflict', (k, t) => /contradict|conflict|divergence|read-race/.test(k) || CONTRACT_CONFLICT_TEXT.test(t)],
   ['cross-workflow', (k, t) => /cross|foreign|shared|history|unowned|env-/.test(k) || /git reset|\brebase\b|\bamend\b|reflog/i.test(t)],
   ['host-tooling', (k, t) => /inbox|orchestration|host|unbridged|release|reap/.test(k) || /\bENOBUFS\b|orca(?:\.exe)? |managedWorker/i.test(t)],
-  ['decision', (k, t) => /decision|delegat|ruling|scope-gap|design-gap|srs-gap|account-gap|owner-gate/.test(k) || /ủy quyền|uỷ quyền|\bdelegat|quyết\b/i.test(t)],
+  ['decision', (k, t) => /decision|delegat|ruling|scope-gap|design-gap|srs-gap|account-gap|owner-gate/.test(k) || DECISION_TEXT.test(t)],
   ['grammar', (k, t) => /grammar/.test(k) || /@starci\/grammar/.test(t)],
 ];
 export const labelsOf = (kind, text) => LABEL_RULES.filter(([, test]) => test(String(kind ?? ''), String(text ?? ''))).map(([name]) => name);

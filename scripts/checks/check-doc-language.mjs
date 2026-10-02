@@ -7,16 +7,16 @@
 //
 // The only exceptions are the declared field-level ones of scripts/lib/language.mjs (DECLARED_VIETNAMESE_FIELDS): the Vietnamese
 // operator fields of the failure-code catalog (modules/kernel/failure-codes.yaml), the `vi` field of the op-label catalogue
-// (modules/ops/_labels.yaml) and the phrase-list keys of the Vietnamese lexicons (modules/goal/archetypes.yaml). The byte copies under a bundle's runtime/ directory (packages/*/runtime) are checked against
+// (modules/ops/_labels.yaml) and the phrase-list keys of the Vietnamese lexicons (modules/goal/archetypes.yaml and
+// modules/goal/source-phrases.yaml). The byte copies under a bundle's runtime/ directory (packages/*/runtime) are checked against
 // their sources by `sync-runtime.mjs --check`, so they are skipped here. A product repository's message catalogs are JSON or
 // TypeScript, which this check does not read.
 //
 // Source is English too (HFS_SOURCE_NOT_ENGLISH): every comment, string and SQL comment of scripts/, engine/, bin/, ui/,
 // packages/ and tests/ (`.mjs .cjs .js .ts .tsx .sql .ps1 .sh .html .css`). Text the owner must read in Vietnamese lives in a
 // DECLARED catalog instead, keyed from its English source: scripts/lib/i18n.mjs reads modules/i18n/messages/*.yaml, and the UI
-// catalog files under ui/src/i18n/ are declared in DECLARED_SOURCE_CATALOGS. Files not converted yet are listed in
-// scripts/checks/source-language.pending (shrink-only: an entry whose file is clean or gone is stale and fails, a file that
-// carries Vietnamese and is not listed fails). A new undeclared Vietnamese line therefore fails.
+// catalog files under ui/src/i18n/ are declared in DECLARED_SOURCE_CATALOGS. Phrase data a matcher applies to owner or
+// product text lives in modules/goal/source-phrases.yaml (source-phrases.mjs). A new undeclared Vietnamese line fails.
 // Exit 0 clean, 1 findings.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -67,14 +67,6 @@ export const FUNCTIONAL_VIETNAMESE = Object.freeze({
 });
 /** A bundle's own runtime/ copy directory (a byte copy of a runtime source, kept by sync-runtime). */
 const BUNDLE_RUNTIME = /^packages\/(?:[^/]+|eslint\/[^/]+)\/runtime(?:\/|$)/;
-export const SOURCE_PENDING_FILE = 'scripts/checks/source-language.pending';
-
-/** The pending list: one repository-relative path per line (`#` lines and blanks skipped). */
-export function readSourcePending(root = skillRoot) {
-  try {
-    return new Set(fs.readFileSync(path.join(root, SOURCE_PENDING_FILE), 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')));
-  } catch { return new Set(); }
-}
 
 /** The tracked source files of a runtime checkout (repository-relative POSIX paths). */
 export function runtimeSourceFiles(root = skillRoot) {
@@ -94,22 +86,15 @@ export function runtimeSourceFiles(root = skillRoot) {
 }
 
 /**
- * The source-language findings: HFS_SOURCE_NOT_ENGLISH for a file with a Vietnamese letter that is neither a declared catalog
- * nor pending, and HFS_SOURCE_PENDING_STALE for a pending entry whose file is clean, declared or missing.
+ * The source-language findings: HFS_SOURCE_NOT_ENGLISH for a file with a Vietnamese letter that is not a declared catalog.
  */
 export function sourceLanguageFindings(root = skillRoot) {
-  const pending = readSourcePending(root);
-  const dirty = new Map();
+  const findings = [];
   for (const rel of runtimeSourceFiles(root)) {
     if (DECLARED_SOURCE_CATALOGS.some((prefix) => rel.startsWith(prefix)) || Object.hasOwn(FUNCTIONAL_VIETNAMESE, rel)) continue;
     const hits = secondLanguageHits(fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8'));
-    if (hits.length) dirty.set(rel, hits);
+    if (hits.length) findings.push({ code: 'HFS_SOURCE_NOT_ENGLISH', path: rel, line: hits[0].line, column: hits[0].column, count: hits.length });
   }
-  const findings = [];
-  for (const [rel, hits] of dirty) {
-    if (!pending.has(rel)) findings.push({ code: 'HFS_SOURCE_NOT_ENGLISH', path: rel, line: hits[0].line, column: hits[0].column, count: hits.length });
-  }
-  for (const rel of pending) if (!dirty.has(rel)) findings.push({ code: 'HFS_SOURCE_PENDING_STALE', path: rel, line: 1, column: 1, count: 0 });
   return findings;
 }
 

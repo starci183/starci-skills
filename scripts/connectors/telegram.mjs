@@ -53,7 +53,7 @@ import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { translate, translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
@@ -317,6 +317,10 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
 
 const DRAW_REVIEW_ASK = 'draw-review';
 const CAPTION_MAX = 1000;
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// The ask text's round label was written in the ask's language: 'Round {round}' in English and its catalog translation
+// (modules/i18n/messages). The label never hardcodes either spelling - both are derived from the one English source.
+const ROUND_LABEL = new RegExp(`(?:${['en', 'vi'].map((l) => escRe(translate('Round {round}', { round: '@@' }, { language: l })).replace('@@', '\\d+')).join('|')})`);
 /** The line under a draw-review notice: how the owner answers by replying. */
 export const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
 
@@ -326,7 +330,7 @@ export function drawAlbumCaption(question, language) {
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
   const round = Number.isInteger(review.round) ? review.round : 1;
-  const answers = /(?:Round \d+|Vòng \d+);[^\[]*(.*?)(?:\.\s|$)/.exec(String(question.text ?? ''))?.[1] ?? '';
+  const answers = new RegExp(`${ROUND_LABEL.source};[^\\[]*(.*?)(?:\\.\\s|$)`).exec(String(question.text ?? ''))?.[1] ?? '';
   const head = tr('[StarCi] Please review: {record}', { record: review.record ?? '' });
   const lines = [head, `${tr('Shapes')}: ${shapes.join(', ') || '-'}`, tr('Round {round}', { round })];
   if (round > 1 && answers) lines.push(`${tr('Notes addressed')}: ${answers}`);

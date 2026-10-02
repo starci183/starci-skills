@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DECLARED_SOURCE_CATALOGS, SOURCE_PENDING_FILE, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
+import { DECLARED_SOURCE_CATALOGS, sourceLanguageFindings } from '../../scripts/checks/check-doc-language.mjs';
 import { declaredVietnameseFieldsOf, documentLanguageHits } from '../../scripts/lib/language.mjs';
 
 // HFS_SOURCE_NOT_ENGLISH: runtime source is English; Vietnamese lives only in a declared catalog. Vietnamese letters in this
@@ -48,17 +48,6 @@ test('a declared catalog file, a bundle copy and a document are not source findi
     'scripts/machine/ask-recommendation.mjs': `const MARK = /(${VI})/u;\n`,
   })), []);
   assert.deepEqual(found(fixture(t, { 'scripts/machine/other.mjs': `const MARK = /(${VI})/u;\n` })), [['HFS_SOURCE_NOT_ENGLISH', 'scripts/machine/other.mjs']]);
-});
-
-test('the pending list is shrink-only: a listed file with Vietnamese is tolerated, a clean or missing one is stale', (t) => {
-  assert.deepEqual(found(fixture(t, {
-    'scripts/old.mjs': `// ${VI}\n`,
-    [SOURCE_PENDING_FILE]: '# header\nscripts/old.mjs\n',
-  })), []);
-  assert.deepEqual(found(fixture(t, {
-    'scripts/clean.mjs': 'export const x = 1;\n',
-    [SOURCE_PENDING_FILE]: 'scripts/clean.mjs\nscripts/gone.mjs\n',
-  })), [['HFS_SOURCE_PENDING_STALE', 'scripts/clean.mjs'], ['HFS_SOURCE_PENDING_STALE', 'scripts/gone.mjs']]);
 });
 
 test('the i18n catalog files declare their vi field, so a catalog is the one place Vietnamese is allowed in YAML', () => {

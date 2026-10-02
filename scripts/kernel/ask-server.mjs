@@ -68,6 +68,7 @@ import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../w
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { altOf, phrasesOf } from '../lib/source-phrases.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
 // The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question
@@ -456,10 +457,11 @@ export const pickGroupsOf = (question, images) => {
 };
 
 // The owner reviews a drawing on Telegram (owner ruling 2026-09-27): a reply to the draw-review notice made of
-// only ACCEPT_WORDS (ok and its Vietnamese glosses, optionally "golden") accepts; any other reply is the owner's feedback - a redraw
+// only ACCEPT_WORDS (the English words below plus the Vietnamese accept words of the source-phrases lexicon,
+// optionally "golden") accepts; any other reply is the owner's feedback - a redraw
 // whose notes are the reply's lines. A reply to one image of the album is a note on that image.
-const ACCEPT_WORDS = new Set(['ok', 'okay', 'oke', 'okie', 'duyệt', 'đồng', 'ý', 'chấp', 'nhận', 'accept', 'accepted', 'approve', 'approved', 'lgtm', 'được', 'good', 'đẹp', 'rồi', 'nhé', 'nha', 'yes', 'ừ', 'uh']);
-const GOLDEN_REPLY = /\bgolden\b|(?:đặt làm |làm )?(?:mẫu|ảnh|hình) chuẩn|làm mẫu/gi;
+const ACCEPT_WORDS = new Set(['ok', 'okay', 'oke', 'okie', 'accept', 'accepted', 'approve', 'approved', 'lgtm', 'good', 'yes', 'uh', ...phrasesOf('drawReply.accept')]);
+const GOLDEN_REPLY = new RegExp(`\\bgolden\\b|${altOf('drawReply.golden')}`, 'gi');
 /** {decision: 'accept'|'redraw', optionIndex, golden, note} of an owner's Telegram reply to a draw-review notice. */
 export function drawReplyDecision(text) {
   const raw = String(text ?? '').trim();
