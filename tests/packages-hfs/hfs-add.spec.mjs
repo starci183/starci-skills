@@ -46,7 +46,7 @@ const withPlatform = (dir, ...topics) => {
 
 test('the files trees and the template bodies are one set: every named template exists and every template is named', () => {
   const named = new Set();
-  for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus', 'api', 'webhooks', 'realtime']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
+  for (const topic of ['jobs', 'reactors', 'queues', 'projections', 'event-bus', 'api', 'cli', 'webhooks', 'realtime', 'saga']) for (const entry of tree(topic)) if (entry.template) named.add(entry.template);
   const dir = path.join(ROOT, 'packages', 'hfs', 'templates', 'be', 'patterns');
   const walk = (folder, prefix) => fs.readdirSync(path.join(dir, folder), { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(`${folder}/${entry.name}`, prefix) : [`${folder}/${entry.name}`]));
   const present = new Set(fs.readdirSync(dir).flatMap((topic) => walk(topic, topic)));
@@ -195,6 +195,26 @@ test('hfs add realtime writes the transport/graphql subscription tree and regist
   assert.ok(door.includes('this.hub.subscribe(orderStatusTopic(principal.id, input.id))'));
   assert.deepEqual(hfsJson(dir).sides.be.patterns, ['realtime']);
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'realtime']);
+});
+
+test('hfs add saga writes the saga kind tree with its orchestrator, step, compensation, commands and consumers, and registers the kind and its pattern', async () => {
+  const dir = repo();
+  const missing = await cli(['add', 'saga', 'fulfil', '--repo', dir]);
+  assert.equal(missing.code, 2);
+  assert.match(missing.err, /HFS_ADD_OPTION_MISSING/);
+  const result = await cli(['add', 'saga', 'fulfil', '--owner', 'shop', '--from', 'billing', '--failed', 'invoice-rejected', '--done', 'invoice-issued', '--service', 'FulfilService=@modules/domain/fulfil', '--repo', dir]);
+  assert.equal(result.code, 0, result.err);
+  const base = 'be/src/features/saga/fulfil';
+  const files = ['index.ts', 'fulfil.module.ts', 'fulfil.saga.service.ts', 'fulfil.saga.service.spec.ts', 'fulfil.saga-state.ts', 'fulfil.saga.log-events.ts', 'steps/fulfil.saga-step.ts', 'compensations/fulfil.compensation.ts', 'application/undo-fulfil.command.ts', 'application/undo-fulfil.contracts.ts', 'application/undo-fulfil.handler.ts', 'application/compensate-fulfil.command.ts', 'application/compensate-fulfil.contracts.ts', 'application/compensate-fulfil.handler.ts', 'application/complete-fulfil.command.ts', 'application/complete-fulfil.contracts.ts', 'application/complete-fulfil.handler.ts', 'transport/message/invoice-rejected.consumer.ts', 'transport/message/invoice-issued.consumer.ts', 'transport/message/fulfil-message.module.ts'];
+  for (const file of files) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
+  const service = read(dir, `${base}/fulfil.saga.service.ts`);
+  assert.ok(service.includes('export class FulfilSagaService'));
+  assert.ok(service.includes('import { FULFIL_SAGA } from "@modules/domain/fulfil"'));
+  assert.ok(read(dir, `${base}/steps/fulfil.saga-step.ts`).includes('readonly event = "shop.fulfil"'));
+  assert.ok(read(dir, `${base}/compensations/fulfil.compensation.ts`).includes('readonly event = "billing.invoice-rejected"'));
+  assert.ok(read(dir, `${base}/transport/message/invoice-rejected.consumer.ts`).includes('export class InvoiceRejectedConsumer implements EventConsumer<InvoiceRejectedEvent>'));
+  assert.deepEqual(hfsJson(dir).sides.be.patterns, ['saga']);
+  assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'saga']);
 });
 
 test('hfs add refuses an unknown noun, a bad name and a repository that is not an app root', async () => {

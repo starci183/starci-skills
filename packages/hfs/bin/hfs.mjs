@@ -40,7 +40,7 @@
 //   hfs secret list | show <slug> | set <slug> | gen <slug> [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--repo DIR]
 //                                            the sealed secrets of `.starcistacks/<env>/secrets/` (runtime scripts/hfs/secret.mjs over the sops api): `set` reads the value from
 //                                            stdin, `gen` seals a random one, `show` decrypts one to stdout; a plain `sops` command in a runbook is retired.
-//   hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
+//   hfs add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--repo <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
 //                                            it registers the patterns and the trigger kind in hfs.json (sides.be.patterns, sides.be.kinds). Never overwrites a file (scaffold/add.mjs).
@@ -76,11 +76,11 @@ hfs work-hygiene
 hfs secret list|show|set|gen ...
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
-hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
+hfs add <api|webhook|realtime|saga|job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--owner <service> --failed <event> --done <event>] [--connection <name>] [--repo <dir>]
 hfs new image [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into', '--event', '--from', '--service', '--connection', '--owner', '--failed', '--done']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
 const BOOL_FLAGS = new Set(['--json', '--fast']);
@@ -245,7 +245,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'add') {
       const [noun, name, ...extra] = opts.positional;
       if (!noun || !name || extra.length) throw new Error('hfs add takes `<noun> <name>` and the options of the noun');
-      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection } });
+      const { created, registered } = addKind({ repoRoot, noun, name, options: { event: opts.event, from: opts.from, service: opts.service, connection: opts.connection, owner: opts.owner, failed: opts.failed, done: opts.done } });
       for (const file of created) stdout(`created ${file}
 `);
       stdout(`hfs add ${noun}: registered patterns ${registered.patterns.join(', ')}${registered.kinds.length ? `; kinds ${registered.kinds.join(', ')}` : ''}

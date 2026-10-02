@@ -150,7 +150,7 @@ describe("InvoiceService", () => {
 
     describe("markPaid", () => {
         it("marks only the issued invoice of the order paid, stamped with the time the caller gives, in the caller transaction", async () => {
-            const manager = mockEntityManager()
+            const manager = mockEntityManager({ update: [InvoiceEntity, { affected: 1 }] })
             const { service } = await build(mockEntityManager())
 
             await service.markPaid({ manager, orderId: "o-1", paidAt: new Date(AT) })

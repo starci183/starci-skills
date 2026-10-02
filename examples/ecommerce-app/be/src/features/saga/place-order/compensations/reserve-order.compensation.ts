@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import type { CommandBus } from "@nestjs/cqrs"
 import { InjectCommandBus } from "@modules/platform/cqrs"
-import { CancelOrderCommand } from "../../application/cancel-order.command"
+import { CancelOrderCommand } from "../application/cancel-order.command"
 
 @Injectable()
 /** The compensation of the reserve-order step: cancels the order, and releases the stock of its lines. */

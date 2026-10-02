@@ -3,7 +3,7 @@ import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import type { SagaTransition } from "@modules/platform/saga"
-import { PlaceOrderSagaService } from "../saga/place-order.saga.service"
+import { PlaceOrderSagaService } from "../place-order.saga.service"
 import { CompensatePlaceOrderCommand } from "./compensate-place-order.command"
 
 @CommandHandler(CompensatePlaceOrderCommand)

@@ -58,7 +58,7 @@ export class BullmqQueueTransportClient implements QueueTransport {
 
     /** Closes the workers first, then the queues. */
     async close(): Promise<void> {
-        await Promise.all(this.workers.map((worker) => worker.close()))
+        await Promise.all(this.workers.map((worker) => worker.close(true)))
         await Promise.all([...this.queues.values()].map((queue) => queue.close()))
     }
 

@@ -1,7 +1,7 @@
 import { Test } from "@nestjs/testing"
 import { FakeClock, mockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
-import { BILLING_ENTITY_MANAGER } from "@modules/platform/database"
+import { INBOX_MANAGERS } from "./inbox.decorators"
 import { PostgresInbox } from "./inbox.service"
 import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 
@@ -10,7 +10,7 @@ const build = async (manager: ReturnType<typeof mockEntityManager>) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             PostgresInbox,
-            { provide: BILLING_ENTITY_MANAGER, useValue: manager },
+            { provide: INBOX_MANAGERS, useValue: [manager] },
             { provide: CLOCK, useValue: clock },
         ],
     }).compile()

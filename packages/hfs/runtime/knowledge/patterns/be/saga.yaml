@@ -3,7 +3,7 @@ id: be.saga
 title: Sagas
 purpose: |-
   Given a flow that spans services and must be undone when a later step fails, how is it written so that hfs can check it?
-  A saga is a folder of a feature: an orchestrator that lists the steps and, for each, the compensation that undoes it; the
+  A saga is a feature of the saga kind (`be/src/features/saga/<saga>/`): an orchestrator that lists the steps and, for each, the compensation that undoes it; the
   persisted state of a run with a version fence; consumers that advance it through the inbox; and the events it relies on,
   declared in the vendored contracts. The saga pattern is declared (`patterns: ["saga"]` in hfs.json sides.be); an
   undeclared saga folder is refused.
@@ -24,56 +24,130 @@ provenance:
     failure injected by an e2e spec is the right one; the state machine and its fence are proven by the unit spec of
     platform/saga, the flow by the e2e specs, and the semantics by review.
 files:
-  - path: be/src/features/api/<feature>/saga/<saga>.saga.service.ts
+  - path: src/features/saga/<saga>/index.ts
     slot: be.feature.saga
+    template: saga/saga.index.ts.tpl
+    role: "The public surface of the kind folder: the message module an app composes."
+  - path: src/features/saga/<saga>/<saga>.module.ts
+    slot: be.feature.saga
+    template: saga/saga.module.ts.tpl
+    role: "The application module: handlers, orchestrator, step and compensation."
+  - path: src/features/saga/<saga>/<saga>.saga.service.ts
+    slot: be.feature.saga
+    template: saga/saga.service.ts.tpl
+    role: "The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it. It lists the steps and compensations, imports them all and moves the run through `platform/saga` (a transition names the version it read)."
     suffix: saga.service
-    role: 'The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it (`<saga>.saga.service.spec.ts`, unit-beside). It lists the steps and compensations, imports them all and moves the run through `platform/saga`; it decides nothing.'
     rules: [R169, R170]
-  - path: be/src/features/api/<feature>/saga/<saga>.saga-state.ts
+  - path: src/features/saga/<saga>/<saga>.saga.service.spec.ts
     slot: be.feature.saga
+    template: saga/saga.service.spec.ts.tpl
+    role: "Unit spec of the orchestrator beside it."
+  - path: src/features/saga/<saga>/<saga>.saga-state.ts
+    slot: be.feature.saga
+    template: saga/saga.state.ts.tpl
+    role: "The typed state of a run, with `status` and `version: number`, the fence."
     suffix: saga-state
-    role: 'The typed state of a run, with `status` and `version: number`, the fence.'
     rules: [R170]
-  - path: be/src/features/api/<feature>/saga/steps/<step>.saga-step.ts
+  - path: src/features/saga/<saga>/<saga>.saga.log-events.ts
+    slot: be.feature.saga
+    template: saga/saga.log-events.ts.tpl
+    role: "The log events of the saga."
+  - path: src/features/saga/<saga>/steps/<step>.saga-step.ts
     slot: be.feature.saga.steps
+    template: saga/saga.step.ts.tpl
+    role: "One step. Names its event (`readonly event = \"<name>\"`); the domain does the work and announces the event in its transaction."
     suffix: step
-    role: 'One step. Names its event (`readonly event = "<name>"`) and dispatches one command.'
     rules: [R169, R171]
-  - path: be/src/features/api/<feature>/saga/compensations/<step>.compensation.ts
+  - path: src/features/saga/<saga>/compensations/<step>.compensation.ts
     slot: be.feature.saga.compensations
+    template: saga/saga.compensation.ts.tpl
+    role: "The compensation of the step of the same name; REQUIRED for every step. Names the failure event and dispatches one command."
     suffix: compensation
-    role: The compensation of the step of the same name; REQUIRED for every step. Names the failure event and dispatches one command.
     rules: [R169, R171, R173]
-  - path: be/src/features/api/<feature>/application/<action>.{command,handler,contracts}.ts
+  - path: src/features/saga/<saga>/application/undo-<saga>.command.ts
     slot: be.feature.application
-    suffix: command, handler, contracts
-    role: The commands the steps, compensations and consumers dispatch; plain CQRS (BE-CQRS-1), thin handlers calling one service.
+    template: saga/saga.undo.command.ts.tpl
+    role: "The undo command of the saga (command): undoes what the saga did; plain CQRS (BE-CQRS-1), thin handlers calling one service."
     rules: [R87]
-  - path: be/src/features/api/<feature>/transport/message/<event>.consumer.ts
+  - path: src/features/saga/<saga>/application/undo-<saga>.contracts.ts
+    slot: be.feature.application
+    template: saga/saga.undo.contracts.ts.tpl
+    role: "The undo command of the saga (contracts): undoes what the saga did; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/undo-<saga>.handler.ts
+    slot: be.feature.application
+    template: saga/saga.undo.handler.ts.tpl
+    role: "The undo command of the saga (handler): undoes what the saga did; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/compensate-<saga>.command.ts
+    slot: be.feature.application
+    template: saga/saga.compensate.command.ts.tpl
+    role: "The compensate command of the saga (command): compensates a failed run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/compensate-<saga>.contracts.ts
+    slot: be.feature.application
+    template: saga/saga.compensate.contracts.ts.tpl
+    role: "The compensate command of the saga (contracts): compensates a failed run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/compensate-<saga>.handler.ts
+    slot: be.feature.application
+    template: saga/saga.compensate.handler.ts.tpl
+    role: "The compensate command of the saga (handler): compensates a failed run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/complete-<saga>.command.ts
+    slot: be.feature.application
+    template: saga/saga.complete.command.ts.tpl
+    role: "The complete command of the saga (command): completes a finished run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/complete-<saga>.contracts.ts
+    slot: be.feature.application
+    template: saga/saga.complete.contracts.ts.tpl
+    role: "The complete command of the saga (contracts): completes a finished run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/application/complete-<saga>.handler.ts
+    slot: be.feature.application
+    template: saga/saga.complete.handler.ts.tpl
+    role: "The complete command of the saga (handler): completes a finished run; plain CQRS (BE-CQRS-1), thin handlers calling one service."
+    rules: [R87]
+  - path: src/features/saga/<saga>/transport/message/<failed>.consumer.ts
     slot: be.transport.message
+    template: saga/saga.failed.consumer.ts.tpl
+    role: "A thin door that hands the failure delivery, with its `eventId`, to the compensate command; the saga takes it through the inbox."
     suffix: consumer
-    role: 'A thin door that hands the delivery, with its `eventId`, to a command; the saga takes it through the inbox.'
     rules: [R80, R88, R172]
+  - path: src/features/saga/<saga>/transport/message/<done>.consumer.ts
+    slot: be.transport.message
+    template: saga/saga.done.consumer.ts.tpl
+    role: "A thin door that hands the delivery of the last event, with its `eventId`, to the complete command; the saga takes it through the inbox."
+    suffix: consumer
+    rules: [R80, R88, R172]
+  - path: src/features/saga/<saga>/transport/message/<saga>-message.module.ts
+    slot: be.transport.message
+    template: saga/saga.message.module.ts.tpl
+    role: "The message transport module: registers the consumers with the event bus; composed only by an app."
   - path: be/contracts/<service>/events.json
     slot: be.contract.events
     role: 'Every event of the saga, emitted from the publisher''s events.ts; a compensating event declares `compensates`.'
     rules: [R166, R171]
-  - path: be/src/modules/platform/saga/
+    optional: true
+  - path: src/modules/platform/saga/
     slot: be.platform
     role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` (unit-tested to 100%).'
     rules: [R170, R80]
-  - path: be/src/tests/e2e/<area>/<name>.e2e-spec.ts
+    optional: true
+  - path: src/tests/e2e/<area>/<name>.e2e-spec.ts
     slot: be.tests.e2e
     suffix: e2e-spec
     role: One spec per compensation path that names the compensation event and injects a failure through the world (an infra or app outage, a fake's failNext), then reads the compensated state back; plus one spec from the api call to the final state.
     rules: [R173, R167]
+    optional: true
 rules:
   - id: BE-SAGA-1
     title: Every step has a compensation, and the orchestrator lists them all
     kind: mandatory
     hfsRules: [R169]
     requirement: |-
-      A saga is `be/src/features/api/<feature>/saga/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
+      A saga is `be/src/features/saga/<saga>/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
       `compensations/<step>.compensation.ts`: every step has a compensation of the same name and every compensation a step,
       and the orchestrator imports every step and every compensation of its folder. The folders are slots enabled by the
       declared pattern; a saga folder in a product that does not declare `patterns: ["saga"]` is `HFS_SLOT_NOT_ENABLED`.
@@ -83,7 +157,7 @@ rules:
     cases:
       - id: case-1
         when: A new step
-        write: 'saga/steps/reserve-order.saga-step.ts and saga/compensations/reserve-order.compensation.ts, both imported by place-order.saga.service.ts.'
+        write: 'features/saga/place-order/steps/reserve-order.saga-step.ts and features/saga/place-order/compensations/reserve-order.compensation.ts, both imported by place-order.saga.service.ts.'
     verification:
       automated:
         - BE_SAGA_STEP_COMPENSATION
@@ -98,7 +172,7 @@ rules:
     requirement: |-
       `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator moves a run only
       through `platform/saga`: a transition names the version it read and moves it by one, and takes its event through the
-      inbox first. A consumer of a saga feature passes the id of the delivery (`message.eventId`) to its command.
+      inbox first. A consumer of a saga passes the id of the delivery (`message.eventId`) to its command.
     rationale: |-
       Deliveries repeat and arrive late. The version fence stops a zombie delivery from moving a run twice, and the inbox makes
       a redelivery a no-op.

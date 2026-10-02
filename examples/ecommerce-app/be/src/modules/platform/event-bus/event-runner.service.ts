@@ -31,7 +31,7 @@ import {
  * The runner never throws for a failed delivery, so one poisoned event does not stop the partition behind it.
  */
 export class EventRunnerService implements EventConsumerRegistry, OnApplicationBootstrap {
-    private readonly consumers = new Map<string, EventConsumer<BaseEvent>>()
+    private readonly consumers = new Map<string, ReadonlyArray<EventConsumer<BaseEvent>>>()
 
     constructor(
         @InjectEventBusOptions() private readonly options: EventBusOptions,
@@ -40,9 +40,10 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** Registers the consumer of its event; the read loop starts when the app has registered every consumer. */
+    /** Registers a consumer of its event (several features may consume one event); the read loop starts when the app has registered every consumer. */
     add<Event extends BaseEvent>(consumer: EventConsumer<Event>): void {
-        this.consumers.set(consumer.event.eventName, consumer)
+        const name = consumer.event.eventName
+        this.consumers.set(name, [...(this.consumers.get(name) ?? []), consumer])
     }
 
     /** Starts reading the topics of the registered events and their retry topics. */
@@ -54,11 +55,15 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         await this.transport.subscribe({ topics, onMessage: (message) => this.receive(message) })
     }
 
-    /** Hands one message to the consumer of its event; the events of the topic nobody here consumes are left alone. */
+    /**
+     * Hands one message to every consumer of its event, in the order they registered; the events of the topic nobody here consumes
+     * are left alone. A failing consumer does not stop the others; the message goes once to the retry topic when any failed, and
+     * each consumer takes a redelivery through its own inbox, so one that already succeeded changes nothing.
+     */
     async receive(message: InboundMessage): Promise<void> {
         const { eventName, envelope, cause: unreadable } = readEnvelopeText(message.value)
-        const consumer = this.consumers.get(eventName)
-        if (consumer === undefined) {
+        const consumers = this.consumers.get(eventName) ?? []
+        if (consumers.length === 0) {
             if (unreadable !== null)
                 this.logger.error(EventBusLogEvent.MessageSkipped, unreadable, { topic: message.topic })
             else if (eventName === "") this.logger.warn(EventBusLogEvent.MessageSkipped, { topic: message.topic })
@@ -68,16 +73,23 @@ export class EventRunnerService implements EventConsumerRegistry, OnApplicationB
         const notBefore = Number(message.headers[NOT_BEFORE_HEADER] ?? 0)
         const pause = notBefore - this.clock.now().getTime()
         if (pause > 0) await this.transport.wait(pause)
-        const event = consumer.event.parse(envelope)
-        if (event === null) {
-            await this.bury(message, eventName, attempt, "the envelope does not have the shape of the event")
-            return
+        const failures: Array<unknown> = []
+        for (const consumer of consumers) {
+            const event = consumer.event.parse(envelope)
+            if (event === null) {
+                await this.bury(message, eventName, attempt, "the envelope does not have the shape of the event")
+                return
+            }
+            try {
+                await consumer.handle({ eventId: event.eventId, event, attempt })
+            } catch (cause) {
+                this.logger.error(EventBusLogEvent.DeliveryFailed, cause, { event: eventName, attempt })
+                failures.push(cause)
+            }
         }
-        try {
-            await consumer.handle({ eventId: event.eventId, event, attempt })
-        } catch (cause) {
-            this.logger.error(EventBusLogEvent.DeliveryFailed, cause, { event: eventName, attempt })
-            await this.failed(message, eventName, attempt, cause instanceof Error ? cause.message : String(cause))
+        const [first] = failures
+        if (failures.length > 0) {
+            await this.failed(message, eventName, attempt, first instanceof Error ? first.message : String(first))
         }
     }
 

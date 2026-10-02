@@ -1509,7 +1509,7 @@ rules:
       - {kind: eslint-be, id: service-isolation}
   - id: R169
     code: "BE_SAGA_STEP_COMPENSATION"
-    law: "In a product that declares the `saga` pattern (`patterns: [\"saga\"]` in hfs.json sides.be) a saga is the folder `be/src/features/api/<feature>/saga/` (`<saga>.saga.ts` the orchestrator, `steps/<step>.step.ts`, `compensations/<step>.compensation.ts`): every step has a compensation of the same name and every compensation a step, the orchestrator imports every step and every compensation of its folder, and a folder of steps or compensations has an orchestrator; the folders themselves are slots enabled only by the declared pattern, so an undeclared saga is `HFS_SLOT_NOT_ENABLED`."
+    law: "In a product that declares the `saga` pattern (`patterns: [\"saga\"]` in hfs.json sides.be) a saga is the folder `be/src/features/saga/<saga>/` (`<saga>.saga.ts` the orchestrator, `steps/<step>.step.ts`, `compensations/<step>.compensation.ts`): every step has a compensation of the same name and every compensation a step, the orchestrator imports every step and every compensation of its folder, and a folder of steps or compensations has an orchestrator; the folders themselves are slots enabled only by the declared pattern, so an undeclared saga is `HFS_SLOT_NOT_ENABLED`."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_STEP_COMPENSATION"]
@@ -1533,7 +1533,7 @@ rules:
       - {kind: hfs, id: saga-event-contract, at: scripts/hfs/rules/saga.mjs}
   - id: R172
     code: "BE_SAGA_CONSUMER_DEDUPE"
-    law: "A consumer of a feature that holds a saga (`transport/message/<event>.consumer.ts`) passes the id of the delivery on (`message.eventId`) to the command it dispatches: the saga takes every event through the inbox (R80), so the consumer must hand it the dedupe key."
+    law: "A consumer of a saga (`be/src/features/saga/<saga>/transport/message/<event>.consumer.ts`) passes the id of the delivery on (`message.eventId`) to the command it dispatches: the saga takes every event through the inbox (R80), so the consumer must hand it the dedupe key."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["BE_SAGA_CONSUMER_DEDUPE"]

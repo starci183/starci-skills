@@ -18,6 +18,7 @@
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with these exceptions (unit test
  * standard): the unit spec of every unit role (ruleParams.be.unitRoles: `<name>.service.spec.ts`, `<name>.cli.spec.ts`), a
+ * unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`, `.subscription.spec.ts`: a door has no service of its own), a
  * `*.builder.ts` under src/tests/fixtures/builders, and a file of the test world (slots be.tests.world and be.tests.world.kit, which
  * open and migrate the real databases of the e2e run) read from disk count as consumers, because a spec can only provide an
  * Inject*() token or a param type the entry exports, and the world wires the same capabilities the apps do. An integration
@@ -173,6 +174,8 @@ function deadFiles(graph, config) {
   return { violations, judged, roots: roots.size };
 }
 
+/** The unit spec of a webhook, gateway or subscription door: a door has no service of its own, so its spec is the only unit spec of its kind. */
+const DOOR_SPEC = /^src\/features\/(?:webhooks|realtime)\/.+\.(?:webhook|gateway|subscription)\.spec\.ts$/u;
 const BUILDER_CONSUMER = /^src\/tests\/fixtures\/builders\/.+\.builder\.ts$/u;
 /** The test world slots (knowledge/hfs/slots.yaml): their files wire the real capabilities of the e2e run. */
 const WORLD_SLOTS = new Set(['be.tests.world', 'be.tests.world.kit']);
@@ -181,6 +184,7 @@ const WORLD_SLOTS = new Set(['be.tests.world', 'be.tests.world.kit']);
 function testConsumer(graph, rel) {
   const roles = graph.resolver.ruleParams().unitRoles ?? [];
   if (/^(?:src|apps)\//u.test(rel) && roles.some(role => rel.endsWith(`.${role.spec}.ts`))) return true;
+  if (DOOR_SPEC.test(rel)) return true;
   if (BUILDER_CONSUMER.test(rel)) return true;
   const classified = graph.resolver.classifyPath(rel);
   return WORLD_SLOTS.has(classified.slot) && classified.status !== 'forbidden' && /\.tsx?$/u.test(rel);

@@ -29,12 +29,12 @@ const put = (dir, relative, text = 'export {};\n') => {
 const run = (declaration, mutate) => checkRepo({ repoRoot: repoOf(declaration, mutate) }).findings;
 const only = (findings, code) => findings.filter((f) => f.code === code);
 
-const SAGA = 'be/src/features/orders/saga/';
+const SAGA = 'be/src/features/saga/place/';
 const STEP = `${SAGA}steps/reserve.saga-step.ts`;
 const COMPENSATION = `${SAGA}compensations/reserve.compensation.ts`;
 const ORCHESTRATOR = `${SAGA}place.saga.service.ts`;
 const STATE = `${SAGA}place.saga-state.ts`;
-const CONSUMER = 'be/src/features/orders/transport/message/invoice-rejected.consumer.ts';
+const CONSUMER = 'be/src/features/saga/place/transport/message/invoice-rejected.consumer.ts';
 const SPEC = 'be/src/tests/e2e/orders/place.e2e-spec.ts';
 
 const STEP_TS = 'export class ReserveStep {\n  readonly event = "order.placed"\n}\n';

@@ -1,18 +1,10 @@
-import { createHmac } from "node:crypto"
-import { FakeClock, mock } from "@starci/jest-preset"
-import type { RawBodyRequest } from "@nestjs/common"
+import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
-import type { Request } from "express"
 import { PaymentService } from "@modules/domain/payment"
-import { CLOCK } from "@modules/platform/clock"
-import { Secret } from "@modules/platform/config"
-import { HttpSecurityModule } from "@modules/platform/http-security"
+import { HttpSecurityError, HttpSecurityErrorCode, WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { SepayTransferRequest } from "./dto/sepay-transfer.request"
 import { SepayWebhook } from "./sepay.webhook"
-
-const AT = "2026-09-01T00:00:00.000Z"
-const SECRET = "spec-webhook-secret"
-const SIGNED_AT = String(new Date(AT).getTime())
 
 /** The notice the notifier delivers for one transfer: the validated request class, as the pipe builds it. */
 const noticeOf = (): SepayTransferRequest => {
@@ -34,23 +26,13 @@ const noticeOf = (): SepayTransferRequest => {
 
 const NOTICE = noticeOf()
 const RAW_BODY = Buffer.from(JSON.stringify(NOTICE))
-const REQUEST = mock<RawBodyRequest<Request>>({ rawBody: RAW_BODY })
+const REQUEST = { rawBody: RAW_BODY } as never
 
-const sign = (rawBody: Buffer, timestamp: string): string =>
-    `sha256=${createHmac("sha256", SECRET).update(`${timestamp}.`).update(rawBody).digest("hex")}`
-
-const build = async (payments: PaymentService) => {
+const build = async (signature: WebhookSignatureService, payments: PaymentService) => {
     const moduleRef = await Test.createTestingModule({
-        imports: [
-            HttpSecurityModule.register({
-                allowedOrigins: [],
-                rateLimit: { windowMs: 60_000, defaultLimit: 100, strictLimit: 100 },
-                webhooks: { sepay: { secret: new Secret(SECRET), toleranceMs: 300_000 } },
-            }),
-        ],
         controllers: [SepayWebhook],
         providers: [
-            { provide: CLOCK, useValue: new FakeClock(AT) },
+            { provide: WEBHOOK_SIGNATURE, useValue: signature },
             { provide: PaymentService, useValue: payments },
         ],
     }).compile()
@@ -60,35 +42,33 @@ const build = async (payments: PaymentService) => {
 describe("SepayWebhook", () => {
     describe("receive", () => {
         it("proves the delivery on its raw body and headers, then hands the notice to the payment intake once", async () => {
+            const signature = mock<WebhookSignatureService>()
             const payments = mock<PaymentService>()
-            const door = await build(payments)
+            const door = await build(signature, payments)
 
-            await door.receive(REQUEST, sign(RAW_BODY, SIGNED_AT), SIGNED_AT, NOTICE)
+            await door.receive(REQUEST, "sha256=abc", "1790899200000", NOTICE)
 
+            expect(signature.verify).toHaveBeenCalledWith({
+                provider: "sepay",
+                rawBody: RAW_BODY,
+                signature: "sha256=abc",
+                timestamp: "1790899200000",
+            })
             expect(payments.acceptBankTransfer).toHaveBeenCalledTimes(1)
             expect(payments.acceptBankTransfer).toHaveBeenCalledWith(NOTICE)
         })
 
-        it("never reaches the intake when the signature is not the provider's", async () => {
-            const payments = mock<PaymentService>()
-            const door = await build(payments)
-
-            await expect(
-                door.receive(REQUEST, sign(Buffer.from("other body"), SIGNED_AT), SIGNED_AT, NOTICE),
-            ).rejects.toMatchObject({
-                code: "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID",
+        it("never reaches the intake when the proof throws", async () => {
+            const refusal = new HttpSecurityError({ code: HttpSecurityErrorCode.WebhookSignatureInvalid })
+            const signature = mock<WebhookSignatureService>({
+                verify: jest.fn(() => {
+                    throw refusal
+                }),
             })
-
-            expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
-        })
-
-        it("never reaches the intake when the delivery carries no proof at all", async () => {
             const payments = mock<PaymentService>()
-            const door = await build(payments)
+            const door = await build(signature, payments)
 
-            await expect(door.receive(REQUEST, undefined, undefined, NOTICE)).rejects.toMatchObject({
-                code: "HTTP_SECURITY_WEBHOOK_SIGNATURE_INVALID",
-            })
+            await expect(door.receive(REQUEST, undefined, undefined, NOTICE)).rejects.toBe(refusal)
 
             expect(payments.acceptBankTransfer).not.toHaveBeenCalled()
         })
