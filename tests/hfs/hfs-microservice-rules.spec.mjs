@@ -1,5 +1,5 @@
 // The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R136 HFS_SERVICE_PLACEMENT, R137 HFS_IMAGE_UNPINNED,
-// R138 HFS_SERVICE_STACK_DECLARATION, R139 HFS_EVENT_CONTRACT, R140 BE_ASYNC_SPEC_MISSING, plus the event contract emit
+// R138 HFS_SERVICE_STACK_DECLARATION, R139 HFS_EVENT_CONTRACT (event classes -> events.json), R140 BE_ASYNC_SPEC_MISSING, plus the event contract emit
 // (packages/hfs/emit). Each rule has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the base.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -89,138 +89,130 @@ test('HFS_SERVICE_STACK_DECLARATION: every service app declared as a role servic
 
 // ------------------------------------------------------------------------------------------------ R139 HFS_EVENT_CONTRACT
 
-const EVENTS_TS = 'export const EVENTS = {\n  "order.placed": { version: 1, payload: { orderId: "string", totalCents: "number", note: "string?" } },\n} as const\n';
-const CONSUMES_TS = (version = 1, event = 'order.placed') => `export const CONSUMES = {\n  core: { "${event}": ${version} },\n} as const\n`;
-/** The provider `core` and the consumer `billing`; the snapshot is what `hfs emit-contracts` writes. */
-const withEvents = ({ consumes = CONSUMES_TS(), snapshot = true, events = EVENTS_TS } = {}) => (dir) => {
-  withStack(COMPONENTS)(dir);
-  put(dir, 'be/apps/core/src/events.ts', events);
-  put(dir, 'be/apps/billing/src/consumes.ts', consumes);
-  if (snapshot) {
-    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-events-'));
-    put(temp, 'package.json', '{}\n');
-    installTypeScript(temp);
-    put(temp, 'be/apps/core/src/events.ts', events);
-    const out = path.join(temp, 'out');
-    emitContracts({ repoRoot: path.join(temp, 'be'), declaration: { apps: [{ name: 'core', kind: 'worker' }] }, outDir: out });
-    put(dir, 'be/contracts/core/events.json', fs.readFileSync(path.join(out, 'contracts/core/events.json'), 'utf8'));
-    fs.rmSync(temp, { recursive: true, force: true });
-  }
-};
-const r131 = (options) => only(MULTI, withEvents(options), 'HFS_EVENT_CONTRACT');
+const EVENTS_DIR = 'be/src/modules/events';
+const PLACED_PATH = `${EVENTS_DIR}/core/order-placed.event.ts`;
+const REJECTED_PATH = `${EVENTS_DIR}/billing/invoice-rejected.event.ts`;
+/** An event class in the shape of knowledge/patterns/be/event-bus.yaml: a payload interface, static eventName and version, create(payload). */
+const eventClass = ({ className, name, version = 1, compensates, fields = 'readonly orderId: string; readonly totalCents: number; readonly note?: string' }) => `import { BaseEvent } from '@modules/platform/event-bus';
+export interface ${className}Payload { ${fields} }
+export class ${className} extends BaseEvent {
+  static readonly eventName = "${name}";
+  static readonly version = ${version};
+${compensates === undefined ? '' : `  static readonly compensates = "${compensates}";\n`}  static create(payload: ${className}Payload): ${className} { return new ${className}(payload.orderId, payload); }
+}
+`;
+const PLACED = eventClass({ className: 'OrderPlacedEvent', name: 'order.placed' });
+const REJECTED = eventClass({ className: 'InvoiceRejectedEvent', name: 'billing.invoice-rejected', compensates: 'order.placed', fields: 'readonly orderId: string; readonly reason: string' });
 
-test('HFS_EVENT_CONTRACT: a consumer reading an event at the vendored version, with a snapshot equal to the provider table, passes', () => {
-  assert.deepEqual(r131(), []);
-});
-
-test('HFS_EVENT_CONTRACT: a provider with no committed snapshot and a consumer of a service with no snapshot are refused', () => {
-  const findings = r131({ snapshot: false });
-  assert.deepEqual(pathsOf(findings), ['be/apps/billing/src/consumes.ts', 'be/contracts/core/events.json']);
-});
-
-test('HFS_EVENT_CONTRACT: an unknown event and a version the snapshot does not declare are refused on the consumer', () => {
-  assert.match(r131({ consumes: CONSUMES_TS(1, 'order.cancelled') })[0].message, /"order.cancelled", which be\/contracts\/core\/events.json does not declare/);
-  assert.match(r131({ consumes: CONSUMES_TS(2) })[0].message, /at version 2, but be\/contracts\/core\/events.json declares version 1/);
-});
-
-test('HFS_EVENT_CONTRACT: a snapshot that no longer equals the provider table is stale, and a table that is not a literal is refused', () => {
-  const stale = only(MULTI, (dir) => {
-    withEvents()(dir);
-    put(dir, 'be/apps/core/src/events.ts', EVENTS_TS.replace('version: 1', 'version: 2'));
-  }, 'HFS_EVENT_CONTRACT');
-  assert.deepEqual(stale.map((f) => [f.path, f.drift]), [['be/contracts/core/events.json', 'stale']]);
-  const loose = only(MULTI, (dir) => {
-    withEvents()(dir);
-    put(dir, 'be/apps/core/src/events.ts', 'const v = 1\nexport const EVENTS = { "a.b": { version: v, payload: {} } } as const\n');
-  }, 'HFS_EVENT_CONTRACT');
-  assert.match(loose.find((f) => f.path === 'be/apps/core/src/events.ts').message, /needs a positive integer `version`/);
-});
-
-test('HFS_EVENT_CONTRACT: an event that compensates an event no contract declares is refused, one that compensates a declared event passes', () => {
-  const withCompensation = (compensates) => (dir) => {
-    withEvents()(dir);
-    put(dir, 'be/apps/billing/src/events.ts', `export const EVENTS = { "billing.invoice-rejected": { version: 1, compensates: "${compensates}", payload: { orderId: "string" } } } as const\n`);
-  };
-  assert.deepEqual(only(MULTI, withCompensation('order.placed'), 'HFS_EVENT_CONTRACT').filter((f) => f.event !== undefined), []);
-  const refused = only(MULTI, withCompensation('order.shipped'), 'HFS_EVENT_CONTRACT').filter((f) => f.event !== undefined);
-  assert.equal(refused.length, 1);
-  assert.match(refused[0].message, /compensates "order.shipped", which no service contract declares/);
-});
-
-test('hfs emit-contracts writes events.json for an api or worker app that declares events.ts, sorted and with a final newline', () => {
+/** What `hfs emit-contracts` writes for the event classes of `service`, in a scratch app that holds only those files. */
+const emitted = (service, classes) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-events-'));
   made.push(temp);
   put(temp, 'package.json', '{}\n');
   installTypeScript(temp);
-  put(temp, 'be/apps/billing/src/events.ts', 'export const EVENTS = { "invoice.rejected": { version: 1, payload: { orderId: "string", reason: "string" } } } as const\n');
-  const result = emitContracts({ repoRoot: path.join(temp, 'be'), declaration: { apps: [{ name: 'billing', kind: 'worker' }] } });
-  assert.deepEqual(result.written, ['contracts/billing/events.json']);
-  const text = fs.readFileSync(path.join(temp, 'be/contracts/billing/events.json'), 'utf8');
-  assert.equal(text, `${JSON.stringify({ events: { 'invoice.rejected': { payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
+  for (const [file, text] of Object.entries(classes)) put(temp, file.replace(/^be\//, 'be/'), text);
+  const out = path.join(temp, 'out');
+  emitContracts({ repoRoot: path.join(temp, 'be'), declaration: { apps: [] }, outDir: out });
+  return fs.readFileSync(path.join(out, 'contracts', service, 'events.json'), 'utf8');
+};
+/** The provider `core` (order.placed) and `billing` (invoice-rejected, compensating order.placed), their snapshots as emitted. */
+const withEvents = ({ classes = { [PLACED_PATH]: PLACED, [REJECTED_PATH]: REJECTED }, snapshots = true } = {}) => (dir) => {
+  withStack(COMPONENTS)(dir);
+  for (const [file, text] of Object.entries(classes)) put(dir, file, text);
+  if (snapshots) {
+    for (const service of new Set(Object.keys(classes).map((file) => file.split('/')[4]))) {
+      const own = Object.fromEntries(Object.entries(classes).filter(([file]) => file.split('/')[4] === service));
+      put(dir, `be/contracts/${service}/events.json`, emitted(service, own));
+    }
+  }
+};
+const r139 = (options) => only(MULTI, withEvents(options), 'HFS_EVENT_CONTRACT');
+
+test('HFS_EVENT_CONTRACT: event classes whose vendored snapshots equal what they emit pass', () => {
+  assert.deepEqual(r139(), []);
+});
+
+test('HFS_EVENT_CONTRACT: a service with event classes and no committed snapshot is refused', () => {
+  assert.deepEqual(pathsOf(r139({ snapshots: false })), ['be/contracts/billing/events.json', 'be/contracts/core/events.json']);
+});
+
+test('HFS_EVENT_CONTRACT: a snapshot that no longer equals what the event classes emit is stale', () => {
+  const findings = only(MULTI, (dir) => {
+    withEvents()(dir);
+    put(dir, PLACED_PATH, PLACED.replace('version = 1', 'version = 2'));
+  }, 'HFS_EVENT_CONTRACT');
+  assert.deepEqual(findings.map((f) => [f.path, f.drift]), [['be/contracts/core/events.json', 'stale']]);
+});
+
+test('HFS_EVENT_CONTRACT: a changed payload field is drift too, and an unreadable class is refused', () => {
+  const drift = only(MULTI, (dir) => {
+    withEvents()(dir);
+    put(dir, PLACED_PATH, PLACED.replace('readonly totalCents: number', 'readonly totalCents: string'));
+  }, 'HFS_EVENT_CONTRACT');
+  assert.equal(drift.length, 1);
+  const loose = only(MULTI, (dir) => {
+    withEvents()(dir);
+    put(dir, PLACED_PATH, PLACED.replace('static readonly version = 1', 'static readonly version = VERSION'));
+  }, 'HFS_EVENT_CONTRACT');
+  assert.match(loose.find((f) => f.path === PLACED_PATH).message, /needs `static readonly version`/);
+  const nested = only(MULTI, (dir) => {
+    withEvents()(dir);
+    put(dir, PLACED_PATH, PLACED.replace('readonly note?: string', 'readonly note: { text: string }'));
+  }, 'HFS_EVENT_CONTRACT');
+  assert.match(nested.find((f) => f.path === PLACED_PATH).message, /payload field note must be/);
+});
+
+test('HFS_EVENT_CONTRACT: an event that compensates an event no class declares is refused, one that compensates a declared event passes', () => {
+  const refused = only(MULTI, withEvents({ classes: { [PLACED_PATH]: PLACED, [REJECTED_PATH]: eventClass({ className: 'InvoiceRejectedEvent', name: 'billing.invoice-rejected', compensates: 'order.shipped', fields: 'readonly orderId: string' }) } }), 'HFS_EVENT_CONTRACT');
+  assert.equal(refused.length, 1);
+  assert.match(refused[0].message, /compensates "order.shipped", which no event class declares/);
+});
+
+test('HFS_EVENT_CONTRACT: a committed snapshot of a service with no event class is left behind', () => {
+  const findings = only(MULTI, (dir) => {
+    withEvents()(dir);
+    put(dir, 'be/contracts/shipping/events.json', '{}\n');
+  }, 'HFS_EVENT_CONTRACT');
+  assert.deepEqual(findings.map((f) => [f.path, f.drift]), [['be/contracts/shipping/events.json', 'left-behind']]);
+});
+
+test('hfs emit-contracts writes events.json for a service that declares event classes, sorted and with a final newline', () => {
+  const text = emitted('billing', { [REJECTED_PATH]: REJECTED });
+  assert.equal(text, `${JSON.stringify({ events: { 'billing.invoice-rejected': { compensates: 'order.placed', payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
 });
 
 // ------------------------------------------------------------------------------------------------ R140 BE_ASYNC_SPEC_MISSING
 
-const snapshot = (service, events) => `${JSON.stringify({ events, schema: 'starci/event-contract@1', service }, null, 2)}\n`;
-const consumesOf = (service, event) => `export const CONSUMES = { ${service}: { "${event}": 1 } } as const\n`;
-const SPEC = (...events) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\n${events.map((event) => `it('handles ${event}', () => undefined);`).join('\n')}\n`;
+const consumerOf = (className, file) => `import { ${className} } from '@modules/events/${file}';\nexport class ${className}Consumer {\n  readonly event = ${className}\n}\n`;
+const CONSUMER_REJECTED = 'be/src/features/orders/transport/message/invoice-rejected.consumer.ts';
+const CONSUMER_PLACED = 'be/src/features/billing/transport/message/order-placed.consumer.ts';
 const SPEC_PLACED = 'be/src/tests/e2e/orders/order-placed.e2e-spec.ts';
 const SPEC_REJECTED = 'be/src/tests/e2e/orders/invoice-rejected.e2e-spec.ts';
-/** `billing` consumes `order.placed` of `core`; `core` consumes `billing.invoice-rejected`, which compensates `order.placed`. */
+const SPEC = (...events) => `import { useTestWorld } from '../../world/use-test-world';\nconst world = useTestWorld({ apps: ['core'] });\n${events.map((event) => `it('handles ${event}', () => undefined);`).join('\n')}\n`;
+/** `billing` consumes `order.placed`; `core` consumes `billing.invoice-rejected`, which compensates `order.placed`. */
 const asyncRepo = (specs = {}) => (dir) => {
-  withStack(COMPONENTS)(dir);
-  put(dir, 'be/contracts/core/events.json', snapshot('core', { 'order.placed': { payload: {}, version: 1 } }));
-  put(dir, 'be/contracts/billing/events.json', snapshot('billing', { 'billing.invoice-rejected': { compensates: 'order.placed', payload: {}, version: 1 } }));
-  put(dir, 'be/apps/billing/src/consumes.ts', consumesOf('core', 'order.placed'));
-  put(dir, 'be/apps/core/src/consumes.ts', consumesOf('billing', 'billing.invoice-rejected'));
+  withEvents()(dir);
+  put(dir, CONSUMER_PLACED, consumerOf('OrderPlacedEvent', 'core'));
+  put(dir, CONSUMER_REJECTED, consumerOf('InvoiceRejectedEvent', 'billing'));
   for (const [file, text] of Object.entries(specs)) put(dir, file, text);
 };
-const r132 = (specs) => only(MULTI, asyncRepo(specs), 'BE_ASYNC_SPEC_MISSING');
+const r140 = (specs) => only(MULTI, asyncRepo(specs), 'BE_ASYNC_SPEC_MISSING');
 
-test('BE_ASYNC_SPEC_MISSING: a consumed event no e2e spec names, and a spec that does not boot the world, are refused on the consumes table', () => {
-  assert.deepEqual(r132().map((f) => [f.path, f.event]).sort(), [['be/apps/billing/src/consumes.ts', 'order.placed'], ['be/apps/core/src/consumes.ts', 'billing.invoice-rejected']]);
-  const notWorld = r132({ [SPEC_PLACED]: "it('order.placed', () => undefined)\n", [SPEC_REJECTED]: "it('billing.invoice-rejected', () => undefined)\n" });
+test('BE_ASYNC_SPEC_MISSING: a consumed event no e2e spec names, and a spec that does not boot the world, are refused on the consumer', () => {
+  assert.deepEqual(r140().map((f) => [f.path, f.event]).sort(), [[CONSUMER_PLACED, 'order.placed'], [CONSUMER_REJECTED, 'billing.invoice-rejected']]);
+  const notWorld = r140({ [SPEC_PLACED]: "it('order.placed', () => undefined)\n", [SPEC_REJECTED]: "it('billing.invoice-rejected', () => undefined)\n" });
   assert.equal(notWorld.length, 2);
-  assert.match(notWorld[0].message, /boots the apps with useTestWorld and names it/);
+  assert.match(notWorld[0].message, /has no e2e spec/);
 });
 
 test('BE_ASYNC_SPEC_MISSING: the spec of a saga step must also drive the event it compensates', () => {
-  const stepOnly = r132({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('billing.invoice-rejected') });
+  const stepOnly = r140({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('billing.invoice-rejected') });
   assert.equal(stepOnly.length, 1);
   assert.equal(stepOnly[0].path, SPEC_REJECTED);
   assert.match(stepOnly[0].message, /undoes "order.placed", but never names it/);
 });
 
 test('BE_ASYNC_SPEC_MISSING: every consumed event named by an e2e spec through the world, a saga step driving the whole flow, passes', () => {
-  assert.deepEqual(r132({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') }), []);
-  assert.deepEqual(r132({ 'be/src/tests/e2e/orders/whole-saga.e2e-spec.ts': SPEC('order.placed', 'billing.invoice-rejected') }), []);
-});
-
-// ------------------------------------------------------------------------------------------------ R139 queues of the consumers
-
-const QUEUE_SOURCE = 'be/src/modules/domain/invoice/invoice.contracts.ts';
-const queueSource = (module, name) => `import { defineQueue } from '${module}';\nexport const SHIPPED_QUEUE = defineQueue({ name: '${name}', attempts: 3, backoffMs: 1000, parse: () => null });\n`;
-const r131queues = (source, consumesFile) => only(MULTI, (dir) => {
-  asyncRepo({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') })(dir);
-  if (source !== undefined) put(dir, QUEUE_SOURCE, source);
-  if (consumesFile !== undefined) put(dir, 'be/apps/billing/src/consumes.ts', consumesFile);
-}, 'HFS_EVENT_CONTRACT').filter((f) => f.path === QUEUE_SOURCE);
-
-test('HFS_EVENT_CONTRACT: a queue a consumer defines with defineQueue must be listed in a consumes table', () => {
-  const findings = r131queues(queueSource('@modules/platform/messaging', 'order.shipped'));
-  assert.equal(findings.length, 1);
-  assert.match(findings[0].message, /defines the event "order.shipped", but no be\/apps\/<app>\/src\/consumes.ts lists that event/);
-});
-
-test('HFS_EVENT_CONTRACT: a defined queue that a consumes table lists passes, and a defineQueue of another module is not a consumer queue', () => {
-  assert.deepEqual(r131queues(queueSource('@modules/platform/messaging', 'order.placed')), []);
-  assert.deepEqual(r131queues(queueSource('./local-helper', 'order.shipped')), []);
-});
-
-test('HFS_EVENT_CONTRACT: an event declared with defineEvent of platform/event-bus is judged like a queue: unlisted is refused, listed passes', () => {
-  const eventSource = (name) => `import { defineEvent } from '@modules/platform/event-bus';\nexport const SHIPPED = defineEvent({ name: '${name}', version: 1, attempts: 3, backoffMs: 1000, parse: () => null });\n`;
-  const refused = r131queues(eventSource('order.shipped'));
-  assert.equal(refused.length, 1);
-  assert.match(refused[0].message, /defines the event "order.shipped"/);
-  assert.deepEqual(r131queues(eventSource('order.placed')), []);
+  assert.deepEqual(r140({ [SPEC_PLACED]: SPEC('order.placed'), [SPEC_REJECTED]: SPEC('order.placed', 'billing.invoice-rejected') }), []);
+  assert.deepEqual(r140({ 'be/src/tests/e2e/orders/whole-saga.e2e-spec.ts': SPEC('order.placed', 'billing.invoice-rejected') }), []);
 });

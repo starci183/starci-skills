@@ -1,27 +1,45 @@
-import type { QueueDefinition } from "@modules/platform/messaging"
+/** The base of every typed event (`modules/events/<service>/<event>.event.ts`): who it is and what it carries. */
+export abstract class BaseEvent {
+    /** The stable event id: the same logical event always carries the same id, so a receiver can dedupe. */
+    abstract readonly eventId: string
 
-/** The declaration of one event: its name and version (an entry of the vendored contract `be/contracts/<service>/events.json`), how many deliveries it gets, the base of the backoff between them and how a stored payload is read back. */
-export interface EventDefinition<Payload extends object> extends QueueDefinition<Payload> {
-    /** The contract version of the payload. */
-    readonly version: number
+    /** The event name, `<service>.<what>`: an entry of the vendored contract `be/contracts/<service>/events.json`. */
+    abstract readonly eventName: string
+
+    /** The data of the event. */
+    abstract readonly payload: object
 }
 
-/** An event as a service publishes it: its definition, the stable event id the receiver dedupes on, and the payload. */
-export interface BusEvent<Payload extends object> {
-    /** The declaration of the event. */
-    readonly definition: EventDefinition<Payload>
-    /** The stable event id: the same logical event always carries the same id. */
-    readonly eventId: string
-    /** The payload. */
-    readonly payload: Payload
+/** The class side of a typed event: its name and version (the vendored contract), the event it compensates when it reports a failure, and how a received envelope is read back. */
+export interface EventClass<Event extends BaseEvent> {
+    /** The event name. */
+    readonly eventName: string
+    /** The contract version of the payload. */
+    readonly version: number
+    /** Reads a received envelope `{ eventId, payload }` back into the event; null when it does not have the shape. */
+    parse(envelope: unknown): Event | null
 }
 
 /** An event as a consumer receives it. */
-export interface EventDelivery<Payload extends object> {
+export interface EventDelivery<Event extends BaseEvent> {
     /** The stable event id: the dedupe key of the receiver. */
     readonly eventId: string
-    /** The parsed payload. */
-    readonly payload: Payload
+    /** The event. */
+    readonly event: Event
     /** How many deliveries were started, this one included. */
     readonly attempt: number
+}
+
+/** An event that ran out of attempts and waits for an operator. */
+export interface EventDeadLetter {
+    /** The id of the dead letter, what `requeue` takes. */
+    readonly id: string
+    /** The event name. */
+    readonly eventName: string
+    /** The stable event id. */
+    readonly eventId: string
+    /** Why the last delivery failed. */
+    readonly reason: string
+    /** How many deliveries were tried. */
+    readonly attempts: number
 }

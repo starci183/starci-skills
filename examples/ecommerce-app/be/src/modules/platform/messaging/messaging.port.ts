@@ -6,6 +6,10 @@ export interface MessagePublisher {
     publish<Payload extends object>(message: PublishedMessage<Payload>): Promise<void>
     /** The messages of the queue that ran out of attempts. */
     deadLetters(queue: QueueSpec): Promise<ReadonlyArray<DeadLetter>>
+    /** How many messages of the queue wait for the backoff of a failed delivery to pass. */
+    pendingRetries(queue: QueueSpec): Promise<number>
+    /** Puts a dead letter of the queue back to be delivered again. */
+    requeue(queue: QueueSpec, deadLetterId: string): Promise<void>
 }
 
 /** One consumer of one queue; a transport class in `transport/message` implements it. */

@@ -1,26 +1,41 @@
 /**
- * The async contract of a service: `contracts/<app>/events.json`, emitted from the literal `EVENTS` table of
- * `apps/<app>/src/events.ts` (the events the service publishes: stream, version, payload fields). Nothing is executed: the
- * table is read as a TypeScript syntax tree with the repository's own `typescript`. The reader and the printer are the runtime's
- * (`scripts/lib/event-contract.mjs`), so `hfs check` (R139 HFS_EVENT_CONTRACT) compares the committed file with exactly this text.
+ * The async contract of a service: `contracts/<service>/events.json`, emitted from the typed event classes of the service,
+ * `src/modules/events/<service>/<event>.event.ts` (name, version, `compensates`, the payload fields of the interface `create` takes).
+ * Nothing is executed: the classes are read as a TypeScript syntax tree with the repository's own `typescript`. The reader and the
+ * printer are the runtime's (`scripts/lib/event-contract.mjs`), so `hfs check` (R139 HFS_EVENT_CONTRACT) compares the committed file
+ * with exactly this text.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { readEvents, snapshotText } from '../runtime/scripts/lib/event-contract.mjs';
+import { readEventClasses, snapshotText } from '../runtime/scripts/lib/event-contract.mjs';
 
-/** The repository-relative path of a service's event table. */
-export const eventsPath = (app) => `apps/${app}/src/events.ts`;
+const EVENTS_ROOT = 'src/modules/events';
+const EVENT_SUFFIX = '.event.ts';
 
 /** The repository-relative path of a service's event contract. */
-export const eventsSnapshotPath = (app) => `contracts/${app}/events.json`;
+export const eventsSnapshotPath = (service) => `contracts/${service}/events.json`;
 
-/** The text of the event contract of `app`, or null when the app declares no `events.ts`; a table that is not a literal throws. */
-export function emitEvents({ repoRoot, app }) {
-  const file = path.join(repoRoot, eventsPath(app));
-  if (!fs.existsSync(file)) return null;
+/** The services that declare event classes under `src/modules/events/<service>/`. */
+export function eventServices(repoRoot) {
+  const root = path.join(repoRoot, EVENTS_ROOT);
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+}
+
+/** The text of the event contract of `service`, or null when it declares no event class; a class that cannot be read throws. */
+export function emitEvents({ repoRoot, service }) {
+  const folder = path.join(repoRoot, EVENTS_ROOT, service);
+  const files = fs.existsSync(folder) ? fs.readdirSync(folder).filter((name) => name.endsWith(EVENT_SUFFIX)).sort() : [];
+  if (files.length === 0) return null;
   const ts = createRequire(path.join(repoRoot, 'package.json'))('typescript');
-  const { events, problems } = readEvents(ts, fs.readFileSync(file, 'utf8'));
-  if (problems.length > 0) throw new Error(`hfs emit-contracts: ${eventsPath(app)} is not a literal event table: ${problems.join('; ')}`);
-  return snapshotText(app, events);
+  const events = [];
+  const problems = [];
+  for (const name of files) {
+    const read = readEventClasses(ts, fs.readFileSync(path.join(folder, name), 'utf8'), name);
+    events.push(...read.events);
+    problems.push(...read.problems.map((problem) => `${name}: ${problem}`));
+  }
+  if (problems.length > 0) throw new Error(`hfs emit-contracts: the event classes of ${service} cannot be read: ${problems.join('; ')}`);
+  return snapshotText(service, events);
 }

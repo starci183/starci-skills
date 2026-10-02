@@ -605,7 +605,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the literal `EVENTS` table of `apps/<app>/src/events.ts`; the consumers of its events are judged against it (R139 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R139 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -619,8 +619,7 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts, events.ts, consumes.ts]   # events.ts: the events this service publishes (R139); consumes.ts: what it reads of its siblings (R139)
-    contractTables: [operations.ts, events.ts, consumes.ts]   # read as data by `hfs emit-contracts` and `hfs check`, imported by nothing: roots of the dead-file walk
+    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
@@ -633,8 +632,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts", events.ts, consumes.ts]
-    contractTables: [events.ts, consumes.ts]   # read as data by `hfs emit-contracts` and `hfs check`, imported by nothing: roots of the dead-file walk
+    allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate

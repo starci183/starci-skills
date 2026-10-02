@@ -32,7 +32,7 @@ import {
     RateLimitGuard,
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
-import { EventBusModule } from "@modules/platform/event-bus"
+import { EVENT_BUS_ERROR_KINDS, EVENT_BUS_MESSAGES, EventBusModule } from "@modules/platform/event-bus"
 import { LoggingModule } from "@modules/platform/logging"
 import {
     MESSAGE_PUBLISHER,
@@ -67,6 +67,7 @@ export class AppModule {
                         ORDER_MESSAGES,
                         RECEIPT_STORAGE_MESSAGES,
                         MESSAGING_MESSAGES,
+                        EVENT_BUS_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
                 }),
@@ -83,6 +84,7 @@ export class AppModule {
                         ORDER_ERROR_KINDS,
                         RECEIPT_STORAGE_ERROR_KINDS,
                         MESSAGING_ERROR_KINDS,
+                        EVENT_BUS_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
                 }),

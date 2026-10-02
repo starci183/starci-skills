@@ -76,6 +76,19 @@ export class BullmqMessagingClient
         }))
     }
 
+    /** How many messages of the queue wait for the backoff of a failed delivery to pass. */
+    async pendingRetries(queue: QueueSpec): Promise<number> {
+        return this.run(() => this.queueOf(queue.name).getDelayedCount())
+    }
+
+    /** Puts a dead letter of the queue back to be delivered again; an id the queue no longer holds changes nothing. */
+    async requeue(queue: QueueSpec, deadLetterId: string): Promise<void> {
+        await this.run(async () => {
+            const job = await this.queueOf(queue.name).getJob(deadLetterId)
+            await job?.retry("failed")
+        })
+    }
+
     /** Registers the consumer of its queue; its worker starts when the app does, or at once when the app already runs. */
     add<Payload extends object>(consumer: MessageConsumer<Payload>): void {
         const registered: RegisteredConsumer = {

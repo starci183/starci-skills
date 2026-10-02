@@ -18,8 +18,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findStackDeclaration } from '../../lib/stack-declaration.mjs';
 import { findPackage, requirePackage } from '../../lib/package-at.mjs';
-import { folded, readConsumes, readEvents, snapshotText } from '../../lib/event-contract.mjs';
-import { found, readJson, readText } from './read.mjs';
+import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
+import { found, readText } from './read.mjs';
 
 export const SERVICE_PLACEMENT = 'HFS_SERVICE_PLACEMENT';
 export const IMAGE_UNPINNED = 'HFS_IMAGE_UNPINNED';
@@ -35,10 +35,10 @@ const WORKSPACE_PACKAGE_JSON = /^fe\/(?:packages|apps)\/[^/]+\/package\.json$/;
 const SNAPSHOT = /^be\/contracts\/([^/]+)\/events\.json$/;
 const DIGEST = /@sha256:[0-9a-f]{64}$/;
 const EXACT_TAG = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
-const CONSUMES_FILE = /^be\/apps\/[^/]+\/src\/consumes\.ts$/;
+const EVENT_CLASS_FILE = /^be\/src\/modules\/events\/([^/]+)\/[^/]+\.event\.ts$/;
+const CONSUMER_FILE = /^be\/src\/features\/(?:[^/]+\/)+transport\/message\/[^/]+\.consumer\.ts$/;
 const E2E_SPEC = /^be\/src\/tests\/e2e\/[^/]+\/[^/]+\.e2e-spec\.ts$/;
 const USE_TEST_WORLD = /\buseTestWorld\s*\(/;
-const SPEC_FILE = /\.(spec|e2e-spec|integration-spec|contract-spec)\.ts$/;
 
 /** The be apps of kind api or worker. */
 const servicesOf = (repo) => (repo.sides?.be?.apps ?? []).filter((app) => SERVICE_KINDS.has(app.kind));
@@ -125,107 +125,69 @@ export function serviceStackFindings({ repoRoot, repo }) {
 
 // ------------------------------------------------------------------------------------------------ R139 event contract
 
-/** The event names a source file defines: the `name` of each `defineEvent({ ... })` or `defineQueue({ ... })` call, imported from an `event-bus` or `messaging` module (by import origin, not by spelling). */
-function queueNamesOf(ts, text) {
-  const sourceFile = ts.createSourceFile('queue.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const locals = new Set();
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) || !/(?:^|\/)(?:messaging|event-bus)$/.test(statement.moduleSpecifier.text)) continue;
-    const named = statement.importClause?.namedBindings;
-    if (named && ts.isNamedImports(named)) for (const element of named.elements) if (['defineEvent', 'defineQueue'].includes((element.propertyName ?? element.name).text)) locals.add(element.name.text);
+/** The typed event classes of every service: `[{ service, file, className, name, version, compensates, payload }]` and the problems of the ones that cannot be read. */
+function eventClassesOf({ repoRoot, files, ts }) {
+  const classes = [];
+  const problems = [];
+  for (const file of files.filter((candidate) => EVENT_CLASS_FILE.test(candidate)).sort()) {
+    const service = EVENT_CLASS_FILE.exec(file)[1];
+    const read = readEventClasses(ts, readText(repoRoot, file) ?? '', file);
+    for (const event of read.events) classes.push({ service, file, ...event });
+    for (const problem of read.problems) problems.push({ service, file, problem });
   }
-  const names = [];
-  const visit = (node) => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && locals.has(node.expression.text) && node.arguments[0] !== undefined && ts.isObjectLiteralExpression(node.arguments[0])) {
-      for (const property of node.arguments[0].properties) {
-        if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && property.name.text === 'name' && ts.isStringLiteralLike(property.initializer)) names.push(property.initializer.text);
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return names;
+  return { classes, problems };
 }
 
-/** Findings of R139 over the provider tables, their snapshots and the consumer tables of every service app. */
+/** Findings of R139: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
 export function eventContractFindings({ repoRoot, files }) {
-  const tracked = new Set(files);
-  const providers = files.filter((file) => /^be\/apps\/[^/]+\/src\/events\.ts$/.test(file));
-  const consumers = files.filter((file) => /^be\/apps\/[^/]+\/src\/consumes\.ts$/.test(file));
+  const classFiles = files.filter((file) => EVENT_CLASS_FILE.test(file));
   const snapshots = files.filter((file) => SNAPSHOT.test(file));
-  if (providers.length === 0 && consumers.length === 0 && snapshots.length === 0) return [];
+  if (classFiles.length === 0 && snapshots.length === 0) return [];
   const ts = typescriptFor(repoRoot);
   if (ts === null) return [];
-  const findings = [];
-  const provided = new Map();
-  for (const file of providers) {
-    const service = BE_SERVICE_FILE.exec(file)[1];
+  const tracked = new Set(files);
+  const { classes, problems } = eventClassesOf({ repoRoot, files, ts });
+  const findings = problems.map(({ service, file, problem }) => found(EVENT_CONTRACT, file, `${file} is not an event class the contract can be emitted from: ${problem}.`, { service }));
+  const services = [...new Set(classes.map((event) => event.service))].sort();
+  const declared = new Set(classes.map((event) => event.name));
+  for (const service of services) {
     const snapshot = `be/contracts/${service}/events.json`;
-    const { events, problems } = readEvents(ts, readText(repoRoot, file) ?? '');
-    if (problems.length > 0) {
-      findings.push(found(EVENT_CONTRACT, file, `${file} is not a literal event table the contract can be emitted from: ${problems.join('; ')}.`, { service }));
-      continue;
-    }
-    provided.set(service, events);
-    if (!tracked.has(snapshot)) findings.push(found(EVENT_CONTRACT, snapshot, `${service} declares events (${file}) but ${snapshot} is not committed; run \`npm run contract:emit\` and commit the snapshot, the contract its consumers are judged against.`, { service }));
-    else if (folded(readText(repoRoot, snapshot) ?? '') !== snapshotText(service, events)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} differs from the event table ${service} declares now (${file}); run \`npm run contract:emit\` and commit the result.`, { service, drift: 'stale' }));
+    const events = classes.filter((event) => event.service === service);
+    if (!tracked.has(snapshot)) findings.push(found(EVENT_CONTRACT, snapshot, `${service} declares event classes (be/src/modules/events/${service}/) but ${snapshot} is not committed; run \`npm run contract:emit\` and commit the snapshot, the contract its consumers rely on.`, { service }));
+    else if (folded(readText(repoRoot, snapshot) ?? '') !== snapshotText(service, events)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} differs from what the event classes of ${service} emit now; run \`npm run contract:emit\` and commit the result.`, { service, drift: 'stale' }));
   }
   for (const snapshot of snapshots) {
     const service = SNAPSHOT.exec(snapshot)[1];
-    if (!provided.has(service) && !providers.includes(`be/apps/${service}/src/events.ts`)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} is committed but be/apps/${service}/src/events.ts declares no events; delete the snapshot or restore the table.`, { service, drift: 'left-behind' }));
+    if (!services.includes(service) && !problems.some((entry) => entry.service === service)) findings.push(found(EVENT_CONTRACT, snapshot, `${snapshot} is committed but be/src/modules/events/${service}/ declares no event class; delete the snapshot or restore the classes.`, { service, drift: 'left-behind' }));
   }
-  for (const file of consumers) {
-    const app = BE_SERVICE_FILE.exec(file)[1];
-    const { consumes, problems } = readConsumes(ts, readText(repoRoot, file) ?? '');
-    if (problems.length > 0) {
-      findings.push(found(EVENT_CONTRACT, file, `${file} is not a literal consumes table: ${problems.join('; ')}.`, { app }));
-      continue;
-    }
-    for (const [service, events] of Object.entries(consumes)) {
-      const snapshot = `be/contracts/${service}/events.json`;
-      const text = tracked.has(snapshot) ? readText(repoRoot, snapshot) : null;
-      let vendored = null;
-      try { vendored = text === null ? null : JSON.parse(text).events ?? null; } catch { vendored = null; }
-      if (vendored === null) {
-        findings.push(found(EVENT_CONTRACT, file, `${file}: ${app} consumes events of ${service}, but the vendored contract ${snapshot} is ${text === null ? 'not committed' : 'not a JSON event contract'}; a consumer is judged against the snapshot, so vendor it (\`npm run contract:emit\`).`, { app, service }));
-        continue;
-      }
-      for (const [event, version] of Object.entries(events)) {
-        const declared = vendored[event];
-        if (declared === undefined) findings.push(found(EVENT_CONTRACT, file, `${file}: ${app} consumes ${service} event "${event}", which ${snapshot} does not declare.`, { app, service, event }));
-        else if (declared.version !== version) findings.push(found(EVENT_CONTRACT, file, `${file}: ${app} consumes ${service} event "${event}" at version ${version}, but ${snapshot} declares version ${declared.version}; update the consumer (and its handling) or the provider's version.`, { app, service, event }));
-      }
-    }
-  }
-  const declared = new Set(consumedEvents({ repoRoot, files, ts }).map((entry) => entry.event));
-  for (const file of files.filter((candidate) => candidate.startsWith('be/src/') && candidate.endsWith('.ts') && !SPEC_FILE.test(candidate))) {
-    const text = readText(repoRoot, file);
-    if (text === null || !/define(?:Event|Queue)/.test(text)) continue;
-    for (const name of queueNamesOf(ts, text)) {
-      if (!declared.has(name)) findings.push(found(EVENT_CONTRACT, file, `${file} defines the event "${name}", but no be/apps/<app>/src/consumes.ts lists that event; a service reads only what its consumes table declares and the vendored contract judges (add it, or delete the queue).`, { event: name }));
-    }
-  }
-  const known = new Set([...provided.values()].flatMap((events) => Object.keys(events)));
-  for (const snapshot of snapshots) {
-    try { for (const name of Object.keys(JSON.parse(readText(repoRoot, snapshot) ?? '{}').events ?? {})) known.add(name); } catch { /* an unreadable snapshot is reported above */ }
-  }
-  for (const [service, events] of provided) {
-    for (const [name, event] of Object.entries(events)) {
-      if (event.compensates !== undefined && !known.has(event.compensates)) findings.push(found(EVENT_CONTRACT, `be/apps/${service}/src/events.ts`, `be/apps/${service}/src/events.ts: event "${name}" compensates "${event.compensates}", which no service contract declares; name the event whose step it undoes.`, { service, event: name }));
-    }
+  for (const event of classes) {
+    if (event.compensates !== undefined && !declared.has(event.compensates)) findings.push(found(EVENT_CONTRACT, event.file, `${event.file}: event "${event.name}" compensates "${event.compensates}", which no event class declares; name the event whose step it undoes.`, { service: event.service, event: event.name }));
   }
   return findings;
 }
 
 // ------------------------------------------------------------------------------------------------ R140 async specs
 
-/** The entries of every `be/apps/<app>/src/consumes.ts`: `[{ app, file, service, event }]` (a table that is not a literal is R139's finding). */
+/** The class an expression names, from `readonly event = <Class>` of a consumer: the identifier, or null. */
+function consumedClassOf(ts, text) {
+  const sourceFile = ts.createSourceFile('consumer.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let name = null;
+  const visit = (node) => {
+    if (ts.isPropertyDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'event' && node.initializer && ts.isIdentifier(node.initializer)) name = node.initializer.text;
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return name;
+}
+
+/** The events the consumers consume: `[{ file, className, service, event }]` from `readonly event = <EventClass>` of every `transport/message/*.consumer.ts`. */
 function consumedEvents({ repoRoot, files, ts }) {
+  const { classes } = eventClassesOf({ repoRoot, files, ts });
   const consumed = [];
-  for (const file of files.filter((candidate) => CONSUMES_FILE.test(candidate))) {
-    const { consumes } = readConsumes(ts, readText(repoRoot, file) ?? '');
-    if (consumes === null) continue;
-    for (const [service, events] of Object.entries(consumes)) for (const event of Object.keys(events)) consumed.push({ app: BE_SERVICE_FILE.exec(file)[1], file, service, event });
+  for (const file of files.filter((candidate) => CONSUMER_FILE.test(candidate))) {
+    const className = consumedClassOf(ts, readText(repoRoot, file) ?? '');
+    const event = classes.find((candidate) => candidate.className === className);
+    if (event !== undefined) consumed.push({ file, className, service: event.service, event: event.name, compensates: event.compensates });
   }
   return consumed;
 }
@@ -241,16 +203,14 @@ export function asyncSpecFindings({ repoRoot, files }) {
     .map((file) => ({ file, text: readText(repoRoot, file) ?? '' }))
     .filter(({ text }) => USE_TEST_WORLD.test(text));
   const findings = [];
-  for (const { app, file, service, event } of consumed) {
-    const vendored = readJson(repoRoot, `be/contracts/${service}/events.json`)?.events?.[event];
+  for (const { file, className, service, event, compensates } of consumed) {
     const named = specs.filter(({ text }) => text.includes(event));
     if (named.length === 0) {
-      findings.push(found(ASYNC_SPEC_MISSING, file, `${file}: ${app} consumes ${service} event "${event}" but no e2e spec (be/src/tests/e2e/<area>/<name>.e2e-spec.ts) boots the apps with useTestWorld and names it; an async flow is proven through the world: publish the event, read the persisted effect back and redeliver it.`, { app, service, event }));
+      findings.push(found(ASYNC_SPEC_MISSING, file, `${file}: the consumer of ${service} event "${event}" (${className}) has no e2e spec; add be/src/tests/e2e/<area>/<name>.e2e-spec.ts, which boots the apps with useTestWorld and names it: publish the event, read the persisted effect back and redeliver it.`, { service, event }));
       continue;
     }
-    const compensates = vendored?.compensates;
     if (typeof compensates === 'string' && !named.some(({ text }) => text.includes(compensates))) {
-      findings.push(found(ASYNC_SPEC_MISSING, named[0].file, `${named[0].file} is the spec of the saga step "${event}", which undoes "${compensates}", but never names it; the spec drives the whole flow: the step, the failure, then the compensated state.`, { app, service, event, compensates }));
+      findings.push(found(ASYNC_SPEC_MISSING, named[0].file, `${named[0].file} is the spec of the saga step "${event}", which undoes "${compensates}", but never names it; the spec drives the whole flow: the step, the failure, then the compensated state.`, { service, event, compensates }));
     }
   }
   return findings;
