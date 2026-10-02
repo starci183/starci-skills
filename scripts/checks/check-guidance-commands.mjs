@@ -28,6 +28,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { commandVerdict } from '../guards/command-guard.mjs';
+import { sentencesOf } from '../lib/tracked-text-scan.mjs';
 import * as gitPolicy from '../guards/git-policy.mjs';
 import * as depsGuard from '../guards/deps-guard.mjs';
 import { CATALOG_FILE } from './check-failure-codes.mjs';
@@ -44,22 +45,6 @@ export const isGuidanceFile = (rel) => (rel.startsWith('modules/') && (rel.endsW
   || /^skills\/[^/]+\/SKILL\.md$/.test(rel);
 
 /* ------------------------------------------------------------ sentences */
-
-/** `text` cut into sentences; a backticked span never splits. */
-export function sentencesOf(text) {
-  const out = [];
-  const s = String(text ?? '');
-  let start = 0, tick = false;
-  for (let i = 0; i < s.length; i += 1) {
-    if (s[i] === '`') tick = !tick;
-    else if (!tick && /[.!?]/.test(s[i]) && /\s/.test(s[i + 1] ?? '') && /[A-Z0-9`("']/.test(s.slice(i + 1).trimStart()[0] ?? '')) {
-      out.push(s.slice(start, i + 1).trim()); start = i + 1;
-    }
-  }
-  const last = s.slice(start).trim();
-  if (last) out.push(last);
-  return out.filter(Boolean);
-}
 
 /** The outermost parenthesised spans of `s` outside backticks: [{text, at}]. */
 function parenSpans(s) {

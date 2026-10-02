@@ -27,7 +27,7 @@ profiles: [runtime]
 tiers:
   runtime:
     entry:      {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
-    checks:     {mayImport: [reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package]}
+    checks:     {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package]}
     reconciler: {mayImport: [supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
     supervisor: {mayImport: [kernel, domain, gates, machine, hfs, api, db, base]}
     kernel:     {mayImport: [domain, gates, machine, hfs, api, db, base]}

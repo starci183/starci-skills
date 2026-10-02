@@ -3,7 +3,7 @@
 import { policyVerdict } from '../../guards/command-policy.mjs';
 import { maskTextRange } from '../../lib/text-mask.mjs';
 import { lineTextAt, sentenceRanges, sentenceTextAt } from '../../lib/tracked-text-scan.mjs';
-import { sentencesOf } from '../check-guidance-commands.mjs';
+import { sentencesOf } from '../../lib/tracked-text-scan.mjs';
 
 const POLICY_PROGRAMS = new Set([
   'git', 'npm', 'npx', 'pnpm', 'yarn',

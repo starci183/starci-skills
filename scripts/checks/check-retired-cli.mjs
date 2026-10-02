@@ -12,8 +12,8 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { maskTextRange } from '../lib/text-mask.mjs';
-import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
-import { sentencesOf } from './check-guidance-commands.mjs';
+import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt, sentencesOf } from '../lib/tracked-text-scan.mjs';
+
 
 export const CODE = 'RT_RETIRED_CLI_CALL';
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -8,6 +8,22 @@ export const lineTextAt = (text, at) => {
   return text.slice(start, next < 0 ? text.length : next).trim().slice(0, 240);
 };
 
+/** `text` cut into sentences; a backticked span never splits. */
+export function sentencesOf(text) {
+  const out = [];
+  const s = String(text ?? '');
+  let start = 0, tick = false;
+  for (let i = 0; i < s.length; i += 1) {
+    if (s[i] === '`') tick = !tick;
+    else if (!tick && /[.!?]/.test(s[i]) && /\s/.test(s[i + 1] ?? '') && /[A-Z0-9`("']/.test(s.slice(i + 1).trimStart()[0] ?? '')) {
+      out.push(s.slice(start, i + 1).trim()); start = i + 1;
+    }
+  }
+  const last = s.slice(start).trim();
+  if (last) out.push(last);
+  return out.filter(Boolean);
+}
+
 /** Offset ranges for the sentence strings returned by a caller's prose splitter. */
 export const sentenceRanges = (text, sentences) => {
   const ranges = [];

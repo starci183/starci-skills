@@ -8,14 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
+import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt, sentencesOf } from '../lib/tracked-text-scan.mjs';
 import { codexGuardBlock, toolGuardCommand } from '../agent/trust.mjs';
 import { historyHookBody, workHookCheck } from '../guards/hook-install.mjs';
 import { taskScript as reconcilerTaskScript } from '../reconciler/boot.mjs';
 import { tunnelTaskScript } from '../reconciler/tunnel-task.mjs';
 import { escapeRegExp } from '../lib/regex.mjs';
 import { loadCommandPolicy } from '../guards/command-policy.mjs';
-import { sentencesOf } from './check-guidance-commands.mjs';
+
 import { loadInternalRegistry } from './check-cli-parity.mjs';
 import { maskCatalogRemoved, retiredCallsInText, retiredMatchers } from './check-retired-cli.mjs';
 import { rawCommandFindingsInText, rawUseCounts } from './lib/raw-command-scan.mjs';
