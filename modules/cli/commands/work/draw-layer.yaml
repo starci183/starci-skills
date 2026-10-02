@@ -1,0 +1,15 @@
+group: work
+verb: draw-layer
+owner: runtime
+summary: verify that drawings are isolated content layers
+impl: {script: scripts/work/draw/draw-layer.mjs}
+positional:
+  - {name: path, required: true, variadic: true}
+flags:
+  - {name: playwright, type: string}
+exit: {"0": clean, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-layer <render-dir> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-layer.mjs']

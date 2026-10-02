@@ -1,0 +1,15 @@
+group: work
+verb: draw-acceptance
+owner: runtime
+summary: verify that drawn assets are accepted render shapes
+impl: {script: scripts/work/draw/draw-acceptance.mjs}
+flags:
+  - {name: repo, type: string, required: true}
+  - {name: job, type: string}
+  - {name: files, type: string}
+exit: {"0": accepted, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-acceptance --repo <repo> --job <job> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-acceptance.mjs']

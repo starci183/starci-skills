@@ -34,7 +34,7 @@
 // is kept proof, never re-judged.
 // An entry marked retired, a retired asset and a rejected-* candidate are kept proof.
 //
-//   node scripts/work/draw/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
+//   starci work draw-acceptance --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -308,7 +308,7 @@ async function main(argv) {
   const get = (name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
   const repo = get('--repo'), jobId = get('--job'), filesArg = get('--files'), json = argv.includes('--json');
   if (!repo || (!jobId && !filesArg)) {
-    process.stderr.write('use: node scripts/work/draw/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]\n');
+    process.stderr.write('use: starci work draw-acceptance --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]\n');
     return 2;
   }
   let files = filesArg ? filesArg.split(',').map((s) => s.trim()).filter(Boolean) : [];

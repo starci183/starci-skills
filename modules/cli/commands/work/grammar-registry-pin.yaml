@@ -1,0 +1,13 @@
+group: work
+verb: grammar-registry-pin
+owner: runtime
+summary: check a frontend grammar dependency against the registry pin
+impl: {script: scripts/work/ui/grammar-registry-pin.mjs}
+flags:
+  - {name: repo, type: string, required: true}
+exit: {"0": clean, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work grammar-registry-pin --repo <repo> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/ui/grammar-registry-pin.mjs']

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // shell-conformance.mjs — every drawn and built screen sits inside the product's REAL layout tree.
 //
-//   node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]
+//   starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]
 //
 // The shell record (.starciwork/shell/index.yaml) is the layout tree, work/layout-tree@1: the frontend's
 // Next.js app/ directory scanned into one node per segment (scripts/work/layout-tree.mjs), each layout with
@@ -194,7 +194,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
         // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
         // string another workflow adds is not drift (nivo inc-13f6af8494bf).
         const drift = scan ? sourceDrift(tree, scan) : null;
-        if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
+        if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs starci work layout-tree scan --work <.starciwork> --write and re-captures what moved`));
       }
     }
   }
@@ -374,7 +374,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
   const assets = assetsOf(record);
   const composites = assets.filter((a) => a.composite && typeof a.composite === 'object');
   const generated = generatedDrawingsOf(assets).filter((a) => a.role !== 'direction-content' && !a.composite);
-  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - a drawing is only the slot content; place it with node scripts/work/compose-direction.mjs`));
+  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - a drawing is only the slot content; place it with starci work compose-direction`));
   const loader = (id) => records.get(id) ?? null;
   for (const a of composites) {
     const c = a.composite;
@@ -645,7 +645,7 @@ export function shellConformanceMain(argv = []) {
   argv = admitted.rest;
   const args = argv.filter((a) => a !== '--json');
   if (args.includes('--help') || args.includes('-h') || args.length !== 1) {
-    return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };
+    return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };
   }
   if (!fs.existsSync(args[0])) return { exitCode: 2, text: `${args[0]}: target does not exist\n` };
   const result = checkShellConformance(args[0], { advisoryCodes: admitted.codes });

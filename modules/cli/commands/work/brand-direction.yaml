@@ -1,0 +1,19 @@
+group: work
+verb: brand-direction
+owner: runtime
+summary: inspect, ask for, or apply owner review of a brand direction
+impl: {script: scripts/work/brand-direction.mjs}
+positional:
+  - {name: command, enum: [status, question, apply], required: true, variadic: false}
+flags:
+  - {name: work, type: string, required: true}
+  - {name: archetype, type: string}
+  - {name: lang, type: enum, enum: [en, vi]}
+  - {name: receipt, type: string}
+  - {name: write, type: boolean}
+exit: {"0": success, "1": review failed, "2": bad usage}
+json: flag
+examples: ['starci work brand-direction status --work .starciwork']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/brand-direction.mjs']

@@ -1,0 +1,18 @@
+group: work
+verb: ui-proof-brief
+owner: runtime
+summary: emit a UI proof brief or score a rendered surface
+impl: {script: scripts/work/ui/ui-proof-brief.mjs}
+flags:
+  - {name: surface, type: string}
+  - {name: repo, type: string, required: true}
+  - {name: family, type: enum, enum: [starci, nivo]}
+  - {name: elements, type: string}
+  - {name: score, type: string}
+  - {name: viewport, type: string}
+exit: {"0": success, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work ui-proof-brief --surface <record> --repo <repo> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/ui/ui-proof-brief.mjs']

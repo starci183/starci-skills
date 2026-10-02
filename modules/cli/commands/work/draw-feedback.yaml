@@ -1,0 +1,22 @@
+group: work
+verb: draw-feedback
+owner: runtime
+summary: build, inspect, check, or classify drawing feedback
+impl: {script: scripts/work/draw-feedback.mjs}
+positional:
+  - {name: command, enum: [brief, status, check, classify], required: true, variadic: false}
+flags:
+  - {name: ui, type: string, required: true}
+  - {name: shape, type: string}
+  - {name: note, type: string}
+  - {name: class, type: string}
+  - {name: target, type: string}
+  - {name: as, type: string}
+  - {name: by, type: enum, enum: [kernel, critic]}
+  - {name: write, type: boolean}
+exit: {"0": success, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-feedback status --ui <record> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-feedback.mjs']

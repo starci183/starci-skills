@@ -1,0 +1,27 @@
+group: work
+verb: graph
+owner: runtime
+summary: inspect, validate, diff or propose a workflow work graph
+impl: {script: scripts/work/work-graph.mjs}
+positional:
+  - {name: action, enum: [show, validate, diff, propose], required: true, variadic: false}
+flags:
+  - {name: repo, type: string, required: true}
+  - {name: workflow, type: string}
+  - {name: version, type: number}
+  - {name: file, type: string}
+  - {name: from, type: number}
+  - {name: to, type: number}
+  - {name: job, type: string}
+  - {name: reason, type: string}
+  - {name: slice, type: string}
+exit: {"0": action completed, "1": graph refused or invalid, "2": bad usage}
+json: flag
+examples:
+  - starci work graph show --repo <path> --workflow <id>
+  - starci work graph propose --repo <path> --job <id> --file <candidate> --reason <text>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/work/work-graph.mjs
+  - node .claude/scripts/work/work-graph.mjs

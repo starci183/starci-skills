@@ -19,8 +19,8 @@
 // job's settle records one `grammar-proposal-filed` ledger event per proposal (status proposed), and `api status`
 // lists the workflow's open ones as grammarProposals[] until a grammar lane records `grammar-proposal-resolved`.
 //
-//   node scripts/work/grammar-proposal.mjs list <file|dir>... [--json]     every proposal found, complete or not
-//   node scripts/work/grammar-proposal.mjs check <file|dir>... [--json]    exit 1 when one is incomplete
+//   starci work grammar-proposal list <file|dir>... [--json]     every proposal found, complete or not
+//   starci work grammar-proposal check <file|dir>... [--json]    exit 1 when one is incomplete
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
@@ -183,7 +183,7 @@ function main(argv) {
   const json = rest.includes('--json');
   const targets = rest.filter((a) => !a.startsWith('--'));
   if (!['list', 'check'].includes(cmd) || !targets.length) {
-    process.stderr.write('use: node scripts/work/grammar-proposal.mjs list|check <file|dir>... [--json]\n');
+    process.stderr.write('use: starci work grammar-proposal list|check <file|dir>... [--json]\n');
     return 2;
   }
   const proposals = readProposals(proposalFilesIn(targets.map((t) => path.resolve(t))));

@@ -23,8 +23,8 @@
 // the files it binds and one `asset-slot-filled` per filled one; `api status` lists the open ones as assetSlotsOwed[]
 // and its nextActions propose an interface.asset leg for them (scripts/kernel/cli.mjs).
 //
-//   node scripts/work/asset-slot.mjs list <file|dir>... [--json]    every slot, owed or filled, with its request
-//   node scripts/work/asset-slot.mjs check <file|dir>... [--json]   exit 1 when a slot has no request
+//   starci work asset-slot list <file|dir>... [--json]    every slot, owed or filled, with its request
+//   starci work asset-slot check <file|dir>... [--json]   exit 1 when a slot has no request
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
@@ -246,7 +246,7 @@ function main(argv) {
   const json = rest.includes('--json');
   const targets = rest.filter((a) => !a.startsWith('--')).map((t) => path.resolve(t));
   if (!['list', 'check'].includes(cmd) || !targets.length) {
-    process.stderr.write('use: node scripts/work/asset-slot.mjs list|check <file|dir>... [--json]\n');
+    process.stderr.write('use: starci work asset-slot list|check <file|dir>... [--json]\n');
     return 2;
   }
   const slots = assetSlotsOf(targets);

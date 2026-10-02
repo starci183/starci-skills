@@ -255,7 +255,7 @@ export function brandDirectionMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const work = flag(args, '--work');
-  const usage = 'Usage: node scripts/work/brand-direction.mjs <status|question|apply> --work <tree> [--archetype <name>] [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: starci work brand-direction <status|question|apply> --work <tree> [--archetype <name>] [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
   if (!['status', 'question', 'apply'].includes(command) || !work) return { exitCode: 2, text: usage };
   try {
     if (command === 'status') {

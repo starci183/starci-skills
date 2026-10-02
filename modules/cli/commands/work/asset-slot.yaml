@@ -1,0 +1,15 @@
+group: work
+verb: asset-slot
+owner: runtime
+summary: list or check asset slots in Work records
+impl: {script: scripts/work/asset-slot.mjs}
+positional:
+  - {name: command, enum: [list, check], required: true, variadic: false}
+  - {name: target, required: true, variadic: true}
+flags: []
+exit: {"0": success, "1": incomplete slots, "2": bad usage}
+json: flag
+examples: ['starci work asset-slot check .starciwork']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/asset-slot.mjs']

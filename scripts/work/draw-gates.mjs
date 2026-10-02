@@ -6,7 +6,7 @@
 // and prints the report.checks entries - each red one with `failing` (the implicated files), so api record-checks attributes
 // a red gate on a record outside the job's owned paths instead of spending the attempt on it.
 //
-//   node scripts/work/draw-gates.mjs --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure]
+//   starci work draw-gates --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure]
 //        [--checks-out <file>] [--json]
 //
 // The gates (names are the report.checks names):
@@ -46,7 +46,13 @@ const rel = (repo, p) => slash(path.relative(repo, p));
 const uniq = (xs) => [...new Set(xs.filter(Boolean))];
 
 /** The command line a gate is re-run by (the evidence names it, api record-checks records it). */
-const cmd = (script, args) => `node ${slash(path.join(SKILL_ROOT, script))} ${args.join(' ')}`;
+const WORK_VERBS = new Map([
+  ['scripts/work/draw/draw-acceptance.mjs', 'draw-acceptance'],
+  ['scripts/work/draw-loop.mjs', 'draw-loop'],
+  ['scripts/work/ui/shell-conformance.mjs', 'shell-conformance'],
+  ['scripts/work/draw/draw-layer.mjs', 'draw-layer'],
+]);
+const cmd = (script, args) => `starci work ${WORK_VERBS.get(script)} ${args.join(' ')}`;
 
 /** The repo-relative file a finding implicates: its path, else the record. */
 const fileOf = (f, fallback) => (typeof f?.path === 'string' && f.path ? f.path.split('#')[0] : fallback);
@@ -145,7 +151,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
     owner: { owed: owner.length > 0, detail: owner.map((f) => f.detail).join('; ') || null },
     next: failed.length
       ? `red: ${failed.map((g) => `${g.name} [${g.codes.join(', ') || 'exit ' + g.exitCode}]`).join('; ')} - fix and re-run this command; if a red gate is not yours to fix, report blocked naming it (report.checks below carry the failing files)`
-      : owner.length ? 'every machine gate is green; the owner gate is owed: file the draw-review ask (node scripts/work/draw-review.mjs question --job <id>) and report ask with these checks'
+      : owner.length ? 'every machine gate is green; the owner gate is owed: file the draw-review ask (starci work draw-review question --job <id>) and report ask with these checks'
         : 'every gate is green: report with these checks',
   };
 }
@@ -153,7 +159,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
 async function main(argv) {
   const get = (k) => { const i = argv.indexOf(k); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
   const ui = get('--ui'), repo = get('--repo');
-  if (!ui || !repo) { process.stderr.write('use: node scripts/work/draw-gates.mjs --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure] [--checks-out <file>] [--json]\n'); return 2; }
+  if (!ui || !repo) { process.stderr.write('use: starci work draw-gates --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure] [--checks-out <file>] [--json]\n'); return 2; }
   const r = await drawGates({ ui: path.resolve(repo, ui), repo, files: (get('--files') ?? '').split(',').map((s) => s.trim()).filter(Boolean), remeasure: !argv.includes('--no-remeasure') });
   if (get('--checks-out')) fs.writeFileSync(path.resolve(get('--checks-out')), `${JSON.stringify({ checks: r.checks }, null, 2)}\n`);
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);

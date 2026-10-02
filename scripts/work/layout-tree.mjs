@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // layout-tree.mjs — the product's layout tree, scanned out of the frontend's Next.js `app/` directory.
 //
-//   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>]... [--write] [--json]   (every fe app hfs.json declares)
-//   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--app <name>] [--repo-root <dir>] [--json]
-//   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
-//   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
-//   node scripts/work/layout-tree.mjs lockup  --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme t] --write
-//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--app <name>] [--route <node-id> [--active-nav <key>]] [--write] [--json]
-//   node scripts/work/layout-tree.mjs plan    --work <.starciwork> [--app <name>] --node <id> [--files layout,page] [--design <ui-id>] --write
-//   node scripts/work/layout-tree.mjs slot    <png> [--key ff00ff] [--tolerance 8]
+//   starci work layout-tree scan    --work <.starciwork> [--app-dir <dir>]... [--write] [--json]   (every fe app hfs.json declares)
+//   starci work layout-tree scan    --app-dir <dir> [--app <name>] [--repo-root <dir>] [--json]
+//   starci work layout-tree capture --work <.starciwork> [--app <name>] --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
+//   starci work layout-tree capture --work <.starciwork> [--app <name>] --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
+//   starci work layout-tree lockup  --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme t] --write
+//   starci work layout-tree destinations --work <.starciwork> [--app <name>] [--route <node-id> [--active-nav <key>]] [--write] [--json]
+//   starci work layout-tree plan    --work <.starciwork> [--app <name>] --node <id> [--files layout,page] [--design <ui-id>] --write
+//   starci work layout-tree slot    <png> [--key ff00ff] [--tolerance 8]
 //
 // The source of truth for what wraps a screen is the App Router's own file convention, not a sentence in a
 // prompt and not a hand-kept list: one node per segment directory under app/ with its special files
@@ -49,7 +49,7 @@ export const SLOT_KEY = [255, 0, 255];
 // before the final reconciliation, so interface.draw parks one owner draw-review ask of its parts and applies the
 // accept answer onto the record - the owner's, or auto-accepted when the owner did not ask for the drawing
 // (scripts/work/draw-review.mjs).
-export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (scripts/work/draw-review.mjs question) and, on its accept answer (the owner answer, or an auto-accept when the owner did not ask for the drawing), writes the record done (draw-review.mjs apply --receipt <answer receipt> --write)';
+export const ACCEPT_PATH = 'interface.draw parks the owner draw-review ask of its drawn parts (starci work draw-review question) and, on its accept answer (the owner answer, or an auto-accept when the owner did not ask for the drawing), writes the record done (starci work draw-review apply --receipt <answer receipt> --write)';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage', 'storybook-static', '.turbo']);
 const LOCALE_PARAMS = new Set(['locale', 'lang', 'lng', 'language']);
@@ -1221,7 +1221,7 @@ export function layoutTreeMain(argv = []) {
   try {
     if (command === 'slot') {
       const file = args.find((a) => !a.startsWith('--') && a !== flag(args, '--key') && a !== flag(args, '--tolerance'));
-      if (!file) return { exitCode: 2, text: 'Usage: layout-tree.mjs slot <png> [--key ff00ff] [--tolerance 8]\n' };
+      if (!file) return { exitCode: 2, text: 'Usage: starci work layout-tree slot <png> [--key ff00ff] [--tolerance 8]\n' };
       const hex = (flag(args, '--key') ?? 'ff00ff').replace(/^#/, '');
       const key = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
       const found = keyRect(decodePng(fs.readFileSync(file)), key, Number(flag(args, '--tolerance') ?? 8));
@@ -1237,7 +1237,7 @@ export function layoutTreeMain(argv = []) {
       return out(record, summarize(record));
     }
     if (!['scan', 'capture', 'plan', 'destinations', 'lockup'].includes(command) || !work) {
-      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
+      return { exitCode: 2, text: 'Usage: starci work layout-tree <scan|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
     const shell = readShellRecord(workRoot);
@@ -1247,7 +1247,7 @@ export function layoutTreeMain(argv = []) {
     const save = (record) => writeRecordFile(shellFileOf(workRoot), stringifyYaml(record, { lineWidth: 110 }));
     if (command === 'lockup') {
       if (!isLayoutTree(existing)) return { exitCode: 1, text: 'lockup needs a work/layout-tree@1 record\n' };
-      if (!flag(args, '--from') || !flag(args, '--rect')) return { exitCode: 2, text: 'Usage: layout-tree.mjs lockup --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme light] [--provenance <text>] --write\n' };
+      if (!flag(args, '--from') || !flag(args, '--rect')) return { exitCode: 2, text: 'Usage: starci work layout-tree lockup --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme light] [--provenance <text>] --write\n' };
       const record = existing;
       if (!write) {
         const source = lockupSourceOf(record, workRoot, flag(args, '--from'));
@@ -1281,7 +1281,7 @@ export function layoutTreeMain(argv = []) {
     }
     if (command === 'capture' || command === 'plan') {
       if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan first\n' };
-      if (command === 'plan' && !flags(args, '--node').length) return { exitCode: 2, text: 'Usage: layout-tree.mjs plan --work <.starciwork> --node <id> [--node <id>]... [--files layout,page] [--design <ui-id>] --write\n' };
+      if (command === 'plan' && !flags(args, '--node').length) return { exitCode: 2, text: 'Usage: starci work layout-tree plan --work <.starciwork> --node <id> [--node <id>]... [--files layout,page] [--design <ui-id>] --write\n' };
       const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], apps: [{ name: flag(args, '--app') ?? 'app', root: '.', appDir: 'app', framework: 'next-app-router', nodes: [] }] };
       const picked = appOf(record);
       if (picked.error) return { exitCode: 2, text: `layout-tree: ${picked.error}\n` };

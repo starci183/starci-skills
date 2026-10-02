@@ -491,7 +491,7 @@ export function drawReviewMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');
-  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: starci work draw-review <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
   if (!['status', 'question', 'apply'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     if (command === 'status') {

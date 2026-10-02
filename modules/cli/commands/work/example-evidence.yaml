@@ -1,0 +1,16 @@
+group: work
+verb: example-evidence
+owner: runtime
+summary: collect evidence for one example Work record
+impl: {script: scripts/example/example-evidence.mjs}
+flags:
+  - {name: work, type: string, required: true}
+  - {name: record, type: string, required: true}
+  - {name: cwd, type: string, required: true}
+  - {name: assert, type: list}
+exit: {"0": evidence collected, "1": evidence failed, "2": bad usage}
+json: none
+examples: ['starci work example-evidence --work .starciwork --record <id> --cwd <repo>']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/example/example-evidence.mjs']

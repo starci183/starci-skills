@@ -13,7 +13,7 @@
 // (upgradeOwed {status: owed, from, to, range, inRange}) - interface.implement bumps the product's dependency; the
 // draw never touches the product's package.json. When neither satisfies: DRAW_TYPECHECK_FAILED.
 //
-//   node scripts/work/draw-grammar.mjs --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist]
+//   starci work draw-grammar --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist]
 //        [--grammar-dist <package root>]   (default .claude/packages/grammar; env STARCI_GRAMMAR_DIST; a lane checkout
 //        without a built dist points it at the live checkout's)
 import path from 'node:path';
@@ -143,7 +143,7 @@ export function grammarEntry(root, subpath = '') {
 async function main(argv) {
   const val = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
   const productDir = val('--product');
-  if (!productDir) { process.stderr.write('use: node scripts/work/draw-grammar.mjs --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist] [--json]\n'); return 2; }
+  if (!productDir) { process.stderr.write('use: starci work draw-grammar --product <app dir> [--file <X.draw.tsx>] [--grammar auto|product|claude-dist] [--json]\n'); return 2; }
   const r = resolveDrawGrammar({ file: val('--file') ? path.resolve(val('--file')) : null, productDir: path.resolve(productDir), prefer: val('--grammar') ?? 'auto', grammarDist: val('--grammar-dist') });
   if (argv.includes('--json')) process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
   else process.stdout.write(`${r.ok ? `grammar ${r.grammarSource}` : `UNRESOLVED: ${r.error}`}${r.upgradeOwed ? `; product upgrade owed ${r.upgradeOwed.from} -> ${r.upgradeOwed.to} (range ${r.upgradeOwed.range}, in range ${r.upgradeOwed.inRange})` : ''}\n${r.attempts.map((a) => `  ${a.source}@${a.version}: ${a.ok ? 'type-checks' : `${a.errors.length} error(s): ${a.errors.slice(0, 3).map((e) => `${e.code} ${e.message}`).join(' | ')}`}`).join('\n')}\n`);

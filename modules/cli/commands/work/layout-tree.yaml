@@ -1,0 +1,36 @@
+group: work
+verb: layout-tree
+owner: runtime
+summary: scan, capture, plan, lock, or inspect a product layout tree
+impl: {script: scripts/work/layout-tree.mjs}
+positional:
+  - {name: command, enum: [scan, capture, plan, destinations, lockup, slot], required: true, variadic: false}
+  - {name: image, required: false, variadic: false}
+flags:
+  - {name: work, type: string}
+  - {name: app-dir, type: list}
+  - {name: write, type: boolean}
+  - {name: app, type: string}
+  - {name: repo-root, type: string}
+  - {name: node, type: list}
+  - {name: breakpoint, type: string}
+  - {name: theme, type: string}
+  - {name: file, type: string}
+  - {name: url, type: string}
+  - {name: provenance, type: string}
+  - {name: destination, type: string}
+  - {name: route, type: list}
+  - {name: locale, type: string}
+  - {name: from, type: string}
+  - {name: rect, type: string}
+  - {name: active-nav, type: string}
+  - {name: design, type: string}
+  - {name: files, type: string}
+  - {name: key, type: string}
+  - {name: tolerance, type: number}
+exit: {"0": success, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work layout-tree scan --work .starciwork --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/layout-tree.mjs']

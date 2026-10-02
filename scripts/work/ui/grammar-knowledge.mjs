@@ -845,7 +845,7 @@ export async function writeGrammarKnowledge({packageRoot=defaultPaths().packageR
 // ---------------------------------------------------------------------------
 
 export async function main(argv=process.argv.slice(2)){
-  if(argv.includes('--help'))return {exitCode:0,text:'Usage: node scripts/work/ui/grammar-knowledge.mjs [--write] [--json]\n\nCompares knowledge/grammars/*/DNA.yaml with packages/grammar source (renderers, classes, rule ids, tokens, dna.ts values, version). --write refreshes the measured blocks in place. Exit 0 is clean, 1 reports drift.\n'};
+  if(argv.includes('--help'))return {exitCode:0,text:'Usage: starci work grammar-knowledge [--write] [--json]\n\nCompares knowledge/grammars/*/DNA.yaml with packages/grammar source (renderers, classes, rule ids, tokens, dna.ts values, version). --write refreshes the measured blocks in place. Exit 0 is clean, 1 reports drift.\n'};
   if(argv.includes('--write')){
     const {written,census}=await writeGrammarKnowledge();
     return {exitCode:0,text:`rewrote ${written.join(', ')} from ${census.package}@${census.version} (${census.renderers.length} renderers)\n`};
@@ -855,7 +855,7 @@ export async function main(argv=process.argv.slice(2)){
   const lines=[`grammar knowledge vs ${result.version} (${result.renderers} renderers): ${result.ok?'no drift':`${result.findings.length} drift finding(s)`}`];
   for(const f of result.findings.slice(0,60))lines.push(`  ${f.file} ${f.what}: ${f.detail}`);
   if(result.findings.length>60)lines.push(`  ... ${result.findings.length-60} more`);
-  if(!result.ok)lines.push('  refresh the measured blocks with: node scripts/work/ui/grammar-knowledge.mjs --write');
+  if(!result.ok)lines.push('  refresh the measured blocks with: starci work grammar-knowledge --write');
   return {exitCode:result.ok?0:1,text:`${lines.join('\n')}\n`};
 }
 

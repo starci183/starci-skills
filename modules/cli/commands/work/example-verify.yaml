@@ -1,0 +1,15 @@
+group: work
+verb: example-verify
+owner: runtime
+summary: replay and verify evidence for one example Work record
+impl: {script: scripts/example/example-verify.mjs}
+flags:
+  - {name: work, type: string, required: true}
+  - {name: record, type: string, required: true}
+  - {name: cwd, type: string, required: true}
+exit: {"0": evidence verified, "1": verification failed, "2": bad usage}
+json: none
+examples: ['starci work example-verify --work .starciwork --record <id> --cwd <repo>']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/example/example-verify.mjs']

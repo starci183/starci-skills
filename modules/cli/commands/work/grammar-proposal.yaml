@@ -1,0 +1,15 @@
+group: work
+verb: grammar-proposal
+owner: runtime
+summary: list or check grammar proposals in Work records
+impl: {script: scripts/work/grammar-proposal.mjs}
+positional:
+  - {name: command, enum: [list, check], required: true, variadic: false}
+  - {name: target, required: true, variadic: true}
+flags: []
+exit: {"0": success, "1": incomplete proposals, "2": bad usage}
+json: flag
+examples: ['starci work grammar-proposal check .starciwork']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/grammar-proposal.mjs']

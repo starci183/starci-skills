@@ -1,0 +1,34 @@
+group: work
+verb: draw-loop
+owner: runtime
+summary: render, score, inspect, finish, or verify an iterative drawing loop
+impl: {script: scripts/work/draw-loop.mjs}
+positional:
+  - {name: command, enum: [round, status, finish, verify], required: true, variadic: false}
+flags:
+  - {name: ui, type: string}
+  - {name: html, type: string}
+  - {name: source, type: string}
+  - {name: fixture, type: list}
+  - {name: product, type: string}
+  - {name: css, type: list}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist]}
+  - {name: grammar-dist, type: string}
+  - {name: base, type: string}
+  - {name: state, type: string}
+  - {name: viewports, type: string}
+  - {name: repo, type: string}
+  - {name: out, type: string}
+  - {name: family, type: string}
+  - {name: drawer, type: string}
+  - {name: no-full-page, type: boolean}
+  - {name: no-critic, type: boolean}
+  - {name: parts, type: string}
+  - {name: prompt, type: string}
+  - {name: force, type: boolean}
+exit: {"0": success, "1": drawing gates red, "2": bad usage}
+json: flag
+examples: ['starci work draw-loop status --out <loop-dir> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-loop.mjs']

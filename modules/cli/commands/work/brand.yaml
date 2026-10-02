@@ -1,0 +1,17 @@
+group: work
+verb: brand
+owner: runtime
+summary: derive or verify the canonical brand Work record
+impl: {script: scripts/work/brand/brand.mjs}
+positional:
+  - {name: work-root, required: true, variadic: false}
+flags:
+  - {name: source, type: string}
+  - {name: stage, type: enum, enum: [decide, verify]}
+  - {name: grammar-root, type: string}
+exit: {"0": success, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work brand .starciwork --stage verify --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/brand/brand.mjs']

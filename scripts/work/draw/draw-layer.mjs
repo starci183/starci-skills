@@ -158,7 +158,7 @@ export const LAYER_PROBE = Object.freeze({
 // ---------------------------------------------------------------------------------------------------------
 // Existing renders: the CLI and the draw-gates gate
 //
-//   node scripts/work/draw/draw-layer.mjs <render dir | part png>... [--playwright <product dir>] [--json]
+//   starci work draw-layer <render dir | part png>... [--playwright <product dir>] [--json]
 //
 // Every drawn part under the paths (a <part>.png whose <part>.json is a starci/draw-render@1 record) is judged:
 // DRAW_NESTED_VARIANT on its rendered DOM (<part>.dom.html, else the html beside it), DRAW_MEASURE_UNCAPPED on the
@@ -244,7 +244,7 @@ async function main(argv) {
     else if (argv[i].startsWith('--')) { process.stderr.write(`draw-layer: unknown flag ${argv[i]}\n`); return 2; }
     else paths.push(argv[i]);
   }
-  if (!paths.length) { process.stderr.write('use: node scripts/work/draw/draw-layer.mjs <render dir | part png>... [--playwright <product dir>] [--json]\n'); return 2; }
+  if (!paths.length) { process.stderr.write('use: starci work draw-layer <render dir | part png>... [--playwright <product dir>] [--json]\n'); return 2; }
   const parts = partsUnder(paths);
   let playwright = null;
   try { const { loadPlaywright } = await import('../draw-render.mjs'); playwright = loadPlaywright([opts.playwright, process.env.STARCI_PLAYWRIGHT_DIR, process.cwd()].filter(Boolean)); } catch { playwright = null; }

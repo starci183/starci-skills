@@ -1,0 +1,30 @@
+group: work
+verb: draw-render
+owner: runtime
+summary: render HTML or a drawing component at declared viewports
+impl: {script: scripts/work/draw-render.mjs}
+flags:
+  - {name: html, type: string}
+  - {name: out, type: string, required: true}
+  - {name: viewports, type: string, required: true}
+  - {name: name, type: string}
+  - {name: theme, type: enum, enum: [light, dark]}
+  - {name: component, type: string}
+  - {name: export, type: string}
+  - {name: props, type: string}
+  - {name: css, type: list}
+  - {name: state, type: string}
+  - {name: base, type: string}
+  - {name: rationale, type: string}
+  - {name: product, type: string}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist]}
+  - {name: grammar-dist, type: string}
+  - {name: harness-out, type: string}
+  - {name: full-page, type: boolean}
+  - {name: trace, type: boolean}
+exit: {"0": renders written, "1": render failed, "2": bad usage}
+json: flag
+examples: ['starci work draw-render --html <file> --out <dir> --viewports 390x844 --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-render.mjs']

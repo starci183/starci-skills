@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // work-graph.mjs — read and revise a workflow's work graph (modules/schemas/work-graph.schema.yaml).
 //
-//   node scripts/work/work-graph.mjs show     --repo <repo> --workflow <id> [--version <n>] [--json]
-//   node scripts/work/work-graph.mjs validate --repo <repo> --workflow <id> [--file <candidate>] [--json]
-//   node scripts/work/work-graph.mjs diff     --repo <repo> --workflow <id> [--from <n>] [--to <n> | --file <candidate>] [--json]
-//   node scripts/work/work-graph.mjs propose  --repo <repo> [--workflow <id>] --job <job> --file <candidate> --reason <text> [--slice <id>] [--json]
+//   starci work graph show     --repo <repo> --workflow <id> [--version <n>] [--json]
+//   starci work graph validate --repo <repo> --workflow <id> [--file <candidate>] [--json]
+//   starci work graph diff     --repo <repo> --workflow <id> [--from <n>] [--to <n> | --file <candidate>] [--json]
+//   starci work graph propose  --repo <repo> [--workflow <id>] --job <job> --file <candidate> --reason <text> [--slice <id>] [--json]
 //
 // propose takes its workflow from the job when --workflow is absent, and a candidate without `workflow` gets it.
 // propose writes: the job must be open, belong to the workflow and run an op whose manifest declares
@@ -21,7 +21,7 @@ import { diffGraphs, frontierOf, validateGraph } from './work-graph-model.mjs';
 import { latestVersion, liveColors, recordVersion, versionOf, versionsOf } from './work-graph-store.mjs';
 import { workGraphContext } from './work-graph-context.mjs';
 
-const USAGE = 'use: node scripts/work/work-graph.mjs show|validate|diff|propose --repo <repo> --workflow <id> [...] [--json]';
+const USAGE = 'use: starci work graph show|validate|diff|propose --repo <repo> --workflow <id> [...] [--json]';
 const VERBS = ['show', 'validate', 'diff', 'propose'];
 const VALUE_FLAGS = ['repo', 'workflow', 'version', 'file', 'from', 'to', 'job', 'reason', 'slice'];
 const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });

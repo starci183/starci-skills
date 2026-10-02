@@ -1,0 +1,16 @@
+group: work
+verb: brand-palette
+owner: runtime
+summary: emit a brand palette prompt or check rendered images against it
+impl: {script: scripts/work/brand/brand-palette.mjs}
+flags:
+  - {name: prompt, type: string}
+  - {name: check, type: string}
+  - {name: brand, type: string}
+  - {name: scan, type: string}
+exit: {"0": success, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work brand-palette --scan .starciwork --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/brand/brand-palette.mjs']

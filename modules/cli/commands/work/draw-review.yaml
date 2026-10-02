@@ -1,0 +1,20 @@
+group: work
+verb: draw-review
+owner: runtime
+summary: inspect, ask for, or apply owner review of a drawing
+impl: {script: scripts/work/draw-review.mjs}
+positional:
+  - {name: command, enum: [status, question, apply], required: true, variadic: false}
+flags:
+  - {name: ui, type: string, required: true}
+  - {name: lang, type: enum, enum: [en, vi]}
+  - {name: owner-requested, type: boolean}
+  - {name: job, type: string}
+  - {name: receipt, type: string}
+  - {name: write, type: boolean}
+exit: {"0": success, "1": review failed, "2": bad usage}
+json: flag
+examples: ['starci work draw-review status --ui <record> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-review.mjs']

@@ -44,7 +44,7 @@ export function loopCoverageFindings(recordDir, record, repo) {
   for (const p of livePartsOf(recordDir, record)) {
     const at = slash(path.relative(repo, p.png));
     const ref = p.asset.generation?.loop;
-    if (!ref?.sha256) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): node scripts/work/draw-loop.mjs round ... then finish, and record the asset entries it prints` }); continue; }
+    if (!ref?.sha256) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): starci work draw-loop round ... then finish, and record the asset entries it prints` }); continue; }
     const loopFile = loopFileOfRef(ref);
     const loop = loopFile ? readJson(loopFile) : null;
     if (loop?.schema !== LOOP_SCHEMA) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} names the loop blob:${ref.sha256}, which is not a draw-loop bundle in the blob store` }); continue; }

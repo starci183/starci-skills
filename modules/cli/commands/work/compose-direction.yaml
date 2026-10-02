@@ -1,0 +1,24 @@
+group: work
+verb: compose-direction
+owner: runtime
+summary: place drawn content into its measured page or overlay shell
+impl: {script: scripts/work/compose-direction.mjs}
+flags:
+  - {name: ui, type: string, required: true}
+  - {name: content, type: string, required: true}
+  - {name: breakpoint, type: string, required: true}
+  - {name: theme, type: enum, enum: [light, dark], required: true}
+  - {name: state, type: string}
+  - {name: presentation, type: enum, enum: [page, overlay]}
+  - {name: host-state, type: string}
+  - {name: fit, type: enum, enum: [cover, stretch]}
+  - {name: scrim, type: number}
+  - {name: tool, type: string}
+  - {name: prompt, type: string}
+  - {name: out, type: string}
+exit: {"0": composite written, "1": composition refused, "2": bad usage}
+json: flag
+examples: ['starci work compose-direction --ui <record> --content <png> --breakpoint mobile --theme light']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/compose-direction.mjs']

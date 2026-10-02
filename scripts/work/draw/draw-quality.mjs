@@ -292,7 +292,7 @@ export function drawQualityFindings(recordDir, record, repo) {
     let score = null;
     try { score = JSON.parse(fs.readFileSync(scoreFile, 'utf8')); } catch { score = null; }
     const htmlSha = shaOf(src);
-    if (!score || score.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (draw-loop.mjs round, then finish installs <part>.score.json)' : `run node scripts/work/ui/ui-proof-brief.mjs --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
+    if (!score || score.schema !== SCORE_SCHEMA) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${a.path} has no ui-proof score: ${component ? 'draw it through the draw loop (starci work draw-loop round, then finish installs <part>.score.json)' : `run starci work ui-proof-brief --surface <record> --repo <product> --score ${path.basename(src)} --viewport <WxH> --json > ${path.basename(scoreFile)}`}` });
     // A component part was scored on its bundled harness page, never on the DOM snapshot; its freshness is the settle
     // re-measure from <part>.draw.tsx (draw-loop-settle.mjs), so only the score's verdict binds here.
     else if (!component && score.htmlSha256 !== htmlSha) out.push({ code: DRAW_SCORE_BELOW, path: rel, detail: `${path.basename(scoreFile)} scored another version of ${path.basename(src)} (htmlSha256 ${String(score.htmlSha256 ?? 'absent').slice(0, 12)}, now ${String(htmlSha).slice(0, 12)}): score the current render` });
@@ -309,7 +309,7 @@ export function drawQualityFindings(recordDir, record, repo) {
   if (parts.length || live.length) {
     const acceptance = ownerAcceptanceOf(record, recordDir);
     const by = acceptance?.answeredBy ?? null;
-    if (!acceptance) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `${record?.id ?? 'the record'} carries no owner acceptance: a draw goes to the owner as one draw-review ask (scripts/work/draw-review.mjs question --job <id>) and only the owner's accept settles it` });
+    if (!acceptance) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `${record?.id ?? 'the record'} carries no owner acceptance: a draw goes to the owner as one draw-review ask (starci work draw-review question --job <id>) and only the owner's accept settles it` });
     else if (!acceptance.current) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the owner's acceptance no longer holds (${acceptance.reasons.join('; ')}): review it again` });
     else if (by !== OWNER) out.push({ code: DRAW_NOT_OWNER_ACCEPTED, path: at('index.yaml'), detail: `the acceptance was answered by ${by ?? 'nobody named'}, not the owner: a drawing never turns green on checks or an automatic accept` });
   }

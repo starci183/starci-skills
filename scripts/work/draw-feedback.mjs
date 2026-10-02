@@ -531,7 +531,7 @@ export function drawFeedbackMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');
-  const usage = 'Usage: node scripts/work/draw-feedback.mjs <brief|status|check|classify> --ui <ui-record-dir> [--shape <XBase#state>] [--note <id> --class <class> [--target <x>] [--as <kind>] [--by kernel|critic] --write] [--json]\n';
+  const usage = 'Usage: starci work draw-feedback <brief|status|check|classify> --ui <ui-record-dir> [--shape <XBase#state>] [--note <id> --class <class> [--target <x>] [--as <kind>] [--by kernel|critic] --write] [--json]\n';
   if (!['brief', 'status', 'check', 'classify'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     const dir = path.resolve(ui);

@@ -1,0 +1,14 @@
+group: work
+verb: draw-taste
+owner: runtime
+summary: check a rendered drawing against visual taste rules
+impl: {script: scripts/work/draw/draw-taste.mjs}
+flags:
+  - {name: html, type: string, required: true}
+  - {name: png, type: list}
+exit: {"0": clean, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-taste --html <render.html> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-taste.mjs']
