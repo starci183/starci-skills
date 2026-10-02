@@ -30,7 +30,7 @@
 //   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
 //   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
 //   HFS_MONO_WORKSPACES, HFS_MONO_FE_WORKSPACE, HFS_MONO_NEST_PROJECTS, HFS_MONO_WORKSPACE_DEP
-//                                 (R127-R130, hfs-rules/monorepo.mjs) every app is a monorepo: root workspaces and turbo, the fe workspace manifests and
+//                                 (R128-R131, hfs-rules/monorepo.mjs) every app is a monorepo: root workspaces and turbo, the fe workspace manifests and
 //                                 what they import, the Nest projects of be/apps
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
