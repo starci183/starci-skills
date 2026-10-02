@@ -30,7 +30,7 @@
  * that. Those are read by a person, which is why the law states them with the scars attached.
  */
 
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** A schema generation baked into an identifier. */
@@ -203,7 +203,7 @@ export const noBareVerbExport = {
 // -- no-default-export -------------------------------------------------------------------------------------------
 
 /** The one file kind that may default-export: a Jest global setup, whose API is a default function. */
-const isGlobalSetup = (context) => hfsOf(context).slotOf(context.filename) === "be.tests.world" && /\/global-(?:setup|teardown)\.ts$/.test(normalizePath(context.filename))
+const isGlobalSetup = (context) => inTestWorld(hfsOf(context), context.filename) && /\/global-(?:setup|teardown)\.ts$/.test(normalizePath(context.filename))
 
 /** Named exports only: a default export has no name to grep, rename or import-check. */
 export const noDefaultExport = {

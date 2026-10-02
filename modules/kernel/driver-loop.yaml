@@ -170,7 +170,7 @@ progress:
     toward the goal - units that PASSED their gates per hour vs
     progress.minUnitsPerHour, running vs progress.allowedParallel,
     queued-ready, ETA? (2) if not, why - rca.clusters (dead workers, absent
-    paths, grants too narrow, tool timeouts, test gaps, partial commits,
+    paths, grants too narrow, tool timeouts, test gaps, preserved partial work,
     canon conflicts, runtime/binding defects, upstream peers)? (3) which ONE
     change fixes the most - rca.actions[0] that is not already tried? Only
     then continue with nextActions. A stall (progress.stall.stalled) is your
@@ -185,7 +185,7 @@ progress:
     light: >-
       Tier 1, act now, inside your workflow: `api graph-edit` (drop units whose
       paths are absent, widen a unit inside its repository, ONE serial wire
-      unit for shared files, continue a partial commit, retry a failed unit
+      unit for shared files, continue a unit's preserved work, retry a failed unit
       with a CHANGED shape, reorder/split/merge a few units, per-unit params,
       canon scan + re-cut of a canon cut from it), `api op-override` (a local,
       additive variant of an op for this workflow: notes, commandTimeoutMs,
@@ -424,15 +424,14 @@ tick:
       owedToWire path a slice reports (a wire still queued when a slice reports
       one outside it is dropped with `api reconcile --drop` and re-enqueued on
       the union). A canon slice that settled blocked or failed after
-      committing is redone from its commit, never from scratch: `node
+      leaving work is redone from its preserved work, never from scratch: `node
       scripts/kernel/seam-policy.mjs canon-redispatch --repo ROOT --job <job>
       [--paths <grants it lacked>]` prints the `api enqueue ... --cut-id <id>
       --cut-ordinal <n> --cut-total <N> --retry-of <job> --params
-      '{"resumeFrom":"<its patch head>","admissionBase":"<its admission
-      base>"}'` to run. A canon slice that settles blocked with a filed report
+      '{"resumeFrom":"refs/heads/preserved/<workflow>/<job>"}'` to run. A canon slice that settles blocked with a filed report
       is followed up by settle itself (result nextStep kind canon-follow-up,
       scripts/kernel/seam-policy.mjs canonSettleFollowUpOf) - a continuation from
-      its commit owning its page relocations, its shared-root needs added to
+      its preserved work owning its page relocations, its shared-root needs added to
       the queued canon-wire leg - so the Kernel never enqueues a second redo
       of that job; every slice packet carries context.cut.manifest (the path
       union and passed ordinals) from dispatch. A canon slice's
@@ -487,7 +486,7 @@ tick:
       A cut's seam never stalls the chain (owner ruling 2026-09-28: "A seam must not block the whole chain: if a seam
       slips, re-cut it or let the later slices run in parallel with a stub, do not wait 3 hours";
       scripts/kernel/seam-policy.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
-      and runs contract-first: its op publishes the committed interface (types, contracts, a stub) with
+      and runs contract-first: its op publishes the interface (types, contracts, a stub) with
       `api cut-seam --publish-interface` before finishing, and every sibling ordinal is released to
       build against it at once. A sibling also stops waiting - `api status` frontier.queued reads it
       `ready` with seamStub {mode} - when the seam's latest attempt settled failed/blocked

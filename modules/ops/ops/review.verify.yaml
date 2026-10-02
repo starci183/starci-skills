@@ -138,6 +138,11 @@ proofs:
       en: "In every mode but lint api settle re-reads the attached review-defects.json (runtime check op-proof, proof review-defects): a done without it (op-review-defects-missing), with a defect not classified business or non-business (op-review-defect-unclassified) or with a non-business defect no check caught and no missingCheck recorded (op-review-missing-check-unrecorded) is refused."
       vi: "Ở mọi chế độ trừ lint api settle tự đọc lại review-defects.json đính kèm (check op-proof, proof review-defects): done thiếu nó (op-review-defects-missing), có lỗi chưa phân loại business hay non-business (op-review-defect-unclassified) hoặc có lỗi non-business không check nào bắt mà không ghi missingCheck (op-review-missing-check-unrecorded) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
+  - id: verified-head
+    requirement:
+      en: "The report's head is git rev-parse HEAD of the tree this review verified. In a workflow worktree the finish lands only that exact head: the head the runtime recorded at this op's settle must equal the report's head and the head that lands (reviewVerifiedOf), else workflow-finish-verify-stale and review.verify runs again."
+      vi: "head trong báo cáo là git rev-parse HEAD của cây mà lần review này đã kiểm. Trong worktree của workflow, finish chỉ đưa vào main đúng head đó: head mà runtime ghi lại khi settle op này phải trùng head trong báo cáo và head được đưa vào main (reviewVerifiedOf), nếu không là workflow-finish-verify-stale và phải chạy lại review.verify."
+    check: scripts/kernel/workflow-checkpoint.mjs
 blockers:
   - code: OPERATION_REQUIRED
     condition:

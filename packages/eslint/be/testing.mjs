@@ -24,7 +24,7 @@
 
 import { statSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { doorOfSpec, isUnitSpecFile, unitRoleOfSpec, unitRoleOfSubject } from "./lib/unit-spec.mjs"
 
@@ -178,7 +178,7 @@ const isStateReader = (context, node) => STATE_TYPES.some((name) => isPackageTyp
 /** The handle `useTestWorld` answers, by where its type is declared: the `@starci/test-world` package or the repository's world slot. */
 const isWorldHandle = (context, node) => {
   const hfs = hfsOf(context)
-  return typeOrigins(context, node).some((origin) => origin.name === "TestWorld" && (origin.module === "@starci/test-world" || hfs.slotOf(origin.file) === "be.tests.world"))
+  return typeOrigins(context, node).some((origin) => origin.name === "TestWorld" && (origin.module === "@starci/test-world" || inTestWorld(hfs, origin.file)))
 }
 
 /** The name a non-computed member access reads, or null. */
@@ -305,7 +305,7 @@ export const noApiShapedE2eFilename = {
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
 /** Test infrastructure: the fixtures and the test world, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.world`). */
-const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.world"].includes(hfs.slotOf(filename))
+const isTestInfrastructure = (hfs, filename) => hfs.slotOf(filename) === "be.tests.fixtures" || inTestWorld(hfs, filename)
 
 /** Bare markers a stub returns when nobody gave it a real answer to stand in for. */
 const MARKER_STRINGS = new Set(["stubbed", "stub", "ok", "test", "mock", "fake", "todo", "tbd", "n/a", "pending", ""])

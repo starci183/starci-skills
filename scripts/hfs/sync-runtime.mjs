@@ -31,8 +31,8 @@ const SLOT_FILES = [
   'scripts/hfs/allows.mjs',
   'knowledge/hfs/slots.yaml',
 ];
-/** The entry modules of `hfs check`; everything they import, statically, is bundled. */
-const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs'];
+/** The entry modules of `hfs check` and `hfs secret`; everything they import, statically, is bundled. */
+const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs'];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
 /** A read of the migration DDL of one store: `migrations/runtime` or `migrations/machine`. */

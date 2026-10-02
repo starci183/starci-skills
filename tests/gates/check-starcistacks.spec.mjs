@@ -23,7 +23,7 @@ const sonarEntry = (repo, extra = {}) => ({ provider: 'sonarqube', mode: 'local'
   projects: [{ repository: repo, key: repo }],
   credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
   ci: { wiring: 'required', secrets: [{ name: 'SONAR_TOKEN', credential: 'analysis' }], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonar.example.org' }] },
-  qualityGate: 'starci-new-code', ownerAction: 'none', ...extra });
+  qualityGate: 'starci-quality', ownerAction: 'none', ...extra });
 const sentryEntry = (repo, extra = {}) => ({ provider: 'sentry', mode: 'hosted', host: { public: 'https://sentry.io' }, auth: 'oidc',
   projects: [{ repository: repo, key: `gh/org/${repo}` }], credentials: [], ci: { wiring: 'required', permissions: ['id-token: write'], secrets: [], vars: [] }, ownerAction: 'none', ...extra });
 const CI = 'jobs:\n  ci:\n    steps:\n      - uses: getsentry/action-release@v1\n        with: {environment: ci}\n      - uses: SonarSource/sonarqube-scan-action@v7\n        env:\n          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}\n          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}\n';
@@ -122,7 +122,7 @@ test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yam
   const own = workspace(t, { services: { sonar: sonarEntry('product', { qualityGate: 'my-own-gate' }), 'error-tracking': sentryEntry('product') } });
   const refused = checkStarciStacks(own.product);
   assert.ok(codes(refused, 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'));
-  assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-new-code/);
+  assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-quality/);
   const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
   assert.equal(checkStarciStacks(own.product, { advisoryCodes: CODES }).ok, true, 'a leg admitted before the change reads it as a suspect');

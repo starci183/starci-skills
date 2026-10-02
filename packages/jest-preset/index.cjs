@@ -7,6 +7,7 @@ const { fakeCache } = require("./cache.cjs")
 const { fakeLock } = require("./lock.cjs")
 const { recordingEventBus } = require("./event-bus.cjs")
 const { recordingQueueOutbox } = require("./queue.cjs")
+const { fakeInbox } = require("./inbox.cjs")
 const { builder } = require("./builders.cjs")
 const { fakeIds, FakeIds } = require("./ids.cjs")
 
@@ -180,6 +181,7 @@ module.exports = {
   fakeLock,
   recordingEventBus,
   recordingQueueOutbox,
+  fakeInbox,
   builder,
   fakeIds,
   FakeIds,

@@ -205,8 +205,31 @@ never commit keep the shared tree.
   (`checkpointOp`) commits its side's changes on `wf-<workflowId>` as that op's
   checkpoint: it is the only committer on the branch. The op's gate base is the
   previous checkpoint (the merge-base with main for the first op), so only the
-  op's own new findings block, and settle refuses a gate measured against any
-  other base.
+  op's own new findings block. The base is per side: settle also accepts an
+  older checkpoint when no checkpoint since then touched the op's owned paths
+  (`gateBasesOf`), so a `be/` checkpoint never makes an `fe/` op in flight run
+  its gate again; any other base is refused (`op-gate-base-mismatch`).
+- **Milestone rebase.** After a green checkpoint, when no other op of the
+  workflow is live, settle asks the milestone policy
+  (`scripts/lib/rebase-milestone.mjs`) whether main moved enough: main changed
+  a path the branch also changed, or main is `worktrees.rebaseMilestoneBehind`
+  commits (`modules/kernel/product-land.yaml`) past the merge-base. If so, the
+  branch is rebased onto main now and the checkpoint follows. A conflict leaves
+  the branch where it was, keeps its head as
+  `refs/heads/preserved/<workflowId>/rebase-<main sha>`, and opens one
+  `rebase-conflict` Decision Item (the Kernel's, escalated on the usual
+  ladder); the same main tip is never tried twice. It never refuses the settle.
+- **Work records.** A Work record is committed only by the runtime, on the
+  workflow branch of its owner workflow (`scripts/kernel/work-ownership.mjs`
+  `ownerOf`): an op that writes a record commits nothing, and its green
+  checkpoint carries the record like any other owned file. A workflow that is
+  not the record's owner may not change it: settle refuses the op
+  (`workflow-work-record-not-owner`; a record no rule but the repo-owner
+  fallback names is the writer's). The owner reads its own records at its
+  workflow branch (`workflowCommittedReader`), so its later settles see them
+  before it lands; every other workflow reads main, so a peer sees the record
+  when the owner lands. `api record-change` reads the owner's records in its
+  workflow worktree.
 - **Failure.** A failed or blocked op's uncommitted work is preserved to
   `refs/heads/preserved/<workflowId>/<op>` (a snapshot commit that never holds
   `node_modules`), and the worktree is reset to the last checkpoint. The tree is
@@ -214,7 +237,7 @@ never commit keep the shared tree.
 - **Finish.** Main is touched only when the workflow ends, in this order: a
   full `gate.mjs` over the whole branch against its merge-base with main; the
   merge guard; `review.verify`, which must have verified the exact head that
-  lands; a rebase onto main (also at milestones when main has moved); main
+  lands; a rebase onto main (the hard stop for a conflict); main
   fast-forwarded and pushed. The finish then marks the worktree
   `release-pending`; it never removes it itself, because the workflow's
   terminals still run there. Any refusal leaves main untouched.

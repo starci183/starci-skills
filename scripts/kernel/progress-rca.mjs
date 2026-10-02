@@ -214,7 +214,7 @@ export const CAUSES = Object.freeze({
   'grant-too-narrow': { why: 'the fix needs files outside the unit\'s owned paths (moves, shared files, config)', authority: 'kernel' },
   'tool-timeout': { why: 'a required validator did not finish inside the agent\'s command window', authority: 'kernel' },
   'test-gap': { why: 'no regression test covers the unit, so the refactor refuses to start', authority: 'kernel' },
-  'partial-commit': { why: 'the unit committed its in-ceiling part and stopped: progress, not a failure', authority: 'kernel' },
+  'partial-work': { why: 'the unit left in-ceiling work the runtime preserved (preserved/<wf>/<job>) and stopped: progress, not a failure', authority: 'kernel' },
   'canon-conflict': { why: 'the cut asks for a location a canon rule forbids', authority: 'kernel' },
   'binding-defect': { why: 'the runtime bound the job to the wrong repository/guard', authority: 'supervisor' },
   // FMEA #20 / DESIGN §16.7: code moved and its importers still point at the old path - fixed by ONE repoint unit per
@@ -228,7 +228,6 @@ export const CAUSES = Object.freeze({
 const SHAPE_CAUSES = new Set(['missing-paths', 'grant-too-narrow', 'tool-timeout', 'test-gap', 'canon-conflict', 'product-defect']);
 export const isShapeCause = (c) => SHAPE_CAUSES.has(c);
 
-const COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
 const PATH_RE = /(?:^|[\s`'"(,:])((?:apps|packages|src|libs|e2e)\/[A-Za-z0-9_@.\-[\]()/]+?[A-Za-z0-9_\])])(?=[\s`'",;:)]|$)/g;
 
 /** The causes of one failed/blocked attempt, primary first. Pure. */
@@ -248,13 +247,13 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
   if (!causes.includes('broken-import') && /status[= ]unavailable|unavailable \(exit|checker (?:is )?unavailable|không khả dụng/i.test(text) && kind === 'environment') add('checker-unavailable');
   if (report?.rootCause && report.rootCause.self === false && /^wf-/.test(String(report.rootCause.node ?? ''))) add('upstream');
-  if (report && COMMIT_RE.test(text) && (report.outcome === 'blocked' || status === 'failed')) add('partial-commit');
+  if (report && preservedOf(result) && (report.outcome === 'blocked' || status === 'failed')) add('partial-work');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
   if (!causes.length) add(kind === 'environment' ? 'checker-unavailable' : 'other');
   // An unresolved import is the cause even when the attempt also reads as something else (its checker "unavailable").
   if (causes.includes('broken-import') && causes[0] !== 'broken-import') causes.unshift(...causes.splice(causes.indexOf('broken-import'), 1));
-  // A partial commit is a secondary fact: the blocker that stopped the unit leads.
-  if (causes[0] === 'partial-commit' && causes.length > 1) causes.push(causes.shift());
+  // Partial work is a secondary fact: the blocker that stopped the unit leads.
+  if (causes[0] === 'partial-work' && causes.length > 1) causes.push(causes.shift());
   return causes;
 }
 
@@ -283,12 +282,13 @@ export function reportsOf(db, workflowId) {
   return m;
 }
 
-const commitOf = (report) => { const m = COMMIT_RE.exec([report?.summary, report?.blocker?.detail].join(' ')); return m ? m[1] : null; };
+/** The preserved ref settle recorded for a failed or blocked attempt in a workflow worktree (result.checkpoint), or null. */
+const preservedOf = (result) => (typeof result?.checkpoint?.preservedRef === 'string' ? result.checkpoint.preservedRef : null);
 
 /**
  * The failure-cluster RCA over every failed/blocked attempt of the workflow in the RCA window, read together.
  * Pure over `jobs`, `reports`. {window, attempts, byOp, clusters: [{cause, why, authority, count, open, units, jobs,
- * examples, commits, destinations}], trigger}.
+ * examples, preserved, destinations}], trigger}.
  */
 export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSettings(), stalled = false }) {
   const units = unitsOf(jobs);
@@ -303,7 +303,7 @@ export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSett
     const causes = causesOf({ status: j.status, result: j.result, report });
     rows.push({ jobId: j.job_id, op: j.op_id, unit: u?.key ?? null, unitState: u?.state ?? null, causes, at: Number(j.updated_at),
       summary: one(report?.summary ?? report?.blocker?.detail ?? j.result?.environment ?? j.result?.worker?.liveness ?? j.result?.verdict, 200),
-      commit: commitOf(report), destinations: report ? destinationsOf(report, j.payload?.owned_paths ?? []) : [], env: j.result?.environment ?? null,
+      preserved: preservedOf(j.result), destinations: report ? destinationsOf(report, j.payload?.owned_paths ?? []) : [], env: j.result?.environment ?? null,
       liveness: j.result?.worker?.liveness ?? null, paths: j.payload?.owned_paths ?? [] });
   }
   const byOp = {};
@@ -322,7 +322,7 @@ export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSett
       cause: c.cause, why: c.why, authority: c.authority, primary: c.rows.filter((r) => r.causes[0] === c.cause).length,
       count: c.rows.length, open: openRows.length, units: [...new Set(openRows.map((r) => r.unit).filter(Boolean))],
       jobs: c.rows.map((r) => r.jobId), examples: c.rows.slice(-settings.rca.examples).map((r) => `${r.jobId}: ${r.summary}`),
-      commits: [...new Set(c.rows.map((r) => r.commit).filter(Boolean))], destinations: [...new Set(openRows.flatMap((r) => r.destinations))].slice(0, 12),
+      preserved: [...new Set(c.rows.map((r) => r.preserved).filter(Boolean))], destinations: [...new Set(openRows.flatMap((r) => r.destinations))].slice(0, 12),
       envs: [...new Set(c.rows.map((r) => r.env ?? r.liveness).filter(Boolean))],
     };
   }).sort((a, b) => b.open - a.open || b.count - a.count);
@@ -427,12 +427,12 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
   for (const c of rca?.clusters ?? []) {
     if (!c.open && c.cause !== 'dead-worker') continue;
     const us = openUnits(c.units);
-    if (c.cause === 'partial-commit') {
+    if (c.cause === 'partial-work') {
       const targets = us.filter((u) => !u.open.length && lastFailedOf(u)).slice(0, N);
       if (targets.length) add({ key: actionKey('continue', ...targets.map((u) => u.key)), tier: 'light', cause: c.cause, unblocks: targets.length,
-        title: `continue ${targets.length} partial commit(s) as continuation units instead of failures (${c.commits.slice(0, 3).join(', ')})`,
+        title: `continue ${targets.length} unit(s) from their preserved work instead of failures (${c.preserved.slice(0, 3).join(', ')})`,
         command: targets.map((u) => `${api} graph-edit ${base} --edit continue --job ${lastFailedOf(u).job_id}${c.destinations.length ? ` --add-paths ${q(c.destinations.slice(0, 4).join(','))}` : ''} --decision <id>`).join(' && '),
-        expected: 'the in-ceiling commits count toward the unit, the continuation starts from them' });
+        expected: 'the preserved in-ceiling work counts toward the unit, the continuation starts from it' });
     } else if (c.cause === 'grant-too-narrow') {
       const rows = (rca.rows ?? []).filter((r) => r.causes.includes('grant-too-narrow') && r.unitState !== 'done');
       const shared = c.destinations.filter((d) => rows.filter((r) => r.destinations.includes(d)).length >= 2);
@@ -450,11 +450,11 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
       for (const u of retry) {
         const r = rows.find((x) => x.unit === u.key);
         const dest = (r?.destinations ?? []).filter((d) => !shared.includes(d)).slice(0, 4);
-        const commit = Boolean(r?.commit);
-        if (!dest.length && !commit) continue;
-        add({ key: actionKey(commit ? 'continue' : 'retry', u.key), tier: 'light', cause: c.cause, unblocks: 1,
-          title: `${commit ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ` (${dest.join(', ')})` : ''}`,
-          command: `${api} graph-edit ${base} --edit ${commit ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ` --add-paths ${q(dest.join(','))}` : ''} --decision <id>`,
+        const kept = Boolean(r?.preserved);
+        if (!dest.length && !kept) continue;
+        add({ key: actionKey(kept ? 'continue' : 'retry', u.key), tier: 'light', cause: c.cause, unblocks: 1,
+          title: `${kept ? 'continue' : 'retry'} ${u.key} with the destinations its report names${dest.length ? ` (${dest.join(', ')})` : ''}`,
+          command: `${api} graph-edit ${base} --edit ${kept ? 'continue' : 'retry'} --job ${lastFailedOf(u).job_id}${dest.length ? ` --add-paths ${q(dest.join(','))}` : ''} --decision <id>`,
           expected: 'the unit owns what its fix must touch; the api refuses the same failing shape and the paths of other workflows' });
       }
     } else if (c.cause === 'tool-timeout') {

@@ -36,8 +36,10 @@
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
 //                                            one placeholder it per public method. Never overwrites a file.
 //   hfs new image [--repo <dir>]                  the Dockerfile of every declared app that has none, from the image canon (scaffold/image.mjs); never overwrites
-//   hfs new spec <file>.service.ts [--repo <dir>]
-//                                            the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
+//   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
+//   hfs secret list | show <slug> | set <slug> | gen <slug> [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--repo DIR]
+//                                            the sealed secrets of `.starcistacks/<env>/secrets/` (runtime scripts/hfs/secret.mjs over the sops api): `set` reads the value from
+//                                            stdin, `gen` seals a random one, `show` decrypts one to stdout; a plain `sops` command in a runbook is retired.
 //   hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
 //                                            exactly that kind's file tree, generated FROM the files: tree of its pattern topic (knowledge/patterns/be) with the
 //                                            one template body of each entry (templates/be/patterns), plus the platform capabilities it needs when they are missing;
@@ -49,6 +51,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../runtime/scripts/lib/is-main.mjs';
 import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
+import { secretMain } from '../runtime/scripts/hfs/secret.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
@@ -70,6 +73,7 @@ hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
+hfs secret list|show|set|gen ...
 hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
 hfs new spec <file>.service.ts [--repo <dir>]
 hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]
@@ -198,10 +202,11 @@ async function scaffoldPresets() {
 /** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new', 'add'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new', 'add', 'secret'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     if (verb === 'lint') return await lintMain(rest, { stdout, presets, prettier });
+    if (verb === 'secret') return secretMain(rest, { stdout, stderr });
     const opts = parse(rest);
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {

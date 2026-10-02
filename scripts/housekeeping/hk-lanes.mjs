@@ -9,13 +9,13 @@
 //
 // sweepLanes removes the registered worktrees under that root whose branch is fully landed on main
 // (git cherry finds no '+') and that stayed idle for allocation.housekeeping.laneGraceMs, after
-// proving the tree holds no link. A lane made by `git worktree add -b lane/<x> main` has no commit
+// safeRemoveWorktree unlinks every link as a link first. A lane made by `git worktree add -b lane/<x> main` has no commit
 // of its own yet, so git cherry reads it as landed: its branch never moved since creation (tip equals
 // its merge-base with main, one reflog position) and it is skipped as no-work-yet; a landed lane still
 // in use (its HEAD/branch reflog or directory changed within the grace) is skipped as recent-activity.
 // laneGraceMs unset or not a positive number sweeps nothing (lane-grace-unset). A reparse point
-// inside a worktree means `git worktree remove` could be made to walk out of it, so that
-// worktree is skipped, never unlinked here. The main checkout, the checkout the sweep runs from, a
+// inside a worktree is enumerated without following it and removed as a link before `git worktree remove`.
+// The main checkout, the checkout the sweep runs from, a
 // detached or dirty tree and anything outside the lanes root are skipped with a reason.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +33,6 @@ import { diffTree } from '../api/git/diff-tree.mjs';
 import { log as gitLog } from '../api/git/log.mjs';
 import { branchDelete } from '../api/git/branch-delete.mjs';
 import { gitResultOf } from '../lib/git.mjs';
-import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -56,21 +55,6 @@ export function parseWorktreeList(text) {
     else if (line.startsWith('prunable')) cur.prunable = true;
   }
   return out;
-}
-
-/** The first link-like entry inside `dir` (or `dir` itself), null when the tree is link-free. */
-export function linkInside(dir) {
-  if (isLinkLike(dir)) return dir;
-  let entries;
-  try { entries = fs.readdirSync(dir); } catch { return null; }
-  for (const name of entries) {
-    const p = path.join(dir, name);
-    let st;
-    try { st = fs.lstatSync(p); } catch { continue; }
-    if (isLinkLike(p, { stat: st })) return p;
-    if (st.isDirectory()) { const hit = linkInside(p); if (hit) return hit; }
-  }
-  return null;
 }
 
 /** Bytes `dir` holds in regular files, never descending into a link. */
@@ -173,8 +157,6 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     if (w.detached || !w.branch) { skip(w.path, 'detached-head'); continue; }
     if (w.locked) { skip(w.path, 'locked'); continue; }
     if (!fs.existsSync(w.path)) { skip(w.path, 'missing'); continue; }
-    const link = linkInside(w.path);
-    if (link) { skip(w.path, 'contains-links', link); continue; }
     if (w.dirty) { skip(w.path, 'dirty'); continue; }
     const status = run(['status', '--porcelain', '--untracked-files=all'], { cwd: w.path });
     if (!status.ok) { skip(w.path, 'status-unreadable', status.error); continue; }

@@ -166,10 +166,24 @@ ruleParams:
         - {token: "(?:^|_)CLOCK$", double: FakeClock, forms: [new]}
         - {token: "(?:^|_)EVENT_BUS$", double: recordingEventBus, forms: [call]}
         - {token: "(?:^|_)QUEUE_OUTBOX$", double: recordingQueueOutbox, forms: [call]}
+        - {token: "(?:^|_)INBOX(?:_|$)", double: fakeInbox, forms: [call]}
         - {token: "(?:^|_)CACHE(?:_|$)", double: fakeCache, forms: [call]}
         - {token: "(?:^|_)(?:LOCK|LEASE|FENCE|HOLD)(?:_|$)", double: fakeLock, forms: [call]}
         - {token: "(?:^|_)(?:IDS|ID_GENERATOR|ID_FACTORY)$", double: fakeIds, forms: [call]}
       fallback: {double: mock, forms: [call, primitive, array]}
+    # R85 BE_RAW_INJECT injected-param-name: the names of the ports every class injects the same way (BE-CONVENTION 1.6: the parameter name
+    # is the camelCase of the port). An entry matches a constructor parameter that carries an injector and is annotated with a type
+    # declared outside the owner (a package, platform/* or integrations/*): `type` is the exact declared name, `typeSuffix` the end of
+    # it. The parameter is named one of `names`, or ends in `nameSuffix` when the entry has one (`orderEntityManager` for a class that
+    # injects two connections, `paymentOptions` beside `options`). A type no entry names is free to be named for what it is.
+    paramNames:
+      - {type: Clock, names: [clock]}
+      - {type: Logger, names: [logger]}
+      - {type: Cache, names: [cache]}
+      - {type: CommandBus, names: [commandBus]}
+      - {type: QueryBus, names: [queryBus]}
+      - {type: EntityManager, names: [entityManager], nameSuffix: EntityManager}
+      - {typeSuffix: Options, names: [options], nameSuffix: Options}
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.

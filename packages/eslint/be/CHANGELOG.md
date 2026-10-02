@@ -4,6 +4,11 @@
 
 - Changed: `no-repository-class` (R83) accepts `platform/saga` as a platform persistence capability (state of a saga run with its version fence).
 - New: `service-isolation` (R168 `BE_SERVICE_ISOLATION`, new law `service-isolation`): a file of a service app imports no file of a sibling service app. The slot manifest copy gains `be.contract.events` and `events.ts`/`consumes.ts` in the api and worker app slots.
+- New: `no-ambient-id` (R142 `BE_AMBIENT_ID`): `randomUUID` of Node's crypto, the `uuid` generators `v1`/`v4`/`v6`/`v7`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included; code asks the `Ids` port and specs use `fakeIds()`.
+- New: `response-cookie-attributes` (R141 `BE_COOKIE_ATTRIBUTES`): a cookie written through the Express or Fastify response states `httpOnly: true`, `secure: true` and `sameSite` `lax` or `strict` in typed options, and `Set-Cookie` is never written as a header.
+- New: `injected-param-name` (R85): a parameter that injects a port of the table `ruleParams.be.paramNames` of the slot manifest (`Clock`, `Logger`, `Cache`, `CommandBus`, `QueryBus`, `EntityManager`, `*Options`) carries the name that table gives it.
+- Changed: `secret-compare-timing-safe` (R41) also recognises, by type, the `.digest()` of a crypto `Hash` or `Hmac`.
+- Changed: the texts of `unit-test-colocated` and the law headers name the four test kinds and the pattern files; the bundled runtime copies follow.
 
 ## 3.0.7 - 2026-10-01
 

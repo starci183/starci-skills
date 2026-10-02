@@ -449,7 +449,8 @@ sections:
         machine is shared with Orca and every other agent, and a lane's `taskkill` of node.exe restarted Orca
         (2026-10-01). End only a PID you started yourself (`taskkill /PID <pid>`, `kill <pid>`,
         `Stop-Process -Id <pid>`); a process you did not start is reported, never killed. The command guard
-        refuses a kill by name (PROCESS_KILL_BY_NAME). Never run `git worktree add` or `remove` (WORKTREE_NOT_OPS):
+        refuses a kill by name (PROCESS_KILL_BY_NAME). Never run `git worktree add` or `remove` (WORKTREE_NOT_OPS)
+        or create or remove an Orca worktree yourself (scripts/api/orca/worktree-create.mjs, worktree-rm.mjs; AGENT_ORCA_WORKTREE):
         a worktree is made and removed only by the runtime worktree API (scripts/machine/worktrees.mjs, safeRemoveWorktree,
         and the workflow worktree that Orca creates at Kernel start and the runtime's host-side controller removes after
         the workflow's finish). Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `del /s`,
@@ -460,7 +461,8 @@ sections:
         (RAW_TERMINAL_CREATE) and no headless agent CLI (`codex exec`, `claude -p`/`--print`, `cursor-agent -p`,
         `devin -p`, `gemini -p`, `opencode run`; AGENT_HEADLESS_LAUNCH); every agent and worker starts through
         scripts/api/orca/worker-start.mjs (orchestration worker-start --agent <provider>) and is supervised with worker-show / worker-read /
-        worker-stop / worker-release. The command guard sees through cmd, PowerShell and bash wrappers and chains,
+        worker-stop / worker-release. A uat op walks the app's real dev stack and never starts a test world
+        (test-world-run.mjs; UAT_TEST_WORLD). The command guard sees through cmd, PowerShell and bash wrappers and chains,
         and lets text that only mentions these commands (echo, commit message, heredoc) pass. The runtime enforces this: an op's git and npm are the guard
         (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,
         never work around it. A logical piece can span repositories; report each one's changed paths

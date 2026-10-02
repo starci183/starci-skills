@@ -214,7 +214,6 @@ rules:
     verification:
       automated:
         - BE_TEST_TOPOLOGY
-        - HFS_TEST_KIND_RETIRED
       manual:
         - A mocked manager test is not database isolation, boot or remote-effect evidence.
     relatedExamples: []

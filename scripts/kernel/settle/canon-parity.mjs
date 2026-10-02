@@ -43,10 +43,8 @@ const trimOwned = (p) => norm(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/,
 export const parityEligible = (item) => item?.outcome === 'done' && PARITY_OPS.includes(item.op)
   && Boolean(item.payload?.cut) && Boolean(item.payload?.params?.canonFamilies);
 
-/** The slice's admission base: params.admissionBase, else the --base its checks (gate.mjs, canon-scan) measured against. */
+/** The slice's admission base: the --base its checks (gate.mjs, canon-scan) measured against. */
 export function sliceBaseOf(item) {
-  const param = String(item?.payload?.params?.admissionBase ?? '').trim();
-  if (/^[0-9a-f]{7,40}$/i.test(param)) return param;
   for (const c of Array.isArray(item?.report?.checks) ? item.report.checks : []) {
     const m = /--base\s+([0-9a-f]{7,40})\b/i.exec(String(c?.command ?? ''));
     if (m) return m[1];
@@ -293,7 +291,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // H7: a measurement that could not run is tooling, never the slice's red (scripts/kernel/settle/check-verdict.mjs).
   const unavailable = (reason, detail) => ({ ...hand(reason, detail), unavailable: true });
   const base = sliceBaseOf(item);
-  if (!base) return hand('parity-no-base', 'no params.admissionBase and no --base in the report checks');
+  if (!base) return hand('parity-no-base', 'no --base in the report checks');
   const where = await resolveRoot(item, { repo });
   if (!where.ok) return hand('parity-unresolved', where.why);
   const { root, ownedRels } = where;

@@ -1,0 +1,22 @@
+id: seam-interface-uncommitted
+effectiveAt: '2026-10-02T08:00:00+07:00'
+summary: >-
+  NO OP TEXT ASKS AN OP TO COMMIT (WFWT2 2.3). A cut's seam ordinal authors its interface (types, DTOs, ports/contracts, a
+  stub) under its owned paths and publishes it with api cut-seam --publish-interface --files <interface files>; it no
+  longer "commits" it first - ops never commit, the runtime checkpoints a green op at settle (contract change
+  workflow-worktree). backend.implement, interface.implement, the cut-seam prompt lines (scripts/kernel/seam-policy.mjs
+  seamPromptLines), the cli usage, the cut-seam verb refusal and modules/kernel/driver-loop.yaml say so. The module that
+  reads a job's owned paths in their checkouts (landingRepos, specBatches, ownedPathEffects) is renamed from
+  scripts/kernel/settle-landed.mjs to its job, scripts/kernel/owned-path-effects.mjs (moved[] in
+  modules/kernel/retired-paths.yaml); its spec follows.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/seam-interface-uncommitted.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/kernel/driver-loop.yaml
+  - scripts/kernel/seam-policy.mjs
+  - scripts/kernel/verbs/cut-seam.mjs
+  - scripts/kernel/cli.mjs
+  - scripts/kernel/owned-path-effects.mjs
+  - tests/kernel/owned-path-effects-batches.spec.mjs

@@ -26,7 +26,7 @@ const put=(repo,rel,body)=>{const abs=path.join(repo,rel);fs.mkdirSync(path.dirn
 const scan=(over={})=>({schema:'starci/sonar-local-scan@3',at:'2026-09-29T10:00:00.000Z',scope:'slice',outcome:'pass',gate:thresholdsOf(gate),slice:{verdict:'pass',failures:[]},...over});
 
 test('the gate is one file: the thresholds, the enforced ops and the server conditions come from it', () => {
-  assert.equal(gate.gate.name,'starci-new-code');
+  assert.equal(gate.gate.name,'starci-quality');
   assert.deepEqual([...gate.enforcedOps].sort(),['backend.implement','code.refactor','interface.implement']);
   assert.deepEqual(serverConditions(gate),[
     {metric:'new_coverage',op:'LT',error:'100'},
@@ -40,7 +40,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
     {metric:'duplicated_lines_density',op:'GT',error:'3'},
   ]);
   assert.deepEqual(gate.overall.issues.engines,['starci-hfs','eslint','stylelint']);
-  assert.deepEqual(thresholdsOf(gate),{name:'starci-new-code',ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0,coverageMinPercent:100});
+  assert.deepEqual(thresholdsOf(gate),{name:'starci-quality',ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0,coverageMinPercent:100});
   for(const op of gate.enforcedOps){
     const manifest=fs.readFileSync(path.join(ROOT,'modules','ops','ops',`${op}.yaml`),'utf8');
     assert.match(manifest,/sonar-local\.mjs scan/,`${op} tells its worker to run sonar-local`);
@@ -211,7 +211,7 @@ const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement
     ledger.transaction(db=>{
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
-        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD'),branch:'main'}});
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD')}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
         recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
     });

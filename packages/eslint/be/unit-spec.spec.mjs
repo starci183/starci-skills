@@ -153,7 +153,7 @@ test("no-return-only-generic: a helper of a spec or a fixture is not a cast with
 })
 
 /** A service spec that provides one token with one value. */
-const provide = (token, value, head = "") => `import { mock, mockEntityManager, fakeTransaction, FakeClock, fakeIds, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, builder } from "@starci/jest-preset"\n${head}\nexport const provider = { provide: ${token}, useValue: ${value} }`
+const provide = (token, value, head = "") => `import { mock, mockEntityManager, fakeTransaction, FakeClock, fakeIds, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, fakeInbox, builder } from "@starci/jest-preset"\n${head}\nexport const provider = { provide: ${token}, useValue: ${value} }`
 
 test("spec-infra-double-from-kit: a provider takes its value from the kit double the token calls for", () => {
     tester.run("spec-infra-double-from-kit", specInfraDoubleFromKit, {
@@ -164,6 +164,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             { filename: SPEC, code: provide("CLOCK", "clock", "const clock = new FakeClock(0)") },
             { filename: SPEC, code: provide("EVENT_BUS", "recordingEventBus()") },
             { filename: SPEC, code: provide("EVENT_BUS", "recordingEventBus<Placed>()", "interface Placed { eventId: string }") },
+            { filename: SPEC, code: provide("INBOX", "fakeInbox()") },
             { filename: SPEC, code: provide("QUEUE_OUTBOX", "recordingQueueOutbox()") },
             { filename: SPEC, code: provide("REDIS_CACHE_MANAGER", "fakeCache(new FakeClock(0))") },
             { filename: SPEC, code: provide("CACHE", "cache", "const cache = fakeCache(new FakeClock(0))") },
@@ -195,6 +196,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             { filename: SPEC, code: provide("CLOCK", "mock<Clock>()", "interface Clock { now(): Date }"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("EVENT_BUS", "mock<EventBus>()", "interface EventBus { publish(): void }"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("QUEUE_OUTBOX", "{ write: () => undefined }"), errors: [{ messageId: "wrong" }] },
+            { filename: SPEC, code: provide("INBOX", "mock<Inbox>()", "interface Inbox { claim(): void }"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("REDIS_CACHE_MANAGER", "new Map()"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("CACHE", "mock<Cache>()", "interface Cache { get(): void }"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("INSTANCE_WRITER_FENCE", "mock<Fence>()", "interface Fence { take(): void }"), errors: [{ messageId: "wrong" }] },
@@ -213,7 +215,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
 test("the token table is the manifest's, not the rule's", () => {
     const table = fixtureHfs().ruleParams.specDoubles
     assert.equal(table.kit, "@starci/jest-preset")
-    assert.deepEqual(table.doubles.map((entry) => entry.double).sort(), ["FakeClock", "builder", "fakeCache", "fakeIds", "fakeLock", "fakeTransaction", "mockEntityManager", "recordingEventBus", "recordingQueueOutbox"])
+    assert.deepEqual(table.doubles.map((entry) => entry.double).sort(), ["FakeClock", "builder", "fakeCache", "fakeIds", "fakeInbox", "fakeLock", "fakeTransaction", "mockEntityManager", "recordingEventBus", "recordingQueueOutbox"])
     assert.equal(table.fallback.double, "mock")
 })
 

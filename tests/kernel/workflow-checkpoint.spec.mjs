@@ -12,7 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveGateBase, GATE_SCHEMA } from '../../scripts/gates/gate.mjs';
 import { judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
-import { gateBaseAt, gateBaseOf } from '../../scripts/machine/workflow-tree.mjs';
+import { gateBaseAt, gateBaseOf, gateBasesOf } from '../../scripts/machine/workflow-tree.mjs';
 import { checkpointOp, preserveAndReset, finishWorkflow, rebaseWorkflow, reviewVerifiedOf, FINISH_STEPS } from '../../scripts/kernel/workflow-checkpoint.mjs';
 
 const WF = 'wf-nivo-checkpoint-k1';
@@ -35,10 +35,11 @@ function fakeOrca() {
 
 /** The ledger rows the module reads: jobs (owned paths, the last settled op) and reports (the head review.verify verified). */
 const OCCUPYING = ['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
-function fakeDb(jobs, reports = {}) {
+function fakeDb(jobs, reports = {}, settled = reports) {
   return { prepare: (sql) => ({ all: (workflowId, exceptId, ...statuses) => jobs.filter((j) => j.workflow_id === workflowId && j.job_id !== exceptId && statuses.includes(j.status)),
     get: (...args) => {
     if (/FROM reports/.test(sql)) return args[0] in reports ? { head: reports[args[0]] } : null;
+    if (/FROM events/.test(sql)) return args[2] === 'workflow-checkpoint' && args[1] in settled ? { sha: settled[args[1]] } : null;
     if (/WHERE job_id=\?/.test(sql)) return jobs.find((j) => j.job_id === args[0]) ?? null;
     return jobs.filter((j) => j.workflow_id === args[0] && ['succeeded', 'failed'].includes(j.status)).sort((a, b) => b.updated_at - a.updated_at)[0] ?? null;
   } }) };
@@ -241,19 +242,48 @@ test('the default review.verify: the last settled op is a passing review.verify 
   const stale = reviewVerifiedOf(ctx(verifiedJobs()), { workflowId: WF, head: 'b'.repeat(40) });
   assert.deepEqual([stale.ok, stale.code, stale.verifiedHead], [false, 'workflow-finish-verify-stale', head]);
   assert.equal(reviewVerifiedOf(ctx(verifiedJobs(), {}), { workflowId: WF, head }).code, 'workflow-finish-verify-stale', 'a review that names no head verified nothing');
+  // Head-pinned (WFWT2 2.5): the runtime's checkpoint at the review's settle is the verified head, never the report alone.
+  const pinned = (reports, settled) => reviewVerifiedOf({ db: fakeDb(verifiedJobs(), reports, settled) }, { workflowId: WF, head });
+  assert.equal(pinned({ 'op-rv-1': head.slice(0, 12) }, { 'op-rv-1': head }).ok, true, 'an abbreviated report head of the settled tree passes');
+  const moved = pinned({ 'op-rv-1': 'b'.repeat(40) }, { 'op-rv-1': head });
+  assert.deepEqual([moved.ok, moved.code, moved.verifiedHead], [false, 'workflow-finish-verify-stale', head], 'an op checkpointed while the review ran');
+  assert.match(moved.detail, /checkpointed while it ran/);
+  assert.equal(pinned({ 'op-rv-1': head }, {}).code, 'workflow-finish-verify-stale', 'no runtime-recorded checkpoint: the report alone pins nothing');
+  assert.equal(pinned({ 'op-rv-1': 'b'.repeat(40) }, { 'op-rv-1': 'b'.repeat(40) }).code, 'workflow-finish-verify-stale', 'a review of another head');
   assert.equal(reviewVerifiedOf(ctx([...verifiedJobs(), job('op-be-2', 'code.refactor', [], { status: 'succeeded', updated_at: 3 })]), { workflowId: WF, head }).code, 'workflow-finish-verify-missing');
   assert.equal(reviewVerifiedOf(ctx([job('op-rv-1', 'review.verify', [], { status: 'failed', updated_at: 2 })]), { workflowId: WF, head }).code, 'workflow-finish-verify-missing');
   assert.equal(reviewVerifiedOf({}, { workflowId: WF, head }).ok, false);
 });
 
-test('settle refuses a gate JSON whose base is not the workflow checkpoint (op-gate-base-mismatch)', () => {
-  const cp = 'c'.repeat(40);
+test('settle refuses a gate JSON whose base is not an accepted workflow checkpoint (op-gate-base-mismatch)', () => {
+  const cp = 'c'.repeat(40), older = 'e'.repeat(40);
   const gate = (base) => ({ schema: GATE_SCHEMA, base, exit: 0, counts: { new: 0 }, findings: [], errors: [] });
-  const off = judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [], expectedBase: cp });
+  const off = judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [], gateBases: [cp, older] });
   assert.deepEqual([off.status, off.code], ['red', 'op-gate-base-mismatch']);
-  assert.equal(judgeLoop({ gate: gate(undefined), digest: null, kinds: [], expectedBase: cp }).code, 'op-gate-base-mismatch');
-  assert.notEqual(judgeLoop({ gate: gate(cp), digest: null, kinds: [], expectedBase: cp }).code, 'op-gate-base-mismatch', 'the checkpoint base passes on to the rest of the loop');
+  assert.match(off.detail, /cccccccccccc/, 'the refusal names the current checkpoint');
+  assert.equal(judgeLoop({ gate: gate(undefined), digest: null, kinds: [], gateBases: [cp] }).code, 'op-gate-base-mismatch');
+  assert.notEqual(judgeLoop({ gate: gate(cp), digest: null, kinds: [], gateBases: [cp] }).code, 'op-gate-base-mismatch', 'the checkpoint base passes on to the rest of the loop');
+  assert.notEqual(judgeLoop({ gate: gate(older), digest: null, kinds: [], gateBases: [cp, older] }).code, 'op-gate-base-mismatch', 'an older checkpoint its side has not moved since passes');
   assert.notEqual(judgeLoop({ gate: gate('d'.repeat(40)), digest: null, kinds: [] }).code, 'op-gate-base-mismatch', 'outside a workflow worktree any base is the op\'s own');
+});
+
+test('per-side gate bases: an fe op gated before a be checkpoint keeps its base; its own side moving drops it', (t) => {
+  const fx = fixture(t, { jobs: [job('op-be-1', 'code.refactor', ['be']), job('op-fe-1', 'code.refactor', ['fe']), job('op-be-2', 'code.refactor', ['be'])] });
+  const start = git(fx.dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [start], 'no checkpoint yet: the merge-base only');
+  write(fx.dir, 'be/a.ts', 'export const a = 2;\n');
+  const c1 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-be-1' }).sha;
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [c1, start], 'a be checkpoint never forces the fe op to re-gate');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['be'] }), [c1], 'the be side moved at c1');
+  write(fx.dir, 'fe/b.ts', 'export const b = 2;\n');
+  const c2 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-fe-1' }).sha;
+  write(fx.dir, 'be/a.ts', 'export const a = 3;\n');
+  const c3 = checkpointOp(fx.ctx, { workflowId: WF, opId: 'op-be-2' }).sha;
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['fe'] }), [c3, c2], 'the fe side moved at c2: c1 and the merge-base are gone');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['be'] }), [c3]);
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['.'] }), [c3], 'an op owning the whole tree gets the current checkpoint only');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: [] }), [c3], 'an op with no known paths gets the current checkpoint only');
+  assert.deepEqual(gateBasesOf(fx.ctx, WF, { owned: ['docs'] }), [c3, c2, c1, start], 'an untouched side walks back to the merge-base');
 });
 
 test('finish refused at each step with its typed code; main moves at none of the refusals before fast-forward', (t) => {

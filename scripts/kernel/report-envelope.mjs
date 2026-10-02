@@ -20,7 +20,7 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims', 'failureClass', 'seamAssumptions', 'owedToWire']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'head', 'credentialPending', 'rootCause', 'claims', 'failureClass', 'seamAssumptions', 'owedToWire']);
 // Why a failed attempt failed (scripts/kernel/verify-failure.mjs): the route table keys failed routes on it.
 // The api derives it from the evidence and accepts a stated one only where the evidence does not contradict it.
 export const FAILURE_CLASSES = ['environment', 'tool', 'findings', 'product', 'deterministic', 'transient'];

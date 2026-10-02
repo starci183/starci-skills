@@ -248,7 +248,7 @@ allocation:
   # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
   liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
     kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
-  # one local git read over a job's owned paths (scripts/kernel/settle-landed.mjs ownedPathEffects, job-artifacts.mjs).
+  # one local git read over a job's owned paths (scripts/kernel/owned-path-effects.mjs ownedPathEffects, job-artifacts.mjs).
   settleGit: {commandMs: 15000}
   # Typed logs (scripts/kernel/typed-logs.mjs, the ledger's logs table): perJobCap rows a job's own writes
   # may store before one log.truncated row closes them (derived event rows are never capped); dataMaxBytes bounds
@@ -499,6 +499,9 @@ allocation:
   # pane title; an owner's hand-opened tab with recent output is reported, not closed, allowlisted or not).
   gc:
     sweepMs: 1800000
+    # laneCap: the most lane worktrees that stay registered under the lanes root (scripts/supervisor/gc.mjs collectLanes); past it the
+    # longest idle clean lanes go, landed or not (an unlanded lane keeps its branch). Owner rule: worktrees never accumulate.
+    laneCap: 40
     keepTitles: []
   # reconciler (scripts/reconciler/*; DESIGN 7.4-7.8, contract modules/reconciler/reconciler.yaml): the engine polls
   # every ledger's events every pollMs; the leader row lasts leaseMs and is renewed (with the heartbeat row and file)

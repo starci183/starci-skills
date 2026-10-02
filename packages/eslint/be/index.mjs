@@ -17,12 +17,14 @@
  * leave two names for one rule and no way to tell which a message came from.
  */
 import { buildBeConfig } from "./lib/config.mjs"
+import { recommended as ambientIdRecommended, rules as ambientIdRules } from "./ambient-id.mjs"
 import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as buildersRecommended, rules as buildersRules } from "./builders.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as configOwnerRecommended, rules as configOwnerRules } from "./config-owner.mjs"
 import { recommended as connectionsRecommended, rules as connectionsRules } from "./connections.mjs"
+import { recommended as cookiesRecommended, rules as cookiesRules } from "./cookies.mjs"
 import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
 import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
@@ -65,6 +67,7 @@ import { recommended as projectGraphRecommended, rules as projectGraphRules } fr
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
     { law: "project-graph", rules: projectGraphRules, recommended: projectGraphRecommended },
+    { law: "ambient-id", rules: ambientIdRules, recommended: ambientIdRecommended },
     { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "builders", rules: buildersRules, recommended: buildersRecommended },
@@ -72,6 +75,7 @@ const CONTRIBUTIONS = [
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
     { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
     { law: "connections", rules: connectionsRules, recommended: connectionsRecommended },
+    { law: "cookies", rules: cookiesRules, recommended: cookiesRecommended },
     { law: "cqrs", rules: cqrsRules, recommended: cqrsRecommended },
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
     { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },

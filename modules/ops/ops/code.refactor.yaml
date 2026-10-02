@@ -35,16 +35,10 @@ params:
     default: ''
     setBy: kernel
     doc:
-      en: "The commit a redone slice starts from: the head its blocked or failed attempt committed
-        (scripts/kernel/seam-policy.mjs canonRedispatchOf). Empty starts from the checkout as it is."
-  admissionBase:
-    type: string
-    default: ''
-    setBy: kernel
-    doc:
-      en: "The admission commit of a redone slice's first attempt: the gate.mjs --base and the
-        canon-before tree, so the work params.resumeFrom keeps is still measured. Empty means this
-        attempt records its own admission commit."
+      en: "The preserved work a redone slice continues from: refs/heads/preserved/<workflow>/<job>, the
+        snapshot the runtime kept of its blocked or failed attempt's owned paths at settle (ops never
+        commit; scripts/kernel/seam-policy.mjs preservedRefOf, canonRedispatchOf). Empty starts from the
+        checkout as it is."
 nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
@@ -207,10 +201,10 @@ steps:
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked app side and context.cut is present,
-        record the slice's admission commit before editing (params.admissionBase when it is set;
-        with params.resumeFrom set, first bring that commit into the checkout - cherry-pick it, or
-        git apply its indexed patch - and continue from the findings it left, never redoing its
-        committed work) and run node scripts/gates/gate.mjs
+        record the slice's admission commit (git rev-parse HEAD) before editing (with
+        params.resumeFrom set, first apply that preserved work to your owned paths - git diff
+        <resumeFrom>^ <resumeFrom> -- <owned paths> | git apply - and continue from the findings it
+        left, never redoing it) and run node scripts/gates/gate.mjs
         --root ROOT --base <slice admission commit> --changed <owned paths>
         BEFORE the first edit. It gates only the slice's new findings. Without context.cut,
         run the whole-repository hfs lint --format json at ROOT

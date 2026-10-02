@@ -13,7 +13,7 @@
  */
 import { basename } from "node:path"
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -172,7 +172,7 @@ export const noBranchInFlowStep = {
             !call.callee.computed &&
             call.callee.property.type === "Identifier" &&
             call.callee.property.name === "waitFor" &&
-            typeOrigins(context, call.callee.object).some((origin) => hfs.slotOf(origin.file) === "be.tests.world")
+            typeOrigins(context, call.callee.object).some((origin) => inTestWorld(hfs, origin.file))
 
         /** True when this node sits inside the callback of an `it(...)` or `test(...)`, and not inside a `waitFor` probe. */
         const insideStep = (node) => {

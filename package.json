@@ -53,7 +53,9 @@
   "scripts": {
     "check": "node bin/starci.mjs check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --test \"tests/**/*.spec.mjs\"",
-    "starci": "node bin/starci.mjs"
+    "starci": "node bin/starci.mjs",
+    "release:check": "node scripts/gates/release-check.mjs",
+    "release:publish": "node scripts/gates/release-publish.mjs"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

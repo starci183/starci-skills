@@ -65,7 +65,7 @@ $defs:
           be:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
+            required: [fileLines, duplicateBlock, infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -102,6 +102,26 @@ $defs:
                     properties:
                       double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
                       forms: {$ref: '#/$defs/doubleForms'}
+              paramNames:
+                type: array
+                minItems: 1
+                description: R85 BE_RAW_INJECT injected-param-name. The names of the ports every class injects the same way; an entry names a declared type (type) or its ending (typeSuffix) and the parameter names it allows (names, and any ending nameSuffix).
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [names]
+                  oneOf:
+                    - {required: [type]}
+                    - {required: [typeSuffix]}
+                  properties:
+                    type: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
+                    typeSuffix: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
+                    names:
+                      type: array
+                      minItems: 1
+                      uniqueItems: true
+                      items: {type: string, pattern: '^[a-z][A-Za-z0-9]*$'}
+                    nameSuffix: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
               kindPatterns:
                 type: object
                 description: 'BE_KIND_DECLARATION. Trigger kind -> the patterns an app that uses the kind declares (and whose platform capabilities must exist).'

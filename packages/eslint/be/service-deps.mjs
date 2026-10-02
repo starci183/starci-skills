@@ -21,9 +21,9 @@
  * slot view. A name is read only for the fixed vocabulary of the double markers, as whole words.
  */
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isSpecFile, normalizePath } from "./lib/path.mjs"
-import { implementsMigration, inCli, inTestBootstrap, isMigrationFile, mayHoldEntityManager } from "./lib/persistence.mjs"
+import { implementsMigration, inCli, isMigrationFile, mayHoldEntityManager } from "./lib/persistence.mjs"
 import { typed, typeOrigins } from "./lib/types.mjs"
 
 // -- provider-param-token --------------------------------------------------------------------------
@@ -153,7 +153,7 @@ export const noRepositoryClass = {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
         const file = normalizePath(filename)
-        if (mayHoldEntityManager(hfs, file) || inCli(hfs, file) || inTestBootstrap(hfs, file) || isMigrationFile(hfs, file) || (hfs.slotOf(file) ?? "").startsWith("be.tests.")) return {}
+        if (mayHoldEntityManager(hfs, file) || inCli(hfs, file) || inTestWorld(hfs, file) || isMigrationFile(hfs, file) || (hfs.slotOf(file) ?? "").startsWith("be.tests.")) return {}
         const check = (node) => {
             if (implementsMigration(context, node)) return
             const found = persistenceMember(context, node)

@@ -165,7 +165,7 @@ test('the third no-report death of one op raises one pattern incident, and only 
   const second=ledger.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? AND status=?').get(WF,'queued').job_id;
   for(const to of ['ready','leased','running'])ledger.write.setJobStatus({jobId:second,to,reason:'test retry',...(to==='running'?{workerId:HANDLE}:{})});
   // The retry's own effect: a file the first attempt left, written before this job existed, is debris the
-  // retry found (settle-landed.mjs ownedPathEffects preexisting), never this attempt's evidence.
+  // retry found (owned-path-effects.mjs ownedPathEffects preexisting), never this attempt's evidence.
   fs.writeFileSync(path.join(repoRoot,'docs','half-written-again.md'),'partial\n');
   const again=out(run('reconcile','--job',second,'--dead-worker','--settle-failed'));
   assert.equal(again.recovery,'settled-failed',JSON.stringify(again));

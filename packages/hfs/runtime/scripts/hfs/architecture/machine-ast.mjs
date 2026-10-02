@@ -115,18 +115,51 @@ export function machineKit({ config, context, graph }) {
   };
 
   /** The `{ provide: <token>, ... }` provider literals of `file` whose token is `name` imported from `moduleName`, in source order. */
+  const HELPER_DEPTH = 4;
+
+  /** The body a call or a spread identifier resolves to when it is a function or a const declared in a file of the program (not a package), else null. */
+  const helperBodyOf = (checker, node) => {
+    const target = ts.isCallExpression(node) ? node.expression : node;
+    for (const declaration of declarationsOf(checker, ts.isPropertyAccessExpression(target) ? target.name : target)) {
+      if (!graphPath(declaration)) continue;
+      if (ts.isFunctionDeclaration(declaration) && declaration.body) return { declaration, body: declaration.body };
+      if (ts.isVariableDeclaration(declaration) && declaration.initializer) return { declaration, body: declaration.initializer };
+    }
+    return null;
+  };
+
+  /**
+   * The `{ provide: <token>, ... }` provider literals of `file` whose token is `name` imported from `moduleName`, in source order.
+   * A call or a spread of a function or a const declared in another file of the program is followed (to a depth of four), so a
+   * helper that builds the `APP_GUARD` or `APP_FILTER` entries outside the app root file is read too: the entry's `node` is then the
+   * call or spread inside the app root (where the entry is provided), its `useClass` and `checker` those of the helper's file.
+   */
   const providersOf = (file, name, moduleName) => {
-    const checker = checkerOf(file.sourceFile);
     const found = [];
-    walk(file.sourceFile, node => {
-      if (!ts.isObjectLiteralExpression(node)) return true;
-      const provide = propertyOf(node, 'provide');
-      if (provide && isImportOf(checker, valueOfProperty(provide), name, moduleName)) {
-        const use = propertyOf(node, 'useClass');
-        found.push({ node, useClass: use ? valueOfProperty(use) : null, checker });
-      }
-      return true;
-    });
+    const seen = new Set();
+    const scan = (root, anchor, depth) => {
+      const checker = checkerOf(root.getSourceFile());
+      walk(root, node => {
+        if (ts.isObjectLiteralExpression(node)) {
+          const provide = propertyOf(node, 'provide');
+          if (provide && isImportOf(checker, valueOfProperty(provide), name, moduleName)) {
+            const use = propertyOf(node, 'useClass');
+            found.push({ node: anchor ?? node, useClass: use ? valueOfProperty(use) : null, checker });
+          }
+          return true;
+        }
+        const reference = ts.isSpreadElement(node) ? node.expression : (ts.isCallExpression(node) ? node : null);
+        if (reference && depth < HELPER_DEPTH) {
+          const helper = helperBodyOf(checker, reference);
+          if (helper && !seen.has(helper.declaration)) {
+            seen.add(helper.declaration);
+            scan(helper.body, anchor ?? node, depth + 1);
+          }
+        }
+        return true;
+      });
+    };
+    scan(file.sourceFile, null, 0);
     return found.sort((a, b) => a.node.getStart() - b.node.getStart());
   };
 

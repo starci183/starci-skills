@@ -44,6 +44,7 @@ import { readFoundations } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
+import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
 export const TRANSFER_SCOPE = 'ownership-transfer';
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
@@ -211,6 +212,24 @@ export function committedReader(repo, { workDir = '.starciwork' } = {}) {
       out.set(rel, body?.type === 'blob' ? body.bytes : null);
     }
     return out;
+  };
+}
+
+/**
+ * The committed reader of workflow `workflowId` (WFWT2 2.8, the one rule for Work records): a record it owns (ownerOf) is
+ * read at its own workflow branch - the HEAD of its live workflow worktree, where the runtime checkpoints its records -
+ * so its later settles see its own records before it lands; every other record is read at the ledger checkout's HEAD
+ * (main): a peer sees a record when its owner lands. Same contract as committedReader. `worktree`: the workflow
+ * worktree's path (default: the registry's live one), null for none.
+ */
+export function workflowCommittedReader({ repo, workDir = '.starciwork', workflowId, ownerOf, worktree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? null }) {
+  const main = committedReader(repo, { workDir });
+  if (!worktree || !workflowId) return main;
+  const own = committedReader(worktree, { workDir });
+  return (rels) => {
+    const mine = rels.filter((rel) => ownerOf(rel)?.workflowId === workflowId);
+    const a = own(mine), b = main(rels.filter((rel) => !mine.includes(rel)));
+    return a === null || b === null ? null : new Map([...b, ...a]);
   };
 }
 

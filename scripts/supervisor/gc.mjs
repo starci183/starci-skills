@@ -81,6 +81,7 @@ import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productR
 import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
+import { evictOverCap, spareInfo } from './lane-cap.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -90,7 +91,7 @@ export const SCHEMA = 'starci/gc-report@1';
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
-  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000 });
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000, laneCap: 40 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/cli.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
@@ -117,11 +118,9 @@ export function gcSettings(allocation = allocationSettings()) {
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
     // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
     laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
-    // One pass judges lanes for at most laneBudgetMs, then records where it stopped; the next pass resumes there (a
-    // backlog of hundreds of lane worktrees timed the sweep child out every pass, 2026-10-01).
-    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs) };
+    // One pass judges lanes for at most laneBudgetMs, then resumes there; laneCap: most lanes that stay registered (lane-cap.mjs).
+    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
 }
-
 
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
@@ -569,7 +568,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
       const ledger = landedCommitsForLane(branch, env);
       const ledgerLanded = commits.length > 0 && commits.every((sha) => ledger.has(sha));
       if (!ledgerLanded && !laneContentLanded(commits, branch, root, run)) {
-        item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true }); continue;
+        item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true, ...spareInfo({ w, branch, ahead, now, idleMs: settings.laneIdleMs ?? settings.laneGraceMs, root, run, workers, sup }) }); continue;
       }
     }
     const act = laneActivity({ worktree: w.path, branch: w.branch, root, run });
@@ -580,6 +579,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
+  if (!fatal && progress.complete) evictOverCap({ items, total: lanes.length, cap: settings.laneCap ?? DEFAULTS.laneCap, lanesByPath: new Map(lanes.map((w) => [w.path, w])), removeTree, item, base, stopped: () => fatal });
   if (fatal) return { items, freedBytes, errors, progress, fatal };
   if (apply) run(['worktree', 'prune'], { cwd: root });
   // Leftover empty directories of removed land scratch checkouts whose registration is gone.
