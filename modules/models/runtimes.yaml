@@ -354,6 +354,10 @@ allocation:
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
   # specsBaseMs plus perSpecMs for every spec it runs, specConcurrency spec files at a time.
   landGate: {waitMs: 1800000, specsBaseMs: 600000, perSpecMs: 60000, specConcurrency: 6}
+  # workerClose (scripts/machine/worker-close.mjs; owner rule: a finished worker is closed COMPLETELY): after worker-release and the terminal
+  # close the runtime waits verifyMs for every process of that terminal's shell tree to end (polled every pollMs); a survivor proven to belong
+  # to the tree is stopped and given stopVerifyMs to end before the finding is raised.
+  workerClose: {verifyMs: 10000, pollMs: 1000, stopVerifyMs: 5000}
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}

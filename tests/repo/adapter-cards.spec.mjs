@@ -25,6 +25,9 @@ for(const file of cards){
     assert.equal(card.start?.agentArgument,card.agent,`${file}: worker-start --agent names the card's agent`);
     assert.ok(card.start?.modelArgument===undefined||typeof card.start.modelArgument==='boolean',`${file}: start.modelArgument is a boolean`);
     assert.equal(card.release?.api,'orchestration.worker-release',`${file}: a settled worker is released`);
+    // worker-release alone does not end every agent (cursor-agent survived it): every card declares the runtime's close and its proof.
+    assert.equal(card.release?.closeTerminal,true,`${file}: the released worker's terminal is closed by the runtime`);
+    assert.equal(card.release?.verify,'terminal-process-tree',`${file}: the close is verified against the terminal's process tree`);
     for(const gone of ['terminalFallback','hostLaunchPrefix','commandPrefix','commandRequirements','kernelCommandRequirements','environmentStrip'])
       assert.equal(card[gone],undefined,`${file}: no hand-built launch command (${gone}) - Orca composes it`);
   });

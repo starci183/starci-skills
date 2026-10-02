@@ -23,6 +23,19 @@ function temporary(t,label){
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   return root;
 }
+// The examples declare their custody under the runtime HOST repository by name (starci-academy-backend, whose .claude is this
+// runtime). Where the runtime is the repository itself (a CI checkout, any other clone) no checkout carries that name, so the
+// declaration would read as not checked out: these specs name a host of that name through STARCI_SOURCE_ROOT, the documented
+// override, and prove the same resolution into this runtime tree on every machine.
+function declaredHost(t){
+  const host=path.join(temporary(t,'declared-host'),'starci-academy-backend');
+  fs.mkdirSync(host,{recursive:true});
+  const before=process.env.STARCI_SOURCE_ROOT;
+  process.env.STARCI_SOURCE_ROOT=host;
+  t.after(()=>{if(before===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=before;});
+  return host;
+}
+
 const write=(root,relative,body)=>{
   const file=path.join(root,relative);
   fs.mkdirSync(path.dirname(file),{recursive:true});
@@ -1051,7 +1064,8 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   assertNoSecret(red.report,'dashboard report');
 });
 
-test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', () => {
+test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', t => {
+  declaredHost(t);
   const root=path.resolve(import.meta.dirname,'..', '..');
   const file=path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml');
   const declared=readSonarDeclaration(file);
@@ -1081,6 +1095,7 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
 });
 
 test('a project token is the declared credential that names the project, else the one declared credential whose purpose is analysis', t => {
+  declaredHost(t);
   const root=path.resolve(import.meta.dirname,'..', '..');
   // The examples declare their own analysis credential, sealed in the host's ext/sonar custody: no --token-ref is needed.
   for(const [app,key] of [['ecommerce-app','starci-ecommerce-app']]){

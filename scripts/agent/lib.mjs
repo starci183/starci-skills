@@ -23,7 +23,7 @@ import { hostAgentVerdict } from './host-agents.mjs';
 import { workerStart } from '../api/orca/worker-start.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { closeWorker } from '../machine/worker-close.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { runShow } from '../api/orca/run-show.mjs';
@@ -383,7 +383,7 @@ function sendPrompt(handle, text, adapter, io) {
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
-    rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? workerRelease,
+    rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
     trust: io?.trust ?? ensureLaunchTrust };
   const { card, error: cardError } = loadAdapter(provider);
   if (cardError) return { ok: false, step: 'card', error: cardError, provider };

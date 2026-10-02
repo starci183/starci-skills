@@ -60,6 +60,10 @@ start:
   modelArgument: false
 release:
   api: orchestration.worker-release
+  # worker-release alone does not end every agent (a released cursor worker kept its cursor-agent process running): the runtime then closes the
+  # worker's terminal and proves that no process of that terminal's shell tree remains (scripts/machine/worker-close.mjs, allocation.workerClose).
+  closeTerminal: true
+  verify: terminal-process-tree
 knownFailures:
   - signal: 'Unknown model'
     meaning: The --model flag named an id the account cannot run; the CLI exits before the prompt.

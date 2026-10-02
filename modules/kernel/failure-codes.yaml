@@ -10698,6 +10698,16 @@ managed-unproven:
   nextStep_vi: "Job giữ nguyên trạng thái settled; api reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
   owner: runtime-core
   kind: settle-reason
+worker-process-survived:
+  title: "A process of a closed worker terminal outlived the close"
+  title_vi: "Một tiến trình của terminal worker đã đóng vẫn còn chạy sau khi đóng"
+  meaning_vi: "Sau worker-release và việc đóng terminal của worker, vẫn còn một tiến trình thuộc cây shell của terminal đó (tiến trình mang ORCA_TERMINAL_HANDLE của terminal hoặc con cháu của nó) và không dừng được trong thời hạn kiểm chứng. Đây là phát hiện vệ sinh máy chủ: kết quả của worker (đã báo worker_done, đã thành công) không bị đổi."
+  causes_vi:
+    - "Agent như cursor-agent không tự thoát khi Orca giải phóng worker nên tiến trình Node của nó vẫn chạy"
+    - "Tiến trình con của agent giữ terminal hoặc từ chối bị dừng"
+  nextStep_vi: "Người giám sát xem pid trong phát hiện (chỉ các pid đã được chứng minh thuộc cây shell của terminal) và dừng đúng các pid đó; không dừng theo tên tiến trình. Lượt dọn của supervisor quét lại phần còn sót."
+  owner: supervisor
+  kind: settle-reason
 worker-died-no-report:
   title: "Worker died without report"
   title_vi: "Worker chết mà chưa báo cáo"
