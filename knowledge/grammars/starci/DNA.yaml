@@ -87,7 +87,7 @@ provenance:
     inset, top hairline, one command; `visibility` "narrow" hides it at 48rem and wider, or "always"); and every
     registry renderer now stamps `data-component` and `data-tier` on its root (28 emitted none).
   limitations: |
-    Snapshot generated 2026-09-23 from package @starci/grammar@0.8.2 at the recorded checkout; the
+    Snapshot generated 2026-09-23 from the pinned @starci/grammar package at the recorded checkout; the
     measured blocks were re-verified against 0.5.1 source on 2026-09-25 (tertiary surface only) and
     re-measured by `grammar-knowledge --write` against 0.5.2 source on 2026-09-27 (Meter segments) and
     against 0.5.3 source on 2026-09-27 (Button danger variants, Alert action by tone, Badge dot) and

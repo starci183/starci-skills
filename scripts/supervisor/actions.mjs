@@ -25,7 +25,7 @@ import { OWNER_ONLY } from './owed.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const ACTION_KIND = 'supervisor-action';
@@ -208,7 +208,7 @@ const digestTexts = (language) => {
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
-export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = 'en', now = Date.now() }) {
+export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = ownerLanguage(), now = Date.now() }) {
   const t = digestTexts(language);
   const lines = [`${t.head} ${stampMinute(now)}`];
   // Outcome first: progress per workflow, priority first, and why it is slow.

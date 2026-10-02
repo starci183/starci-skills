@@ -406,18 +406,9 @@ export const noUseCase = {
 
 // -- no-event-bus ------------------------------------------------------------------------------------------------
 
-/** The in-process event names of `@nestjs/cqrs`. */
-const EVENT_NAMES = new Set(["EventBus", "EventsHandler", "IEventHandler"])
-
-/** The package of the second in-process event system. */
-const EVENT_EMITTER_PACKAGE = "@nestjs/event-emitter"
-
-/** The Node and RxJS classes that are an in-process event bus when constructed or extended: package -> class names. */
-const BUS_CLASSES = { events: new Set(["EventEmitter"]), "node:events": new Set(["EventEmitter"]), rxjs: new Set(["Subject", "BehaviorSubject", "ReplaySubject", "AsyncSubject"]) }
-
-/** The bus class a constructed or extended expression is declared as (by declaration origin), else null. */
-const busClassOf = (context, node) => {
-    const origin = typeOrigins(context, node).find((entry) => entry.module !== null && BUS_CLASSES[entry.module]?.has(entry.name))
+/** The bus class a constructed or extended expression is declared as (by declaration origin), else null. `classes` is the `ruleParams.be.eventBus.classes` map: module specifier -> class names. */
+const busClassOf = (context, node, classes) => {
+    const origin = typeOrigins(context, node).find((entry) => entry.module !== null && classes[entry.module]?.includes(entry.name))
     return origin ? origin.name : null
 }
 
@@ -449,6 +440,8 @@ export const noEventBus = {
     },
     create(context) {
         const report = (node, name) => context.report({ node, messageId: "event", data: { name } })
+        const eventBus = hfsOf(context).ruleParams.eventBus
+        const eventNames = new Set(eventBus.imports[CQRS_PACKAGE] ?? [])
         const { checker, toTs } = typed(context)
         /** Collects, per class, the functions-collection properties and the registrations made on them. */
         const checkClass = (classNode) => {
@@ -484,21 +477,23 @@ export const noEventBus = {
             ClassDeclaration(node) {
                 checkClass(node)
                 if (node.superClass) {
-                    const name = busClassOf(context, node.superClass)
+                    const name = busClassOf(context, node.superClass, eventBus.classes)
                     if (name) context.report({ node: node.superClass, messageId: "bus", data: { name } })
                 }
             },
             ClassExpression(node) { checkClass(node) },
             NewExpression(node) {
-                const name = busClassOf(context, node.callee)
+                const name = busClassOf(context, node.callee, eventBus.classes)
                 if (name) context.report({ node, messageId: "bus", data: { name } })
             },
             ...moduleReferences(({ node, source, value, names }) => {
-                if (value === EVENT_EMITTER_PACKAGE) report(source, value)
-                else if (value === CQRS_PACKAGE) for (const name of names) if (EVENT_NAMES.has(name)) report(node, name)
+                const members = eventBus.imports[value]
+                if (members === undefined) return
+                if (members.length === 0) report(source, value)
+                else for (const name of names) if (members.includes(name)) report(node, name)
             }),
             MemberExpression(node) {
-                if (node.computed || node.property.type !== "Identifier" || !EVENT_NAMES.has(node.property.name)) return
+                if (node.computed || node.property.type !== "Identifier" || !eventNames.has(node.property.name)) return
                 if (node.object.type === "Identifier" && importOf(context, node.object)?.source === CQRS_PACKAGE && importOf(context, node.object).imported === "*") report(node, node.property.name)
             },
         }

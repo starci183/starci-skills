@@ -67,15 +67,14 @@ import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKind
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { altOf, phrasesOf } from '../lib/source-phrases.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
 // The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question
 // in the same language (provision.ask, packet owner_language). Strings are English sources (scripts/lib/i18n.mjs).
 const uiText = () => {
-  let lang = 'en';
-  try { lang = loadConfig()?.language ?? 'en'; } catch { /* default */ }
+  const lang = ownerLanguage();
   const tr = translator(lang);
   return { lang, t: {
     title: tr('Owner decision'), artifacts: tr('Artifacts under review'), choose: tr('Choose'), picks: tr('Choose'),

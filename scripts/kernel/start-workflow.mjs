@@ -45,6 +45,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
+import { DEFAULT_OWNER_LANGUAGE } from '../machine/home.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability, loadModelRegistry } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
@@ -371,7 +372,7 @@ const renderKernelPrompt = ({ workflowId, inboxId, goalRevision, launchAuthority
   .replaceAll('{ledgerFile}', ledgerFileFor(repo))
   .replaceAll('{bindingFile}', context?.file ?? '(no matching project binding; --repo is authoritative)')
   .replaceAll('{frontendRoot}', context?.fe ?? '(not bound)')
-  .replaceAll('{ownerLanguage}', inspectOwnerConfig(ownerRoot).config?.language ?? 'en')
+  .replaceAll('{ownerLanguage}', inspectOwnerConfig(ownerRoot).config?.language ?? DEFAULT_OWNER_LANGUAGE)
   .replaceAll('{apiFile}', apiFile)
   .replaceAll('{runtimeRev}', shortRev(bootRuntimeRev) ?? 'unknown');
 

@@ -9,7 +9,7 @@ import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../agent/quota/index.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -46,7 +46,7 @@ const blockTexts = (language) => {
  * 'dead' and ⚠ on 'limited'. Providers with no number are skipped; nothing is
  * rendered when no provider reports a figure.
  */
-export function renderQuotaLine(quota, { language = 'en' } = {}) {
+export function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
   const t = blockTexts(language);
   const parts = [];
   for (const [name, q] of Object.entries(quota ?? {})) {
@@ -61,7 +61,7 @@ export function renderQuotaLine(quota, { language = 'en' } = {}) {
 
 
 /** The block as Telegram HTML, or null. `quota` is a probeAll() result map (null/absent hides the line). */
-export function renderSupervisorBlock(snap, { language = 'en', land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
+export function renderSupervisorBlock(snap, { language = ownerLanguage(), land = { busy: false, current: null }, now = Date.now(), quota = null } = {}) {
   if (!snap) return null;
   const t = blockTexts(language);
   const lines = [];
@@ -94,7 +94,7 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
  * The /status block for `language`, or null (machine.sqlite not created yet or unreadable, or a spec run whose `env`
  * names no test machine.sqlite).
  */
-export function supervisorStatusMessage({ language = 'en', env = process.env, now = Date.now(), quota = undefined } = {}) {
+export function supervisorStatusMessage({ language = ownerLanguage(), env = process.env, now = Date.now(), quota = undefined } = {}) {
   if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env[TEST_REGISTRY_ENV]) return null;
   const read = readSupervisor((m) => supervisorSnapshot(m, { now }), null, { env });
   const snap = read ? { ...read, mode: supervisorMode({ env }) } : null;

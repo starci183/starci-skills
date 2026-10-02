@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-port-once.mjs — PORT_ONCE (R208, RT_PORT_RESTATED; part of `npm run check`).
+// check-port-once.mjs — PORT_ONCE (part of `npm run check`).
 //   node scripts/checks/check-port-once.mjs [--json]
 //
 // A port number is stated once, by its owner, and every other file references the owner — the literal never

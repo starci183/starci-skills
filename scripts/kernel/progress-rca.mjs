@@ -589,7 +589,7 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
 }
 
 /** The Kernel notice for one stalled workflow (the Workflow controller's progress-stall DI text). Pure. */
-export function stallNotice(w, { lang = 'vi' } = {}) {
+export function stallNotice(w, { lang = ownerLanguage() } = {}) {
   const p = w.progress, r = w.rca, tr = translator(lang);
   const top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
   return [

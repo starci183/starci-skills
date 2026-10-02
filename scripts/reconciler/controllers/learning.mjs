@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { clipLine } from '../../lib/clip.mjs';
-import { translator } from '../../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../../lib/i18n.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const LEARNING_FILE = path.join(ROOT, 'modules', 'reconciler', 'learning.yaml');
@@ -51,7 +51,7 @@ export function violationItems(violations, { now, windowMs = DEFAULTS.windowMs }
  * What one pass decides. Pure over `items`, the learning `state` (lessons.mjs learningState) and the helpers
  * `newHypotheses` / `measureExperiments` (injected so a spec can run it without a ledger). {decisions, hypotheses, verdicts}.
  */
-export function planLearning({ items, state, settings, now, newHypotheses, measureExperiments, dueMs = DEFAULTS.decisionDueMs, language = 'vi' }) {
+export function planLearning({ items, state, settings, now, newHypotheses, measureExperiments, dueMs = DEFAULTS.decisionDueMs, language = ownerLanguage() }) {
   const tr = translator(language);
   const hypotheses = newHypotheses(items, state, { minRepeats: settings.minRepeats });
   const verdicts = measureExperiments(state, { items, now, measureMs: settings.measureMs, successDrop: settings.successDrop });
@@ -81,8 +81,7 @@ export async function reconcileLearning(key, ctx, { settings = learningControlle
   const state = deps.state ?? lessons.readLearning({ env: ctx.env ?? process.env });
   let ls;
   try { ls = deps.learningSettings ?? lessons.learningSettings(); } catch { ls = { minRepeats: 2, measureMs: 86_400_000, successDrop: 0.1 }; }
-  let language = deps.language;
-  if (!language) { try { const { loadConfig } = await import('../../../engine/config.mjs'); language = loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { language = 'vi'; } }
+  const language = deps.language ?? ownerLanguage();
   const plan = planLearning({ items, state, settings: ls, now, newHypotheses: lessons.newHypotheses, measureExperiments: lessons.measureExperiments, dueMs: settings.decisionDueMs, language });
   const opened = [];
   for (const d of plan.decisions) { try { await ctx.openDecision(d); opened.push(d.idempotencyKey); } catch { /* the next pass retries */ } }

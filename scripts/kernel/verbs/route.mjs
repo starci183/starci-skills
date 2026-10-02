@@ -182,7 +182,7 @@ export default {
 
   const decided = {
     // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
-    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? 'high') : null),
+    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
     routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
     // Always written (null when absent) so a reroute never keeps the previous decision's values.
     routePolicy: decision.policy ?? null,

@@ -10,6 +10,7 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { isOrcaDepthRefusal } from '../lib/worker-depth.mjs';
 import { MAX_WORKER_DEPTH_CEILING } from '../../engine/orca-config.mjs';
+import { DEFAULT_AGENT } from '../machine/home.mjs';
 
 export const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no command, edit no file, start no worker. Wait to be released.';
 
@@ -18,7 +19,7 @@ export const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: ru
  * refused a start for depth (measured = the depth before it); a start that failed for any other reason ends the probe
  * unmeasured. `released` lists each started worker's cleanup: {dispatchId, stopped, released}.
  */
-export async function probeWorkerDepth({ entry = null, worktree, agent = 'claude', ceiling = MAX_WORKER_DEPTH_CEILING,
+export async function probeWorkerDepth({ entry = null, worktree, agent = DEFAULT_AGENT, ceiling = MAX_WORKER_DEPTH_CEILING,
   start = startAgent, stop = workerStop, release = workerRelease } = {}) {
   const started = [];
   let refusedAt = null;

@@ -36,6 +36,7 @@ import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, STARTUP_RESERVATION_MS,
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
+  DEFAULT_OWNER_LANGUAGE,
 } from '../machine/home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
@@ -79,7 +80,7 @@ export function renderSupervisorPrompt({ template, doc, settings, restart = null
     .replaceAll('{launchAuthority}', launchAuthorityText({ restart }))
     .replaceAll('{doctrine}', doctrineOf(doc))
     .replaceAll('{skillRoot}', skillRoot)
-    .replaceAll('{ownerLanguage}', settings.language ?? 'en')
+    .replaceAll('{ownerLanguage}', settings.language ?? DEFAULT_OWNER_LANGUAGE)
     .replaceAll('{repos}', productRepos(settings).join(', ') || '(none listed)')
     .replaceAll('{supervisorId}', SUPERVISOR_ID)
     .replaceAll('{pollMinutes}', String(Math.round(settings.pollIntervalMs / 60_000)));

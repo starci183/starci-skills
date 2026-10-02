@@ -1,6 +1,7 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -34,7 +35,25 @@ const CHROME = [20, 40, 160, 255];
 const MARK = [250, 200, 0, 255];
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateUi = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
-const env = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1' }; for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[k]; return e; })();
+// The draw-review contract entries (interface-draw-owner-review, draw-review-gate-fails-closed,
+// draw-content-owner-gate, owner-draw-feedback-golden) predated the alpha.3 release base and were deleted by
+// the release-line compaction; every api call in this spec runs against the live entries plus those four.
+const CONTRACT_CHANGES_FILE = (() => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-review-registry-'));
+  after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const changesDir = path.join(ROOT, 'modules', 'kernel', 'contract-changes');
+  const changes = fs.readdirSync(changesDir).filter((f) => f.endsWith('.yaml')).map((f) => parseYaml(fs.readFileSync(path.join(changesDir, f), 'utf8')));
+  changes.push(
+    { id: 'interface-draw-owner-review', effectiveAt: '2026-09-25T00:45:00+07:00', ops: ['interface.draw', 'brand.decide'], summary: 'spec fixture for the compacted entry' },
+    { id: 'draw-review-gate-fails-closed', effectiveAt: '2026-09-25T17:10:00+07:00', ops: ['interface.draw', 'brand.decide', 'interface.implement', 'interface.audit'], summary: 'spec fixture for the compacted entry' },
+    { id: 'draw-content-owner-gate', effectiveAt: '2026-09-27T15:50:00+07:00', reach: 'follow-up', ops: ['interface.draw'], followUp: { op: 'interface.draw', ops: ['interface.draw'], detail: 'spec fixture for the compacted entry' }, summary: 'spec fixture for the compacted entry' },
+    { id: 'owner-draw-feedback-golden', effectiveAt: '2026-09-27T19:30:00+07:00', ops: ['interface.draw', 'brand.decide'], summary: 'spec fixture for the compacted entry' },
+  );
+  const file = path.join(dir, 'contract-changes.yaml');
+  fs.writeFileSync(file, stringifyYaml({ schema: 'starci/contract-changes@1', changes }));
+  return file;
+})();
+const env = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1', STARCI_CONTRACT_CHANGES: CONTRACT_CHANGES_FILE }; for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[k]; return e; })();
 const readTree = (p) => parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
 const readApp = (p) => treeOf(readTree(p), 'app');
 const writeTree = (p, tree) => fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml(tree));
@@ -96,7 +115,7 @@ test('the draw-review question shows the owner the drawn parts only - desktop an
   const status = drawReviewStatus(dir);
   assert.equal(status.owed, true, status.why);
   assert.deepEqual(status.gates.map((g) => g.kind), ['planned-layout']);
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   assert.equal(q.kind, 'draw-review');
   assert.equal(q.options.length, 2);
   assert.equal(q.recommended, undefined, 'the owner reviews a drawing: nothing to auto-accept');
@@ -122,7 +141,7 @@ test('the draw-review question shows the owner the drawn parts only - desktop an
   // An incomplete draw is refused a question: the owner reviews desktop AND mobile.
   const record = readRecord(dir);
   fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml({ ...record, assets: record.assets.filter((a) => a.breakpoint !== 'mobile') }));
-  assert.throws(() => drawReviewQuestion(dir), /no drawn part at default mobile\/light/);
+  assert.throws(() => drawReviewQuestion(dir, { lang: 'en' }), /no drawn part at default mobile\/light/);
   assert.equal(drawReviewStatus(dir).owed, false, 'an incomplete draw is drawn first, then reviewed');
 });
 
@@ -138,7 +157,7 @@ test('greenfield sequence: brand a6 plans, interface.draw draws, the owner accep
   const settledReasons = () => layoutSettlement(readApp(p), { ...node(), layout: { ...node().layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons;
   assert.ok(settledReasons().some((r) => /which is todo, not done - interface\.draw parks the owner draw-review ask/.test(r)));
   // The ask, the owner's accept answer, and the draw op's accept path.
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   const receipt = receiptFor(p, q);
   const dry = applyDrawReview(dir, receipt);
   assert.equal(dry.written, false);
@@ -174,7 +193,7 @@ test('greenfield sequence: brand a6 plans, interface.draw draws, the owner accep
 test('apply: a redraw answer writes nothing and hands back the note; only the owner or the auto-accept accepts the current parts of this record', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   const redraw = applyDrawReview(dir, receiptFor(p, q, { optionIndex: 1, note: 'Make the wordmark larger' }), { write: true });
   assert.deepEqual([redraw.decision, redraw.written, redraw.brief], ['redraw', false, 'Make the wordmark larger']);
   assert.equal(readRecord(dir).state, 'todo');
@@ -232,11 +251,11 @@ test('api report refuses a done interface.draw that leaves a gating drawing unre
   assert.match(lastErr(refused).error, /ui\.home\.app-layout .* gates another leg \(planned-layout\).*draw-review\.mjs question --ui/);
   // The ask itself is what the attempt files.
   const ask = path.join(reportScratchOf(p), 'ask.json');
-  fs.writeFileSync(ask, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'The owner reviews the drawn parts.', files, checks: [], question: drawReviewQuestion(dir) }));
+  fs.writeFileSync(ask, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'The owner reviews the drawn parts.', files, checks: [], question: drawReviewQuestion(dir, { lang: 'en' }) }));
   const asked = runApi('report', '--repo', p.repo, '--job', 'job-draw-1', '--report', ask, '--json');
   assert.equal(asked.status, 0, asked.stderr);
   // After the owner's accept answer is applied, the done report is filed.
-  applyDrawReview(dir, receiptFor(p, drawReviewQuestion(dir)), { write: true });
+  applyDrawReview(dir, receiptFor(p, drawReviewQuestion(dir, { lang: 'en' })), { write: true });
   seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2099-01-01T00:00:00Z') });
   fs.writeFileSync(report, JSON.stringify({ schema: 'starci/op-report@1', outcome: 'done', summary: 'Drew the planned layout.', files, checks: [], head: 'abcdef1234567' }));
   const filed = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
@@ -253,7 +272,7 @@ test('serve-ask: the owner accepts in the form, the receipt keeps the review, an
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const wf = 'wf-draw-form', dispatchId = 'ctx_draw_form';
-  const question = drawReviewQuestion(dir);
+  const question = drawReviewQuestion(dir, { lang: 'en' });
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
       fileDrawAsk(l,{wf,dispatchId,question});
@@ -343,7 +362,7 @@ test('gates: a repository layout drawn by the record is layout-design; only a pl
 test('apply: a receipt outside the repository is refused; a reviewed part without its sha256 is named, not called redrawn', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   const inside = receiptFor(p, q);
   const outsideDir = fs.mkdtempSync(path.join(path.dirname(p.repo), 'receipt-'));
   t.after(() => fs.rmSync(outsideDir, { recursive: true, force: true }));
@@ -419,21 +438,21 @@ test('a drawing the owner asked for stays owner-only: a prior owner redraw, an o
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
     // The owner answered an earlier review of this record with a redraw (in another workflow of this ledger).
-    const first = fileDrawAsk(l, { wf: 'wf-draw-first', dispatchId: 'ctx_draw_first', question: drawReviewQuestion(dir) });
-    const redrawReceipt = receiptFor(p, drawReviewQuestion(dir), { optionIndex: 1, note: 'Larger wordmark', dispatchId: 'ctx_draw_first' });
+    const first = fileDrawAsk(l, { wf: 'wf-draw-first', dispatchId: 'ctx_draw_first', question: drawReviewQuestion(dir, { lang: 'en' }) });
+    const redrawReceipt = receiptFor(p, drawReviewQuestion(dir, { lang: 'en' }), { optionIndex: 1, note: 'Larger wordmark', dispatchId: 'ctx_draw_first' });
     l.appendEvent({ workflowId: 'wf-draw-first', entityType: 'report', entityId: first.dispatch_id, kind: 'ask-answered', payload: { dispatchId: first.dispatch_id, receiptPath: redrawReceipt, answeredBy: 'owner', optionIndex: 1 } });
     drawLayout(p, { mark: [0, 250, 0, 255] });
-    const redrawn = fileDrawAsk(l, { dispatchId: 'ctx_draw_redrawn', question: drawReviewQuestion(dir) });
+    const redrawn = fileDrawAsk(l, { dispatchId: 'ctx_draw_redrawn', question: drawReviewQuestion(dir, { lang: 'en' }) });
     const refused = await autoRun(p, l, redrawn);
     assert.deepEqual([refused.accepted, refused.why], [false, 'owner-requested']);
     assert.match(refused.detail, /the owner asked for a redraw of ui\.home\.app-layout in draw-review ask ctx_draw_first \(wf-draw-first\)/);
     assert.deepEqual([eventsOf(l, 'ask-auto-accepted'), eventsOf(l, 'ask-answered').length], [[], 1], 'nothing is written: the owner sees the redraw they asked for');
     // The ask is marked owner-requested.
-    const marked = fileDrawAsk(l, { dispatchId: 'ctx_marked', question: drawReviewQuestion(dir, { ownerRequested: true }) });
+    const marked = fileDrawAsk(l, { dispatchId: 'ctx_marked', question: drawReviewQuestion(dir, { ownerRequested: true, lang: 'en' }) });
     assert.equal(JSON.parse(drawReviewMain(['question', '--ui', dir, '--owner-requested']).text).ownerRequested, true);
     assert.match((await autoRun(p, l, marked)).detail, /marked owner-requested/);
     // The owner opens the form (Generate URL): now, or earlier.
-    const opened = fileDrawAsk(l, { dispatchId: 'ctx_opened', question: drawReviewQuestion(dir) });
+    const opened = fileDrawAsk(l, { dispatchId: 'ctx_opened', question: drawReviewQuestion(dir, { lang: 'en' }) });
     assert.match((await autoRun(p, l, opened, { ownerOpening: true })).detail, /the owner opened the drawing to review it/);
     l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: 'ctx_opened', kind: 'ask-serving', payload: { dispatchId: 'ctx_opened', url: 'http://127.0.0.1:1/x', onDemand: true, requestedBy: 'telegram' } });
     assert.match((await autoRun(p, l, opened)).detail, /the owner opened this drawing to review it \(ask-serving on demand/);
@@ -446,11 +465,11 @@ test('an owner accept with a feedback note makes the next drawing of that record
   const { dir } = drawLayout(p);
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
-    const fed = fileDrawAsk(l, { dispatchId: 'ctx_fed', question: drawReviewQuestion(dir) });
-    const receipt = receiptFor(p, drawReviewQuestion(dir), { note: 'Keep the teal', dispatchId: 'ctx_fed' });
+    const fed = fileDrawAsk(l, { dispatchId: 'ctx_fed', question: drawReviewQuestion(dir, { lang: 'en' }) });
+    const receipt = receiptFor(p, drawReviewQuestion(dir, { lang: 'en' }), { note: 'Keep the teal', dispatchId: 'ctx_fed' });
     l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: 'ctx_fed', kind: 'ask-answered', payload: { dispatchId: 'ctx_fed', receiptPath: receipt, answeredBy: 'owner', optionIndex: 0 } });
     drawLayout(p, { mark: [0, 0, 250, 255] });
-    const after = fileDrawAsk(l, { dispatchId: 'ctx_after_feedback', question: drawReviewQuestion(dir) });
+    const after = fileDrawAsk(l, { dispatchId: 'ctx_after_feedback', question: drawReviewQuestion(dir, { lang: 'en' }) });
     const r = await autoRun(p, l, after);
     assert.deepEqual([r.accepted, r.why], [false, 'owner-requested']);
     assert.match(r.detail, /the owner left feedback on ui\.home\.app-layout in draw-review ask ctx_fed/);
@@ -464,7 +483,7 @@ test('config.yaml asks.excludes [draw-review] opts drawings out of auto-accept',
   const { dir } = drawLayout(p);
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
-    const report = fileDrawAsk(l, { dispatchId: 'ctx_optout', question: drawReviewQuestion(dir) });
+    const report = fileDrawAsk(l, { dispatchId: 'ctx_optout', question: drawReviewQuestion(dir, { lang: 'en' }) });
     const spy = quiet();
     const r = await autoAcceptAsk({ ledger: l, ledgerFile: ledgerFileFor(p.repo), repo: p.repo, workflowId: 'wf-draw-auto', report, policy: { ...ON, excludes: [...ON.excludes, 'draw-review'] }, wake: spy.wake, notify: spy.notify, close: spy.close });
     assert.deepEqual(r, { accepted: false, why: 'excluded:draw-review' });
@@ -487,11 +506,11 @@ function fileJobAsk(l, { wf, jobId, attempt, dispatchId, question }) {
 /** Attempt 1 asked the owner (ctx_first) and settled awaiting-owner; attempt 2 is its owner-answer retry and asks again. */
 function redrawLineage(p, l, dir, { wf = 'wf-redraw', close }) {
   seedJob(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', status: 'awaiting_owner', result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: 'ctx_first' } });
-  const first = fileJobAsk(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', question: drawReviewQuestion(dir) });
+  const first = fileJobAsk(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', question: drawReviewQuestion(dir, { lang: 'en' }) });
   close(first);
   drawLayout(p, { mark: [0, 250, 0, 255] });
   seedJob(l, { wf, jobId: 'job-draw-a2', attempt: 2, dispatchId: 'ctx_second', retry: { retryOf: 'job-draw-a1', attempt: 2, retryClass: 'owner-answer' } });
-  return fileJobAsk(l, { wf, jobId: 'job-draw-a2', attempt: 2, dispatchId: 'ctx_second', question: drawReviewQuestion(dir) });
+  return fileJobAsk(l, { wf, jobId: 'job-draw-a2', attempt: 2, dispatchId: 'ctx_second', question: drawReviewQuestion(dir, { lang: 'en' }) });
 }
 
 test('a redraw the owner ruled on is never auto-accepted: an owner-answer retry past a retired owner ask stays owner-only', async (t) => {
@@ -507,9 +526,9 @@ test('a redraw the owner ruled on is never auto-accepted: an owner-answer retry 
     assert.deepEqual([eventsOf(l, 'ask-auto-accepted'), eventsOf(l, 'ask-answered')], [[], []]);
   } finally { l.close(); }
   // The question path reads the same lineage: the asking job marks its question owner-requested.
-  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a2' }).ownerRequested, true);
+  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a2', lang: 'en' }).ownerRequested, true);
   assert.equal(JSON.parse(drawReviewMain(['question', '--ui', dir, '--job', 'job-draw-a2']).text).ownerRequested, true);
-  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a1' }).ownerRequested, undefined, 'the first drawing was not requested');
+  assert.equal(drawReviewQuestion(dir, { jobId: 'job-draw-a1', lang: 'en' }).ownerRequested, undefined, 'the first drawing was not requested');
   assert.match(drawReviewMain(['question', '--ui', dir, '--job', 'job-missing']).text, /job job-missing is not in .*cannot read whether the owner asked/);
 });
 
@@ -544,15 +563,15 @@ test('an owner plain accept settles an earlier owner redraw: the next drawing of
   const l = openLedger({ file: ledgerFileFor(p.repo) });
   try {
     const answered = (dispatchId, optionIndex, note = null) => {
-      fileDrawAsk(l, { dispatchId, question: drawReviewQuestion(dir) });
-      const receipt = receiptFor(p, drawReviewQuestion(dir), { optionIndex, note, dispatchId });
+      fileDrawAsk(l, { dispatchId, question: drawReviewQuestion(dir, { lang: 'en' }) });
+      const receipt = receiptFor(p, drawReviewQuestion(dir, { lang: 'en' }), { optionIndex, note, dispatchId });
       l.appendEvent({ workflowId: 'wf-draw-auto', entityType: 'report', entityId: dispatchId, kind: 'ask-answered', payload: { dispatchId, receiptPath: receipt, answeredBy: 'owner', optionIndex } });
     };
     answered('ctx_redraw', 1, 'Larger wordmark');
     drawLayout(p, { mark: [0, 250, 0, 255] });
     answered('ctx_accept', 0);
     drawLayout(p, { mark: [0, 0, 250, 255] });
-    const later = fileDrawAsk(l, { dispatchId: 'ctx_later', question: drawReviewQuestion(dir) });
+    const later = fileDrawAsk(l, { dispatchId: 'ctx_later', question: drawReviewQuestion(dir, { lang: 'en' }) });
     assert.deepEqual(Object.values((({ accepted, why }) => ({ accepted, why }))(await autoRun(p, l, later))), [false, 'owner-only'], 'not owner-requested, and still for the owner to accept');
   } finally { l.close(); }
 });
@@ -575,7 +594,7 @@ test('the owner reviews shapes only: data-status parts are retired, listed and n
   const { dir } = drawLayout(p);
   drawState(dir, 'loading');
   drawState(dir, '403');
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   assert.deepEqual(q.review.parts.map((x) => `${x.shape} ${x.breakpoint}`), ['default desktop', 'default mobile']);
   assert.ok(q.assets.every((a) => /default--/.test(a.path)), 'no data-status image reaches the owner');
   assert.match(q.text, /Data-status images \(loading, 403\) are retired and not for review/);
@@ -595,9 +614,9 @@ test('the owner reviews shapes only: data-status parts are retired, listed and n
   const shaped = { ...record, state: 'todo', ui: { ...ui, shapes, dataStatus: [{ base: 'AppLayoutBase', slot: 'nav', statuses: ['loading', 'forbidden'] }] } };
   assert.equal(validateUi(shaped), true, JSON.stringify(validateUi.errors));
   fs.writeFileSync(path.join(dir, 'index.yaml'), stringifyYaml(shaped));
-  assert.throws(() => drawReviewQuestion(dir), /no drawn part at AppLayoutBase#compact desktop\/light, AppLayoutBase#compact mobile\/light: the owner reviews every shape/);
+  assert.throws(() => drawReviewQuestion(dir, { lang: 'en' }), /no drawn part at AppLayoutBase#compact desktop\/light, AppLayoutBase#compact mobile\/light: the owner reviews every shape/);
   drawState(dir, 'compact');
-  const q2 = drawReviewQuestion(dir);
+  const q2 = drawReviewQuestion(dir, { lang: 'en' });
   assert.deepEqual([...new Set(q2.review.parts.map((x) => x.shape))], ['AppLayoutBase#default', 'AppLayoutBase#compact']);
   assert.match(q2.text, /Data-status images \(loading, 403\)/);
 });
@@ -612,7 +631,7 @@ test('a retired asset (retired: data-status) never reaches owner review, and its
   assert.equal(validateUi(readRecord(dir)), true, JSON.stringify(validateUi.errors));
   assert.deepEqual(reviewPartsOf(readRecord(dir)).map((x) => x.state), ['default', 'default'], 'partAssetsOf skips the retired asset');
   assert.deepEqual(partAssetsOf(readRecord(dir), { retired: true }).map((x) => x.state), ['empty', 'empty']);
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   assert.ok(q.assets.every((a) => !/empty--/.test(a.path)) && q.review.parts.every((x) => x.state === 'default'), 'never shown to the owner');
   assert.match(q.text, /Data-status images \(empty\) are retired and not for review/);
   assert.deepEqual(drawReviewStatus(dir).retired.map((x) => x.retired), ['data-status', 'data-status']);
@@ -635,7 +654,7 @@ test('a record rendered by recipe - a data-status surface, or only data-status s
     assert.equal(status.owed, false, status.why);
     assert.deepEqual(status.recipe.recipes, recipes);
     assert.match(status.why, /rendered by recipe .* settles done with no drawing and no owner review/);
-    assert.throws(() => drawReviewQuestion(dir), /is rendered by recipe/);
+    assert.throws(() => drawReviewQuestion(dir, { lang: 'en' }), /is rendered by recipe/);
   }
   const rel = (dir) => path.relative(p.repo, path.join(dir, 'index.yaml')).split(path.sep).join('/');
   assert.deepEqual(drawReviewsOwed(p.repo, [rel(loading), rel(gating)]), { owed: [], unjudged: [] });
@@ -648,7 +667,7 @@ test('a record rendered by recipe - a data-status surface, or only data-status s
 test('the draw-review ask lists the drawing\'s grammar proposals for the owner - never accepted by the worker or the runtime', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
-  assert.equal(drawReviewQuestion(dir).grammarProposals, undefined, 'no proposal: nothing added');
+  assert.equal(drawReviewQuestion(dir, { lang: 'en' }).grammarProposals, undefined, 'no proposal: nothing added');
   const loop = path.join(dir, 'assets', 'directions', 'draw-loop', 'AppLayout--default');
   fs.mkdirSync(loop, { recursive: true });
   const render = path.join(loop, 'meter-segments.png');
@@ -656,7 +675,7 @@ test('the draw-review ask lists the drawing\'s grammar proposals for the owner -
   fs.writeFileSync(path.join(loop, 'grammar-proposal.yaml'), stringifyYaml({ schema: 'starci/grammar-proposal@1', proposals: [
     { name: 'Meter.segments', gap: 'DNA Meter has no segmented variant', anatomy: ['one role=meter root', 'N presentational segments'], tokens: ['--accent', '--default'], claims: ['A11Y-3', 'ACCENT-4'], render: 'meter-segments.png' },
   ] }));
-  const q = drawReviewQuestion(dir);
+  const q = drawReviewQuestion(dir, { lang: 'en' });
   assert.deepEqual(q.grammarProposals.map((x) => [x.name, x.status, x.complete]), [['Meter.segments', 'proposed', true]]);
   assert.match(q.text, /Grammar proposals \(yours to decide, never auto-accepted\): Meter\.segments/);
   assert.ok(q.assets.some((a) => a.path.endsWith('draw-loop/AppLayout--default/meter-segments.png')), 'its isolated render is shown to the owner');

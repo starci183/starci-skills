@@ -23,7 +23,7 @@ rules:
   - id: REPO-WORK-1
     title: Product records only
     kind: mandatory
-    hfsRules: [R07, R01]
+    hfsRules: [R07, R01, R105]
     requirement: |
       The app root's `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
@@ -56,6 +56,7 @@ rules:
         - HFS_MODULE_TIER_INVALID
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
+        - HFS_PROOF_COMMAND_FILE_MISSING
       manual:
         - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
     relatedExamples: []

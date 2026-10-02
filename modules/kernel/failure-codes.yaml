@@ -4681,50 +4681,6 @@ RT_RETIRED_NAME_LIVE:
   owner: supervisor
   kind: check-finding
 
-RT_EXAMPLE_COUPLING:
-  title: "Runtime source names a concrete example tree"
-  title_vi: "Mã nguồn runtime gọi tên một cây examples/ cụ thể"
-  meaning_vi: "Một tệp nguồn runtime được theo dõi (scripts/, engine/, packages/ trừ bản sao runtime đã sinh, ui/src, ui/api, hay một template quản lý dưới packages/hfs/templates/) viết literal examples/<name> — trỏ tới một thư mục ví dụ cụ thể thay vì một khai báo chung. Canon của runtime ship vào mọi sản phẩm, nên một đường dẫn ví dụ cứng chỉ đúng trên một checkout. Spec, test, lịch sử contract-change, CHANGELOG và các bản ghi .starciwork nằm ngoài phạm vi; một lượt đọc runtime thật sự cần được khai báo một lần trong scripts/lib/example-refs.mjs và mọi nơi dùng gọi tên hằng đó."
-  causes_vi:
-    - "Một script hay gate đọc ví dụ của riêng một sản phẩm (ví dụ một tệp declaration đặt theo tên repo) lúc chạy, thay vì một mẫu chung hay tệp của repo đang được kiểm"
-    - "Comment, tài liệu hay chuỗi trong nguồn trích dẫn đường dẫn examples/<name> cụ thể thay vì nói examples/<app>"
-  nextStep_vi: "Người giám sát khái quát hóa chỗ đó (ví dụ examples/<app>, một mẫu template.*, hay một hằng trong scripts/lib/example-refs.mjs khi runtime thật sự đọc cây đó) hoặc trỏ tới repo đang được kiểm tra, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
-RT_PRODUCT_NAME_IN_SOURCE:
-  title: "A product name is written in runtime source"
-  title_vi: "Tên một sản phẩm xuất hiện trong mã nguồn runtime"
-  meaning_vi: "Một tệp nguồn runtime được theo dõi viết tên của một sản phẩm mà runtime từng ship kèm (danh sách đóng PRODUCT_NAMES trong scripts/lib/example-refs.mjs) hoặc một mã inc-<hash> có tiền tố là tên sản phẩm. Canon chạy trong mọi repo sản phẩm, nên một tên cứng trong source rò rỉ phán đoán của một sản phẩm sang mọi sản phẩm khác. Spec, test và lịch sử được giữ tên đó; mọi nơi khác phải nói chung chung hoặc qua hằng khai báo trong scripts/lib/example-refs.mjs."
-  causes_vi:
-    - "Một câu chuyện sự cố trong comment hay log viết thẳng tên sản phẩm (ví dụ workflow wf-<product>-… hay một ledger cụ thể) thay vì 'a product's …' hay <product>"
-    - "Một ánh xạ, alias hay fixture đặt theo tên sản phẩm được để trong source thay vì trong tệp khai báo chung"
-  nextStep_vi: "Người giám sát viết lại chỗ đó theo dạng chung (<product>, a product's …, acme cho một ví dụ) hoặc chuyển giá trị thật sự cần vào một hằng trong scripts/lib/example-refs.mjs, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
-RT_HOST_PATH_IN_TEMPLATE:
-  title: "A host drive path is hard-coded in source"
-  title_vi: "Một đường dẫn trên host bị viết cứng trong mã nguồn"
-  meaning_vi: "Một tệp nguồn runtime hay một template quản lý viết cứng một đường dẫn của máy host — một ổ đĩa Windows kiểu chữ cái kèm dấu hai chấm, một thư mục người dùng kiểu Users hay home, hay một đường AppData đã bung. Source và template ship sang mọi máy và mọi sản phẩm, nên đường dẫn phải tương đối, đi qua runtime root, os.tmpdir() hay một giá trị cấu hình."
-  causes_vi:
-    - "Sao chép một đường dẫn tuyệt đối từ máy phát triển vào một script, template hay fixture"
-    - "Một chuỗi gỡ lỗi hay ví dụ viết thẳng đường dẫn host thay vì biến môi trường hay đường tương đối"
-  nextStep_vi: "Người giám sát thay đường đó bằng đường tương đối, runtime root, os.tmpdir() hay một cấu hình đã khai báo, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
-RT_DOC_NO_OWNER:
-  title: "A document has no single ownership header"
-  title_vi: "Một tài liệu không có đúng một dòng sở hữu"
-  meaning_vi: "Một tệp docs/*.md không mở đầu bằng đúng một dòng sở hữu — \"Owner: <đường dẫn knowledge/ hoặc modules/ tồn tại>\" khi tài liệu giải thích một nguồn do máy sở hữu, hoặc \"Task: <một việc>\" với một tài liệu hướng dẫn — hoặc nó trùng một tài liệu khác: cùng một dòng Task, hoặc hai tiêu đề chung từ hai từ chủ đề trở lên trong khi ít nhất 30% câu của tài liệu ngắn hơn xuất hiện trong tài liệu kia. Một câu chuyện chỉ có một tài liệu; nguồn máy là luật và tài liệu chỉ đọc nó."
-  causes_vi:
-    - "Thêm một tài liệu mà quên dòng Owner:/Task: đầu tiên, hoặc Owner trỏ tới một đường dẫn không tồn tại hay ngoài knowledge/ và modules/"
-    - "Tách một tài liệu thành hai mà không gộp nội dung trùng hoặc không đổi dòng Task của một trong hai"
-  nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
-  owner: supervisor
-  kind: check-finding
-
 RT_ALLOWLIST_SPRAWL:
   title: "A second allowlist or baseline file exists"
   title_vi: "Có thêm một tệp allowlist hay baseline thứ hai"
@@ -14046,6 +14002,17 @@ RT_RULE_ID_GAP:
     - "Xóa một luật mà không ghi vào retired"
     - "Đánh số lại khối luật làm bỏ qua một đoạn mã"
   nextStep_vi: "Người giám sát thêm mã vào retired kèm lý do, hoặc khôi phục luật, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RULE_UNCITED:
+  title: "A catalog rule no pattern topic cites"
+  title_vi: "Một luật của danh mục mà không chủ đề pattern nào trích dẫn"
+  meaning_vi: "Một luật của knowledge/hfs/rules.yaml không được nêu trong hfsRules của bất kỳ chủ đề nào dưới knowledge/patterns/** và cũng không mang scope: runtime. Luật của sản phẩm tồn tại để được dạy; một luật không được trích dẫn là luật mà một lane không bao giờ đọc."
+  causes_vi:
+    - "Thêm một luật vào danh mục mà không trích dẫn nó từ chủ đề dạy nó"
+    - "Một luật chỉ quản trị chính kho runtime mà thiếu scope: runtime"
+  nextStep_vi: "Người giám sát thêm mã luật vào hfsRules của chủ đề knowledge/patterns dạy nó, hoặc đánh dấu luật scope: runtime khi nó chỉ quản trị kho runtime, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 

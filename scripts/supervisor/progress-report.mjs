@@ -25,7 +25,7 @@ import { productRepos, supervisorSettings } from '../machine/home.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { opLabel, opLabelMap } from '../lib/display-names.mjs';
 import { WORKFLOW_ALIASES } from '../lib/example-refs.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
 
@@ -98,7 +98,7 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 }
 
 /** One running workflow's progress, read from its ledger. */
-export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = 'vi' } = {}) {
+export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parseJson(goalRow?.json, {}) ?? {};
@@ -156,7 +156,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   };
 }
 
-export function collectProgress(repos, { now = Date.now(), language = 'vi', config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
+export function collectProgress(repos, { now = Date.now(), language = ownerLanguage(), config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
   const publicBase = publicBaseOf(config);
   const out = [];
   for (const repo of repos) {
@@ -177,7 +177,7 @@ const OUTCOME = { done: 'done', partial: 'partially done', failed: 'failed', ask
 const outcomeText = (outcome, tr) => tr(OUTCOME[outcome] ?? outcome);
 
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
-export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
+export function holdLine(h, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const on = h.heldBecause === 'peer-wait'
     ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`
@@ -188,7 +188,7 @@ export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
 }
 
 /** One readable section for one workflow (HTML). */
-export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
+export function workflowSection(r, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const line = [];
   line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: esc(r.name), done: r.done, total: r.total }));
@@ -217,7 +217,7 @@ export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
 }
 
 /** The report as Telegram messages (HTML), split under the message size limit. */
-export function progressMessages(rows, { now = Date.now(), language = 'vi' } = {}) {
+export function progressMessages(rows, { now = Date.now(), language = ownerLanguage() } = {}) {
   const tr = translator(language);
   const ok = rows.filter((r) => !r.error);
   const creds = ok.reduce((n, r) => n + r.asks.filter((a) => a.askClass === 'credential').length, 0);

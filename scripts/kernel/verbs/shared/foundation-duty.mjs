@@ -23,7 +23,7 @@ export const foundationDutyFor = (db, wf, skillRoot, { foundations = readFoundat
   // a ledger whose workflows never registered one is advised, so no workflow is held by a registry
   // nobody started.
   const ledgerPlans = foundations.length > 0 || Boolean(db.prepare("SELECT 1 FROM signals WHERE scope='foundation-declared' LIMIT 1").get());
-  const required = owed && ledgerPlans && Boolean(change) && wf.created_at >= change.effectiveAt;
+  const required = owed && ledgerPlans && (!change || wf.created_at >= change.effectiveAt);
   return {
     peers, declared: declared.declared, none: declared.none,
     owns: declared.owns.map((f) => foundationBriefOf(db, f)), needs: declared.needs.map((f) => foundationBriefOf(db, f)),

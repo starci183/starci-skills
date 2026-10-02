@@ -12,7 +12,7 @@
 //   digest      sup_events supervisor-owner-digest
 // The typed rows are machine_logs actor supervisor (sup-log.mjs; /api/supervisor/logs).
 import { redactText } from '../lib/redact.mjs';
-import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings } from '../machine/home.mjs';
+import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings, DEFAULT_SUPERVISOR_MODE } from '../machine/home.mjs';
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
 import { learningState } from '../machine/lessons.mjs';
 
@@ -25,7 +25,7 @@ const iso = (at) => (Number.isFinite(Number(at)) ? new Date(Number(at)).toISOStr
 
 /** The whole state, every field typed as ui/src/contract.ts SupervisorState says. Never throws. */
 export function readSupervisorState({ env = process.env, now = Date.now(), limit = 50, settings = null } = {}) {
-  let mode = 'chat';
+  let mode = DEFAULT_SUPERVISOR_MODE;
   try { mode = (settings ?? supervisorSettings()).mode; } catch { /* the default */ }
   const message = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), from: r.from_ref ? String(r.from_ref) : (r.chat_id ? 'telegram' : null), text: txt(r.text, 600), read: r.read_at != null });
   const reply = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), to: r.to_ref ? String(r.to_ref) : null, via: r.via ? String(r.via) : null, ok: r.ok !== 0, text: txt(r.text, 600) });

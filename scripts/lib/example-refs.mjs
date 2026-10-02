@@ -36,7 +36,6 @@ export const WORKFLOW_ALIASES = Object.freeze({
 export const PRODUCT_NAME_SEGMENT = /^(nivo|starci|mia)[-\w]*$/i;
 
 /** The closed list of product names this runtime shipped against - the names R206
- *  (check-example-coupling.mjs) refuses anywhere in runtime source outside this file. The last
- *  entry is a retired name (modules/kernel/retired-paths.yaml retiredNames), so it is built from
- *  parts: a retired name never appears as a literal in a live file. */
-export const PRODUCT_NAMES = Object.freeze(['mia-mia', 'miamia', 'nivo', 'starci-academy', 'ecommerce-app', 'shape-slot', ['todo', 'app'].join('-')]);
+ *  (check-example-coupling.mjs) refuses anywhere in runtime source outside this file (a retired
+ *  name is judged by RT_RETIRED_NAME_LIVE, R207, from modules/kernel/retired-paths.yaml). */
+export const PRODUCT_NAMES = Object.freeze(['mia-mia', 'miamia', 'nivo', 'starci-academy', 'ecommerce-app', 'shape-slot']);

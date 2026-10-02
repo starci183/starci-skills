@@ -3772,7 +3772,7 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
 function handoverProofGate(db, job, repo) {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
-  if (!change || admittedBeforeChange(admitted, change)) return;
+  if (admittedBeforeChange(admitted, change)) return;
   let cov;
   try { cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)) }); }
   catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: api coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }

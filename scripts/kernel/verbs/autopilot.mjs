@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { csvList, getWorkflow } from './shared/rows.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
+import { ownerLanguage } from '../../lib/i18n.mjs';
 
 export default {
   verb: 'autopilot',
@@ -34,7 +35,7 @@ export default {
       return;
     }
     if (args.bundle) { const out = { ok: true, ...autopilotBundle(db, workflowId) }; emit(out, `${out.title} ${workflowId}: ${JSON.stringify(out.counts)}`, args.json); return; }
-    if (args.checklist) { const out = { ok: true, workflowId, ...credentialChecklist(db, workflowId, { lang: args.lang ?? 'vi' }) }; emit(out, out.question.text, args.json); return; }
+    if (args.checklist) { const out = { ok: true, workflowId, ...credentialChecklist(db, workflowId, { lang: args.lang ?? ownerLanguage() }) }; emit(out, out.question.text, args.json); return; }
     if (args['defer-to-handover']) {
       const cls = String(args.class ?? '').trim();
       if (!['credential', 'real-money', 'shared-system', 'owner-decision'].includes(cls)) throw Object.assign(new Error('--defer-to-handover needs --class credential|real-money|shared-system|owner-decision'), { code: 'class-invalid' });

@@ -73,7 +73,7 @@ $defs:
           be:
             type: object
             additionalProperties: false
-            required: [infraOwners, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
+            required: [infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape, unitRoles, patternScenarios, kindPatterns, addKinds]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -85,6 +85,30 @@ $defs:
                   type: array
                   uniqueItems: true
                   items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
+              eventBus:
+                type: object
+                additionalProperties: false
+                required: [imports, classes]
+                description: >-
+                  R87 BE_CQRS_SHAPE no-event-bus. `imports`: module specifier -> the member names that are an in-process event
+                  ([] flags the package itself); `classes`: module specifier -> the class names that are an in-process bus when
+                  constructed or extended.
+                properties:
+                  imports:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: array
+                      uniqueItems: true
+                      items: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
+                  classes:
+                    type: object
+                    minProperties: 1
+                    additionalProperties:
+                      type: array
+                      minItems: 1
+                      uniqueItems: true
+                      items: {type: string, pattern: '^[A-Z][A-Za-z0-9]*$'}
               specDoubles:
                 type: object
                 additionalProperties: false

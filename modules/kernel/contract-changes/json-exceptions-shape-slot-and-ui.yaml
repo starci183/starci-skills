@@ -1,7 +1,0 @@
-id: json-exceptions-shape-slot-and-ui
-effectiveAt: '2026-09-27T05:30:00+07:00'
-summary: "json-exceptions admits the JSON the npm, tsc, next-intl, shadcn and architecture toolchains require in examples/shape-slot and ui/, and the authored-JSON walk skips gitignored .secrets directories (local credentials, never committed). Adds no check or finding code"
-paths:
-  - modules/schemas/json-exceptions.yaml
-  - scripts/checks/check-json-exceptions.mjs
-reach: new-legs

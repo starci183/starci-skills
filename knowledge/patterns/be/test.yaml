@@ -33,7 +33,7 @@ rules:
   - id: BE-TEST-1
     title: Placement, kinds and topology
     kind: mandatory
-    hfsRules: [R12, R47, R48, R149]
+    hfsRules: [R12, R47, R48, R149, R112]
     requirement: |-
       Four test kinds exist and the folder and the file suffix always agree. Unit covers exactly the unit-tested roles that
       `ruleParams.be.unitRoles` of knowledge/hfs/slots.yaml lists: `<name>.service.spec.ts` beside its `<name>.service.ts`, and
@@ -84,6 +84,7 @@ rules:
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_QUALITY
         - BE_CLI_COMMAND_SHAPE
+        - BE_INTEGRATION_SPEC_MISSING
       manual:
         - Record which transport, service, database and external boundary an e2e run actually exercised.
     relatedExamples: []

@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -57,7 +57,7 @@ export function planUrgent(items, sent = {}, { now, perKeyMs = URGENT_KEY_MS } =
 const T = (tr) => ({ judge: tr('Supervisor judgement'), viol: tr('Open invariant violations'), lands: tr('AUTO lands today'), owner: tr('Waiting on the owner'), none: tr('none'), slow: tr('Why slow') });
 
 /** One progress line per workflow (starci/progress@1 + rca.why). Pure. */
-export function progressLines(rows, language = 'vi') {
+export function progressLines(rows, language = ownerLanguage()) {
   const tr = translator(language);
   const t = T(tr);
   return rows.map((r) => {
@@ -72,7 +72,7 @@ export function progressLines(rows, language = 'vi') {
  * The digest text. Pure over what the caller read: `progress` rows, `actions`/`owed` for digestText, `gc` line,
  * `violations` [{code}], `lands` [{kind, id, at}], `judgements` [{text, at}], `ownerWaits` [text].
  */
-export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = 'vi', now }) {
+export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = ownerLanguage(), now }) {
   const t = T(translator(language));
   const base = digestText({ actions, owed: { ...(owed ?? {}), items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
   const lines = [base];
@@ -125,7 +125,7 @@ export async function judge(text, { env = process.env, now = Date.now() } = {}) 
 /* ------------------------------------------------------------ the digest */
 
 async function languageOf() {
-  try { const { loadConfig } = await import('../../engine/config.mjs'); return loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
+  return ownerLanguage();
 }
 
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */

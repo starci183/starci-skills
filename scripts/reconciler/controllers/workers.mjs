@@ -34,7 +34,8 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
-import { translator } from '../../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../../lib/i18n.mjs';
+import { DEFAULTS as SUPERVISOR_DEFAULTS, supervisorSettings } from '../../machine/home.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -104,7 +105,7 @@ export function waitCycles(edges) {
  * The deps pass: one `deadlock` DI per wait cycle, one `cross-workflow` DI per hub-blocker / unowned-need finding.
  * `graphs` [{ledgerId, edges: [{from, to, via}], findings: [{kind, workflows, summary, proposal}]}]. Pure.
  */
-export function planDeps({ graphs = [], now, settings = DEFAULTS, language = 'vi' }) {
+export function planDeps({ graphs = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   const edges = graphs.flatMap((g) => (g.edges ?? []).map((e) => ({ ...e, ledgerId: g.ledgerId })));
   const ledgerOf = (wf) => graphs.find((g) => (g.edges ?? []).some((e) => e.from === wf || e.to === wf))?.ledgerId ?? null;
@@ -137,7 +138,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = 'vi
 }
 
 /** The owed pass: one Supervisor DI per open cluster (cluster.mjs clusterOwed), keyed by the cluster id. Pure. */
-export function planOwed({ clusters = [], now, settings = DEFAULTS, language = 'vi' }) {
+export function planOwed({ clusters = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   return clusters.filter((c) => !c.fixedBy).map((c) => {
     const first = c.items?.[0] ?? {};
@@ -179,7 +180,7 @@ const sigId = (signature) => crypto.createHash('sha256').update(String(signature
  * instead. A changed signature or head is a new key that supersedes the repo's older push DI (supersedeEntity), so
  * the one live DI always carries the current reason with its full output blob (MB-03). Pure.
  */
-export function planPush({ results = [], now, settings = DEFAULTS, language = 'vi' }) {
+export function planPush({ results = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   const decisions = [], incomplete = [];
   for (const r of results.filter((x) => x?.refused || (x?.pushed === false && x?.error && !x?.skipped))) {
@@ -203,7 +204,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = 'v
 }
 
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
-export function planDirect({ commits = [], now, settings = DEFAULTS, language = 'vi' }) {
+export function planDirect({ commits = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   return commits.map((c) => workersDecision({
     kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,
@@ -216,7 +217,7 @@ export function planDirect({ commits = [], now, settings = DEFAULTS, language = 
 }
 
 /** Supervisor DIs escalated `min` times or more and past due: the urgent items (DESIGN §19). Pure. */
-export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations, language = 'vi' } = {}) => {
+export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations, language = ownerLanguage() } = {}) => {
   const tr = translator(language);
   return dis
     .filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && (d.escalations ?? 0) >= min && d.dueAt != null && d.dueAt < now)
@@ -263,10 +264,9 @@ async function landEventsOf(ctx, now) {
 
 /* ------------------------------------------------------------ reconcile */
 
-/** config.yaml language for the owner-visible DI text ('vi' unless it says 'en'); `deps.language` overrides. */
+/** config.yaml language for the owner-visible DI text (DEFAULT_OWNER_LANGUAGE unless config says otherwise); `deps.language` overrides. */
 const languageOf = async (deps) => {
-  if (deps.language) return deps.language;
-  try { const { loadConfig } = await import('../../../engine/config.mjs'); return loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
+  return deps.language ?? ownerLanguage();
 };
 
 export async function reconcileWorkers(key, ctx, { settings = workersSettings(), deps = {} } = {}) {
@@ -337,7 +337,7 @@ export async function reconcileWorkers(key, ctx, { settings = workersSettings(),
   if (key === KEYS.direct) {
     if (!force && !due(ctx, key, settings.directEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
     let mode = deps.landGateMode;
-    if (mode === undefined) { try { mode = (await import('../../machine/home.mjs')).supervisorSettings().landGate?.mode ?? 'shared'; } catch { mode = 'shared'; } }
+    if (mode === undefined) { try { mode = supervisorSettings().landGate.mode; } catch { mode = SUPERVISOR_DEFAULTS.landGate.mode; } }
     if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
     const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
     return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings, language }))) };

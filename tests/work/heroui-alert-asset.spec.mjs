@@ -22,7 +22,6 @@ import {
 import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 import { DEFAULT_RUBRIC } from '../../scripts/work/draw-critic.mjs';
 import { directionReviewQuestion } from '../../scripts/work/brand-direction.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-alert-asset-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -292,11 +291,4 @@ test('the brand-direction-review ask carries the owner\'s stated choice beside t
   const q = directionReviewQuestion(path.join(root, '.starciwork'), { archetype: 'dashboard' });
   assert.doesNotMatch(q.text, /owner stated: black/);
   assert.equal(q.recommended, undefined, 'never auto-accepted');
-});
-
-test('the contract change registers the new codes for interface.draw and the asset-slot reach of interface.asset', () => {
-  const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'heroui-alert-asset-slots');
-  assert.ok(change);
-  for (const code of [DRAW_ALERT_ANATOMY, DRAW_METER_TRACK, DRAW_ASSET_SLOT_UNDECLARED]) assert.ok(change.adds.codes.includes(code), code);
-  assert.deepEqual([...change.ops].sort(), ['interface.asset', 'interface.draw']);
 });

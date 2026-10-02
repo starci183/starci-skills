@@ -44,7 +44,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
 import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -455,7 +455,7 @@ const signed = (n, fmt) => (n == null || n === 0 ? '' : ` (${n > 0 ? '+' : '-'}$
  * One short trend line from snapshots (oldest first): the newest against the one closest to `trendMs` before it.
  * null when there is no snapshot. Pure.
  */
-export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
+export function trendLine(snaps, { trendMs, language = ownerLanguage() } = {}) {
   const last = snaps[snaps.length - 1];
   if (!last?.totals) return null;
   const target = last.at - trendMs;
@@ -473,7 +473,7 @@ export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
 }
 
 /** The trend line from machine.sqlite (home.mjs readSupervisor), or null. Never throws. */
-export async function currentTrend({ env = process.env, language = 'en', settings = null } = {}) {
+export async function currentTrend({ env = process.env, language = ownerLanguage(), settings = null } = {}) {
   try {
     const { readSupervisor } = await import('./home.mjs');
     const s = settings ?? telemetrySettings();

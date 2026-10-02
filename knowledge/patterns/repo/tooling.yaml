@@ -26,7 +26,7 @@ rules:
   - id: REPO-TOOLING-1
     title: Configs are thin calls into canon packages
     kind: mandatory
-    hfsRules: [R16, R22, R05]
+    hfsRules: [R16, R22, R05, R103]
     requirement: |
       `be/eslint.config.mjs` calls `starciBeConfig({ hfs: loadHfs(import.meta.url) })` and `fe/eslint.config.mjs`
       `starciFeConfig({ hfs: loadHfs(import.meta.url) })`. `be/tsconfig.json` extends `@starci/tsconfig/be.json` and adds its three
@@ -53,6 +53,7 @@ rules:
         - HFS_TS_STRICT
         - FE_TYPE_ESCAPE
         - HFS_MANAGED_FILE_DRIFT
+        - HFS_REPO_LOCAL_CHECK
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-2
@@ -105,7 +106,7 @@ rules:
   - id: REPO-TOOLING-4
     title: No inline configuration and no rule off
     kind: mandatory
-    hfsRules: [R17, R18]
+    hfsRules: [R17, R18, R104]
     requirement: |
       `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`. The ESLint
       configuration of each side is the rendered one-liner; no rule is off, warned or redefined, and a rule that a check
@@ -120,6 +121,7 @@ rules:
       automated:
         - HFS_RULE_OFF_WITHOUT_REPLACEMENT
         - HFS_INLINE_SUPPRESSION
+        - HFS_LINT_SUPPRESSION_FILE
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-5

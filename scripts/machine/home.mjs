@@ -139,6 +139,7 @@ export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
 export const DEFAULT_SUPERVISOR_MODE = 'chat';
 /** The owner-facing language when config.yaml `language` is absent — the one default every reader shares (scripts/lib/i18n.mjs ownerLanguage). */
 export const DEFAULT_OWNER_LANGUAGE = 'en';
+export const DEFAULT_AGENT = 'claude';
 export function supervisorMode({ env = process.env, config = undefined } = {}) {
   const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();
   if (SUPERVISOR_MODES.includes(fromEnv)) return fromEnv;
@@ -158,7 +159,7 @@ export function supervisorSettings({ config = undefined } = {}) {
   const pick = (...values) => values.find((v) => typeof v === 'string' && v.trim())?.trim() ?? null;
   return {
     mode: SUPERVISOR_MODES.includes(sup.mode) ? sup.mode : DEFAULT_SUPERVISOR_MODE,
-    agent: pick(seat.agent, kernel.agent, 'claude'),
+    agent: pick(seat.agent, kernel.agent, DEFAULT_AGENT),
     model: pick(seat.model, seat.agent ? null : kernel.model),
     effort: pick(seat.effort, seat.agent ? null : kernel.effort, cfg?.effort),
     repos: Array.isArray(sup.repos) ? sup.repos : [],

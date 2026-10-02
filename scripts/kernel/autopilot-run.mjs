@@ -585,7 +585,7 @@ export function checklistAnswerOf(db, workflowId) {
 }
 
 /** The ONE end-of-flow owner step: the credential checklist question provision.ask files verbatim (subject handover-credentials). */
-export function credentialChecklist(db, workflowId, { lang = 'vi' } = {}) {
+export function credentialChecklist(db, workflowId, { lang = ownerLanguage() } = {}) {
   const items = deferredToHandoverOf(db, workflowId).filter((item) => DEFERRED_CLASSES.includes(item.deferClass));
   const creds = items.filter((item) => item.deferClass === 'credential');
   const approvals = items.filter((item) => item.deferClass !== 'credential');

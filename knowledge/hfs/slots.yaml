@@ -155,6 +155,18 @@ ruleParams:
       socket.io: [platform/realtime]
       graphql-subscriptions: [platform/realtime]
       graphql-ws: [platform/realtime]
+    # R87 BE_CQRS_SHAPE no-event-bus: the in-process event vocabulary the rule refuses. `imports` maps a module
+    # specifier to the member names that are an in-process event; `[]` flags the package itself (its emitter packages
+    # are the `[]` owners of infraOwners above). `classes` maps a module specifier to the class names that are an
+    # in-process bus when constructed or extended.
+    eventBus:
+      imports:
+        "@nestjs/cqrs": [EventBus, EventsHandler, IEventHandler]
+        "@nestjs/event-emitter": []
+      classes:
+        events: [EventEmitter]
+        "node:events": [EventEmitter]
+        rxjs: [Subject, BehaviorSubject, ReplaySubject, AsyncSubject]
     # R48 BE_SPEC_QUALITY spec-infra-double-from-kit: in a `<name>.service.spec.ts` a provider `{ provide: TOKEN, useValue: X }` takes X from
     # the kit named here (the package root of `kit`). The token name is normalised to UPPER_SNAKE (`EntityManager` -> ENTITY_MANAGER), the
     # FIRST entry whose `token` regex matches decides, and `fallback` decides for every other token. `forms` say what X may be:

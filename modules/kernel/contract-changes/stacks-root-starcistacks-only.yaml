@@ -9,7 +9,6 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/stacks-root-starcistacks-only.yaml
-  - modules/kernel/contract-changes/starcistacks-services.yaml
   - modules/schemas/application-stacks.schema.yaml
   - modules/schemas/stacks-layout.yaml
   - modules/schemas/index.yaml

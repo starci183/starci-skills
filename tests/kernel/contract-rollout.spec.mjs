@@ -11,6 +11,7 @@ import {
   CONTRACT_VERSION_SCHEMA,advisoryCodesFor,classifyChecks,contractFilesOf,contractVersionOf,laterChangesFor,loadContractChanges,runtimeShaOf,
 } from '../../scripts/machine/contract-version.mjs';
 import {checkShellConformance} from '../../scripts/work/ui/shell-conformance.mjs';
+import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 
 // Owner, 2026-09-24: most blocks came from contract changes rolled onto running workflows mid-flight
 // (app shell, layout tree, nav, part review in one night; DRAW_MATRIX_INCOMPLETE refused drawings
@@ -45,7 +46,7 @@ test('the registry normalizes changes, refuses malformed ones, and the live regi
   assert.deepEqual(registry.changes.at(-1).followUp,{op:'interface.implement',ops:['interface.draw'],detail:'re-derive the nav of drawings admitted before nav routes'});
   const live=loadContractChanges(ROOT);
   assert.deepEqual(live.problems,[],'modules/kernel/contract-changes/ is well-formed');
-  assert.ok(live.changes.some(c=>c.id==='part-review-matrix'&&c.adds.codes.includes('DRAW_MATRIX_INCOMPLETE')));
+  assert.ok(live.changes.some(c=>c.id==='evidence-off-starciwork'&&c.adds.codes.includes('STARCIWORK_DRIFT')));
 
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bad-changes-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
@@ -115,9 +116,16 @@ test('shell-conformance demotes the codes added after a leg\'s admission to susp
   const admitted=checkShellConformance(work,{advisoryCodes:['SHELL_RECORD_MISSING']});
   assert.equal(admitted.ok,true);
   assert.ok(admitted.suspect.some(line=>line.includes('SHELL_RECORD_MISSING')&&line.includes('added after this leg was admitted')));
-  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','2026-09-24T00:00:00+07:00'],{cwd:ROOT,encoding:'utf8',windowsHide:true});
+  // app-shell-record (which registered SHELL_RECORD_MISSING) predates the alpha.3 release base and was
+  // deleted by the release-line compaction; a fixture registry keeps it so --admitted-at demotes as before.
+  const changesDir=path.join(ROOT,'modules','kernel','contract-changes');
+  const changes=fs.readdirSync(changesDir).filter(f=>f.endsWith('.yaml')).map(f=>parseYaml(fs.readFileSync(path.join(changesDir,f),'utf8')));
+  changes.push({id:'app-shell-record',effectiveAt:'2026-09-24T02:11:02+07:00',adds:{checks:['shell-conformance'],codes:['SHELL_RECORD_MISSING']},summary:'spec fixture for the compacted app-shell-record entry'});
+  const changesFile=path.join(dir,'contract-changes.yaml');fs.writeFileSync(changesFile,stringifyYaml({schema:'starci/contract-changes@1',changes}));
+  const env={...process.env,STARCI_CONTRACT_CHANGES:changesFile};
+  const cli=spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','2026-09-24T00:00:00+07:00'],{cwd:ROOT,encoding:'utf8',windowsHide:true,env});
   assert.equal(cli.status,0,cli.stdout);
-  assert.equal(spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','soon'],{cwd:ROOT,encoding:'utf8',windowsHide:true}).status,2);
+  assert.equal(spawnSync(process.execPath,[path.join(ROOT,'scripts','work','ui','shell-conformance.mjs'),work,'--admitted-at','soon'],{cwd:ROOT,encoding:'utf8',windowsHide:true,env}).status,2);
 });
 
 const fixture=t=>{

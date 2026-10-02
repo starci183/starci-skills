@@ -1,8 +1,0 @@
-id: api-status-verb
-effectiveAt: '2026-09-28T18:25:00+07:00'
-summary: 'Move the status projection and command contract into a dedicated file while keeping prefetched host reads and status extensions.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/status.mjs
-  - modules/kernel/api.yaml
-  - modules/kernel/api-commands/status.yaml

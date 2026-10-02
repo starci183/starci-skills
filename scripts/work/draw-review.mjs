@@ -59,7 +59,7 @@ import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
 import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
@@ -300,7 +300,7 @@ export function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
  * drawing); `ownerRequested` marks a drawing the owner asked for, which then reaches the owner. The text names each
  * part's digest prefix, so a redraw asks a new question rather than repeating an answered one.
  */
-export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false, jobId = null } = {}) {
+export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequested = false, jobId = null } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, record, repoRoot } = drawing;
   const requested = ownerRequested || Boolean(jobId && drawOwnerRulingInRepo(repoRoot, { jobId, record: record.id }));
@@ -499,7 +499,7 @@ export function drawReviewMain(argv = []) {
       return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
     }
     if (command === 'question') {
-      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null });
+      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null });
       return { exitCode: 0, text: `${JSON.stringify(q, null, 2)}\n` };
     }
     const receipt = flag(args, '--receipt');
