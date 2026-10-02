@@ -7,6 +7,7 @@ import { isAncestor as isAncestorCall } from '../api/git/is-ancestor.mjs';
 import { mergeBase as mergeBaseCall } from '../api/git/merge-base.mjs';
 import { revParse as revParseCall } from '../api/git/rev-parse.mjs';
 import { gitCallResult, linkedNodeModules, landLocalMain as landLocalMainCall } from './git-land-repo.mjs';
+import { underHostLock as underHostLockCall } from '../machine/verb-lock.mjs';
 import { runLandGate as runLandGateCall } from './git-land-gate.mjs';
 import { runLandFullCheck, verifyLandSpecs } from './git-land-verify.mjs';
 
@@ -87,7 +88,7 @@ export async function gitLand(ctx, deps = {}) {
 
   const input = { worktree, ref, verified: args.verified ?? null, verifiedLog: args['verified-log'] ? path.resolve(ctx.cwd ?? process.cwd(), args['verified-log']) : null,
     dryRun: Boolean(args['dry-run']), lane: args.lane ?? null, concurrency };
-  const lockDoor = deps.underHostLock ?? (await import('../machine/verb-lock.mjs')).underHostLock;
+  const lockDoor = deps.underHostLock ?? underHostLockCall;
   const lock = await lockDoor({ role: 'coordinator', purpose: 'land', env: ctx.env ?? process.env }, () => lockedLand(input, deps), deps);
   if (!lock?.ok) return refused({ step: STEP.lock, cause: lock?.cause ?? 'held', owner: lock?.owner ?? 'unknown', detail: lock?.detail ?? '' });
   return await lock.value;

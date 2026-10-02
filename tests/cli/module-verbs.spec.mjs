@@ -105,7 +105,7 @@ test('role and argument refusals happen before a module executes', async (t) => 
   const { root, catalog } = fixture(t);
   const role = capture();
   assert.equal(await runtimeMain(['demo', 'ok', 'item'], {
-    ...role, catalog, runtimeRoot: root, env: { STARCI_ROLE: 'worker' },
+    ...role, catalog, runtimeRoot: root, env: { STARCI_ROLE: 'op' },
   }), 2);
   assert.equal(role.value.err, 'starci demo ok: role worker may not run this (allowed: lead, owner)\n');
 
@@ -175,6 +175,7 @@ test('script verbs keep the caller environment when they cross the process seam'
 
 test('role helpers default unknown seats to owner and keep exact refusal text', () => {
   assert.equal(currentRole({ env: { STARCI_ROLE: 'lead' } }), 'lead');
+  assert.equal(currentRole({ env: { STARCI_ROLE: 'op' } }), 'worker');
   assert.equal(currentRole({ env: { STARCI_ROLE: 'unknown' } }), 'owner');
   assert.equal(requireRole({ role: 'owner', group: 'demo', verb: 'ok', roles: ['lead'] }), null);
   assert.equal(requireRole({ role: 'worker', group: 'demo', verb: 'ok', roles: ['lead'] }), 'starci demo ok: role worker may not run this (allowed: lead)');
