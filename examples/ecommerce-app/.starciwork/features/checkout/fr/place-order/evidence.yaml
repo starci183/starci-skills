@@ -138,10 +138,10 @@ assertions:
     outcome: pass
     observation: npx jest --selectProjects e2e checkout/checkout-journey exited 0
   - id: e2e-refusal-paths
-    command: npm run test:e2e -- order-lifecycle checkout/payment-failure
+    command: npm run test:e2e -- order-lifecycle checkout/checkout-refusal
     exit: 0
     outcome: pass
-    observation: npx jest --selectProjects e2e order-lifecycle checkout/payment-failure
+    observation: npx jest --selectProjects e2e order-lifecycle checkout/checkout-refusal
       exited 0
 provenance:
   actor: example-evidence
