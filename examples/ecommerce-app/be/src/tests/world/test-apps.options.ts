@@ -14,6 +14,7 @@ import { loyaltyEntities } from "@modules/domain/loyalty"
 import { orderEntities } from "@modules/domain/order"
 import { paymentEntities } from "@modules/domain/payment"
 import { ClockModule } from "@modules/platform/clock"
+import { IdsModule } from "@modules/platform/ids"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 import { EnvSource, Secret } from "@modules/platform/config"
 import {
@@ -232,6 +233,7 @@ export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
 /** The platform base of a modules world: clock, logging and both connections, as the app roots register them. */
 export const platformBase = (w: EcommerceWiring): ReadonlyArray<DynamicModule> => [
     ClockModule.register({ isGlobal: true }),
+    IdsModule.register({ isGlobal: true }),
     LoggingModule.register({ isGlobal: true }),
     HttpModule.register({ isGlobal: true }),
     DatabaseModule.register({

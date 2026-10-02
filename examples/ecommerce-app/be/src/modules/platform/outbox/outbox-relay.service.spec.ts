@@ -1,3 +1,4 @@
+import { Inject, Injectable } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import type { EntityManager } from "typeorm"
@@ -9,6 +10,11 @@ interface Row {
     readonly id: string
 }
 
+const MANAGERS: unique symbol = Symbol("spec.managers")
+const LOGGER: unique symbol = Symbol("spec.logger")
+const WAITING: unique symbol = Symbol("spec.waiting")
+
+@Injectable()
 /** A relay over a fixed list of waiting rows that records what it delivered and marked. */
 class ListRelay extends OutboxRelayService<Row> {
     readonly delivered: Array<string> = []
@@ -18,9 +24,9 @@ class ListRelay extends OutboxRelayService<Row> {
     deliverFails = false
 
     constructor(
-        protected readonly managers: ReadonlyArray<EntityManager>,
-        protected readonly logger: Logger,
-        private waiting: Array<Row>,
+        @Inject(MANAGERS) protected readonly managers: ReadonlyArray<EntityManager>,
+        @Inject(LOGGER) protected readonly logger: Logger,
+        @Inject(WAITING) private waiting: Array<Row>,
     ) {
         super()
     }
@@ -50,7 +56,12 @@ class ListRelay extends OutboxRelayService<Row> {
 const build = async (managers: ReadonlyArray<EntityManager>, waiting: Array<Row>) => {
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
-        providers: [{ provide: ListRelay, useFactory: () => new ListRelay(managers, logger, waiting) }],
+        providers: [
+            ListRelay,
+            { provide: MANAGERS, useValue: managers },
+            { provide: LOGGER, useValue: logger },
+            { provide: WAITING, useValue: waiting },
+        ],
     }).compile()
     return { relay: moduleRef.get(ListRelay), logger }
 }

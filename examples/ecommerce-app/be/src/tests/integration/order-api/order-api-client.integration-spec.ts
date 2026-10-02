@@ -1,8 +1,11 @@
-import { randomUUID } from "node:crypto"
+import { fakeIds } from "@starci/jest-preset"
 import { ORDER_API, OrderApiErrorCode } from "@modules/integrations/order-api"
 import type { OrderApiClient } from "@modules/integrations/order-api"
 import { ORDER_API_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
+
+/** The ids of the rows and keys this spec arranges: deterministic, so a failing run reproduces. */
+const ids = fakeIds()
 
 /**
  * order-api: the identity app's real client of the order service against the real order app the world boots beside it (and
@@ -25,7 +28,7 @@ describe("order-api: order service client (integration)", () => {
     })
 
     it("a session the order service refuses is the declared unavailable refusal naming its code", async () => {
-        await expect(orderApi().getBuyerStatus(`unknown-${randomUUID()}`)).rejects.toMatchObject({
+        await expect(orderApi().getBuyerStatus(`unknown-${ids.next()}`)).rejects.toMatchObject({
             code: OrderApiErrorCode.Unavailable,
             params: { reason: expect.stringContaining("UNAUTHENTICATED") },
         })

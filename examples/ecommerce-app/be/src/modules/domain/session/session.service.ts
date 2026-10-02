@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common"
-import { randomUUID } from "node:crypto"
 import { InjectCache } from "@modules/integrations/cache"
 import type { Cache } from "@modules/integrations/cache"
 import { InjectKeycloak, KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
@@ -31,11 +32,12 @@ export class SessionService {
         @InjectCache() private readonly cache: Cache,
         @InjectKeycloak() private readonly keycloak: KeycloakClient,
         @InjectLogger() private readonly logger: Logger,
+        @InjectIds() private readonly ids: Ids,
     ) {}
 
     /** Starts a session for `personId` and answers its token. */
     async issue(params: IssueSessionParams): Promise<IssuedSession> {
-        const sessionToken = randomUUID()
+        const sessionToken = this.ids.next()
         await this.cache.set({
             key: SESSION_KEY,
             args: [sessionToken],
