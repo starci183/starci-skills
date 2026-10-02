@@ -197,7 +197,7 @@ export function digestInterfaceFiles({ repo, payload, files }) {
     if (!owned.some((root) => sameOrUnder(file, root))) throw Object.assign(new Error(`seam interface file ${file} is outside the seam's owned paths (${owned.join(', ')})`), { code: 'seam-interface-outside-seam' });
     const abs = path.resolve(repo, file);
     let bytes;
-    try { bytes = fs.readFileSync(abs); } catch { throw Object.assign(new Error(`seam interface file ${file} is missing in ${repo}: commit it before publishing`), { code: 'seam-interface-file-missing' }); }
+    try { bytes = fs.readFileSync(abs); } catch { throw Object.assign(new Error(`seam interface file ${file} is missing in ${repo}: write it under your owned paths before publishing`), { code: 'seam-interface-file-missing' }); }
     out.push({ path: file, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length });
   }
   return out;
@@ -208,8 +208,8 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/cli.mjs',
   if (!cut) return [];
   if (isSeamCut(cut)) {
     return [
-      `seam: you are ordinal 1 of cut ${cut.id} - ${Number(cut.total) - 1} sibling ordinal(s) build on you. CONTRACT FIRST: author and commit the seam's interface (types, DTOs, ports/contracts, a stub implementation) before anything else, then publish it:`,
-      `  node ${api} cut-seam --repo ${repoLabel} --publish-interface --job ${jobLabel} --files <committed interface files, csv> --summary "<one line>"`,
+      `seam: you are ordinal 1 of cut ${cut.id} - ${Number(cut.total) - 1} sibling ordinal(s) build on you. CONTRACT FIRST: author the seam's interface (types, DTOs, ports/contracts, a stub implementation) before anything else, then publish it:`,
+      `  node ${api} cut-seam --repo ${repoLabel} --publish-interface --job ${jobLabel} --files <interface files, csv> --summary "<one line>"`,
       `  every sibling is released to build against it at once; then finish the seam. Keep the published signatures stable - a change after publishing owes the siblings a reconcile.`,
     ];
   }

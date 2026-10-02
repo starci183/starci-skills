@@ -13,7 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { HOST_EVENT_MIN_WORKFLOWS, HOST_EVENT_WINDOW_MS, hostWideDisconnectOf } from '../../scripts/kernel/host-event.mjs';
 import { salvageUnfiledReport, unfiledReportCandidates } from '../../scripts/kernel/report-salvage.mjs';
 import { resumeContextOf, resumePromptLines } from '../../scripts/kernel/resume-context.mjs';
-import { ownedPathEffects } from '../../scripts/kernel/settle-landed.mjs';
+import { ownedPathEffects } from '../../scripts/kernel/owned-path-effects.mjs';
 import { OWNED_INLINE_MAX, ownedPathsFileOf, ownedPathsLine } from '../../scripts/kernel/op-prompt.mjs';
 import { withLedger,seedWorkflow } from '../helpers/ledger-fixture.mjs';
 

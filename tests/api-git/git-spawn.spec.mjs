@@ -31,7 +31,7 @@ test('gitResultOf folds a git spawn result into {ok, stdout, error}', () => {
   const ok = gitResult(['rev-parse', '--verify', 'HEAD'], { dir: ROOT });
   assert.equal(ok.ok, true);
   assert.match(ok.stdout.trim(), /^[0-9a-f]{40}$/);
-  // The settle-landed copy this replaces named a clean exit 'exit 0' in error; callers read
+  // The owned-path-effects copy this replaces named a clean exit 'exit 0' in error; callers read
   // error only when ok is false, and the quirk is preserved verbatim.
   assert.equal(ok.error, 'exit 0');
   const bad = gitResult(['rev-parse', '--verify', 'no-such-ref-starci'], { dir: ROOT });

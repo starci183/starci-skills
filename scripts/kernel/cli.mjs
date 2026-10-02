@@ -72,7 +72,7 @@ import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs'
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
-import { ownedPathEffects } from './settle-landed.mjs';
+import { ownedPathEffects } from './owned-path-effects.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
@@ -335,7 +335,7 @@ const usage = (code) => {
            an open quota circuit: a real 1-token completion at most once per probe.everyMs (and right after
            the plan reset); a pass clears it (the kernel watchdog runs it under --repair)
   finish   --workflow <id>
-  cut-seam --publish-interface --job <seam job> --files <csv> [--summary <s>]   the seam publishes its committed interface: siblings start on it
+  cut-seam --publish-interface --job <seam job> --files <csv> [--summary <s>]   the seam publishes its interface: siblings start on it
   cut-seam --release --workflow <id> --op <op> --cut-id <id> --reason <text>     the Kernel releases a cut's siblings to run on a stub now
   cut-seam --reconcile --job <sibling job> --exit-code <n> [--command <c>] [--evidence <path>]   cut-seam-reconcile of a stub sibling against the landed seam
   kernel-ack-rev --workflow <id> --rev <sha> [--files <csv>]

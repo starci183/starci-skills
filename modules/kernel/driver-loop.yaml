@@ -487,7 +487,7 @@ tick:
       A cut's seam never stalls the chain (owner ruling 2026-09-28: "A seam must not block the whole chain: if a seam
       slips, re-cut it or let the later slices run in parallel with a stub, do not wait 3 hours";
       scripts/kernel/seam-policy.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
-      and runs contract-first: its op publishes the committed interface (types, contracts, a stub) with
+      and runs contract-first: its op publishes the interface (types, contracts, a stub) with
       `api cut-seam --publish-interface` before finishing, and every sibling ordinal is released to
       build against it at once. A sibling also stops waiting - `api status` frontier.queued reads it
       `ready` with seamStub {mode} - when the seam's latest attempt settled failed/blocked

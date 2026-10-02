@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseRequests,ownedPathsIntersect,ownedPathspec} from '../../engine/admission.mjs';
-import {ownedPathEffects} from '../../scripts/kernel/settle-landed.mjs';
+import {ownedPathEffects} from '../../scripts/kernel/owned-path-effects.mjs';
 import {resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';

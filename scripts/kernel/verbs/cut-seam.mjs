@@ -35,7 +35,7 @@ export default {
       if (!isSeamCut(cut)) throw Object.assign(new Error(`${args.job} is not the seam (ordinal 1) of a cut of more than one`), { code: 'cut-seam-not-seam' });
       if (internals.SETTLED.includes(job.status) && job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: a failed seam attempt publishes nothing; its retry does`), { code: 'cut-seam-settled' });
       const files = csvList(args.files);
-      if (!files.length) throw Object.assign(new Error('cut-seam --publish-interface needs --files <committed interface files, csv>'), { code: 'cut-seam-files-missing' });
+      if (!files.length) throw Object.assign(new Error('cut-seam --publish-interface needs --files <interface files, csv>'), { code: 'cut-seam-files-missing' });
       const digests = digestInterfaceFiles({ repo, payload, files });
       ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_INTERFACE_EVENT,
         payload: { op, cutId: String(cut.id), files: digests, summary: args.summary ?? null, by: caller.role }, createdAt: now }));
