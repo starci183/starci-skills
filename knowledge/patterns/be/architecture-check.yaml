@@ -194,7 +194,7 @@ rules:
   - id: BE-ARCHITECTURE-6
     title: No trigger kind imports another; the kinds meet through the event bus
     kind: mandatory
-    hfsRules: [R136, R28, R31]
+    hfsRules: [R141, R28, R31]
     requirement: |-
       Features are grouped by what starts their work: `api`, `webhooks`, `realtime`, `saga`, `reactors`, `jobs` and `cli` (the slot
       field `trigger` of the kind's owner slot). Business logic stays in `modules/domain` and a feature is a thin door. No kind imports

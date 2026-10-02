@@ -27,7 +27,7 @@ rules:
   - id: BE-API-1
     title: An api feature is request-driven, flat and composed by an api app
     kind: mandatory
-    hfsRules: [R136, R46, R31]
+    hfsRules: [R141, R46, R31]
     requirement: |-
       A feature outside the folders `webhooks/`, `realtime/`, `jobs/`, `reactors/` and `cli/` is of kind `api`: `index.ts`,
       `<feature>.module.ts`, `application/` (messages, handlers, contracts), `transport/graphql/` and, only where GraphQL cannot serve,

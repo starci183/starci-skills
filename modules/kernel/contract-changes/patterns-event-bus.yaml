@@ -1,13 +1,13 @@
 id: patterns-event-bus
 effectiveAt: '2026-10-02T12:00:00+07:00'
 summary: >-
-  Lane PATTERNS (lead C1), unit U1: the event bus and the queues become declared patterns. R131 BE_EVENT_CLASS_CONTRACT holds a typed event
+  Lane PATTERNS (lead C1), unit U1: the event bus and the queues become declared patterns. R136 BE_EVENT_CLASS_CONTRACT holds a typed event
   class (`be/src/modules/events/<service>/<event>.event.ts`, literal eventName and version) equal to its entry in the vendored contract
-  `be/contracts/<service>/events.json`; R132 BE_OUTBOX_WRITE_TX (ESLint `outbox-write-tx`) allows `eventBus.publish(event, tx)` and a queue
-  producer's `enqueueX(payload, tx)` only in `modules/domain`, with the manager of the caller's own transaction; R133 BE_EVENT_CONSUMER_SHAPE
+  `be/contracts/<service>/events.json`; R137 BE_OUTBOX_WRITE_TX (ESLint `outbox-write-tx`) allows `eventBus.publish(event, tx)` and a queue
+  producer's `enqueueX(payload, tx)` only in `modules/domain`, with the manager of the caller's own transaction; R138 BE_EVENT_CONSUMER_SHAPE
   (ESLint `event-consumer-shape`) makes a message consumer a `transport/message/<event>.consumer.ts` named after its event that forwards
-  `delivery.eventId`; R134 BE_QUEUE_PRODUCER_SHAPE (ESLint `queue-producer-shape`) makes a queue producer pass its own tx parameter to the
-  outbox; R135 BE_PATTERN_SPEC_MISSING requires every scenario of a declared pattern (`ruleParams.be.patternScenarios`) to have a test titled
+  `delivery.eventId`; R139 BE_QUEUE_PRODUCER_SHAPE (ESLint `queue-producer-shape`) makes a queue producer pass its own tx parameter to the
+  outbox; R140 BE_PATTERN_SPEC_MISSING requires every scenario of a declared pattern (`ruleParams.be.patternScenarios`) to have a test titled
   `<pattern>/<scenario>: ...`. Slots: be.platform.event-bus, be.platform.queue, be.events, be.queues (opt-in, enabled by `sides.be.patterns`),
   be.transport.message carries the event-bus pattern; new tiers events, queues and projections in the be matrix (domain may import events and
   queues; features may import events, queues and projections); the role suffixes event, queue, projection, projection-entity, processor and step.

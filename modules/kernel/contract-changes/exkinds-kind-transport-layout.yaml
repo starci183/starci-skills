@@ -8,7 +8,7 @@ summary: >-
   jobs transport/queue/ (new slot be.feature.jobs.queue, composedBy api and worker: <job>-queue.module.ts and <job>.processor.ts); the
   application module <job>.module.ts of a job stays at the job root with its steps/ and application/. The door slot ids replace the old door
   ids in KIND_DOOR_SLOTS and in the webhook-shape, webhook-verify-first, realtime-* and job-shape enforcers. The `hfs add job` template
-  tree (knowledge/patterns/be/jobs.yaml, templates/be/patterns/jobs) generates the queue module and moves the processor. R140 names the
+  tree (knowledge/patterns/be/jobs.yaml, templates/be/patterns/jobs) generates the queue module and moves the processor. R145 names the
   new processor home. Three adjustments found by the first real lint of ecommerce: the typed producer file of a queue (`<queue>.queue.ts` of slot
   be.queues) may take the caller's transaction (no-repository-class); the table of a projection declared by its `<name>.projection-entity.ts` is
   its own schema owner (schema-owner, BE_SCHEMA_OWNER); the inbox joins event-bus and jobs in the perConnection list of be.persistence; a queue needs

@@ -27,7 +27,7 @@ rules:
   - id: BE-EVENT-BUS-1
     title: Inside one context nothing is an event
     kind: mandatory
-    hfsRules: [R132]
+    hfsRules: [R137]
     requirement: |-
       Work that stays inside one context (one connection, one set of tables) is synchronous: the handler dispatches to that
       context's domain service, which does the whole change in one transaction. No event, no queue and no bus is involved, and a
@@ -54,7 +54,7 @@ rules:
   - id: BE-EVENT-BUS-2
     title: An event is a typed class that equals its vendored contract
     kind: mandatory
-    hfsRules: [R131]
+    hfsRules: [R136]
     requirement: |-
       Events are classes in `be/src/modules/events/<service>/<event>.event.ts`, one per file, named after the event
       (`order.placed` is `order-placed.event.ts`): a class extending the platform `BaseEvent` with literal
@@ -78,7 +78,7 @@ rules:
   - id: BE-EVENT-BUS-3
     title: Publish through the bus, in the domain transaction, to Kafka only
     kind: mandatory
-    hfsRules: [R132, R90, R87]
+    hfsRules: [R137, R90, R87]
     requirement: |-
       `eventBus.publish(event, tx)` is called only in `modules/domain`, with the manager of the transaction that makes the
       domain change (`this.entityManager.transaction(async (manager) => { ...; await this.eventBus.publish(event, manager) })`).
@@ -103,7 +103,7 @@ rules:
   - id: BE-EVENT-BUS-4
     title: A consumer is a thin door; delivery is at least once with retry and a dead letter
     kind: mandatory
-    hfsRules: [R133, R80]
+    hfsRules: [R138, R80]
     requirement: |-
       A consumer is `transport/message/<event>.consumer.ts` implementing `EventConsumer<E>` with `readonly event = <Event>Event`;
       `handle(delivery)` dispatches one command and forwards `delivery.eventId`. Delivery is at least once: the domain service the
@@ -129,7 +129,7 @@ rules:
   - id: BE-EVENT-BUS-5
     title: A declared event bus is proven on the test world
     kind: mandatory
-    hfsRules: [R135]
+    hfsRules: [R140]
     requirement: |-
       An app that declares the pattern (`hfs.json` `sides.be.patterns: ["event-bus"]`) has e2e or integration tests, titled
       `event-bus/<scenario>: ...`, for each scenario of `ruleParams.be.patternScenarios.event-bus`, run against a real Kafka:
