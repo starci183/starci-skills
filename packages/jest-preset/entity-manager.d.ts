@@ -93,7 +93,7 @@ export interface FakeTransaction<M extends MockEntityManager = MockEntityManager
 /** Makes `em.transaction(work)` run `work` with a scoped view of the double and record commit, rollback and writes. */
 export declare function fakeTransaction<M extends MockEntityManager = MockEntityManager>(em?: M): FakeTransaction<M>
 
-/** Whether `manager` is the view a `fakeTransaction` body received (used by `recordingOutbox`). */
+/** Whether `manager` is the view a `fakeTransaction` body received (used by `recordingEventBus` and `recordingQueueOutbox`). */
 export declare function isTransactionManager(manager: unknown): boolean
 
 /** The kit over a function factory, for callers that bring their own (used by the package spec). */

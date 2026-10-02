@@ -42,7 +42,7 @@ test('a new service is written with a spec whose providers are exactly its const
     '--inject', 'InjectClock=@modules/platform/clock:Clock',
     '--inject', 'InjectCommissionOptions=./commission.decorators:CommissionOptions',
     '--inject', 'InjectCache=@modules/integrations/cache:Cache',
-    '--inject', 'InjectOutbox=@modules/platform/outbox:Outbox',
+    '--inject', 'InjectEventBus=@modules/platform/event-bus:EventBus',
     '--inject', 'InjectChallengeLock=@modules/platform/lock:ChallengeLock',
     '--inject', 'InjectIds=@modules/platform/ids:Ids',
     '--inject', 'InjectKeycloakAdmin=@modules/integrations/keycloak-admin:KeycloakAdmin',
@@ -59,15 +59,23 @@ test('a new service is written with a spec whose providers are exactly its const
 
   const spec = read(dir, `${DIR}/commission.service.spec.ts`);
   assert.equal(spec, `import { Test } from "@nestjs/testing"
-import { fakeCache, FakeClock, fakeIds, fakeLock, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import {
+    fakeCache,
+    FakeClock,
+    fakeIds,
+    fakeLock,
+    mock,
+    mockEntityManager,
+    recordingEventBus,
+} from "@starci/jest-preset"
 import { CACHE } from "@modules/integrations/cache"
 import { KEYCLOAK_ADMIN } from "@modules/integrations/keycloak-admin"
 import type { KeycloakAdmin } from "@modules/integrations/keycloak-admin"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { EVENT_BUS } from "@modules/platform/event-bus"
 import { IDS } from "@modules/platform/ids"
 import { CHALLENGE_LOCK } from "@modules/platform/lock"
-import { OUTBOX } from "@modules/platform/outbox"
 import { ProbeCheckerService } from "@modules/platform/probes"
 import { COMMISSION_OPTIONS } from "./commission.decorators"
 import { CommissionService } from "./commission.service"
@@ -78,7 +86,7 @@ const build = async () => {
     // Fill in the real values of the options this service reads: one case per flag branch.
     const commissionOptions = {}
     const cache = fakeCache(clock)
-    const outbox = recordingOutbox()
+    const eventBus = recordingEventBus()
     const challengeLock = fakeLock(clock)
     const ids = fakeIds()
     const keycloakAdmin = mock<KeycloakAdmin>()
@@ -90,7 +98,7 @@ const build = async () => {
             { provide: CLOCK, useValue: clock },
             { provide: COMMISSION_OPTIONS, useValue: commissionOptions },
             { provide: CACHE, useValue: cache },
-            { provide: OUTBOX, useValue: outbox },
+            { provide: EVENT_BUS, useValue: eventBus },
             { provide: CHALLENGE_LOCK, useValue: challengeLock },
             { provide: IDS, useValue: ids },
             { provide: KEYCLOAK_ADMIN, useValue: keycloakAdmin },
@@ -103,7 +111,7 @@ const build = async () => {
         entityManager,
         commissionOptions,
         cache,
-        outbox,
+        eventBus,
         challengeLock,
         ids,
         keycloakAdmin,

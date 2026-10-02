@@ -159,17 +159,17 @@ rules:
     hfsRules: [R48, R72, R79, R83]
     requirement: |-
       Doubles come only from `@starci/jest-preset` (package root exports): `mockEntityManager`, `fakeTransaction`, `fakeCache`,
-      `fakeLock`, `recordingOutbox`, `FakeClock`, `fakeIds`, `mock<T>()`, `builder` and the Outcome matchers (`toBeRefused`,
+      `fakeLock`, `recordingEventBus`, `recordingQueueOutbox`, `FakeClock`, `fakeIds`, `mock<T>()`, `builder` and the Outcome matchers (`toBeRefused`,
       `toSucceedWith`). A `useValue` for a known infrastructure token comes from its matching kit double: `CACHE` -> `fakeCache`,
-      `*ENTITY_MANAGER` -> `mockEntityManager`, `CLOCK` -> `FakeClock`, `OUTBOX` -> `recordingOutbox`, lock, lease, fence and hold
+      `*ENTITY_MANAGER` -> `mockEntityManager`, `CLOCK` -> `FakeClock`, `EVENT_BUS` -> `recordingEventBus`, `QUEUE_OUTBOX` -> `recordingQueueOutbox`, lock, lease, fence and hold
       -> `fakeLock`, ids -> `fakeIds`, options tokens -> `builder(...)` or a plain literal, everything else -> `mock<T>()`.
       `mockEntityManager({ method: [Entity, result] })` is typed against the entity (`query: [sql, rows]`; a list of pairs answers
       several calls), every method is a `jest.fn`, and any unstubbed method throws an error naming it, so the absence of a stub
       proves the absence of that database call; `create(Entity, plain)` works unstubbed. `fakeTransaction(em)` runs
       `em.transaction(work)` with a scoped view and records `outcomes`, `commits`, `rollbacks`, `committedWrites` and
       `rolledBackWrites`. `fakeCache(clock)` is a behavioural cache (JSON round trip, TTL from the clock, `has`, `ttlOf`, `keys`).
-      `fakeLock(clock)` has acquire, contention, release, expiry and fence (`isHeld`, `holderOf`, `fenceOf`). `recordingOutbox()`
-      exposes `messages` (deduplicated by queue and event id), `writes` and `entries` with `inTransaction`. The ban list: no cast of
+      `fakeLock(clock)` has acquire, contention, release, expiry and fence (`isHeld`, `holderOf`, `fenceOf`). `recordingEventBus()`
+      exposes `events` (deduplicated by event name and event id), `writes` and `entries` with `inTransaction`; `recordingQueueOutbox()` exposes `jobs`, `jobsOf(queue)` and `entries`. The ban list: no cast of
       any kind (`as X`, `as never`, `as unknown as`, `x!`), no ambient clock (`Date.now()`, an argument-less `new Date()`), no
       `jest.mock` of an own module or of a third-party library, no `process.env`, no ad-hoc `jest.fn` object standing in for an
       EntityManager, and no `fs` read of source.
@@ -248,7 +248,7 @@ rules:
         write: 'Double: fakeLock(). Cases: acquired / contended / released on error / expiry.'
       - id: case-11
         when: 11. Scheduler, queue, outbox, Kafka, `*TransitionEmitter`
-        write: 'Double: recordingOutbox(), mock<SchedulerRegistry>(). Cases: emitted exactly once / nothing emitted on refusal / idempotency key present.'
+        write: 'Double: recordingEventBus(), recordingQueueOutbox(). Cases: emitted exactly once / nothing emitted on refusal / idempotency key present.'
       - id: case-12
         when: 12. Request context (`ACTING_LEARNER`, `InjectRequest`, `CURRENT_PLAN_CONTEXT`, `Locale`, `MessageCatalogMap`)
         write: 'Double: REAL values from builders. Cases: owner / other / admin / anonymous / each locale.'

@@ -1,6 +1,6 @@
 # @starci/jest-preset
 
-The jest config of a Nest repository and the one shared unit-test double kit (`mock<T>()`, `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingOutbox`, `builder`, `FakeClock`, `fakeIds` and the Outcome matchers). Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
+The jest config of a Nest repository and the one shared unit-test double kit (`mock<T>()`, `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingEventBus`, `recordingQueueOutbox`, `builder`, `FakeClock`, `fakeIds` and the Outcome matchers). Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 ```js
 // jest.config.js (a managed file: `hfs sync` renders it, `hfs check` compares it; do not edit)
@@ -62,7 +62,7 @@ const service = moduleRef.get(CommissionService)
 No `new` of the service, no `imports`, no `overrideProvider`, no `jest.mock`, no casts, no `Date.now()` and no `process.env`. The
 full rules and the dependency-to-double-to-cases table are `knowledge/patterns/be/test.yaml` (BE-TEST-1 to BE-TEST-15). Every
 export below is on the package root (`@starci/jest-preset`); the sub-paths `./mock`, `./clock`, `./entity-manager`, `./ids`,
-`./matchers`, `./cache`, `./lock`, `./outbox` and `./builders` exist as well.
+`./matchers`, `./cache`, `./lock`, `./event-bus`, `./queue` and `./builders` exist as well.
 
 ## `mockEntityManager` and `fakeTransaction`
 
@@ -95,7 +95,7 @@ The stubbable methods are `findOne`, `findOneBy`, `findOneOrFail`, `findOneByOrF
 `delete`, `softDelete`, `restore`, `increment`, `decrement` and `query`. `fakeTransaction(em)` returns `{ em, outcomes, commits,
 rollbacks, committedWrites, rolledBackWrites }`.
 
-## `fakeCache(clock)`, `fakeLock(clock)` and `recordingOutbox()`
+## `fakeCache(clock)`, `fakeLock(clock)`, `recordingEventBus()` and `recordingQueueOutbox()`
 
 ```ts
 const clock = new FakeClock("2026-01-01T00:00:00.000Z")
@@ -114,18 +114,17 @@ const grant = await lock.acquire({ name: "writer", holder: "a", ttlMs: 30_000 })
 lock.isHeld("writer"); lock.holderOf("writer"); lock.fenceOf("writer")
 await lock.release({ grant })
 
-const outbox = recordingOutbox()   // enqueue(manager, message)
-outbox.messages     // what the store would hold: the first write of each (queue, eventId)
-outbox.writes       // every message written, duplicates included
-outbox.entries      // every write with its manager and `inTransaction`
-outbox.allInTransaction; outbox.messagesOf("queue"); outbox.clear()
+const bus = recordingEventBus()   // publish(event, tx): the EventBus port
+bus.events          // what the outbox would hold: the first publication of each (event name, event id)
+bus.writes          // every event published, duplicates included
+bus.entries         // every publication with its tx and `inTransaction`
+bus.allInTransaction; bus.eventsOf(OrderPlacedEvent); bus.clear()
+bus.setPendingRetries(2)                    // what pendingRetries(eventClass) answers
+bus.queueDeadLetters(letter)                // what deadLetters(eventClass) hands out; bus.requeued keeps requeue(id) calls
+bus.failNext("publish", new Error("down"))  // the next call of that operation rejects once
 
-// the claim side: script what a worker's claim returns
-outbox.queueRecords(record)                 // the backlog claimDue hands out, in order, filtered by queue and cut at limit
-outbox.queueRecords(record, record)         // a duplicate delivery
-await outbox.claimDue(params)               // [] when the backlog is empty
-outbox.failNext("complete", new Error("db down"))   // the next call of that operation rejects once
-outbox.claims; outbox.completed; outbox.retried; outbox.buried; outbox.backlog
+const queueOutbox = recordingQueueOutbox()  // write(tx, queue, payload): the QueueOutbox port
+queueOutbox.jobs; queueOutbox.jobsOf("mail"); queueOutbox.entries; queueOutbox.allInTransaction
 ```
 
 ## `builder`, `fakeIds` and the Outcome matchers

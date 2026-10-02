@@ -159,7 +159,8 @@ ruleParams:
         - {token: "(?:^|_)ENTITY_MANAGER$", double: mockEntityManager, forms: [call]}
         - {token: "(?:^|_)TRANSACTION(?:_RUNNER)?$", double: fakeTransaction, forms: [call]}
         - {token: "(?:^|_)CLOCK$", double: FakeClock, forms: [new]}
-        - {token: "(?:^|_)OUTBOX(?:_|$)", double: recordingOutbox, forms: [call]}
+        - {token: "(?:^|_)EVENT_BUS$", double: recordingEventBus, forms: [call]}
+        - {token: "(?:^|_)QUEUE_OUTBOX$", double: recordingQueueOutbox, forms: [call]}
         - {token: "(?:^|_)CACHE(?:_|$)", double: fakeCache, forms: [call]}
         - {token: "(?:^|_)(?:LOCK|LEASE|FENCE|HOLD)(?:_|$)", double: fakeLock, forms: [call]}
         - {token: "(?:^|_)(?:IDS|ID_GENERATOR|ID_FACTORY)$", double: fakeIds, forms: [call]}

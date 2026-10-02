@@ -36,3 +36,7 @@ paths:
   - packages/eslint/be/event-bus.mjs
   - packages/eslint/be/lib/transactions.mjs
   - packages/eslint/be/lib/ports.mjs
+  - packages/jest-preset/event-bus.cjs
+  - packages/jest-preset/queue.cjs
+  - packages/jest-preset/index.cjs
+  - packages/jest-preset/package.json
