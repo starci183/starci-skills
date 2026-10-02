@@ -9,7 +9,7 @@ const PLACED_LONG_AGO = new Date("2020-01-01T00:00:00.000Z")
 /**
  * An order nobody pays expires, end to end: the scheduler of the order-expiry queue ticks inside the running order service,
  * the fenced expire-orders job claims each tick, and the sweep moves the pending order that waited past the payment window to
- * expired in one transaction that also announces \`order.expired\`; an order placed inside the window and an order that was
+ * expired in one transaction that also announces order.expired; an order placed inside the window and an order that was
  * already paid are left alone. The Postgres reads are out-of-band verification only.
  *
  * Run: npm run test:e2e -- order/unpaid-order-expires
