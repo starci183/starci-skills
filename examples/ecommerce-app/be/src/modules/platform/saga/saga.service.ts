@@ -5,6 +5,8 @@ import type { Clock } from "@modules/platform/clock"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { InjectInbox } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
+import { InjectLogger } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
 import type {
     BeginSagaParams,
     CompensateSagaParams,
@@ -15,6 +17,7 @@ import type {
     SagaStatus,
     SagaTransition,
 } from "./saga.contracts"
+import { SagaLogEvent } from "./saga.log-events"
 import type { SagaStateRow, SagaVersionRow } from "./persistence/saga.rows"
 import { BEGIN_SAGA, MOVE_SAGA, READ_SAGA } from "./persistence/saga.sql"
 
@@ -33,6 +36,7 @@ export class SagaService {
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
         @InjectInbox() private readonly inbox: Inbox,
+        @InjectLogger() private readonly logger: Logger,
     ) {}
 
     /** Starts the run in the caller transaction, at version 1; starting a run that exists changes nothing. */
@@ -51,7 +55,13 @@ export class SagaService {
         const claimed = state.status === "running" ? await this.move(params, state, "compensating") : state
         if (claimed === null) return "ignored"
         try {
-            await params.compensate()
+            this.logger.info(SagaLogEvent.Compensating, {
+                saga: params.saga,
+                correlationId: params.correlationId,
+                step: params.step.name,
+                event: params.step.event,
+            })
+            await params.compensation.run(params.correlationId)
         } catch (error) {
             await this.inbox.release(sourceOf(params.saga), params.eventId)
             throw error
@@ -72,7 +82,7 @@ export class SagaService {
     async state(run: SagaRun): Promise<FindSagaResult> {
         const rows: Array<SagaStateRow> = await this.entityManager.query(READ_SAGA, [run.saga, run.correlationId])
         const [row] = rows
-        return row === undefined ? null : { status: row.status, version: row.version }
+        return row === undefined ? null : { correlationId: run.correlationId, status: row.status, version: row.version }
     }
 
     /** Moves the run from the state it was read in to `to`; answers the new state, or null when another transition moved it first. */
@@ -86,6 +96,6 @@ export class SagaService {
             this.clock.now(),
         ])
         const [row] = rows
-        return row === undefined ? null : { status: to, version: row.version }
+        return row === undefined ? null : { correlationId: run.correlationId, status: to, version: row.version }
     }
 }

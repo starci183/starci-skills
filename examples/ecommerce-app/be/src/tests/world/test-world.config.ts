@@ -12,8 +12,7 @@ import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
 import { parseCliAppOptions } from "../../../apps/cli/src/cli.options"
-import { migrateConnections } from "@features/cli"
-import { openConnectionSource } from "@modules/platform/database"
+import { migrateConnections, openConnectionSource } from "@modules/platform/database"
 import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
@@ -65,7 +64,8 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     },
     migrate: {
         // the one migration runner: the cli migrate command's, over the cli app's connections
-        module: (env: EnvSource) => migrateConnections(parseCliAppOptions(env).connections, openConnectionSource),
+        module: (env: EnvSource) =>
+            migrateConnections(parseCliAppOptions(env).connections, { open: openConnectionSource }),
         options: (w) =>
             new EnvSource({
                 IDENTITY_DB_URL: w.db.identity.url,

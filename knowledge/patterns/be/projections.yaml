@@ -150,6 +150,9 @@ files:
     template: projections/projection.projection.ts.tpl
     role: recompute* and get* only.
     rules: [BE_PROJECTION_SHAPE, BE_PROJECTION_WRITE_OWNER]
+  - path: src/modules/projections/<name>/<name>.projection.spec.ts
+    slot: be.projections
+    template: projections/projection.projection.spec.ts.tpl
   - path: src/modules/projections/<name>/<name>.projection-entity.ts
     slot: be.projections
     template: projections/projection.entity.ts.tpl

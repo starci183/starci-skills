@@ -603,7 +603,7 @@ sections:
       - "Owner rule 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root
         `specs: {unit, e2e}` switches product testing per class; unit is on unless set false, e2e is off unless set true (defaults 2026-09-29).
         unit covers the back end's unit tests (*.service.spec.ts; jest and its per-file coverage threshold, and the
-        services' coverage Sonar judges; the front end has no tests); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
+        coverage Sonar judges (the logic of be/src/modules); the front end has no tests); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/route/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the

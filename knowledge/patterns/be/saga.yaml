@@ -38,9 +38,9 @@ files:
   - path: src/features/saga/<saga>/<saga>.saga.service.ts
     slot: be.feature.saga
     template: saga/saga.service.ts.tpl
-    role: "The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it. It lists the steps and compensations, imports them all and moves the run through `platform/saga` (a transition names the version it read)."
+    role: "The orchestrator. A `*.service.ts` because a handler injects only services; thin (R203 `BE_FEATURE_THIN`) like every feature file — it maps and delegates, and the run's orchestration lives in `platform/saga` — and it owes its `<saga>.saga.service.spec.ts` beside it (a `service` of `ruleParams.be.unitRoles`), which asserts the delegation. It hands `platform/saga` each run with the compensation OBJECT of the step (`compensation`, never a callback): the platform logs `Compensating`, orders the steps and moves the run through the version fence; its slot is `coverage: none`, so it is never a coverage target."
     suffix: saga.service
-    rules: [R169, R170]
+    rules: [R169, R170, R203]
   - path: src/features/saga/<saga>/<saga>.saga.service.spec.ts
     slot: be.feature.saga
     template: saga/saga.service.spec.ts.tpl
@@ -51,10 +51,6 @@ files:
     role: "The typed state of a run, with `status` and `version: number`, the fence."
     suffix: saga-state
     rules: [R170]
-  - path: src/features/saga/<saga>/<saga>.saga.log-events.ts
-    slot: be.feature.saga
-    template: saga/saga.log-events.ts.tpl
-    role: "The log events of the saga."
   - path: src/features/saga/<saga>/steps/<step>.saga-step.ts
     slot: be.feature.saga.steps
     template: saga/saga.step.ts.tpl
@@ -64,7 +60,7 @@ files:
   - path: src/features/saga/<saga>/compensations/<step>.compensation.ts
     slot: be.feature.saga.compensations
     template: saga/saga.compensation.ts.tpl
-    role: "The compensation of the step of the same name; REQUIRED for every step. Names the failure event and dispatches one command."
+    role: "The compensation of the step of the same name; REQUIRED for every step. Names the step it undoes and the failure event, and dispatches one command; the orchestrator passes it to `platform/saga` as the compensation object."
     suffix: compensation
     rules: [R169, R171, R173]
   - path: src/features/saga/<saga>/application/undo-<saga>.command.ts
@@ -135,7 +131,7 @@ files:
     optional: true
   - path: src/modules/platform/saga/
     slot: be.platform
-    role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` (unit-tested to 100%).'
+    role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` — a measured file of a `coverage: required` slot, held at 100 per file with its spec beside it.'
     rules: [R170, R80]
     optional: true
   - path: src/tests/e2e/<area>/<name>.e2e-spec.ts
@@ -152,15 +148,16 @@ rules:
     requirement: |-
       A saga is `be/src/features/saga/<saga>/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
       `compensations/<step>.compensation.ts`: every step has a compensation of the same name and every compensation a step,
-      and the orchestrator imports every step and every compensation of its folder. The folders are slots enabled by the
-      declared pattern; a saga folder in a product that does not declare `patterns: ["saga"]` is `HFS_SLOT_NOT_ENABLED`.
+      and the orchestrator passes every compensation of its folder to `platform/saga` (the compensation names the step it
+      undoes). The folders are slots enabled by the declared pattern; a saga folder in a product that does not declare
+      `patterns: ["saga"]` is `HFS_SLOT_NOT_ENABLED`.
     rationale: |-
       A forward step with no way back leaves a half-done flow when a later step fails. Naming the pair by file makes the
       missing half a finding, and listing both in the orchestrator keeps a step nobody runs from hiding.
     cases:
       - id: case-1
         when: A new step
-        write: 'features/saga/place-order/steps/reserve-order.saga-step.ts and features/saga/place-order/compensations/reserve-order.compensation.ts, both imported by place-order.saga.service.ts.'
+        write: 'features/saga/place-order/steps/reserve-order.saga-step.ts and features/saga/place-order/compensations/reserve-order.compensation.ts; the orchestrator passes the compensation object to `platform/saga`.'
     verification:
       automated:
         - BE_SAGA_STEP_COMPENSATION
@@ -182,10 +179,11 @@ rules:
   - id: BE-SAGA-2
     title: The state of a run is typed, versioned and moved only through the fenced store
     kind: mandatory
-    hfsRules: [R170, R80, R172]
+    hfsRules: [R170, R80, R172, R203]
     requirement: |-
-      `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator moves a run only
-      through `platform/saga`: a transition names the version it read and moves it by one, and takes its event through the
+      `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator is a thin feature
+      file (R203 `BE_FEATURE_THIN`) and the run's orchestration lives in `platform/saga`: the orchestrator moves a run only
+      through it, a transition names the version it read and moves it by one, and takes its event through the
       inbox first. A consumer of a saga passes the id of the delivery (`message.eventId`) to its command.
     rationale: |-
       Deliveries repeat and arrive late. The version fence stops a zombie delivery from moving a run twice, and the inbox makes
@@ -193,12 +191,13 @@ rules:
     cases:
       - id: case-1
         when: A failure event arrives twice
-        write: 'compensate({ saga, correlationId, eventId, compensate }) claims the event, moves running to compensating at version 1, runs the compensation, settles compensated; the second delivery answers duplicate.'
+        write: 'compensate({ saga, correlationId, eventId, compensation }) claims the event, moves running to compensating at version 1, logs Compensating and runs compensation.run(correlationId), settles compensated; the second delivery answers duplicate.'
     verification:
       automated:
         - BE_SAGA_STATE_VERSIONED
         - BE_INBOX_DEDUPE_MISSING
         - BE_SAGA_CONSUMER_DEDUPE
+        - BE_FEATURE_THIN
       manual:
         - Check a failing compensation gives the event back so the redelivery resumes the run.
     relatedExamples: [saga]

@@ -62,6 +62,7 @@ import { recommended as unitSpecRecommended, rules as unitSpecRules } from "./un
 import { recommended as userCopyRecommended, rules as userCopyRules } from "./user-copy.mjs"
 import { recommended as webhooksRecommended, rules as webhooksRules } from "./webhooks.mjs"
 import { recommended as realtimeRecommended, rules as realtimeRules } from "./realtime.mjs"
+import { recommended as featureThinRecommended, rules as featureThinRules } from "./feature-thin.mjs"
 import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
@@ -112,6 +113,7 @@ const CONTRIBUTIONS = [
     { law: "user-copy", rules: userCopyRules, recommended: userCopyRecommended },
     { law: "webhooks", rules: webhooksRules, recommended: webhooksRecommended },
     { law: "realtime", rules: realtimeRules, recommended: realtimeRecommended },
+    { law: "feature-thin", rules: featureThinRules, recommended: featureThinRecommended },
 ]
 
 /** Every gathered law. */

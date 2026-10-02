@@ -7,25 +7,29 @@
 //                                   folder whose hfs.json is of kind app): install, typecheck, lint, unit with coverage,
 //                                   the Codecov upload under the app's flag, the front-end build and the Sonar gate on
 //                                   push and pull_request; integration and e2e on workflow_dispatch only (owner ruling).
-//   codecov.yml                     one flag per example app, rendered here from the same coverage scope as the app's own
-//                                   codecov.yml and, as its complement, sonar.coverage.exclusions (packages/hfs/sync/index.mjs coverageScope over
-//                                   the jest preset's COVERAGE_SOURCES), each held at 100 on the project and the patch.
+//   codecov.yml                     one flag per example app, and one component per service app plus platform, rendered here from the
+//                                   same coverage scope as the app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions (the
+//                                   slot manifest's `coverage` field, derived once by scripts/hfs/coverage-scope.mjs), each held at 100
+//                                   on the project and the patch.
 //
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
 //   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
 //   node scripts/checks/check-examples-ci.mjs --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
-//   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own codecov.yml and sonar-project.properties from the render
+//   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own codecov.yml, sonar-project.properties and be/jest.config.js from the render
 //
-// The quality files of each example (codecov.yml, sonar-project.properties) are rendered here from the SOURCE jest preset of this repository, the
-// one the root codecov.yml flag already reads, so the root flag, the app's coverage paths and sonar.coverage.exclusions are one scope. The build
+// The quality files of each example (codecov.yml, sonar-project.properties, be/jest.config.js) are rendered here from the SOURCE slot manifest of this
+// repository, the one the root codecov.yml flags and components already read, so the root flag, the app's jest scope, coverage paths and
+// sonar.coverage.exclusions are one scope. The build
 // of every image of every example (never a push) is the `images` job, whose matrix is the --images output.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { coverageScope, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { appSource, componentsYaml, renderTargets } from '../../packages/hfs/sync/index.mjs';
+import { codecovPaths, coverageComponents } from '../hfs/coverage-scope.mjs';
+import { loadSlotManifest } from '../hfs/slots.mjs';
 import { declaredSonarKeys, repositoryName, DECLARATION } from '../../packages/hfs/sync/sonar-key.mjs';
 import { dockerfilePath } from '../hfs/rules/docker.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -49,10 +53,17 @@ export function exampleApps(root = ROOT) {
   }).map((entry) => entry.name).sort();
 }
 
-/** The coverage scope of one example app from the repository root: the app scope of hfs sync under examples/<app>/. */
+/** The coverage paths of one example app from the repository root: the measured roots of its be side under examples/<app>/. */
 export function appCoverageScope(app, root = ROOT) {
-  const preset = createRequire(import.meta.url)(path.join(root, 'packages', 'jest-preset', 'index.cjs'));
-  return coverageScope({ coverageSources: [...preset.COVERAGE_SOURCES] }).map((glob) => `examples/${app}/${glob}`);
+  return codecovPaths(loadSlotManifest()).map((glob) => `examples/${app}/${glob}`);
+}
+
+/** The Codecov components of one example app, [{ id, name, paths }], ids and paths from the repository root (`<app>-<service>`, `<app>-platform`). */
+function appComponents(app, root = ROOT) {
+  const appRoot = path.join(root, 'examples', app);
+  const hfs = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
+  return coverageComponents(loadSlotManifest(), { ...appSource(appRoot), apps: hfs.sides.be.apps })
+    .map((component) => ({ id: `${app}-${component.id}`, name: `${app}-${component.name}`, paths: component.paths.map((glob) => `examples/${app}/${glob}`) }));
 }
 
 /** The Sonar project key an example declares in its stack declaration, or its project name. */
@@ -64,15 +75,15 @@ function sonarKeyOf(appRoot, project) {
   return project;
 }
 
-/** The quality files of an example rendered from the source preset: [{ path, content, mode, hash }] (codecov.yml, sonar-project.properties). */
+/** The quality files of an example rendered from the source slot manifest: [{ path, content, mode, hash }] (codecov.yml, sonar-project.properties, be/jest.config.js). */
 export function appQualityTargets(app, root = ROOT) {
   const appRoot = path.join(root, 'examples', app);
   const hfs = JSON.parse(fs.readFileSync(path.join(appRoot, 'hfs.json'), 'utf8'));
   const preset = createRequire(import.meta.url)(path.join(root, 'packages', 'jest-preset', 'index.cjs'));
-  const presets = { sonarExclusions: preset.sonarExclusions(), coverageSources: [...preset.COVERAGE_SOURCES] };
-  return renderTargets(hfs, presets, { sonarKey: sonarKeyOf(appRoot, hfs.project) }).filter((target) => APP_QUALITY_FILES.includes(target.path));
+  const presets = { sonarExclusions: preset.sonarExclusions() };
+  return renderTargets(hfs, presets, { sonarKey: sonarKeyOf(appRoot, hfs.project), manifest: loadSlotManifest(), source: appSource(appRoot) }).filter((target) => APP_QUALITY_FILES.includes(target.path));
 }
-export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties']);
+export const APP_QUALITY_FILES = Object.freeze(['codecov.yml', 'sonar-project.properties', 'be/jest.config.js']);
 
 /** Every image of every example app, from its hfs.json: [{ app, name, file }] (be apps, then fe apps). */
 export function exampleImages(root = ROOT) {
@@ -84,13 +95,15 @@ export function exampleImages(root = ROOT) {
 const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
 const IMAGES_JOB = 'images';
 
-/** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
+/** The root codecov.yml: one flag per example app over its measured roots and one component per service app plus platform, project and patch at 100 per flag and component. */
 export function renderCodecov(root = ROOT) {
   const flags = exampleApps(root).map((app) => [`    - name: ${app}`, '      paths:', ...appCoverageScope(app, root).map((glob) => `        - ${JSON.stringify(glob)}`)].join('\n'));
+  const components = exampleApps(root).flatMap((app) => appComponents(app, root));
   return `# Generated by scripts/checks/check-examples-ci.mjs --write. Do not edit: npm run check fails on any difference.
-# One flag per example app (examples/*/hfs.json of kind app), uploaded by .github/workflows/examples.yml. The paths are the
-# app's coverage scope (its services only), the same scope hfs sync renders into the app's own codecov.yml (and its complement into sonar.coverage.exclusions);
-# every flag is held at 100 on the project and on the patch.
+# One flag per example app (examples/*/hfs.json of kind app), uploaded by .github/workflows/examples.yml. The paths are the app's coverage
+# scope (the logic of be/src/modules/**: the slot manifest's \`coverage\` field, derived once by scripts/hfs/coverage-scope.mjs, the same scope the
+# app's own codecov.yml, be/jest.config.js and sonar.coverage.exclusions render); every flag is held at 100 on the project and on the patch,
+# and so is every component (one per service app of each example, plus its platform).
 codecov:
   require_ci_to_pass: true
 coverage:
@@ -115,6 +128,17 @@ flag_management:
         threshold: 0%
   individual_flags:
 ${flags.join('\n')}
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 100%
+        threshold: 0%
+      - type: patch
+        target: 100%
+        threshold: 0%
+  individual_components:
+${componentsYaml(components)}
 `;
 }
 
@@ -187,7 +211,11 @@ export function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.st
   if (argv.includes('--images')) { out(`${JSON.stringify(exampleImages(root))}\n`); return 0; }
   if (argv.includes('--write')) {
     fs.writeFileSync(path.join(root, CODECOV), renderCodecov(root));
-    for (const app of exampleApps(root)) for (const target of appQualityTargets(app, root)) fs.writeFileSync(path.join(root, 'examples', app, target.path), target.content);
+    for (const app of exampleApps(root)) for (const target of appQualityTargets(app, root)) {
+      const file = path.join(root, 'examples', app, target.path);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, target.content);
+    }
     out(`examples-ci: wrote ${CODECOV} (${exampleApps(root).length} flags) and each example's ${APP_QUALITY_FILES.join(', ')}\n`);
     return 0;
   }

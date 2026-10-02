@@ -4,14 +4,14 @@ import { @@service@@ } from "@@serviceModule@@"
 import { RunCli } from "./run.cli"
 
 describe("RunCli", () => {
-    it("runs @@group@@ through the domain service, once", async () => {
+    it("delegates the @@group@@ run to the runner service once", async () => {
         const @@serviceCamel@@ = mock<@@service@@>()
         const moduleRef = await Test.createTestingModule({
             providers: [RunCli, { provide: @@service@@, useValue: @@serviceCamel@@ }],
         }).compile()
 
-        await moduleRef.get(RunCli).run()
+        await expect(moduleRef.get(RunCli).run()).resolves.toBeUndefined()
 
-        expect(@@serviceCamel@@.@@groupCamel@@).toHaveBeenCalledTimes(1)
+        expect(@@serviceCamel@@.run).toHaveBeenCalledTimes(1)
     })
 })

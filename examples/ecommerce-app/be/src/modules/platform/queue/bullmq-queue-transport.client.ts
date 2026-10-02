@@ -1,18 +1,20 @@
 import { Injectable } from "@nestjs/common"
-import { Queue, Worker } from "bullmq"
-import { InjectQueueOptions } from "./queue.decorators"
+import { InjectQueueFactory, InjectQueueOptions } from "./queue.decorators"
 import type { QueueHandler, QueueSchedulerDefinition } from "./queue.contracts"
 import type { QueueOptions } from "./queue.options"
 import { ATTEMPTS, BACKOFF_MS, KEEP_COMPLETED_SECONDS, jobNameOf } from "./queue.policy"
-import type { QueueTransport } from "./queue-transport.port"
+import type { BullmqConnection, BullmqQueue, BullmqWorker, QueueFactory, QueueTransport } from "./queue-transport.port"
 
 @Injectable()
-/** The one importer of BullMQ: the QueueTransport port over a Redis the app names in its options. */
+/** The QueueTransport port over a Redis the app names in its options; the BullMQ objects come from the injected factory the module composes. */
 export class BullmqQueueTransportClient implements QueueTransport {
-    private readonly queues = new Map<string, Queue>()
-    private readonly workers: Array<Worker> = []
+    private readonly queues = new Map<string, BullmqQueue>()
+    private readonly workers: Array<BullmqWorker> = []
 
-    constructor(@InjectQueueOptions() private readonly options: QueueOptions) {}
+    constructor(
+        @InjectQueueOptions() private readonly options: QueueOptions,
+        @InjectQueueFactory() private readonly factory: QueueFactory,
+    ) {}
 
     /** Adds the job with the outbox row id as its BullMQ id, so adding it twice leaves one job. */
     async add(queue: string, jobId: string, payload: object): Promise<void> {
@@ -36,7 +38,7 @@ export class BullmqQueueTransportClient implements QueueTransport {
     /** Starts a worker of the queue. */
     work(handler: QueueHandler, concurrency: number): Promise<void> {
         this.workers.push(
-            new Worker<object>(
+            this.factory.worker(
                 handler.queue,
                 (job) =>
                     handler.handle({
@@ -62,17 +64,17 @@ export class BullmqQueueTransportClient implements QueueTransport {
         await Promise.all([...this.queues.values()].map((queue) => queue.close()))
     }
 
-    private connection() {
+    private connection(): BullmqConnection {
         return {
             prefix: this.options.prefix,
             connection: { host: this.options.redisHost, port: this.options.redisPort, maxRetriesPerRequest: null },
         }
     }
 
-    private queueOf(name: string): Queue {
+    private queueOf(name: string): BullmqQueue {
         const known = this.queues.get(name)
         if (known !== undefined) return known
-        const created = new Queue(name, this.connection())
+        const created = this.factory.queue(name, this.connection())
         this.queues.set(name, created)
         return created
     }

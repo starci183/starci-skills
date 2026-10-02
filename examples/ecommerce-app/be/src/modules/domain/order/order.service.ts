@@ -54,7 +54,8 @@ export class OrderService {
      * little stock is a refusal; otherwise the order, stock and cart clear all happen in one transaction and the order is pending.
      */
     async placeOrder(request: PlaceOrderRequest): Promise<Outcome<PlacedOrder, OrderErrorCode>> {
-        const { personId, idempotencyKey } = request
+        const { personId } = request
+        const idempotencyKey = request.idempotencyKey?.trim() || undefined
         if (idempotencyKey !== undefined) {
             const replay = await this.findPlaced({ personId, idempotencyKey })
             if (replay) return ok(replay)

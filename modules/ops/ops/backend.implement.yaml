@@ -94,10 +94,11 @@ writes:
         op loop's gate.json (the gate step below): findings the base already has are repository debt owed to
         code.refactor and measured by review.verify's whole-repository hfs lint, never an open item of this slice. Unit coverage is the
         runner's: the unit project (`npm test`, jest with `--coverage`) fails below its per-file 100
-        threshold on `*.service.ts`; Sonar judges the same services: `sonar-local.mjs scan` first runs the
-        unit specs related to every service this slice touched with coverage into be/coverage/lcov.info, and the
+        threshold on every measured file of the coverage scope (the `ruleParams.be.logicRoles` roles of the `coverage: required`
+        slots, R204); Sonar judges the same files: `sonar-local.mjs scan` first runs the
+        unit specs related to every measured file this slice touched with coverage into be/coverage/lcov.info, and the
         slice fails when one of them is below 100 (not while specs.unit is off). The app's full
-        unit suite (`npm test`) is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the source it adds or changes and runs only those and the specs that import it; the whole unit suite is unit.verify's or /push-git's
+        unit suite (`npm test`) is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the spec-required subjects it adds or changes and the specs that cover the measured files it touches, and runs only those and the specs that import them; the whole unit suite is unit.verify's or /push-git's
         (CONTEXT.md useful verification). Run Sonar only through
         `node <Source>/.claude/scripts/gates/sonar-local.mjs scan --cwd <absolute repository root>
         --wait --isolate --base <source commit recorded before

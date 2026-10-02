@@ -95,8 +95,10 @@ proofs:
     attach: unit-run.json
     script: scripts/gates/unit-run.mjs
     purpose: >-
-      The unit run summary: the whole unit project ran green, every *.service.ts reaches 100 on lines, branches, functions and
-      statements on its own, and every service spec builds its subject with Test.createTestingModule over the kit doubles.
+      The unit run summary: the whole unit project ran green, every measured file of the coverage scope (a
+      `ruleParams.be.logicRoles` file inside a `coverage: required` slot, R204) reaches 100 on lines, branches, functions and
+      statements on its own, and every spec of a spec-required subject (a `*.service.ts`, a cli command) builds its subject with
+      Test.createTestingModule over the kit doubles.
   security-lint:
     schema: starci/lint@1
     attach: lint.json

@@ -42,6 +42,7 @@
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev) as suspects, never refusals.
 import fs from 'node:fs';
+import { escapeRegExp } from '../../lib/regex.mjs';
 import { capturesOf } from '../impl-captures.mjs';
 import path from 'node:path';
 import { runNode } from '../../api/node/run-node.mjs';
@@ -63,7 +64,6 @@ const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 
-const escapeRe = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The Work root enclosing `dir` (work-io.mjs workRootOf), else `dir` itself. */
 const workRootOf = (dir) => enclosingWorkRoot(dir) ?? path.resolve(dir);
@@ -457,7 +457,7 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
     seen.add(promptPath);
     const file = path.join(path.dirname(uiFile), promptPath);
     if (!fs.existsSync(file)) { out.push(finding('refuse', 'SHELL_PROMPT_UNREADABLE', at, `${asset.path}: its prompt ${promptPath} is not on disk`)); continue; }
-    if (!new RegExp(`product[\\s_-]?locale\\s*[:=]\\s*${escapeRe(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
+    if (!new RegExp(`product[\\s_-]?locale\\s*[:=]\\s*${escapeRegExp(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
   }
   return out;
 }

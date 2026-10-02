@@ -4,7 +4,7 @@
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { paramNamesOk } from './param-names.mjs';
 import { kindParamProblems, scenarioProblem } from './declaration-slots.mjs';
-import { unitRolesProblems } from './manifest-shape.mjs';
+import { roleListProblems, unitRolesProblems } from './manifest-shape.mjs';
 
 const PROFILES = ['be', 'fe'];
 
@@ -20,7 +20,7 @@ export function ruleParamsProblems(m) {
     const sharedParam = (key, v) => (key === 'fileLines' ? fileLinesOk(v) : blockOk(v));
     const sideOk = (side, own) => own.every((k) => side[k] !== undefined) && Object.entries(side).every(([k, v]) => own.includes(k) || (['fileLines', 'duplicateBlock'].includes(k) && sharedParam(k, v)));
     if (Object.keys(rp.common).length !== 2 || !fileLinesOk(rp.common.fileLines) || !blockOk(rp.common.duplicateBlock)) bad.push('ruleParams.common needs exactly fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
-    if (!sideOk(rp.be, ['infraOwners', 'eventBus', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'patternScenarios', 'kindPatterns', 'addKinds'])) bad.push('ruleParams.be needs infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, patternScenarios, kindPatterns and addKinds (fileLines and duplicateBlock live in ruleParams.common, a side may override them)'); else bad.push(...unitRolesProblems(rp.be));
+    if (!sideOk(rp.be, ['infraOwners', 'eventBus', 'specDoubles', 'paramNames', 'suffixes', 'bannedSuffixes', 'contractShape', 'unitRoles', 'logicRoles', 'thinRoles', 'patternScenarios', 'kindPatterns', 'addKinds'])) bad.push('ruleParams.be needs infraOwners, eventBus, specDoubles, paramNames, suffixes, bannedSuffixes, contractShape {helper}, unitRoles, logicRoles, thinRoles, patternScenarios, kindPatterns and addKinds (fileLines and duplicateBlock live in ruleParams.common, a side may override them)'); else bad.push(...unitRolesProblems(rp.be), ...roleListProblems(rp.be));
     bad.push(...scenarioProblem(rp.be.patternScenarios), ...kindParamProblems(rp.be, m.triggerKinds));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;

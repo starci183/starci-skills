@@ -41,16 +41,29 @@ test('a synced app (its root, be/ and fe/) has no managed-file finding of any co
   assert.deepEqual(await findings(await synced()), []);
 });
 
-test('HFS_MANAGED_FILE_DRIFT: an edited hook, jest config, .prettierignore or scripts block is drift, a deleted optional workflow is not', async () => {
+test('HFS_MANAGED_FILE_DRIFT: an edited hook, .prettierignore or scripts block is drift, a deleted optional workflow is not', async () => {
   const dir = await synced();
   put(dir, '.husky/pre-push', `${read(dir, '.husky/pre-push')}echo extra\n`);
-  put(dir, 'be/jest.config.js', 'module.exports = {}\n');
   put(dir, '.prettierignore', 'dist/\n');
   fs.rmSync(path.join(dir, '.github', 'workflows', 'e2e.yml'));
   const pkg = JSON.parse(read(dir, 'package.json'));
   pkg.scripts.lint = 'eslint . --no-inline-config';
   put(dir, 'package.json', JSON.stringify(pkg));
-  assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push'], ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', 'be/jest.config.js'], ['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
+  assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push'], ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
+});
+
+test('HFS_COVERAGE_SCOPE_DRIFT (R204): the files that state the coverage scope are its render, and nothing else of them is judged by this code', async () => {
+  const dir = await synced();
+  // the jest scope, narrowed by hand to measure less
+  put(dir, 'be/jest.config.js', read(dir, 'be/jest.config.js').replace('"service",', ''));
+  // the Codecov paths of the project status
+  put(dir, 'codecov.yml', read(dir, 'codecov.yml').replace('target: 100%', 'target: 80%'));
+  // the Sonar coverage exclusions (an exclusion added by hand) and, apart from it, another Sonar line
+  put(dir, 'sonar-project.properties', read(dir, 'sonar-project.properties').replace('sonar.coverage.exclusions=', 'sonar.coverage.exclusions=be/src/modules/**,'));
+  assert.deepEqual((await findings(dir)).sort(), [['HFS_COVERAGE_SCOPE_DRIFT', 'be/jest.config.js'], ['HFS_COVERAGE_SCOPE_DRIFT', 'codecov.yml'], ['HFS_COVERAGE_SCOPE_DRIFT', 'sonar-project.properties']]);
+  const other = await synced();
+  put(other, 'sonar-project.properties', read(other, 'sonar-project.properties').replace('sonar.sourceEncoding=UTF-8', 'sonar.sourceEncoding=UTF-16'));
+  assert.deepEqual(await findings(other), [['HFS_SONAR_CONFIG', 'sonar-project.properties']], 'a Sonar line that is not the coverage scope stays R11');
 });
 
 test('HFS_MANAGED_FILE_DRIFT: key order in package.json scripts and lines outside the scripts block are not drift', async () => {

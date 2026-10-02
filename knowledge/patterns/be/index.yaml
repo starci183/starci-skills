@@ -107,7 +107,7 @@ topics:
   - id: be.test
     title: Test
     path: test.yaml
-    decides: Unit and e2e placement, the jest topology, unit specs for services and cli commands only built on the testing module with kit doubles, the thin-transport prerequisite, per-file 100 coverage of those roles, real-app e2e, what an assertion proves
+    decides: Unit and e2e placement, the jest topology, unit specs of the spec-required roles (services and cli commands) built on the testing module with kit doubles, the thin feature tier (R203), per-file 100 coverage of the logic roles of the measured slots from one derivation (R204), real-app e2e, what an assertion proves
     rules: BE-TEST-1 … BE-TEST-7
   - id: be.api-auth
     title: API authentication and input bounds

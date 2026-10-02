@@ -32,7 +32,7 @@ rules:
     requirement: |-
       A provider webhook lives in `be/src/features/webhooks/<provider>/` (slot `be.feature.webhooks`), enabled by declaring the pattern
       `webhooks` in `hfs.json` `sides.be.patterns`. The folder holds `index.ts` (the module class an app composes), `transport/http/<provider>-http.module.ts`, `transport/http/<provider>.webhook.ts` (the
-      door), `<provider>.webhook.spec.ts` (its spec, the one non-service unit spec of the kind) and an optional `transport/http/dto/` of typed
+      door), `<provider>.webhook.spec.ts` (its spec — the kind's door has no service of its own, so the door carries it) and an optional `transport/http/dto/` of typed
       payload classes (`<event>.request.ts`). Nothing else exists there: no application layer, no handler, no consumer. The kind
       imports only `modules/*`, never another kind, and only an api-kind app composes `<provider>-http.module.ts`.
     rationale: |-
@@ -78,10 +78,10 @@ rules:
   - id: BE-WEBHOOK-2
     title: The door verifies first, then makes one domain call
     kind: mandatory
-    hfsRules: [R182, R183, R41, R42]
+    hfsRules: [R182, R183, R41, R42, R203]
     requirement: |-
       `<provider>.webhook.ts` is one `@Controller` with one `@Post` handler declared
-      `@Public({ reason: PublicReason.SignedWebhook })`. The handler's FIRST statement is the unconditional
+      `@Public({ reason: PublicReason.SignedWebhook })`, thin (R203 `BE_FEATURE_THIN`). The handler's FIRST statement is the unconditional
       `this.<signature>.verify({ provider, rawBody, signature, timestamp })` of the `WebhookSignatureService` of `platform/http-security`
       (HMAC-SHA256 over `<timestamp>.<raw body>` with the provider's secret, a constant-time comparison and a replay window on the signed timestamp; it throws before anything else runs). The provider key and its secret and tolerance are options of `platform/http-security` (`options.webhooks[provider]`). The
       second and last call is one method of a domain service, the intake. The door injects only that service and the signature
@@ -119,6 +119,7 @@ rules:
         - BE_WEBHOOK_UNVERIFIED
         - BE_DEFAULT_DENY
         - BE_INPUT_BOUNDED
+        - BE_FEATURE_THIN
       manual:
         - Review that the raw body, not a re-serialized one, is verified, and that the replay window matches the provider's tolerance.
     relatedExamples: [webhooks]

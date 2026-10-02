@@ -3,6 +3,8 @@ import type { EntityManager } from "typeorm"
 import { InjectReceiptStorage } from "@modules/integrations/receipt-storage"
 import type { ReceiptLink, ReceiptStorage } from "@modules/integrations/receipt-storage"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import type { RunKey } from "@modules/platform/jobs"
+import { isSendReceiptPayload } from "@modules/queues/receipt"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { OrderErrorCode } from "./errors/order.error"
@@ -22,6 +24,19 @@ export class ReceiptService {
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectReceiptStorage() private readonly storage: ReceiptStorage,
     ) {}
+
+    /**
+     * The effect of one send-receipt job: stores the receipt document of the paid order under the run key of the claim (it
+     * carries the fencing token, so a stale worker's store is refused at the provider) and remembers the key it was stored
+     * under. A payload that is not a send-receipt payload, or an order with no receipt to prepare, changes nothing.
+     */
+    async archiveReceipt(payload: object, runKey: RunKey): Promise<void> {
+        if (!isSendReceiptPayload(payload)) return
+        const prepared = await this.prepareReceipt(payload.orderId)
+        if (prepared === null) return
+        await this.storage.store({ key: prepared.key, content: prepared.content }, runKey)
+        await this.recordArchived({ orderId: payload.orderId, key: prepared.key })
+    }
 
     /** The receipt document of a paid order, or null when the order does not exist or is not paid. */
     async prepareReceipt(orderId: string): Promise<PrepareReceiptResult> {

@@ -2,8 +2,10 @@
  * What is a unit spec, decided by the slot manifest and the file's role suffix, never by a path pattern.
  *
  * A unit spec is a `*.spec.ts` outside the folders that own the other test kinds (`src/tests/{e2e,integration,contract,world}`)
- * only. Only a `<name>.service.spec.ts` beside `<name>.service.ts` is a
- * legitimate unit spec (R47), and so is the spec of a door of a feature kind that has no service of its own
+ * only. Only a `<name>.<role>.spec.ts` beside `<name>.<role>.ts` is a legitimate unit spec (R47): of a spec-required unit role
+ * (`ruleParams.be.unitRoles`: a service, a cli command) anywhere its slot admits, and of any other LOGIC role (`ruleParams.be.logicRoles`: a policy,
+ * a client, a guard, a mapper, ...) inside a slot whose `coverage` is required, where the spec is optional (the file owes 100 per file, not a spec of
+ * its own). So is the spec of a door of a feature kind that has no service of its own
  * (`<provider>.webhook.spec.ts`, `<channel>.gateway.spec.ts`, `<channel>.subscription.spec.ts` beside its door, in the kind's slot);
  * the quality rules of R48 judge the service specs.
  */
@@ -39,8 +41,17 @@ export const isServiceSpecFile = (hfs, filename) => /\.service\.spec\.ts$/.test(
  */
 export const unitRoles = (hfs) => hfs.ruleParams.unitRoles ?? []
 
-/** Whether a role admits a file by its slot (a role with no slot admits any slot). */
-const inRoleSlot = (hfs, role, filename) => role.slot === undefined || hfs.slotOf(filename) === role.slot
+/** Whether the slot that owns a file is measured at 100 per file (`coverage: required`): the home of the optional specs of the logic roles. */
+const inCoverageSlot = (hfs, filename) => {
+    const slot = hfs.slotOf(filename)
+    return slot !== null && hfs.slot(slot)?.coverage === "required"
+}
+
+/** The roles whose spec is legal but not required: every logic role that is not a spec-required unit role. */
+const optionalRoles = (hfs) => (hfs.ruleParams.logicRoles ?? []).filter((role) => !unitRoles(hfs).some((unit) => unit.role === role)).map((role) => ({ role, spec: `${role}.spec`, optional: true }))
+
+/** Whether a role admits a file by its slot (a role with no slot admits any slot; an optional logic role only a coverage-required slot). */
+const inRoleSlot = (hfs, role, filename) => (role.optional === true ? inCoverageSlot(hfs, filename) : role.slot === undefined || hfs.slotOf(filename) === role.slot)
 
 /**
  * The unit-tested role whose spec a file is (`<name>.<role>.spec.ts`, in the role's slot), or null.
@@ -52,7 +63,7 @@ const inRoleSlot = (hfs, role, filename) => role.slot === undefined || hfs.slotO
 export const unitRoleOfSpec = (hfs, filename) => {
     if (!isUnitSpecFile(hfs, filename)) return null
     const name = baseOf(filename)
-    return unitRoles(hfs).find((role) => name.endsWith(`.${role.spec}.ts`) && inRoleSlot(hfs, role, filename)) ?? null
+    return [...unitRoles(hfs), ...optionalRoles(hfs)].find((role) => name.endsWith(`.${role.spec}.ts`) && inRoleSlot(hfs, role, filename)) ?? null
 }
 
 /**

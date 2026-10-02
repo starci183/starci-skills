@@ -29,7 +29,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { parseYaml } from '../runtime/engine/yaml.mjs';
-import { TEMPLATES_DIR, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
+import { TEMPLATES_DIR, appSource, imageFiles, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
@@ -287,7 +287,7 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, file.content);
   }
-  const targets = renderTargets(declaration, presets, { manifest });
+  const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
   writeTargets(root, targets);
   const locked = lock(root);
   if (!locked.ok) {

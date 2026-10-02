@@ -61,9 +61,9 @@ export class JobRunnerService implements JobProcessorRegistry {
         this.logger.error(JobsLogEvent.DeliveryFailed, cause, { jobId: job.jobId })
         await this.claims
             .fail({ jobId: job.jobId, expectedFencingToken: job.fencingToken, reason })
-            .catch((failure: unknown) => {
-                if (isFencedOut(failure)) this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId })
-                else this.logger.error(JobsLogEvent.FailureNotRecorded, failure, { jobId: job.jobId })
+            .catch((error_: unknown) => {
+                if (isFencedOut(error_)) this.logger.warn(JobsLogEvent.FencedOut, { jobId: job.jobId })
+                else this.logger.error(JobsLogEvent.FailureNotRecorded, error_, { jobId: job.jobId })
             })
     }
 }

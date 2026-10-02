@@ -89,16 +89,16 @@ rules:
   - id: BE-CQRS-3
     title: A handler overrides process and returns its declared result
     kind: mandatory
-    hfsRules: [R87, R75, R48]
+    hfsRules: [R87, R75, R48, R203]
     requirement: |-
       `@CommandHandler(X)` or `@QueryHandler(X)` on a class that `extends ICQRSHandler<X, XResult>` and implements
       `protected override async process(message)`; it never overrides `execute`. `ICQRSHandler.execute` is load-bearing: it
       logs `OperationFailed` with the operation name and the error and rethrows, and counts refused outcomes. `<Action>Result`
       is a plain projection type or an `Outcome<Value, Code>` and the return type of `process` is declared. The handler opens
       the transaction (`this.entityManager.transaction(async (manager) => ...)`), stamps `this.clock.now()` once and passes
-      it down. The handler is thin (BE-TEST-7): its `process` maps the message, calls exactly one method of an injected `*.service` and
-      returns the result, so it has no unit spec; the decisions (persisted state, the `where` that holds ownership, nothing
-      written on a refusal) live in the service and its `<name>.service.spec.ts` asserts them.
+      it down. The handler is thin (R203 `BE_FEATURE_THIN`): its `process` maps the message, makes one delegating call to an
+      injected `*.service` and returns the result, so it has no unit spec; the decisions (persisted state, the `where` that
+      holds ownership, nothing written on a refusal) live in the service and its `<name>.service.spec.ts` asserts them.
     rationale: |-
       A single template gives every operation the same failure log and metric, and the service spec pins the decision the
       handler delegates.
@@ -126,6 +126,7 @@ rules:
         - BE_READONLY_BOUNDARY
         - BE_RETURN_TYPE
         - BE_SPEC_QUALITY
+        - BE_FEATURE_THIN
       manual:
         - Confirm the service spec the handler calls asserts refusal paths and ownership, not only that a mock was called.
     relatedExamples: []
@@ -249,7 +250,7 @@ rules:
       Each resolver method and controller action of an api feature is driven by an e2e spec (`src/tests/e2e/<area>/*.e2e-spec.ts`) that boots the
       app's real AppModule and calls it as a client does: the happy path, the refusal the command declares and the denial of an unauthenticated caller.
     rationale: |-
-      A transport has no logic to unit-test; what can break is the wiring, the guards and the mapping, which only the booted app exercises.
+      A transport is thin (R203 `BE_FEATURE_THIN`) and has no logic to unit-test; what can break is the wiring, the guards and the mapping, which only the booted app exercises.
     cases:
       - id: case-1
         when: A new mutation
