@@ -101,5 +101,11 @@ $defs:
     properties:
       kind: {enum: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar, runtime]}
       id: {type: string, pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'}
+      editions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {enum: [full, lite]}
+        description: The editions this ONE enforcer runs in (default: the editions of its rule); lets a rule that stays in lite keep a single full-only lint rule, e.g. the GraphQL-preference law of the doors.
       status: {const: planned, description: Present only while the enforcer is owed; absent means it exists.}
       at: {type: string, minLength: 1, description: Repository-relative file that emits one of the rule's failure codes; only an existing machine, hfs, work-validate or runtime enforcer carries it.}

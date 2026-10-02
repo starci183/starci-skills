@@ -46,6 +46,12 @@ export function judgedInEdition(owner, edition = 'full') {
   return !owner?.editions || owner.editions.includes(edition);
 }
 
+/** Whether the enforcer `kind:id` of the catalog `rules` runs under `edition`: every rule listing it is judged there, and the enforcer row's own `editions` (a rule with several enforcers where only one is full-only) agrees. A lint rule no rule lists runs everywhere. */
+export function enforcerJudgedInEdition(rules, kind, id, edition = 'full') {
+  const owners = rules.filter((rule) => rule.enforcers.some((enforcer) => enforcer.kind === kind && enforcer.id === id));
+  return owners.every((rule) => judgedInEdition(rule, edition) && rule.enforcers.filter((enforcer) => enforcer.kind === kind && enforcer.id === id).every((enforcer) => judgedInEdition(enforcer, edition)));
+}
+
 /** A frozen copy of one profile's parameters, with its lite overrides applied only in the lite edition. */
 export function editionRuleParams(params, edition) {
   const { lite, ...base } = params;
