@@ -16,7 +16,7 @@ test('BE_KIND_ISOLATION: a jobs feature importing a reactors feature, and an api
     files: {
       'src/features/jobs/send/index.ts': "import { stock } from '../../reactors/stock';\nexport const send = stock;\n",
       'src/features/reactors/stock/index.ts': 'export const stock = 1;\n',
-      'src/features/orders/index.ts': "import type { Send } from '../jobs/send';\nexport type Order = Send;\n",
+      'src/features/api/orders/index.ts': "import type { Send } from '../../jobs/send';\nexport type Order = Send;\n",
     },
   });
   const report = runArch(root);
@@ -25,7 +25,7 @@ test('BE_KIND_ISOLATION: a jobs feature importing a reactors feature, and an api
   const byPath = Object.fromEntries(hits.map(item => [item.path, item]));
   assert.match(byPath['src/features/jobs/send/index.ts'].message, /a jobs feature imports a reactors feature/);
   assert.match(byPath['src/features/jobs/send/index.ts'].message, /eventBus\.publish\(event, tx\)/);
-  assert.equal(byPath['src/features/orders/index.ts'].typeOnly, true);
+  assert.equal(byPath['src/features/api/orders/index.ts'].typeOnly, true);
   assert.deepEqual(featureImports(report), [], 'a cross-kind import is the kind finding, not a second one');
   assert.ok(report.coverage.checkedRuleIds.includes('BE_KIND_ISOLATION'));
 });

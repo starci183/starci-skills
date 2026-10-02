@@ -613,6 +613,16 @@ BE_SAGA_CONSUMER_DEDUPE:
   owner: op-retry
   kind: check-finding
 
+BE_SAGA_E2E_MISSING:
+  title: "Every compensation path has an e2e spec that injects a failure"
+  title_vi: "Đường bù trừ của saga chưa có spec e2e chèn lỗi"
+  meaning_vi: "Một bù trừ của saga không có spec e2e (qua `useTestWorld`) nêu tên sự kiện của nó, hoặc spec đó không chèn lỗi nào qua world (`during`, `cut`, `latency`, `failNext`, `interruptDatabase`)."
+  causes_vi:
+    - "Vi phạm luật R173: đường bù trừ được chứng minh dưới lỗi thật, không chỉ trên luồng thuận."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e cho đường bù trừ, cắt một hạ tầng (hoặc app) khi sự kiện thất bại tới, rồi đọc trạng thái đã bù trừ."
+  owner: op-retry
+  kind: check-finding
+
 BE_SAGA_EVENT_CONTRACT:
   title: "Every event of a saga step and compensation is in a vendored contract"
   title_vi: "Sự kiện của bước saga không nằm trong hợp đồng hoặc bù trừ không khớp"
@@ -1216,6 +1226,56 @@ HFS_DEP_VERSION_SKEW:
   causes_vi:
     - "Vi phạm luật R14: Mỗi dependency một version trong workspace; cấm bản sao lồng thứ hai (`apps/*/node_modules/@starci/grammar`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_BASE_PIN:
+  title: "A Dockerfile base image is not pinned"
+  title_vi: "Image nền của Dockerfile không được ghim"
+  meaning_vi: "Mọi FROM của Dockerfile phải là một stage trước đó, image node duy nhất của chuẩn (phiên bản node và bản alpine cụ thể), hoặc image ghim bằng digest `@sha256`; không dùng tag trôi nổi (`latest`, `node:22`) và không để build argument chưa xác định."
+  causes_vi:
+    - "Vi phạm luật R190: tag trôi nổi làm image đổi nội dung mà không có thay đổi nào trong repo, nên build không tái lập và lỗ hổng mới lọt vào không dấu vết."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi FROM thành image node của chuẩn (xem `NODE_IMAGE` trong scripts/hfs/rules/docker.mjs) hoặc ghim image bằng digest `@sha256`."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_BUILD_CONTEXT:
+  title: "The Dockerfile does not build from the app root"
+  title_vi: "Dockerfile không build từ gốc app"
+  meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` đúng đường dẫn của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
+  causes_vi:
+    - "Vi phạm luật R187: context build là gốc app; lệnh build sai hoặc nguồn COPY vượt ra ngoài context khiến image build được trên máy này nhưng hỏng trên CI hoặc trộn lẫn dữ liệu của app khác."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `docker build -f <đường dẫn Dockerfile> -t <image> .` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_ENTRY:
+  title: "The Dockerfile does not start the app's own entry or declare its port and health"
+  title_vi: "Dockerfile không chạy đúng entry của app hoặc thiếu cổng và healthcheck"
+  meaning_vi: "Stage `runtime` phải chạy entry đã build của chính app ở dạng exec (be: `node be/dist/apps/<app>/src/main.js`; fe: `node fe/apps/<app>/server.js`); app api hoặc Next đặt `ENV PORT`, EXPOSE đúng cổng đó và có HEALTHCHECK; worker có HEALTHCHECK theo tiến trình và không EXPOSE; cli/migrate ghi `HEALTHCHECK NONE` và không EXPOSE; app Next build bằng `turbo run build --filter=@<project>/<app>` và `next.config.ts` đặt `output: \"standalone\"`."
+  causes_vi:
+    - "Vi phạm luật R189: một image khởi động sai entry, không công bố cổng hoặc không có healthcheck thì nền tảng không thể điều phối hay phát hiện lỗi của nó."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa CMD/ENTRYPOINT về entry của app, thêm `ENV PORT`, `EXPOSE`, `HEALTHCHECK` (hoặc `HEALTHCHECK NONE` cho cli), và đặt `output: \"standalone\"` trong `next.config.ts` của app Next."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_SECRETS:
+  title: "A secret enters an image"
+  title_vi: "Bí mật bị đưa vào image"
+  meaning_vi: "Không được COPY/ADD tệp `.env*` (trừ `.env.example`) hay đường dẫn trong `.starcistacks`, `.secrets`, `.volume`, khóa, chứng chỉ, kubeconfig; không ADD một URL; không có ARG hoặc ENV mang tên một thông tin xác thực (PASSWORD, SECRET, TOKEN, KEY, CREDENTIAL, PRIVATE); riêng `NEXT_PUBLIC_*` được phép vì được công khai theo thiết kế."
+  causes_vi:
+    - "Vi phạm luật R191: mọi thứ trong layer hoặc lịch sử image đều lấy ra được; một bí mật trong image là bí mật đã lộ cho mọi nơi image được kéo về."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: bỏ COPY/ADD hoặc ARG/ENV đó, mount thông tin xác thực lúc chạy, và tải về bằng stage có kiểm checksum thay vì ADD URL."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOCKER_STAGES:
+  title: "The Dockerfile stages, user or install break the canon"
+  title_vi: "Các stage, user hoặc lệnh cài của Dockerfile sai chuẩn"
+  meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài là `npm ci` (không `npm install`); runtime của be chạy `npm ci --omit=dev --ignore-scripts`, runtime của fe không cài gì."
+  causes_vi:
+    - "Vi phạm luật R188: image chạy bằng root, mang theo công cụ build hoặc cài không theo lockfile thì vừa lớn vừa kém an toàn, và không tái lập được."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `npm install` thành `npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
   owner: op-retry
   kind: check-finding
 

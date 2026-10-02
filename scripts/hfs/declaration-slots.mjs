@@ -36,7 +36,7 @@ export function kindShapeProblems(s, at, namePattern) {
   return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? [] : [`${at}.kinds must be a unique list of trigger kind names`];
 }
 
-/** The problems of `ruleParams.be.kindPatterns` (trigger kind -> patterns) and `ruleParams.be.addKinds` (hfs add noun -> {topic, variable, patterns, trigger?, needs?, also?, defaults?}). */
+/** The problems of `ruleParams.be.kindPatterns` (trigger kind -> patterns) and `ruleParams.be.addKinds` (hfs add noun -> {topic, variable, patterns, trigger?, needs?, also?, defaults?, wire?}). */
 export function kindParamProblems(be, triggerKinds) {
   const kebab = /^[a-z][a-z0-9-]*$/;
   const names = (list) => Array.isArray(list) && list.every((value) => kebab.test(String(value))) && new Set(list).size === list.length;
@@ -44,7 +44,7 @@ export function kindParamProblems(be, triggerKinds) {
   const patterns = be.kindPatterns;
   if (patterns === null || typeof patterns !== 'object' || Array.isArray(patterns) || !Object.entries(patterns).every(([kind, list]) => (triggerKinds ?? []).includes(kind) && names(list))) bad.push('ruleParams.be.kindPatterns must map a trigger kind to a unique list of pattern names');
   const nouns = be.addKinds;
-  const nounOk = (spec) => spec !== null && typeof spec === 'object' && kebab.test(String(spec.topic)) && kebab.test(String(spec.variable)) && names(spec.patterns) && (spec.trigger === undefined || kebab.test(String(spec.trigger))) && (spec.needs === undefined || names(spec.needs)) && (spec.also === undefined || names(spec.also)) && (spec.defaults === undefined || (typeof spec.defaults === 'object' && !Array.isArray(spec.defaults)));
+  const nounOk = (spec) => spec !== null && typeof spec === 'object' && kebab.test(String(spec.topic)) && kebab.test(String(spec.variable)) && names(spec.patterns) && (spec.trigger === undefined || kebab.test(String(spec.trigger))) && (spec.needs === undefined || names(spec.needs)) && (spec.also === undefined || names(spec.also)) && (spec.defaults === undefined || (typeof spec.defaults === 'object' && !Array.isArray(spec.defaults))) && (spec.wire === undefined || (spec.wire !== null && typeof spec.wire === 'object' && ['file', 'import', 'symbol'].every((key) => typeof spec.wire[key] === 'string' && spec.wire[key] !== '')));
   if (nouns === null || typeof nouns !== 'object' || Array.isArray(nouns) || !Object.entries(nouns).every(([noun, spec]) => kebab.test(noun) && nounOk(spec))) bad.push('ruleParams.be.addKinds must map a noun to {topic, variable, patterns, trigger?, needs?, also?, defaults?}');
   return bad;
 }

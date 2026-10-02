@@ -232,7 +232,7 @@ test('hfs add api writes a feature with one operation: the application, the grap
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
   const result = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--repo', dir]);
   assert.equal(result.code, 0, result.err);
-  const base = 'be/src/features/checkout';
+  const base = 'be/src/features/api/checkout';
   const files = ['index.ts', 'checkout.module.ts', 'application/checkout.command.ts', 'application/checkout.handler.ts', 'application/checkout.contracts.ts', 'transport/graphql/checkout.resolver.ts', 'transport/graphql/checkout.mapper.ts', 'transport/graphql/dto/checkout.input.ts', 'transport/graphql/dto/checkout.type.ts', 'transport/graphql/checkout-graphql.module.ts'];
   for (const file of files) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
   assert.match(read(dir, `${base}/application/checkout.handler.ts`), /this\.checkoutService\.checkout\(command\.params\.request\)/);
@@ -242,21 +242,24 @@ test('hfs add api writes a feature with one operation: the application, the grap
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api']);
 });
 
-test('hfs add cli writes the command line capability with the first command, its entry registered with the registry, and declares the cli pattern and kind', async () => {
+test('hfs add cli writes a command group with its first sub-command and registers it in the static cli module', async () => {
   const dir = repo();
-  const result = await cli(['add', 'cli', 'requeue-dead-letter', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
+  const seeded = path.join(dir, 'be', 'src', 'features', 'cli', 'cli.module.ts');
+  fs.mkdirSync(path.dirname(seeded), { recursive: true });
+  fs.writeFileSync(seeded, ['import { Module } from "@nestjs/common"', 'import { MigrateModule } from "./migrate/migrate.module"', '', '@Module({ imports: [MigrateModule] })', 'export class CliModule {}', ''].join('\n'));
+  const missing = await cli(['add', 'cli', 'requeue', '--repo', dir]);
+  assert.equal(missing.code, 2);
+  assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
+  const result = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
   assert.equal(result.code, 0, result.err);
-  for (const file of ['index.ts', 'cli.module.ts', 'cli.port.ts', 'cli.contracts.ts', 'cli.decorators.ts', 'cli-runner.service.ts', 'cli-runner.service.spec.ts']) {
-    assert.ok(parses(read(dir, `be/src/modules/platform/cli/${file}`)), `platform/cli/${file} parses`);
-  }
-  const base = 'be/src/features/cli/requeue-dead-letter';
-  for (const file of ['index.ts', 'requeue-dead-letter.module.ts', 'application/requeue-dead-letter.command.ts', 'application/requeue-dead-letter.handler.ts', 'application/requeue-dead-letter.contracts.ts', 'transport/cli/requeue-dead-letter.cli.ts', 'transport/cli/requeue-dead-letter-cli.module.ts']) {
-    assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
-  }
-  assert.match(read(dir, `${base}/transport/cli/requeue-dead-letter.cli.ts`), /export class RequeueDeadLetterCli implements CliCommand/);
-  assert.match(read(dir, `${base}/transport/cli/requeue-dead-letter-cli.module.ts`), /this\.registry\.add\(this\.entry\)/);
-  assert.deepEqual(hfsJson(dir).sides.be.patterns, ['cli']);
+  const base = 'be/src/features/cli/requeue';
+  for (const file of ['requeue.cli.ts', 'requeue.cli.spec.ts', 'requeue.module.ts', 'subs/run.cli.ts', 'subs/run.cli.spec.ts']) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
+  assert.match(read(dir, `${base}/requeue.cli.ts`), /export class RequeueCli extends CommandRunner/);
+  assert.ok(read(dir, `${base}/subs/run.cli.ts`).includes('await this.deadLetterService.requeue()'));
+  const module = read(dir, 'be/src/features/cli/cli.module.ts');
+  assert.ok(module.includes('import { RequeueModule } from "./requeue/requeue.module"'));
+  assert.ok(module.includes('imports: [MigrateModule, RequeueModule]'));
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'cli']);
-  assert.equal((await cli(['add', 'cli', 'rebuild', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir])).code, 0);
-  assert.equal(fs.readFileSync(path.join(dir, 'be/src/modules/platform/cli/cli.module.ts'), 'utf8'), read(dir, 'be/src/modules/platform/cli/cli.module.ts'), 'the capability is written once');
+  assert.equal((await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir])).code, 2, 'an existing group is refused');
+  assert.equal(read(dir, 'be/src/features/cli/cli.module.ts'), module, 'a refused add registers nothing');
 });

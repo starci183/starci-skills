@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import type { OnApplicationShutdown } from "@nestjs/common"
 import { Kafka, logLevel } from "kafkajs"
 import type { Admin, Consumer, IHeaders, Producer } from "kafkajs"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import type { Probe } from "@modules/platform/probes"
 import { EventBusError, EventBusErrorCode } from "./errors/event-bus.error"
 import { InjectEventBusOptions } from "./event-bus.decorators"
@@ -47,7 +48,10 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     private consumer: Consumer | null = null
     private admin: Admin | null = null
 
-    constructor(@InjectEventBusOptions() private readonly options: EventBusOptions) {
+    constructor(
+        @InjectEventBusOptions() private readonly options: EventBusOptions,
+        @InjectIds() private readonly ids: Ids,
+    ) {
         this.kafka = new Kafka({
             clientId: options.groupId,
             brokers: [...options.brokers],
@@ -122,7 +126,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
             const { ends } = await this.endsOf(admin, topic)
             const expected = ends.reduce((sum, end) => sum + (Number(end.high) - Number(end.low)), 0)
             if (expected === 0) return []
-            const groupId = `${this.options.groupId}.read.${randomUUID()}`
+            const groupId = `${this.options.groupId}.read.${this.ids.next()}`
             const reader = this.kafka.consumer({ groupId })
             const found: Array<InboundMessage> = []
             try {

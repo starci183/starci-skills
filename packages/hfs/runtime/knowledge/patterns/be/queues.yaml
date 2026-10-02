@@ -115,14 +115,10 @@ files:
     slot: be.platform
     role: "The log event of a failed relay pass."
     template: outbox/platform/outbox.log-events.ts.tpl
-  - path: src/modules/platform/outbox/outbox-relay.service.ts
+  - path: src/modules/platform/outbox/outbox-relay.policy.ts
     slot: be.platform
     role: "The one relay loop the event bus and the queues share: read, deliver and mark in one transaction."
-    template: outbox/platform/outbox-relay.service.ts.tpl
-  - path: src/modules/platform/outbox/outbox-relay.service.spec.ts
-    slot: be.platform
-    role: "The unit spec of the relay loop through a concrete relay."
-    template: outbox/platform/outbox-relay.service.spec.ts.tpl
+    template: outbox/platform/outbox-relay.policy.ts.tpl
   - path: src/modules/platform/queue/index.ts
     slot: be.platform.queue
     role: "Public surface of the capability (ports, config, module, entity arrays)."
