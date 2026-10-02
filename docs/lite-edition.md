@@ -1,3 +1,4 @@
+Owner: knowledge/hfs/slots.yaml
 # HFS lite edition
 
 Lite is the small-product edition of the same HFS standard. It uses the same manifest, rule catalog, lint canons, grammar,

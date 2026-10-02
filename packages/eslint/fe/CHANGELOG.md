@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Changed: `one-outcome-union` reads the Outcome home from the slot manifest (`outcomeHome` on `fe.transport.outcome`, `fe.package.api.outcome` and the lite `fe.db.outcome`, i.e. `modules/db/outcome.ts`) instead of two slot ids in code; a lite app's db owner is its transport, so its `modules/db/outcome.ts` is THE union and a second one anywhere else is still refused. Full is unchanged.
+- Changed: `one-outcome-union` reads the Outcome home from the slot manifest (`outcomeHome` on `fe.transport.outcome`, `fe.package.api.outcome` and the lite `fe.modules.db.outcome`, i.e. `modules/db/outcome.ts`) instead of two slot ids in code; a lite app's db owner is its transport, so its `modules/db/outcome.ts` is THE union and a second one anywhere else is still refused. Full is unchanged.
 - Changed: `public-component-signature` accepts a component with no parameter; `no-raw-structural-element` names `Region`, `NavLandmark`, `List` and `ListItem` as owners of section, nav, ul/ol and li; FE-I18N-1 and FE-TYPING-6 canon text (request locale through `next/root-params`, no `void props`); the FE_SWR_KEY_IDENTITY check reads `&&` and `||` gates in its bundled runtime.
 ## Unreleased (C0 batch)
 

@@ -7,7 +7,7 @@ import { machineKit } from './machine-ast.mjs';
  * what the checker resolves. A repository has exactly ONE transport client and ONE Outcome union, both named by slot (never
  * by a path spelled here): the api package's (`fe.package.api.client`, `fe.package.api.outcome`) when the repository shares
  * it, or the only app's (`fe.transport.client`, `fe.transport.outcome`) when the repository declares exactly one app. The
- * Outcome homes are the slots the manifest marks `outcomeHome` (the lite edition adds `fe.db.outcome`), not a list kept here.
+ * Outcome homes are the slots the manifest marks `outcomeHome` (the lite edition adds `fe.modules.db.outcome`), not a list kept here.
  *
  *   - two or more clients, or two or more Outcome unions, in the repository (two apps each keeping one, or a package one plus
  *     an app one) are findings on every copy;

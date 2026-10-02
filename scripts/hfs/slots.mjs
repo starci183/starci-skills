@@ -357,8 +357,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
   const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
   if (bad.length) declarationInvalid(bad, file);
   if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
-  // A provider declared on any connection enables the provider slots of every profile (a fe side declares no connections,
-  // yet fe.modules.db is the provider slot of a Supabase app): each resolved view carries the union.
+  // A provider declared on any connection enables the provider slots of every profile (a fe side declares none): each view carries the union.
   const providers = Object.freeze([...new Set(PROFILES.flatMap((name) => (declaration.sides[name].connections ?? []).map((c) => c.provider).filter((p) => p !== undefined)))]);
   const sides = Object.fromEntries(PROFILES.map((name) => {
     const s = declaration.sides[name];

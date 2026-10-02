@@ -678,7 +678,7 @@ const literalsOf = (checker, type, name, location) => {
 }
 
 /**
- * A result union is declared once per repository: `Outcome<T>` in the file of the slot the manifest marks `outcomeHome` (`fe.transport.outcome`, `fe.package.api.outcome`, or `fe.db.outcome` in a lite app).
+ * A result union is declared once per repository: `Outcome<T>` in the file of the slot the manifest marks `outcomeHome` (`fe.transport.outcome`, `fe.package.api.outcome`, or `fe.modules.db.outcome` in a lite app).
  *
  * A union type alias is a result union when its members are object types that ALL carry the same literal-typed discriminant, in the
  * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (a member of kind `"ok"` beside at least one failure

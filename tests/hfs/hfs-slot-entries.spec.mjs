@@ -24,9 +24,9 @@ const schemaAccepts = (id, patch) => {
 
 test('the manifest declares the db owner client entry and the Outcome homes as data, and both the shape check and the schema accept them', () => {
   assert.deepEqual(slot('fe.modules.db').entries, ['browser.ts']);
-  assert.deepEqual(MANIFEST.slots.filter((candidate) => candidate.outcomeHome).map((candidate) => candidate.id).sort(), ['fe.db.outcome', 'fe.package.api.outcome', 'fe.transport.outcome']);
+  assert.deepEqual(MANIFEST.slots.filter((candidate) => candidate.outcomeHome).map((candidate) => candidate.id).sort(), ['fe.modules.db.outcome', 'fe.package.api.outcome', 'fe.transport.outcome']);
   assert.equal(validateSlotsSchema(RAW), true, JSON.stringify(validateSlotsSchema.errors));
-  for (const id of ['fe.modules.db', 'fe.db.outcome', 'fe.transport.outcome', 'fe.package.api.outcome']) assert.deepEqual(slotProblems(slot(id), 0, APP_KIND, SCOPE), [], id);
+  for (const id of ['fe.modules.db', 'fe.modules.db.outcome', 'fe.transport.outcome', 'fe.package.api.outcome']) assert.deepEqual(slotProblems(slot(id), 0, APP_KIND, SCOPE), [], id);
 });
 
 test('the lite db outcome slot owns modules/db/outcome.ts under lite only; under full that file is plain db owner content', () => {
@@ -34,7 +34,7 @@ test('the lite db outcome slot owns modules/db/outcome.ts under lite only; under
   const declaration = (edition) => ({ hfs: 2, kind: 'app', project: 'demo', ...(edition ? { edition } : {}), sides: { be: { apps: [{ name: 'core', kind: 'api' }], connections: [connection] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
   const file = 'fe/apps/web/src/modules/db/outcome.ts';
   const lite = openHfs({ declaration: declaration('lite') }).classifyPath(file);
-  assert.deepEqual([lite.status, lite.slot], ['owned', 'fe.db.outcome']);
+  assert.deepEqual([lite.status, lite.slot], ['owned', 'fe.modules.db.outcome']);
   const full = openHfs({ declaration: declaration() }).classifyPath(file);
   assert.deepEqual([full.status, full.slot], ['owned', 'fe.modules.db']);
   assert.equal(openHfs({ declaration: declaration('lite') }).classifyPath('fe/apps/web/src/modules/db/browser.ts').slot, 'fe.modules.db');

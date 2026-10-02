@@ -275,7 +275,7 @@ downgrade is not supported.
 | `fe/apps/<app>/src/modules/routes/` | required, tracked | `fe.modules.routes` |
 | `fe/apps/<app>/src/modules/types/` | optional, tracked | `fe.modules.types` |
 | `fe/apps/<app>/src/modules/db/` | opt-in, tracked | `fe.modules.db` |
-| `fe/apps/<app>/src/modules/db/outcome.ts` | opt-in, tracked | `fe.db.outcome` |
+| `fe/apps/<app>/src/modules/db/outcome.ts` | opt-in, tracked | `fe.modules.db.outcome` |
 | `fe/packages/<family>-ui/` | opt-in, tracked | `fe.package.ui` |
 | `fe/packages/<family>-api/` | opt-in, tracked | `fe.package.api` |
 | `fe/packages/<family>-api/src/client.ts` | optional, tracked | `fe.package.api.client` |
@@ -564,7 +564,7 @@ fe/apps/<app>/src/modules/brand/brand.css                                       
 fe/apps/<app>/src/modules/routes/                                                                                                                  required  fe.modules.routes
 fe/apps/<app>/src/modules/types/                                                                                                                   optional  fe.modules.types
 fe/apps/<app>/src/modules/db/                                                                                                                      opt-in    fe.modules.db
-fe/apps/<app>/src/modules/db/outcome.ts                                                                                                            opt-in    fe.db.outcome
+fe/apps/<app>/src/modules/db/outcome.ts                                                                                                            opt-in    fe.modules.db.outcome
 fe/packages/<family>-ui/                                                                                                                           opt-in    fe.package.ui
 fe/packages/<family>-api/                                                                                                                          opt-in    fe.package.api
 fe/packages/<family>-api/src/client.ts                                                                                                             optional  fe.package.api.client

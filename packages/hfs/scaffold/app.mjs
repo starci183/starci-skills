@@ -121,18 +121,18 @@ const STARTER_DEPENDENCIES = Object.freeze({
 /** Lite keeps the production stack and canon tools, but has no test runtime or test types. */
 const LITE_STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
-    '@nestjs/platform-express': null, '@nestjs/typeorm': '^11.0.3', '@supabase/supabase-js': null,
-    'class-transformer': null, 'class-validator': null, jose: null, pg: '^8.12.0',
-    'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', tslib: '^2.8.1', typeorm: '^0.3.20',
+    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
+    '@nestjs/platform-express': null, '@nestjs/typeorm': null, '@supabase/supabase-js': null,
+    'class-transformer': null, 'class-validator': null, jose: null, pg: null,
+    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
     turbo: null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null,
-    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4',
-    '@types/express': '^4.17.21', '@types/node': null, '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0',
-    eslint: null, 'eslint-plugin-react-hooks': null, husky: '^9.1.7', 'postcss-value-parser': null, prettier: null,
-    stylelint: null, supabase: null, tailwindcss: '^4', 'ts-node-dev': '^2.0.0', 'tsc-alias': '^1.8.10',
-    'tsconfig-paths': '^4.2.0', typescript: null,
+    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null,
+    '@types/express': null, '@types/node': null, '@types/react': null, '@types/react-dom': null,
+    eslint: null, 'eslint-plugin-react-hooks': null, husky: null, 'postcss-value-parser': null, prettier: null,
+    stylelint: null, supabase: null, tailwindcss: null, 'ts-node-dev': null, 'tsc-alias': null,
+    'tsconfig-paths': null, typescript: null,
   },
 });
 
@@ -149,7 +149,7 @@ const FE_APP_DEPENDENCIES = Object.freeze({
 /** The sole lite FE workspace owns its Supabase clients directly; no shared FE package is emitted. */
 const LITE_FE_APP_DEPENDENCIES = Object.freeze({
   '@heroui/react': null, '@heroui/styles': null, '@starci/grammar': null, '@supabase/ssr': null,
-  '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': '^0.0.1',
+  '@supabase/supabase-js': null, next: null, 'next-intl': null, react: null, 'react-dom': null, 'server-only': null,
 });
 
 /**

@@ -140,7 +140,7 @@ test('a fetch outside the package client in a package-client repository is FE_TR
   assert.deepEqual(hits(report).map(item => item.path), ['apps/admin/src/hooks/course/useCalled.ts']);
 });
 
-// The Outcome homes are the slots the manifest marks `outcomeHome`; the lite edition adds fe.db.outcome (modules/db/outcome.ts).
+// The Outcome homes are the slots the manifest marks `outcomeHome`; the lite edition adds fe.modules.db.outcome (modules/db/outcome.ts).
 const DB_OUTCOME = 'apps/web/src/modules/db/outcome.ts';
 const runEdition = (t, edition, files) => {
   const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });

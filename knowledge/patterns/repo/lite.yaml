@@ -1,0 +1,129 @@
+schema: starci/knowledge-source@1
+id: repo.lite
+title: Lite edition
+purpose: |
+  Given a small product on Supabase, which part of the one HFS standard still applies and how is it kept? A lite app is the same
+  standard through a filtered slot and rule view (`edition: lite` in hfs.json): the database is the Supabase project, the
+  front end is the one door to it, and nothing a lite app does not have is present.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-10-03
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - docs/lite-edition.md
+    - https://supabase.com/docs/guides/database/postgres/row-level-security
+    - https://supabase.com/docs/guides/auth/server-side/nextjs
+  limitations: |
+    The lite rules judge source text, migrations and configuration. They do not certify that a policy expresses the intended access
+    model; a person still reads every policy. The local database proof belongs to the app, not to the standard.
+rules:
+  - id: REPO-LITE-1
+    title: One edition, one engine
+    kind: mandatory
+    hfsRules: [R212]
+    requirement: |
+      `hfs.json` names its edition (`full`, or `lite`; absent means `full`). The edition selects which slots and rules are in
+      view; it never selects another engine or relaxes a rule locally. A lite app holds none of what lite does not have: no
+      spec or test file, test script, test dependency or test-tool config, no UAT record, no `supabase/functions`.
+    rationale: |
+      One manifest and one catalog keep a lite app upgradable to full by additions only.
+    cases:
+      - id: case-1
+        when: A product outgrows lite
+        write: Run the upgrade verb with the full edition; it adds the full slots and removes nothing.
+    verification:
+      automated:
+        - HFS_EDITION_INVALID
+        - HFS_EDITION_FORBIDDEN_PRESENT
+      manual: []
+    relatedExamples: []
+  - id: REPO-LITE-2
+    title: Migrations are code a parser reads
+    kind: mandatory
+    hfsRules: [R213, R214, R215]
+    requirement: |
+      A migration is a timestamped forward file under `supabase/migrations`; one already on the base branch is never edited. Every
+      table in an exposed schema enables row level security in the same migration and carries policies of a checked shape. A
+      privileged function pins its search path and is not callable by `public`. DDL is never assembled from strings.
+    rationale: |
+      Authorization that lives in the database is only as good as the file that declares it; a parser can check what a reviewer
+      skims.
+    cases:
+      - id: case-1
+        when: A new owner-scoped table
+        write: One migration that creates the table, enables RLS, adds owner policies, and grants only the columns the client writes.
+    verification:
+      automated:
+        - DB_MIGRATION_SHAPE
+        - DB_RLS_REQUIRED
+        - DB_DYNAMIC_DDL
+        - DB_POLICY_SHAPE
+        - DB_DEFINER_SAFE
+        - DB_STORAGE_POLICY
+      manual:
+        - Read every policy against the intended access model.
+    relatedExamples: []
+  - id: REPO-LITE-3
+    title: Configuration and types are checked facts
+    kind: mandatory
+    hfsRules: [R216]
+    requirement: |
+      `supabase/config.toml` carries no literal credential and mirrors the `supabase` block of hfs.json (signup, token lifetime, site
+      and redirect urls). The generated database types equal what the local stack produces; a drift is a finding.
+    rationale: |
+      A client typed by stale generated types compiles against a schema that no longer exists.
+    cases: []
+    verification:
+      automated:
+        - DB_CONFIG_POLICY
+        - DB_TYPES_DRIFT
+      manual: []
+    relatedExamples: []
+  - id: REPO-LITE-4
+    title: One door to the database and a typed, verified result
+    kind: mandatory
+    hfsRules: [R217, R218, R219]
+    requirement: |
+      Only the front-end db module (and the back-end Supabase integration) imports a Supabase client; no route handler and no
+      service-role key reaches the browser side. Every result is typed by inference and its error is read; server code verifies
+      the principal through `getPrincipal()` and never trusts `getSession()`; a write Server Action awaits the principal first and
+      parses its input.
+    rationale: |
+      A single door is the only place where the session, the result shape and the authorization check can be enforced.
+    cases:
+      - id: case-1
+        when: A page saves a row
+        write: A `write-*.ts` Server Action in the db module that awaits getPrincipal, parses input, and returns an Outcome.
+    verification:
+      automated:
+        - FE_SUPABASE_CLIENT_OWNER
+        - BE_SUPABASE_CLIENT_OWNER
+        - FE_ROUTE_HANDLER_FORBIDDEN
+        - FE_SERVICE_ROLE_FORBIDDEN
+        - FE_DB_RESULT_TYPED
+        - FE_DB_ERROR_HANDLED
+        - FE_AUTH_SESSION_TRUST
+        - FE_DB_WRITE_SHAPE
+        - BE_SUPABASE_JWT_VERIFIED
+      manual: []
+    relatedExamples: []
+  - id: REPO-LITE-5
+    title: No secret material in a lite tree
+    kind: mandatory
+    hfsRules: [R220]
+    requirement: |
+      A lite app holds no root `.env*`, `.secrets/` or sealed file outside the `.starcistacks` secrets location, and `fe/` and
+      `supabase/` hold no token, JWT or connection string with a password. Configuration names a secret as `env(NAME)`.
+    rationale: |
+      Supabase keys are bearer credentials; a tree that holds none cannot leak one.
+    cases: []
+    verification:
+      automated:
+        - HFS_LITE_SECRET_CUSTODY
+      manual: []
+    relatedExamples: []

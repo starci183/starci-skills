@@ -480,7 +480,8 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    lite: {path: scripts/codegen.mjs}
+    lite:
+      path: scripts/codegen.mjs
     liteManagedBy: codegen-lite
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: app.sides
@@ -1842,7 +1843,7 @@ slots:
     anonymousActions: [auth/write-sign-in.ts, auth/write-sign-out.ts]     # the Server Actions that run for an anonymous principal by design (FE_AUTH_SESSION_TRUST)
     tests: none
     since: 2.1.0
-  - id: fe.db.outcome
+  - id: fe.modules.db.outcome
     profiles: [fe]
     # A lite app has no modules/api: its db transport is the transport, so the one Outcome union lives here (toOutcome maps
     # {data, error} into it). Under full the union stays fe.transport.outcome / fe.package.api.outcome.
