@@ -123,6 +123,7 @@ test('the ui record gate carries DATA_STATUS_DRAWN: refused on every record that
   const put = (rel, body) => { const file = path.join(work, rel); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); };
   put('index.yaml', 'schema: work/catalog@1\nid: fixture\nfeatures: []\n');
   const legacy = example();
+  legacy.refs = []; // the example's FR records are not part of this fixture tree
   legacy.assets = [];
   legacy.assets.push({ path: 'assets/directions/loading--page--desktop--light.content.png', role: 'direction-content', sha256: sha });
   put('features/identity/ui/sign-in/index.yaml', stringifyYaml(legacy));
@@ -133,10 +134,12 @@ test('the ui record gate carries DATA_STATUS_DRAWN: refused on every record that
   const refused = [], warned = [];
   checkWorkTree(work, refused, warned, []);
   const hits = (list) => list.filter((line) => line.includes(`[${DATA_STATUS_DRAWN}]`));
-  assert.equal(hits(refused).length, 1, refused.join('\n'));
-  assert.match(hits(refused)[0], /sign-up\/index\.yaml/);
-  assert.equal(hits(warned).length, 1, warned.join('\n'));
-  assert.match(hits(warned)[0], /sign-in\/index\.yaml/);
+  // No record is "not yet migrated" any more (the migration script is retired): the shaped and the unshaped record that
+  // draw the loading data status are both refused, and nothing is only warned.
+  assert.equal(hits(refused).length, 2, refused.join('\n'));
+  assert.ok(hits(refused).some((line) => /sign-up\/index\.yaml/.test(line)) && hits(refused).some((line) => /sign-in\/index\.yaml/.test(line)), refused.join('\n'));
+  assert.equal(hits(warned).length, 0, warned.join('\n'));
+  assert.deepEqual(refused.filter((line) => !line.includes(`[${DATA_STATUS_DRAWN}]`)), [], 'the fixture is otherwise clean');
 });
 
 const salesLike = () => ({

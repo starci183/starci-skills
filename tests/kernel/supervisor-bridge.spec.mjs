@@ -123,7 +123,7 @@ test('shared unowned need: an alias merges into the owned foundation, a stopped 
   assert.deepEqual([alias.kind, alias.proposal.action, alias.proposal.mergeInto, alias.proposal.to, alias.proposal.clearCut], ['unowned-need', 'transfer', 'brand', MOD, true]);
   const stopped = graph.findings.find((f) => f.key === 'unowned-need|foundation:fe-contract');
   assert.deepEqual([stopped.proposal.action, stopped.proposal.to, stopped.proposal.clearCut], ['transfer', COLLAB, false]);
-  assert.match(stopped.summary, /owner wf-app-fe-debt is not running/);
+  assert.match(stopped.summary, /owner app-fe-debt is not running/);
 
   const merged = await fx.bridge(['transfer', '--foundation', 'app.brand', '--merge-into', 'brand', '--reason', alias.proposal.why, '--finding', alias.key]);
   assert.equal(merged.ok, true, JSON.stringify(merged));
