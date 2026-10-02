@@ -90,7 +90,7 @@ export const SCHEMA = 'starci/gc-report@1';
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
-  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000 });
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000, laneCap: 40 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/cli.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
@@ -119,7 +119,10 @@ export function gcSettings(allocation = allocationSettings()) {
     laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
     // One pass judges lanes for at most laneBudgetMs, then records where it stopped; the next pass resumes there (a
     // backlog of hundreds of lane worktrees timed the sweep child out every pass, 2026-10-01).
-    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs) };
+    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs),
+    // The most lane worktrees that stay registered under the lanes root: past it the oldest clean idle lanes go even when their
+    // commits are not in main (the branch keeps them), so the worktree list never piles up (allocation.gc.laneCap).
+    laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
 }
 
 
@@ -521,9 +524,11 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
   const branchOf = (ref) => String(ref ?? '').replace(/^refs\/heads\//, '');
   const dirty = (p) => { const s = run(['status', '--porcelain', '--untracked-files=normal'], { cwd: p }); return s.ok ? s.stdout.trim().split(/\r?\n/).filter(Boolean).length : null; };
   let fatal = null;
+  let removedLanes = 0;
+  const spare = [];
   const removeTree = (w, branch, { why = 'landed in main, clean, idle' }) => {
     const bytes = treeBytes(w.path);
-    if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; return; }
+    if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; removedLanes += 1; return; }
     // safeRemoveWorktree: every link removed as a link (found without following one), zero links asserted, then git
     // worktree remove, and the main checkout asserted untouched (a violation stops the collector).
     const r = safeRemoveWorktree(w.path, { repo: root, git });
@@ -532,6 +537,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     markRemoved(w.path, { env });
     item('collect', w.path, `removed (${why})`, { bytes, branch, branchDeleted: false, ok: true, worktree: true });
     freedBytes += bytes;
+    removedLanes += 1;
   };
   const lanes = worktrees.filter((w) => { const k = pathKey(w.path); return k !== mainKey && k !== selfKey && k.startsWith(baseKey); })
     .sort((a, b) => (pathKey(a.path) < pathKey(b.path) ? -1 : pathKey(a.path) > pathKey(b.path) ? 1 : 0));
@@ -569,6 +575,9 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
       const ledger = landedCommitsForLane(branch, env);
       const ledgerLanded = commits.length > 0 && commits.every((sha) => ledger.has(sha));
       if (!ledgerLanded && !laneContentLanded(commits, branch, root, run)) {
+        const unlanded = laneActivity({ worktree: w.path, branch: w.branch, root, run });
+        const idleFor = unlanded.lastActiveMs == null ? null : now - unlanded.lastActiveMs;
+        if (idleFor != null && idleFor >= (settings.laneIdleMs ?? settings.laneGraceMs) && !laneOwnerOf({ lanePath: w.path, branch, workers, sup })) spare.push({ w, branch, idleFor, ahead });
         item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true }); continue;
       }
     }
@@ -579,6 +588,17 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     const owner = laneOwnerOf({ lanePath: w.path, branch, workers, sup });
     if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
+  }
+  // The cap: a complete pass that leaves more lanes than allocation.gc.laneCap evicts the longest idle clean lanes whose commits
+  // are not in main. The branch stays (it holds every commit), so nothing committed is lost; a dirty or live-owned lane is never one.
+  const cap = settings.laneCap ?? DEFAULTS.laneCap;
+  if (!fatal && progress.complete) {
+    spare.sort((a, b) => b.idleFor - a.idleFor);
+    for (const c of spare) {
+      if (lanes.length - removedLanes <= cap || fatal) break;
+      removeTree(c.w, c.branch, { why: `over the lane cap of ${cap}; branch kept with ${c.ahead} unlanded commit(s)` });
+    }
+    if (lanes.length - removedLanes > cap) item('keep', base, `${lanes.length - removedLanes} lanes stay registered, over the cap of ${cap}: the rest are dirty, live or not idle`, { overCap: true });
   }
   if (fatal) return { items, freedBytes, errors, progress, fatal };
   if (apply) run(['worktree', 'prune'], { cwd: root });

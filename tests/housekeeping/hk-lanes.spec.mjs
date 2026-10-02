@@ -1,7 +1,7 @@
 // hk-lanes: the lanes root authority (the owner config roots.lanes, STARCI_LANES_ROOT,
 // default <starciLocalRoot>/lanes) and sweepLanes — merged lane worktrees of a real repo are removed only
-// after the tree proves link-free and idle for allocation.housekeeping.laneGraceMs; the main
-// checkout, dirty, detached, unmerged and link-holding worktrees, a fresh lane with no commit yet
+// link-safely (links unlinked first, never followed) and idle for allocation.housekeeping.laneGraceMs; the main
+// checkout, dirty, detached and unmerged worktrees, a fresh lane with no commit yet
 // (no-work-yet) and a landed lane still in use (recent-activity) are skipped with a reason.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -64,7 +64,7 @@ test('lanesRoot: the env override wins, then the owner config roots.lanes, then 
     path.resolve(oneOff), 'a one-off/spec env still overrides the owner config');
 });
 
-test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, linked and outside trees stay; the main checkout is never touched', (t) => {
+test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged and outside trees stay and a lane holding a link is removed without touching the link target; the main checkout is never touched', (t) => {
   const root = repoFixture(t);
   const lanes = path.join(tmp(t, 'hk-lanes-'), 'lanes');
   // lane/done: committed work merged back into main -> merged.
@@ -75,9 +75,10 @@ test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, link
   // lane/dirty: uncommitted changes -> kept.
   const dirty = addWorktree(root, path.join(lanes, 'dirty'), 'lane/dirty');
   fs.writeFileSync(path.join(dirty, 'scratch.txt'), 'unsaved\n');
-  // lane/linked: a directory link inside -> kept, never removed through it.
+  // lane/linked: a directory link into main inside -> the link goes as a link, main stays whole.
   const linked = addWorktree(root, path.join(lanes, 'linked'), 'lane/linked');
-  fs.symlinkSync(root, path.join(linked, 'into-main'), process.platform === 'win32' ? 'junction' : 'dir');
+  fs.appendFileSync(path.join(root, '.git', 'info', 'exclude'), 'node_modules\n');
+  fs.symlinkSync(root, path.join(linked, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   // A detached scratch and a worktree outside the lanes root -> kept.
   const detached = path.join(lanes, 'det');
   git(root, 'worktree', 'add', '-q', '--detach', detached, 'main');
@@ -87,15 +88,17 @@ test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, link
   const dry = sweepLanes({ apply: false, now, env: envOf(lanes), allocation: graceOf(), root });
   assert.equal(dry.ok, true, JSON.stringify(dry.errors));
   assert.deepEqual(dry.removed, []);
-  assert.deepEqual(dry.wouldRemove.map((w) => w.branch), ['lane/done'], JSON.stringify(dry, null, 1));
+  assert.deepEqual(dry.wouldRemove.map((w) => w.branch), ['lane/done', 'lane/linked'], JSON.stringify(dry, null, 1));
   assert.ok(fs.existsSync(done), 'a dry run removes nothing');
 
   const out = sweepLanes({ apply: true, now, env: envOf(lanes), allocation: graceOf(), root });
   assert.equal(out.ok, true, JSON.stringify(out.errors));
-  assert.equal(out.removed.length, 1);
-  samePathAs(out.removed[0].path, done);
-  assert.equal(out.removed[0].branch, 'lane/done');
-  assert.equal(out.removed[0].branchDeleted, true);
+  assert.equal(out.removed.length, 2);
+  const doneRow = out.removed.find((r) => r.branch === 'lane/done');
+  samePathAs(doneRow.path, done);
+  assert.equal(doneRow.branchDeleted, true);
+  assert.ok(!fs.existsSync(linked), 'the link-holding lane is removed');
+  assert.ok(fs.existsSync(path.join(root, 'a.txt')), 'the link target (main) is untouched');
   assert.ok(out.freedBytes > 0);
   assert.ok(!fs.existsSync(done), 'the merged worktree directory is gone');
   assert.equal(git(root, 'branch', '--list', 'lane/done'), '', 'its merged branch is gone');
@@ -104,11 +107,10 @@ test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, link
   const reason = (p) => out.skipped.find((s) => pathKey(s.path) === pathKey(p))?.reason;
   assert.equal(reason(wip), 'unmerged-commits');
   assert.ok(['dirty', 'uncommitted-changes'].includes(reason(dirty)), JSON.stringify(out.skipped));
-  assert.equal(reason(linked), 'contains-links');
   assert.equal(reason(detached), 'detached-head');
   assert.equal(reason(outside), 'outside-lanes-root');
   assert.equal(reason(root), 'main-checkout', 'the main checkout is always named and kept');
-  for (const kept of [wip, dirty, linked, detached, outside]) assert.ok(fs.existsSync(kept), `${kept} stays`);
+  for (const kept of [wip, dirty, detached, outside]) assert.ok(fs.existsSync(kept), `${kept} stays`);
   assert.ok(git(root, 'branch', '--list', 'lane/wip'), 'an unmerged branch is kept');
   assert.equal(git(root, 'rev-parse', 'HEAD'), git(root, 'rev-parse', 'main'), 'the main checkout still stands on its merge');
 });
