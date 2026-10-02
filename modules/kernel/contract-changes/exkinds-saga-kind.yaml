@@ -1,0 +1,20 @@
+id: exkinds-saga-kind
+effectiveAt: '2026-10-02T14:00:00+07:00'
+summary: >-
+  Lane EX-KINDS (lead C2), owner rule: saga is a trigger kind with a folder of its own, be/src/features/saga/<saga>/, like webhooks, realtime,
+  reactors, jobs and cli. The slots be.feature.saga (owner, trigger saga), be.feature.saga.steps and be.feature.saga.compensations move from
+  src/features/<feature>/saga/ to src/features/saga/<saga>/ (steps/, compensations/, application/, transport/message/, <saga>.module.ts,
+  <saga>.saga.service.ts, <saga>.saga-state.ts, <saga>.saga.log-events.ts); ruleParams.be.kindPatterns gains saga: [saga]; the application and
+  message transport slots accept the saga kind folder. The saga machine rules (BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED,
+  BE_SAGA_EVENT_CONTRACT, BE_SAGA_CONSUMER_DEDUPE, BE_SAGA_E2E_MISSING) read the new paths. A saga imports only modules/*, an api feature
+  never imports it, and only an app composes it: the api starts a saga only indirectly, the domain writes the run and announces the event in
+  its transaction and the saga consumers advance it. The ecommerce place-order saga moves out of the checkout feature.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/exkinds-saga-kind.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/saga.yaml
+  - scripts/hfs/rules/saga.mjs
+  - docs/microservices.md

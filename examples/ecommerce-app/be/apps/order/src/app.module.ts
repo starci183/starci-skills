@@ -47,8 +47,9 @@ import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/plat
 import { QueueModule, queueEntities, queueMigrations } from "@modules/platform/queue"
 import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
-import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
+import { CheckoutGraphqlModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
+import { PlaceOrderMessageModule } from "@features/saga/place-order"
 import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 import { ExpireOrdersQueueModule } from "@features/jobs/expire-orders"
 import { orderExpirySchedulerOf } from "@modules/queues/order-expiry"
@@ -164,7 +165,7 @@ export class AppModule {
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,
-                CheckoutMessageModule,
+                PlaceOrderMessageModule,
                 OrderPaymentStatusMessageModule,
                 OrderPaidLoyaltyMessageModule,
                 OrderStatusPushMessageModule,

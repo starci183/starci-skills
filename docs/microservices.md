@@ -63,14 +63,17 @@ command reads it.
 
 A saga is a chain of services reacting to each other's events; the canon has no in-process event (R87). A product declares the
 pattern (`"patterns": ["saga"]` in `hfs.json` `sides.be`), which enables the saga slots; a saga folder in a product that has not
-declared it is `HFS_SLOT_NOT_ENABLED`. The saga is a folder of a feature (`knowledge/patterns/be/saga.yaml` lists every path with its slot):
+declared it is `HFS_SLOT_NOT_ENABLED`. The saga is a feature of the saga kind (`knowledge/patterns/be/saga.yaml` lists every path with its slot):
 
 ```text
-be/src/features/<feature>/saga/
+be/src/features/saga/<saga>/
   <saga>.saga.service.ts          the orchestrator: lists the steps and compensations, a service unit-tested beside it
   <saga>.saga-state.ts            the typed state of a run: status and the version fence
-  steps/<step>.saga-step.ts            one step: names its event, dispatches one command
+  <saga>.module.ts                its application module (handlers, orchestrator, steps, compensations)
+  steps/<step>.saga-step.ts            one step: names its event; the domain does its work and announces the event
   compensations/<step>.compensation.ts   REQUIRED for every step: names the failure event, dispatches one command
+  application/                    the commands the consumers and compensations dispatch
+  transport/message/              the consumers that advance the run (<event>.consumer.ts) and its message module
 ```
 
 The consumers (`transport/message/<event>.consumer.ts`) hand the delivery id to a command, and the saga takes every event through
