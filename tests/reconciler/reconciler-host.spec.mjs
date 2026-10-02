@@ -402,7 +402,7 @@ test('the Supervisor seat has its own 30-minute budget and interrupts with --sup
 });
 
 test('every clock state emitted by exercised host-controller scenarios is in the SLA catalogue', async () => {
-  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };
+  const dbs = { 'shop-be': ledgerDb({ workflows: [{ id: 'wf-shop-fe-canon', goal: GOAL }] }) };
   for (const action of ['interactive-gate', 'host-unavailable', 'queued-input']) {
     const ctx = hostCtx({ dbs });
     await booted(controller({ probeSeat: async () => ({ ok: true, action }) })).reconcile(SEAT, ctx);
