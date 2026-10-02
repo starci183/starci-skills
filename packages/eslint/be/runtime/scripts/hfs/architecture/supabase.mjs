@@ -344,12 +344,14 @@ function checkFrontendAuthAndRoutes(input) {
       if (!declared.length) reportAt(violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
       for (const action of declared) {
         actions += 1;
-        const first = action.body.statements[0];
+        // A function-level directive ("use server") is the prologue, not work: the principal is the first statement after it.
+        const work = action.body.statements.slice(action.body.statements.findIndex((statement) => !(ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression))) >>> 0);
+        const first = work[0];
         const principal = first ? firstPrincipal(kit, checker, input.graph, first) : { call: null, symbol: null };
         if (!principal.call || !principal.symbol) {
           reportAt(violations, kit, FE_SESSION_TRUST, file, first ?? action, 'A write Server Action must begin with `const principal = await getPrincipal()` from the db owner.');
         } else if (!authenticatesAnonymous) {
-          const refuses = action.body.statements.slice(1).some(statement => ts.isIfStatement(statement)
+          const refuses = work.slice(1).some(statement => ts.isIfStatement(statement)
             && contains(kit, statement.expression, node => ts.isIdentifier(node) && sameSymbol(kit, checker, node, principal.symbol))
             && typedRefusal(kit, statement.thenStatement));
           if (!refuses) reportAt(violations, kit, FE_SESSION_TRUST, file, action, 'A write Server Action must refuse an anonymous principal with a typed `refused` Outcome before doing work.');

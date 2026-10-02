@@ -77,7 +77,7 @@ const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml', RULE_CATALOG_FILE, ...patternTopicFiles()])].sort()), catalog: true }),
-  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
+  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA, RULE_CATALOG_FILE])].sort()), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
 });
 

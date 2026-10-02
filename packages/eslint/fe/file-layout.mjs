@@ -205,12 +205,13 @@ const featureTiers = (hfs) => {
 }
 
 /**
- * In a monorepo, the shared package stops below the block.
+ * In a front end with two or more apps, the shared package stops below the block.
  *
  * WHY THE SLOT IS ENOUGH HERE. The feature line is already drawn by the layer: a leaf knows
  * no domain and a block is a domain sentence, so which side of the workspace each belongs on
  * follows from the layer the slot reports. The layers a shared package may hold are the `kinds` of
- * `fe.package.ui`; an app holds the shared ones only when the repository declares that package.
+ * `fe.package.ui`; an app holds the shared ones only when the repository declares that package and another app can
+ * consume them. A one-app front end has nothing to share, so every tier may stay with that app.
  *
  * WHAT IT COST TO LEARN. A shared package carried one `blocks/FleetRow/` while its own header
  * insisted that "a block carries feature meaning and therefore belongs to the app that owns the
@@ -222,18 +223,19 @@ export const monorepoTierBelongsToItsSide = {
     type: "problem",
     docs: {
       description:
-        "In a monorepo the shared package holds leaves, composites and branches; blocks, overlays, layouts and pages belong to the app that owns the feature.",
+        "With two or more apps, the shared package holds leaves, composites and branches; blocks, overlays, layouts and pages belong to the app that owns the feature.",
     },
     schema: [],
     messages: {
       featureInPackage:
         "`{{tier}}/` knows a feature, so it belongs to the app that owns that feature, not to the shared package - every app that never wanted this domain now ships it. Move it to `apps/<app>/src/components/{{tier}}/`.",
       vocabularyInApp:
-        "`{{tier}}/` knows no feature, so one copy belongs to every app - left here, the second app writes it again and the two drift with nothing to notice. Move it to `packages/ui/src/{{tier}}/`.",
+        "`{{tier}}/` knows no feature, and this repository has multiple apps, so one copy belongs to every app - left here, another app writes it again and the two drift with nothing to notice. Move it to `packages/ui/src/{{tier}}/`.",
     },
   },
   create(context) {
     const hfs = hfsOf(context)
+    if (hfs.apps.length < 2) return {}
     const folder = unknownLayerFolder(context)
     const inPackage = inSlot(context, "fe.package.ui") && folder !== null && featureTiers(hfs).has(folder) ? folder : null
     const tier = kindOfFile(context)

@@ -31,7 +31,7 @@ import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, EDITIONS, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SCHEMA_AUTHORITIES, SEMVER, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, roleListProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, optionalSlotProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 import { declarationShapeProblems } from './declaration-shape.mjs';
-import { declarationEdition, editionRuleParams, effectiveSlot, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
+import { declarationEdition, editionRuleParams, effectiveSlot, enforcerJudgedInEdition, judgedInEdition, litePresenceOf, ruleEditionProblems, slotInEdition } from './edition-slots.mjs';
 export { litePresenceOf, slotInEdition } from './edition-slots.mjs';
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -834,7 +834,8 @@ function ruleCatalogProblems(d) {
     r.enforcers.forEach((e, n) => {
       const eat = `${label}.enforcers[${n}]`;
       if (!isPlainObject(e)) { bad.push(`${eat} is not a map`); return; }
-      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
+      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at', 'editions'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
+      bad.push(...ruleEditionProblems(e, eat));
       if (!ENFORCER_FAMILIES.includes(e.kind)) bad.push(`${eat}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
       if (!ENFORCER_ID.test(String(e.id))) bad.push(`${eat}.id must be kebab-case`);
       if (seen.has(`${e.kind}:${e.id}`)) bad.push(`${eat} repeats ${e.kind}:${e.id}`);
@@ -883,6 +884,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     byCode: (code) => byCode.get(code) ?? null,
     /** Whether a finding code is judged under `edition`: a code of a rule that names `editions` without it is not (a code outside the catalog always is). */
     judgedIn: (code, edition = 'full') => judgedInEdition(byCode.get(code), edition),
+    enforcerJudgedIn: (kind, id, edition = 'full') => enforcerJudgedInEdition(list, kind, id, edition),
     /** The rules that run at a gate. */
     forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
     /** The catalogued why code of a lint finding's rule id (`starci-be/<id>`, `starci-fe/<id>`), or undefined. */

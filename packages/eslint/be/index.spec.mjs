@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
 import plugin, { lawOwners, recommended, ruleDeclarations, ruleOwners, rules } from "./index.mjs"
+import { pluginForEdition } from "./lib/edition.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -90,4 +91,18 @@ test("every rule is a rule, and the plugin exposes them all", () => {
         assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
         assert.equal(plugin.rules[name], rule, `${name} is missing from the plugin object`)
     }
+})
+
+test("the generic edition gate disables a full-only catalog enforcer in lite and keeps it active in full", () => {
+    const gated = "rest-door-needs-a-reason"
+    const shared = "default-deny-guards"
+    const catalog = { enforcerJudgedIn: (_kind, id, edition) => id !== gated || edition === "full" }
+
+    const lite = pluginForEdition({ plugin, hfs: { edition: "lite" }, catalog })
+    assert.deepEqual(lite.rules[gated].create(), {})
+    assert.equal(lite.rules[shared], plugin.rules[shared])
+
+    const full = pluginForEdition({ plugin, hfs: { edition: "full" }, catalog })
+    assert.equal(full.rules[gated], plugin.rules[gated])
+    assert.equal(full.rules[shared], plugin.rules[shared])
 })

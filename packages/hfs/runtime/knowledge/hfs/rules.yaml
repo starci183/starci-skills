@@ -909,7 +909,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: door-lives-in-features}
       - {kind: eslint-be, id: no-capability-imports-features}
-      - {kind: eslint-be, id: rest-door-needs-a-reason}
+      - {kind: eslint-be, id: rest-door-needs-a-reason, editions: [full]}
       - {kind: eslint-be, id: transport-is-thin}
       - {kind: eslint-be, id: no-response-envelope}
       - {kind: eslint-be, id: no-graphql-json}

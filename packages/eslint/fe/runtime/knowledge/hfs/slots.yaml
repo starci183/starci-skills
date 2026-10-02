@@ -270,7 +270,7 @@ ruleParams:
     # Edition lite (ruleParams(manifest, 'be', 'lite') merges these keys over the base): the schema authority is the Supabase
     # migration tree (supabase/migrations/*.sql, forward-only), so a lite back end holds no TypeORM migration or entity under
     # be/ (R34/R35 read schemaAuthority; be.persistence's lite overlay allows neither).
-    lite: {schemaAuthority: supabase}
+    lite: {schemaAuthority: supabase, unitRoles: []}     # lite has no test world: no service or cli command owes a unit spec
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
