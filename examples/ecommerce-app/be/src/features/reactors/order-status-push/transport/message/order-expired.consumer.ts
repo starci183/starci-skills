@@ -12,11 +12,12 @@ export class OrderExpiredConsumer implements EventConsumer<OrderExpiredEvent> {
 
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
-    /** Dispatches one push order status command. */
+    /** Dispatches one push order status command with the event id as its dedupe key. */
     async handle(delivery: EventDelivery<OrderExpiredEvent>): Promise<void> {
         await this.commandBus.execute(
             new PushOrderStatusCommand({
                 request: {
+                    eventId: delivery.eventId,
                     personId: delivery.event.payload.personId,
                     orderId: delivery.event.payload.orderId,
                     status: "expired",

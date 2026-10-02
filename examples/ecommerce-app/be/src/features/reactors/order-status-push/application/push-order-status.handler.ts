@@ -17,7 +17,6 @@ export class PushOrderStatusHandler extends ICQRSHandler<PushOrderStatusCommand,
     }
 
     protected override process(command: PushOrderStatusCommand): Promise<PushOrderStatusResult> {
-        this.statuses.push(command.params.request)
-        return Promise.resolve()
+        return this.statuses.push(command.params.request)
     }
 }

@@ -13,6 +13,8 @@ export interface OrderStatusFrame {
 
 /** What pushing one status change to the order's buyer takes. */
 export interface PushOrderStatusParams {
+    /** The stable id of the delivered event; a repeat of it pushes nothing twice. */
+    readonly eventId: string
     /** The buyer who owns the order and is the only one who can listen to its channel. */
     readonly personId: string
     /** The order. */

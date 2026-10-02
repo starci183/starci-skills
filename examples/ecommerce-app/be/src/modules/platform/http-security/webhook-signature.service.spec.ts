@@ -12,11 +12,11 @@ const NOW = "2026-10-02T03:00:00.000Z"
 const SECRET = "gateway-secret"
 const BODY = Buffer.from(JSON.stringify({ eventId: "evt-1", status: "confirmed" }))
 
-const optionsOf = builder<HttpSecurityOptions>({
+const OPTIONS: HttpSecurityOptions = {
     allowedOrigins: [],
     rateLimit: { windowMs: 60_000, defaultLimit: 600, strictLimit: 30 },
     webhooks: { "payment-gateway": { secret: new Secret(SECRET), toleranceMs: 300_000 } },
-})
+}
 
 /** The `sha256=<hex>` header of a delivery signed at `timestamp` with `secret`. */
 const sign = (timestamp: string, body: Buffer, secret = SECRET): string =>
@@ -26,7 +26,7 @@ const build = async () => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             WebhookSignatureService,
-            { provide: HTTP_SECURITY_OPTIONS, useValue: optionsOf() },
+            { provide: HTTP_SECURITY_OPTIONS, useValue: builder<HttpSecurityOptions>(OPTIONS)() },
             { provide: CLOCK, useValue: new FakeClock(NOW) },
         ],
     }).compile()
