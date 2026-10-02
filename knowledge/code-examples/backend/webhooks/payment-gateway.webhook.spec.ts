@@ -27,7 +27,12 @@ describe("PaymentGatewayWebhook", () => {
 
         await door.receive({ rawBody: RAW_BODY } as never, "sig", "1790899200000", NOTIFICATION)
 
-        expect(signature.verify).toHaveBeenCalledWith({ rawBody: RAW_BODY, signature: "sig", timestamp: "1790899200000" })
+        expect(signature.verify).toHaveBeenCalledWith({
+            provider: "payment-gateway",
+            rawBody: RAW_BODY,
+            signature: "sig",
+            timestamp: "1790899200000",
+        })
         expect(payments.acceptNotification).toHaveBeenCalledTimes(1)
         expect(payments.acceptNotification).toHaveBeenCalledWith(NOTIFICATION)
     })

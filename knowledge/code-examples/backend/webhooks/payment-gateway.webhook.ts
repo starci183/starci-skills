@@ -28,7 +28,7 @@ export class PaymentGatewayWebhook {
         @Headers("x-gateway-timestamp") timestamp: string | undefined,
         @Body() body: PaymentNotificationRequest,
     ): Promise<void> {
-        this.signature.verify({ rawBody: request.rawBody, signature, timestamp })
+        this.signature.verify({ provider: "payment-gateway", rawBody: request.rawBody, signature, timestamp })
         await this.payments.acceptNotification(body)
     }
 }

@@ -62,7 +62,8 @@ rules:
     hfsRules: [R140]
     requirement: |-
       The only value a realtime door injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
-      iterable of frames, `publish(topic, payload)` pushes one). No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
+      iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
+      contract, never a string written in a door). No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
       service of `modules/domain` is injected: a domain service may write, so it is not provably read-only. The data a client
       needs is pushed by a reactor; the socket library and the pub/sub engine (`socket.io`, `graphql-subscriptions`, `graphql-ws`)
       are imported only by `platform/realtime`.
@@ -79,7 +80,7 @@ rules:
 
               @Subscription(() => OrderStatusChangedType)
               orderStatusChanged(@CurrentPrincipal() principal: Principal, @Args("orderId") orderId: string): AsyncIterable<OrderStatusChangedType> {
-                  return this.hub.subscribe(`order-status:${principal.id}:${orderId}`)
+                  return this.hub.subscribe(orderStatusTopic(principal.id, orderId))
               }
           }
     verification:
@@ -95,7 +96,8 @@ rules:
     hfsRules: [R141, R41]
     requirement: |-
       Every `@SubscribeMessage` and `@Subscription` handler takes `@CurrentPrincipal()` of `domain/identity` and builds the topic it
-      passes to `hub.subscribe` from the principal's id (plus a client-supplied id only inside that prefix), so one client cannot
+      passes to `hub.subscribe` from the principal's id (plus a client-supplied id only inside that prefix) with the topic
+      builder of the owning domain contract, so one client cannot
       listen to another's channel. The reactor that pushes uses the same topic builder from the owning domain contract, never a
       hand-written string. The default-deny guards apply to the door like to any other.
     rationale: |-
@@ -103,7 +105,7 @@ rules:
     cases:
       - id: case-1
         when: Subscribing to one order's status
-        write: 'hub.subscribe(`order-status:${principal.id}:${orderId}`); the reactor publishes to the topic of the order owner, so a different principal receives nothing.'
+        write: 'hub.subscribe(orderStatusTopic(principal.id, orderId)); the reactor publishes to orderStatusTopic(buyerId, orderId) of the order owner, so a different principal receives nothing.'
     verification:
       automated:
         - BE_REALTIME_TOPIC_SCOPE
