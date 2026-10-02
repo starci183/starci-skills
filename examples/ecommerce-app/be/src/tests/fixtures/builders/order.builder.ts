@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import type { EntityManager } from "typeorm"
 import type { PlacedOrder } from "@modules/domain/order"
 
@@ -72,6 +71,13 @@ export const placedOrder = (overrides: Partial<PlacedOrder> = {}): PlacedOrder =
     ...overrides,
 })
 
+/** The next id of a row this builder arranges: a UUID counted from one, so a failing spec reproduces. */
+let sequence = 0
+const nextId = (): string => {
+    sequence += 1
+    return `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`
+}
+
 /** The table the order rows live in. */
 const ORDERS = "orders"
 
@@ -82,10 +88,10 @@ const ORDER_LINES = "order_lines"
 export const orderBuilder = (manager: EntityManager) => ({
     /** Inserts the order and its lines, and answers the stored order row. */
     async build(overrides: Partial<OrderRow> = {}, lineCount = 1): Promise<OrderRow> {
-        const row = orderRow({ id: randomUUID(), personId: randomUUID(), ...overrides })
+        const row = orderRow({ id: nextId(), personId: nextId(), ...overrides })
         await manager.insert(ORDERS, row)
         for (let index = 1; index <= lineCount; index += 1) {
-            await manager.insert(ORDER_LINES, orderLineRow({ id: randomUUID(), orderId: row.id, productId: `sku-line-${index}` }))
+            await manager.insert(ORDER_LINES, orderLineRow({ id: nextId(), orderId: row.id, productId: `sku-line-${index}` }))
         }
         return row
     },

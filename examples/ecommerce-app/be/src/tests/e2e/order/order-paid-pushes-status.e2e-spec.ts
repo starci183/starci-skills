@@ -50,7 +50,7 @@ describe("order paid pushes its status", () => {
         expect((await readRows(world.db.order, ORDER_SUMMARY, [orderId]))[0]?.status).toBe("paid")
         const points = await world.waitFor("the loyalty points of the order are granted", async () => {
             const rows = await readRows(world.db.order, LOYALTY_POINTS_OF_ORDER, [orderId])
-            return rows[0]?.points === 125 ? rows[0] : null
+            return rows.find((row) => row.points === 125) ?? null
         })
         expect(points).toEqual({ points: 125 })
         await subscription.close()
