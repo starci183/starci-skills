@@ -1,11 +1,4 @@
-import { Injectable } from "@nestjs/common"
-import type { CommandBus } from "@nestjs/cqrs"
-import { REJECTED_INVOICE_QUEUE } from "@modules/domain/order"
-import type { RejectedInvoiceNotice } from "@modules/domain/order"
-import type { ConsumedMessage, MessageConsumer } from "@modules/integrations/messaging"
-import { InjectCommandBus } from "@modules/platform/cqrs"
-import { CompensatePlaceOrderCommand } from "../../application/compensate-place-order.command"
-
+// Imports of the host (resolve them to its aliases): ../../application/compensate-place-order.command, @modules/domain/order, @modules/integrations/messaging, @modules/platform/cqrs, @nestjs/common, @nestjs/cqrs.
 @Injectable()
 /** Consumer of `billing.invoice-rejected`, the failure event of the place-order saga: hands each delivery to the compensate command. */
 export class InvoiceRejectedConsumer implements MessageConsumer<RejectedInvoiceNotice> {

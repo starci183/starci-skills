@@ -1,22 +1,4 @@
-import { Injectable } from "@nestjs/common"
-import type { EntityManager } from "typeorm"
-import { InjectClock } from "@modules/platform/clock"
-import type { Clock } from "@modules/platform/clock"
-import { InjectOrderEntityManager } from "@modules/platform/database"
-import { InjectInbox } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
-import type {
-    BeginSagaParams,
-    CompensateSagaParams,
-    CompleteSagaParams,
-    SagaRun,
-    SagaState,
-    SagaStatus,
-    SagaTransition,
-} from "./saga.contracts"
-import type { SagaStateRow, SagaVersionRow } from "./persistence/saga.rows"
-import { BEGIN_SAGA, MOVE_SAGA, READ_SAGA } from "./persistence/saga.sql"
-
+// Imports of the host (resolve them to its aliases): ./persistence/saga.rows, ./persistence/saga.sql, ./saga.contracts, @modules/platform/clock, @modules/platform/database, @modules/platform/inbox, @nestjs/common, typeorm.
 /** The inbox source of the events that move one saga. */
 const sourceOf = (saga: string): string => `saga:${saga}`
 
@@ -68,7 +50,7 @@ export class SagaService {
     }
 
     /** Where the run stands, or null when it does not exist. */
-    async state(run: SagaRun): Promise<SagaState | null> {
+    async state(run: SagaRun): Promise<FindSagaResult> {
         const rows: Array<SagaStateRow> = await this.entityManager.query(READ_SAGA, [run.saga, run.correlationId])
         const [row] = rows
         return row === undefined ? null : { status: row.status, version: row.version }

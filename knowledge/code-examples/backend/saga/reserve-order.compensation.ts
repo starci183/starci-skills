@@ -1,8 +1,4 @@
-import { Injectable } from "@nestjs/common"
-import type { CommandBus } from "@nestjs/cqrs"
-import { InjectCommandBus } from "@modules/platform/cqrs"
-import { CancelOrderCommand } from "../../application/cancel-order.command"
-
+// Imports of the host (resolve them to its aliases): ../../application/cancel-order.command, @modules/platform/cqrs, @nestjs/common, @nestjs/cqrs.
 @Injectable()
 /** The compensation of the reserve-order step: cancels the order, releases the stock of its lines and refunds its payment. */
 export class ReserveOrderCompensation {
