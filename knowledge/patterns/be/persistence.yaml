@@ -52,7 +52,7 @@ rules:
   - id: BE-PERSISTENCE-2
     title: The cli migrate command is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34, R131]
+    hfsRules: [R33, R34, R132]
     requirement: |-
       Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`), once per
       connection, before any api or worker process starts (a deploy runs the cli image as an init job), and through the test

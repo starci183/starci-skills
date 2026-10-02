@@ -1,4 +1,4 @@
-// cli.mjs - the one command line of a back end (R131 BE_CLI_REQUIRED; id provisional until the lane lands).
+// cli.mjs - the one command line of a back end (R132 BE_CLI_REQUIRED; id provisional until the lane lands).
 //   BE_CLI_REQUIRED       a back end that declares a connection (it has migrations to run) or tracks a command (src/features/cli/)
 //                         declares exactly one app of kind cli, named cli (be/apps/cli), and tracks its image be/apps/cli/Dockerfile:
 //                         one image, run as `cli <group> <command>`. A cli app with another name, or a second one, is refused.
@@ -15,7 +15,7 @@ const CLI_KIND = 'cli';
 const IMAGE = 'Dockerfile';
 const CLI_FEATURE_SLOT = 'be.cli';
 
-/** The findings of R131 over the tracked paths `files` (app-relative) of the app `repo`; `resolver` is the app's. */
+/** The findings of R132 over the tracked paths `files` (app-relative) of the app `repo`; `resolver` is the app's. */
 export function cliFindings({ files, repo, resolver }) {
   if (!repo?.sides) return [];
   const be = repo.sides.be;

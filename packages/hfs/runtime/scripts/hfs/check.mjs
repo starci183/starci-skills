@@ -29,7 +29,7 @@
 //   HFS_PEER_INTEGRATION_MISSING  (R111, hfs-rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
 //   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
 //   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
-//   HFS_MONO_* (R127-R130, rules/monorepo.mjs) the monorepo shape; BE_CLI_REQUIRED (R131, rules/cli.mjs) the one cli app
+//   HFS_MONO_* (R128-R131, rules/monorepo.mjs) the monorepo shape; BE_CLI_REQUIRED (R132, rules/cli.mjs) the one cli app
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier

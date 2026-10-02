@@ -11,7 +11,7 @@ const { fakeIds, FakeIds } = require("./ids.cjs")
 
 /**
  * Coverage is measured where logic runs: every service (the one place business logic lives, owner-locked unit standard) and
- * every cli command of the cli feature root (`src/features/cli/**` + `/*.cli.ts`: an action runner, R133). Handlers, resolvers,
+ * every cli command of the cli feature root (`src/features/cli/**` + `/*.cli.ts`: an action runner, R134). Handlers, resolvers,
  * controllers and consumers are thin, and helpers called by a service are covered through the service's own spec, so the
  * services and the cli commands under `src` are the whole denominator and every file in it must reach 100 on every metric.
  * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
