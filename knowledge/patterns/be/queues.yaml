@@ -1,0 +1,158 @@
+schema: starci/knowledge-source@1
+id: be.queues
+title: Queues and schedulers
+purpose: |-
+  Given work that must run later, in the background or on a schedule, how is it started? It is a job of a typed queue:
+  `modules/queues/<queue>/<queue>.queue.ts` is the producer (`enqueueX(payload, tx)` writes the outbox in the caller's
+  transaction), `platform/queue` relays committed rows to BullMQ (the job id is the outbox id, so a relay retry never duplicates
+  a job), and a `features/jobs/<job>/<job>.processor.ts` runs it. A schedule is a BullMQ job scheduler declared beside the
+  producer; `@Cron`, `@Interval` and `@Timeout` do not exist.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner decision 2026-10-02 (BullMQ queues with a transactional outbox, schedulers replace cron)
+    - https://docs.bullmq.io/guide/job-schedulers
+  limitations: |-
+    Static checks prove who enqueues, with which transaction, and that nothing imports BullMQ or Nest scheduling outside the
+    owner. They do not prove retry budgets, concurrency, or that a scheduler's cadence suits the business; the test-world
+    scenarios (`queue/*`) prove delivery against a real Redis.
+rules:
+  - id: BE-QUEUES-1
+    title: A queue is a typed producer that writes the outbox in the caller's transaction
+    kind: mandatory
+    hfsRules: [R132, R134]
+    requirement: |-
+      Each queue is a folder `be/src/modules/queues/<queue>/` with `<queue>.queue.ts` (a class whose methods are the typed
+      producers `enqueueX(payload, tx: EntityManager)`), optional `<queue>.contracts.ts` (payload types and the queue name) and
+      `index.ts`. A producer writes the `QueueOutbox` port of `platform/queue` with its own `tx` as the first argument. A producer
+      is called only by a domain service, inside its transaction (the same rule as `eventBus.publish`). Work inside one context
+      that must happen now is a direct call, not a job.
+    rationale: |-
+      The job row commits with the change that caused it, so a rolled-back change never starts work and a committed one is never
+      lost.
+    cases:
+      - id: case-1
+        when: A domain service must send a receipt after payment
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(...); await this.receiptQueue.enqueueSendReceipt({ orderId }, manager) })'
+    verification:
+      automated:
+        - BE_QUEUE_PRODUCER_SHAPE
+        - BE_OUTBOX_WRITE_TX
+      manual:
+        - Confirm the payload carries ids, not entities, and the queue name is the contract between producer and processor.
+    relatedExamples: [queue]
+  - id: BE-QUEUES-2
+    title: platform/queue is the only BullMQ owner and the relay keeps jobId equal to the outbox id
+    kind: mandatory
+    hfsRules: [R90]
+    requirement: |-
+      `bullmq` and `@nestjs/bullmq` are imported only by `platform/queue`. Its relay claims committed queue-outbox rows per
+      registered connection and adds each job with `jobId = <outbox id>`; BullMQ ignores a second add of the same id, so a relay
+      that crashes after adding and before marking the row sent re-adds harmlessly. Nothing else constructs a `Queue`, `Worker`
+      or `FlowProducer`.
+    rationale: |-
+      The relay is at least once; a deterministic job id turns it into effectively once.
+    cases:
+      - id: case-1
+        when: The relay re-reads a row it already added
+        write: 'queue.add(name, payload, { jobId: row.id }) is a no-op for an id BullMQ already holds.'
+    verification:
+      automated:
+        - BE_INFRA_OWNER
+      manual: []
+    relatedExamples: [queue]
+  - id: BE-QUEUES-3
+    title: A schedule is a BullMQ job scheduler declared with its queue
+    kind: mandatory
+    hfsRules: [R90]
+    requirement: |-
+      A recurring task is a job scheduler (`upsertJobScheduler`) that the queue module declares in its `schedulers` list and
+      `platform/queue` registers at boot; its job is processed by the same `features/jobs/<job>/<job>.processor.ts` as any
+      enqueued job. `@nestjs/schedule`, `@Cron`, `@Interval`, `@Timeout` and `setInterval` for work are not used anywhere.
+    rationale: |-
+      One scheduler in Redis fires once for the whole fleet, where cron in a replicated process fires once per replica.
+    cases:
+      - id: case-1
+        when: Expire unpaid orders every five minutes
+        write: 'order-expiry.queue.ts declares scheduler { every: 5 minutes } for the expire-orders job; the processor dispatches ExpireOrdersCommand.'
+    verification:
+      automated:
+        - BE_INFRA_OWNER
+      manual:
+        - Confirm the cadence and the job's idempotence.
+    relatedExamples: [queue]
+  - id: BE-QUEUES-4
+    title: A declared queue pattern is proven on the test world
+    kind: mandatory
+    hfsRules: [R135]
+    requirement: |-
+      An app that declares `queue` has tests titled `queue/<scenario>: ...` for `enqueue-atomic-with-transaction`,
+      `relay-job-id-is-outbox-id` and `scheduler-fires-once`, run against a real Redis.
+    rationale: |-
+      Atomicity and once-only firing are runtime facts.
+    cases:
+      - id: case-1
+        when: The order-expiry e2e suite
+        write: "it('queue/scheduler-fires-once: two relays, one job', ...)"
+    verification:
+      automated:
+        - BE_PATTERN_SPEC_MISSING
+      manual: []
+    relatedExamples: [queue]
+files:
+  - path: src/modules/platform/queue/index.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/queue.module.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/queue.module-definition.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/queue.options.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/queue.config.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/queue.decorators.ts
+    slot: be.platform.queue
+    role: InjectQueueOutbox and its token.
+  - path: src/modules/platform/queue/queue.contracts.ts
+    slot: be.platform.queue
+    role: QueueDefinition, QueueJob, SchedulerDefinition.
+  - path: src/modules/platform/queue/queue.port.ts
+    slot: be.platform.queue
+    role: QueueOutbox port (write(tx, queue, payload)).
+  - path: src/modules/platform/queue/queue.service.ts
+    slot: be.platform.queue
+    role: Outbox write, relay into BullMQ (jobId = outbox id), scheduler registration.
+    spec: src/modules/platform/queue/queue.service.spec.ts
+  - path: src/modules/platform/queue/queue.log-events.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/errors/queue.error.ts
+    slot: be.platform.queue
+  - path: src/modules/platform/queue/persistence/connection.ts
+    slot: be.persistence
+  - path: src/modules/platform/queue/persistence/entities/queue-outbox.entity.ts
+    slot: be.persistence
+  - path: src/modules/platform/queue/persistence/queue.sql.ts
+    slot: be.persistence
+  - path: src/modules/platform/queue/persistence/migrations/<epochMs13>-create-queue-outbox.ts
+    slot: be.persistence
+  - path: src/modules/queues/<queue>/index.ts
+    slot: be.queues
+  - path: src/modules/queues/<queue>/<queue>.queue.ts
+    slot: be.queues
+    role: The typed producers and the schedulers of one queue.
+    rules: [BE_QUEUE_PRODUCER_SHAPE, BE_OUTBOX_WRITE_TX]
+  - path: src/modules/queues/<queue>/<queue>.contracts.ts
+    slot: be.queues
+    role: Payload types and the queue name.
+    optional: true
+  - path: src/tests/e2e/<area>/<queue>.e2e-spec.ts
+    slot: be.tests.e2e
+    role: "Titles queue/<scenario>: ... prove the pattern."
+    spec: queue/enqueue-atomic-with-transaction, queue/relay-job-id-is-outbox-id, queue/scheduler-fires-once
+    rules: [BE_PATTERN_SPEC_MISSING]

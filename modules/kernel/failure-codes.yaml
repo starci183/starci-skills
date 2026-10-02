@@ -13179,3 +13179,56 @@ HFS_MONO_WORKSPACE_DEP:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
   owner: op-retry
   kind: check-finding
+
+BE_EVENT_CLASS_CONTRACT:
+  title: "A typed event class and its vendored contract agree"
+  title_vi: "Lớp sự kiện và hợp đồng sự kiện đã vendor không khớp"
+  meaning_vi: "Một lớp sự kiện dưới `be/src/modules/events/<service>/` không khai báo đúng một lớp với `eventName` và `version` là literal, không đặt tên tệp theo sự kiện của nó, không có mục tương ứng (cùng tên và phiên bản) trong `be/contracts/<service>/events.json`, hoặc một mục của hợp đồng không có lớp."
+  causes_vi:
+    - "Vi phạm luật R131: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
+    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `hfs emit-contracts`, hoặc thêm mục hợp đồng bằng tay."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
+  owner: op-retry
+  kind: check-finding
+
+BE_OUTBOX_WRITE_TX:
+  title: "The outbox is written by a domain service inside its transaction"
+  title_vi: "Outbox bị ghi ngoài domain hoặc không trong transaction"
+  meaning_vi: "`eventBus.publish(event, tx)` hoặc `enqueueX(payload, tx)` của một queue được gọi ngoài `modules/domain`, hoặc đối số `tx` không phải manager của transaction đang chạy (manager dùng chung được inject, một bí danh, manager ở ngoài hoặc thiếu đối số)."
+  causes_vi:
+    - "Vi phạm luật R132: một sự kiện hoặc job là hệ quả của thay đổi miền; dòng outbox phải cùng commit hoặc cùng rollback với thay đổi đó, nên chỉ domain service ghi và chỉ trong transaction của nó."
+    - "Handler, consumer, integration hoặc platform tự phát sự kiện, hoặc gọi `publish` bằng manager ngoài transaction làm sự kiện bị mất hoặc phát dù giao dịch đã rollback."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đưa việc phát sự kiện vào domain service, gọi trong `this.entityManager.transaction(async (manager) => { ... })` và truyền đúng `manager` đó; handler hay consumer chỉ gọi domain service."
+  owner: op-retry
+  kind: check-finding
+
+BE_EVENT_CONSUMER_SHAPE:
+  title: "A message consumer is a transport door named after its event"
+  title_vi: "Consumer sự kiện sai chỗ, sai tên hoặc không chuyển eventId"
+  meaning_vi: "Một lớp implements `EventConsumer` nằm ngoài tệp `.consumer.ts` của `transport/message`, tên tệp không theo `eventName` của lớp sự kiện, `handle` không đọc `delivery.eventId`, hoặc một tệp `.consumer.ts` chứa lớp không phải consumer sự kiện."
+  causes_vi:
+    - "Vi phạm luật R133: giao hàng ít nhất một lần nên mỗi lần nhận lại phải dedupe; consumer chuyển `eventId` vào command để domain service claim trong `platform/inbox` cùng transaction với tác dụng của nó."
+    - "Consumer được đặt ở handler hoặc nơi khác, hoặc đặt tên theo ý riêng khiến bên phát và bên nhận không cùng một tên sự kiện."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt consumer tại `transport/message/<event>.consumer.ts` (tên theo eventName, dấu chấm thành gạch ngang), khai báo `readonly event = <Lớp>Event`, và truyền `delivery.eventId` vào command được dispatch."
+  owner: op-retry
+  kind: check-finding
+
+BE_QUEUE_PRODUCER_SHAPE:
+  title: "A queue producer writes the outbox with its own tx parameter"
+  title_vi: "Producer của queue ghi outbox không bằng tham số tx của nó"
+  meaning_vi: "Một hàm hoặc phương thức export trong `<queue>.queue.ts` ghi vào `QueueOutbox` mà không khai báo tham số `tx: EntityManager` hoặc không truyền chính tham số đó làm đối số đầu."
+  causes_vi:
+    - "Vi phạm luật R134: job được enqueue trong transaction của người gọi (`enqueueX(payload, tx)`), nếu không job có thể chạy dù giao dịch rollback hoặc mất khi commit thành công."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm tham số `tx: EntityManager` vào producer và gọi `outbox.write(tx, ...)`."
+  owner: op-retry
+  kind: check-finding
+
+BE_PATTERN_SPEC_MISSING:
+  title: "A declared pattern has its proof scenarios on the test world"
+  title_vi: "Pattern đã khai báo thiếu kịch bản chứng minh trên test world"
+  meaning_vi: "hfs.json khai báo một pattern (event-bus, queue, ...) nhưng không có spec e2e hoặc integration nào có test mang tiêu đề `<pattern>/<kịch bản>: ...` cho một kịch bản bắt buộc của pattern đó."
+  causes_vi:
+    - "Vi phạm luật R135: phân tích tĩnh chỉ chứng minh hình dạng; hành vi (giao lại rồi vào dead letter, fencing token từ chối worker cũ, outbox chỉ phát sau commit) chỉ được chứng minh bằng kịch bản chạy thật trên test world."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e hoặc integration có test tiêu đề `<pattern>/<kịch bản>: ...` chạy trên `useTestWorld` cho từng kịch bản còn thiếu."
+  owner: op-retry
+  kind: check-finding

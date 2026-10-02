@@ -7,3 +7,9 @@ examples:
   - id: named-exception
     path: named-exception
     title: AbstractException declaration shape
+  - id: event-bus
+    path: event-bus
+    title: Publish an event in the domain transaction and consume it
+  - id: queue
+    path: queue
+    title: A typed queue producer called inside the domain transaction

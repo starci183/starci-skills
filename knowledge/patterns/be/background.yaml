@@ -2,8 +2,9 @@ schema: starci/knowledge-source@1
 id: be.background
 title: Backend background work
 purpose: |-
-  Given work that runs without a request (cron, sweep, outbox relay, queue consumption, retry), where does it live and which
-  process runs it? Background work is a transport that dispatches one command, run only by an app of kind worker.
+  Given work that runs without a request (a schedule, a sweep, event or queue consumption, retry), where does it live and which
+  process runs it? Background work is a transport that dispatches one command, run only by an app of kind worker. Events travel
+  through event-bus.yaml and jobs through queues.yaml; this topic keeps the rule that a runner must exist.
 appliesTo:
   - backend
 family: be
@@ -26,20 +27,17 @@ rules:
     kind: mandatory
     hfsRules: [R46, R88, R90]
     requirement: |-
-      Scheduled work is `transport/schedule/<job>.job.ts` implementing `ScheduledJob { name; schedule: CronSchedule | IntervalSchedule; run(at: Date): Promise<void> }`,
-      registered through `<feature>-schedule.module.ts` into `platform/scheduling`, which owns cron parsing, the lease and the
-      fencing so one replica runs a tick and a job never overlaps itself. Queue consumption is
-      `transport/message/<event>.consumer.ts` registered through `<feature>-message.module.ts` into `platform/messaging` (an
-      adapter over `@nestjs/bullmq` for queues and a Kafka adapter for cross-system streams). A job or consumer dispatches one
-      command exactly as a resolver does and holds no business decision. `@Cron`, `@Interval`, `@Timeout`, `setInterval`,
-      `new Worker(`, `@Processor` and `WorkerHost` appear only inside `platform/{scheduling,messaging}`. A CLI command is
-      `transport/cli/<name>.cli.ts` registered through `platform/cli`.
+      Work that runs without a request is a transport that dispatches one command exactly as a resolver does and holds no
+      business decision. An event is consumed by `transport/message/<event>.consumer.ts` (knowledge/patterns/be/event-bus.yaml). A
+      job that was enqueued or scheduled is processed by a processor (knowledge/patterns/be/queues.yaml for the producer and the
+      BullMQ job schedulers). `@Cron`, `@Interval`, `@Timeout`, `setInterval` for work, `new Worker(`, `@Processor`, `WorkerHost`, `kafkajs`
+      and Nest's in-process event bus appear nowhere outside `platform/{event-bus,queue}`.
     rationale: |-
       One shape for every entry protocol keeps handlers reusable and lets the app choose which protocols it serves.
     cases:
       - id: case-1
-        when: An outbox relay
-        write: 'platform/outbox exposes a job whose run(at) dispatches RelayOutboxCommand on each tick.'
+        when: A recurring task
+        write: 'a BullMQ job scheduler declared in modules/queues/<queue>/<queue>.queue.ts; its processor dispatches the command (queues.yaml).'
       - id: case-2
         when: A queue consumer
         write: 'transport/message/payment-settled.consumer.ts maps the payload to SettlePaymentRequest and dispatches SettlePaymentCommand after claiming the event in the inbox.'
@@ -55,9 +53,9 @@ rules:
     kind: mandatory
     hfsRules: [R46, R31]
     requirement: |-
-      An app of kind `worker` composes the schedule and message modules; an api app never runs cron or consumes a queue,
-      because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app that
-      composes it, and an e2e run boots the worker's real AppModule.
+      An app of kind `worker` composes the message transport and the processors; an api app never consumes a queue or runs a
+      processor, because that work would then run once per replica of the api. Every message transport has at least one app that
+      composes it, and an e2e run boots that app's real AppModule.
     rationale: |-
       A job that no process composes never runs, and a job inside a replicated api runs many times.
     cases:
@@ -76,15 +74,15 @@ rules:
     kind: mandatory
     hfsRules: [R46]
     requirement: |-
-      A method named `sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` must be reachable from a job or consumer that a
-      worker app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing
-      invokes does not recover anything.
+      A method named `sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` must be reachable from a consumer or a processor that an
+      app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing invokes
+      does not recover anything.
     rationale: |-
-      A built and unit-tested outbox, sweep or reconcile that nothing schedules gives the false impression of durable recovery.
+      A built and unit-tested sweep or reconcile that nothing schedules gives the false impression of durable recovery.
     cases:
       - id: case-1
         when: A new sweep
-        write: 'add a SweepUnsettledPaymentsJob in transport/schedule that dispatches the sweep command, and compose it in the worker in the same change.'
+        write: 'add a scheduler to the queue and a processor that dispatches the sweep command, and compose the processor in the worker in the same change.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED
@@ -112,24 +110,23 @@ rules:
         - Run a paused old worker resuming after reassignment against the actual store and assert its writes are refused.
     relatedExamples: []
   - id: BE-BACKGROUND-5
-    title: Producers publish through typed queues and the outbox
+    title: Producers publish through the event bus or a typed queue producer
     kind: mandatory
-    hfsRules: [R82, R90]
+    hfsRules: [R82, R90, R132]
     requirement: |-
-      Producers publish through `InjectMessagePublisher()` with a typed queue definition
-      `defineQueue<Payload>({ name, attempts, backoff })` declared by the owning capability. A publish that must be atomic with
-      a write goes through `InjectOutbox()` `outbox.enqueue(manager, message)` inside the transaction and is relayed by the
-      `platform/outbox` job. `@InjectQueue`, `Queue` and `KafkaClientService` are not used outside `platform/messaging`.
+      A producer publishes an event with `eventBus.publish(event, tx)` or enqueues a job with a typed queue producer
+      (`enqueueX(payload, tx)`), only from a domain service and only inside its transaction. See event-bus.yaml and queues.yaml.
+      `Queue`, `Worker`, `kafkajs` and `KafkaClientService` are used only inside `platform/queue` and `platform/event-bus`.
     rationale: |-
-      A typed queue definition keeps the payload, the attempts and the backoff with the owner, and the outbox keeps the
-      publish atomic with the write.
+      The outbox row commits with the write, so the publish is atomic with it.
     cases:
       - id: case-1
         when: A publish atomic with a write
-        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, order); await this.outbox.enqueue(manager, orderPlacedMessage(order)) })'
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, order); await this.eventBus.publish(OrderPlacedEvent.create({ orderId: order.id }), manager) })'
     verification:
       automated:
         - BE_INFRA_OWNER
+        - BE_OUTBOX_WRITE_TX
         - BE_TRANSACTION_EXTERNAL_CALL
         - BE_RAW_INJECT
       manual: []

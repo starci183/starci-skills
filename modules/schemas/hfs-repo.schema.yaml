@@ -84,6 +84,11 @@ $defs:
         type: array
         uniqueItems: true
         items: {type: string, pattern: '^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      patterns:
+        type: array
+        uniqueItems: true
+        description: The design patterns this side applies (event-bus, queue, fenced-job, projection, saga); each enables the opt-in slots that name it, and the checks require its proof scenarios.
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       connections: true
       reads:
         type: array
