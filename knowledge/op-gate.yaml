@@ -60,7 +60,7 @@ kinds:
       be.transport.message: [be/transport.yaml, be/event-bus.yaml, be/background.yaml, be/idempotency.yaml, be/services.yaml]
       be.feature.jobs: [be/jobs.yaml, be/queues.yaml, be/background.yaml]
       be.feature.reactors: [be/reactors.yaml, be/event-bus.yaml, be/idempotency.yaml]
-      be.jobs: [be/jobs.yaml]
+      be.feature.jobs.steps: [be/jobs.yaml]
       be.events: [be/event-bus.yaml]
       be.queues: [be/queues.yaml]
       be.projections: [be/projections.yaml]

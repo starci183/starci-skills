@@ -1127,7 +1127,7 @@ slots:
     tests: none
     composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
-  - id: be.jobs.steps
+  - id: be.feature.jobs.steps
     profiles: [be]
     path: "src/features/jobs/<job>/steps/"
     presence: opt-in

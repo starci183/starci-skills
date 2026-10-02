@@ -38,22 +38,11 @@ orchestration:
     (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `api dispatch --spawn`
     launches one isolated agent per ready operation in the workflow's one worktree, using the first eligible target in
     that operation's chain. The kernel never implements, repairs or tests on behalf of an operation agent.
-defaults:
-  codex:
-    working: gpt-6-luna
-    reasoning: gpt-6-sol
-  claude:
-    working: opus
-    reasoning: opus-reviewer
-  devin:
-    working: devin-worker
-    reasoning: devin-reviewer
 targets:
-  # Pool targets are named by the provider-window pool of modules/models/runtimes.yaml; `requestedModel` stays the
-  # implement-role model of the pool's models map for compatibility with consumers that read one model.
+  # Pool targets are named by the provider-window pool of modules/models/runtimes.yaml, whose `models` map pins
+  # the launch model per difficulty. A target names no model itself.
   codex-agent:
     runtime: codex
-    requestedModel: gpt-6-luna
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-sol
@@ -62,14 +51,12 @@ targets:
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
   gpt-6-sol:
     runtime: codex
-    requestedModel: gpt-6-sol
     profiles:
       working: gpt-6-sol
       reasoning: gpt-6-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   gpt-6-luna:
     runtime: codex
-    requestedModel: gpt-6-luna
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-luna
@@ -80,21 +67,18 @@ targets:
   # quota probe exists, so no automatic chain routes to it.
   cursor-agent:
     runtime: cursor
-    requestedModel: auto
     profiles:
       working: auto
       reasoning: auto
     orcaLaunch: {agent: cursor}   # orca orchestration worker-start --agent cursor
   claude-agent:
     runtime: claude
-    requestedModel: claude-opus-5-5
     profiles:
       working: opus
       reasoning: opus-reviewer
     orcaLaunch: {agent: claude}   # orca orchestration worker-start --agent claude
   devin-agent:
     runtime: devin
-    requestedModel: swe-2-max
     executionHosts: [orca]
     profiles:
       working: devin-worker

@@ -4,8 +4,8 @@
 //   agent-binary-missing     its CLI binary (the card's start.cli, or Orca's agentCmdOverrides command) is not on PATH;
 //   agent-bypass-missing     Orca's settings.agentDefaultArgs for the agent lack the card's bypassFlag (an approval prompt no one answers);
 //   model-not-listed         the model is no model the runtime declares for that provider (a provider that declares none, like Cursor whose
-//                            models Orca lists dynamically, is not judged) (prices.yaml, the registry defaults,
-//                            the runtimes.yaml pool models); a card with no model flag (Devin) takes no model.
+//                            models Orca lists dynamically, is not judged) (prices.yaml, the runtimes.yaml pool models);
+//                            a card with no model flag (Devin) takes no model.
 // No agent list is hard-coded: the card, Orca's settings and PATH decide. A test process reads none of them unless a spec passes
 // its own `settingsFile` / `pathDirs` (the host's real settings must not decide a spec's verdict).
 import fs from 'node:fs';
@@ -37,7 +37,6 @@ export function orcaSettingsFile(opts = {}) {
 export function modelsOfProvider(provider) {
   const found = new Set();
   for (const [id, row] of Object.entries(readYaml('modules/models/prices.yaml')?.models ?? {})) if (row?.provider === provider) found.add(id);
-  for (const v of Object.values(readYaml('modules/models/registry.yaml')?.defaults?.[provider] ?? {})) if (typeof v === 'string') found.add(v);
   const walk = (node) => {
     if (!node || typeof node !== 'object') return;
     if (node.provider === provider && node.models && typeof node.models === 'object') for (const v of Object.values(node.models)) if (typeof v === 'string') found.add(v);
@@ -75,7 +74,7 @@ export function hostAgentVerdict({ provider, model = null, card, env = process.e
   }
   if (card?.start?.modelArgument !== false && model) {
     const listed = models ?? modelsOfProvider(provider);
-    if (listed.size && !listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models: prices, registry defaults, runtime pools)` };
+    if (listed.size && !listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models: prices, runtime pools)` };
   }
   return { ok: true };
 }

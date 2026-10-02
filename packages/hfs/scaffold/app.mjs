@@ -73,23 +73,22 @@ export const STARTER_SIDES = Object.freeze({
 });
 
 /**
- * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. A name with a
- * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference app (examples/ecommerce-app)
- * declare. The root package.json holds the back end's runtime and every tool; each fe app workspace declares the packages its
- * own source imports (HFS_MONO_WORKSPACE_DEP), FE_APP_DEPENDENCIES.
+ * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. Every name
+ * takes its canon pin (knowledge/hfs/canon-pins.yaml). The root package.json holds the back end's runtime and every tool;
+ * each fe app workspace declares the packages its own source imports (HFS_MONO_WORKSPACE_DEP), FE_APP_DEPENDENCIES.
  */
 const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
-    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
-    '@nestjs/platform-express': null, '@nestjs/typeorm': '^11.0.3', 'nest-commander': null, pg: '^8.12.0',
-    'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', tslib: '^2.8.1', typeorm: '^0.3.20',
+    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
+    '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null,
+    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
     turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
-    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/test-world': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4', '@types/express': '^4.17.21',
-    '@types/jest': null, '@types/node': null, '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', eslint: null, 'eslint-plugin-react-hooks': null,
-    husky: '^9.1.7', jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: '^4', 'ts-jest': null,
-    'ts-node-dev': '^2.0.0', 'tsc-alias': '^1.8.10', 'tsconfig-paths': '^4.2.0', typescript: null,
+    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/test-world': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null, '@types/express': null,
+    '@types/jest': null, '@types/node': null, '@types/react': null, '@types/react-dom': null, eslint: null, 'eslint-plugin-react-hooks': null,
+    husky: null, jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: null, 'ts-jest': null,
+    'ts-node-dev': null, 'tsc-alias': null, 'tsconfig-paths': null, typescript: null,
   },
 });
 
@@ -111,7 +110,7 @@ const FE_APP_DEPENDENCIES = Object.freeze({
  */
 const FE_PACKAGES = Object.freeze({
   ui: { exports: ['.'], dependencies: { '@heroui/react': null, '@starci/grammar': null, 'next-intl': null, react: null } },
-  i18n: { exports: ['.', './proxy', './routing'], dependencies: { next: null, 'next-intl': null, 'server-only': '^0.0.1' } },
+  i18n: { exports: ['.', './proxy', './routing'], dependencies: { next: null, 'next-intl': null, 'server-only': null } },
 });
 
 /** The scripts of every fe package workspace: tsc builds it to dist and type-checks it; it lints with the workspace lint. */
@@ -120,7 +119,7 @@ const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.
 /** The app hfs.json of a new app called `name`. */
 export const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
 
-/** A dependency section at the canon pins (a null range takes the pin, which must exist). */
+/** A dependency section at the canon pins (a null range takes the pin, which must exist; every pinned name is null). */
 function pinnedSection(entries, pins) {
   const pinned = (dependency, range) => {
     if (range !== null) return range;

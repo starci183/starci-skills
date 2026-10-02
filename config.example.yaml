@@ -32,8 +32,9 @@ kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: 
 # never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
 parallel: {gear: 1}
 # supervisor — the optional chat digest cadence. pollIntervalMs controls
-# scripts/supervisor/poll.mjs when run continuously (at least 60000); null uses
-# scripts/machine/home.mjs DEFAULTS, and --interval-ms overrides this key.
+# scripts/supervisor/poll.mjs when run continuously (its floor is the config
+# validation of engine/config.mjs); null uses scripts/machine/home.mjs
+# DEFAULTS, and --interval-ms overrides this key.
 # The reconciler engine owns host runtime cadence and restores seats after reboot.
 # repos: managed product ledger-owner repositories for the reconciler and Supervisor tools,
 # relative to the source root (the directory holding this skill) or absolute.

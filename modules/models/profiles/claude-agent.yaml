@@ -9,7 +9,7 @@ runtime: claude                 # registry.yaml: targets.claude-agent.runtime
 schema: starci/module-model-profile@1  # module-local document kind; no upstream schema
 
 identity:
-  requestedModel: claude-opus-5-5   # registry.yaml targets.claude-agent.requestedModel; runtimes.yaml pins it at every difficulty
+  requestedModel: claude-opus-5-5   # the profile's own fallback model; runtimes.yaml runtimes.claude-agent.models pins it at every difficulty
   profiles:                     # registry.yaml targets.claude-agent.profiles
     working: opus
     reasoning: opus-reviewer

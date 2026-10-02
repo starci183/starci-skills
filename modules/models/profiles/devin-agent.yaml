@@ -8,7 +8,7 @@ runtime: devin                # registry.yaml
 schema: starci/module-model-profile@1
 
 identity:
-  requestedModel: swe-2-max   # registry.yaml
+  requestedModel: swe-2-max   # the profile's own fallback model; runtimes.yaml runtimes.devin-agent.models pins it per difficulty
   profiles:
     working: devin-worker     # registry.yaml targets — one bounded task in the workflow worktree via Devin CLI
     reasoning: devin-reviewer # registry.yaml targets — verify one bounded change, never expand scope

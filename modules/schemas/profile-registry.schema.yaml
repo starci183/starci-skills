@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry.schema.json
 title: StarCi profile registry
 type: object
-required: [schema, runtimes, aliases, executionModel, defaults, targets, skills, operators, fallback]
+required: [schema, runtimes, aliases, executionModel, targets, skills, operators, fallback]
 properties:
   schema: {const: starci/profile-registry@1}
   runtimes:
@@ -35,7 +35,6 @@ properties:
       # is the only file scripts/kernel/cli.mjs and scripts/agent/models.mjs read
       # for capacity.
       concurrency: {type: string, minLength: 1}
-  defaults: {type: object}
   targets:
     type: object
     minProperties: 1
@@ -88,13 +87,10 @@ properties:
         uniqueItems: true
         items: {type: string, minLength: 1}
 $defs:
-  model:
-    type: [string, "null"]
-    minLength: 1
   target:
     type: object
     additionalProperties: false
-    required: [runtime, profiles, requestedModel, orcaLaunch]
+    required: [runtime, profiles, orcaLaunch]
     properties:
       runtime: {type: string, minLength: 1}
       profiles:
@@ -104,7 +100,6 @@ $defs:
         properties:
           working: {type: string, minLength: 1}
           reasoning: {type: string, minLength: 1}
-      requestedModel: {$ref: "#/$defs/model"}
       executionHosts:
         type: array
         minItems: 1

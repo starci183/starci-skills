@@ -1,6 +1,6 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up without gaps; count them, never type the count).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids increase from R01; a retired id is never reused, so gaps are normal - count the rules, never type the count).
 #
-# One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
+# One entry per rule: its id, its finding code, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
 # rule is knowledge/hfs/README.md (section 12 lists the same ids and codes); this file is the data behind it. Read it only
 # through scripts/hfs/slots.mjs (loadRuleCatalog, rules); its shape is modules/schemas/hfs-rules.schema.yaml.
@@ -913,7 +913,7 @@ rules:
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest, `ruleParams.be.suffixes`; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
@@ -1429,7 +1429,7 @@ rules:
       - {kind: eslint-be, id: job-fence-required}
   - id: R159
     code: "BE_JOB_RUN_KEY"
-    law: "In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
+    law: "In a job step (slot be.feature.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_RUN_KEY"]
