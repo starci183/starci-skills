@@ -22,6 +22,7 @@
     "migrate": "node be/dist/apps/cli/src/main.js migrate run",
     "start:landing": "npm run start -w @ecommerce-app/landing",
     "start:app": "npm run start -w @ecommerce-app/app",
+    "test:browser": "playwright test -c browser/playwright.config.ts",
     "docker:build": "npm run docker:build:identity && npm run docker:build:order && npm run docker:build:billing && npm run docker:build:cli && npm run docker:build:landing && npm run docker:build:app",
     "docker:build:identity": "docker build -f be/apps/identity/Dockerfile -t ecommerce-app/identity:dev .",
     "docker:build:order": "docker build -f be/apps/order/Dockerfile -t ecommerce-app/order:dev .",
@@ -76,6 +77,7 @@
   "devDependencies": {
     "@apollo/client": "^4.3.1",
     "@nestjs/testing": "11.2.5",
+    "@playwright/test": "1.63.0",
     "@starci/eslint-canon-be": "3.0.7",
     "@starci/eslint-canon-fe": "8.0.7",
     "@starci/hfs": "4.0.7",
