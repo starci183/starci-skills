@@ -4571,6 +4571,17 @@ RT_DUPLICATE_CODE:
   owner: supervisor
   kind: check-finding
 
+RT_EXPORT_UNUSED:
+  title: "Export used by no other file"
+  title_vi: "Export không tệp nào khác dùng"
+  meaning_vi: "Một tệp .mjs của runtime (scripts, engine, modules, bin, ext, ui, packages) export một tên mà không tệp văn bản nào khác trong repo nhắc tới (mã nguồn, spec, yaml, json, markdown, shell đều tính). Chỉ tệp đầu vào công khai của một package (main, exports, bin, types trong package.json của nó) được miễn vì là API cho người dùng bên ngoài. Không có danh sách pending hay allowlist."
+  causes_vi:
+    - "Hàm hoặc hằng được export từ lúc viết nhưng chỉ dùng trong chính tệp"
+    - "Nơi dùng đã bị xóa hoặc đã chuyển sang hàm khác mà phần export còn lại"
+  nextStep_vi: "Người giám sát bỏ từ khóa export nếu tên chỉ dùng trong tệp, hoặc xóa luôn phần khai báo nếu tệp cũng không dùng, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_EXTERNAL_OWNER:
   title: "External system reached outside its owner"
   title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"

@@ -140,6 +140,7 @@ ruleParams:
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
       - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
       - {id: clones, run: scripts/checks/check-clones.mjs}
+      - {id: export-used, run: scripts/checks/check-export-used.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
