@@ -119,13 +119,13 @@ const seams=({start=null,show=null,handle='term_1'}={})=>{
 test('spawnAgent starts the routed agent with its spec through worker-start, takes the terminal from the receipt, names it and attests it',()=>{
   const s=seams();
   const created=[];
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',effort:'high',worktree:'D:/w',title:'[Op] x',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',effort:'high',worktree:'w',title:'[Op] x',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',
     request:{job:'j1',lease:'l1'},onCreated:(h,d)=>created.push([h,d]),io:s.io});
   assert.equal(r.ok,true,JSON.stringify(r));
   assert.deepEqual(s.names(),['trust','start','show','rename'],'no task-create and no dispatch-show');
   const start=s.calls.find(c=>c[0]==='start')[1];
   assert.deepEqual({agent:start.agent,model:start.model,effort:start.effort,spec:start.spec,taskTitle:start.taskTitle,run:start.run,from:start.from,worktree:start.worktree},
-    {agent:'claude',model:'claude-opus-5-5',effort:'high',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',worktree:'D:/w'});
+    {agent:'claude',model:'claude-opus-5-5',effort:'high',spec:'do x',taskTitle:'x.op #1',run:'run_1',from:'term_k',worktree:'w'});
   assert.deepEqual(start.request,{job:'j1',lease:'l1',run:'run_1',agent:'claude',model:'claude-opus-5-5'},'the start identity is the ledger identity plus the Run, agent and model');
   assert.equal(start.task,undefined,'a start never names an existing Task');
   assert.equal(start.terminal,undefined,'no terminal is ever handed to worker-start');
@@ -135,21 +135,21 @@ test('spawnAgent starts the routed agent with its spec through worker-start, tak
 
 test('a start receipt without the agent terminal takes it from worker-show; neither is a typed refusal that cleans the worker',()=>{
   const s=seams({handle:null});
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
   assert.equal(r.ok,true,JSON.stringify(r));
   assert.equal(r.terminal,'term_shown');
   const none=seams({handle:null,show:()=>({ok:true,state:'ready',dispatch:{id:'ctx_1'},effective:{agent:'claude',model:'claude-opus-5-5'}})});
-  const n=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:none.io});
+  const n=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:none.io});
   assert.deepEqual([n.ok,n.step,n.code,n.effectState],[false,'worker-show','worker-terminal-unknown','none']);
   assert.ok(none.names().includes('stop')&&none.names().includes('release'),'the nameless worker is stopped and released');
   const noTask=seams({start:({agent,model})=>({ok:true,outcome:'ok',effectState:'committed',dispatchId:'ctx_1',taskId:null,agentTerminalHandle:'term_1',agent,model})});
-  const t=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:noTask.io});
+  const t=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:noTask.io});
   assert.deepEqual([t.ok,t.step,t.code],[false,'worker-start','worker-start-no-task']);
 });
 
 test('a card that takes no model flag starts without --model/--effort and is attested on its agent alone',()=>{
   const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'devin',model:null}})});
-  const r=spawnAgent({provider:'devin',model:'swe-2-max',effort:'high',worktree:'D:/w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
+  const r=spawnAgent({provider:'devin',model:'swe-2-max',effort:'high',worktree:'w',title:'[Op] x',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
   assert.equal(r.ok,true,JSON.stringify(r));
   const start=s.calls.find(c=>c[0]==='start')[1];
   assert.equal(start.agent,'devin');
@@ -159,7 +159,7 @@ test('a card that takes no model flag starts without --model/--effort and is att
 
 test('an attestation mismatch fences and releases the worker it started and never reports it live',()=>{
   const s=seams({show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'claude-sonnet-5'}})});
-  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'D:/w',title:'t',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
+  const r=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',spec:'s',run:'run_1',request:{job:'j'},io:s.io});
   assert.equal(r.ok,false);
   assert.equal(r.step,'attestation');
   assert.ok(s.names().includes('stop')&&s.names().includes('release'),'the mismatched worker is stopped and released');

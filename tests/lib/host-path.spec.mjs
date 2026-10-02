@@ -22,7 +22,7 @@ test('hostPathHits: a drive path, a user-profile path and an AppData path are hi
   assert.equal(hits(`${FWD}Users/someone/${['AppData', 'Local'].join('/')}/x`), 1, 'the profile and AppData parts of a drive path are the drive path');
   assert.equal(hits('http://localhost:3000/x and file:///tmp/x and https://example.com/a'), 0);
   assert.equal(hits('%LOCALAPPDATA% and <runtime>/scripts and src/a.ts'), 0);
-  assert.equal(hits('Grüße:\\n and été:/x'), 0, 'a letter that is part of a longer (non-ASCII) word is not a drive');
+  assert.equal(hits('Grüße:\\n and Straße:/x'), 0, 'a letter that is part of a longer (non-ASCII) word is not a drive');
 });
 
 test('normalizeHostPaths: a path inside the repo becomes repo-relative, in either slash form and either case', () => {
