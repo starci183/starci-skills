@@ -2,6 +2,7 @@ import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { relativePath, workspaceExportSources } from './typescript.mjs';
 import { sourceLocation } from '../../lib/ts-ast.mjs';
+import { isServerActionModule } from './server-action.mjs';
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));
@@ -22,7 +23,7 @@ function ownerOf(owners, file) {
   return owners.find(owner => isInside(owner.root, file)) ?? null;
 }
 
-function privateOwnerChain(context, owners, edge) {
+function privateOwnerChain(context, owners, actionEntries, edge) {
   const sourceOwner = ownerOf(owners, edge.from);
   const queue = [{ file: edge.to, chain: [edge.from, edge.to] }];
   const visited = new Set();
@@ -31,7 +32,7 @@ function privateOwnerChain(context, owners, edge) {
     if (visited.has(current.file)) continue;
     visited.add(current.file);
     const owner = ownerOf(owners, current.file);
-    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) ? null : { owner, chain: current.chain };
+    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) || actionEntries.has(current.file) ? null : { owner, chain: current.chain };
     for (const candidate of context.edges.get(current.file) ?? []) if (candidate.reexport) {
       queue.push({ file: candidate.to, chain: [...current.chain, candidate.to] });
     }
@@ -56,6 +57,9 @@ export function checkOwners(config, context) {
   const owners = ownerDeclarations(config, context);
   const violations = [];
   const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
+  const actionEntries = new Set(config.kinds.includes('frontend')
+    ? [...sourceFiles].filter(([, file]) => isServerActionModule(context.ts, file)).map(([name]) => name)
+    : []);
   for (const owner of owners) {
     const sourceFile = sourceFiles.get(owner.entry);
     if (!sourceFile) {
@@ -76,7 +80,7 @@ export function checkOwners(config, context) {
   for (const sourceFile of context.files) {
     const from = canonical(sourceFile.fileName);
     for (const edge of context.edges.get(from) ?? []) {
-      const bypass = privateOwnerChain(context, owners, edge);
+      const bypass = privateOwnerChain(context, owners, actionEntries, edge);
       if (!bypass) continue;
       if (arrangesSchema(config, from, bypass.chain.at(-1))) continue;
       violations.push({

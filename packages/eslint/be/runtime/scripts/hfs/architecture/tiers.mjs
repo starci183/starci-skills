@@ -1,3 +1,5 @@
+import { isServerActionModule } from './server-action.mjs';
+
 /**
  * HFS checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
  *   1. the tier direction matrix: every import, re-export and type-only import between two owners must go from a tier to
@@ -78,6 +80,16 @@ const triggerOf = (resolver, file) => {
   return owner ? (resolver.slot(owner.slot)?.trigger ?? null) : null;
 };
 
+/** A connected block may call a db writer directly when that writer is a file-level Next Server Action. */
+const blockCallsServerAction = (graph, edge) => {
+  if (graph.profile !== 'fe') return false;
+  const from = graph.resolver.classifyPath(edge.from);
+  const to = graph.resolver.classifyPath(edge.to);
+  return from.slot === 'fe.components' && from.kind === 'blocks' && from.role === 'entry'
+    && to.slot === 'fe.modules.db' && /^write-[^/]+\.ts$/u.test(edge.to.split('/').at(-1))
+    && isServerActionModule(null, graph.files.get(edge.to).sourceFile);
+};
+
 export function checkTiers(graph) {
   const { resolver, profile } = graph;
   const violations = [];
@@ -89,7 +101,7 @@ export function checkTiers(graph) {
     const verdict = resolver.importAllowed(edge.from, edge.to);
     if (verdict.reason === 'unowned' || verdict.reason?.startsWith('slot')) { unclassified += 1; continue; }
     edgesChecked += 1;
-    if (verdict.allowed || !REASON_TEXT[verdict.reason]) continue;
+    if (verdict.allowed || (verdict.reason === 'tierDirection' && blockCallsServerAction(graph, edge)) || !REASON_TEXT[verdict.reason]) continue;
     counts[verdict.reason] += 1;
     const featureToFeature = profile === 'be' && verdict.reason === 'tierDirection' && verdict.fromTier === 'feature' && verdict.toTier === 'feature';
     const fromKind = featureToFeature ? triggerOf(resolver, edge.from) : null;

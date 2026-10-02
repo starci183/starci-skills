@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, archFixture, runArch, findings } from '../helpers/hfs-arch-fixture.mjs';
 
 // A workspace package's public entries are every source file its package.json `exports` maps (dist back to src),
 // not only src/index.ts: a client entry `.` and server subpaths (./proxy, ./layout, ./request) are all entries.
@@ -43,4 +43,26 @@ test('a deep import that no export maps is still refused', t => {
     files: files({ 'apps/web/src/app/deep.tsx': "import { hidden } from '../../../../packages/demo-i18n/src/private';\nexport const deep = hidden;\n" }),
   }));
   assert.equal(findings(report, 'ARCH_OWNER_EXPORT_BYPASS').length, 1, JSON.stringify(report.errors));
+});
+
+test('a Server Action is its own owner entry, but a barrel that re-exports it is not', t => {
+  const declaration = appDeclaration('fe', { apps: [{ name: 'web', kind: 'next' }] });
+  declaration.edition = 'lite';
+  declaration.sides.be.connections = [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }];
+  const report = runArch(archFixture(t, {
+    profile: 'fe',
+    files: {
+      '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+      'apps/web/src/components/blocks/Direct/index.tsx': "import { writeOrder } from '../../../modules/db/orders/write-order';\nexport const Direct = writeOrder;\n",
+      'apps/web/src/components/blocks/Barrel/index.tsx': "import { writeOrder } from '../../../modules/db/orders/actions';\nexport const Barrel = writeOrder;\n",
+      'apps/web/src/modules/db/index.ts': "export const db = true;\n",
+      'apps/web/src/modules/db/orders/actions.ts': "export { writeOrder } from './write-order';\n",
+      'apps/web/src/modules/db/orders/write-order.ts': "'use server';\nimport 'server-only';\nexport const writeOrder = async () => 1;\n",
+    },
+  }));
+  const found = findings(report, 'ARCH_OWNER_EXPORT_BYPASS');
+  assert.deepEqual(found.map(item => [item.path, item.resolvedPath]), [[
+    'apps/web/src/components/blocks/Barrel/index.tsx',
+    'apps/web/src/modules/db/orders/actions.ts',
+  ]]);
 });
