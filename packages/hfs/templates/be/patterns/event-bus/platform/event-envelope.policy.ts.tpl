@@ -39,11 +39,19 @@ export const readEnvelopeText = (value: string): ReadEnvelopeText => {
     }
 }
 
+/** What proves the payload record of an envelope has the fields of an event's payload. */
+export type PayloadGuard<Payload extends object> = (
+    payload: Record<string, unknown>,
+) => payload is Payload & Record<string, unknown>
+
+/** What makes an event from a checked envelope: its id and its proven payload. */
+export type EventBuilder<Payload extends object, Event extends BaseEvent> = (eventId: string, payload: Payload) => Event
+
 /** Reads an envelope into an event: the shape is checked, `isPayload` proves the payload fields, `build` makes the event; null when either check fails. */
 export const readEventOf = <Payload extends object, Event extends BaseEvent>(
     envelope: unknown,
-    isPayload: (payload: Record<string, unknown>) => payload is Payload & Record<string, unknown>,
-    build: (eventId: string, payload: Payload) => Event,
+    isPayload: PayloadGuard<Payload>,
+    build: EventBuilder<Payload, Event>,
 ): ParsedEvent<Event> => {
     const read = readEnvelope(envelope)
     return read !== null && isPayload(read.payload) ? build(read.eventId, read.payload) : null

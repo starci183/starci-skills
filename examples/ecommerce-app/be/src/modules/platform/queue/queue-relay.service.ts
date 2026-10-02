@@ -5,7 +5,8 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { PassLoop } from "@modules/platform/primitives"
+import { relayLoopOf } from "@modules/platform/primitives"
+import type { RelayLoop } from "@modules/platform/primitives"
 import { InjectQueueOptions, InjectQueueRelayManagers, InjectQueueTransport } from "./queue.decorators"
 import { QueueLogEvent } from "./queue.log-events"
 import type { QueueOptions } from "./queue.options"
@@ -22,7 +23,7 @@ import type { QueueRow } from "./persistence/queue.rows"
  * shutdown and pauses only when the outbox is empty.
  */
 export class QueueRelayService implements OnApplicationBootstrap, OnApplicationShutdown {
-    private readonly loop: PassLoop
+    private loop: RelayLoop | null = null
 
     constructor(
         @InjectQueueOptions() private readonly options: QueueOptions,
@@ -30,30 +31,33 @@ export class QueueRelayService implements OnApplicationBootstrap, OnApplicationS
         @InjectQueueTransport() private readonly transport: QueueTransport,
         @InjectClock() private readonly clock: Clock,
         @InjectLogger() private readonly logger: Logger,
-    ) {
-        this.loop = new PassLoop({
-            pass: () => this.relay(),
-            onFailure: (cause) => this.logger.error(QueueLogEvent.RelayFailed, cause),
-            wait: (ms) => this.transport.wait(ms),
-            idleMs: this.options.relayIntervalMs,
-        })
-    }
+    ) {}
 
     /** One pass over every connection: adds the oldest waiting rows of each (at most the batch size) and answers how many it added. */
-    async relay(): Promise<number> {
-        let added = 0
-        for (const manager of this.managers) added += await this.relayOf(manager)
-        return added
+    relay(): Promise<number> {
+        return this.loopOf().relay()
     }
 
     /** Starts the relay loop over the outbox of every connection the options name. */
     onApplicationBootstrap(): void {
-        this.loop.start()
+        this.loopOf().start()
     }
 
     /** Stops the loop and waits for its last pass. */
     async onApplicationShutdown(): Promise<void> {
-        await this.loop.stop()
+        await this.loopOf().stop()
+    }
+
+    private loopOf(): RelayLoop {
+        this.loop ??= relayLoopOf({
+            managers: this.managers,
+            relayOf: (manager) => this.relayOf(manager),
+            logger: this.logger,
+            failure: QueueLogEvent.RelayFailed,
+            wait: (ms) => this.transport.wait(ms),
+            idleMs: this.options.relayIntervalMs,
+        })
+        return this.loop
     }
 
     private relayOf(manager: EntityManager): Promise<number> {

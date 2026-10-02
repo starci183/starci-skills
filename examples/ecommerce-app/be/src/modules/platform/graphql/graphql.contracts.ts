@@ -22,6 +22,7 @@ export interface GraphqlContextInput {
 /** The request headers of an upgrade request: any header by name, the Authorization one typed. */
 export interface ConnectionHeaders {
     readonly [name: string]: string | ReadonlyArray<string> | undefined
+    /** The Authorization header the client sent, when it did. */
     readonly authorization?: string
 }
 
