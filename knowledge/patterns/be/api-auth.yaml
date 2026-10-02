@@ -26,7 +26,7 @@ rules:
   - id: BE-AUTH-1
     title: Default deny with APP_GUARD and @Public
     kind: mandatory
-    hfsRules: [R41]
+    hfsRules: [R41, R02]
     requirement: |-
       `domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles(...)` and `@CurrentPrincipal()`.
       Every api app registers, in this order, the `APP_GUARD` throttler, the CSRF origin guard and `AuthGuard`. `PublicReason`
@@ -39,7 +39,7 @@ rules:
     cases:
       - id: case-1
         when: Registration
-        write: 'be/apps/api/src/app.module.ts provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
+        write: 'the api app''s be/apps/<app>/src/app.module.ts (slot be.app.api) provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
       - id: case-2
         when: An open door
         write: '@Public({ reason: PublicReason.AuthHandshake }) on the signIn operation'
@@ -50,6 +50,19 @@ rules:
       automated:
         - BE_DEFAULT_DENY
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_MIN_INSTANCES
+        - HFS_REQUIRED_FILE_MISSING
+        - HFS_ROOT_ENTRY_MISSING
+        - HFS_APPS_REQUIRED
+        - HFS_APP_LAYOUT_INVALID
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
       manual:
         - Review each `@Public` reason and confirm that the operation may be reached without a session.
     relatedExamples: []
@@ -73,6 +86,8 @@ rules:
     verification:
       automated:
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
         - BE_DEFAULT_DENY
       manual:
         - Confirm the audience, issuer and algorithm allow list against the provider contract.
@@ -149,7 +164,7 @@ rules:
   - id: BE-AUTH-6
     title: Pagination is by cursor
     kind: mandatory
-    hfsRules: [R42]
+    hfsRules: [R42, R69]
     requirement: |-
       A list operation takes `PageArgs { first: Int (1..PAGE_SIZE_MAX), after?: String }` and returns
       `<X>Connection { items, pageInfo { endCursor, hasNextPage } }`; cursors are opaque and HMAC-signed by

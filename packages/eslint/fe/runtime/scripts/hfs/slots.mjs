@@ -786,7 +786,7 @@ const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];
 function ruleCatalogProblems(d) {
   const bad = [];
   if (!isPlainObject(d)) return ['the rule catalog is not a map'];
-  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules'].includes(key)) bad.push(`unknown top-level key ${key}`);
+  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules', 'retired'].includes(key)) bad.push(`unknown top-level key ${key}`);
   const schemaOk = /^starci\/hfs-rules@\d+$/.test(String(d.schema));
   if (!schemaOk) bad.push('schema must be starci/hfs-rules@<major>');
   if (!SEMVER.test(String(d.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -879,7 +879,7 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
     version: doc.version, major, minor, patch,
     gates: deepFreeze(structuredClone(doc.gates)),
     enforcerKinds: deepFreeze(structuredClone(doc.enforcerKinds)),
-    rules: list,
+    rules: list, retired: deepFreeze(structuredClone(doc.retired ?? [])),
     /** The rule with this id (R01..), or null. */
     rule: (id) => byId.get(id) ?? null,
     /** The rule that owns this failure code (its own or a sub-check code), or null. */

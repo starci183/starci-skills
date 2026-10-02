@@ -22,7 +22,7 @@ rules:
   - id: FE-ERROR-1
     title: Failure is resolved before presentation
     kind: mandatory
-    hfsRules: [R51, R53]
+    hfsRules: [R51, R53, R92]
     requirement: |
       A read failure is a slot status, never a shape: the connected half folds each Outcome with `toSlot` (a refused
       outcome becomes isForbidden, any other failure isError), and the pure half renders it through `SlotView` with a
@@ -55,10 +55,17 @@ rules:
           string
     verification:
       automated:
-        - FE_WORLD_OWNER_RENDER_BOUNDARY
         - FE_HTTP_STATUS_COLLAPSE
-        - starci-fe/no-data-status-shape
-        - starci-fe/slot-status-through-slotview
+        - FE_OUTCOME_KIND_UNHANDLED
+        - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm failure copy and recovery eligibility match business policy.
     relatedExamples:
@@ -91,6 +98,8 @@ rules:
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE
+        - FE_OUTCOME_KIND_UNHANDLED
+        - FE_WIRE_GENERATED
       manual:
         - Verify business dispositions, retry eligibility, failure copy and redaction.
     relatedExamples:
@@ -99,7 +108,7 @@ rules:
   - id: FE-ERROR-3
     title: throw new Error where silence would be wrong
     kind: mandatory
-    hfsRules: [R51]
+    hfsRules: [R51, R49]
     requirement: |
       `throw new Error(...)` marks results the code cannot continue without: a required payload that is absent, a slot
       rendered outside its owner, an environment value missing in production. It does not replace typed normal business
@@ -120,6 +129,8 @@ rules:
           modules/config throws when it loads if a required NEXT_PUBLIC value is missing; there is no localhost fallback
     verification:
       automated:
+        - FE_HTTP_STATUS_COLLAPSE
+        - FE_OUTCOME_KIND_UNHANDLED
         - FE_ENV_OWNER
       manual:
         - Select domain-required bindings and confirm which absence modes must stop continuation.
@@ -152,6 +163,7 @@ rules:
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING
+        - FE_SUSPENSE_NULL_FALLBACK
       manual:
         - Verify feedback applicability, recovery safety, copy, redaction and telemetry behavior.
     relatedExamples:
@@ -176,7 +188,8 @@ rules:
         when: "Invalid vocabulary value"
         write: "assertPresentationState(\"unknown\") throws TypeError"
     verification:
-      automated: []
+      automated:
+        - FE_PACKAGE_SHAPE
       manual:
         - Verify conformance helpers against installed @starci/grammar/common exports.
     relatedExamples: []

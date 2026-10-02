@@ -27,7 +27,7 @@ rules:
   - id: BE-EVENT-BUS-1
     title: Inside one context nothing is an event
     kind: mandatory
-    hfsRules: [R152]
+    hfsRules: [R152, R26]
     requirement: |-
       Work that stays inside one context (one connection, one set of tables) is synchronous: the handler dispatches to that
       context's domain service, which does the whole change in one transaction. No event, no queue and no bus is involved, and a
@@ -48,6 +48,8 @@ rules:
       automated:
         - BE_OUTBOX_WRITE_TX
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm each published event crosses a context or starts asynchronous work, and no handler publishes to tell itself something.
     relatedExamples: [event-bus]
@@ -98,6 +100,7 @@ rules:
         - BE_OUTBOX_WRITE_TX
         - BE_INFRA_OWNER
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual: []
     relatedExamples: [event-bus]
   - id: BE-EVENT-BUS-4
@@ -226,7 +229,7 @@ files:
     role: "The one kafkajs importer."
     template: event-bus/platform/kafka-event-transport.client.ts.tpl
   - path: src/modules/platform/event-bus/messages/event-bus.messages.ts
-    slot: be.platform.event-bus
+    slot: be.domain.messages
     template: event-bus/platform/messages/event-bus.messages.ts.tpl
   - path: src/modules/platform/event-bus/persistence/connection.ts
     slot: be.persistence

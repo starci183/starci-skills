@@ -23,8 +23,8 @@ rules:
     kind: mandatory
     hfsRules: [R20, R30, R65]
     requirement: |
-      Backend: source file 500 lines, function 80 lines, `app.module.ts` 250 lines, `main.ts` 80 lines, `index.ts` 60 exports,
-      feature 250 source files. Frontend: component 300 lines, connected `index.tsx` 200 lines, hook 200 lines, module file 400
+      Backend: source file 500 lines, function 80 lines, the app bootstrap and root module budgets of the `be.app.*` slots
+      (80 and 250 lines), an owner's public index 60 exports, feature 250 source files. Frontend: component 300 lines, connected `index.tsx` 200 lines, hook 200 lines, module file 400
       lines, at most 6 data hooks and 6 `useState` per connected unit. Packages: images under docs 500 KB. Budgets are the slot
       `budget` fields and are read by the checks.
     rationale: |
@@ -36,8 +36,17 @@ rules:
     verification:
       automated:
         - HFS_SIZE_GROWTH
-        - FE_SIZE_AND_STATE_BUDGET
+        - HFS_SIZE_SOFT_BACKLOG
         - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - FE_SIZE_AND_STATE_BUDGET
+        - FE_LIST_KEY
+        - FE_EFFECT_CLEANUP
+        - FE_SWALLOWED_ERROR
+        - FE_CONSOLE_CALL
       manual: []
     relatedExamples: []
   - id: REPO-BUDGET-2
@@ -58,6 +67,7 @@ rules:
     verification:
       automated:
         - HFS_SIZE_GROWTH
+        - HFS_SIZE_SOFT_BACKLOG
       manual:
         - Review that a split follows responsibility, not line count.
     relatedExamples: []
@@ -78,5 +88,7 @@ rules:
     verification:
       automated:
         - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
       manual: []
     relatedExamples: []

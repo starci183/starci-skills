@@ -43,8 +43,8 @@ rules:
         write: 'await this.entityManager.transaction(async (manager) => { await manager.save(...); await this.receiptQueue.enqueueSendReceipt({ orderId }, manager) })'
     verification:
       automated:
-        - BE_QUEUE_PRODUCER_SHAPE
         - BE_OUTBOX_WRITE_TX
+        - BE_QUEUE_PRODUCER_SHAPE
       manual:
         - Confirm the payload carries ids, not entities, and the queue name is the contract between producer and processor.
     relatedExamples: [queue]

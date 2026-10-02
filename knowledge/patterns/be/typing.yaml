@@ -40,6 +40,7 @@ rules:
     verification:
       automated:
         - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
       manual:
         - Validate external payloads before using narrowed values.
     relatedExamples: []
@@ -81,6 +82,8 @@ rules:
     verification:
       automated:
         - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
       manual:
         - Check runtime DTO construction and mutation behavior.
     relatedExamples: []
@@ -100,7 +103,10 @@ rules:
         write: 'export enum PurchaseStatus { Open = "open", Settled = "settled" } in the domain; persistence stores the string.'
     verification:
       automated:
+        - BE_SCHEMA_OWNER
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Verify client and database contract compatibility.
     relatedExamples: []
@@ -125,8 +131,9 @@ rules:
     verification:
       automated:
         - HFS_INLINE_SUPPRESSION
-        - BE_TYPE_ESCAPE
         - BE_DEFAULT_DENY
+        - BE_SPEC_QUALITY
+        - BE_TYPE_ESCAPE
       manual:
         - Inspect unvalidated data flow.
     relatedExamples: []
@@ -148,6 +155,7 @@ rules:
       automated:
         - BE_ENTITY_IN_CONTRACT
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual:
         - Review the smallest data and authority each operation needs.
     relatedExamples: []
@@ -169,8 +177,8 @@ rules:
         write: '@InputType() export class StartCheckoutInput { @Field() @IsUUID() offerId!: string; @Field() @IsString() @MaxLength(200) note!: string }'
     verification:
       automated:
-        - BE_INPUT_BOUNDED
         - BE_ENTITY_IN_CONTRACT
+        - BE_INPUT_BOUNDED
       manual:
         - Test validation, unknown and nested input handling and safe output fields.
     relatedExamples: []

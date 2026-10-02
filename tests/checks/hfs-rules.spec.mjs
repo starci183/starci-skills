@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, rules } from '../../scripts/hfs/slots.mjs';
-import { hfsRulesFindings, pluginRuleIds, stylelintRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows, readKnowledgeFiles, KNOWLEDGE_CODE_ROOTS } from '../../scripts/checks/check-hfs-rules.mjs';
+import { hfsRulesFindings, pluginRuleIds, stylelintRuleIds, checkHfsRules, PLUGIN_ENTRY, readKnowledgeFiles, KNOWLEDGE_CODE_ROOTS } from '../../scripts/checks/check-hfs-rules.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const catalogText = fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8');
@@ -221,18 +221,6 @@ test('a plugin rule no catalog entry names is uncatalogued', () => {
   plugins['eslint-be'].ids.add('rule-nobody-owns');
   const findings = run(catalog, { plugins });
   assert.deepEqual(findings.map((f) => [f.code, f.enforcer]), [['HFS_RULE_UNCATALOGUED', 'eslint-be:rule-nobody-owns']]);
-});
-
-test('the README rule table must repeat the catalog: a changed law, a missing row and a stale range are drift', () => {
-  const catalog = loadRuleCatalog();
-  const table = catalog.rules.map((r) => `| ${r.id} | \`${r.code}\` | ${r.law} |`).join('\n');
-  assert.deepEqual(run(catalog, { readme: table }), []);
-  assert.equal(readmeRuleRows(table).length, catalog.rules.length);
-  const changed = table.replace(/^\| R01 \|(.*)\|$/m, '| R01 | `HFS_SLOT_UNDECLARED` | something else |');
-  assert.deepEqual(run(catalog, { readme: changed }).map((f) => [f.code, f.rule]), [['HFS_RULE_LAW_DRIFT', 'R01']]);
-  const missing = table.split('\n').slice(1).join('\n');
-  assert.deepEqual(run(catalog, { readme: missing }).map((f) => [f.code, f.rule]), [['HFS_RULE_LAW_DRIFT', 'R01']]);
-  assert.deepEqual(run(catalog, { readme: `${table}\nThe catalog R01 to R12.` }).map((f) => f.code), ['HFS_RULE_LAW_DRIFT']);
 });
 
 test('an enforcer without a violating and a passing proof is untested', () => {

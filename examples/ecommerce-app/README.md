@@ -35,7 +35,7 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
 
 - `be/apps/<app>/src`: `main.ts` (parses the environment once), `app.module.ts` (`AppModule.register(options)`, every
   capability registered once with `isGlobal: true`), `<app>.options.ts`. An app only composes; the e2e world proves it boots.
-- `be/src/features/{identity,checkout,health}`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
+- `be/src/features/api/<feature>/`: `application/` (command/query + thin handler + contracts) and `transport/{graphql,http}/`. A handler maps its input and calls one method of one service; a resolver or controller dispatches one bus message.
 - `be/src/modules/domain`: account, session, identity (guards), catalog, cart, order (checkout, cancellation and order services), payment, invoice (billing), member; each owns its business logic in its `*.service.ts`, its entities, migrations,
   `.sql.ts` constants and errors under `persistence/` and `errors/`.
 - `be/src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,

@@ -44,7 +44,7 @@ rules:
   - id: BE-REACTORS-2
     title: A reactor never imports another kind and never reads another context
     kind: mandatory
-    hfsRules: [R156]
+    hfsRules: [R156, R26]
     requirement: |-
       A reactor imports only `modules/*`; it meets the api, saga and jobs kinds through events. It never reads another context's
       tables or imports its entities, services or SQL: what it needs from that context arrives in the event, or is read from a
@@ -60,13 +60,15 @@ rules:
       automated:
         - BE_KIND_ISOLATION
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm the event carries every field the copy needs.
     relatedExamples: [event-bus]
   - id: BE-REACTORS-3
     title: The local copy lives in the reactor's own context and is replayable
     kind: mandatory
-    hfsRules: [R152]
+    hfsRules: [R152, R80]
     requirement: |-
       The copy is a table of the context that owns the reactor, on that context's connection, written by a domain service of that
       context (one transaction touches one context's connection). The write is an idempotent upsert keyed by the aggregate id and
@@ -79,6 +81,7 @@ rules:
         write: 'The second delivery claims nothing in the inbox and the row is unchanged.'
     verification:
       automated:
+        - BE_OUTBOX_WRITE_TX
         - BE_INBOX_DEDUPE_MISSING
       manual:
         - Confirm a replay from the start of the topic gives the same rows.

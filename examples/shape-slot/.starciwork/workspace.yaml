@@ -1,0 +1,9 @@
+schema: work/workspace@1
+id: shape-slot
+project: shape-slot
+description: The Work records of shape-slot, one StarCi app with its back end in be/ and its front end in fe/.
+repositories:
+  - role: be
+    name: be
+  - role: fe
+    name: fe

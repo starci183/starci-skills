@@ -27,7 +27,7 @@ rules:
   - id: BE-JOBS-1
     title: The job row has one owner and one atomic claim
     kind: mandatory
-    hfsRules: [R157]
+    hfsRules: [R157, R86]
     requirement: |-
       `modules/platform/jobs` holds the job entity (`id`, `kind`, `status`, `currentStep`, `fencingToken`, `claimedBy`,
       `leaseExpiresAt`, `payload`, a unique `jobKey`), `job-claim.service.ts` and the persistence of the table. `claim()` is one
@@ -196,7 +196,7 @@ files:
     role: "JobFencedOut."
     template: jobs/platform/jobs.error.ts.tpl
   - path: src/modules/platform/jobs/messages/jobs.messages.ts
-    slot: be.platform.jobs
+    slot: be.domain.messages
     template: jobs/platform/jobs.messages.ts.tpl
   - path: src/modules/platform/jobs/persistence/connection.ts
     slot: be.persistence

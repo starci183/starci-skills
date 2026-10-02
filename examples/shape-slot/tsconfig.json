@@ -1,9 +1,0 @@
-{
-  "extends": "@starci/tsconfig/next.json",
-  "compilerOptions": {
-    "allowJs": false,
-    "baseUrl": "."
-  },
-  "include": ["apps/*/src/**/*.ts", "apps/*/src/**/*.tsx", "apps/*/next-env.d.ts"],
-  "exclude": ["node_modules", "apps/*/node_modules", "apps/*/.next"]
-}

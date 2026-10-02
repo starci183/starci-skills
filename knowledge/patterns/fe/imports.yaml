@@ -48,7 +48,10 @@ rules:
         write: 'import { StatusChip } from "@nivo/ui" through package.json exports; never reach fe/packages/nivo-ui/src through @/ or a tsconfig path'
     verification:
       automated:
+        - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
         - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Verify @starci/grammar/common exports before importing; do not use the package root.
@@ -77,7 +80,7 @@ rules:
   - id: FE-IMPORTS-3
     title: Data enters through the owning feature or module
     kind: mandatory
-    hfsRules: [R56, R50]
+    hfsRules: [R56, R50, R26, R92]
     requirement: |
       Every authored hook lives under hooks/<domain>. Feature owners and connected blocks import those hooks through a resolved
       hooks public entry; hooks reach transport and domain capabilities through module public entries (`@/modules/api`).
@@ -98,9 +101,24 @@ rules:
         write: "Import the feature or view type through the feature entry, never a generated wire type."
     verification:
       automated:
+        - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
-        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_TRANSPORT_OWNER
+        - FE_EFFECT_FETCH
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
+        - FE_COMPONENT_API
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_PURE_REACHES_DATA
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm a data lifecycle has a feature owner and reusable presentation does not import it.
     relatedExamples:
@@ -109,7 +127,7 @@ rules:
   - id: FE-IMPORTS-4
     title: Responsibility direction
     kind: mandatory
-    hfsRules: [R27, R64]
+    hfsRules: [R27, R64, R26]
     requirement: |
       App adapters import internal code only through public entries below features/{pages,layouts,overlays}, including
       type-only imports and re-exports. Features compose components, hooks and modules. Components never point to app or
@@ -133,9 +151,11 @@ rules:
         write: "never at runtime; component.tsx may use import type from a generated type only through a feature model"
     verification:
       automated:
-        - FE_APP_ISOLATION
         - ARCH_OWNER_CYCLE
+        - FE_APP_ISOLATION
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm leaves do not import higher tiers or world-reading hooks.
     relatedExamples:
@@ -144,7 +164,7 @@ rules:
   - id: FE-IMPORTS-5
     title: Vendor boundaries
     kind: mandatory
-    hfsRules: [R62]
+    hfsRules: [R62, R61, R93]
     requirement: |
       Only the Icon leaf imports @heroicons/react. Headings come from Grammar Heading, never a raw h2. Form controls come from
       the Grammar renderers, never a raw select, input, textarea or button. Grammar peerDependencies are exactly @heroui/react
@@ -164,9 +184,12 @@ rules:
     verification:
       automated:
         - FE_NATIVE_FORM_CONTROL
-        - no-vendor-icon-outside-icon-leaf
-        - heroicons-is-the-glyph-vendor
-        - no-heading-tag-outside-heading-component
+        - FE_NATIVE_IMAGE
+        - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
+        - FE_VENDOR_BOUNDARY
+        - ARCH_GRAMMAR_CONTRACT_INVALID
+        - ARCH_GRAMMAR_EXPORT_BYPASS
       manual: []
     relatedExamples: []
 
@@ -189,15 +212,20 @@ rules:
         write: 'export { COMMON_SPACING_SCALE, type CommonSpacingStep } from "./spacing.js" with the .js suffix'
     verification:
       automated:
+        - BE_PUBLIC_SURFACE
+        - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
         - HFS_UNUSED_EXPORT
+        - HFS_UNUSED_FILE
       manual: []
     relatedExamples: []
 
   - id: FE-IMPORTS-7
     title: Forbidden
     kind: mandatory
-    hfsRules: [R18, R30, R61, R62]
+    hfsRules: [R18, R30, R61, R62, R26]
     requirement: |
       Do not bypass another owner or package public entry, let resolved presentation runtime-import transport, default-export
       from reusable src/components, use an inline lint or type suppression, import Grammar from the package root or mixed
@@ -234,8 +262,18 @@ rules:
     verification:
       automated:
         - HFS_INLINE_SUPPRESSION
+        - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
+        - ARCH_OWNER_EXPORT_STAR
+        - HFS_ALIAS_REEXPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
+        - FE_NATIVE_FORM_CONTROL
+        - FE_NATIVE_IMAGE
+        - BE_TIER_DIRECTION
         - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
       manual:
         - Confirm Grammar imports use verified @starci/grammar/common exports only.
     relatedExamples: []

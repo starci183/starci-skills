@@ -172,7 +172,7 @@ test("no why names a rule that does not exist", () => {
   assert.deepEqual(orphans, [])
 })
 
-test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, R60-R62, R65-R67", () => {
+test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, R60-R62, R65", () => {
   const codes = new Set(Object.values(why).map((entry) => entry.code))
   for (const code of [
     "FE_ENV_OWNER",

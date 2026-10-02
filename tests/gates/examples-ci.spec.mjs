@@ -17,9 +17,9 @@ const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
-  assert.deepEqual(apps, ['ecommerce-app']);
+  assert.deepEqual(apps, ['ecommerce-app', 'shape-slot']);
   for (const app of apps) assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', app, 'hfs.json'), 'utf8')).kind, 'app');
-  assert.ok(!apps.includes('shape-slot') && !apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
+  assert.ok(!apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   assert.deepEqual(flags.map((flag) => flag.name), apps);
@@ -138,7 +138,11 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
 });
 
 test('every image of every example is derived from its hfs.json (one per be and fe app) and the images job builds from that output without pushing', (t) => {
-  assert.deepEqual(exampleImages(ROOT).map((image) => image.file), ['be/apps/identity/Dockerfile', 'be/apps/order/Dockerfile', 'be/apps/billing/Dockerfile', 'be/apps/cli/Dockerfile', 'fe/apps/landing/Dockerfile', 'fe/apps/app/Dockerfile']);
+  assert.deepEqual(exampleImages(ROOT).map((image) => `${image.app}:${image.file}`), [
+    'ecommerce-app:be/apps/identity/Dockerfile', 'ecommerce-app:be/apps/order/Dockerfile', 'ecommerce-app:be/apps/billing/Dockerfile', 'ecommerce-app:be/apps/cli/Dockerfile',
+    'ecommerce-app:fe/apps/landing/Dockerfile', 'ecommerce-app:fe/apps/app/Dockerfile',
+    'shape-slot:be/apps/core/Dockerfile', 'shape-slot:be/apps/cli/Dockerfile', 'shape-slot:fe/apps/shape-slot/Dockerfile',
+  ]);
   const root = fixture(t, ['alpha']);
   let printed = '';
   examplesCiMain(['--images'], { root, out: (s) => { printed += s; } });

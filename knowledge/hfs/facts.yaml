@@ -1,0 +1,20 @@
+# knowledge/hfs/facts.yaml - the machine-evaluated claims the knowledge and the docs may rely on (RT_FACT_FALSE, rule R192).
+# Each fact is judged against knowledge/hfs/slots.yaml, the one source of the product shape. A fact is false when its
+# `slot` evaluation fails, and prose that states the opposite is false too: a line of knowledge/**, docs/** or a README that
+# matches a `contradicts` pattern, with a `near` pattern within the three lines above it (or on it), is a finding. Prose quotes a
+# fact by its id; it never restates the claim in other words.
+schema: starci/facts@1
+facts:
+  - id: fe-app-has-package-json
+    claim: Each fe/apps/<app> has its own package.json (the workspace manifest).
+    slot: {id: fe.app.next, requires: package.json}
+    contradicts:
+      - pattern: '\bno `?package\.json`?\b'
+        near: 'apps/<app>|an fe app|each fe app|every fe app'
+        unless: 'back end|\bbe/|\bbe\b'
+  - id: one-root-lockfile
+    claim: The app root holds the one package-lock.json; no side and no app holds another lockfile.
+    slot: {id: app.lockfile, presence: required}
+    contradicts:
+      - pattern: '\b(?:a|its own|each app has a|per-app) lockfile\b'
+        near: 'fe/apps/<app>|each fe app|every fe app'

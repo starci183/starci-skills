@@ -1,6 +1,6 @@
 // The `files:` tree of a back-end pattern topic (knowledge/patterns/be/*.yaml) is the single source of what the pattern places and
-// of the slots and rules that judge it (and of the files `hfs add` generates). This spec holds each tree to the manifests: every
-// slot id exists, every rule code is in the catalog, every scenario a tree names is in ruleParams.be.patternScenarios, and every
+// of the rules that judge it (and of the files `hfs add` generates). The slot of each entry is derived from its path
+// (scripts/hfs/derived-fields.mjs, RT_GENERATED_BLOCK_STALE). This spec holds each tree to the manifests: every rule code is in the catalog, every scenario a tree names is in ruleParams.be.patternScenarios, and every
 // path variable is a plain `<name>` placeholder.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,6 @@ import { loadRuleCatalog, loadSlotManifest, ruleParams } from '../../scripts/hfs
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PATTERNS = path.join(ROOT, 'knowledge', 'patterns', 'be');
 const manifest = loadSlotManifest();
-const slotIds = new Set(manifest.slots.map((slot) => slot.id));
 const catalog = loadRuleCatalog({ manifest }).rules;
 const codes = new Set([...catalog.flatMap((rule) => rule.failureCodes ?? []), ...catalog.map((rule) => rule.id)]);
 const scenarios = ruleParams(manifest, 'be').patternScenarios;
@@ -26,10 +25,9 @@ test('the topics that carry a files tree are the kind topics (api, cli, reactors
 });
 
 for (const { name, doc } of topics) {
-  test(`${name}: every file of the tree names an existing slot, catalogued rule codes and known scenarios`, () => {
+  test(`${name}: every file of the tree names catalogued rule codes and known scenarios (its slot is derived: scripts/hfs/derived-fields.mjs)`, () => {
     const seen = new Set();
     for (const file of doc.files) {
-      assert.ok(slotIds.has(file.slot), `${file.path}: slot ${file.slot} is not in knowledge/hfs/slots.yaml`);
       assert.ok(!seen.has(file.path), `${file.path} is listed twice`);
       seen.add(file.path);
       for (const code of file.rules ?? []) assert.ok(codes.has(code), `${file.path}: rule code ${code} is not in the rule catalog`);
@@ -40,10 +38,9 @@ for (const { name, doc } of topics) {
     }
   });
 
-  test(`${name}: every rule of the topic cites catalogued failure codes and an example that exists`, () => {
+  test(`${name}: every rule of the topic cites an example that exists (its automated codes are derived from its hfsRules)`, () => {
     const examples = new Set(fs.readdirSync(path.join(ROOT, 'knowledge', 'code-examples', 'backend')));
     for (const rule of doc.rules) {
-      for (const code of rule.verification?.automated ?? []) assert.ok(codes.has(code), `${rule.id}: ${code} is not in the rule catalog`);
       for (const id of rule.relatedExamples ?? []) assert.ok(examples.has(id), `${rule.id}: example ${id} does not exist`);
     }
   });
