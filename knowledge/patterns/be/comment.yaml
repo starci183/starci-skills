@@ -49,7 +49,8 @@ rules:
           export type PlaceOrderRequest
     verification:
       automated:
-        - require-export-jsdoc
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-COMMENT-2
@@ -73,7 +74,8 @@ rules:
         write: 'Thrown by `QuotaService.consume` when no allowance remains in any sliding window.'
     verification:
       automated:
-        - no-restated-name-jsdoc
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual:
         - Review whether the docblock says something the name does not.
     relatedExamples: []
@@ -101,7 +103,9 @@ rules:
         write: '/** Stable error code that transports map to a status. */ readonly code: string'
     verification:
       automated:
-        - require-public-member-jsdoc
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
+        - BE_MEMBER_DOC_MISSING
       manual:
         - Review responsibility, useful parameter and return explanation and cross-reference meaning.
     relatedExamples: []
@@ -123,7 +127,8 @@ rules:
           Settled = "settled"
     verification:
       automated:
-        - require-enum-member-jsdoc
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []
   - id: BE-COMMENT-5
@@ -144,7 +149,9 @@ rules:
         when: A constraint
         write: '// idempotent add, because a second row would violate UQ_order_lines_order_sku'
     verification:
-      automated: []
+      automated:
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual:
         - Review why the prose is needed and whether it explains the actual consequence.
     relatedExamples: []
@@ -166,7 +173,9 @@ rules:
            * An earlier reading refused anything but the display id; that was wrong about the bucket.
            */
     verification:
-      automated: []
+      automated:
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual:
         - Review the claim, the evidence and the useful corrected history.
     relatedExamples: []
@@ -191,9 +200,7 @@ rules:
     verification:
       automated:
         - HFS_INLINE_SUPPRESSION
-        - no-non-ascii-source
-        - no-ai-symbol
-        - no-emoji
-        - no-line-suppression
+        - BE_SOURCE_FORM
+        - BE_PUBLIC_CONTRACT_FORM
       manual: []
     relatedExamples: []

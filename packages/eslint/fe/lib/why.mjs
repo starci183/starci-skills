@@ -11,7 +11,7 @@
  * `fix` strings are the keys of `modules/i18n/messages/v4.yaml`, so `translator('vi')(entry.en)` and
  * `translator('vi')(entry.fix)` hand back the Vietnamese of the same sentence.
  *
- * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65-R67) has an entry;
+ * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65) has an entry;
  * the twin test refuses a rule of those laws with no entry and an entry for a rule that does not exist.
  */
 

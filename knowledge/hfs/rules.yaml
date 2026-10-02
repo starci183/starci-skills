@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up without gaps; count them, never type the count).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up; an id with no rule is listed under `retired` with its reason, never reused; count the rules, never type the count).
 #
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -1299,7 +1299,7 @@ rules:
       - {kind: eslint-be, id: no-ambient-id}
   - id: R143
     code: "HFS_MONO_WORKSPACES"
-    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
+    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), the app root holds the one `package-lock.json` and the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_MONO_WORKSPACES"]
@@ -1461,7 +1461,7 @@ rules:
       - {kind: eslint-be, id: projection-shape}
   - id: R163
     code: "HFS_SERVICE_PLACEMENT"
-    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app's own and a `fe/packages/<pkg>` workspace's, outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
+    law: "A back-end service lives only at `be/apps/<service>/`: a folder with a `Dockerfile` of its own, or with a `package.json` other than the app root's and those of the fe workspaces (`fe/apps/<app>`, `fe/packages/<pkg>`), outside `be/apps/<service>/` (and outside a front end's `fe/apps/<app>/Dockerfile`) is a second service root and a finding; a service is a Nest app of the one repository that shares the `be/src` libraries and the one package.json, and its image is built from its own Dockerfile."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["HFS_SERVICE_PLACEMENT"]
@@ -1669,7 +1669,7 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R189
     code: "HFS_DOCKER_ENTRY"
-    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node fe/apps/<app>/server.js`); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
+    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node` on the standalone `server.js` of the app); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOCKER_ENTRY"]
@@ -1691,9 +1691,49 @@ rules:
     failureCodes: ["HFS_DOCKER_SECRETS"]
     enforcers:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
+  - id: R192
+    code: "RT_FACT_FALSE"
+    law: "Every claim of knowledge/hfs/facts.yaml holds against knowledge/hfs/slots.yaml (the one source of the product shape), and no prose of knowledge/**, docs/** or a README states the opposite of a fact (for example that an fe app lacks its own package.json, which fe.app.next requires); prose quotes a fact id or a slot id and never restates the claim."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_FACT_FALSE"]
+    enforcers:
+      - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
+  - id: R193
+    code: "RT_RULE_ID_UNKNOWN"
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP"]
+    enforcers:
+      - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
+  - id: R194
+    code: "RT_GENERATED_BLOCK_STALE"
+    law: "The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand. Likewise the `verification.automated` list of a pattern rule is the failure codes of the rules its `hfsRules` names, the `slot` of a `files:` entry is the slot that owns its path, and the `code` of a why-map entry is the code of the catalog rule that lists the lint rule: scripts/hfs/derived-fields.mjs writes them and they equal the derivation byte for byte."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_GENERATED_BLOCK_STALE"]
+    enforcers:
+      - {kind: runtime, id: generated-block, at: scripts/hfs/runtime-rules/generated-block.mjs}
+  - id: R195
+    code: "RT_PROSE_PATH_NO_SLOT"
+    law: "Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one the examples or the starter declare, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PROSE_PATH_NO_SLOT"]
+    enforcers:
+      - {kind: runtime, id: prose-path, at: scripts/hfs/runtime-rules/prose-path.mjs}
+  - id: R196
+    code: "RT_PROSE_RESTATES_SLOTS"
+    law: "Knowledge, docs and READMEs never restate knowledge/hfs/slots.yaml: no fenced block or line names three or more product paths a slot owns, and no sentence lists three or more of the root or side file names the slots declare; a slot is referenced by its id, and the only allowed copy is a generated block between hfs:generated markers. The slot and rule catalogs, the example READMEs and the templates are sources or snapshots, not prose."
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
+    enforcers:
+      - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
   - id: R197
     code: "RT_RETIRED_CLI_CALL"
-    law: "No tracked file invokes a command the unified CLI removed: `starci starci kernel <verb>`, `starci kernel`, `node bin/starci.mjs`, `hfs <verb>`, `npx hfs`, `starci app stack`, and the top-level `starci runtime install|update|doctor|version|validate|check|start|goal`; the catalog `removed` lists, changelogs and contract-change history are exempt."
+    law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields, changelogs and contract-change history are exempt."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_RETIRED_CLI_CALL"]
@@ -1717,7 +1757,7 @@ rules:
       - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
   - id: R200
     code: "RT_CLI_APP_ONLY_TEMPLATES"
-    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and starci app stack commands, and any other starci group, are forbidden there."
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and test-stack commands, and any other starci group, are forbidden there."
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]
@@ -1731,3 +1771,19 @@ rules:
     failureCodes: ["CLI_ONLY_ENTRY"]
     enforcers:
       - {kind: runtime, id: cli-only-entry, at: scripts/checks/check-cli-only-entry.mjs}
+retired:
+  - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
+  - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
+  - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R129, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R130, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R131, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R132, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R133, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R134, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R135, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R136, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R137, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+  - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}

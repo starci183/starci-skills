@@ -26,13 +26,13 @@ rules:
   - id: REPO-TOOLING-1
     title: Configs are thin calls into canon packages
     kind: mandatory
-    hfsRules: [R16, R22]
+    hfsRules: [R16, R22, R05]
     requirement: |
       `be/eslint.config.mjs` calls `starciBeConfig({ hfs: loadHfs(import.meta.url) })` and `fe/eslint.config.mjs`
       `starciFeConfig({ hfs: loadHfs(import.meta.url) })`. `be/tsconfig.json` extends `@starci/tsconfig/be.json` and adds its three
       `paths` (`@features/*`, `@modules/*`, `@tests/*`); `fe/tsconfig.json` extends `@starci/tsconfig/next.json` and adds nothing;
-      `be/src/tests/tsconfig.json` extends `be/tsconfig.json` and `@starci/tsconfig/e2e.json`. `be/jest.config.js` calls
-      `starciJestConfig()` of `@starci/jest-preset`, `fe/stylelint.config.mjs`
+      the `src/tests/tsconfig.json` of `be.tool-config` extends `be/tsconfig.json` and `@starci/tsconfig/e2e.json`, and the
+      `jest.config.js` of `be.tool-config` calls `starciJestConfig()` of `@starci/jest-preset`. `fe/stylelint.config.mjs` calls
       `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })` of `@starci/stylelint-canon`, and the root `.prettierrc`
       is the string `@starci/prettier-config`. All of these are rendered by `starci app sync` and compared by `starci app check` (R05, R17, R22);
       only `fe/turbo.json` is the app's own. The app root holds no tsconfig, eslint, stylelint or jest configuration. An app
@@ -50,8 +50,9 @@ rules:
     verification:
       automated:
         - HFS_TOOL_CONFIG_LOCAL
-        - HFS_MANAGED_FILE_DRIFT
         - HFS_TS_STRICT
+        - FE_TYPE_ESCAPE
+        - HFS_MANAGED_FILE_DRIFT
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-2
@@ -60,9 +61,9 @@ rules:
     hfsRules: [R04, R05, R11]
     requirement: |
       Files that cannot extend a package are rendered by `starci app sync --write` at the app root from the templates in
-      `packages/hfs/templates/` and hash-checked: the root `.husky/{pre-commit,pre-push}`, `.github/workflows/ci.yml` (and the
-      optional `e2e.yml`), the managed block of `.gitignore`, `sonar-project.properties`, `.prettierrc`, `.prettierignore` and
-      the `scripts` block of `package.json`, plus each side's tool configuration (REPO-TOOLING-1). The managed list is the
+      `packages/hfs/templates/` and hash-checked: the managed `app.*` slots — `app.hooks`, `app.ci` and the optional
+      `app.ci-e2e`, the managed block of `app.git-meta`, `app.quality-config`, `app.format-config` — and
+      the `scripts` block of `app.package-manifest`, plus each side's tool configuration (REPO-TOOLING-1). The managed list is the
       `managedBy` slots of `slots.yaml`. `.sops.yaml`, `.starcistacks/application-stacks.yaml` and `be/nest-cli.json` are written once by `starci app scaffold` and are
       the app's own afterwards. Any difference from the render is a finding; the fix is to run `starci app sync --write`, never to
       edit the file. A template change is a change in `.claude`, after which each app moves to the new `@starci/hfs` pin.
@@ -74,8 +75,8 @@ rules:
         write: Change the template in .claude, publish @starci/hfs at a new pin, then run starci app sync --write in each app.
     verification:
       automated:
-        - HFS_MANAGED_FILE_DRIFT
         - HFS_GITIGNORE_BLOCK_DRIFT
+        - HFS_MANAGED_FILE_DRIFT
         - HFS_SONAR_CONFIG
       manual: []
     relatedExamples: []
@@ -97,6 +98,7 @@ rules:
     verification:
       automated:
         - HFS_CI_MISSING_CANON
+        - HFS_HOOKS_PATH_REDIRECTED
         - HFS_ARCH_CONFIG_UNREAD
       manual: []
     relatedExamples: []
@@ -134,12 +136,14 @@ rules:
     verification:
       automated:
         - HFS_UNTRACKED_ROOT_ENTRY
+        - HFS_EMPTY_DIR
+        - HFS_GHOST_TREE
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-6
     title: Integration, e2e and contract are outside the automatic gates
     kind: mandatory
-    hfsRules: [R12]
+    hfsRules: [R12, R47, R97]
     requirement: |
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
       coverage, or an automatic CI trigger. The root `typecheck:tests` (`tsc -p be/src/tests/tsconfig.json`) runs first in
@@ -153,6 +157,7 @@ rules:
       automated:
         - HFS_E2E_IN_AUTOMATIC_GATE
         - BE_TEST_TOPOLOGY
+        - BE_CONTRACT_UNGUARDED
         - FE_NO_TESTS
       manual: []
     relatedExamples: []

@@ -19,7 +19,7 @@ rules:
   - id: FE-COMMENT-1
     title: Every export carries a docblock
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R18, R91]
     requirement: |
       Every export carries a /** */ docblock. The one-liner states ownership or role ("owned by", "resolved by the connected
       owner", "no transport lives here"), not the name. Lint require-export-jsdoc enforces presence.
@@ -43,7 +43,9 @@ rules:
         write: '/** The routed authentication screen. The route mounts one page and makes no drawing decision. */'
     verification:
       automated:
-        - require-export-jsdoc
+        - HFS_INLINE_SUPPRESSION
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual: []
     relatedExamples: []
 
@@ -70,7 +72,8 @@ rules:
         when: "Self-evident fields"
         write: "readonly id: string and readonly body: string carry nothing"
     verification:
-      automated: []
+      automated:
+        - HFS_INLINE_SUPPRESSION
       manual:
         - Review that each field comment adds a constraint the name does not carry.
     relatedExamples: []
@@ -92,7 +95,8 @@ rules:
         when: "A rejected alternative"
         write: 'IT SENDS displayId AND NEVER id, because the server resolves the public identifier and answers an unknown one with a not-found outcome.'
     verification:
-      automated: []
+      automated:
+        - HFS_INLINE_SUPPRESSION
       manual:
         - Review that the claim, the evidence and the rejected alternative are stated.
     relatedExamples: []
@@ -147,8 +151,7 @@ rules:
       automated:
         - HFS_INLINE_SUPPRESSION
         - FE_I18N_LITERAL
-        - no-emoji-in-source
-        - no-vietnamese-in-source
-        - no-second-language-in-path
+        - FE_SOURCE_FORM
+        - FE_SOURCE_LAYOUT_INVALID
       manual: []
     relatedExamples: []

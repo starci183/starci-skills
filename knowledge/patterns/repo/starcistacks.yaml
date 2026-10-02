@@ -22,7 +22,7 @@ rules:
   - id: REPO-STACKS-1
     title: One shape per environment
     kind: mandatory
-    hfsRules: [R10]
+    hfsRules: [R10, R01]
     requirement: |
       `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `vps/`, ...), each holding only
       `README.md`, `environment.json` where the schema asks for it, `infra/{compose,k8s,terraform}/`, `runtime/{config,env}/`,
@@ -41,6 +41,17 @@ rules:
     verification:
       automated:
         - HFS_STACKS_SHAPE
+        - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
       manual:
         - starci gate starcistacks <app> exits 0 (the app root).

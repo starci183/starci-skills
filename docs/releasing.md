@@ -15,8 +15,11 @@ Review source changes and test failures. Do not weaken validators to produce a g
 ## Example apps: CI and the local Sonar dashboard
 
 The root `.github/workflows/examples.yml` runs every example app (the matrix is derived from `examples/*/hfs.json` of kind app,
-`scripts/checks/check-examples-ci.mjs`): typecheck, `starci app lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
-`codecov.yml`, one flag per app, 100 on the project and the patch), the front-end build and the Sonar gate on push and pull request;
+`scripts/checks/check-examples-ci.mjs`): typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
+`codecov.yml`, one flag per app, 100 on the project and the patch), the be build and the fe build (turbo, the packages first) and the Sonar gate on push and pull request; a second job `images`
+builds the Docker image of every be and fe app of every example (its matrix is `check-examples-ci.mjs --images`, derived from the apps of each `hfs.json`) and never pushes. Coverage is one scope: the services
+and the cli commands under `be/src` (the jest preset's `COVERAGE_SOURCES`), shared by every be app, so one flag per example covers identity, order, billing and cli; the fe has no tests. The root flag, each
+example's own `codecov.yml` and the complement in its `sonar-project.properties` are all rendered from the source preset by `node scripts/checks/check-examples-ci.mjs --write` (`npm run check` refuses drift);
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
 only. The owner adds the `CODECOV_TOKEN` secret once to this repository (Codecov, then GitHub Settings > Secrets and variables >
 Actions); each product monorepo adds its own for its app-repository `codecov.yml`. Before a release, run the local dashboard gate

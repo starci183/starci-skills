@@ -43,40 +43,16 @@ ownership rule.
 
 ### Concrete layout
 
-```text
-src/
-  middleware.ts                          # framework-pinned root file; imports modules/feature entries only
-  instrumentation.ts                     # framework-pinned root file (optional)
-  app/
-    [lang]/authentication/page.tsx       # framework adapter; internal imports enter features only
-    [lang]/layout.tsx                    # framework shell adapter
-  features/
-    pages/AuthenticationPage/
-      index.tsx                          # route-facing page owner/public entry
-    layouts/AppLayout/
-      index.tsx                          # product layout owner
-    overlays/CheckoutOverlay/
-      index.tsx                          # product overlay owner
-  components/
-    blocks/CatalogBlock/
-      index.tsx                          # connected owner only when it reads product world
-      component.tsx                      # required sibling render owner for a connected block
-    composites/CourseCard/index.tsx
-    branches/NavigationRail/index.tsx
-    leaves/Icon/index.tsx
-  hooks/
-    authentication/useAuthentication.ts  # every authored custom hook, grouped by domain
-    catalog/useCatalog.ts
-    index.ts                             # optional explicit public entry
-  modules/
-    api/index.ts                         # transport/client capability
-    session/index.ts                     # cohesive reusable capability
-    routing/index.ts
-packages/
-  grammar/
-    package.json                         # declared exports are the package API
-    src/common/index.ts
-```
+The concrete layout of a front end is the `fe.*` slots of `knowledge/hfs/slots.yaml`: the app
+workspace `fe.app.next`, the route adapters `fe.route` (under the app's `src/app/`), the
+framework-pinned root files `fe.source-root-pinned` (`proxy.ts` — `middleware.ts` is refused on
+Next 16, `fe.source-root-retired` — and the instrumentation files), the visual owners `fe.feature`
+(`features/{pages,layouts,overlays}/<Name>`: route-facing page, product layout and product overlay
+owners) and `fe.components` (`components/{blocks,composites,branches,leaves}/<Name>`; a block's
+`index.tsx` is the connected owner only when it reads product world, with `component.tsx` the
+required sibling render owner), the hooks domains `fe.hooks` (`hooks/<domain>`: every authored
+custom hook, grouped by domain) and the capabilities `fe.modules` (its required instances plus
+the transport `fe.modules.api`); shared units are the `fe.package.*` workspace slots.
 
 The same role roots may be declared for one repository or for each Next workspace in a monorepo. Empty
 role folders are never required. `app/` may import React, Next and external framework packages, but every
@@ -150,36 +126,12 @@ models. Grammar never imports them.
 The backend instantiates the same graph with framework boot, feature scenarios, and reusable capabilities.
 The exact transport (GraphQL, HTTP, message) does not create the feature owner.
 
-```text
-apps/
-  api/src/
-    main.ts                               # bootstrap only
-    app.module.ts                         # composition/configuration only
-src/
-  features/
-    api/cart/                             # features are grouped by trigger kind (api, cli); no kind imports another
-      index.ts                            # public feature entry
-      cart.module.ts
-      transport/
-        graphql/add-to-cart.resolver.ts
-      application/
-        add-to-cart.command.ts
-        add-to-cart.handler.ts
-        add-to-cart.contracts.ts
-  modules/
-    domain/
-      identity/
-        index.ts
-    platform/
-      database/
-        index.ts
-        database.module.ts
-        database.options.ts               # typed runtime configuration when it exists
-        primary.decorators.ts             # InjectPrimaryEntityManager()
-    integrations/
-      payment-provider/
-        index.ts
-```
+The back-end layout is the `be.*` slots of `knowledge/hfs/slots.yaml`: the app slots
+`be.app.api`, `be.app.worker` and `be.app.cli` (composition/configuration only), the feature
+roots of `triggerKinds` (`be.feature` for api features — index, the application module, the
+`application/` CQRS files and one `transport/<protocol>/` per protocol — plus `be.cli` and the
+pattern-enabled kinds), and the capability slots of `tiers.be` (`be.domain`, `be.platform`,
+`be.integrations` and the pattern tiers `be.events`, `be.queues`, `be.projections`).
 
 - Apps own boot/configuration/composition. They do not own handlers, services, controllers, or business
   rules.
@@ -261,23 +213,24 @@ accepted SRS/SDS. A green architecture check is structural evidence only.
 
 ## Reference critique
 
-Reference: the `examples/todo-app` and `examples/ecommerce-app` trees of this repository.
+Reference: the `examples/ecommerce-app` tree of this repository.
 
 ### Keep as reference
 
-- `examples/todo-app/fe/apps/web/src/app/[locale]/sign-in/page.tsx` is a thin route adapter that mounts one
-  page owner.
-- `examples/todo-app/fe/apps/web/src/app/[locale]/layout.tsx` is a valid server layout for locale
-  validation, metadata and shell composition; its sibling `providers.tsx` is a narrow client provider
-  boundary.
-- `examples/ecommerce-app/fe/apps/shop/src/app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid
+- `examples/ecommerce-app/fe/apps/app/src/app/[locale]/cart/page.tsx` is a thin route adapter that mounts
+  one page owner (`CartPage`).
+- `examples/ecommerce-app/fe/apps/app/src/app/[locale]/layout.tsx` is a valid server layout for locale
+  validation and shell composition; the `LocaleShell` it mounts from the shared ui package is the narrow
+  client provider boundary.
+- `examples/ecommerce-app/fe/apps/app/src/app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid
   zero-visual-owner adapter.
-- `examples/todo-app/fe/apps/web/src/modules/api/client.ts` is a cohesive technical capability, and hooks
-  such as `src/hooks/task/useTasks.ts` show SWR owning product data caching.
+- `examples/ecommerce-app/fe/packages/ecommerce-api/src/client.ts` is the repository's cohesive transport
+  capability, and hooks such as `fe/apps/app/src/hooks/cart/useAddToCart.ts` own the product-data
+  interaction at the feature boundary.
 - Product code imports the public `@starci/grammar/common` entry; the installed package's declared exports
   are the API.
-- `examples/todo-app/fe/apps/web/src/components/blocks/sign-in-screen/index.tsx` legitimately owns the
-  sign-in form's draft state beside its connected role. An unsaved form draft is intrinsic state, not
+- `examples/ecommerce-app/fe/apps/app/src/components/blocks/SessionForm/index.tsx` legitimately owns the
+  session form's draft state beside its connected role. An unsaved form draft is intrinsic state, not
   product-world lifecycle, and is not evidence of a missing responsibility boundary.
 
 ### Treat as debt, not precedent

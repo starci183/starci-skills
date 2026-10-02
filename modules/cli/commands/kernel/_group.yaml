@@ -1,5 +1,4 @@
-# The kernel group: the ledger-gate verbs formerly spelled `starci starci kernel <verb>` or
-# `starci kernel <verb>`. Every verb runs scripts/kernel/cli.mjs.
+# The kernel group: the ledger-gate verbs of the Kernel agent, each run through scripts/kernel/cli.mjs.
 group: kernel
 summary: kernel ledger verbs (runtime internals; the Kernel agent's door to the ledger)
 owner: runtime

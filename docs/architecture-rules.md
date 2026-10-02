@@ -56,7 +56,7 @@ The owning design records the trigger and invariant, then chooses the smallest m
 
 ## Fixed stack and the app shape
 
-Every project in this standard uses Next.js and NestJS and follows the one HFS tree (`knowledge/patterns/repo/folder.yaml`): one app repository with one root `package.json` and `hfs.json`, its back end in `be/` and its front end in `fe/`, each an `apps/<app>/` monorepo, with back-end shared source in `be/src/` and front-end source inside `fe/apps/<app>/src`. Backend composition maps to the real Nest `main.ts`/`app.module.ts` boundaries inside `be/apps/<app>/src`; frontend composition maps to Next route/layout/provider boundaries inside `fe/apps/<app>/src/app`. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
+Every project in this standard uses Next.js and NestJS and follows the one HFS tree (`knowledge/patterns/repo/folder.yaml`): one app repository with one root `package.json` and `hfs.json` (slots `app.package-manifest`, `app.declaration`), its two sides the `app.sides` slot, each an `apps/<app>/` monorepo of app slots (`be.app.api`, `be.app.worker`, `be.app.cli`, `fe.app.next`), with back-end shared source in the side's `be.*` source slots and front-end source inside the `fe.*` slots of each app's source root. Backend composition maps to the real Nest bootstrap and root-module boundaries the `be.app.*` slots require; frontend composition maps to the Next route, layout and provider boundaries of `fe.route`. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
 
 Similarly:
 

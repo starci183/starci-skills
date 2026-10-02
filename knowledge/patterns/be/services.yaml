@@ -39,12 +39,12 @@ rules:
     cases:
       - id: case-1
         when: A new payments service
-        write: 'Add be/apps/payments/{src/main.ts,src/app.module.ts,Dockerfile}, the component `payments` (role service) in application-stacks.yaml and, in a compose file, the service with the pinned image `<repo>/payments:1.0.0`.'
+        write: 'Add `be/apps/<service>` holding the files its `be.app.*` slot requires plus its `repo.app-image` Dockerfile, the component `payments` (role service) in application-stacks.yaml and, in a compose file, the service with the pinned image `<repo>/payments:1.0.0`.'
     verification:
       automated:
         - HFS_SERVICE_PLACEMENT
-        - HFS_SERVICE_STACK_DECLARATION
         - BE_SERVICE_ISOLATION
+        - HFS_SERVICE_STACK_DECLARATION
       manual:
         - Confirm the shared code a service needs belongs in be/src, not copied between apps.
     relatedExamples: []
@@ -87,11 +87,12 @@ rules:
     cases:
       - id: case-1
         when: Order publishes order.placed and billing consumes it
-        write: 'be/apps/order/src/events.ts exports EVENTS; be/contracts/order/events.json is emitted from it; be/apps/billing/src/consumes.ts exports CONSUMES = { order: { "order.placed": 1 } }.'
+        write: 'the `events.ts` of the order app (inside its `be.app.*` source slot) exports EVENTS; the `be.contract.events` snapshot is emitted from it; the `consumes.ts` of the billing app exports CONSUMES = { order: { "order.placed": 1 } }.'
     verification:
       automated:
         - HFS_EVENT_CONTRACT
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - FE_GRAPHQL_CONTRACT
       manual:
         - Review the payload fields of a new event version for compatibility with the old consumers.
     relatedExamples: []

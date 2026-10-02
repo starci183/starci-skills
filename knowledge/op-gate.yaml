@@ -98,7 +98,6 @@ kinds:
       fe.package.i18n: [fe/packages.yaml, fe/i18n.yaml]
       fe.package.ui: [fe/packages.yaml, fe/css.yaml]
       fe.tool-config: [repo/tooling.yaml]
-      fe.tool-config-repo: [repo/tooling.yaml]
       fe.tool-config-local: [repo/tooling.yaml]
   repo:
     always: [repo/index.yaml, repo/folder.yaml]

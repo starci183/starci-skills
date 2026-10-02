@@ -201,6 +201,7 @@ export function appScripts(app) {
       return [line('cli', built(entry)), ...(connections.length ? [line('migrate', `${built(entry)} ${MIGRATE_COMMAND}`)] : [])];
     }),
     ...fe.map(entry => line(`start:${entry.name}`, `npm run start -w ${workspace(entry)}`)),
+    ...(app.optionalSlots.includes('app.browser') ? [line('test:browser', 'playwright test -c browser/playwright.config.ts')] : []),
     line('docker:build', images.map(image => `npm run docker:build:${image.entry.name}`).join(' && ')),
     ...images.map(image => line(`docker:build:${image.entry.name}`, imageCommand(image))),
   ].join('\n    ');

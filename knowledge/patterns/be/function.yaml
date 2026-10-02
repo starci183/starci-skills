@@ -38,7 +38,11 @@ rules:
     verification:
       automated:
         - BE_FEATURE_SHAPE
+        - BE_FEATURE_LAYOUT_INVALID
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual:
         - Verify handler registration through the e2e run of the app and test the service the handler calls through its service spec.
     relatedExamples: []
@@ -61,6 +65,7 @@ rules:
       automated:
         - BE_ENTITY_IN_CONTRACT
         - BE_CQRS_SHAPE
+        - BE_READONLY_BOUNDARY
       manual:
         - Verify replay, serialization and authorization at the actual boundary.
     relatedExamples: []
@@ -82,6 +87,8 @@ rules:
     verification:
       automated:
         - BE_TIER_DIRECTION
+        - FE_TIER_DIRECTION
+        - ARCH_PACKAGE_IMPORTS_APP
         - BE_SQL_OUTSIDE_PERSISTENCE
       manual:
         - Identify where invariant, transaction and effect ownership live.
@@ -172,9 +179,13 @@ rules:
         write: 'platform/primitives exports each once.'
     verification:
       automated:
-        - HFS_DUPLICATE_CODE
         - HFS_SIZE_GROWTH
+        - HFS_SIZE_SOFT_BACKLOG
+        - HFS_DUPLICATE_CODE
+        - HFS_DUPLICATE_SYMBOL
+        - FE_CROSS_APP_DUPLICATE
         - HFS_UNUSED_EXPORT
+        - HFS_UNUSED_FILE
       manual:
         - Confirm purity and absence of hidden config, I/O or authority decisions.
     relatedExamples: []
@@ -196,8 +207,11 @@ rules:
         write: 'PurchaseModule.register({ isGlobal: true, ...options.purchase }) from app.module.ts, where options.purchase is the output of parsePurchaseConfig(env) computed once in main.ts.'
     verification:
       automated:
-        - BE_MODULE_SHAPE
         - BE_CONFIG_OWNER
+        - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
+        - BE_RAW_INJECT
       manual:
         - Boot the module with valid and invalid options and verify the intended provider identity.
     relatedExamples: []

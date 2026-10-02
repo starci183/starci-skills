@@ -124,5 +124,7 @@ rules:
       automated:
         - BE_RAW_INJECT
         - BE_MODULE_SHAPE
+        - BE_MODULE_HANDLER_REGISTRATION
+        - BE_MODULE_PROVIDER_REREGISTRATION
       manual: []
     relatedExamples: []

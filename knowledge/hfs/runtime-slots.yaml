@@ -531,7 +531,7 @@ slots:
     rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
   - id: runtime.hfs-manifests
     profiles: [runtime]
-    path: "knowledge/hfs/{slots.yaml,rules.yaml,runtime-slots.yaml,canon-pins.yaml,peer-integrations.yaml,README.md}"
+    path: "knowledge/hfs/{slots.yaml,rules.yaml,facts.yaml,runtime-slots.yaml,canon-pins.yaml,peer-integrations.yaml,README.md}"
     presence: required
     tracked: tracked
     tier: none

@@ -60,8 +60,8 @@ verification:
   lint: true
   limitations: |
     Verified 2026-09-27 by dropping these files into examples/shape-slot as
-    apps/shape-slot/src/components/blocks/ExampleBlock (with stub @/hooks and
-    @/i18n/navigation seams): tsc clean, @starci/eslint-canon-fe clean including
+    fe/apps/shape-slot/src/components/blocks/ExampleBlock (with stub @/hooks and
+    @/modules/i18n/navigation seams): tsc clean, @starci/eslint-canon-fe clean including
     the shape-slot rules. Mock-only connected mapping is not browser UAT.
 provenance:
   sources:

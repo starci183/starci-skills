@@ -23,7 +23,7 @@ rules:
   - id: REPO-WORK-1
     title: Product records only
     kind: mandatory
-    hfsRules: [R07]
+    hfsRules: [R07, R01]
     requirement: |
       The app root's `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
@@ -45,6 +45,17 @@ rules:
       automated:
         - HFS_AGENT_DATA_TRACKED
         - HFS_SLOT_UNDECLARED
+        - HFS_SLOT_AMBIGUOUS
+        - HFS_SLOT_NOT_ENABLED
+        - HFS_FORBIDDEN_PRESENT
+        - HFS_TRACKED_MUST_BE_IGNORED
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+        - HFS_SRC_LAYOUT_INVALID
+        - HFS_MODULE_TIER_INVALID
+        - HFS_WORK_IN_FE
+        - HFS_STACKS_IN_SIDE
       manual:
         - starci runtime validate <app>/.starciwork passes.
     relatedExamples: []
@@ -75,7 +86,7 @@ rules:
   - id: REPO-WORK-3
     title: Flat records, no work/node
     kind: mandatory
-    hfsRules: [R08]
+    hfsRules: [R08, R64]
     requirement: |
       Every record is a flat family record `features/<feature>/<family>/<name>/index.yaml` of a family in
       modules/schemas/work-layout.yaml. There is no `work/node` record. A ui-screen record declares `app`, a name from
@@ -110,6 +121,8 @@ rules:
     verification:
       automated:
         - HFS_IDENTITY_CUSTODY
+        - SEALED_CUSTODY_LOCATION
+        - SEALED_FILE_IN_WORK
         - HFS_PLAINTEXT_SECRET
       manual:
         - The owner seals the file; the agent never reads or writes the value.
