@@ -7,6 +7,8 @@ import type { CatalogService } from "@modules/domain/catalog"
 import { InjectPaymentService } from "@modules/domain/payment"
 import type { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectSagaService } from "@modules/platform/saga"
+import type { SagaService } from "@modules/platform/saga"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectMessagePublisher } from "@modules/integrations/messaging"
@@ -15,7 +17,7 @@ import { ok } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
-import { ORDER_PLACED_QUEUE } from "./order.contracts"
+import { ORDER_PLACED_QUEUE, PLACE_ORDER_SAGA } from "./order.contracts"
 import { OrderLogEvent } from "./order.log-events"
 import type {
     GetBuyerStatusResult,
@@ -51,6 +53,7 @@ export class OrderService {
         private readonly receipts: ReceiptService,
         @InjectMessagePublisher() private readonly messages: MessagePublisher,
         @InjectLogger() private readonly logger: Logger,
+        @InjectSagaService() private readonly sagas: SagaService,
     ) {}
 
     /**
@@ -174,6 +177,7 @@ export class OrderService {
             amountMinorUnits: plan.totalMinorUnits,
         })
         await this.cart.clear({ manager, personId })
+        await this.sagas.begin({ manager, saga: PLACE_ORDER_SAGA, correlationId: orderId })
         return {
             orderId,
             status: "confirmed",

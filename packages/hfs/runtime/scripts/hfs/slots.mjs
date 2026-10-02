@@ -29,6 +29,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, patternShapeProblem } from './declaration-slots.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -303,7 +304,7 @@ function declarationShapeProblems(d) {
     const s = d.sides[side];
     const at = `sides.${side}`;
     if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
-    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'patterns', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
     if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
     else s.apps.forEach((app, i) => {
       if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
@@ -312,6 +313,8 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
+    const patternProblem = patternShapeProblem(s, at, NAME);
+    if (patternProblem !== null) bad.push(patternProblem);
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
@@ -333,12 +336,7 @@ const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `
 function sideProblems(manifest, side, s) {
   const bad = [];
   for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  for (const id of s.optionalSlots ?? []) {
-    const slot = manifest.slots.find((candidate) => candidate.id === id);
-    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
-    else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
-    else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
-  }
+  bad.push(...optionalSlotProblems(manifest, side, s));
   for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
   const connections = s.connections ?? [];
   for (const slot of manifest.slots) {
@@ -389,6 +387,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       profile: name,
       apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
       optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
+      patterns: Object.freeze([...(s.patterns ?? [])]),
       connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
       reads: Object.freeze([...(s.reads ?? [])]),
       manifestVersion: manifest.version,
@@ -453,7 +452,7 @@ function createScopeResolver(manifest, repo) {
 
   const slotEnabled = (slot) => {
     if (slot.presence !== 'opt-in') return true;
-    return slot.appKind !== undefined ? repo.apps.some((a) => a.kind === slot.appKind) : repo.optionalSlots.includes(slot.id);
+    return declaredSlotEnabled(slot, repo);
   };
   const clean = (p) => posixPath(p).replace(/\/+$/, '');
 

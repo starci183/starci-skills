@@ -55,6 +55,7 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
   if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
+  if (slot.pattern !== undefined && !/^[a-z][a-z0-9-]*$/.test(String(slot.pattern))) bad.push(`${at}: pattern must be a kebab-case pattern name`);
   if (slot.contractTables !== undefined && !(strList(slot.contractTables) && slot.contractTables.length)) bad.push(`${at}: contractTables must be a non-empty list of file names`);
   if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
   for (const key of ['requires', 'contractTables', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);

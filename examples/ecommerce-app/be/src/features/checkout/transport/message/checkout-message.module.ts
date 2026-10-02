@@ -2,19 +2,22 @@ import { Module } from "@nestjs/common"
 import type { OnModuleInit } from "@nestjs/common"
 import { InjectConsumerRegistry } from "@modules/integrations/messaging"
 import type { ConsumerRegistry } from "@modules/integrations/messaging"
-import { CancellationModule } from "../../cancellation.module"
+import { CheckoutModule } from "../../checkout.module"
+import { InvoiceIssuedConsumer } from "./invoice-issued.consumer"
 import { InvoiceRejectedConsumer } from "./invoice-rejected.consumer"
 
-@Module({ imports: [CancellationModule], providers: [InvoiceRejectedConsumer] })
-/** The message transport of the cancellation feature: registers its consumers with the messaging capability; only a worker composes it. */
-export class CancellationMessageModule implements OnModuleInit {
+@Module({ imports: [CheckoutModule], providers: [InvoiceIssuedConsumer, InvoiceRejectedConsumer] })
+/** The message transport of the checkout feature: registers its consumers with the messaging capability. */
+export class CheckoutMessageModule implements OnModuleInit {
     constructor(
         @InjectConsumerRegistry() private readonly registry: ConsumerRegistry,
+        private readonly invoiceIssuedConsumer: InvoiceIssuedConsumer,
         private readonly invoiceRejectedConsumer: InvoiceRejectedConsumer,
     ) {}
 
     /** Hands every consumer to the registry. */
     onModuleInit(): void {
+        this.registry.add(this.invoiceIssuedConsumer)
         this.registry.add(this.invoiceRejectedConsumer)
     }
 }

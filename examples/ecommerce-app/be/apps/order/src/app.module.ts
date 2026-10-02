@@ -40,8 +40,8 @@ import {
     MessagingModule,
 } from "@modules/integrations/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
-import { CancellationMessageModule } from "@features/cancellation"
-import { CheckoutGraphqlModule } from "@features/checkout"
+import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
+import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
 import type { OrderAppOptions } from "./order.options"
 
@@ -92,12 +92,19 @@ export class AppModule {
                     connections: [
                         {
                             ...options.database,
-                            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities],
+                            entities: [
+                                ...catalogEntities,
+                                ...cartEntities,
+                                ...orderEntities,
+                                ...paymentEntities,
+                                ...sagaEntities,
+                            ],
                             migrations: [
                                 ...catalogMigrations,
                                 ...cartMigrations,
                                 ...orderMigrations,
                                 ...paymentMigrations,
+                                ...sagaMigrations,
                             ],
                         },
                     ],
@@ -109,6 +116,7 @@ export class AppModule {
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),
+                SagaModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
                 ProbesModule.register({
@@ -119,7 +127,7 @@ export class AppModule {
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,
-                CancellationMessageModule,
+                CheckoutMessageModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

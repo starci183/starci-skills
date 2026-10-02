@@ -39,6 +39,17 @@ export const PLACED_ORDER_QUEUE = defineQueue<PlacedOrderNotice>({
 /** The queue this service announces a rejected invoice on, for the order service to compensate. */
 export const INVOICE_REJECTED_QUEUE: QueueSpec = { name: "billing.invoice-rejected", attempts: 3, backoffMs: 1000 }
 
+/** The payload of `billing.invoice-issued` as this service publishes it (version 1 of its own contract, `be/contracts/billing/events.json`). */
+export interface InvoiceIssuedPayload {
+    /** The order whose invoice was issued. */
+    readonly orderId: string
+    /** The billed amount in minor units. */
+    readonly totalMinorUnits: number
+}
+
+/** The queue this service announces an issued invoice on, for the order service to complete its saga. */
+export const INVOICE_ISSUED_QUEUE: QueueSpec = { name: "billing.invoice-issued", attempts: 3, backoffMs: 1000 }
+
 /** The invoice a consumer or a read shows. */
 export interface InvoiceView {
     /** The invoice id. */

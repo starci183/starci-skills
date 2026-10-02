@@ -23,6 +23,7 @@ import {
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { HttpModule } from "@modules/platform/http"
 import { inboxEntities } from "@modules/platform/inbox"
+import { sagaEntities } from "@modules/platform/saga"
 import type { MessagingOptions } from "@modules/integrations/messaging"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
@@ -57,6 +58,7 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...cartEntities,
     ...orderEntities,
     ...paymentEntities,
+    ...sagaEntities,
 ]
 
 /** The entities the billing connection maps. */

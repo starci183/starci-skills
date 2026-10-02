@@ -14,6 +14,12 @@ directories:
       Append-only model-pool snapshots written by scripts/agent/benchmark-snapshot.mjs, one
       <YYYY-MM-DD>-<N>h.json per date and window in the raw model-scorecard --json shape
       (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
+  - path: examples/ecommerce-app/be/contracts/billing
+    reason: >
+      The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R131).
+  - path: examples/ecommerce-app/be/contracts/order
+    reason: >
+      The vendored async contract of the order service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R131).
   - path: examples/ecommerce-app/fe/packages/ecommerce-api
     reason: >
       npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.

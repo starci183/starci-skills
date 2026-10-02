@@ -60,6 +60,14 @@ export interface InvoiceRow {
     total_minor_units: number
 }
 
+/** The persisted state of one saga run of the order database. */
+export interface SagaStateRow {
+    /** Where the run stands. */
+    status: string
+    /** The fence of the run. */
+    version: number
+}
+
 /** A count answered by an aggregate read. */
 export interface CountRow {
     /** The number of rows. */

@@ -9,7 +9,7 @@ import { MESSAGE_PUBLISHER } from "@modules/integrations/messaging"
 import type { MessagePublisher } from "@modules/integrations/messaging"
 import { invoiceRow } from "@tests/fixtures/builders/invoice.builder"
 import { InvoiceErrorCode } from "./errors/invoice.error"
-import { INVOICE_REJECTED_QUEUE } from "./invoice.contracts"
+import { INVOICE_ISSUED_QUEUE, INVOICE_REJECTED_QUEUE } from "./invoice.contracts"
 import { INVOICE_OPTIONS } from "./invoice.decorators"
 import type { InvoiceOptions } from "./invoice.options"
 import { InvoiceService } from "./invoice.service"
@@ -40,7 +40,7 @@ const build = async (entityManager: MockEntityManager, claimed = true) => {
 
 describe("InvoiceService", () => {
     describe("issue", () => {
-        it("claims the event first, records an issued invoice stamped by the clock and answers it", async () => {
+        it("claims the event first, records an issued invoice stamped by the clock, announces it and answers it", async () => {
             const manager = mockEntityManager({ save: [InvoiceEntity, invoiceRow()] })
             const { service, inbox, messages } = await build(manager)
 
@@ -58,7 +58,11 @@ describe("InvoiceService", () => {
                 status: "issued",
                 createdAt: new Date(AT),
             })
-            expect(messages.publish).not.toHaveBeenCalled()
+            expect(messages.publish).toHaveBeenCalledWith({
+                queue: INVOICE_ISSUED_QUEUE,
+                eventId: "o-1",
+                payload: { orderId: "o-1", totalMinorUnits: 1500 },
+            })
         })
 
         it("records a total above the limit as rejected, announces it and refuses", async () => {
@@ -82,7 +86,7 @@ describe("InvoiceService", () => {
             })
         })
 
-        it("answers the invoice already recorded for a redelivered event without writing again", async () => {
+        it("answers the invoice already recorded for a redelivered event without writing again, announcing it again", async () => {
             const manager = mockEntityManager({ findOneByOrFail: [InvoiceEntity, invoiceRow()] })
             const { service, messages } = await build(manager, false)
 
@@ -94,7 +98,7 @@ describe("InvoiceService", () => {
             })
             expect(manager.findOneByOrFail).toHaveBeenCalledWith(InvoiceEntity, { orderId: "o-1" })
             expect(manager.save).not.toHaveBeenCalled()
-            expect(messages.publish).not.toHaveBeenCalled()
+            expect(messages.publish).toHaveBeenCalledTimes(1)
         })
 
         it("announces a rejected invoice again when its event is redelivered", async () => {

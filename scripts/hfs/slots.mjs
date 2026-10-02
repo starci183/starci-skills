@@ -29,6 +29,7 @@ import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, optionalSlotProblems, patternShapeProblem } from './declaration-slots.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -312,7 +313,8 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    if (s.patterns !== undefined && (!Array.isArray(s.patterns) || !s.patterns.every((v) => NAME.test(String(v))) || new Set(s.patterns).size !== s.patterns.length)) bad.push(`${at}.patterns must be a unique list of pattern names`);
+    const patternProblem = patternShapeProblem(s, at, NAME);
+    if (patternProblem !== null) bad.push(patternProblem);
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
@@ -334,13 +336,7 @@ const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `
 function sideProblems(manifest, side, s) {
   const bad = [];
   for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  for (const id of s.optionalSlots ?? []) {
-    const slot = manifest.slots.find((candidate) => candidate.id === id);
-    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
-    else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
-    else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
-  }
-  for (const name of s.patterns ?? []) if (!manifest.slots.some((slot) => slot.profiles.includes(side) && slot.pattern === name)) bad.push(`sides.${side}.patterns names ${name}, which no ${side} slot declares as its pattern`);
+  bad.push(...optionalSlotProblems(manifest, side, s));
   for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
   const connections = s.connections ?? [];
   for (const slot of manifest.slots) {
@@ -456,8 +452,7 @@ function createScopeResolver(manifest, repo) {
 
   const slotEnabled = (slot) => {
     if (slot.presence !== 'opt-in') return true;
-    if (slot.appKind !== undefined) return repo.apps.some((a) => a.kind === slot.appKind);
-    return repo.optionalSlots.includes(slot.id) || (slot.pattern !== undefined && (repo.patterns ?? []).includes(slot.pattern));
+    return declaredSlotEnabled(slot, repo);
   };
   const clean = (p) => posixPath(p).replace(/\/+$/, '');
 

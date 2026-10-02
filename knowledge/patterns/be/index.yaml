@@ -134,6 +134,11 @@ topics:
     path: services.yaml
     decides: A service only at be/apps/<service> with its own Dockerfile and image, pinned images in a multi-service stack, the vendored event contract and consumer tables, e2e specs for every consumer and saga
     rules: BE-SERVICES-1 … BE-SERVICES-4
+  - id: be.saga
+    title: Sagas
+    path: saga.yaml
+    decides: A saga as a declared-pattern feature folder, an orchestrator listing steps and compensations, the versioned and fenced state of a run, the events in the vendored contract, e2e specs that inject a failure per compensation path
+    rules: BE-SAGA-1 … BE-SAGA-4
   - id: be.resilience
     title: Retry through the shared helper
     path: resilience.yaml

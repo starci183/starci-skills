@@ -10,7 +10,7 @@ import type { MessagePublisher } from "@modules/integrations/messaging"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { InvoiceErrorCode } from "./errors/invoice.error"
-import { INVOICE_REJECTED_QUEUE } from "./invoice.contracts"
+import { INVOICE_ISSUED_QUEUE, INVOICE_REJECTED_QUEUE } from "./invoice.contracts"
 import type { InvoiceView, IssueInvoiceParams } from "./invoice.contracts"
 import { InjectInvoiceOptions } from "./invoice.decorators"
 import type { InvoiceOptions } from "./invoice.options"
@@ -68,9 +68,16 @@ export class InvoiceService {
         }
     }
 
-    /** The outcome of a recorded invoice; a rejected one is announced to the order service. */
+    /** The outcome of a recorded invoice; an issued and a rejected one are each announced to the order service. */
     private async outcomeOf(row: InvoiceEntity): Promise<Outcome<InvoiceView, InvoiceErrorCode.OverLimit>> {
-        if (row.status === "issued") return ok(toView(row))
+        if (row.status === "issued") {
+            await this.messages.publish({
+                queue: INVOICE_ISSUED_QUEUE,
+                eventId: row.orderId,
+                payload: { orderId: row.orderId, totalMinorUnits: row.totalMinorUnits },
+            })
+            return ok(toView(row))
+        }
         await this.messages.publish({
             queue: INVOICE_REJECTED_QUEUE,
             eventId: row.orderId,

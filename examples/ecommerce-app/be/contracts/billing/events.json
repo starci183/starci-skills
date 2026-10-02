@@ -1,5 +1,12 @@
 {
   "events": {
+    "billing.invoice-issued": {
+      "payload": {
+        "orderId": "string",
+        "totalMinorUnits": "number"
+      },
+      "version": 1
+    },
     "billing.invoice-rejected": {
       "compensates": "order.placed",
       "payload": {

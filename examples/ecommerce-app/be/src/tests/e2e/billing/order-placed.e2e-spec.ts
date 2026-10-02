@@ -6,6 +6,7 @@ import {
     INBOX_CLAIM_COUNT,
     INVOICES_OF_ORDER,
     INVOICE_COUNT_OF_PERSON,
+    PLACE_ORDER_SAGA_STATE,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -14,7 +15,8 @@ import { useTestWorld } from "../../world/use-test-world"
  * services, identity checking the session), the order service publishes `order.placed` on its Redis queue, and the billing
  * worker, a separate app with its own database, consumes it and records one invoice. A confirmation replayed with the same key
  * announces the order again; the billing inbox claims the repeated event once, so the order keeps one invoice. A second order
- * proves the repeat was consumed before it: the queue is ordered.
+ * proves the repeat was consumed before it: the queue is ordered. The invoice the billing service issues is announced as
+ * `billing.invoice-issued`, which completes the saga run of the order at version 2.
  *
  * Run: npm run test:e2e -- billing/order-placed
  */
@@ -60,6 +62,11 @@ describe("order.placed consumed by billing", () => {
         })
 
         expect(await readRows(world.db.billing, INVOICES_OF_ORDER, [first.orderId])).toHaveLength(1)
+        const completed = await world.waitFor("the saga run of the first order is completed", async () => {
+            const rows = await readRows(world.db.order, PLACE_ORDER_SAGA_STATE, [first.orderId])
+            return rows.find((row) => row.status === "completed") ?? null
+        })
+        expect(completed).toEqual({ status: "completed", version: 2 })
         expect(await readCount(world.db.billing, INVOICE_COUNT_OF_PERSON, session.personId)).toBe(2)
         expect(await readCount(world.db.billing, INBOX_CLAIM_COUNT, "order")).toBeGreaterThanOrEqual(2)
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])

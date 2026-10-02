@@ -1,25 +1,22 @@
 import { CommandHandler } from "@nestjs/cqrs"
-import { OrderService } from "@modules/domain/order"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { PlaceOrderSagaService } from "../saga/place-order.saga.service"
 import type { PlaceOrderResult } from "./place-order.contracts"
 import { PlaceOrderCommand } from "./place-order.command"
 
 @CommandHandler(PlaceOrderCommand)
-/** Confirms the caller cart; the order service decides replay, pricing and the one transaction. */
+/** Places the order of the caller cart by running the place-order saga: its steps are commands, its compensation answers a failure of the invoice. */
 export class PlaceOrderHandler extends ICQRSHandler<PlaceOrderCommand, PlaceOrderResult> {
     constructor(
         @InjectLogger() logger: Logger,
-        private readonly orders: OrderService,
+        private readonly saga: PlaceOrderSagaService,
     ) {
         super(logger)
     }
 
     protected override process(command: PlaceOrderCommand): Promise<PlaceOrderResult> {
-        return this.orders.placeOrder({
-            personId: command.params.principal.id,
-            idempotencyKey: command.params.request.idempotencyKey,
-        })
+        return this.saga.place(command.params)
     }
 }

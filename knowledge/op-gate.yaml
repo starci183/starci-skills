@@ -57,6 +57,7 @@ kinds:
       be.feature.transport: [be/transport.yaml, be/api-auth.yaml]
       be.transport: [be/transport.yaml, be/api-auth.yaml]
       be.transport.message: [be/transport.yaml, be/background.yaml, be/idempotency.yaml, be/services.yaml]
+      be.feature.saga: [be/saga.yaml, be/cqrs.yaml, be/services.yaml]
       be.transport.schedule: [be/transport.yaml, be/background.yaml]
       be.contract: [be/transport.yaml, be/services.yaml]
       be.domain: [be/error.yaml, be/messages.yaml]

@@ -23,7 +23,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 export const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'contractTables', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'contractTables', 'pattern', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy'];
 
@@ -55,6 +55,7 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
   if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
+  if (slot.pattern !== undefined && !/^[a-z][a-z0-9-]*$/.test(String(slot.pattern))) bad.push(`${at}: pattern must be a kebab-case pattern name`);
   if (slot.contractTables !== undefined && !(strList(slot.contractTables) && slot.contractTables.length)) bad.push(`${at}: contractTables must be a non-empty list of file names`);
   if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
   for (const key of ['requires', 'contractTables', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);

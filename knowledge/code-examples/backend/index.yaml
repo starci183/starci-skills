@@ -7,3 +7,6 @@ examples:
   - id: named-exception
     path: named-exception
     title: AbstractException declaration shape
+  - id: saga
+    path: saga
+    title: A saga with steps, compensations and a fenced state

@@ -1,0 +1,58 @@
+schema: starci/code-example@1
+id: saga
+title: A saga with steps, compensations and a fenced state
+purpose: |
+  Show how a multi-service flow is written so that hfs can check it: an orchestrator that lists its steps and, for each,
+  the compensation that undoes it; each step and compensation names the event of its contract and dispatches one command;
+  the persisted state of a run carries a version fence and moves only through the shared saga store; the consumers of the
+  billing events hand the id of the delivery to a command, so the inbox dedupes it; the events are declared in the
+  vendored contract of the service that publishes them.
+appliesTo: [backend]
+relatedRules:
+  - BE-SERVICES-3
+  - BE-SERVICES-4
+  - BE-SAGA-1
+  - BE-SAGA-2
+  - BE-SAGA-3
+files:
+  - path: place-order.saga.service.ts
+    role: 'The orchestrator (a service, unit-tested beside it): place, compensate, complete, stateOf. It decides nothing; the state machine is the store''s.'
+  - path: place-order.saga-state.ts
+    role: The typed persisted state of a run, with its status and its version fence.
+  - path: reserve-order.step.ts
+    role: One step, naming its event ("order.placed") and dispatching one command.
+  - path: reserve-order.compensation.ts
+    role: The compensation of that step, naming the failure event ("billing.invoice-rejected") and dispatching one command.
+  - path: invoice-rejected.consumer.ts
+    role: A consumer of the failure event; it hands the delivery id on, so the saga takes the event through the inbox.
+  - path: saga.service.ts
+    role: 'The shared store (platform/saga): begin in the caller transaction, compensate and complete behind the inbox and the version fence.'
+  - path: billing.events.ts
+    role: The EVENTS table of the publishing service; the failure event says which event it compensates.
+  - path: order.consumes.ts
+    role: The CONSUMES table of the consuming service, judged against the vendored contract.
+entrypoint: place-order.saga.service.ts
+adapt:
+  - Keep one step per command; add a compensation file of the same name for every step, and import both in the orchestrator.
+  - Declare every event in the publisher's events.ts with its version; a failure event declares `compensates`.
+  - Every compensation path gets an e2e spec that injects a failure through the world (an infra outage or an app outage) and reads the compensated state back.
+dependencies:
+  packages: ["@nestjs/common", "@nestjs/cqrs"]
+  assumptions: |
+    The host has platform/saga (state machine and fence), platform/inbox (or the saga's own claims) and the contract tooling
+    of hfs; the imports are those of the ecommerce-app example and must be resolved to the host's aliases.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    An excerpt of examples/ecommerce-app (the order saga of the checkout feature): it does not show the command handlers, the
+    module wiring or the e2e specs, which live in the example and prove the flow on the real stack.
+provenance:
+  sources:
+    - examples/ecommerce-app/be/src/features/checkout/saga
+    - examples/ecommerce-app/be/src/modules/platform/saga
+    - examples/ecommerce-app/be/apps/billing/src/events.ts
+  simplifications: |
+    Files copied as they are; only the folder is flattened.

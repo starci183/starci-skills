@@ -62,11 +62,29 @@ command reads it.
 
 ## Sagas and compensation
 
-A saga is a chain of services reacting to each other's events; the canon has no in-process event (R87). The failure of a step is an
-event whose contract declares `compensates: "<event of the step it undoes>"`, and the consumer of that event undoes the step
-in one transaction. In the example, `order.placed` starts the billing service's invoice; when the invoice is above the limit
-`billing.invoice-rejected` (which compensates `order.placed`) makes the order service cancel the order, release its stock and refund
-its payment.
+A saga is a chain of services reacting to each other's events; the canon has no in-process event (R87). A product declares the
+pattern (`"patterns": ["saga"]` in `hfs.json` `sides.be`), which enables the saga slots; a saga folder in a product that has not
+declared it is `HFS_SLOT_NOT_ENABLED`. The saga is a folder of a feature (`knowledge/patterns/be/saga.yaml` lists every path with its slot):
+
+```text
+be/src/features/<feature>/saga/
+  <saga>.saga.service.ts          the orchestrator: lists the steps and compensations, a service unit-tested beside it
+  <saga>.saga-state.ts            the typed state of a run: status and the version fence
+  steps/<step>.step.ts            one step: names its event, dispatches one command
+  compensations/<step>.compensation.ts   REQUIRED for every step: names the failure event, dispatches one command
+```
+
+The consumers (`transport/message/<event>.consumer.ts`) hand the delivery id to a command, and the saga takes every event through
+the inbox. The state machine, the version fence and the inbox of a run are `platform/saga`: a run is started in the transaction of
+the first step (`begin`), moved to `compensating` at the version it read when the failure event arrives, settled as `compensated`
+once the compensation ran (a failing compensation gives the event back, so the redelivery resumes the run), or settled as
+`completed` when the last step is confirmed. The failure of a step is an event whose contract declares `compensates: "<event of
+the step it undoes>"`. Five checks keep it honest: `BE_SAGA_STEP_COMPENSATION` (R134), `BE_SAGA_STATE_VERSIONED` (R135),
+`BE_SAGA_EVENT_CONTRACT` (R136), `BE_SAGA_CONSUMER_DEDUPE` (R137) and `BE_SAGA_E2E_MISSING` (R138: every compensation path has an e2e
+spec that names its event and injects a failure through the world). In the example, `order.placed` starts the billing service's
+invoice; when the invoice is above the limit `billing.invoice-rejected` (which compensates `order.placed`) makes the order service
+cancel the order, release its stock and refund its payment, and `billing.invoice-issued` completes the run. The e2e spec
+`order/invoice-rejected` also cuts the order database while the rejection is delivered and proves the compensation resumes on the retry.
 
 ## Specs
 

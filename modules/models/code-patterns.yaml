@@ -10,8 +10,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: f083bb7848ca998c510339135dad57998875eae69fa27fcc12dd7ea41db9c19a
-        files: 136
+        value: 5c59e86edffc0bd73e51eb8f56e8466ca75650fba6af87cc79a6843ab365107f
+        files: 137
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -70,6 +70,10 @@ profiles:
       - BE-PERSISTENCE-6
       - BE-PERSISTENCE-7
       - BE-RESILIENCE-1
+      - BE-SAGA-1
+      - BE-SAGA-2
+      - BE-SAGA-3
+      - BE-SAGA-4
       - BE-SERVICES-1
       - BE-SERVICES-2
       - BE-SERVICES-3
@@ -566,6 +570,10 @@ profiles:
           guidance: knowledge/patterns/be/services.yaml
           review: Confirm shared code a service needs lives in `src` and that a call to a sibling goes through its API client or its vendored contract, not through a copied file.
         status: implemented
+      - id: NEST-SAGA-OBSERVATION
+        sourceRuleIds: [BE-SAGA-1, BE-SAGA-2, BE-SAGA-3, BE-SAGA-4]
+        rationale: These are tree checks of `hfs check` (BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_CONSUMER_DEDUPE, BE_SAGA_E2E_MISSING) over a folder tree, event names and e2e spec files, not lint rules; whether a compensation really undoes its step, a step is idempotent and an injected fault is the right one is reviewed against the accepted design.
+        guidance: knowledge/patterns/be/saga.yaml
       - id: NEST-SERVICE-STACK-AND-CONTRACT-OBSERVATION
         sourceRuleIds: [BE-SERVICES-2, BE-SERVICES-3, BE-SERVICES-4]
         rationale: These are tree checks of `hfs check` (HFS_IMAGE_UNPINNED, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING), not lint rules; whether a spec asserts the right behaviour, whether a version bump is compatible and whether a saga compensates every failure is reviewed against the accepted design.
@@ -581,8 +589,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 64f552bb01c2b3d8d638e5ff27dc5736ce644ce8e13cf722bf6575ee144581fc
-        files: 148
+        value: aa2df3d7799d66f5a03cbcdb55f4632e7f28d1332f305c345e29369877d630ec
+        files: 149
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:

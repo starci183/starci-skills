@@ -5,6 +5,7 @@ import type {
     OrderLineRow,
     OrderRow,
     OrderSummaryRow,
+    SagaStateRow,
     PaymentRow,
     PersonRow,
     RowQuery,
@@ -71,6 +72,11 @@ export const INVOICES_OF_ORDER: RowQuery<InvoiceRow> = {
 /** The cancelled order with this id ($1 order id): one row, or none while it is still confirmed. */
 export const CANCELLED_ORDER: RowQuery<OrderSummaryRow> = {
     text: sql`SELECT status, total_minor_units FROM orders WHERE id = $1 AND status = 'cancelled'`,
+}
+
+/** The state of the place-order saga run of one order ($1 order id). */
+export const PLACE_ORDER_SAGA_STATE: RowQuery<SagaStateRow> = {
+    text: sql`SELECT status, version FROM saga_states WHERE saga = 'place-order' AND correlation_id = $1`,
 }
 
 /** How many invoices the billing database holds for the orders of one person ($1 person id). */

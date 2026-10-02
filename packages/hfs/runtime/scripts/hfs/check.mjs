@@ -61,6 +61,7 @@ import { contractFindings } from './rules/contract.mjs';
 import { depFindings } from './rules/deps.mjs';
 import { appFrontendFindings, frontendFindings } from './rules/frontend-tree.mjs';
 import { feContractFindings } from './rules/fe-contract-documents.mjs';
+import { sagaFindings } from './rules/saga.mjs';
 import { serviceFindings } from './rules/services.mjs';
 import { integrationSpecFindings } from './rules/integration-specs.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
@@ -93,7 +94,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
-  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_SAGA_E2E_MISSING', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -279,6 +280,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
       ...integrationSpecFindings({ repoRoot, files: all }),
       ...feContractFindings({ repoRoot, files: all }),
       ...serviceFindings({ repoRoot, files: all, repo }),
+      ...sagaFindings({ repoRoot, files: all }),
       ...pipelineFindings({ repoRoot, files, pins }),
       ...testTopologyFindings({ repoRoot, files }),
       ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),

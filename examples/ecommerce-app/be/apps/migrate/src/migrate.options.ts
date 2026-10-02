@@ -12,6 +12,7 @@ import {
 } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
+import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
 
 /** Everything the migrate app needs from its environment: every connection with the entities and migrations of its owners. */
 export interface MigrateAppOptions {
@@ -25,8 +26,14 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
         { ...parseIdentityDatabaseConfig(env), entities: accountEntities, migrations: accountMigrations },
         {
             ...parseOrderDatabaseConfig(env),
-            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities],
-            migrations: [...catalogMigrations, ...cartMigrations, ...orderMigrations, ...paymentMigrations],
+            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities, ...sagaEntities],
+            migrations: [
+                ...catalogMigrations,
+                ...cartMigrations,
+                ...orderMigrations,
+                ...paymentMigrations,
+                ...sagaMigrations,
+            ],
         },
         {
             ...parseBillingDatabaseConfig(env),

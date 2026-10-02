@@ -8,14 +8,16 @@ import { PAYMENT_SERVICE } from "@modules/domain/payment"
 import type { PaymentService } from "@modules/domain/payment"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { LOGGER } from "@modules/platform/logging"
+import { SAGA_SERVICE } from "@modules/platform/saga"
 import type { Logger } from "@modules/platform/logging"
+import type { SagaService } from "@modules/platform/saga"
 import { MESSAGE_PUBLISHER } from "@modules/integrations/messaging"
 import type { MessagePublisher } from "@modules/integrations/messaging"
 import { Test } from "@nestjs/testing"
 import { orderLineRow, orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
-import { ORDER_PLACED_QUEUE } from "./order.contracts"
+import { ORDER_PLACED_QUEUE, PLACE_ORDER_SAGA } from "./order.contracts"
 import { OrderLogEvent } from "./order.log-events"
 import { OrderService } from "./order.service"
 import { ReceiptService } from "./receipt.service"
@@ -33,6 +35,7 @@ const build = async (entityManager: MockEntityManager) => {
     const receipts = mock<ReceiptService>()
     const messages = mock<MessagePublisher>()
     const logger = mock<Logger>()
+    const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             OrderService,
@@ -43,9 +46,10 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: ReceiptService, useValue: receipts },
             { provide: MESSAGE_PUBLISHER, useValue: messages },
             { provide: LOGGER, useValue: logger },
+            { provide: SAGA_SERVICE, useValue: sagas },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts, messages, logger }
+    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts, messages, logger, sagas }
 }
 
 describe("OrderService", () => {
@@ -125,7 +129,7 @@ describe("OrderService", () => {
                     insert: [OrderLineEntity, {}],
                 }),
             )
-            const { orders, cart, catalog, payments, receipts, messages } = await build(tx.em)
+            const { orders, cart, catalog, payments, receipts, messages, sagas } = await build(tx.em)
             cart.list.mockResolvedValue([
                 { productId: "sku-1", quantity: 2 },
                 { productId: "sku-2", quantity: 1 },
@@ -163,6 +167,11 @@ describe("OrderService", () => {
             expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)
             expect(receipts.archive).toHaveBeenCalledWith("o-7")
+            expect(sagas.begin).toHaveBeenCalledWith({
+                manager: expect.anything(),
+                saga: PLACE_ORDER_SAGA,
+                correlationId: "o-7",
+            })
             expect(messages.publish).toHaveBeenCalledWith({
                 queue: ORDER_PLACED_QUEUE,
                 eventId: "o-7",

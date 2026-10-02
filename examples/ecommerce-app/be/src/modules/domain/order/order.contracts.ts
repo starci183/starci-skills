@@ -163,6 +163,9 @@ export interface EmptiedCart {
     readonly cleared: true
 }
 
+/** The saga that orchestrates an order from its placement to its invoice: the name of `place-order.saga.ts` of the checkout feature. */
+export const PLACE_ORDER_SAGA = "place-order"
+
 /** The payload of `order.placed`, as published on its queue (the contract `be/contracts/order/events.json`). */
 export interface OrderPlacedPayload {
     /** The placed order. */
@@ -208,3 +211,17 @@ export interface CancelledOrder {
     /** Whether this call cancelled it. */
     readonly cancelled: boolean
 }
+
+/** The payload of `billing.invoice-issued` as this service reads it (version 1 of the billing service's contract, `be/contracts/billing/events.json`). */
+export interface IssuedInvoiceNotice {
+    /** The order whose invoice was issued. */
+    readonly orderId: string
+}
+
+/** The queue of the issued invoices this service completes its saga on: three deliveries, one second of backoff doubling. */
+export const ISSUED_INVOICE_QUEUE = defineQueue<IssuedInvoiceNotice>({
+    name: "billing.invoice-issued",
+    attempts: 3,
+    backoffMs: 1000,
+    parse: (value) => (isRecord(value) && typeof value.orderId === "string" ? { orderId: value.orderId } : null),
+})
