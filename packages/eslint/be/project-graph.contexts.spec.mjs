@@ -255,3 +255,18 @@ test("sql-owner: a cross-context JOIN or read is refused, an own-table and a sam
     const g = repo(t, clean)
     g.tester.run("sql-owner", rules["sql-owner"], { valid: ok(g, clean, [`${DOMAIN}/order/persistence/order.sql.ts`]), invalid: [] })
 })
+
+// BE_CONTEXT_OWNER through the options file of an app: the registration literal names the connection, the database module is passed an options object.
+const OPTIONS_FILE = (entry) => `${Object.entries(IMPORTS).filter(([name]) => entry.some((text) => text.includes(name))).map(([, text]) => text).join("")}export const databases = [${entry.join(", ")}];\n`
+test("context-owner: a registration literal in an app options file counts, an unresolvable runner registration is not judged", (t) => {
+    const files = {
+        "apps/order/src/order.options.ts": OPTIONS_FILE([ORDER_ENTRY, BILLING_ENTRY]),
+        "apps/billing/src/billing.options.ts": OPTIONS_FILE([BILLING_ENTRY]),
+        "apps/migrate/src/app.module.ts": "import { Module } from '@nestjs/common';\nimport { DatabaseModule } from '../../../src/modules/platform/database';\nimport { orderEntities } from '../../../src/modules/domain/order';\ndeclare const name: string;\n@Module({ imports: [DatabaseModule.register({ connections: [{ name, entities: orderEntities }] })] })\nexport class AppModule {}\n",
+    }
+    const f = repo(t, files)
+    f.tester.run("context-owner", rules["context-owner"], {
+        valid: [...ok(f, files, ["apps/billing/src/billing.options.ts", "apps/migrate/src/app.module.ts"])],
+        invalid: [...bad(f, files, [["apps/order/src/order.options.ts", ["import { billingEntities", /App order imports src\/modules\/domain\/billing/], ["databases = [", /App order composes connection billing, the context owned by app billing/]]])],
+    })
+})

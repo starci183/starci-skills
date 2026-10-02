@@ -10,7 +10,7 @@ const camel = name => { const text = pascal(name); return text[0].toLowerCase() 
  * The one walk BE_SCHEMA_OWNER and the bounded-context rules (R131 to R135) share, so a capability's context is decided once, by origin.
  *
  * @param {{kit: object, graph: object, persistenceOf: (rel: string) => ({root: string, capability: string, folder: string, below: string[]} | null)}} input
- * @returns {{registered: Map<string, {name: string, connections: Map<string, {file: object, node: object}>}>, registrations: number}}
+ * @returns {{registered: Map<string, {name: string, connections: Map<string, {file: object, node: object}>}>, registrations: number, all: Array<{file: object, node: object, connection: string | null}>}}
  *   `registered`: capability root -> its name and the connections it is registered on (first site each).
  */
 export function collectRegistrations({ kit, graph, persistenceOf }) {
@@ -91,6 +91,7 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
       out.push({ key: path.posix.dirname(owner.root), name: owner.capability });
     } else if (declaration.initializer) arraysIn(kit.checkerOf(declaration.getSourceFile()), declaration.initializer, out, depth + 1);
   };
+  const all = []; // every registration literal: {file, node, connection | null when the name cannot be resolved}
   const registered = new Map(); // capability root -> {name, connections: Map(connection -> first site)}
   let registrations = 0;
   for (const file of graph.files.values()) {
@@ -105,6 +106,7 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
       if (!arrays.length) return true;
       registrations += 1;
       const connection = nameOfLiteral(checker, node, 0);
+      all.push({ file, node, connection });
       if (connection === null) return true;
       for (const { key, name } of new Map(arrays.map(item => [item.key, item])).values()) {
         if (!registered.has(key)) registered.set(key, { name, connections: new Map() });
@@ -114,7 +116,7 @@ export function collectRegistrations({ kit, graph, persistenceOf }) {
       return true;
     });
   }
-  return { registered, registrations };
+  return { registered, registrations, all };
 }
 
 const PERSISTENCE_SLOT = 'be.persistence';
@@ -147,7 +149,7 @@ export function contextModelOf(kit, graph) {
   const { ts, resolver } = kit;
   const persistenceOf = persistenceOfFactory(resolver);
   const declared = new Map(resolver.repo.connections.map(connection => [connection.name, connection]));
-  const { registered } = collectRegistrations({ kit, graph, persistenceOf });
+  const { registered, all } = collectRegistrations({ kit, graph, persistenceOf });
   const perConnection = new Set();
   const contextOfRoot = new Map(); // capability root -> declared connection name (single registration only)
   for (const [root, { name, connections }] of registered) {
@@ -199,7 +201,7 @@ export function contextModelOf(kit, graph) {
     }
     return null;
   };
-  const model = { declared, registered, perConnection, contextOfCapability, contextOfFile, connectionOfManager, unparen };
+  const model = { declared, registered, registrations: all, perConnection, contextOfCapability, contextOfFile, connectionOfManager, unparen };
   MODELS.set(graph, model);
   return model;
 }
