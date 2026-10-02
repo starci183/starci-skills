@@ -13,14 +13,14 @@ const startOptionsOf = (row) => {
   try { return JSON.parse(row?.start_options ?? 'null') ?? {}; } catch { return {}; }
 };
 
-export function agentOfWorker(row) {
+function agentOfWorker(row) {
   const options = startOptionsOf(row);
   return text(row?.agentType ?? row?.agent ?? row?.provider ?? row?.launch?.effective?.agent
     ?? row?.projection?.agent?.id ?? row?.projection?.agent?.type ?? options.agent
     ?? options.launch?.requested?.agent ?? options.launch?.effective?.agent) || 'unknown';
 }
 
-export function taskTitleOfWorker(row) {
+function taskTitleOfWorker(row) {
   const options = startOptionsOf(row);
   return text(row?.taskTitle ?? row?.task_title ?? row?.task?.title ?? row?.projection?.task?.title
     ?? options['task-title'] ?? options.taskTitle) || '-';
@@ -76,7 +76,7 @@ export function registeredWorktree(worktrees, requested, cwd) {
   return target;
 }
 
-export function projectWorker(row) {
+function projectWorker(row) {
   return {
     dispatchId: row?.dispatchId ?? null,
     state: row?.workerState ?? row?.state ?? null,

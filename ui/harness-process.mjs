@@ -147,7 +147,7 @@ export function startHarness({
 }
 
 /** A PID is ours only when its identity, creation time and dispatched harness command match the record. */
-export function recordedHarnessProcess(record, row) {
+function recordedHarnessProcess(record, row) {
   if (!record || !row || Number(row.pid) !== Number(record.pid)) return false;
   const command = normalize(row.cmd);
   if (!/(?:^|\s|["'])harness(?:$|\s|["'])/.test(command) || !/(?:^|\s|["'])start(?:$|\s|["'])/.test(command)) return false;

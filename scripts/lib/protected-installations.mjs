@@ -4,7 +4,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
-export const PROTECTED_INSTALLATIONS_FILE = 'modules/host/protected-installations.yaml';
+const PROTECTED_INSTALLATIONS_FILE = 'modules/host/protected-installations.yaml';
 const SCHEMA = 'starci/protected-installations@1';
 
 const validPort = (value) => Number.isInteger(value) && value > 0 && value <= 65_535;

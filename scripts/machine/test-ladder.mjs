@@ -57,7 +57,10 @@ export function pathList(value) {
 /** A consistent machine envelope for ladder verbs. */
 export function ladderResult({ schema, level, scope = [], ok, findings = [], ...extra }) {
   const data = { schema, level, scope: [...scope], ok: Boolean(ok), findings: [...findings], ...extra };
-  return { code: ok ? 0 : 1, text: `${schema}: ${ok ? 'GREEN' : 'RED'} ${level} (${scope.length} scope item(s), ${findings.length} finding(s))`, data };
+  const head = `${schema}: ${ok ? 'GREEN' : 'RED'} ${level} (${scope.length} scope item(s), ${findings.length} finding(s))`;
+  // A red run names what is red: the first lines of each finding, so the caller never has to re-run with --json to learn why.
+  const detail = ok ? [] : findings.flatMap((finding) => String(finding.message ?? '').split(/\r?\n/).filter(Boolean).slice(0, 12).map((line) => `  ${line.slice(0, 300)}`));
+  return { code: ok ? 0 : 1, text: [head, ...detail].join('\n'), data };
 }
 
 /** A usage or policy refusal is code 2 while preserving the same JSON shape as a completed run. */

@@ -48,7 +48,7 @@ function briefReference(line) {
   return /(?:^|\s|["'(])[^\s"'<>]+\.(?:md|txt|ya?ml)\b/i.test(line);
 }
 
-export function resolveWorkerSpec(value, cwd, { readFile = (file) => fs.readFileSync(file, 'utf8'), exists = fs.existsSync } = {}) {
+function resolveWorkerSpec(value, cwd, { readFile = (file) => fs.readFileSync(file, 'utf8'), exists = fs.existsSync } = {}) {
   const supplied = clean(value);
   if (!supplied) return { error: '--spec is required' };
   if (supplied.startsWith('@')) {
