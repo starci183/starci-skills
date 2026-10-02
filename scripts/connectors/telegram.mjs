@@ -411,7 +411,7 @@ function sendContext(over = {}) {
     config: ownerConfig(), env, root: configRoot, fetchImpl: fetch,
     apiBase: env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE,
     warn: (line) => process.stderr.write(`${line}\n`), sleepImpl: sleep, now: Date.now(),
-    ...over,
+    ...Object.fromEntries(Object.entries(over).filter(([, value]) => value !== undefined)),
   };
   const off = guarded(o.env, o.apiBase, o.fetchImpl);
   if (off) return { ...o, skipped: off };
