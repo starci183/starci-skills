@@ -132,10 +132,10 @@ assertions:
       src/modules/domain/catalog src/modules/domain/payment src/modules/integrations/identity
       src/features/api/checkout --runInBand exited 0
   - id: e2e
-    command: npm run test:e2e -- order-lifecycle checkout/payment-failure
+    command: npm run test:e2e -- order-lifecycle checkout/checkout-refusal
     exit: 0
     outcome: pass
-    observation: npx jest --selectProjects e2e order-lifecycle checkout/payment-failure
+    observation: npx jest --selectProjects e2e order-lifecycle checkout/checkout-refusal
       exited 0
 provenance:
   actor: example-evidence

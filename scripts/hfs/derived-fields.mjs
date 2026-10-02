@@ -6,10 +6,11 @@
 // `node scripts/hfs/derived-fields.mjs --write` rewrites them in place, `--check` (the default) lists the files that differ.
 // A typed value that names a code or an enforcer a catalog rule owns adds that rule to `hfsRules` once, so nothing a pattern
 // verified by hand is lost; a typed value no rule owns is reported and never silently dropped. Pure text in, text out.
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 
@@ -142,7 +143,7 @@ if (isMain(import.meta.url)) {
   const examples = ['examples/ecommerce-app/hfs.json'].filter((f) => fs.existsSync(path.join(root, f)));
   const resolver = createProseResolver({ files: examples, read: (f) => fs.readFileSync(path.join(root, f), 'utf8') }, manifest);
   const classify = (p) => resolver.classify(`be/${sample(p.replace(/<kind>/g, 'api'))}`).slot ?? null;
-  const files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n').filter(Boolean);
+  const files = gitOutputOf(lsFiles([], { dir: root, maxBuffer: 1 << 28 }), 'git ls-files').split('\n').filter(Boolean);
   const stale = derivedFiles({ files, read: (f) => fs.readFileSync(path.join(root, f), 'utf8'), catalog: loadRuleCatalog({ root }), classify });
   const write = process.argv.includes('--write');
   let problems = 0;

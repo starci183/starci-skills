@@ -5,6 +5,3 @@ export interface RecomputeOrderSummaryRequest {
     /** The order whose summary is recomputed. */
     readonly orderId: string
 }
-
-/** The command answers nothing: its effect is the state the domain service wrote. */
-export type RecomputeOrderSummaryResult = void

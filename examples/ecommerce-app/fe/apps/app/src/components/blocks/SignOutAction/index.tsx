@@ -3,12 +3,8 @@
 import { useSignOutAction } from "../../../hooks/session"
 import { SignOutActionBase } from "./component"
 
-/** The connected sign-out action takes no external inputs. */
-type SignOutActionProps = Record<never, never>
-
 /** Mounts the pure action with its resolved session lifecycle. */
-export const SignOutAction = (props: SignOutActionProps) => {
-    void props
+export const SignOutAction = () => {
     const model = useSignOutAction()
     return <SignOutActionBase {...model} />
 }
