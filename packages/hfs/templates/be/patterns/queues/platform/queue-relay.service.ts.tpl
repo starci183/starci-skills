@@ -65,5 +65,4 @@ export class QueueRelayService implements OnApplicationBootstrap, OnApplicationS
             return rows.length
         })
     }
-
 }

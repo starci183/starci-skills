@@ -72,5 +72,4 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
             return rows.length
         })
     }
-
 }
