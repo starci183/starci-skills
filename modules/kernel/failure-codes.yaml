@@ -14376,6 +14376,7 @@ RT_DOC_NO_OWNER:
     - "Tách một tài liệu thành hai mà không gộp nội dung trùng hoặc không đổi dòng Task của một trong hai"
   nextStep_vi: "Người giám sát thêm đúng một dòng sở hữu vào dòng đầu của tài liệu (một nguồn knowledge/ hoặc modules/ tồn tại, hoặc một Task duy nhất), hoặc gộp hai tài liệu trùng thành một rồi xóa tệp thừa, qua một lane đã land."
   owner: supervisor
+  kind: check-finding
 
 DB_MIGRATION_SHAPE:
   title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"

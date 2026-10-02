@@ -486,7 +486,7 @@ export async function upgradeEdition({
   return result;
 }
 
-/** CLI adapter kept outside bin/hfs.mjs so that verb wiring remains one line. */
+/** CLI adapter kept outside the CLI entry so that verb wiring remains one line. */
 export async function upgradeMain(
   argv,
   { stdout = (value) => process.stdout.write(value), presets } = {},
