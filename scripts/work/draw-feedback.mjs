@@ -38,7 +38,7 @@ import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf
 import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
-import { text } from '../lib/stack-declaration.mjs';
+import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 /** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes.yaml). */
@@ -557,7 +557,7 @@ export function drawFeedbackMain(argv = []) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = drawFeedbackMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

@@ -48,7 +48,7 @@ import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
@@ -59,6 +59,7 @@ import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
 import { rationaleFileOf, rationaleSummary } from './draw/draw-rationale.mjs';
 import { DRAW_FEEDBACK_UNADDRESSED, dnaNamesFor, feedbackFindings, feedbackOf, goldenMarkOf, notesOfReceipt, openNotesOf, withFeedbackRound } from './draw-feedback.mjs';
@@ -75,14 +76,11 @@ export const DRAW_REVIEW_CHANGE = 'interface-draw-owner-review';
 export const DRAW_REVIEW_UNJUDGED_CHANGE = 'draw-review-gate-fails-closed';
 /** The two answers, in this order: 0 accepts the drawn parts, 1 asks for a redraw (the note says what to change). */
 export const DRAW_REVIEW_DECISIONS = Object.freeze(['accept', 'redraw']);
-const OPTIONS = {
-  en: ['Accept the drawn parts', 'Redraw - say in the note what to change'],
-  vi: ['Chấp nhận các phần đã vẽ', 'Vẽ lại - ghi chú rõ cần đổi gì'],
-};
+const OPTIONS = ['Accept the drawn parts', 'Redraw - say in the note what to change'];
 const OWNER = 'owner';
 /** The contract change that made every drawing owe the owner's review (modules/kernel/contract-changes.yaml). */
 export const DRAW_OWNER_EVERY_CHANGE = 'draw-content-owner-gate';
-/** Autopilot (scripts/kernel/autopilot.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
+/** Autopilot (scripts/kernel/autopilot-run.mjs AUTOPILOT_BY; owner ruling 2026-09-28 autopilot-run-to-finish): a PROVISIONAL accept. */
 export const AUTOPILOT_BY = 'autopilot';
 /** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);
@@ -204,7 +202,7 @@ export function drawReviewStatus(uiDir) {
   let provisional = false;
   if (acceptance?.current && acceptance.answeredBy === OWNER) why = `accepted by ${acceptance.answeredBy} in ask ${acceptance.dispatchId} at ${acceptance.at}`;
   // Autopilot: a current provisional acceptance owes nothing now - the owner reviews it once, at handover.
-  else if (acceptance?.current && isProvisionalAcceptance(acceptance)) { provisional = true; why = `provisionally accepted by autopilot in ask ${acceptance.dispatchId} at ${acceptance.at} (tự nhận tạm): every machine gate passed; the owner reviews it at handover`; }
+  else if (acceptance?.current && isProvisionalAcceptance(acceptance)) { provisional = true; why = `provisionally accepted by autopilot in ask ${acceptance.dispatchId} at ${acceptance.at}: every machine gate passed; the owner reviews it at handover`; }
   else if (record.state === 'done' && !acceptance) why = 'already done without a draw review (another path settled it)';
   else if (!split.shapes.length) why = `no shape is drawn yet${retiredStates(split).length ? ` (retired: ${retiredStates(split).join(', ')})` : ''}: draw the shapes first`;
   else if (missing.length) why = `the draw is incomplete: no part at ${missing.join(', ')}`;
@@ -325,25 +323,20 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
   if (unaddressed.length) throw Object.assign(new Error(`${DRAW_FEEDBACK_UNADDRESSED}: ${unaddressed.map((f) => f.detail).join(' | ')} - redraw through draw-loop.mjs with the brief carrying \`draw-feedback.mjs brief --ui <dir>\` and ask again`), { code: DRAW_FEEDBACK_UNADDRESSED, findings: unaddressed });
   const priorRounds = feedbackOf(record).rounds;
   const answered = openNotesOf(record);
-  const vi = lang === 'vi';
+  const tr = translator(lang);
+  const bpLabel = (bp) => (bp === 'desktop' ? tr('desktop') : tr('mobile'));
   const digests = reviewed.map((p) => `${p.shape} ${p.breakpoint} ${p.sha256.slice(0, 8)}`).join(', ');
-  const roundLine = !priorRounds.length ? '' : vi
-    ? ` Vòng ${priorRounds.length + 1}; bản vẽ lại này xử lý các ghi chú: ${answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || '(không có)'}.`
-    : ` Round ${priorRounds.length + 1}; this redraw addresses your notes: ${answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || '(none)'}.`;
+  const roundLine = !priorRounds.length ? '' : tr(' Round {n}; this redraw addresses your notes: {notes}.',
+    { n: priorRounds.length + 1, notes: answered.map((n) => `[${n.id}] ${n.text}`).join(' | ') || tr('(none)') });
   const title = String(record.title ?? record.id);
   const retired = retiredStates(split);
-  const retiredLine = !retired.length ? '' : vi
-    ? ` Ảnh trạng thái dữ liệu (${retired.join(', ')}) đã loại, không cần duyệt.`
-    : ` Data-status images (${retired.join(', ')}) are retired and not for review.`;
-  const text = vi
-    ? `Xin chủ dự án duyệt các hình dạng đã vẽ của "${title}" (${record.id}): máy tính và điện thoại, giao diện sáng. Đây là hướng thiết kế đề xuất, chưa phải ảnh sản phẩm đang chạy. Chấp nhận, hoặc yêu cầu vẽ lại và ghi rõ cần đổi gì trong ghi chú.${retiredLine} [${digests}]`
-    : `Please review the drawn shapes of "${title}" (${record.id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.${retiredLine} [${digests}]`;
-  const label = (p) => `${p.shape} - ${vi ? (p.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : p.breakpoint}`;
+  const retiredLine = !retired.length ? '' : tr(' Data-status images ({states}) are retired and not for review.', { states: retired.join(', ') });
+  const text = tr('Please review the drawn shapes of "{title}" ({id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.{retiredLine} [{digests}]',
+    { title, id: record.id, retiredLine, digests });
+  const label = (p) => `${p.shape} - ${bpLabel(p.breakpoint)}`;
   // What the drawing needed that the Grammar's DNA lacks (grammar-proposal.mjs): the owner is asked, never the runtime.
   const proposals = readProposals(proposalFilesUnder(dir));
-  const proposalLine = !proposals.length ? '' : vi
-    ? ` Đề xuất bổ sung grammar (chờ chủ dự án quyết, không tự chấp nhận): ${proposals.map((p) => p.name).join(', ')}.`
-    : ` Grammar proposals (yours to decide, never auto-accepted): ${proposals.map((p) => p.name).join(', ')}.`;
+  const proposalLine = !proposals.length ? '' : tr(' Grammar proposals (yours to decide, never auto-accepted): {names}.', { names: proposals.map((p) => p.name).join(', ') });
   // The evidence the owner critiques from (owner ruling 2026-09-27 draw-rationale-evidence): each part's annotated
   // redline render (<part>.redline.png) and its rationale.json - every decision with its value, rule ids and reason.
   const redlines = reviewed.map((p) => ({ part: p.path, abs: path.join(dir, p.path.replace(/.png$/i, '.redline.png')), shape: p.shape, breakpoint: p.breakpoint }))
@@ -352,17 +345,16 @@ export function drawReviewQuestion(uiDir, { lang = 'en', ownerRequested = false,
     const file = rationaleFileOf(path.join(dir, p.path.replace(/.png$/i, '.html')));
     return file ? [file, { shape: p.shape, file: slash(path.relative(repoRoot, file)), ...rationaleSummary(file) }] : null;
   }).filter(Boolean)).values()];
-  const whyLine = !rationale.length ? '' : vi
-    ? ` Bằng chứng cho từng quyết định: hình redline (khoảng cách, mã quy tắc) và ${rationale.map((r) => `${r.file} (${r.decisions} quyết định)`).join(', ')}.`
-    : ` Evidence for every decision: the redline images (spacing, rule ids) and ${rationale.map((r) => `${r.file} (${r.decisions} decisions)`).join(', ')}.`;
+  const whyLine = !rationale.length ? '' : tr(' Evidence for every decision: the redline images (spacing, rule ids) and {list}.',
+    { list: rationale.map((r) => `${r.file} ${tr('({n} decisions)', { n: r.decisions })}`).join(', ') });
   return {
     kind: DRAW_REVIEW_KIND,
     text: `${text}${roundLine}${proposalLine}${whyLine}`,
-    options: [...(OPTIONS[lang] ?? OPTIONS.en)],
+    options: OPTIONS.map((o) => tr(o)),
     refs: [record.id],
     assets: [...reviewed.map((p) => ({ path: slash(path.relative(repoRoot, path.join(dir, p.path))), label: label(p) })),
-      ...redlines.map((r) => ({ path: r.repoPath, label: `${r.shape} - redline ${vi ? (r.breakpoint === 'desktop' ? 'máy tính' : 'điện thoại') : r.breakpoint}` })),
-      ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${vi ? 'đề xuất' : 'proposal'} ${p.name}` }))],
+      ...redlines.map((r) => ({ path: r.repoPath, label: `${r.shape} - redline ${bpLabel(r.breakpoint)}` })),
+      ...proposals.map((p) => [p, proposalImageOf(p)]).filter(([, img]) => img).map(([p, img]) => ({ path: slash(path.relative(repoRoot, img)), label: `${tr('proposal')} ${p.name}` }))],
     ...(rationale.length ? { rationale } : {}),
     ...(proposals.length ? { grammarProposals: proposals.map((p) => ({ name: p.name, file: slash(path.relative(repoRoot, p.file)), gap: p.gap, claims: p.claims, complete: p.complete, status: p.status })) } : {}),
     review: { schema: DRAW_REVIEW_SCHEMA, record: record.id, recordPath: slash(path.relative(repoRoot, path.join(dir, 'index.yaml'))), parts: reviewed,
@@ -462,7 +454,7 @@ export function applyDrawReview(uiDir, receiptFile, { write = false, now = () =>
       : auto
       ? `The drawn parts (desktop and mobile, light) were accepted without the owner in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}, answeredBy ${AUTO_ACCEPTED_BY}): config.yaml asks.autoAcceptRecommended accepts a drawing the owner did not ask to review (owner ruling 2026-09-26). A design direction is accepted, not proved by a run. Implementation captures and browser UAT remain separate proof.`
       : `The owner accepted the drawn parts (desktop and mobile, light) in draw-review ask ${owner.dispatchId} at ${owner.at} (receipt ${receiptRel}): a design direction is accepted by its owner, not proved by a run. Implementation captures and browser UAT remain separate proof.`,
-    ui: { ...record.ui, status: `${pilot ? 'Provisionally accepted by autopilot (tự nhận tạm; owner review at handover)' : auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
+    ui: { ...record.ui, status: `${pilot ? 'Provisionally accepted by autopilot (provisional; owner review at handover)' : auto ? 'Auto-accepted (unrequested by the owner)' : 'Owner-accepted'} design direction (draw-review ask ${owner.dispatchId}, ${owner.at}); implementation and real-render review remain pending.`,
       review: { ...(withFeedbackRound(record, feedbackRound).ui?.review ?? {}), owner, ...(golden?.promoted ? { golden: { archetype: golden.archetype, shapes: golden.shapes, dispatchId: owner.dispatchId, promotedAt: owner.appliedAt, archetypeAccepted: golden.archetypeAccepted } } : {}) } },
     ...(Number.isInteger(record.change?.rev) ? { change: { rev: record.change.rev + 1, kind: 'clarifying', at: owner.appliedAt, reason: `${pilot ? 'The drawn parts were accepted provisionally by autopilot' : auto ? 'The drawn parts were auto-accepted' : 'The owner accepted the drawn parts'} in draw-review ask ${owner.dispatchId}; the record is done on that acceptance.` } } : {}),
   };
@@ -569,7 +561,7 @@ export function drawReviewsOwed(repo, files) {
   return { owed, unjudged: unjudged.filter((u) => !seen.has(u.path) && seen.add(u.path)) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = drawReviewMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

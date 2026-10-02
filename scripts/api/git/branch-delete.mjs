@@ -1,10 +1,10 @@
 // branch-delete.mjs — delete a removed tree's branch: 'merged' -> `git branch -d` (judged against `main`), 'force' -> `-D`.
 import { gitRunner } from './lib.mjs';
 import { revParse } from './rev-parse.mjs';
-import { isAncestor } from './merge-base.mjs';
+import { isAncestor } from './is-ancestor.mjs';
 
 /** {ok, detail?}. The branch's config section goes with it. */
-export function deleteBranch({ repoRoot, branch, mode, main = 'main', git = null }) {
+export function branchDelete({ repoRoot, branch, mode, main = 'main', git = null }) {
   const run = gitRunner(git);
   const flag = mode === 'force' ? '-D' : '-d';
   let d = run(['branch', flag, branch], { cwd: repoRoot });

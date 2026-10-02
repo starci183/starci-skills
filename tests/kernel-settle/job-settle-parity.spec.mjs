@@ -14,7 +14,7 @@ import { verifyReported, classifyCheck, isBaselineCheck, settlerSettings, parity
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const tmpDirs = [];
+const tmpDirs = [], DRIVE = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
 const tmp = (p) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), p)); tmpDirs.push(d); return d; };
 after(() => { for (const d of tmpDirs) fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
 const git = (cwd, ...args) => { const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
@@ -65,7 +65,7 @@ test('families, base and eligibility', () => {
   assert.equal(checkFamilyOf({ name: 'vitest', command: 'npx vitest run' }), null);
   assert.equal(checkFamilyOf({ name: 'starci-validate-strict', command: 'node .claude/bin/starci.mjs validate X --strict' }), null);
   assert.equal(sliceBaseOf(sliceItem('abc1234', [])), 'abc1234');
-  assert.equal(sliceBaseOf({ payload: { params: { admissionBase: 'def5678' } }, report: {} }), 'def5678');
+  assert.equal(sliceBaseOf({ payload: { params: { admissionBase: 'def5678' } }, report: {} }), null, 'no admissionBase param: the base is what the checks measured against');
   assert.equal(sliceBaseOf({ payload: { params: {} }, report: { checks: [] } }), null);
   assert.equal(parityEligible(sliceItem('a', [])), true);
   assert.equal(parityEligible({ ...sliceItem('a', []), payload: { params: { canonFamilies: 'all' } } }), false, 'a wire leg (no cut) is not a slice');
@@ -227,11 +227,11 @@ test('owedToWire: findings left on owned paths pass only when declared, held by 
 
 test('a NODE_PATH prefix is dropped before a declared runtime check is classified and re-run', async () => {
   const { withoutNodePath } = await import('../../scripts/kernel/settle/canon-parity.mjs');
-  assert.equal(withoutNodePath('NODE_PATH=D:/x/node_modules node .claude/bin/starci.mjs validate X --strict --json'), 'node .claude/bin/starci.mjs validate X --strict --json');
-  assert.equal(withoutNodePath("$env:NODE_PATH='D:/x'; node D:/r/.claude/bin/starci.mjs validate X --json"), 'node D:/r/.claude/bin/starci.mjs validate X --json');
+  assert.equal(withoutNodePath(`NODE_PATH=${DRIVE}x/node_modules node .claude/bin/starci.mjs validate X --strict --json`), 'node .claude/bin/starci.mjs validate X --strict --json');
+  assert.equal(withoutNodePath(`$env:NODE_PATH='${DRIVE}x'; node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`), `node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`);
   assert.equal(withoutNodePath('FOO=1 node x.mjs'), 'FOO=1 node x.mjs');
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
-  const strict = { name: 'starci-validate-strict', command: 'NODE_PATH=D:/x/node_modules node .claude/bin/starci.mjs validate X --strict --json', exitCode: 0 };
+  const strict = { name: 'starci-validate-strict', command: `NODE_PATH=${DRIVE}x/node_modules node .claude/bin/starci.mjs validate X --strict --json`, exitCode: 0 };
   let ran = null;
   const v = await canonParityVerdict(sliceItem(base, [...RED, strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
   assert.equal(v.green, true, JSON.stringify(v));

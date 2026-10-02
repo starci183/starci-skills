@@ -29,9 +29,9 @@
 //   HFS_PEER_INTEGRATION_MISSING  (R111, hfs-rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
 //   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
 //   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
-//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R143-R147, hfs-rules/services.mjs) the microservice policy of a product with more than one service
-//   HFS_MONO_WORKSPACES, HFS_MONO_FE_WORKSPACE, HFS_MONO_NEST_PROJECTS, HFS_MONO_WORKSPACE_DEP   (R127-R130, hfs-rules/monorepo.mjs) the monorepo shape
-//   BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING, BE_KIND_DECLARATION, BE_KIND_EMPTY   (hfs-rules/repository-rules.mjs: event-bus.mjs and kinds.mjs) a typed event class the vendored contract does not list, a declared pattern whose proof scenarios have no test, and the trigger kinds of the features (declared, whole, never empty)
+//   HFS_MONO_* (R143-R146, rules/monorepo.mjs) the monorepo shape; BE_CLI_REQUIRED (R147, rules/cli.mjs) the one cli app
+//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R163-R167, hfs-rules/services.mjs) the microservice policy of a product with more than one service
+//   BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING, BE_KIND_DECLARATION, BE_KIND_EMPTY   (rules/app-root.mjs: event-bus.mjs and kinds.mjs) a typed event class the vendored contract does not list, a declared pattern whose proof scenarios have no test, and the trigger kinds of the features (declared, whole, never empty)
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
@@ -56,24 +56,22 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
 import { allowsFile } from './allows.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
-import { gitOutput } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { mergeBase } from '../api/git/merge-base.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './tree.mjs';
 import { contractFindings } from './rules/contract.mjs';
-import { depFindings } from './rules/deps.mjs';
-import { appFrontendFindings, frontendFindings } from './rules/frontend-tree.mjs';
+import { appRootFindings } from './rules/app-root.mjs';
+import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
-import { repositoryRuleFindings } from './rules/repository-rules.mjs';
-import { peerIntegrationFindings } from './rules/peer-integrations.mjs';
-import { pipelineFindings } from './rules/pipeline.mjs';
-import { proofCommandFindings } from './rules/proof-commands.mjs';
 import { repoLocalCheckFindings } from './rules/repo-local-checks.mjs';
 import { readJson } from './rules/read.mjs';
 import { secretFindings } from './rules/secrets.mjs';
 import { pathFindings } from './path-findings.mjs';
 import { onLintSurface } from './architecture/surface.mjs';
 import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
-import { stacksFindings } from './rules/stacks.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 
@@ -93,7 +91,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
-  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CONTRACT_BREAKING', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -122,7 +120,7 @@ export function readWhy(root = skillRoot, codes = CHECK_CODES) {
 export function trackedFiles(repoRoot) {
   let out;
   try {
-    out = gitOutput(['ls-files', '-z', '--cached', '--exclude-standard'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
+    out = gitOutputOf(lsFiles(['-z', '--cached', '--exclude-standard'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files');
   } catch (error) {
     refuse('HFS_REPO_UNREADABLE', `${repoRoot} is not a readable Git work tree (${String(error?.stderr ?? error?.message ?? error).trim().split('\n')[0]})`, { repoRoot });
   }
@@ -274,14 +272,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   );
   if (isRoot) {
     findings.push(
-      ...depFindings({ repoRoot, files: all }),
-      ...peerIntegrationFindings({ repoRoot, files: all }),
-      ...repositoryRuleFindings({ repoRoot, files: all, repo }),
-      ...pipelineFindings({ repoRoot, files, pins }),
-      ...testTopologyFindings({ repoRoot, files }),
-      ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),
-      ...appFrontendFindings({ repoRoot, files: all, repo }),
-      ...stacksFindings({ repoRoot, files, resolver }),
+      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins }),
       // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );
@@ -357,15 +348,11 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
 // ------------------------------------------------------------------------------------------ the whole check
 
-const gitOut = (repoRoot, args) => gitOutput(args, { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
-
 /** The merge-base of HEAD with `base`, else with origin/main, else with main; null when none resolves. */
 function mergeBaseOf(repoRoot, base) {
   for (const ref of base ? [base] : ['origin/main', 'main']) {
-    try {
-      const sha = gitOut(repoRoot, ['merge-base', 'HEAD', ref]).trim();
-      if (sha) return sha;
-    } catch { /* this ref has no merge-base with HEAD; try the next */ }
+    const sha = mergeBase(repoRoot, 'HEAD', ref); // null: this ref has no merge-base with HEAD; try the next
+    if (sha) return sha;
   }
   return null;
 }
@@ -378,7 +365,7 @@ export function changedSince(repoRoot, base) {
       ? `--base ${base} has no merge-base with HEAD; pass a ref this branch descends from`
       : '--fast needs a merge-base with origin/main or main and found none; run `git fetch origin main` or pass --base <ref>');
   }
-  const files = gitOut(repoRoot, ['diff', '--name-only', '--diff-filter=ACMRT', '-z', sha]).split('\0').filter(Boolean).map(posixPath);
+  const files = gitOutputOf(gitDiff(['--name-only', '--diff-filter=ACMRT', '-z', sha], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 }), 'git diff').split('\0').filter(Boolean).map(posixPath);
   return { base: sha, files };
 }
 

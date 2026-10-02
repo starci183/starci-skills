@@ -7,7 +7,7 @@
 //     drop     --jobs <csv> --reason <t>               drop queued units (e.g. every owned path absent)
 //     widen    --job <queued> --add-paths <csv>         widen a unit inside its repository (never another workflow's paths)
 //     wire     --paths <csv> [--op <op>] [--before <queued csv>]   ONE serial unit owning shared files; --before waits on it
-//     continue --job <failed> [--add-paths <csv>]       a continuation unit for a partial commit (counts toward the unit)
+//     continue --job <failed> [--add-paths <csv>]       a continuation unit from its preserved work (counts toward the unit)
 //     retry    --job <failed> [--add-paths <csv>] [--set '<json>'] [--after <csv>]   retry a failed unit with a CHANGED shape (the same failing shape is refused)
 //     reorder  --job <queued> --after <csv>             the unit waits on other units of this workflow (no cycles)
 //     split    --job <queued> --parts '[["p",...],...]' split one unit into 2..N disjoint units
@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import { RETRYABLE_JOB_STATUSES } from '../../../engine/admission.mjs';
 import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
 import { ownedPathPlacements } from '../target-repo.mjs';
 import {
@@ -32,13 +32,12 @@ import {
   recordKernel, refuse, requireDecision, restoreJob, setPayload, settingsN, shapeOf, validateOverride,
 } from '../kernel-authority.mjs';
 import { GRAPH_EDIT_KIND, OPEN_JOB, opJobsOf, unitsOf } from '../progress-rca.mjs';
-import { canonCutPlanOf } from '../cut-seam.mjs';
+import { canonCutPlanOf } from '../seam-policy.mjs';
+import { preservedRefOf } from '../preserved-ref.mjs';
 import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
 import { putArtifact, stageBlob } from '../../machine/evidence-store.mjs';
-import { latestReportOf } from './shared/rows.mjs';
 
 const EDITS = ['drop', 'widen', 'wire', 'continue', 'retry', 'reorder', 'split', 'merge', 'params', 'scan', 'recut', 'undo'];
-const COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
 const parseJson = (s, what) => { try { return JSON.parse(s); } catch (e) { throw refuse(`${what} is not JSON: ${e.message}`, 'edit-invalid'); } };
 /** Refuse a continuation/retry of a unit that already passed its gates. */
 const unitDone = (db, wf, job) => {
@@ -147,23 +146,21 @@ export default {
       if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
       if (job.status !== 'failed') throw refuse(`${job.job_id} is ${job.status}: a continuation follows a failed/blocked attempt`, 'edit-invalid');
       unitDone(db, wf, job);
-      const rep = latestReportOf(db, job.job_id);
-      const text = rep?.report_json ?? '';
-      const commit = COMMIT_RE.exec(text)?.[1] ?? null;
-      if (!commit) throw refuse(`${job.job_id}'s report names no commit: a continuation continues committed work (retry a failure with a changed shape instead)`, 'continue-no-commit');
+      const preserved = preservedRefOf(db, job.job_id);
+      if (!preserved) throw refuse(`the runtime preserved no work of ${job.job_id}: a continuation continues preserved work (retry a failure with a changed shape instead)`, 'continue-no-preserved-work');
       const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND json_extract(payload_json,'$.kernelEdit.continuationOf')=?`).get(wf, job.op_id, ...OPEN_JOB, job.job_id);
       if (open) throw refuse(`${open.job_id} already continues ${job.job_id}`, 'continue-exists');
       const add = args['add-paths'] ? checkPaths(db, { repo, workflowId: wf, op: job.op_id, payload: job.payload, current: job.payload.owned_paths ?? [], add: csv(args['add-paths']) }) : [];
       const paths = [...new Set([...(job.payload.owned_paths ?? []), ...add])];
       const cut = job.payload.cut;
-      const created = enqueueUnit({ repo, wf, op: job.op_id, paths, what: `continue ${commit.slice(0, 7)}`,
+      const created = enqueueUnit({ repo, wf, op: job.op_id, paths, what: `continue ${job.job_id.slice(-7)}`,
         extra: ['--retry-of', job.job_id, ...(cut ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : [])] });
       rec.created.push(created);
-      tag(created, { continuationOf: job.job_id, commits: [commit], unitOf: job.job_id });
+      tag(created, { continuationOf: job.job_id, preserved, unitOf: job.job_id });
       const c = jobRow(db, created);
-      if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...(c.payload.kernelOverride ?? {}), notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: commit ${commit} already landed its in-ceiling part. Start from that commit; finish what its report left open${add.length ? ` (you now also own ${add.join(', ')})` : ''}.`] } }, now);
-      ledger.transaction(() => ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: created, commit, editId } }));
-      human = `continuation ${created} of ${job.job_id} from ${commit}`;
+      if (c) setPayload(ledger, c, { ...c.payload, kernelOverride: { ...(c.payload.kernelOverride ?? {}), notes: [...(c.payload.kernelOverride?.notes ?? []), `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${preserved}. Apply it to your owned paths first (git diff ${preserved}^ ${preserved} -- <owned paths> | git apply); finish what its report left open${add.length ? ` (you now also own ${add.join(', ')})` : ''}.`] } }, now);
+      ledger.transaction(() => ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: created, preserved, editId } }));
+      human = `continuation ${created} of ${job.job_id} from ${preserved}`;
     } else if (edit === 'retry') {
       const job = jobRow(db, args.job);
       if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
@@ -225,13 +222,13 @@ export default {
       const file = path.join(dir, `${editId}.json`);
       const log = fs.openSync(`${file}.log`, 'a');
       const out = fs.openSync(file, 'w');
-      const child = spawn(process.execPath, [path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
-        { cwd: skillRoot, detached: true, stdio: ['ignore', out, log], windowsHide: true });
+      const child = spawnNode([path.join(skillRoot, 'scripts', 'gates', 'canon-scan.mjs'), '--root', root, '--families', String(sample.payload.params.canonFamilies || 'all'), '--exclude', exclude.join(','), '--json'],
+        { cwd: skillRoot, detached: true, stdio: ['ignore', out, log] });
       child.unref();
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
       human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: api graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
     } else if (edit === 'recut') {
-      // H6: a re-cut goes through the canon planner (scripts/kernel/cut-seam.mjs canonCutPlanOf): each slice owns its paths
+      // H6: a re-cut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths
       // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
       // whose moves another slice holds (no fix target) is refused here and cut again - never enqueued to block.
       const file = String(args['from-scan'] ?? '');

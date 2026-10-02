@@ -6,7 +6,7 @@ peers:
     workflow with no recorded roots shares every root. define-goal records the ledger's own repo
     as every workflow's root and a job's `repository` is mostly unset, so in practice every
     running workflow of one ledger is a peer: the ledger is one product whose binding spans its
-    repositories (nivo-backend + nivo-fe)
+    repositories (e.g. a back end and a front end)
   reads: 'workflows rows; the open (queued|leased|running|answering|effect_unknown) jobs of each peer; pending peer-message inbox rows'
   writes: 'nothing — pure projection'
   returns: >-

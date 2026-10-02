@@ -7,6 +7,7 @@ import { StateChip } from '../../components/state-chip';
 import { TimeAgo } from '../../components/time-ago';
 import type { DecisionRow, Ref, UiState } from '../../contract';
 import { formatAbsolute } from '../../i18n/vi';
+import { t } from '../../i18n/t';
 import { useRoute } from '../../router';
 import { DecisionDrawer } from './decision-drawer';
 
@@ -18,10 +19,10 @@ type IncidentRow = { id: string; project: string; wf: string; op: string | null;
   status: string; resolvedReason: string | null; ui: UiState; dueAt: number | null; attempts: number;
   modelCalls: number; tokens: number; elapsedMs: number; lastProgress: string | null; updatedAt: number };
 
-const deciderLabel = (value: string) => ({ kernel: 'Kernel', supervisor: 'Supervisor', owner: 'Thầy' } as Record<string, string>)[value] ?? value;
-const channelLabel = (value: string | null) => ({ 'kernel-seat': 'Ghế Kernel', 'supervisor-seat': 'Ghế Supervisor', telegram: 'Telegram', 'serve-ask': 'Kênh hỏi thầy' } as Record<string, string>)[value ?? ''] ?? 'Chưa rõ';
-const statusLabel = (value: string) => ({ open: 'Đang mở', claimed: 'Đã nhận', escalated: 'Đã leo thang', resolved: 'Đã giải', superseded: 'Đã thay thế', expired: 'Hết hạn', answered: 'Đã trả lời', retired: 'Đã đóng' } as Record<string, string>)[value] ?? value;
-const escalation = (row: DecisionRow) => row.decider === 'owner' && row.escalations > 0 ? 'Kernel → Supervisor → Thầy'
+const deciderLabel = (value: string) => ({ kernel: 'Kernel', supervisor: 'Supervisor', owner: t('The owner') } as Record<string, string>)[value] ?? value;
+const channelLabel = (value: string | null) => ({ 'kernel-seat': t('Kernel seat'), 'supervisor-seat': t('Supervisor seat'), telegram: 'Telegram', 'serve-ask': t('the ask channel') } as Record<string, string>)[value ?? ''] ?? t('Unknown');
+const statusLabel = (value: string) => ({ open: t('Open'), claimed: t('Claimed'), escalated: t('Escalated'), resolved: t('Resolved'), superseded: t('Superseded'), expired: t('Expired'), answered: t('Answered'), retired: t('closed') } as Record<string, string>)[value] ?? value;
+const escalation = (row: DecisionRow) => row.decider === 'owner' && row.escalations > 0 ? `Kernel → Supervisor → ${t('The owner')}`
   : row.escalations > 0 ? 'Kernel → Supervisor' : deciderLabel(row.decider);
 
 function hashParams(): URLSearchParams {
@@ -48,26 +49,26 @@ function DecisionCard({ row }: { row: DecisionRow }) {
   return <div className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 min-[760px]:p-6">
     <a href={href({ id: row.id })} className="group flex min-w-0 flex-col gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4">
       <StateChip state={row.ui} compact />
-      <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="text-xs font-semibold text-destructive">Quá hạn</span>}</span>
-        <span className="block break-words text-sm text-muted-foreground">{credential ? 'Yêu cầu xác thực · nội dung được ẩn.' : row.summary}</span>
-        <span className="block break-words text-xs text-muted-foreground">Người quyết: {escalation(row)}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="text-xs font-semibold text-destructive">{t('Overdue')}</span>}</span>
+        <span className="block break-words text-sm text-muted-foreground">{credential ? t('Credential request · content hidden.') : row.summary}</span>
+        <span className="block break-words text-xs text-muted-foreground">{t('Decider: {who}', { who: escalation(row) })}</span>
       </span>
-      <span className={`shrink-0 text-xs text-muted-foreground sm:text-right ${row.overdue ? 'font-semibold text-destructive' : ''}`}>Hạn {formatAbsolute(row.dueAt)}</span>
+      <span className={`shrink-0 text-xs text-muted-foreground sm:text-right ${row.overdue ? 'font-semibold text-destructive' : ''}`}>{t('Due {at}', { at: formatAbsolute(row.dueAt) })}</span>
       <ArrowRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary sm:block" aria-hidden="true" />
     </a>
-    <Advanced summary="Dự án, workflow, kênh và thời điểm mở">
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''}</span><span>Mở <TimeAgo at={row.openedAt} /></span><span>Kênh: {channelLabel(row.channel)}</span>{row.escalations > 0 && <span>Leo thang {row.escalations} lần</span>}</div>
+    <Advanced summary={t('Project, workflow, channel and opened time')}>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? t('Machine')}{row.wf ? ` · ${row.wf}` : ''}</span><span>{t('Opened')} <TimeAgo at={row.openedAt} /></span><span>{t('Channel: {channel}', { channel: channelLabel(row.channel) })}</span>{row.escalations > 0 && <span>{t('{n} escalations', { n: row.escalations })}</span>}</div>
     </Advanced>
   </div>;
 }
 
 function AskCard({ row }: { row: AskRow }) {
   return <ConceptBlock concept="C12" as="article" className="flex flex-col gap-3 rounded-xl border bg-card p-4 min-[760px]:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><MessageCircleQuestion className="size-4 text-primary" aria-hidden="true" /><strong className="text-sm">{row.credential ? 'credential' : 'Hỏi thầy'}</strong></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><MessageCircleQuestion className="size-4 text-primary" aria-hidden="true" /><strong className="text-sm">{row.credential ? 'credential' : t('Ask the owner')}</strong></div>
       <span className="rounded-full border px-2 py-1 text-xs">{statusLabel(row.state)}</span></div>
-    <p className="break-words text-sm">{row.credential ? 'Có mục xác thực cần xử lý qua kênh riêng. Nội dung được ẩn.' : row.question ?? 'Không có nội dung được phép hiển thị.'}</p>
-    {row.di && <a href={row.di.href} className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">Xem quyết định liên quan<ArrowRight className="size-3.5" aria-hidden="true" /></a>}
-    <Advanced summary="Dự án, kênh và thời điểm hỏi"><div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''}</span><span>Kênh: {channelLabel(row.channel)}</span><span><TimeAgo at={row.askedAt} /></span></div></Advanced>
+    <p className="break-words text-sm">{row.credential ? t('A credential item needs handling over a separate channel. Content is hidden.') : row.question ?? t('No content is allowed to be shown.')}</p>
+    {row.di && <a href={row.di.href} className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">{t('View the related decision')}<ArrowRight className="size-3.5" aria-hidden="true" /></a>}
+    <Advanced summary={t('Project, channel and ask time')}><div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? t('Machine')}{row.wf ? ` · ${row.wf}` : ''}</span><span>{t('Channel: {channel}', { channel: channelLabel(row.channel) })}</span><span><TimeAgo at={row.askedAt} /></span></div></Advanced>
   </ConceptBlock>;
 }
 
@@ -76,9 +77,9 @@ function IncidentCard({ row }: { row: IncidentRow }) {
     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
       <StateChip state={row.ui} compact /><div className="flex min-w-0 flex-1 flex-col gap-1"><div className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong><span className="text-xs text-muted-foreground">{statusLabel(row.status)}</span></div>
         {row.lastProgress && <p className="break-words text-sm text-muted-foreground">{row.lastProgress}</p>}
-      </div><div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>Phụ trách: {deciderLabel(row.owner)}</p><p>Hạn: {formatAbsolute(row.dueAt)}</p></div>
+      </div><div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>{t('Owner: {who}', { who: deciderLabel(row.owner) })}</p><p>{t('Due: {at}', { at: formatAbsolute(row.dueAt) })}</p></div>
     </div>
-    <Advanced summary="Dự án, workflow, op và thời điểm cập nhật"><p className="break-words text-xs text-muted-foreground">{row.project} · {row.wf}{row.op ? ` · ${row.op}` : ''} · Cập nhật <TimeAgo at={row.updatedAt} /></p></Advanced>
+    <Advanced summary={t('Project, workflow, op and updated time')}><p className="break-words text-xs text-muted-foreground">{row.project} · {row.wf}{row.op ? ` · ${row.op}` : ''} · {t('Updated')} <TimeAgo at={row.updatedAt} /></p></Advanced>
   </ConceptBlock>;
 }
 
@@ -105,34 +106,34 @@ export function DecisionsPage() {
   const kinds = [...new Set([kind, ...(decisions.data ?? []).map(row => row.kind)].filter(Boolean))].sort();
   const tabs = [
     { key: 'di', label: 'DI', count: decisions.data?.length ?? null, icon: CircleAlert },
-    { key: 'asks', label: 'Hỏi thầy', count: asks.data?.length ?? null, icon: MessageCircleQuestion },
-    { key: 'incidents', label: 'Sự cố', count: incidents.data?.length ?? null, icon: ShieldAlert },
+    { key: 'asks', label: t('Ask the owner'), count: asks.data?.length ?? null, icon: MessageCircleQuestion },
+    { key: 'incidents', label: t('Incidents'), count: incidents.data?.length ?? null, icon: ShieldAlert },
   ] as const;
   return <ConceptBlock concept="C12" className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-24 md:gap-8">
-    <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">StarCi / quyết định</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quyết định</h1>
-      <p className="text-sm text-muted-foreground">Theo dõi việc đang chờ quyết, câu hỏi gửi thầy và sự cố. Trang này chỉ đọc.</p></header>
-    <nav aria-label="Mục quyết định" className="flex min-w-0 gap-1 overflow-x-auto border-b">
+    <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('StarCi / decisions')}</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t('Decisions')}</h1>
+      <p className="text-sm text-muted-foreground">{t('Track pending decisions, questions to the owner and incidents. This page is read-only.')}</p></header>
+    <nav aria-label={t('Decision items')} className="flex min-w-0 gap-1 overflow-x-auto border-b">
       {tabs.map(item => <a key={item.key} href={href({ tab: item.key, id: null, status: null, kind: null, overdue: null })} aria-current={tab === item.key ? 'page' : undefined}
         className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${tab === item.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
         <item.icon className="size-4" aria-hidden="true" />{item.label}<span className="text-xs text-muted-foreground tabular-nums">{item.count ?? '—'}</span>
       </a>)}
     </nav>
     {tab === 'di' && <div className="grid gap-4 rounded-xl border bg-card p-4 min-[760px]:p-6 sm:grid-cols-2 lg:grid-cols-4">
-      <SelectFilter label="Người quyết" value={decider} options={[{ value: '', label: 'Tất cả' }, { value: 'kernel', label: 'Kernel' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'owner', label: 'Thầy' }]} onChange={value => navigate({ decider: value, id: null })} />
-      <SelectFilter label="Trạng thái" value={status} options={[{ value: '', label: 'Đang mở' }, { value: 'all', label: 'Tất cả' }, ...['open', 'claimed', 'escalated', 'resolved', 'expired', 'superseded'].map(value => ({ value, label: statusLabel(value) }))]} onChange={value => navigate({ status: value, id: null })} />
-      <SelectFilter label="Loại" value={kind} options={[{ value: '', label: 'Tất cả' }, ...kinds.map(value => ({ value, label: value }))]} onChange={value => navigate({ kind: value, id: null })} />
-      <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={overdue} onChange={event => navigate({ overdue: event.target.checked ? '1' : null, id: null })} className="size-4 accent-primary" /><span>Chỉ quá hạn</span></label>
+      <SelectFilter label={t('Decider')} value={decider} options={[{ value: '', label: t('All') }, { value: 'kernel', label: 'Kernel' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'owner', label: t('The owner') }]} onChange={value => navigate({ decider: value, id: null })} />
+      <SelectFilter label={t('State')} value={status} options={[{ value: '', label: t('Open') }, { value: 'all', label: t('All') }, ...['open', 'claimed', 'escalated', 'resolved', 'expired', 'superseded'].map(value => ({ value, label: statusLabel(value) }))]} onChange={value => navigate({ status: value, id: null })} />
+      <SelectFilter label={t('Kind')} value={kind} options={[{ value: '', label: t('All') }, ...kinds.map(value => ({ value, label: value }))]} onChange={value => navigate({ kind: value, id: null })} />
+      <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={overdue} onChange={event => navigate({ overdue: event.target.checked ? '1' : null, id: null })} className="size-4 accent-primary" /><span>{t('Only overdue')}</span></label>
     </div>}
-    {tab === 'incidents' && <div className="max-w-xs"><SelectFilter label="Trạng thái sự cố" value={status} options={[{ value: '', label: 'Đang mở' }, { value: 'all', label: 'Tất cả' }, { value: 'open', label: 'Đang mở' }, { value: 'resolved', label: 'Đã giải' }, { value: 'superseded', label: 'Đã thay thế' }]} onChange={value => navigate({ status: value })} /></div>}
+    {tab === 'incidents' && <div className="max-w-xs"><SelectFilter label={t('Incident state')} value={status} options={[{ value: '', label: t('Open') }, { value: 'all', label: t('All') }, { value: 'open', label: t('Open') }, { value: 'resolved', label: t('Resolved') }, { value: 'superseded', label: t('Superseded') }]} onChange={value => navigate({ status: value })} /></div>}
     {tab === 'di' && <div className="grid gap-4" aria-live="polite">{decisions.error && <FeedbackState error onRetry={() => refreshQuery(decisionsUrl)}>{decisions.error}</FeedbackState>}
       <Stagger className="grid gap-4">{decisions.data?.map(row => <StaggerItem key={`${row.project ?? 'machine'}:${row.id}`}><DecisionCard row={row} /></StaggerItem>)}</Stagger>
-      {!decisions.error && !decisions.data?.length && (decisions.loading ? <PageSkeleton label="Đang đọc quyết định…" /> : <FeedbackState>Không có quyết định phù hợp.</FeedbackState>)}</div>}
+      {!decisions.error && !decisions.data?.length && (decisions.loading ? <PageSkeleton label={t('Reading the decision…')} /> : <FeedbackState>{t('No matching decisions.')}</FeedbackState>)}</div>}
     {tab === 'asks' && <div className="grid gap-4" aria-live="polite">{asks.error && <FeedbackState error onRetry={() => refreshQuery(asksUrl)}>{asks.error}</FeedbackState>}
       <Stagger className="grid gap-4">{asks.data?.map(row => <StaggerItem key={row.id}><AskCard row={row} /></StaggerItem>)}</Stagger>
-      {!asks.error && !asks.data?.length && (asks.loading ? <PageSkeleton label="Đang đọc câu hỏi…" /> : <FeedbackState>Không có câu hỏi đang mở.</FeedbackState>)}</div>}
+      {!asks.error && !asks.data?.length && (asks.loading ? <PageSkeleton label={t('Reading the questions…')} /> : <FeedbackState>{t('No open questions.')}</FeedbackState>)}</div>}
     {tab === 'incidents' && <div className="grid gap-4" aria-live="polite">{incidents.error && <FeedbackState error onRetry={() => refreshQuery(incidentsUrl)}>{incidents.error}</FeedbackState>}
       <Stagger className="grid gap-4">{incidents.data?.map(row => <StaggerItem key={`${row.project}:${row.id}`}><IncidentCard row={row} /></StaggerItem>)}</Stagger>
-      {!incidents.error && !incidents.data?.length && (incidents.loading ? <PageSkeleton label="Đang đọc sự cố…" /> : <FeedbackState>Không có sự cố phù hợp.</FeedbackState>)}</div>}
+      {!incidents.error && !incidents.data?.length && (incidents.loading ? <PageSkeleton label={t('Reading the incidents…')} /> : <FeedbackState>{t('No matching incidents.')}</FeedbackState>)}</div>}
     <DecisionDrawer id={selectedId} onClose={() => navigate({ id: null })} />
   </ConceptBlock>;
 }

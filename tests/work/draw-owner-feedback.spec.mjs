@@ -25,6 +25,9 @@ import { checkDirection } from '../../scripts/work/brand/brand.mjs';
 import { autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { answerDrawReviewByReply, autoAcceptAsk, drawReplyDecision } from '../../scripts/kernel/ask-server.mjs';
 import { loadWorkSchemaValidators } from '../../scripts/work/validate/check-work-schemas.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs';
+
+const trv = translator('vi');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GRAMMAR = path.join(ROOT, 'knowledge', 'grammars');
@@ -291,11 +294,11 @@ test('classification is structural; a reclassification must be confirmed by stru
   } finally { l.close(); }
 });
 
-test('the owner answers on Telegram by replying: ok/duyệt accepts, anything else is feedback; the answer is the verified owner answer', async (t) => {
+test('the owner answers on Telegram by replying: ok/duy\u1ec7t accepts, anything else is feedback; the answer is the verified owner answer', async (t) => {
   assert.deepEqual(drawReplyDecision('ok'), { decision: 'accept', optionIndex: 0, golden: false, note: null });
-  assert.deepEqual(drawReplyDecision('Duyệt!').decision, 'accept');
-  assert.deepEqual([drawReplyDecision('ok, làm mẫu chuẩn').decision, drawReplyDecision('ok golden').golden], ['accept', true]);
-  assert.equal(drawReplyDecision('ok nhưng nút chính phải màu đen').decision, 'redraw');
+  assert.deepEqual(drawReplyDecision('Duy\u1ec7t!').decision, 'accept');
+  assert.deepEqual([drawReplyDecision('ok, l\u00e0m m\u1eabu chu\u1ea9n').decision, drawReplyDecision('ok golden').golden], ['accept', true]);
+  assert.equal(drawReplyDecision('ok nh\u01b0ng n\u00fat ch\u00ednh ph\u1ea3i m\u00e0u \u0111en').decision, 'redraw');
   const p = product(t);
   p.draw('v1');
   const question = drawReviewQuestion(p.dir);
@@ -303,7 +306,7 @@ test('the owner answers on Telegram by replying: ok/duyệt accepts, anything el
   const l = p.ledger();
   try { p.fileAsk(l, 'ctx_tg', question); } finally { l.close(); }
   const woken = [];
-  const r = await answerDrawReviewByReply({ repo: p.repo, workflowId: WF, dispatchId: 'ctx_tg', text: 'Header quá chật', partPath: mobile.path,
+  const r = await answerDrawReviewByReply({ repo: p.repo, workflowId: WF, dispatchId: 'ctx_tg', text: 'Header qu\u00e1 ch\u1eadt', partPath: mobile.path,
     telegram: { chatId: 42, messageId: 7, replyTo: 5 }, wake: (_l, x) => { woken.push(x); return { action: 'woken' }; }, close: async () => ({ ok: true }) });
   assert.deepEqual([r.ok, r.decision, r.rulings, r.redrawOwed], [true, 'redraw', 1, true]);
   const receipt = JSON.parse(fs.readFileSync(r.receiptPath, 'utf8'));
@@ -318,7 +321,7 @@ test('the owner answers on Telegram by replying: ok/duyệt accepts, anything el
 });
 
 test('the draw-review notice reaches the verified Telegram chat as an album; a reply to it (or to one image) is routed as the owner answer', async (t) => {
-  const { notifyAsk } = await import('../../scripts/connectors/telegram.mjs');
+  const { notifyAsk, drawReplyHint } = await import('../../scripts/connectors/telegram.mjs');
   const { createBridge } = await import('../../scripts/supervisor/telegram-bridge.mjs');
   const p = product(t);
   p.draw('v1');
@@ -344,14 +347,14 @@ test('the draw-review notice reaches the verified Telegram chat as an album; a r
   assert.ok(album, 'the drawn desktop and mobile images go as one album');
   assert.equal(album.form.get('chat_id'), '4242', 'to the verified owner chat');
   const caption = JSON.parse(album.form.get('media'))[0].caption;
-  assert.ok(caption.includes(SHAPE) && caption.includes('Vòng 1'), caption);
-  assert.match(calls.find((c) => c.method === 'sendMessage').body.text, /REPLY tin này/);
+  assert.ok(caption.includes(SHAPE) && caption.includes(trv('Round {round}', { round: 1 })), caption);
+  assert.ok(calls.find((c) => c.method === 'sendMessage').body.text.includes(drawReplyHint('vi')));
   // A reply to the mobile image, from the verified chat, is routed to the owner-answer path with that image.
   const routed = [];
   const bridge = createBridge({ env, apiBase: 'http://bot.invalid', fetchImpl, sleepImpl: async () => {}, timeoutS: 0, sweepEveryMs: -1,
     settings: () => ({ ready: true, token: env.TELEGRAM_BOT_TOKEN, chatId: '4242', language: 'vi' }), answerDraw: async (a) => { routed.push(a); return { ok: true, decision: 'redraw' }; } });
   const mobileMessage = 502; // the album's second photo
-  const r = await bridge.handleUpdate({ update_id: 1, message: { message_id: 900, date: Math.floor(Date.now() / 1000), chat: { id: 4242, type: 'private' }, from: { id: 4242 }, text: 'Header quá chật', reply_to_message: { message_id: mobileMessage } } });
+  const r = await bridge.handleUpdate({ update_id: 1, message: { message_id: 900, date: Math.floor(Date.now() / 1000), chat: { id: 4242, type: 'private' }, from: { id: 4242 }, text: 'Header qu\u00e1 ch\u1eadt', reply_to_message: { message_id: mobileMessage } } });
   assert.equal(r.handled, 'message');
   assert.deepEqual([routed.length, routed[0].dispatchId, path.basename(routed[0].partPath ?? '')], [1, 'ctx_tg_album', `${SHAPE}--390x844--light.png`]);
   // Another sender in the chat is dropped before any answer is recorded.

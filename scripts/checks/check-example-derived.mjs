@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
 import {runDerive} from '../example/example-derive.mjs';
 import {runCritique} from '../example/example-critique.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /**
  * A separate gate rather than a line inside scripts/work/validate/check-example-work.mjs: another lane owns that file's
@@ -52,7 +53,7 @@ export function checkExampleDerived(workRoot, problems) {
   return {checked: true};
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const problems = [];
   const roots = walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname);

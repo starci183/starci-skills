@@ -11,16 +11,16 @@ const featureImports = report => findings(report, 'BE_FEATURE_IMPORTS_FEATURE');
 test('BE: a feature importing another feature is BE_FEATURE_IMPORTS_FEATURE, never BE_TIER_DIRECTION (R28)', t => {
   const root = archFixture(t, {
     files: {
-      'src/features/a/index.ts': "import { b } from '../b';\nexport const a = b + 1;\n",
-      'src/features/b/index.ts': 'export const b = 1;\n',
+      'src/features/api/a/index.ts': "import { b } from '../b';\nexport const a = b + 1;\n",
+      'src/features/api/b/index.ts': 'export const b = 1;\n',
     },
   });
   const report = runArch(root);
   assert.deepEqual(beDirection(report), []);
   const hits = featureImports(report);
   assert.equal(hits.length, 1, JSON.stringify(hits));
-  assert.equal(hits[0].path, 'src/features/a/index.ts');
-  assert.equal(hits[0].resolvedPath, 'src/features/b/index.ts');
+  assert.equal(hits[0].path, 'src/features/api/a/index.ts');
+  assert.equal(hits[0].resolvedPath, 'src/features/api/b/index.ts');
   assert.equal(hits[0].fromTier, 'feature');
   assert.equal(hits[0].toTier, 'feature');
   assert.equal(hits[0].typeOnly, false);
@@ -32,8 +32,8 @@ test('BE: a feature importing another feature is BE_FEATURE_IMPORTS_FEATURE, nev
 test('BE: a feature may import domain, platform and integrations; an import inside one owner is always fine', t => {
   const root = archFixture(t, {
     files: {
-      'src/features/a/index.ts': "import { x } from '../../modules/domain/x';\nimport { p } from '../../modules/platform/config';\nimport { i } from '../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const a = [x, p, i, inner];\n",
-      'src/features/a/application/inner.ts': 'export const inner = 1;\n',
+      'src/features/api/a/index.ts': "import { x } from '../../../modules/domain/x';\nimport { p } from '../../../modules/platform/config';\nimport { i } from '../../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const a = [x, p, i, inner];\n",
+      'src/features/api/a/application/inner.ts': 'export const inner = 1;\n',
       'src/modules/domain/x/index.ts': 'export const x = 1;\n',
       'src/modules/platform/config/index.ts': 'export const p = 1;\n',
       'src/modules/integrations/mail/index.ts': 'export const i = 1;\n',
@@ -47,15 +47,15 @@ test('BE: a feature may import domain, platform and integrations; an import insi
 test('BE: domain, platform and integrations never import a feature or an app; platform never imports domain', t => {
   const root = archFixture(t, {
     files: {
-      'src/features/a/index.ts': 'export const a = 1;\n',
-      'src/modules/domain/x/index.ts': "import { a } from '../../../features/a';\nexport const x = a;\n",
+      'src/features/api/a/index.ts': 'export const a = 1;\n',
+      'src/modules/domain/x/index.ts': "import { a } from '../../../features/api/a';\nexport const x = a;\n",
       'src/modules/platform/config/index.ts': "import { x } from '../../domain/x';\nexport const p = x;\n",
       'src/modules/integrations/mail/index.ts': "import { p } from '../../platform/config';\nimport { x } from '../../domain/x';\nexport const i = [p, x];\n",
     },
   });
   const paths = beDirection(runArch(root)).map(item => `${item.path} -> ${item.resolvedPath}`).sort();
   assert.deepEqual(paths, [
-    'src/modules/domain/x/index.ts -> src/features/a/index.ts',
+    'src/modules/domain/x/index.ts -> src/features/api/a/index.ts',
     'src/modules/integrations/mail/index.ts -> src/modules/domain/x/index.ts',
     'src/modules/platform/config/index.ts -> src/modules/domain/x/index.ts',
   ]);
@@ -64,8 +64,8 @@ test('BE: domain, platform and integrations never import a feature or an app; pl
 test('BE: a type-only import counts and says so', t => {
   const root = archFixture(t, {
     files: {
-      'src/features/a/index.ts': "import type { B } from '../b';\nexport type A = B;\n",
-      'src/features/b/index.ts': 'export type B = string;\n',
+      'src/features/api/a/index.ts': "import type { B } from '../b';\nexport type A = B;\n",
+      'src/features/api/b/index.ts': 'export type B = string;\n',
     },
   });
   const hits = featureImports(runArch(root));
@@ -199,7 +199,7 @@ test('ARCH_OWNER_EXPORT_BYPASS: a builder may deep-import a capability entity, a
   };
   assert.deepEqual(deep(runArch(archFixture(t, { files }))), []);
   const bad = { ...files,
-    'src/features/a/index.ts': "import { XEntity } from '../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
+    'src/features/api/a/index.ts': "import { XEntity } from '../../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
     'src/tests/fixtures/other.contracts.ts': entity.replace('../../../', '../../') };
-  assert.deepEqual(deep(runArch(archFixture(t, { files: bad }))).sort(), ['src/features/a/index.ts', 'src/tests/fixtures/other.contracts.ts']);
+  assert.deepEqual(deep(runArch(archFixture(t, { files: bad }))).sort(), ['src/features/api/a/index.ts', 'src/tests/fixtures/other.contracts.ts']);
 });

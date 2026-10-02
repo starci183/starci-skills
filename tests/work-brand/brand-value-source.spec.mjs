@@ -13,17 +13,17 @@ import {
 } from '../../scripts/work/brand/brand.mjs';
 
 /*
- * starci-next inc-b077846a4012: the owner ruled a new brand token --starci-surface-tertiary (the Academy
- * render's oklch(93.73% 0.0012 354.13)) that the starci-next-fe theme does not declare yet - interface.implement
+ * The owner ruled a new brand token --starci-surface-tertiary (a reference
+ * render's oklch(93.73% 0.0012 354.13)) that the product theme does not declare yet - interface.implement
  * writes it later. tokens-in-grammar refused the name (no tertiary surface in the starci DNA) and
  * tokens-match-source refused the token (no app source declares it). The DNA now carries the tertiary face and a
  * brand token may bind to its reference render through valueSource until the app writes it.
  */
 const root=fileURLToPath(new URL('../..',import.meta.url));
 const TERTIARY='oklch(93.73% 0.0012 354.13)';
-const ACADEMY='starci-academy-fe/src/app/globals.css';
-const APP='starci-next-fe/src/app/globals.css';
-const ACADEMY_CSS=`:root,
+const REFERENCE='my-app-fe/src/app/globals.css';
+const APP='ecommerce-app-fe/src/app/globals.css';
+const REFERENCE_CSS=`:root,
 .light,
 [data-theme="light"] {
   --surface: oklch(100% 0.0008 354.13);
@@ -56,15 +56,15 @@ const write=(dir,relative,body)=>{
 const sha=text=>crypto.createHash('sha256').update(text).digest('hex');
 
 /** A --source root holding the reference render and the product's own (not yet tertiary) theme. */
-function repositories(t,{academy=ACADEMY_CSS,app=APP_CSS,label='repos'}={}){
+function repositories(t,{reference=REFERENCE_CSS,app=APP_CSS,label='repos'}={}){
   const dir=temporary(t,label);
-  write(dir,ACADEMY,academy);
+  write(dir,REFERENCE,reference);
   if(app!==null)write(dir,APP,app);
   return dir;
 }
 const planned=(fields={})=>({token:'--starci-surface-tertiary',value:TERTIARY,role:'surface-tertiary',
-  valueSource:{path:ACADEMY,token:'--surface-tertiary',value:TERTIARY,line:6,...fields}});
-const brandWith=(token=planned(),{sources=[{path:APP,kind:'css'},{path:ACADEMY,kind:'css'}]}={})=>({
+  valueSource:{path:REFERENCE,token:'--surface-tertiary',value:TERTIARY,line:6,...fields}});
+const brandWith=(token=planned(),{sources=[{path:APP,kind:'css'},{path:REFERENCE,kind:'css'}]}={})=>({
   identity:{family:'starci'},
   color:{tokens:[{token:'--surface',value:'oklch(100% 0.0008 354.13)',role:'surface'},{token:'--muted',value:'oklch(55.17% 0.003 354.13)',role:'muted'},token],
     policy:{dangerMayMatchPrimary:false}},
@@ -89,15 +89,15 @@ test('decide: a token the app has not written passes as planned-from-reference w
   const entry=finding(result);
   assert.equal(entry.status,'planned-from-reference');
   assert.equal(entry.actual,null,'the app source does not declare it');
-  assert.equal(entry.valueSource.path,ACADEMY);
+  assert.equal(entry.valueSource.path,REFERENCE);
   assert.equal(entry.valueSource.token,'--surface-tertiary');
   assert.equal(entry.valueSource.deltaE,0);
   assert.match(result.detail,/1 planned from their reference render/);
   assert.equal(finding(result,'--surface').status,'match','the other tokens still bind to the app source');
   // The digest pins the bytes read; the reference is never written.
-  const pinned=checkTokensMatchSource({brand:brandWith(planned({sha256:sha(ACADEMY_CSS)})),sourceRoot});
+  const pinned=checkTokensMatchSource({brand:brandWith(planned({sha256:sha(REFERENCE_CSS)})),sourceRoot});
   assert.equal(pinned.outcome,'pass');
-  assert.equal(fs.readFileSync(path.join(sourceRoot,ACADEMY),'utf8'),ACADEMY_CSS);
+  assert.equal(fs.readFileSync(path.join(sourceRoot,REFERENCE),'utf8'),REFERENCE_CSS);
 });
 
 test('verify: a planned token still missing from the app source is refused, even though its reference holds',t=>{
@@ -129,8 +129,8 @@ test('once the app theme declares the token the normal source match applies, at 
 
 test('the reference file is never the app source, even when sources[] also lists it',t=>{
   // The reference declares the brand token under its own name; only the app theme may prove it at verify.
-  const academy=ACADEMY_CSS.replace('--surface-tertiary:   ','--starci-surface-tertiary: ');
-  const sourceRoot=repositories(t,{academy,label:'same-name'});
+  const reference=REFERENCE_CSS.replace('--surface-tertiary:   ','--starci-surface-tertiary: ');
+  const sourceRoot=repositories(t,{reference,label:'same-name'});
   const token=planned({token:undefined});
   delete token.valueSource.token;
   const decided=checkTokensMatchSource({brand:brandWith(token),sourceRoot});
@@ -142,11 +142,11 @@ test('the reference file is never the app source, even when sources[] also lists
 test('decide: a reference that does not hold the value refuses the planned token, with the reason',t=>{
   const sourceRoot=repositories(t,{label:'refusals'});
   const cases=[
-    ['value-source-invalid','not an object',{token:'--starci-surface-tertiary',value:TERTIARY,role:'other',valueSource:'academy'}],
+    ['value-source-invalid','not an object',{token:'--starci-surface-tertiary',value:TERTIARY,role:'other',valueSource:'reference'}],
     ['value-source-invalid','no value',planned({value:''})],
     ['value-source-invalid','a token that is no custom property',planned({token:'surface-tertiary'})],
     ['reference-unreadable','a path outside the root',planned({path:'../elsewhere.css'})],
-    ['reference-unreadable','a file the root does not carry',planned({path:'starci-academy-fe/missing.css'})],
+    ['reference-unreadable','a file the root does not carry',planned({path:'my-app-fe/missing.css'})],
     ['reference-digest-mismatch','a changed file',planned({sha256:sha('older bytes')})],
     ['reference-absent','a property the reference does not declare',planned({token:'--surface-quaternary'})],
     ['reference-only-in-dark-scope','a dark-only declaration',planned({token:'--only-dark',value:'oklch(27.21% 0.0023 354.13)'})],

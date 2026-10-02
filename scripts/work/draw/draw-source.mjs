@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// draw-source.mjs — owner ruling 2026-09-27 ("chốt"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS. The
+// draw-source.mjs — owner ruling 2026-09-27 ("locked"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS. The
 // drawer writes each shape as a React `XBase` in `<XBase>.draw.tsx` (the shape-slot pattern of examples/shape-slot:
 // the XBase takes {state, props, on} of atoms) composing ONLY @starci/grammar components with their real props and
 // variants, plus fixture JSON per state (and optionally per viewport); scripts/work/draw-render.mjs --component
@@ -45,6 +45,7 @@ import { findPackage, requirePackage } from '../../lib/package-at.mjs';
 import { list } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT } from './draw-dna.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export { DRAW_OFF_GRAMMAR_COMPONENT };
 export const DRAW_TYPECHECK_FAILED = 'DRAW_TYPECHECK_FAILED';
@@ -52,8 +53,6 @@ export const DRAW_RAW_STYLED_HTML = 'DRAW_RAW_STYLED_HTML';
 export const DRAW_IMPORT_OFF_GRAMMAR = 'DRAW_IMPORT_OFF_GRAMMAR';
 export const DRAW_LAYOUT_VALUE_UNJUSTIFIED = 'DRAW_LAYOUT_VALUE_UNJUSTIFIED';
 export const DRAW_BASE_SIGNATURE = 'DRAW_BASE_SIGNATURE';
-export const DRAW_SOURCE_CODES = Object.freeze([DRAW_TYPECHECK_FAILED, DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML, DRAW_IMPORT_OFF_GRAMMAR,
-  DRAW_LAYOUT_VALUE_UNJUSTIFIED, DRAW_BASE_SIGNATURE]);
 
 export const DRAW_SOURCE_SUFFIX = '.draw.tsx';
 export const GRAMMAR_PACKAGE = '@starci/grammar';
@@ -361,6 +360,6 @@ async function main(argv) {
   return out.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-source: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

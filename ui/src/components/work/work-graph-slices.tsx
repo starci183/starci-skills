@@ -2,6 +2,7 @@ import type { WorkGraphView } from '../../contract';
 import { toneVar, type Tone } from '../status';
 import type { Concept } from '../concept';
 import { formatDayTime } from './leg/time';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C4';
 
@@ -19,7 +20,7 @@ const colorTone = (color: string | null): Tone => {
 
 /** The scope's work graph (slices + data edges) from work_graph_versions, layered left to right by longest path. */
 export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
-  if (!graph) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">Chưa có đồ thị lát cắt cho phạm vi này (work graph chưa được ghi).</p>;
+  if (!graph) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">{t('No slice graph for this scope yet (the work graph has not been written).')}</p>;
   const ids = new Set(graph.nodes.map(n => n.id));
   const edges = graph.edges.filter(e => ids.has(e.from) && ids.has(e.to) && e.from !== e.to);
   // Longest-path layering (Kahn-style; nodes left in a cycle fall to layer 0).
@@ -38,18 +39,18 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
   const trunc = (s: string, n: number) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
   return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <strong className="text-foreground">Phiên bản {graph.version}</strong><span>sự kiện: {graph.event}</span><span>op tác giả: {graph.authorOp}</span><span>{formatDayTime(graph.at)}</span>
-      <span>{graph.nodes.length} lát cắt · {edges.length} cạnh</span>
+      <strong className="text-foreground">{t('Version {n}', { n: graph.version })}</strong><span>{t('event: {event}', { event: graph.event })}</span><span>{t('author op: {op}', { op: graph.authorOp })}</span><span>{formatDayTime(graph.at)}</span>
+      <span>{t('{nodes} slices · {edges} edges', { nodes: graph.nodes.length, edges: edges.length })}</span>
     </div>
     {graph.reason && <p className="text-xs text-muted-foreground">{graph.reason}</p>}
     <div className="max-w-full overflow-x-auto rounded-lg border bg-card">
-      <svg width={width} height={height} role="img" aria-label="Đồ thị lát cắt công việc" style={{ minWidth: width }} className="block">
+      <svg width={width} height={height} role="img" aria-label={t('Work slice graph')} style={{ minWidth: width }} className="block">
         <defs><marker id="wgs-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" style={{ fill: 'var(--muted-foreground)' }} /></marker></defs>
         {edges.map((e, i) => {
           const a = pos.get(e.from); const b = pos.get(e.to); if (!a || !b) return null;
           const x1 = a.x + NODE_W; const y1 = a.y + NODE_H / 2; const x2 = b.x; const y2 = b.y + NODE_H / 2; const mx = (x1 + x2) / 2;
           return <path key={i} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 2},${y2}`} fill="none" strokeWidth="1.5" markerEnd="url(#wgs-arrow)" style={{ stroke: 'var(--muted-foreground)' }} opacity="0.7">
-            <title>{`${e.from} → ${e.to}${e.kind ? ` (${e.kind})` : ''}\n${e.reason ?? 'Không ghi lý do'}`}</title>
+            <title>{`${e.from} → ${e.to}${e.kind ? ` (${e.kind})` : ''}\n${e.reason ?? t('No reason recorded')}`}</title>
           </path>;
         })}
         {graph.nodes.map(n => {
@@ -60,11 +61,11 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
             <rect width="5" height={NODE_H} rx="2.5" style={{ fill: toneVar(tone) }} />
             <text x="16" y="24" fontSize="12.5" fontWeight="600" style={{ fill: 'var(--foreground)' }}>{trunc(n.title, 27)}</text>
             <text x="16" y="42" fontSize="10.5" fontFamily="var(--font-mono, monospace)" style={{ fill: 'var(--muted-foreground)' }}>{trunc(n.id, 30)}</text>
-            <text x="16" y="56" fontSize="10.5" style={{ fill: 'var(--muted-foreground)' }}>{n.ownedPaths.length} đường dẫn{n.domain ? ` · ${trunc(n.domain, 14)}` : ''}</text>
+            <text x="16" y="56" fontSize="10.5" style={{ fill: 'var(--muted-foreground)' }}>{t('{n} paths', { n: n.ownedPaths.length })}{n.domain ? ` · ${trunc(n.domain, 14)}` : ''}</text>
           </g>;
         })}
       </svg>
     </div>
-    {graph.domains.length > 0 && <p className="text-xs text-muted-foreground">Miền: {graph.domains.map(d => d.title ?? d.id).join(', ')}</p>}
+    {graph.domains.length > 0 && <p className="text-xs text-muted-foreground">{t('Domains: {list}', { list: graph.domains.map(d => d.title ?? d.id).join(', ') })}</p>}
   </div>;
 }

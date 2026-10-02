@@ -44,11 +44,11 @@ test('HFS_PLAINTEXT_SECRET: a tracked env file, a key file, a secret value and a
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
     put(dir, '.env', 'A=1\n');
     put(dir, 'be/certs/server.pem', 'not a key\n');
-    put(dir, 'be/src/features/orders/application/keys.ts', `export const key = '${AWS_KEY}';\n`);
+    put(dir, 'be/src/features/api/orders/application/keys.ts', `export const key = '${AWS_KEY}';\n`);
     put(dir, '.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
   }) });
   const found = only(result, 'HFS_PLAINTEXT_SECRET');
-  assert.deepEqual(found.map((f) => f.path).sort(), ['.env', '.starcistacks/dev/secrets/db.enc', 'be/certs/server.pem', 'be/src/features/orders/application/keys.ts']);
+  assert.deepEqual(found.map((f) => f.path).sort(), ['.env', '.starcistacks/dev/secrets/db.enc', 'be/certs/server.pem', 'be/src/features/api/orders/application/keys.ts']);
   assert.deepEqual(only(result, 'HFS_FORBIDDEN_PRESENT'), [], 'a plaintext env file is one finding, under the secret rule');
   const inline = found.find((f) => f.path.endsWith('keys.ts'));
   assert.equal(inline.pattern, 'aws-access-key');
@@ -60,8 +60,8 @@ test('HFS_PLAINTEXT_SECRET: a tracked env file, a key file, a secret value and a
 test('HFS_PLAINTEXT_SECRET: a sops envelope, a stand-in value and a spec file are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
     put(dir, '.starcistacks/dev/secrets/db.enc', SOPS_ENVELOPE);
-    put(dir, 'be/src/features/orders/application/pay.ts', "export const password = 'fixture-not-a-real-secret-value';\n");
-    put(dir, 'be/src/features/orders/application/pay.spec.ts', "export const password = 'a-real-looking-value-12345';\n");
+    put(dir, 'be/src/features/api/orders/application/pay.ts', "export const password = 'fixture-not-a-real-secret-value';\n");
+    put(dir, 'be/src/features/api/orders/application/pay.spec.ts', "export const password = 'a-real-looking-value-12345';\n");
   }) });
   assert.deepEqual(only(result, 'HFS_PLAINTEXT_SECRET'), []);
 });
@@ -219,7 +219,7 @@ test('HFS_DEP_VERSION_SKEW: a dependency declared at another version than the ro
 
 // ------------------------------------------------------------------------------------------------ R23 HFS_CONTRACT_SNAPSHOT_DRIFT
 
-const GRAPHQL = 'be/src/features/orders/transport/graphql/orders-graphql.module.ts';
+const GRAPHQL = 'be/src/features/api/orders/transport/graphql/orders-graphql.module.ts';
 const WITH_CONTRACT = appOf({ be: { apps: [{ name: 'core', kind: 'api' }], optionalSlots: ['be.contract.graphql'] }, fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] } });
 const SCHEMA = 'type Query {\n  ping: String\n}\n';
 const SNAPSHOT = 'be/contracts/core/schema.graphql';
@@ -245,18 +245,18 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT: a committed snapshot, and a back end with no 
 
 test('BE_TEST_TOPOLOGY: a .test file, a testing/ folder, a second jest configuration and a jest key in package.json are refused', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'be/src/features/orders/application/place-order.test.ts');
+    put(dir, 'be/src/features/api/orders/application/place-order.test.ts');
     put(dir, 'be/src/modules/domain/billing/testing/mock-billing.ts');
     put(dir, 'be/jest.config.e2e.js');
     put(dir, 'be/apps/core/jest.config.js');
     put(dir, 'package.json', json({ name: 'demo', private: true, dependencies: { 'next-intl': pins['next-intl'].version }, jest: { preset: 'ts-jest' } }));
   }) });
-  assert.deepEqual(pathsOf(result, 'BE_TEST_TOPOLOGY'), ['be/apps/core/jest.config.js', 'be/jest.config.e2e.js', 'be/src/features/orders/application/place-order.test.ts', 'be/src/modules/domain/billing/testing/mock-billing.ts', 'package.json']);
+  assert.deepEqual(pathsOf(result, 'BE_TEST_TOPOLOGY'), ['be/apps/core/jest.config.js', 'be/jest.config.e2e.js', 'be/src/features/api/orders/application/place-order.test.ts', 'be/src/modules/domain/billing/testing/mock-billing.ts', 'package.json']);
 });
 
 test('BE_TEST_TOPOLOGY: unit specs beside their subject, the be jest.config.js and the jest setup file are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'be/src/features/orders/application/place-order.spec.ts');
+    put(dir, 'be/src/features/api/orders/application/place-order.spec.ts');
     put(dir, 'be/src/tests/world/global-setup.ts');
   }) });
   assert.deepEqual(only(result, 'BE_TEST_TOPOLOGY'), []);
@@ -291,7 +291,7 @@ test('FE_WIRE_GENERATED: generated types newer than the snapshots, and an app wi
 
 test('FE_I18N_PLACEMENT: no next-intl, no proxy.ts, a middleware.ts, a route file outside [locale], a missing default catalog and a stray catalog are refused', () => {
   const result = checkRepo({ repoRoot: repoOf(TWO_FE_APPS, (dir) => {
-    // no fe workspace declares next-intl (each fe app is a workspace with its own package.json, R128)
+    // no fe workspace declares next-intl (each fe app is a workspace with its own package.json, R144)
     for (const app of ['web', 'admin']) put(dir, `fe/apps/${app}/package.json`, json({ name: `@demo/${app}`, private: true }));
     drop(dir, 'fe/apps/web/src/proxy.ts');
     put(dir, 'fe/apps/web/src/middleware.ts');

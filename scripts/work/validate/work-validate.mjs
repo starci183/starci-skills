@@ -10,11 +10,11 @@
 // owned path is moved to `outOfScope` (a pre-existing finding another record's owner repairs) and never
 // fails the run. Since 2026-09-27 business.decide/architecture.decide/scope.define legs validated their
 // whole feature and blocked on a journey actor, DATA_STATUS_DRAWN drawings or a done UI record's missing
-// asset in records they could not write (nivo modules-agentos, workspace-provision; starci-next
-// learn-content). A finding whose file cannot be read off stays in scope.
+// asset in records they could not write (seen on several product workflows).
+// A finding whose file cannot be read off stays in scope.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { checkFamiliesDrift, checkStarciworkBoundary, checkWorkTree, walk } from './check-example-work.mjs';
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
@@ -22,6 +22,7 @@ import { checkWorkSchemas } from './check-work-schemas.mjs';
 import { shellBindingFindings } from '../ui/shell-conformance.mjs';
 import { checkStarciStacks } from '../../gates/starcistacks.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -195,7 +196,7 @@ function usage(code = 0) {
   process.exit(code);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const strict = argv.includes('--strict');
   const owned = [];

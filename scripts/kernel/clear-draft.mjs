@@ -2,7 +2,7 @@
 // draft from a stale one.
 //
 // Orca's `terminal read` answers the text sitting unsubmitted in an agent's input box as `draft` and
-// leaves it out of the frame (scripts/api/orca/lib.mjs draftText). Anything typed next is appended to
+// leaves it out of the frame (scripts/lib/orca-terminal.mjs draftText). Anything typed next is appended to
 // that text: on the nivo collab Kernel (2026-09-25) a dropped Enter left a wake in the box and each
 // later wake piled onto it. Ctrl+U deletes one input row back to its start in the Claude, Codex and
 // Devin TUIs, so a multi-row draft needs several; the draft is re-read after each and the helper stops
@@ -22,7 +22,8 @@
 // and keeps every protection (foreign-input, draft-stuck).
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
-import { draftText, sleepSync } from '../api/orca/lib.mjs';
+import { draftText } from '../lib/orca-terminal.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { collapse } from '../lib/terminal-liveness.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 

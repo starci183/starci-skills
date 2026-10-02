@@ -1,4 +1,4 @@
-import http from 'node:http';
+import { serve } from '../scripts/api/http/serve.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReadStream, existsSync, statSync } from 'node:fs';
@@ -29,7 +29,7 @@ function serveStatic(request,response,url) {
   createReadStream(target).on('error',()=>response.destroy()).pipe(response);
 }
 
-const server = http.createServer(async (request,response) => {
+const server = serve(async (request,response) => {
   try {
     const url = new URL(request.url || '/', 'http://localhost');
     response.setHeader('X-Content-Type-Options','nosniff');

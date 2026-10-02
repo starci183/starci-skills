@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -155,7 +156,7 @@ export function describe(report) {
   return failed.length ? `${base}; FAILED: ${failed.join(', ')}${lost}` : `${base}; all areas ok${lost}`;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   if (!args.ok) {
     console.error(`use: housekeeping.mjs [--dry-run] [--apply] [--json] [--only <${AREA_NAMES.join(',')}>] (${args.error})`);

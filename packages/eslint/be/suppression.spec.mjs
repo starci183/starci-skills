@@ -9,8 +9,8 @@ const tester = new RuleTester({
 })
 /** ESLint itself reports a directive it ignores under noInlineConfig; that notice is not this rule's finding. */
 const NOTICE = { message: /noInlineConfig/ }
-const FILE = "D:/repo/src/modules/domain/plan/plan.service.ts"
-const SPEC = "D:/repo/src/modules/domain/plan/plan.service.spec.ts"
+const FILE = "src/modules/domain/plan/plan.service.ts"
+const SPEC = "src/modules/domain/plan/plan.service.spec.ts"
 
 test("no comment switches a check off at the place it is written", () => {
     tester.run("no-inline-suppression", noInlineSuppression, {

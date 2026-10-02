@@ -10,7 +10,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {openMachine,TEST_REGISTRY_ENV} from '../../engine/db/machine.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -304,8 +304,8 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   assert.match(dep.detail,/precedes docs\.author in the approved order/);
 
   // An earlier-leg job the Kernel ordered after this one with --after is not its
-  // predecessor: the declared edge overrides leg order (inc-df38ecef1927 — a draw
-  // held forever by a brand attempt that was itself enqueued --after the draw).
+  // predecessor: the declared edge overrides leg order (a live draw was held
+  // forever by a brand attempt that was itself enqueued --after the draw).
   seed(repo,ledger=>{
     moveJob(ledger,'earlier-leg-job','succeeded');
     seedOp(ledger,wf,{jobId:'earlier-after-job',opId:'scope.define',payload:{opId:'scope.define',after:[second]}});
@@ -422,18 +422,18 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'dependency');
   assert.match(because(second).detail,/seam/);
 
-  // A StarCi Next and a MiaMia workflow stalled behind a seam / --after job
+  // Two product workflows stalled behind a seam / --after job
   // that had settled failed: status read engaged and nothing woke the Kernel.
   seed(repo,ledger=>{for(const id of [composition,seam]){moveJob(ledger,id,'failed');ledger.write.recordJobResult({jobId:id,result:{verdict:'blocked'}});}});
   const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   let frontier=frontierNow();
   assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
-  // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/cut-seam.mjs): they run on a stub.
+  // A dead seam no longer holds its siblings (owner ruling 2026-09-28, scripts/kernel/seam-policy.mjs): they run on a stub.
   assert.equal(frontier.queued.find(q=>q.jobId===second).queuedBecause,'ready');
   assert.equal(frontier.queued.find(q=>q.jobId===second).seamStub.mode,'seam-failed');
   assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
   // A retry of the failed --after job is followed through its lineage: a live wait, no re-point by hand
-  // (starci-next sn-subscription dropped and re-enqueued its ordinal 6 after each failed attempt it named).
+  // (a live run dropped and re-enqueued its ordinal 6 after each failed attempt it named).
   const compositionRetry=enq('--op','docs.author','--paths','docs/composition','--retry-of',composition);
   assert.equal(because(member).queuedBecause,'dependency');
   assert.deepEqual(because(member).blockedBy,{op:'docs.author',job:compositionRetry});
@@ -452,7 +452,7 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(because(second).queuedBecause,'ready');
 });
 
-// A StarCi Next Kernel held two cut ordinals behind a failed seam whose grants
+// A product Kernel held two cut ordinals behind a failed seam whose grants
 // broke the Work layout and had no verb to retire them, so it could not re-plan.
 test('reconcile --drop retires a never-dispatched queued job and names what waits on it',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-drop';
@@ -593,9 +593,9 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   assert.deepEqual([f.state,f.askReserveDispatches,f.askOnDemandDispatches],['awaiting-owner',[],['ctx_tax']]);
 });
 
-// StarCi Next base-repos recorded an owner-gate for a missing brand before any
+// A base-repos run recorded an owner-gate for a missing brand before any
 // frontend job could be enqueued; the frontier stayed orphaned/actionable
-// (inc-103f2028ba77) and the watchdog woke a kernel that could only wait.
+// and the watchdog woke a kernel that could only wait.
 test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-gate-no-job';
   seedGoal(repo,wf);

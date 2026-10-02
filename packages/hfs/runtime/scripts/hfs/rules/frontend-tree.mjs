@@ -66,7 +66,7 @@ function wireFindings({ repoRoot, files, apps, reads }) {
   return findings;
 }
 
-/** R59 over the app: next-intl is a dependency of an fe workspace manifest (fe/apps/<app> or fe/packages/<pkg>; the workspace that imports it declares it, R130). */
+/** R59 over the app: next-intl is a dependency of an fe workspace manifest (fe/apps/<app> or fe/packages/<pkg>; the workspace that imports it declares it, R146). */
 function intlDependencyFindings({ repoRoot, files }) {
   const declares = (file) => { const pkg = readJson(repoRoot, file); return pkg ? ['dependencies', 'devDependencies'].some((section) => pkg[section]?.['next-intl'] !== undefined) : false; };
   const workspaces = files.filter((file) => /^fe\/(?:apps|packages)\/[^/]+\/package\.json$/.test(file));

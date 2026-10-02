@@ -923,7 +923,7 @@ $defs:
         type: string
         pattern: ^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$
         description: The reference file, relative to the same --source root as sources[] (for example
-          starci-academy-fe/src/app/globals.css). Read-only.
+          examples/ecommerce-app/fe/apps/shop/src/app/globals.css). Read-only.
       token:
         type: string
         pattern: ^--[A-Za-z0-9_-]+$
@@ -1226,7 +1226,7 @@ $defs:
         additionalProperties: false
         required: [by, acceptedBy, receipt, acceptedAt, rev]
         description: "Autopilot's provisional acceptance (owner ruling 2026-09-28 autopilot-run-to-finish,
-          scripts/kernel/autopilot.mjs): every machine gate passed and a starci/ask-answer@1 receipt answeredBy
+          scripts/kernel/autopilot-run.mjs): every machine gate passed and a starci/ask-answer@1 receipt answeredBy
           autopilot, provisional:true, backs it. interface.draw may draw from the archetype; the status stays
           proposed and the owner reviews it once at handover. Never an owner acceptance, never golden."
         properties:

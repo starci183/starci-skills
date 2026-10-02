@@ -42,8 +42,8 @@ reads:
       en: "The existing selected implementation record, its feature scope, declared
         refs/dependsOn/proof demands and validator freshness. Requirement and design Work leaves
         can still read `state: todo` after their decide jobs settle; the source artifacts from a
-        declared dependency may already be present at HEAD (starci-next learn-content
-        op-backend.implement-d5bf375e7a)."
+        declared dependency may already be present at HEAD (a learn-content leg
+        observed exactly this)."
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,decision}/**/index.yaml
     purpose:
@@ -118,7 +118,7 @@ writes:
         --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log
         <STARCI_JOB_SCRATCH>/checks/sonar.txt` in this same attempt; attach both files at api report (--isolate analyses only the
-        slice in a throwaway project: minutes, where a whole nivo-backend analysis took 17-40
+        slice in a throwaway project: minutes, where a whole repository analysis took 17-40
         minutes for a 1-5 file slice): it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
@@ -138,7 +138,7 @@ writes:
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
         responsibility to architecture, business or UAT. Reuse existing authorization and keep
-        secrets outside evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password. A repository-wide gate (typecheck, lint or tests over the whole
+        secrets outside evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/uat/test-secret.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password. A repository-wide gate (typecheck, lint or tests over the whole
         tree) red only on files this slice did not change and that import nothing it changed,
         while the slice's own scoped runs pass, is another op's defect (modules/ops/_common.yaml
         Bounded finish and blockers (d)): record that check with its real exit code and `failing`
@@ -146,9 +146,8 @@ writes:
         or workflow when you can tell>, category: shared-change, evidence, expectedFix}; it is
         never an open item, never partial and never a blocker, and it never turns an otherwise
         green done into anything else - api check attributes it to the peer whose commit left it
-        (peerBlocked) and the Kernel routes it there. nivo collab op-backend.implement-bd2609ff17
-        and starci-next foundation f920334582 filed partial for exactly this and were re-run for
-        hours on files they may not touch."
+        (peerBlocked) and the Kernel routes it there. Legs that filed partial for exactly this
+        were re-run for hours on files they may not touch."
   - id: apiDelivery
     path: evidence/**
     fields: [operations, request, response, errors, authorization, codeRefs, servedVersions, endpoint, probeEvidence]
@@ -182,11 +181,11 @@ steps:
       - repo
     writes: [source]
     action:
-      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/cut-seam.mjs,
+      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/seam-policy.mjs,
         modules/kernel/driver-loop.yaml enqueue.cutExecution seamContractFirst). As ordinal 1 of a cut of
-        more than one you are the seam: before anything else author and commit its interface - types,
+        more than one you are the seam: before anything else author its interface - types,
         DTOs, ports/contracts and a stub implementation inside your owned paths - then publish it with
-        `api cut-seam --publish-interface --job <your job> --files <committed interface files>` so every
+        `api cut-seam --publish-interface --job <your job> --files <interface files>` so every
         sibling ordinal starts on it at once; then finish the seam and keep the published signatures
         stable (a change after publishing owes the siblings a reconcile). As a sibling (ordinal > 1)
         whose packet carries context.cut.seamStub the seam has not landed: never wait for it and never

@@ -21,7 +21,7 @@
 //
 // CLI: node scripts/agent/bias.mjs "<text>"            -> extracted JSON
 //      node scripts/agent/bias.mjs --normalize '<json>' -> normalized JSON
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 const ALIASES = {
@@ -66,8 +66,8 @@ export function normalizeBias(obj) {
   return { prefer, avoid };
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isMain) {
+const entry = isMain(import.meta.url);
+if (entry) {
   const argv = process.argv.slice(2);
   const ni = argv.indexOf('--normalize');
   if (ni >= 0) {

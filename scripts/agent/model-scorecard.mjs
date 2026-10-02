@@ -20,7 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { ledgerFileFor, openLedgerReader } from '../../engine/db/ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { AWAITING_OWNER_STATUS, SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -198,4 +198,4 @@ function main(argv = process.argv.slice(2)) {
   console.log(argv.includes('--json') ? JSON.stringify(sc) : formatTable(sc));
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

@@ -23,7 +23,7 @@ const sonarEntry = (repo, extra = {}) => ({ provider: 'sonarqube', mode: 'local'
   projects: [{ repository: repo, key: repo }],
   credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
   ci: { wiring: 'required', secrets: [{ name: 'SONAR_TOKEN', credential: 'analysis' }], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonar.example.org' }] },
-  qualityGate: 'starci-new-code', ownerAction: 'none', ...extra });
+  qualityGate: 'starci-quality', ownerAction: 'none', ...extra });
 const sentryEntry = (repo, extra = {}) => ({ provider: 'sentry', mode: 'hosted', host: { public: 'https://sentry.io' }, auth: 'oidc',
   projects: [{ repository: repo, key: `gh/org/${repo}` }], credentials: [], ci: { wiring: 'required', permissions: ['id-token: write'], secrets: [], vars: [] }, ownerAction: 'none', ...extra });
 const CI = 'jobs:\n  ci:\n    steps:\n      - uses: getsentry/action-release@v1\n        with: {environment: ci}\n      - uses: SonarSource/sonarqube-scan-action@v7\n        env:\n          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}\n          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}\n';
@@ -122,7 +122,7 @@ test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yam
   const own = workspace(t, { services: { sonar: sonarEntry('product', { qualityGate: 'my-own-gate' }), 'error-tracking': sentryEntry('product') } });
   const refused = checkStarciStacks(own.product);
   assert.ok(codes(refused, 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'));
-  assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-new-code/);
+  assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-quality/);
   const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
   assert.equal(checkStarciStacks(own.product, { advisoryCodes: CODES }).ok, true, 'a leg admitted before the change reads it as a suspect');
@@ -214,7 +214,7 @@ test('api report refuses an ask for a declared credential and files any other as
   assert.equal(count(), 1);
 });
 
-// mia base inc-5360513a96b3: the custody rule re-included `!.starcistacks/*/infra/compose/**` after the
+// Live defect: the custody rule re-included `!.starcistacks/*/infra/compose/**` after the
 // `.env.*` deny, so every plaintext env under compose (compose/.env.generated) was trackable. The rule is
 // now an ordered list (stacks-layout.yaml custody.gitignoreRules) that denies infra value files again after
 // the infra re-includes; the check probes the rules with git and refuses an open one or a tracked value file.
@@ -229,7 +229,7 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   let result = checkStarciStacks(product);
   assert.ok(codes(result, 'refuse').includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
   assert.match(result.findings.find((f) => f.code === 'STACKS_GITIGNORE_VALUE_OPEN').message, /\.starcistacks\/dev\/infra\/compose\/\.env\.generated/);
-  // mia-mia-backend inc-5b22edbb4e62: rules without `!.starcistacks/*/README.md` hide the runbook the
+  // Live defect: rules without `!.starcistacks/*/README.md` hide the runbook the
   // layout declares (shape.runbook) - a suspect, not a refusal.
   const hiddenRunbook = result.findings.find((f) => f.code === 'STACKS_RUNBOOK_IGNORED');
   assert.ok(hiddenRunbook, JSON.stringify(result.findings));

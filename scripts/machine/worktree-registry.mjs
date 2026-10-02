@@ -27,9 +27,9 @@ export const ENDED_WORKFLOW_PHASES = Object.freeze(['stopped', 'finished', 'arch
 export const TERMINAL_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 export const SETTLED_JOBS = new Set(SETTLED_JOB_LIST);
-export const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000 });
+export const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000, rebaseMilestoneBehind: 20 });
 
-/** worktrees.{capPerRepo, ownerGoneMs, gcEveryMs, gcBudgetMs} of modules/kernel/product-land.yaml over the defaults. */
+/** worktrees.{capPerRepo, ownerGoneMs, gcEveryMs, gcBudgetMs, rebaseMilestoneBehind} of modules/kernel/product-land.yaml over the defaults. */
 export function worktreeSettings(file = SETTINGS_FILE) {
   let doc = null;
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')); } catch { doc = null; }
@@ -86,11 +86,6 @@ export const stalePending = (row, now, ownerGoneMs) => isPendingRow(row) && now 
 /** Give a pending slot back (Orca created nothing). */
 export function releaseOrcaSlot(pending, { env = process.env } = {}) {
   try { return withRegistry((m) => m.dropWorktree(pending), env); } catch { return false; }
-}
-
-/** The live registry row Orca knows by `orcaId`, or null. */
-export function orcaRowOf(orcaId, { env = process.env } = {}) {
-  try { return withRegistry((m) => m.db.prepare('SELECT * FROM worktrees WHERE orca_id=? AND removed_at IS NULL').get(orcaId) ?? null, env); } catch { return null; }
 }
 
 /* ------------------------------------------------------------ gc judgement */

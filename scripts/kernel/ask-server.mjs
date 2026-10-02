@@ -50,12 +50,12 @@
 import '../api/process/hide-child-windows.mjs';
 import { writeAskReceipt } from '../machine/ask-receipts.mjs';
 import fs from 'node:fs';
-import http from 'node:http';
+import { serve } from '../api/http/serve.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { runNode } from '../api/node/run-node.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
 import { loadConfig, activeDelegation, allocationMs, askAutoAcceptPolicy, ASK_PORT_BAND } from '../../engine/config.mjs';
@@ -67,24 +67,25 @@ import { AUTO_ACCEPTED_BY, AUTO_ACCEPT_CONFIG_KEY, CREDENTIAL_ASK_KINDS, askKind
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, drawOwnerRulingOf } from '../work/draw-review.mjs';
 import { recordDrawAnswer } from '../work/draw-feedback.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
-// The form speaks the owner's language (config.yaml `language`). Unknown
-// languages fall back to English; the op writes the question itself in the
-// same language (provision.ask, packet owner_language).
-const UI = {
-  en: { title: 'Owner decision', artifacts: 'Artifacts under review', choose: 'Choose', picks: 'Choose',
-    credentials: 'Credentials', note: 'Note to the workflow (optional)', submit: 'Submit answer',
-    answered: 'This ask is already answered — view only.', received: 'Answer received',
-    custody: 'Secret values land in encrypted stack custody and are exposed through *_FILE pointers — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.',
-    wakes: 'Submitting wakes the workflow kernel.' },
-  vi: { title: 'Quyết định của thầy', artifacts: 'Hình để so sánh', choose: 'Chọn', picks: 'Chọn',
-    credentials: 'Thông tin bí mật', note: 'Ghi chú cho workflow (không bắt buộc)', submit: 'Gửi câu trả lời',
-    answered: 'Câu hỏi này đã được trả lời, chỉ xem.', received: 'Đã nhận câu trả lời',
-    custody: 'Giá trị bí mật được lưu mã hoá trong stack custody và chỉ lộ qua con trỏ *_FILE, không bao giờ vào ledger, chat hay log. Gửi xong sẽ đánh thức kernel của workflow.',
-    wakes: 'Gửi xong sẽ đánh thức kernel của workflow.' },
+// The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question
+// in the same language (provision.ask, packet owner_language). Strings are English sources (scripts/lib/i18n.mjs).
+const uiText = () => {
+  let lang = 'en';
+  try { lang = loadConfig()?.language ?? 'en'; } catch { /* default */ }
+  const tr = translator(lang);
+  return { lang, t: {
+    title: tr('Owner decision'), artifacts: tr('Artifacts under review'), choose: tr('Choose'), picks: tr('Choose'),
+    credentials: tr('Credentials'), note: tr('Note to the workflow (optional)'), submit: tr('Submit answer'),
+    answered: tr('This ask is already answered — view only.'), received: tr('Answer received'),
+    custody: tr('Secret values land in encrypted stack custody and are exposed through *_FILE pointers — never in the ledger, the chat, or any log. Submitting wakes the workflow kernel.'),
+    wakes: tr('Submitting wakes the workflow kernel.'),
+    partNote: tr('Note on this image (for a redraw)'),
+    golden: tr('Accept and make it the golden reference for this page archetype'),
+  } };
 };
-const uiText = () => { let lang = 'en'; try { lang = loadConfig()?.language ?? 'en'; } catch { /* default */ } return { lang, t: UI[lang] ?? UI.en }; };
 
 // A single pick group whose choices match question.options one for one is the
 // same decision: render it once (the picks, with their images) and map the
@@ -357,7 +358,7 @@ const writeCustody = (repo, name, value) => {
   try {
     fs.writeFileSync(tmp, value, { mode: 0o600 });
     if (fs.existsSync(tool)) {
-      const r = spawnSync(process.execPath, [tool, 'set', `dev/runtime/files/${name}`, '--from-file', tmp], { cwd: repo });
+      const r = runNode([tool, 'set', `dev/runtime/files/${name}`, '--from-file', tmp], { cwd: repo });
       if (r.status === 0) return { ok: true, via: 'stack-secret' };
       return { ok: false, error: String(r.stderr || r.stdout || 'stack-secret set failed').slice(0, 300) };
     }
@@ -388,11 +389,11 @@ const appEnvUpsert = (repo, key, value) => {
   if (!fs.existsSync(tool)) return false;
   const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
   try {
-    spawnSync(process.execPath, [tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
+    runNode([tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
     const cur = [path.join(repo, '.starcistacks', APP_ENV_REL)].find(fs.existsSync);
     if (!cur) return false;
     fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
-    return spawnSync(process.execPath, [tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
+    return runNode([tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;
   } finally {
     try { fs.unlinkSync(tmp); } catch { /* best effort */ }
   }
@@ -454,8 +455,8 @@ export const pickGroupsOf = (question, images) => {
   return picks;
 };
 
-// The owner reviews a drawing on Telegram (owner ruling 2026-09-27): a reply to the draw-review notice that says
-// only ok / duyệt (and the like, optionally "golden") accepts; any other reply is the owner's feedback - a redraw
+// The owner reviews a drawing on Telegram (owner ruling 2026-09-27): a reply to the draw-review notice made of
+// only ACCEPT_WORDS (ok and its Vietnamese glosses, optionally "golden") accepts; any other reply is the owner's feedback - a redraw
 // whose notes are the reply's lines. A reply to one image of the album is a note on that image.
 const ACCEPT_WORDS = new Set(['ok', 'okay', 'oke', 'okie', 'duyệt', 'đồng', 'ý', 'chấp', 'nhận', 'accept', 'accepted', 'approve', 'approved', 'lgtm', 'được', 'good', 'đẹp', 'rồi', 'nhé', 'nha', 'yes', 'ừ', 'uh']);
 const GOLDEN_REPLY = /\bgolden\b|(?:đặt làm |làm )?(?:mẫu|ảnh|hình) chuẩn|làm mẫu/gi;
@@ -557,9 +558,7 @@ const renderForm = ({ nonce, question, fields, images, repo, workflowId, readonl
   // A draw-review ask takes a note per image (draw-feedback.mjs: each is an owner ruling bound to that shape) and the
   // owner's golden mark on an accept.
   const drawReview = askKindOf(question) === DRAW_REVIEW_KIND && question.review;
-  const drawText = lang === 'vi'
-    ? { partNote: 'Ghi chú cho hình này (nếu cần vẽ lại)', golden: 'Chấp nhận và đặt làm hình chuẩn (golden) cho loại trang này' }
-    : { partNote: 'Note on this image (for a redraw)', golden: 'Accept and make it the golden reference for this page archetype' };
+  const drawText = { partNote: t.partNote, golden: t.golden };
   const imgRows = (images ?? []).map((img, i) => {
     if (pickedImages.has(i)) return '';
     const k = drawReview ? reviewPartIndexOf(question.review, img?.abs, repo) : -1;
@@ -806,11 +805,11 @@ const main = async () => {
     if (superseded.length) await closeAskMessages(ledger, { ledgerFile: file, workflowId: args.workflow, dispatchIds: superseded, reason: 'retired' });
   }
 
-  // Autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28): an ask that is not the owner's end-of-flow
+  // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): an ask that is not the owner's end-of-flow
   // step is answered provisionally or deferred to handover, never served. The owner opening a form (--on-demand) is
   // the owner's own act and is served.
   if (!readonly && !args['on-demand']) {
-    const { autopilotAnswerAsk } = await import('./autopilot.mjs');
+    const { autopilotAnswerAsk } = await import('./autopilot-run.mjs');
     const pilot = autopilotAnswerAsk({ ledger, repo, workflowId: args.workflow, report, wake: wakeAskAnswered });
     if (pilot.handled) {
       console.log(JSON.stringify({ ok: true, workflowId: args.workflow, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, receiptPath: pilot.receiptPath ?? null }));
@@ -839,7 +838,7 @@ const main = async () => {
   const ttl = Number(args.ttl ?? DEFAULT_TTL_MS);
 
   let done = false;
-  const server = http.createServer((req, res) => {
+  const server = serve((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     if (req.method === 'GET' && url.pathname === `/${nonce}`) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -903,7 +902,7 @@ const main = async () => {
         let bridge = null;
         const devEnv = path.join(repo, 'scripts', 'dev-env.mjs');
         if (pointersWritten.length && fs.existsSync(devEnv)) {
-          const r = spawnSync(process.execPath, [devEnv], { cwd: repo, stdio: 'ignore' });
+          const r = runNode([devEnv], { cwd: repo, stdio: 'ignore' });
           bridge = r.status === 0 ? 'refreshed' : 'refresh-failed';
         }
         const mirror = mirroredPick(question, pickGroupsOf(question, images));
@@ -1015,4 +1014,4 @@ ${errors.length ? `<p style="color:#a33">errors: ${esc(errors.join('; '))}</p>` 
   }, ttl).unref();
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

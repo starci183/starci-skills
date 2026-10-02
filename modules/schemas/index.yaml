@@ -36,7 +36,7 @@ schemas:
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
       - scripts/work/validate/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
-      - scripts/work/validate/check-work-consistency.mjs, scripts/example/work-example.mjs
+      - scripts/work/validate/check-work-consistency.mjs
     business:
       question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
       whenNeeded: Before any gate that walks Work records, and whenever a workflow creates a new node/family folder.
@@ -436,18 +436,18 @@ schemas:
       whenNot: Never authorizes a live runtime reference to a deleted or moved file.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
-  - id: starci/push-scan-allow@1
-    file: modules/supervisor/push-scan-allow.yaml
+  - id: starci/i18n-catalog@1
+    file: modules/i18n/messages/common.yaml
     dialect: prose-data
-    subsystem: gate
-    governs: "Owner-approved, file- and pattern-specific exemptions for the push secret scan."
-    binds: "modules/supervisor/push-scan-allow.yaml entries[]"
-    usedBy: [scripts/supervisor/push-mains.mjs]
+    subsystem: kernel
+    governs: "The Vietnamese message catalog of owner-visible runtime text: modules/i18n/messages/<area>.yaml, a messages[] list of {en, vi} entries keyed from the English source."
+    binds: "modules/i18n/messages/*.yaml messages[] entries"
+    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs]
     business:
-      question: "Which reviewed historical scan finding has a narrowly scoped exemption?"
-      whenNeeded: Evaluating push scan findings against owner-approved entries.
-      whenNot: Never exempts forbidden secret files or grants approval for a new credential literal.
-      selectedBy: The push scanner's explicit allow-file read.
+      question: "What does the owner read in Vietnamese for this English runtime message?"
+      whenNeeded: Translating a Telegram notice, a why line, a progress report or any owner-visible runtime message; the only declared home of Vietnamese outside the failure-code, op and archetype fields.
+      whenNot: Never holds English-only text, a second translation of one source, or a message whose placeholders differ between en and vi.
+      selectedBy: scripts/lib/i18n.mjs translator(language) and the i18n-catalog check.
 
   - id: starci/op@1
     file: modules/schemas/op.schema.yaml
@@ -943,12 +943,14 @@ moduleLocalDocumentKinds:
       - modules/models/profiles/devin-agent.yaml
       - modules/models/profiles/gpt-6-luna.yaml
       - modules/models/profiles/gpt-6-sol.yaml
+      - modules/models/profiles/cursor-agent.yaml
   - id: starci/agent-card@1
     governs: "One agent's spawn contract. Enforced by scripts/checks/check-providers.mjs (schema id, agent == file stem) and tests/repo/provider-orca.spec.mjs."
     files:
       - modules/models/agents/claude.yaml
       - modules/models/agents/codex.yaml
       - modules/models/agents/devin.yaml
+      - modules/models/agents/cursor.yaml
   - id: starci/runtimes@1
     governs: "The quota-window runtime pools, allocation policy and roleOfKind table. The only concurrency authority."
     files: [modules/models/runtimes.yaml]

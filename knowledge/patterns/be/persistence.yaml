@@ -34,8 +34,8 @@ rules:
     requirement: |-
       `synchronize` is the literal `false` everywhere, including e2e databases, and is never read from the environment.
       There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE`, `ALTER` or `DROP TABLE` string
-      outside `persistence/migrations/**`, and no glob that discovers entities or migrations. E2E runs the real migrations
-      through the migrate runner function of `apps/cli`, which is the evidence that they are right.
+      outside `persistence/migrations/**`, and no glob that discovers entities or migrations. The test world runs the real
+      migrations over the same connection list the cli migrate command reads, which is the evidence that they are right.
     rationale: |-
       When an ORM diffs the schema at boot, the live schema is whatever the entity graph implies that day, migrations never
       run, and an enum change can crash a boot.
@@ -45,7 +45,7 @@ rules:
         write: 'DatabaseModule.register({ connection: PRIMARY_CONNECTION, entities, migrations, synchronize: false })'
       - id: case-2
         when: An e2e database
-        write: 'the setup runs the migrate runner function of apps/cli against the Testcontainers database before the tests, never synchronize'
+        write: 'the test world global-setup runs the migrations of every connection of the cli app against the real database before the tests, never synchronize'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
@@ -53,14 +53,15 @@ rules:
         - Review each migration against the accepted SDS data design and a copy of realistic data.
     relatedExamples: []
   - id: BE-PERSISTENCE-2
-    title: cli migrate is the only migration runner
+    title: The cli migrate command is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34, R154]
+    hfsRules: [R33, R34, R147, R174]
     requirement: |-
-      Migrations run only through the `migrate` command of `be/apps/cli` (`cli migrate`), once per connection, before any api
-      or worker process starts (a deploy runs it as an init job). `apps/cli` is required as soon as `hfs.json`
-      `sides.be.connections` declares a connection, and it composes EVERY declared connection with its entities and
-      migrations (BE_CONTEXT_OWNER), because the cli is the one process that may touch the schema of every context. It builds
+      Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`), once per
+      connection, before any api or worker process starts (a deploy runs the cli image as an init job), and through the test
+      world over the same connection list. The cli app is required as soon as `hfs.json` `sides.be.connections` declares a
+      connection (cli.yaml BE-CLI-1), and it composes EVERY declared connection with its entities and migrations
+      (BE_CONTEXT_OWNER), because the cli is the one process that may touch the schema of every context. The command builds
       its `DataSource` from the same `<conn>.config.ts` the owning api uses. Api and worker apps never run migrations.
     rationale: |-
       Two processes racing to migrate corrupt a schema, and a migration inside a module cannot be scheduled or retried on
@@ -68,11 +69,12 @@ rules:
     cases:
       - id: case-1
         when: A deploy
-        write: 'run `node dist/apps/cli/main.js migrate` to completion (one run per connection), then start the api and worker.'
+        write: 'run the cli image as `cli migrate run` to completion, then start the api and worker apps.'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
-        - BE_ENTRYPOINT_ONLY_IN_APPS
+        - BE_CLI_REQUIRED
+        - BE_CLI_OWNER
         - BE_CONTEXT_OWNER
         - HFS_SLOT_REQUIRED_MISSING
       manual:
@@ -86,7 +88,7 @@ rules:
       Entities and migrations sit in `persistence/{entities,migrations}/` of the capability that owns the table
       (`domain/<c>/persistence/`, `projections/<name>/persistence/` for a read model or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` declares
       the `<c>Entities` and `<c>Migrations` arrays and no `CONNECTION` alias. The owner's `index.ts` re-exports those two
-      names, the only two, and the apps and `be/apps/cli` concatenate them per connection into `DatabaseModule.register`;
+      names, the only two, and the apps (the cli app among them) concatenate them per connection into `DatabaseModule.register`;
       a capability's connection is the one its arrays are registered on, exactly one declared in `hfs.json` `sides.be.connections`
       across all apps (only a platform capability the manifest lists as `perConnection`, the event-bus outbox and inbox and the
       job table, registers on several: one set of tables on every connection that uses it), and every `Inject<Conn>EntityManager` inside the capability names that same connection. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
@@ -207,8 +209,8 @@ rules:
       transaction callback, with the entity class passed by class and never by string name. Not used: `getRepository`,
       `@InjectRepository`, `Repository<T>`, `TypeOrmModule.forFeature`, custom repository or store classes
       (`*.repository.ts`, `*.store.ts`, `*_STORE` ports), `createQueryBuilder`, `ModuleRef.get`, an injected `DataSource` or
-      `QueryRunner` outside `platform/database` and `be/apps/cli`. A manager is injected only in
-      `be/src/features/<f>/application/*.handler.ts`, `be/src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
+      `QueryRunner` outside `platform/database` and the cli (`be/apps/cli`, `be/src/features/cli/`). A manager is injected only in
+      `be/src/features/api/<f>/application/*.handler.ts`, `be/src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
       a `persistence/` (database, inbox, outbox, lease); never in `transport/**`, `integrations/**` or `be/apps/**`.
     rationale: |-
       A repository handle is bound to one entity and cannot carry a transaction into a second table, and a DataSource used
@@ -241,7 +243,7 @@ rules:
       (reads only `<ENVPREFIX>_*` keys) and `<conn>.decorators.ts`
       (`Inject<Conn>EntityManager = (): TypedParameterDecorator<EntityManager> => injector<EntityManager>(getEntityManagerToken(<CONN>_CONNECTION))`).
       No other file declares a connection or calls `TypeOrmModule.forRoot*`, `new DataSource(`, `getEntityManagerToken(`,
-      `InjectEntityManager(` or `InjectDataSource(`, except `be/apps/cli`. There is no
+      `InjectEntityManager(` or `InjectDataSource(`, except the cli (`be/apps/cli`, `be/src/features/cli/`). There is no
       capability-specific injector, no second connection name onto an existing database, and two connections never resolve to
       the same (host, port, database), except two `isolation: schema` contexts with different `<PREFIX>_SCHEMA` values.
     rationale: |-
@@ -320,10 +322,30 @@ rules:
       manual:
         - Run a refusal-after-write case against a real database and assert the rollback.
     relatedExamples: []
+  - id: BE-PERSISTENCE-16
+    title: UPDATE or DELETE with RETURNING is wrapped in a SELECT
+    kind: mandatory
+    hfsRules: [R181]
+    requirement: |-
+      EntityManager.query returns a bare `UPDATE ... RETURNING` or `DELETE ... RETURNING` as `[rows, affectedCount]`, not as rows (an
+      `INSERT ... RETURNING` returns rows). A `SqlText` constant that updates or deletes and returns columns is written as
+      `WITH changed AS (UPDATE ... RETURNING ...) SELECT ... FROM changed`, which returns rows, and an e2e spec runs it on the real database.
+    rationale: |-
+      A unit spec that stubs the SQL result cannot see the shape; the caller read the tuple as rows and a saga stalled with stock unreleased.
+    cases:
+      - id: case-1
+        when: Releasing reserved stock and reading the released rows
+        write: 'export const RELEASE = sql`WITH changed AS (UPDATE stock_items SET qty = qty + $2 WHERE id = $1 RETURNING id, qty) SELECT id, qty FROM changed`'
+    verification:
+      automated:
+        - BE_SQL_RETURNING_SHAPE
+      manual:
+        - Confirm the e2e run exercises the statement against the real database.
+    relatedExamples: []
   - id: BE-PERSISTENCE-11
     title: A connection is a bounded context with one owning service
     kind: mandatory
-    hfsRules: [R154]
+    hfsRules: [R174]
     requirement: |-
       Every `hfs.json` `sides.be.connections` entry has an `owner` (an api or worker app declared in the same file) and an
       `isolation` (`database` or `schema`). An app passes to `DatabaseModule.register` only the connections it owns and imports
@@ -347,7 +369,7 @@ rules:
   - id: BE-PERSISTENCE-12
     title: Contexts are coupled only by events
     kind: mandatory
-    hfsRules: [R155, R86]
+    hfsRules: [R175, R86]
     requirement: |-
       No cross-context entity relation (`OneToOne`, `OneToMany`, `ManyToOne`, `ManyToMany` to another context's entity), no
       cross-context foreign key (`REFERENCES` another context's table in a migration), no cross-context SQL (BE-PERSISTENCE-9) and
@@ -375,7 +397,7 @@ rules:
   - id: BE-PERSISTENCE-13
     title: One transaction touches one context's connection
     kind: mandatory
-    hfsRules: [R156]
+    hfsRules: [R176]
     requirement: |-
       Inside `entityManager.transaction(async (manager) => ...)` of the manager of connection C, no entity manager of another
       connection is used and no capability of another context is called. Work that spans contexts is a saga: one transaction per
@@ -396,7 +418,7 @@ rules:
   - id: BE-PERSISTENCE-14
     title: Per-connection platform tables and projection placement
     kind: mandatory
-    hfsRules: [R158]
+    hfsRules: [R178]
     requirement: |-
       Projections keep their tables under their owning context's connection, in `modules/projections/<name>/persistence/{entities,migrations}`.
       The outbox and inbox tables exist per connection that publishes or consumes (`platform/event-bus/persistence`,
@@ -420,7 +442,7 @@ rules:
   - id: BE-PERSISTENCE-15
     title: Event contracts evolve only additively
     kind: mandatory
-    hfsRules: [R157]
+    hfsRules: [R177]
     requirement: |-
       `be/contracts/<service>/events.json` is compared with its pinned previous contract `events.pin.json` (copied over when the
       contract is published). Every pinned event keeps its stream, version, payload fields, types and optionality; a new field is

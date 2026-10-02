@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { API_FILE, PUSH_KIND, apiRun, failedShapesOf, jobRow, newId, recordKernel, refuse, shapeOf } from '../kernel-authority.mjs';
 import { refuseDecisionsFirst } from '../../machine/decisions.mjs';
 
@@ -33,7 +33,7 @@ export default {
       fs.mkdirSync(dir, { recursive: true });
       const argv = [API_FILE, 'dispatch-ready', '--repo', repo, '--workflow', wf, '--foreground', '--push-id', pushId, ...(args.max ? ['--max', String(args.max)] : [])];
       const log = fs.openSync(`${resultFile}.log`, 'a');
-      const child = spawn(process.execPath, argv, { detached: true, stdio: ['ignore', log, log], windowsHide: true, env: process.env });
+      const child = spawnNode(argv, { detached: true, stdio: ['ignore', log, log], env: process.env });
       child.unref();
       emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next api status shows the running count`, args.json);
       return;

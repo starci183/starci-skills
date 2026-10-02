@@ -1,0 +1,33 @@
+id: resume-from-preserved-ref
+effectiveAt: '2026-10-02T08:30:00+07:00'
+summary: >-
+  A RETRY CONTINUES FROM THE PRESERVED REF, NEVER FROM A COMMIT (WFWT2 2.6). Ops never commit, so a failed or blocked
+  attempt's work exists only as refs/heads/preserved/<workflow>/<job>, the snapshot settle keeps (preserveAndReset, event
+  workflow-op-preserved). scripts/kernel/seam-policy.mjs preservedRefOf reads it; canonRedispatchOf and canonSettleFollowUpOf
+  set code.refactor params.resumeFrom to it (no longer an indexed patch head, a report head or a commit named in report
+  prose), and api graph-edit --edit continue continues from it (refusal continue-no-preserved-work replaces
+  continue-no-commit). The continuation applies that work to its owned paths itself (git diff <ref>^ <ref> -- <owned
+  paths> | git apply: a read and an apply, which the workflow-history guard allows), never cherry-pick. The
+  code.refactor param admissionBase is deleted: the slice records git rev-parse HEAD as its admission commit and canon
+  parity reads the --base its checks measured against. The progress RCA cause partial-commit becomes partial-work, read
+  from the settle's result.checkpoint.preservedRef. api cut-seam --publish-interface digests the interface files in the
+  workflow worktree when the workflow has one (the ledger checkout otherwise).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/resume-from-preserved-ref.yaml
+  - scripts/kernel/seam-policy.mjs
+  - scripts/kernel/preserved-ref.mjs
+  - scripts/kernel/cli.mjs
+  - scripts/kernel/verbs/graph-edit.mjs
+  - scripts/kernel/verbs/cut-seam.mjs
+  - scripts/kernel/progress-rca.mjs
+  - scripts/kernel/kernel-authority.mjs
+  - scripts/kernel/settle/canon-parity.mjs
+  - modules/ops/ops/code.refactor.yaml
+  - modules/ops/registry.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/api-commands/graph-edit.yaml
+  - modules/kernel/failure-codes.yaml
+  - tests/kernel/canon-slice-wire.spec.mjs
+  - tests/kernel/cut-seam-stub.spec.mjs
+  - tests/kernel/canon-repoint.spec.mjs

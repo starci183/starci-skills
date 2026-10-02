@@ -1,0 +1,32 @@
+id: test-world-worker-slots
+effectiveAt: '2026-10-02T07:00:00+07:00'
+summary: >-
+  @starci/test-world 1.1.0 and @starci/jest-preset 2.2.4, pinned together (alpha.4 item 2.9). World spec files run in
+  parallel: the globalSetup provisions N data slots (N = min(jest maxWorkers, the declaration's workers cap, default 2)), each
+  a complete run of its own namespace <ns>_w<k> and run token <run>-w<k>: its own Postgres database per connection, Keycloak
+  realm, leased Redis DB index, MinIO/Qdrant/Kafka/k3d prefixes, fakes host, toxiproxy proxies and outage lock. The world runner
+  runs up to min(--maxWorkers, slots) files at once, each in a fresh process forked with STARCI_TEST_WORLD_SLOT=<k>, never two
+  files on one slot. The state file is protocol 2 ({version, library, runId, slots}); there is no fallback: another protocol
+  fails the runner with JEST_PRESET_WORLD_PAIR_MISMATCH, and a process without a slot of the run fails the library with
+  TEST_WORLD_PAIR_MISMATCH, each naming both versions and the re-pin. Replaces the "one file at a time" rule of
+  jest-preset-world-runner and lifts the CHANGELOG known limitation. The preset spec proves the width (2 slots under
+  --maxWorkers=3 run 2 files at once, 3 slots run 3, --maxWorkers=1 and --runInBand run one), that no slot is ever shared and
+  that a v1 or foreign state file is refused; the library spec proves the slot selection and the refusals.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/test-world-worker-slots.yaml
+  - packages/jest-preset/world-runner.cjs
+  - packages/jest-preset/index.cjs
+  - packages/jest-preset/package.json
+  - packages/jest-preset/CHANGELOG.md
+  - packages/jest-preset/README.md
+  - packages/jest-preset/preset.spec.mjs
+  - packages/test-world/src/jest/context.ts
+  - packages/test-world/src/jest/setup.ts
+  - packages/test-world/src/jest/teardown.ts
+  - packages/test-world/src/jest/global-setup.ts
+  - packages/test-world/src/stack/namespace.ts
+  - packages/test-world/package.json
+  - packages/test-world/CHANGELOG.md
+  - packages/test-world/README.md
+  - knowledge/hfs/canon-pins.yaml

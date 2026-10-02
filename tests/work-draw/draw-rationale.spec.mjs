@@ -29,12 +29,12 @@ button{padding:8px 16px;border:0;border-radius:9999px;background:#ffffff;font-fa
 body{margin:0;background:#ffffff;color:#000000}
 </style></head><body>
 <main data-grammar-component="PageContainer" data-why="L-page">
-  <header data-grammar-component="SectionHeader" data-why="L-header"><h1 data-grammar-component="Heading" data-why="T-h1">Mô-đun đã cài</h1></header>
+  <header data-grammar-component="SectionHeader" data-why="L-header"><h1 data-grammar-component="Heading" data-why="T-h1">M\u00f4-\u0111un \u0111\u00e3 c\u00e0i</h1></header>
   <section class="cards" data-why="L-cards">
     <article class="card" data-grammar-component="SurfaceCard" data-why="K-card"><p data-grammar-component="Text" data-why="T-body">Chatbot Sales</p>
-      <button data-grammar-component="Button" data-variant="secondary" data-why="K-open">Mở</button></article>
+      <button data-grammar-component="Button" data-variant="secondary" data-why="K-open">M\u1edf</button></article>
     <article class="card" data-grammar-component="SurfaceCard" data-why="K-card"><p data-grammar-component="Text" data-why="T-body">Sales Copilot</p>
-      <button data-grammar-component="Button" data-variant="secondary" data-why="K-open">Mở</button></article>
+      <button data-grammar-component="Button" data-variant="secondary" data-why="K-open">M\u1edf</button></article>
   </section>
 </main></body></html>`;
 
@@ -65,7 +65,7 @@ test('good: every element says why, every measured value and rule id is covered'
 });
 
 test('missing data-why: an element without it, and a data-why naming no decision, are refused', () => {
-  const html = GOOD_HTML.replace(' data-why="T-h1"', '').replace('data-why="K-open">Mở</button></article>\n    <article', 'data-why="K-ghost">Mở</button></article>\n    <article');
+  const html = GOOD_HTML.replace(' data-why="T-h1"', '').replace('data-why="K-open">M\u1edf</button></article>\n    <article', 'data-why="K-ghost">M\u1edf</button></article>\n    <article');
   const f = judge(html, GOOD_RATIONALE);
   assert.ok(f.every((x) => x.code === DRAW_RATIONALE_MISSING));
   assert.deepEqual(kinds(f), ['data-why naming no decision', 'element without data-why']);

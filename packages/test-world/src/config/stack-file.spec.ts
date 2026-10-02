@@ -131,9 +131,9 @@ describe("resolveInfraImages", () => {
 
 describe("resolveSiblingImage", () => {
     test("declaration image first, then the compose service of that name, else an error", () => {
-        const definition = definitionOf({ api: "todo-app/api" })
+        const definition = definitionOf({ api: "shop/api" })
         assert.equal(resolveSiblingImage("api", { image: "own/api:2" }, definition), "own/api:2")
-        assert.equal(resolveSiblingImage("api", {}, definition), "todo-app/api")
+        assert.equal(resolveSiblingImage("api", {}, definition), "shop/api")
         assert.throws(() => resolveSiblingImage("billing", {}, definition), /services\.billing.*api/)
     })
 })

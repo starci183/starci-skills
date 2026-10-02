@@ -1,5 +1,5 @@
 /**
- * Twin tests for the projection laws (R141 `BE_PROJECTION_WRITE_OWNER`, R142 `BE_PROJECTION_SHAPE`).
+ * Twin tests for the projection laws (R161 `BE_PROJECTION_WRITE_OWNER`, R162 `BE_PROJECTION_SHAPE`).
  *
  *   node --test projections.spec.mjs
  *

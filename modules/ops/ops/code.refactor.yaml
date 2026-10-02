@@ -26,7 +26,7 @@ params:
     default: false
     setBy: kernel
     doc:
-      en: "True on the ONE serial canon-wire leg per wave of a canon cut (scripts/kernel/cut-seam.mjs
+      en: "True on the ONE serial canon-wire leg per wave of a canon cut (scripts/kernel/seam-policy.mjs
         canonCutPlanOf): it owns the shared root config (package.json, lockfile, tsconfig, eslint config, hfs.json;
         policy.canonConformance.sharedRoots is empty, owners are derived from slots), the consumers the slices listed as owedToWire and
         the contested relocations, and runs after every slice of its wave."
@@ -35,16 +35,10 @@ params:
     default: ''
     setBy: kernel
     doc:
-      en: "The commit a redone slice starts from: the head its blocked or failed attempt committed
-        (scripts/kernel/cut-seam.mjs canonRedispatchOf). Empty starts from the checkout as it is."
-  admissionBase:
-    type: string
-    default: ''
-    setBy: kernel
-    doc:
-      en: "The admission commit of a redone slice's first attempt: the gate.mjs --base and the
-        canon-before tree, so the work params.resumeFrom keeps is still measured. Empty means this
-        attempt records its own admission commit."
+      en: "The preserved work a redone slice continues from: refs/heads/preserved/<workflow>/<job>, the
+        snapshot the runtime kept of its blocked or failed attempt's owned paths at settle (ops never
+        commit; scripts/kernel/seam-policy.mjs preservedRefOf, canonRedispatchOf). Empty starts from the
+        checkout as it is."
 nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:
@@ -207,10 +201,10 @@ steps:
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
         output. Where the slice lives in a checked app side and context.cut is present,
-        record the slice's admission commit before editing (params.admissionBase when it is set;
-        with params.resumeFrom set, first bring that commit into the checkout - cherry-pick it, or
-        git apply its indexed patch - and continue from the findings it left, never redoing its
-        committed work) and run node scripts/gates/gate.mjs
+        record the slice's admission commit (git rev-parse HEAD) before editing (with
+        params.resumeFrom set, first apply that preserved work to your owned paths - git diff
+        <resumeFrom>^ <resumeFrom> -- <owned paths> | git apply - and continue from the findings it
+        left, never redoing it) and run node scripts/gates/gate.mjs
         --root ROOT --base <slice admission commit> --changed <owned paths>
         BEFORE the first edit. It gates only the slice's new findings. Without context.cut,
         run the whole-repository hfs lint --format json at ROOT
@@ -407,7 +401,7 @@ blockers:
         not blocked - it moves what it owns (its relocation grants are in its owned paths), commits,
         and reports done listing each such finding as owedToWire [{path, finding}]; the wave's
         canon-wire leg lands it. A canon slice that still settles blocked is followed up by settle
-        itself (scripts/kernel/cut-seam.mjs canonSettleFollowUpOf) - a continuation from its commit
+        itself (scripts/kernel/seam-policy.mjs canonSettleFollowUpOf) - a continuation from its commit
         (params.resumeFrom) owning the destinations its report names, and the shared, config and
         public-entry paths go to the canon-wire leg.
   - code: REQUIREMENT_UNSETTLED
@@ -518,7 +512,7 @@ policy:
     partition: the cut is canon-scan's slices over the whole repository - one job per slice with its paths as owned paths and the same params.canonFamilies, the foundation wave settled before the shared wave and the shared wave before the surfaces wave
     excluded: paths another running workflow owns go to canon-scan --exclude and stay unsliced until it finishes
     lintSource: canon-scan resolves the repository's canon package import to this runtime's packages/eslint source, so the slice needs no published canon
-    # scripts/kernel/cut-seam.mjs canonCutPlanOf reads these: the relocation a finding needs (the file
+    # scripts/kernel/seam-policy.mjs canonCutPlanOf reads these: the relocation a finding needs (the file
     # that moves - the finding's own file or its related import target - lands in <src>/<into>/<Owner>; the
     # role is the folder under src) is GRANTED to the slice at enqueue unless a sibling holds it.
     # sharedRoots is empty: HFS has no shared registration file (owners are derived from slots);

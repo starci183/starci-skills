@@ -37,7 +37,7 @@ files:
     template: saga/saga.service.ts.tpl
     role: "The orchestrator. A `*.service.ts` because a handler injects only services; unit-tested beside it. It lists the steps and compensations, imports them all and moves the run through `platform/saga` (a transition names the version it read)."
     suffix: saga.service
-    rules: [R149, R150]
+    rules: [R169, R170]
   - path: src/features/saga/<saga>/<saga>.saga.service.spec.ts
     slot: be.feature.saga
     template: saga/saga.service.spec.ts.tpl
@@ -47,7 +47,7 @@ files:
     template: saga/saga.state.ts.tpl
     role: "The typed state of a run, with `status` and `version: number`, the fence."
     suffix: saga-state
-    rules: [R150]
+    rules: [R170]
   - path: src/features/saga/<saga>/<saga>.saga.log-events.ts
     slot: be.feature.saga
     template: saga/saga.log-events.ts.tpl
@@ -57,13 +57,13 @@ files:
     template: saga/saga.step.ts.tpl
     role: "One step. Names its event (`readonly event = \"<name>\"`); the domain does the work and announces the event in its transaction."
     suffix: step
-    rules: [R149, R151]
+    rules: [R169, R171]
   - path: src/features/saga/<saga>/compensations/<step>.compensation.ts
     slot: be.feature.saga.compensations
     template: saga/saga.compensation.ts.tpl
     role: "The compensation of the step of the same name; REQUIRED for every step. Names the failure event and dispatches one command."
     suffix: compensation
-    rules: [R149, R151, R153]
+    rules: [R169, R171, R173]
   - path: src/features/saga/<saga>/application/undo-<saga>.command.ts
     slot: be.feature.application
     template: saga/saga.undo.command.ts.tpl
@@ -114,13 +114,13 @@ files:
     template: saga/saga.failed.consumer.ts.tpl
     role: "A thin door that hands the failure delivery, with its `eventId`, to the compensate command; the saga takes it through the inbox."
     suffix: consumer
-    rules: [R80, R88, R152]
+    rules: [R80, R88, R172]
   - path: src/features/saga/<saga>/transport/message/<done>.consumer.ts
     slot: be.transport.message
     template: saga/saga.done.consumer.ts.tpl
     role: "A thin door that hands the delivery of the last event, with its `eventId`, to the complete command; the saga takes it through the inbox."
     suffix: consumer
-    rules: [R80, R88, R152]
+    rules: [R80, R88, R172]
   - path: src/features/saga/<saga>/transport/message/<saga>-message.module.ts
     slot: be.transport.message
     template: saga/saga.message.module.ts.tpl
@@ -128,24 +128,24 @@ files:
   - path: be/contracts/<service>/events.json
     slot: be.contract.events
     role: 'Every event of the saga, emitted from the publisher''s events.ts; a compensating event declares `compensates`.'
-    rules: [R146, R151]
+    rules: [R166, R171]
     optional: true
   - path: src/modules/platform/saga/
     slot: be.platform
     role: 'The shared store: `saga_states` (status and version fence) and the event claims, with the state machine in `saga.service.ts` (unit-tested to 100%).'
-    rules: [R150, R80]
+    rules: [R170, R80]
     optional: true
   - path: src/tests/e2e/<area>/<name>.e2e-spec.ts
     slot: be.tests.e2e
     suffix: e2e-spec
     role: One spec per compensation path that names the compensation event and injects a failure through the world (an infra or app outage, a fake's failNext), then reads the compensated state back; plus one spec from the api call to the final state.
-    rules: [R153, R147]
+    rules: [R173, R167]
     optional: true
 rules:
   - id: BE-SAGA-1
     title: Every step has a compensation, and the orchestrator lists them all
     kind: mandatory
-    hfsRules: [R149]
+    hfsRules: [R169]
     requirement: |-
       A saga is `be/src/features/saga/<saga>/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
       `compensations/<step>.compensation.ts`: every step has a compensation of the same name and every compensation a step,
@@ -168,7 +168,7 @@ rules:
   - id: BE-SAGA-2
     title: The state of a run is typed, versioned and moved only through the fenced store
     kind: mandatory
-    hfsRules: [R150, R80, R152]
+    hfsRules: [R170, R80, R172]
     requirement: |-
       `<saga>.saga-state.ts` exports the state type with `status` and `version: number`. The orchestrator moves a run only
       through `platform/saga`: a transition names the version it read and moves it by one, and takes its event through the
@@ -191,7 +191,7 @@ rules:
   - id: BE-SAGA-3
     title: Every event of a step or compensation is in a vendored contract
     kind: mandatory
-    hfsRules: [R151, R146]
+    hfsRules: [R171, R166]
     requirement: |-
       A step and a compensation each declare `readonly event = "<name>"`; both events are declared in a vendored contract
       (`be/contracts/<service>/events.json`), and the contract of the compensation's event declares `compensates: "<event of
@@ -213,7 +213,7 @@ rules:
   - id: BE-SAGA-4
     title: Every compensation path has an e2e spec that injects a failure
     kind: mandatory
-    hfsRules: [R153, R147]
+    hfsRules: [R173, R167]
     requirement: |-
       For each compensation, `be/src/tests/e2e/<area>/*.e2e-spec.ts` boots the real apps through `useTestWorld`, names the
       compensation's event, injects a failure through the world (`during`, `cut` or `latency` of an infra service or an app, a

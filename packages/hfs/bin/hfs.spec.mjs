@@ -11,4 +11,5 @@ test('the hfs CLI loads with no installed dependency and refuses a missing verb 
   assert.equal(code, 2);
   assert.match(err, /^hfs check /m);
   assert.match(err, /^hfs scaffold app <name>/m);
+  assert.match(err, /^hfs secret list/m);
 });

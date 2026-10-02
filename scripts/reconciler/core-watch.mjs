@@ -26,17 +26,21 @@
 // scheduler in this script.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
+import { probe } from '../api/http/probe.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { claudeDebugSettings } from '../../engine/config.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { parseWorktreeList } from '../housekeeping/hk-lanes.mjs';
 import { orphanLedgerFindings } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { parseRuntimeStamp } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HEARTBEAT_STALE_MS = 90_000;
@@ -46,10 +50,8 @@ const LEG_BAD = /failed|blocked|cancel/;
 
 /** A read-only child call that always ends: {ok, stdout, error}. Never throws. */
 export function child(args, { timeoutMs, cwd = ROOT } = {}) {
-  return new Promise((resolve) => {
-    execFile(process.execPath, args, { cwd, encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024, windowsHide: true },
-      (error, stdout, stderr) => resolve({ ok: !error, stdout: stdout ?? '', error: error ? (error.killed ? `timeout ${Math.round(timeoutMs / 1000)}s` : `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').filter(Boolean).pop()?.slice(0, 200)}`) : null }));
-  });
+  return execNode(args, { cwd, timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 })
+    .then(({ error, stdout, stderr }) => ({ ok: !error, stdout: stdout ?? '', error: error ? (error.killed ? `timeout ${Math.round(timeoutMs / 1000)}s` : `exit ${error.code}: ${String(stderr || error.message).trim().split('\n').filter(Boolean).pop()?.slice(0, 200)}`) : null }));
 }
 
 /** The first balanced JSON object in text (a verb may print a banner before it), or null. */
@@ -66,11 +68,9 @@ export function firstJson(text) {
 }
 
 async function httpProbe(url, timeoutMs) {
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-    await r.arrayBuffer().catch(() => null);
-    return r.status === 200 ? null : `HTTP ${r.status}`;
-  } catch (e) { return e?.name === 'TimeoutError' ? `timeout ${Math.round(timeoutMs / 1000)}s` : `unreachable (${e?.cause?.code ?? e?.message ?? e})`.slice(0, 120); }
+  const r = await probe(url, { timeoutMs });
+  if (r.state === 'answered') return r.status === 200 ? null : `HTTP ${r.status}`;
+  return r.state === 'hung' || r.code === 'CONNECT_TIMEOUT' ? `timeout ${Math.round(timeoutMs / 1000)}s` : `unreachable (${r.code})`.slice(0, 120);
 }
 
 /* ------------------------------------------------------------ fact collectors: each returns Map<key, alertText|null> */
@@ -199,8 +199,8 @@ function ledgerFacts() {
 }
 
 /** `git worktree list` of `repo` as [{path, branch, prunable, ...}], or null when git refuses. */
-function worktreesOf(repo, git = gitResult) {
-  const r = git(['worktree', 'list', '--porcelain'], { cwd: repo });
+function worktreesOf(repo) {
+  const r = gitResultOf(worktreeListQuery(['--porcelain'], { cwd: repo }));
   return r.ok ? parseWorktreeList(r.stdout) : null;
 }
 
@@ -242,9 +242,9 @@ function entryCount(dir) { try { return fs.readdirSync(dir).length; } catch { re
  * Main-checkout integrity of the runtime repository checkout `main`: tracked files deleted from the working tree (a
  * worktree removal through a junction empties it), and node_modules / packages/node_modules missing or empty. Read only.
  */
-export function integrityFacts(main, { git = gitResult } = {}) {
+export function integrityFacts(main, { git = (args, opts) => gitResultOf(lsFiles(args, opts)) } = {}) {
   const facts = new Map();
-  const deleted = git(['ls-files', '--deleted'], { cwd: main });
+  const deleted = git(['--deleted'], { cwd: main });
   if (!deleted.ok) facts.set('integrity:tracked-deleted', `git ls-files --deleted failed in ${main}: ${deleted.error}`);
   else {
     const files = deleted.stdout.split(/\r?\n/).filter(Boolean);
@@ -323,4 +323,4 @@ async function main(argv = process.argv.slice(2)) {
   else console.log(snap.alerts.length ? snap.alerts.map((a) => `[core-watch] ALERT ${a.key}: ${a.text}`).join('\n') : `[core-watch] OK (${snap.facts} facts, no alert)`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();

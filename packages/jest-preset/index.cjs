@@ -7,17 +7,19 @@ const { fakeCache } = require("./cache.cjs")
 const { fakeLock } = require("./lock.cjs")
 const { recordingEventBus } = require("./event-bus.cjs")
 const { recordingQueueOutbox } = require("./queue.cjs")
+const { fakeInbox } = require("./inbox.cjs")
 const { builder } = require("./builders.cjs")
 const { fakeIds, FakeIds } = require("./ids.cjs")
 
 /**
- * Coverage is measured on services only: the one place business logic lives (owner-locked unit standard). Handlers,
- * resolvers, controllers and consumers are thin, and helpers called by a service are covered through the service's own
- * spec, so every `*.service.ts` under `src` is the whole denominator and every file in it must reach 100 on every metric.
+ * Coverage is measured where logic runs: every service (the one place business logic lives, owner-locked unit standard) and
+ * every cli command of the cli feature root (`src/features/cli/**` + `/*.cli.ts`: an action runner, R149). Handlers, resolvers,
+ * controllers and consumers are thin, and helpers called by a service are covered through the service's own spec, so the
+ * services and the cli commands under `src` are the whole denominator and every file in it must reach 100 on every metric.
  * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
  * (`sonar.coverage.exclusions` holds every other file, rendered by hfs sync) and its quality gate holds coverage at 100 on those files.
  */
-const COVERAGE_SOURCES = ["src/**/*.service.ts"]
+const COVERAGE_SOURCES = ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts"]
 const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]
 /** The four metrics, each held at 100 per file. */
 const COVERAGE_THRESHOLD = Object.freeze({ lines: 100, branches: 100, functions: 100, statements: 100 })
@@ -86,8 +88,8 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
  * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
- * run their spec files one at a time, each in a worker process of its own (`world-runner.cjs`; every file shares the
- * run's data, so the runner never runs two at once); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
+ * run their spec files up to `min(--maxWorkers, slots)` at once, each in a worker process of its own bound to one data slot
+ * of the test world (`world-runner.cjs`; a slot's data is reset when a file boots, so no two files ever share a slot); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
  * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
  * statements: the `test` script runs the unit project with `--coverage`, fails below it and writes `coverage/lcov.info` for Sonar. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
@@ -98,6 +100,24 @@ const WORLD_RUNNER = require.resolve("./world-runner.cjs")
 /** True when the repository at `root` has the test world's global setup (`src/tests/world/global-setup.ts`). */
 function hasTestWorld(root) {
   return require("node:fs").existsSync(require("node:path").join(root, "src", "tests", "world", "global-setup.ts"))
+}
+
+/**
+ * True when the repository at `root` holds a file of the coverage source `glob` (`<dir>/**` + `/*.<role>.ts`): jest refuses a
+ * threshold key that matches no covered file, and a back end may have no cli command yet, so a role without files gets no key
+ * (its files, once added, are measured and held at 100 like every other).
+ */
+function hasCoverageSubjects(root, glob) {
+  const fsx = require("node:fs")
+  const pathx = require("node:path")
+  const base = glob.slice(0, glob.indexOf("**")).replace(/\/$/, "")
+  const suffix = glob.slice(glob.lastIndexOf("*") + 1)
+  const walk = (dir) => {
+    let entries
+    try { entries = fsx.readdirSync(dir, { withFileTypes: true }) } catch { return false }
+    return entries.some((entry) => (entry.isDirectory() ? !["node_modules", "dist", "coverage"].includes(entry.name) && walk(pathx.join(dir, entry.name)) : entry.name.endsWith(suffix)))
+  }
+  return walk(pathx.join(root, base))
 }
 
 function starciJestConfig() {
@@ -125,7 +145,7 @@ function starciJestConfig() {
     coverageProvider: "v8",
     collectCoverageFrom: collectCoverageFrom(),
     // A glob key is applied to every matching file on its own: each service file must reach 100, not the average.
-    coverageThreshold: { "./src/**/*.service.ts": { ...COVERAGE_THRESHOLD } },
+    coverageThreshold: Object.fromEntries(COVERAGE_SOURCES.filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
     coverageDirectory: "coverage",
     // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads.
     coverageReporters: ["text-summary", "text", "lcov"],
@@ -161,12 +181,14 @@ module.exports = {
   fakeLock,
   recordingEventBus,
   recordingQueueOutbox,
+  fakeInbox,
   builder,
   fakeIds,
   FakeIds,
   collectCoverageFrom,
   sonarExclusions,
   COVERAGE_SOURCES,
+  hasCoverageSubjects,
   COVERAGE_EXCLUDES,
   COVERAGE_THRESHOLD,
   UNIT_COMPILER_OPTIONS,

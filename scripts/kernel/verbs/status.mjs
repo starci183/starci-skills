@@ -1,6 +1,5 @@
 // api status: workflow projection, action frontier, and bounded host reads.
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { sameUnit } from '../../../engine/admission.mjs';
 import { runtimeProfile } from '../../../engine/config.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../../machine/owner-claim.mjs';
@@ -12,11 +11,11 @@ import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW, jobResultSql } from '../../machine/job-row.mjs';
 import { getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal } from './shared/rows.mjs';
 import { kernelSeatOf } from './shared/kernel-seat.mjs';
-import { drainWorkflowMessages, workerQuestionsOf } from './shared/messages.mjs';
-import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './shared/peers.mjs';
+import { drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
+import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from './shared/peer-waits.mjs';
 import { hostThrottle, throttleSummary } from '../../machine/ram-throttle.mjs';
 import { askClassOf, isLiveProofOp, parkAsk } from '../ask-server.mjs';
-import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, SUPERVISOR_GATE, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialsOwed, deferralOf, deferredLegsOf, provisionalOps, reopenedOwed } from '../autopilot.mjs';
+import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, SUPERVISOR_GATE, autopilotOn, autopilotProjection, autopilotSettings, autopilotSweep, credentialsOwed, deferralOf, deferredLegsOf, provisionalOps, reopenedOwed } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 import { OP_REV_DRIFT, kernelRevState, opRevDrift, revRootOf, shortRev } from '../runtime-rev.mjs';
 import { ownerSpecs, deferredTestsOf, specsOff } from '../../route/spec-deferral.mjs';
@@ -49,7 +48,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // A typed condition that can no longer hold (the awaited job settled failed under :succeeded, a
   // named job or incident is gone) is the Kernel's to re-point: actionable, like a dead peer wait.
   const typedUnmeetable = typedWaits.open.filter((incident) => incident.unmeetable.length > 0);
-  // Autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
+  // Autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28): on every status - so every watchdog tick -
   // pending asks are answered provisionally or deferred to handover, owner gates re-routed to the Supervisor, timed-out
   // supervisor gates deferred and budgets checked, before anything below is projected. Never fails the read.
   const autopilotSettingsNow = autopilotSettings();
@@ -290,8 +289,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   }
   const heldWorkers = heldSettle.filter((item) => item.worker === 'held').map((item) => item.jobId);
   // A queued dependant whose chain ends in a job a recorded wait holds (queued, or its settle deferred) is
-  // parked behind that wait, not engaged work (scripts/kernel/frontier-parked.mjs; starci-next
-  // inc-56d621d6359e): it keeps queuedBecause dependency and names the wait in parkedBehind.
+  // parked behind that wait, not engaged work (scripts/kernel/frontier-parked.mjs): it keeps
+  // queuedBecause dependency and names the wait in parkedBehind.
   const parkedBehind = parkedBehindWaits(queued, heldSettle);
   for (const item of queued) {
     const root = parkedBehind.get(item.jobId);
@@ -363,13 +362,13 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     : wf.phase === 'running' && askReserve.length > 0 ? 'ask-reserve'
     // An open owner-gate incident waits on the owner too, even with no job to
     // hold yet (a leg whose first job cannot be enqueued before the owner
-    // decides - a StarCi Next frontend waiting on brand, inc-103f2028ba77).
+    // decides - a frontend workflow waiting on a peer's brand leg).
     : wf.phase === 'running' && (approvalOwner.length > 0 || credentialWait || ownerGates.some((gate) => gate.kind !== SUPERVISOR_GATE)) ? 'awaiting-owner'
     // Autopilot: a supervisor-gate is the Supervisor's step; the Kernel has nothing to move until it resolves.
     : wf.phase === 'running' && ownerGates.length > 0 ? 'supervisor-wait'
     // A typed wait on a peer workflow (api incident --kind peer-wait): the next approved step cannot
     // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
-    // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing (inc-0aebf976e625).
+    // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing.
     : wf.phase === 'running' && peerWaits.length > 0 ? 'peer-wait'
     : wf.phase === 'running' && handover.due ? 'handover-due'
     : wf.phase === 'running' ? 'orphaned-frontier'
@@ -593,7 +592,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // leg's and next step's op label, and the op-job name of a step that names its job. Ids stay the keys.
   const title = workflowDisplayName(wf);
   const nameCache = new Map();
-  // Autopilot keeps its own status word beside the op label (green-provisional: tự nhận tạm; deferred).
+  // Autopilot keeps its own status word beside the op label (green-provisional: PROVISIONAL_LABEL; deferred).
   for (const leg of graph.legs) leg.label = leg.label ? `${opLabel(leg.op)} · ${leg.label}` : opLabel(leg.op);
   for (const action of graph.nextActions) {
     action.label = opLabel(action.op);

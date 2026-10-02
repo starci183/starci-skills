@@ -21,9 +21,9 @@ import { worktreeCreate } from '../api/orca/worktree-create.mjs';
 import { worktreeRm } from '../api/orca/worktree-rm.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { repoAdd } from '../api/orca/repo-add.mjs';
-import { removeLinksUnder } from '../api/fs/safe-remove.mjs';
+import { removeLinksUnder } from '../api/fs/remove-links-under.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
-import { deleteBranch } from '../api/git/branch-delete.mjs';
+import { branchDelete } from '../api/git/branch-delete.mjs';
 
 /**
  * The Orca worktree calls the runtime makes, as one client object: createOrcaWorktree and removeOrcaWorktree take it as
@@ -154,7 +154,7 @@ export function removeOrcaWorktree({ repoRoot, orcaId, dir, branch = null, delet
     return { ...out, reason };
   }
   if (branch && mode && revParse(home, `refs/heads/${branch}`)) {
-    const deleted = deleteBranch({ repoRoot: home, branch, mode, main, git });
+    const deleted = branchDelete({ repoRoot: home, branch, mode, main, git });
     out.branch.deleted = deleted.ok;
     if (!deleted.ok) { markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env }); return { ...out, reason: 'branch-delete-failed', detail: deleted.detail }; }
   } else if (out.branch) out.branch.deleted = !revParse(home, `refs/heads/${branch}`);

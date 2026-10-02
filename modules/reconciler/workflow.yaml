@@ -1,8 +1,8 @@
 # workflow.yaml — the Workflow controller (lane rc-sla-workflow): scripts/reconciler/controllers/workflow.mjs.
 #
-# Design: D:/starci-tmp/reconciler-design/DESIGN.md §8.2 (Workflow controller), §9.2 (the workflow state machine and
+# Design: <tmp>/reconciler-design/DESIGN.md §8.2 (Workflow controller), §9.2 (the workflow state machine and
 # its SLA table), §10.3-§10.4 (Decision Item, doorbell), §17.1 (one stall detector, findings become DIs). Engine
-# contract: D:/starci-tmp/reconciler-design/LANES.md "Shared contract" (controller module, ctx, CONCERNS).
+# contract: <tmp>/reconciler-design/LANES.md "Shared contract" (controller module, ctx, CONCERNS).
 #
 # Mode: config.yaml reconciler.controllers.workflow.mode (off | shadow | active; lane rc-engine). In shadow every
 # api call, DI and doorbell is a would-row (ctx.api / ctx.openDecision); SLA clocks are recorded in every mode.

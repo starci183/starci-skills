@@ -9,7 +9,7 @@ import { ensureHistoryHook, writeJobGuard, bindGuardTerminal, unbindGuardTermina
 import { commandVerdict } from '../../scripts/guards/command-guard.mjs';
 import { normalizeOwnedPath, ownedPathspec } from '../../engine/admission.mjs';
 
-// nivo-fe inc-21f76abb6d10: the op git guard refused `git add` and `git commit` of the op's OWN paths under
+// Live defect: the op git guard refused `git add` and `git commit` of the op's OWN paths under
 // Next.js App Router segments (apps/app/src/app/[locale]/(console)/..., [workspaceId], [templateKey]) with
 // PATH_NOT_OWNED - it cut every pathspec at its first `[` as a glob, so `src/app/[locale]/x` was scoped to
 // `src/app/`, outside the grant. Owned-path admission (engine/admission.mjs) reads such a segment as a
@@ -20,7 +20,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const GRANTS = ['src/app/[locale]', 'src/app/[...slug]', 'src/app/[[...opt]]', 'src/app/(group)', 'src/app/@slot'];
 const FILES = [
   'src/app/[locale]/(console)/route-pages.spec.tsx',
-  'src/app/[locale]/(console)/agentos/workspaces/[workspaceId]/modules/page.spec.tsx',
+  'src/app/[locale]/(console)/my-app/workspaces/[workspaceId]/modules/page.spec.tsx',
   'src/app/[locale]/(console)/(.)[photoId]/page.tsx',
   'src/app/[...slug]/page.tsx',
   'src/app/[[...opt]]/page.tsx',
@@ -31,7 +31,7 @@ const FILES = [
 const PEER = ['src/app/l/page.tsx', 'src/app/(auth)/sign-in/page.tsx'];
 
 test('App Router segments in owned paths are literal names to the guard, as to admission', () => {
-  const cwd = path.resolve(os.tmpdir(), 'nivo-fe');
+  const cwd = path.resolve(os.tmpdir(), 'todo-app-fe');
   for (const grant of GRANTS) assert.equal(normalizeOwnedPath(grant), grant, `admission admits ${grant} literally`);
   const owned = GRANTS.map((g) => path.join(cwd, g));
   const ctx = { cwd, owned, top: cwd };

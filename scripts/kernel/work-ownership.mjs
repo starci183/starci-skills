@@ -1,11 +1,11 @@
 // work-ownership.mjs — who owns a shared product Work record, which revision of it is committed, and
 // what its owner declared about a change.
 //
-// Owner, 2026-09-25 (starci-next inc-1c7f7dad53e0): three workflows on one ledger (sn-foundation,
-// sn-learn-content, sn-subscription) share Work records - challenges, commerce/br/single-subscription,
-// the learning-paths foundation contract. Work-input staleness listed a settled job whenever a record
+// Owner, 2026-09-25: three workflows on one ledger share Work records - challenges,
+// commerce/br/single-subscription, the learning-paths foundation contract. Work-input staleness
+// listed a settled job whenever a record
 // it read changed from outside its workflow, so every peer rewrite re-staled settled work, the
-// Kernels redid it, the redo rewrote records and re-staled the peers: sn-subscription redid its
+// Kernels redid it, the redo rewrote records and re-staled the peers: one workflow redid its
 // scope 5 times and its business seam 6. The versioned rollout that settled Source drift
 // (2af07d02a) now reaches cross-workflow Work records:
 //
@@ -22,7 +22,7 @@
 // Owner rule (ownerOf), the first that names a LIVE workflow (not finished, not archived):
 //   0 transfer      the [Supervisor] transferred the record or a directory above it (scripts/supervisor/
 //                   bridge.mjs transfer --record; signals scope ownership-transfer, provisional under autopilot)
-//   1 foundation    a shared foundation's owner (scripts/kernel/foundations.mjs): a brand foundation
+//   1 foundation    a shared foundation's owner (scripts/kernel/foundation-registry.mjs): a brand foundation
 //                   owns .starciwork/brand, a layout-tree .starciwork/shell, and any foundation owns
 //                   the record directory named after it under a `foundation/` segment
 //                   (features/commerce/contract/foundation/entitlement-contract).
@@ -37,23 +37,22 @@
 //                   layout-tree or brand foundation (in that order), else its oldest live workflow.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { catFile } from '../api/git/cat-file.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { readFoundations } from './foundations.mjs';
+import { readFoundations } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
+import { workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
 export const TRANSFER_SCOPE = 'ownership-transfer';
 export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
 /** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
 export const readTransfers = (db) => db.prepare("SELECT detail_json FROM path_transfers WHERE state='applied' ORDER BY path").all()
   .map((row) => parseJson(row.detail_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
-export const RECORD_CHANGE_SCOPE = 'record-change';
 export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
 export const RECORD_CHANGE_REACHES = Object.freeze(['follow-up', 'advisory']);
-export const OWNER_SOURCES = Object.freeze(['transfer', 'foundation', 'scope-record', 'scope-node', 'cut', 'repo-owner']);
 const WORK_PREFIX = '.starciwork/';
 const REPO_OWNER_KINDS = ['baseline', 'scaffold', 'layout-tree', 'brand'];
 const FOUNDATION_ROOTS = { brand: '.starciwork/brand', 'layout-tree': '.starciwork/shell' };
@@ -192,7 +191,7 @@ export function committedReader(repo, { workDir = '.starciwork' } = {}) {
     const out = new Map();
     if (!wanted.length) return out;
     const input = `HEAD:./${dir}\n${wanted.map((rel) => `HEAD:./${dir}/${rel.slice(WORK_PREFIX.length)}`).join('\n')}\n`;
-    const r = runGit(['cat-file', '--batch'], { dir: repo, input, encoding: null, timeout: 60000, maxBuffer: 512 * 1024 * 1024 });
+    const r = catFile(['--batch'], { dir: repo, input, encoding: null, timeout: 60000, maxBuffer: 512 * 1024 * 1024 });
     if (r.status !== 0 || !Buffer.isBuffer(r.stdout)) return null;
     const buf = r.stdout;
     let pos = 0;
@@ -213,6 +212,24 @@ export function committedReader(repo, { workDir = '.starciwork' } = {}) {
       out.set(rel, body?.type === 'blob' ? body.bytes : null);
     }
     return out;
+  };
+}
+
+/**
+ * The committed reader of workflow `workflowId` (WFWT2 2.8, the one rule for Work records): a record it owns (ownerOf) is
+ * read at its own workflow branch - the HEAD of its live workflow worktree, where the runtime checkpoints its records -
+ * so its later settles see its own records before it lands; every other record is read at the ledger checkout's HEAD
+ * (main): a peer sees a record when its owner lands. Same contract as committedReader. `worktree`: the workflow
+ * worktree's path (default: the registry's live one), null for none.
+ */
+export function workflowCommittedReader({ repo, workDir = '.starciwork', workflowId, ownerOf, worktree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? null }) {
+  const main = committedReader(repo, { workDir });
+  if (!worktree || !workflowId) return main;
+  const own = committedReader(worktree, { workDir });
+  return (rels) => {
+    const mine = rels.filter((rel) => ownerOf(rel)?.workflowId === workflowId);
+    const a = own(mine), b = main(rels.filter((rel) => !mine.includes(rel)));
+    return a === null || b === null ? null : new Map([...b, ...a]);
   };
 }
 

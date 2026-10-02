@@ -17,8 +17,8 @@ import { getSupervisor, supervisorOnline } from './telegram-bridge.mjs';
 import { appendInbox, readInbox, readOutbox } from '../machine/sup-messages.mjs';
 import { SUPERVISOR_ID } from '../machine/home.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const DEFAULT_WAIT_MS = 15 * 60_000;
 
 /** File `text` for the Supervisor. Returns {ok, id, online}. */
@@ -84,4 +84,4 @@ async function main() {
   if (!reply) process.exitCode = 124;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) main();
+if (isMain(import.meta.url)) main();

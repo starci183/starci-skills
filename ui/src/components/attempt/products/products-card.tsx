@@ -8,6 +8,7 @@ import { PathLink } from '../../path-link';
 import { FileTypeBadge } from '../../status-chip';
 import { Card, Empty } from '../frame/card';
 import { formatBytes } from '../frame/util';
+import { t } from '../../../i18n/t';
 import { isManifestFile } from '../result/manifest';
 import { ProductRow } from './product-row';
 import { useProducts } from './use-products';
@@ -35,50 +36,50 @@ function KeyEvidence({ file, authorOp, defaultOpen }: { file: EvidenceFileV3; au
   const id = `key-${file.artifactId}`;
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
-      <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)} className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" title={open ? 'Thu gọn' : 'Mở'}>
+      <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)} className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" title={open ? t('Collapse') : t('Open')}>
         <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       </button>
       <span className="min-w-0 flex-1 break-all text-sm font-medium">{file.base}</span>
       {file.schema && SCHEMA_LABELS[file.schema] ? <span className="rounded border px-2 text-[11px] text-muted-foreground" title={file.schema}>{SCHEMA_LABELS[file.schema]}</span> : null}
       <FileTypeBadge kind={file.kind} />
       <span className="text-xs tabular-nums text-muted-foreground">{formatBytes(file.bytes)}</span>
-      <PathLink path={file.hostPath} kind="file" label="mở" />
+      <PathLink path={file.hostPath} kind="file" label={t('open path')} />
     </div>
     {open ? <div id={id} className="mt-2 min-w-0"><EvidenceSchemaView file={file} authorOp={authorOp} /></div> : null}
   </li>;
 }
 
-/** Block 5 "Sản phẩm (đầu ra thật)": the repo files the op wrote (content + diff) and its key evidence. */
+/** Block 5 "Products (real output)": the repo files the op wrote (content + diff) and its key evidence. */
 export function ProductsCard({ project, attempt }: { project: string; attempt: AttemptDetailV3 }) {
   const { products, loading, fallback } = useProducts(project, attempt);
   const key = keyFiles(attempt);
   const files = products?.files ?? [];
   const other = products?.otherChanged ?? [];
-  const commit = products?.head ? <span className="text-xs text-muted-foreground">commit <code className="font-mono text-foreground" title={products.head}>{short(products.head)}</code>{products.parent ? <> · cha <code className="font-mono" title={products.parent}>{short(products.parent)}</code></> : null}</span> : null;
-  return <Card id="attempt-products" concept="C8" title="Sản phẩm (đầu ra thật)" hint="Tệp op đã ghi vào repo và bằng chứng chính">
+  const commit = products?.head ? <span className="text-xs text-muted-foreground">commit <code className="font-mono text-foreground" title={products.head}>{short(products.head)}</code>{products.parent ? <>{t(' · parent')} <code className="font-mono" title={products.parent}>{short(products.parent)}</code></> : null}</span> : null;
+  return <Card id="attempt-products" concept="C8" title={t('Products (real output)')} hint={t('Files the op wrote to the repo and the key evidence')}>
     <div className="grid min-w-0 gap-6">
       <section className="min-w-0">
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h3 className="m-0 text-sm font-medium">Tệp op đã ghi vào repo</h3>
-          {files.length ? <span className="text-xs text-muted-foreground">{files.length} tệp · bấm để xem nội dung</span> : null}
+          <h3 className="m-0 text-sm font-medium">{t('Files the op wrote to the repo')}</h3>
+          {files.length ? <span className="text-xs text-muted-foreground">{t('{n} files · click to view content', { n: files.length })}</span> : null}
         </div>
-        {loading ? <p className="m-0 text-sm text-muted-foreground">Đang đọc tệp của op…</p>
-          : products?.error ? <Empty>Không đọc được commit của op: {products.error}</Empty>
+        {loading ? <p className="m-0 text-sm text-muted-foreground">{t('Reading the op files…')}</p>
+          : products?.error ? <Empty>{t('Could not read the op commit: {error}', { error: products.error })}</Empty>
             : files.length ? <>
-              {fallback ? <p className="mb-3 mt-0 rounded-lg border p-2 text-xs text-muted-foreground" data-tone="warning">Máy chủ chưa có API sản phẩm: chỉ hiện danh sách tệp trong báo cáo và diff từ patch.diff, chưa có nội dung.</p> : null}
+              {fallback ? <p className="mb-3 mt-0 rounded-lg border p-2 text-xs text-muted-foreground" data-tone="warning">{t('The server has no products API yet: only the report file list and the patch.diff diff are shown, no content.')}</p> : null}
               <ul className="m-0 flex list-none flex-col divide-y p-0">{files.map(file => <ProductRow key={file.path} file={file} />)}</ul>
-            </> : <Empty>Op không ghi tệp nào vào repo (báo cáo không liệt kê tệp).</Empty>}
-        {other.length ? <details className="mt-3 rounded-lg border p-3 text-sm"><summary className="cursor-pointer text-muted-foreground hover:text-foreground">Commit này còn đổi {other.length} tệp khác</summary>
+            </> : <Empty>{t('The op wrote no files to the repo (the report lists no files).')}</Empty>}
+        {other.length ? <details className="mt-3 rounded-lg border p-3 text-sm"><summary className="cursor-pointer text-muted-foreground hover:text-foreground">{t('This commit also changed {n} other files', { n: other.length })}</summary>
           <ul className="m-0 mt-2 grid list-none gap-1 p-0 text-xs">{other.map(f => <li key={f.path} className="break-all"><span className="mr-2 text-muted-foreground">{f.status}</span><code className="font-mono">{f.path}</code></li>)}</ul></details> : null}
       </section>
 
-      <Advanced summary={[commit ? `commit ${short(products?.head ?? null)}` : null, `${key.length} tệp bằng chứng chính`].filter(Boolean).join(' · ')}>
+      <Advanced summary={[commit ? `commit ${short(products?.head ?? null)}` : null, t('{n} key evidence files', { n: key.length })].filter(Boolean).join(' · ')}>
         <div className="grid min-w-0 gap-4">
           {commit}
           <section className="min-w-0">
-            <div className="mb-2 flex flex-wrap items-center gap-x-3"><h3 className="m-0 text-sm font-medium">Bằng chứng chính</h3>{key.length ? <span className="text-xs text-muted-foreground">{key.length} tệp</span> : null}</div>
+            <div className="mb-2 flex flex-wrap items-center gap-x-3"><h3 className="m-0 text-sm font-medium">{t('Key evidence')}</h3>{key.length ? <span className="text-xs text-muted-foreground">{t('{n} files', { n: key.length })}</span> : null}</div>
             {key.length ? <ul className="m-0 flex list-none flex-col divide-y p-0">{key.map((file, i) => <KeyEvidence key={file.artifactId} file={file} authorOp={attempt.op} defaultOpen={i === 0 || file.kind === 'markdown'} />)}</ul>
-              : <Empty>{files.length ? 'Op này không ghi tệp bằng chứng riêng; sản phẩm của nó là các tệp repo ở trên.' : 'Op này không có tệp sản phẩm lẫn bằng chứng chính nào để hiển thị.'}</Empty>}
+              : <Empty>{files.length ? t('This op wrote no dedicated evidence files; its products are the repo files above.') : t('This op has no product files or key evidence to show.')}</Empty>}
           </section>
         </div>
       </Advanced>

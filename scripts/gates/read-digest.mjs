@@ -15,7 +15,7 @@
 // Exit 0 recorded, 2 the digest could not be built (a touched path hfs cannot explain is recorded with slot null, not an error).
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
@@ -114,7 +114,7 @@ export async function explainPaths(root, files, hfs = hfsEntry(root)) {
     if (explainPath) {
       try { return explainPath({ repoRoot: root, input: file }); } catch (error) { return { path: file, status: 'unexplained', reason: firstLine(error?.message ?? error) }; }
     }
-    const run = spawnSync(process.execPath, [hfs.bin, 'explain', file, '--repo', root, '--json'], { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+    const run = runNode([hfs.bin, 'explain', file, '--repo', root, '--json'], { cwd: root, maxBuffer: 16 * 1024 * 1024 });
     try { return JSON.parse(run.stdout); } catch { return { path: file, status: 'unexplained', reason: firstLine(run.stderr || run.stdout) }; }
   });
 }

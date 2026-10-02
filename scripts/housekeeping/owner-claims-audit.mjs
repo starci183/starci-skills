@@ -8,7 +8,7 @@
 // Exit 0 nothing found, 1 findings listed, 2 usage or an unreadable ledger.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../machine/owner-claim.mjs';
 
@@ -46,6 +46,6 @@ async function main(argv) {
   return found ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
 }

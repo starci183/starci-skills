@@ -8,9 +8,8 @@
 //      ownerWaits, and peerLeasedJobs reports its leased jobs ({known:true}).
 //   2. A stale in-repo runtime.sqlite beside a registered ledger is never opened: its phantom owner DI and
 //      phantom leased job stay invisible to both readers.
-//   3. A repo with no resolvable ledger stays a quiet skip ({known:false}, no ownerWaits line, no throw), and a
-//      repo the registry never named still reads its lone in-repo store — the only record that checkout has
-//      (compat: pre-Q1 fixtures and never-registered checkouts; a registered ledger is never shadowed by it).
+//   3. A repo with no resolvable ledger is a quiet skip ({known:false}, no ownerWaits line, no throw), and a repo the
+//      registry never named is NOT read through an in-repo store either: ledgerFileFor is the one resolver.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -67,7 +66,7 @@ test('a stale in-repo runtime.sqlite beside a registered ledger is never read', 
   });
 });
 
-test('a repo with no resolvable ledger is a quiet skip, and an unregistered repo keeps its lone in-repo store', async (t) => {
+test('a repo with no resolvable ledger is a quiet skip, and an in-repo store of an unregistered repo is never read', async (t) => {
   await withLedger(t, async () => {
     const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ledger-less-'));
     t.after(() => fs.rmSync(bare, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -76,7 +75,7 @@ test('a repo with no resolvable ledger is a quiet skip, and an unregistered repo
     assert.deepEqual(inputs.progress, []);
     assert.deepEqual(await peerLeasedJobs({ ledgerRepo: bare, workflowId: 'wf-x' }), { known: false, jobs: [] });
 
-    // Compat: the registry never named this checkout, so the pre-Q1 in-repo file is its only ledger.
+    // The registry never named this checkout: an in-repo file is not a ledger, so it contributes nothing.
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-legacy-only-'));
     t.after(() => fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
     fs.mkdirSync(path.join(repo, '.starciwork'));
@@ -86,7 +85,7 @@ test('a repo with no resolvable ledger is a quiet skip, and an unregistered repo
       ownerWait(legacy, 'wf-legacy', 'the only store this checkout has');
     } finally { legacy.close(); }
     const legacyInputs = await digestInputs({ env: process.env, now: 120_000, repos: [repo] });
-    assert.deepEqual(legacyInputs.ownerWaits, ['wf-legacy: the only store this checkout has']);
-    assert.deepEqual((await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-x' })).jobs.map((j) => j.jobId), ['op-old']);
+    assert.deepEqual(legacyInputs.ownerWaits, []);
+    assert.deepEqual(await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-x' }), { known: false, jobs: [] });
   });
 });

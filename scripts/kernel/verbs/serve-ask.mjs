@@ -14,12 +14,13 @@
 //
 //   serve-ask --workflow <id> [--dispatch <id>] [--ttl <ms>] [--now]
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
+import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
 import { ledgerFileFor } from '../../../engine/db/ledger.mjs';
 import { connectorsConfig } from '../../../engine/config.mjs';
 import { getWorkflow } from './shared/rows.mjs';
-import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot.mjs';
+import { AUTOPILOT_BY, PROVISIONAL_LABEL, autopilotAnswerAsk } from '../autopilot-run.mjs';
 import { autoAcceptAsk, closeAskMessages, parkAsk, supersedeEarlierAsks } from '../ask-server.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 
@@ -29,7 +30,7 @@ function ensureAskConnectors() {
   try { cf = connectorsConfig()?.cloudflare ?? null; } catch { return null; }
   if (!cf || cf.mode === 'off') return null;
   const start = (name) => {
-    const r = spawnSync(process.execPath, [path.join(skillRoot, 'scripts', 'connectors', name), 'start'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: 60000 });
+    const r = runNode([path.join(skillRoot, 'scripts', 'connectors', name), 'start'], { cwd: skillRoot, timeout: 60000 });
     try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, status: r.status }; }
   };
   const gateway = start('ask-gateway.mjs'), tunnel = start('tunnel.mjs');
@@ -95,7 +96,7 @@ export default {
     const connectors = parked?.notified ? null : ensureAskConnectors();
     const script = path.join(skillRoot, 'scripts', 'kernel', 'ask-server.mjs');
     const argv = [script, '--repo', repo, '--workflow', workflowId, ...(dispatchId ? ['--dispatch', dispatchId] : []), ...(args.ttl ? ['--ttl', String(args.ttl)] : [])];
-    const child = spawn(process.execPath, argv, { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot });
+    const child = spawnNode(argv, { detached: true, stdio: 'ignore', cwd: skillRoot });
     child.unref();
     const why = parked ? (parked.notified ? 'now' : `telegram: ${parked.telegram?.skipped ?? parked.telegram?.error ?? 'not sent'}`) : null;
     const out = { ok: true, workflowId, dispatchId, pid: child.pid ?? null, servedBy: 'scripts/kernel/ask-server.mjs', onDemand: false, ...(notice ? { telegram: notice } : {}), ...(why ? { servedBecause: why } : {}), ...(connectors ? { connectors } : {}) };

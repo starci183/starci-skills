@@ -1,8 +1,8 @@
 // owner-claim.mjs — an incident resolution that says the owner decided must prove it.
 //
-// Defect (nivo-backend wf-nivo-workspace-provision-mujek7cb): the Kernel resolved the
-// foreign-file-committed incidents inc-2474f6593dfe and inc-f19d118298f1 with "Owner confirmed: ..."
-// while the ledger holds no owner answer, and a settle then took those resolved incidents as the proof
+// Defect (a workspace-provision workflow): the Kernel resolved two
+// foreign-file-committed incidents with "Owner confirmed: ..."
+// while the ledger held no owner answer, and a settle then took those resolved incidents as the proof
 // that the file owner confirmed the paths. `api incident --resolve` took free
 // text and recorded no resolver.
 //
@@ -21,7 +21,7 @@ export const RESOLVERS = Object.freeze(['kernel', 'owner', 'supervisor']);
 export const OWNER_CLAIM_UNPROVEN = 'owner-claim-unproven';
 export const OWNER_GATE_KINDS = Object.freeze(['owner-gate', 'owner-gate-pending']);
 
-/** Lower case, whitespace collapsed, Vietnamese diacritics folded (đ -> d), so "đã xác nhận" and "da xac nhan" read alike. */
+/** Lower case, whitespace collapsed, Vietnamese diacritics folded (the d-with-stroke letter folds to d explicitly, since NFD never decomposes it), so an accented claim and its unaccented form read alike. */
 export const foldText = (text) => String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[đĐ]/g, 'd').toLowerCase().replace(/\s+/g, ' ');
 
@@ -32,15 +32,15 @@ const OWNER_CLAIM_PATTERNS = [
   /\b(?:confirmed|approved|accepted|authori[sz]ed|signed off|ruled|answered|decided|granted)\s+by\s+(?:the\s+)?owner\b/,
   /\bowner[- ](?:approved|confirmed|accepted|authori[sz]ed|sanctioned|ruled)\b/,
   /(?<!\bno )(?<!\bwithout )(?<!\bawaiting )(?<!\bpending )\bowner(?:'s)?\s+(?:ruling|approval|confirmation|sign-?off|consent|answer|go-ahead)\b(?!\s+(?:is\s+)?(?:pending|required|needed|missing|owed|outstanding))/,
-  // Vietnamese: owner đã / chủ dự án xác nhận / thầy duyệt / được owner duyệt / xác nhận của chủ sở hữu
+  // Vietnamese (folded, as matched): owner da / chu du an xac nhan / thay duyet / duoc owner duyet / xac nhan cua chu so huu
   /\bowner da\b/,
   new RegExp(`\\b${SUBJECT_VI}(?:\\/supervisor)?\\s+(?:da\\s+)?(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|chon|quyet dinh|cho phep|phan quyet)\\b`),
   new RegExp(`\\bduoc\\s+${SUBJECT_VI}\\s+(?:xac nhan|duyet|phe duyet|dong y|chap nhan|tra loi|cho phep)\\b`),
   new RegExp(`\\b(?:xac nhan|phe duyet|phan quyet|quyet dinh) cua ${SUBJECT_VI}\\b`),
 ].map((re) => new RegExp(re.source, 'g'));
 
-// A phrase just after a wait, a condition or a negation is not a claim: "chờ chủ sở hữu duyệt", "until the
-// owner approved", "gate không chờ câu trả lời của owner".
+// A phrase just after a wait, a condition or a negation is not a claim: "cho chu so huu duyet", "until the
+// owner approved", "gate khong cho cau tra loi cua owner".
 const NOT_A_CLAIM_BEFORE = /\b(?:cho|chua|can|doi|neu|khi|de|khong|until|awaiting|await|waits?|waiting|pending|if|once|unless|needs?|before|no|not|without)\b[^.;:!?]{0,12}$/;
 
 /** The owner-claim phrase `text` makes (folded), or null. */
@@ -58,8 +58,8 @@ export function ownerClaimOf(text) {
 }
 
 // An owner-gate whose own text says the wait is not the owner's: a runtime limit or defect, a settle the
-// Kernel defers, a supervisor's step (nivo inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "không phải
-// việc owner thực hiện").
+// Kernel defers, a supervisor's step (nivo inc-1d6e73af51cc RUNTIME LIMIT, inc-c85f3b0c1603 "khong phai
+// viec owner thuc hien").
 const NOT_OWNER_WORK = /\bruntime limit\b|\bruntime[- ]defect\b|\bruntime fix\b|\bcho sua (?:source )?runtime\b|\bnot an? owner(?:'s)? (?:step|ask|action|work|task|wait)\b|\bnot owner work\b|\bkhong phai (?:la )?(?:viec|buoc)(?: cua)? (?:owner|chu)|\bkhong phai owner\b|\bdeferred settle\b|\bcho supervisor\b|\bwaits? (?:on|for) (?:the )?supervisor\b/;
 
 /** The phrase that marks an owner-gate's text as not owner work, or null. */

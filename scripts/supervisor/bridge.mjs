@@ -34,7 +34,7 @@
 // --owner-ok (the owner said ok in the Supervisor's channel). Writes go only through this landed CLI,
 // define-goal.mjs, start-workflow.mjs and cli.mjs incident; nothing here edits a ledger by hand.
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -45,12 +45,12 @@ import {
 } from '../kernel/dependency-graph.mjs';
 import {
   FOUNDATION_KINDS, claimFoundation, declareDependent, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation,
-} from '../kernel/foundations.mjs';
+} from '../kernel/foundation-registry.mjs';
 import { TRANSFER_SCHEMA, createOwnership } from '../kernel/work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 const DEFINE_GOAL = path.join(SKILL_ROOT, 'scripts', 'goal', 'define-goal.mjs');
 const START_WORKFLOW = path.join(SKILL_ROOT, 'scripts', 'kernel', 'start-workflow.mjs');
@@ -84,12 +84,12 @@ export function approvalOf(args, { autopilot = autopilotOn() } = {}) {
   return fail('autopilot is off (runtimes.yaml allocation.autopilot.enabled false): a bridging action needs the owner\'s ok first; re-run with --owner-ok once the owner said ok', 'autopilot-off');
 }
 
-const runNode = (script, argv, { env = process.env, timeout = 180_000 } = {}) => spawnSync(process.execPath, [script, ...argv],
-  { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout, env });
+const runRuntime = (script, argv, { env = process.env, timeout = 180_000 } = {}) => runNode([script, ...argv],
+  { cwd: SKILL_ROOT, timeout, env });
 const lastJson = (text) => { const t = String(text ?? '').trim(); return parseJson(t) ?? parseJson(t.split('\n').at(-1)) ?? null; };
 /** One cli.mjs call: {ok, body, error, code}. */
 export function apiCall(repo, argv, opts) {
-  const r = runNode(API, [...argv, '--repo', repo, '--json'], opts);
+  const r = runRuntime(API, [...argv, '--repo', repo, '--json'], opts);
   const body = lastJson(r.stdout) ?? lastJson(r.stderr);
   if (r.status === 0 && body?.ok !== false) return { ok: true, body };
   return { ok: false, body, code: body?.code ?? body?.reason ?? `exit-${r.status}`, error: clip(body?.error ?? body?.detail ?? r.stderr ?? r.stdout, 600) };
@@ -214,7 +214,7 @@ export async function cmdBridge(args, { env = process.env } = {}) {
   if (args['dry-run']) return { ok: true, dryRun: true, action: 'bridge', plan };
 
   // 1. The bridging workflow, through define-goal.
-  const defined = runNode(DEFINE_GOAL, ['--repo', repo, '--text', goal, '--title', title, '--defined-by', 'supervisor', '--bridge-id', bridgeId, '--reason', reason, '--json'], { env });
+  const defined = runRuntime(DEFINE_GOAL, ['--repo', repo, '--text', goal, '--title', title, '--defined-by', 'supervisor', '--bridge-id', bridgeId, '--reason', reason, '--json'], { env });
   const def = lastJson(defined.stdout);
   if (defined.status !== 0 || !def?.workflowId) fail(`define-goal refused the bridging goal: ${clip(defined.stderr || defined.stdout, 500)}`, 'define-goal-failed');
   const workflowId = def.workflowId;
@@ -242,7 +242,7 @@ export async function cmdBridge(args, { env = process.env } = {}) {
   // 3. Start its Kernel (start-workflow), then re-type the dependents' waits on it.
   let started = null;
   if (args.start) {
-    const r = runNode(START_WORKFLOW, ['--repo', repo, '--goal', workflowId, '--launched-by', 'supervisor', '--json'], { env, timeout: 600_000 });
+    const r = runRuntime(START_WORKFLOW, ['--repo', repo, '--goal', workflowId, '--launched-by', 'supervisor', '--json'], { env, timeout: 600_000 });
     started = { ok: r.status === 0, status: r.status, body: lastJson(r.stdout), ...(r.status === 0 ? {} : { error: clip(r.stderr || r.stdout, 500) }) };
     updateBridge(repo, bridgeId, (b) => ({ ...b, state: started.ok ? 'started' : 'defined', start: { ok: started.ok, at: Date.now(), ...(started.error ? { error: started.error } : {}) } }));
   }
@@ -370,13 +370,13 @@ export async function cmdRevise(args, { env = process.env } = {}) {
   const approval = requestOnly ? { approvedBy: null, provisional: true } : approvalOf(args);
   const bridgeId = `br-${newToken().slice(0, 10)}`;
   const tagged = `${TAG} ${bridgeId}: ${reason}`;
-  const planned = runNode(DEFINE_GOAL, ['--repo', repo, '--revise', workflowId, '--text', text, '--reason', tagged, '--plan', '--json'], { env });
+  const planned = runRuntime(DEFINE_GOAL, ['--repo', repo, '--revise', workflowId, '--text', text, '--reason', tagged, '--plan', '--json'], { env });
   const preview = lastJson(planned.stdout)?.revisionPreview;
   if (planned.status !== 0 || !preview?.approval?.token) fail(`define-goal --revise --plan refused: ${clip(planned.stderr || planned.stdout, 500)}`, 'revise-plan-failed');
   if (args['dry-run']) return { ok: true, dryRun: true, action: 'revise', workflowId, preview };
   let applied = null;
   if (!requestOnly) {
-    const r = runNode(DEFINE_GOAL, ['--repo', repo, '--revise', workflowId, '--text', text, '--reason', tagged, '--approve-revision', preview.approval.token, '--approved-by', 'supervisor', '--bridge-id', bridgeId, '--json'], { env });
+    const r = runRuntime(DEFINE_GOAL, ['--repo', repo, '--revise', workflowId, '--text', text, '--reason', tagged, '--approve-revision', preview.approval.token, '--approved-by', 'supervisor', '--bridge-id', bridgeId, '--json'], { env });
     applied = { ok: r.status === 0, body: lastJson(r.stdout), ...(r.status === 0 ? {} : { error: clip(r.stderr || r.stdout, 500) }) };
   }
   const now = Date.now();
@@ -464,7 +464,7 @@ export async function main(argv = process.argv.slice(2), { env = process.env } =
   return fail('use: bridge.mjs detect|list|bridge|rewire|transfer|revise|designate ... (see the header of scripts/supervisor/bridge.mjs)', 'usage');
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   main(argv).then((out) => {
     const verb = argv[0];

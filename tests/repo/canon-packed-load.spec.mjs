@@ -13,7 +13,7 @@ import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from '../help
 const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 const NEEDED = ['eslint', 'typescript', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals'];
 /** An install that carries every peer and dependency the canons load (an example app installs the fullest set at its root). */
-const DEPS = ['examples/ecommerce-app', 'examples/shape-slot', 'examples/todo-app', 'packages']
+const DEPS = ['examples/ecommerce-app', 'examples/shape-slot', 'packages']
   .map((dir) => path.join(RUNTIME, ...dir.split('/'), 'node_modules'))
   .find((dir) => NEEDED.every((dep) => fs.existsSync(path.join(dir, ...dep.split('/'), 'package.json'))));
 const made = [];
@@ -31,7 +31,7 @@ function installPacked(repo, dir, name) {
   const target = path.join(repo, 'node_modules', '@starci', name);
   fs.mkdirSync(target, { recursive: true });
   // Windows' own bsdtar reads drive-letter paths; the GNU tar a git shell puts first on PATH takes `C:` for a remote host
-  const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? path.win32.join(path.parse(os.tmpdir()).root, 'Windows'), 'System32', 'tar.exe') : 'tar';
   execFileSync(tar, ['-xzf', path.join(out, tgz), '-C', target, '--strip-components=1']);
   for (const dep of ['eslint', 'typescript', '@typescript-eslint', 'eslint-plugin-react-hooks', 'globals']) {
     const link = path.join(repo, 'node_modules', dep);

@@ -12,7 +12,7 @@ const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
 const ASSET_EXTENSION = /\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json)$/i;
 // Framework build output a tsconfig may include (Next writes `.next/types/**/*.ts` back into tsconfig.json on
 // every build) is compiled for type resolution but is never source: it is gitignored, regenerated, and no
-// canon or architecture rule applies to it (starci-next inc-2260b3754afa, nivo inc-ffe60c49f502).
+// canon or architecture rule applies to it (nivo inc-ffe60c49f502).
 export const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.output', '.nuxt', '.svelte-kit', '.expo', '.docusaurus', '.swc', '.cache']);
 export function isGeneratedPath(root, fileName) {
   return slash(path.relative(root, fileName)).split('/').slice(0, -1).some(segment => GENERATED_SEGMENTS.has(segment));

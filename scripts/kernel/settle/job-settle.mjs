@@ -50,7 +50,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync, spawn } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
+import { spawnNode } from '../../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition } from '../../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
@@ -58,7 +59,7 @@ import { claimManager, lockHolder } from '../../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
-import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs';
+import { NEEDS_KERNEL_EVENT, KERNEL_ONLY_OPS, reportedJobs, kernelHandoverOf } from '../../machine/reported-jobs.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -202,9 +203,9 @@ export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
 }
 
 /** Re-run one runtime check: argv, no shell, cwd = the ledger repo. {exitCode, ms, tail} */
-export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = spawnSync }) {
+export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = runNode }) {
   const t0 = Date.now();
-  const r = run(process.execPath, [c.script, ...c.argv], { cwd: repo, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
+  const r = run([c.script, ...c.argv], { cwd: repo, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const exitCode = r.error ? (r.error.code === 'ETIMEDOUT' ? 124 : 127) : (r.status ?? 1);
   const stdout = Buffer.isBuffer(r.stdout) ? r.stdout : Buffer.from(String(r.stdout ?? ''));
   const stderr = Buffer.isBuffer(r.stderr) ? r.stderr : Buffer.from(String(r.stderr ?? r.error?.message ?? ''));
@@ -377,7 +378,7 @@ const jsonOf = (text) => {
 };
 /** `node scripts/kernel/cli.mjs <verb> ... --json` as the runtime: {ok, value, error, code} */
 export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
-  const r = spawnSync(process.execPath, [API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
+  const r = runNode([API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const value = jsonOf(r.stdout), err = jsonOf(r.stderr);
   const ok = r.status === 0 && value?.ok !== false;
   return { ok, value, status: r.status, code: value?.code ?? err?.code ?? value?.reason ?? null,
@@ -640,8 +641,7 @@ export function queueTail(repo, jobId, { now = Date.now() } = {}) {
 /** Start the tail runner for one job, detached: it never blocks the settle. */
 export function startTail(repo, jobId, { env = process.env } = {}) {
   try {
-    const child = spawn(process.execPath, [API_FILE, 'settle-tail', '--repo', path.resolve(repo), '--job', jobId, '--json'],
-      { cwd: SKILL_ROOT, detached: true, stdio: 'ignore', windowsHide: true, env: runtimeEnv(env) });
+    const child = spawnNode([API_FILE, 'settle-tail', '--repo', path.resolve(repo), '--job', jobId, '--json'], { cwd: SKILL_ROOT, detached: true, stdio: 'ignore', env: runtimeEnv(env) });
     child.unref();
     return child.pid ?? null;
   } catch { return null; }
@@ -669,7 +669,7 @@ export const tailLockName = (repo, jobId) => `settle-tail-${repoKey(repo)}-${slu
 export function startSettlerFor(repo, { workflowId = null, jobId = null, env = process.env } = {}) {
   try {
     const args = [selfFile, '--repo', path.resolve(repo), ...(workflowId ? ['--workflow', workflowId] : []), ...(jobId ? ['--job', jobId] : []), '--json'];
-    const child = spawn(process.execPath, args, { cwd: SKILL_ROOT, detached: true, stdio: 'ignore', windowsHide: true, env: runtimeEnv(env) });
+    const child = spawnNode(args, { cwd: SKILL_ROOT, detached: true, stdio: 'ignore', env: runtimeEnv(env) });
     child.unref();
     return child.pid ?? null;
   } catch { return null; }
@@ -680,7 +680,7 @@ export const supervisedRepos = async () => { try { return (await import('../../m
 
 // No top-level await: scripts/machine/decisions.mjs imports this module, and a dynamic import of it while this
 // module still evaluates would deadlock (exit 13).
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) (async () => {
+if (isMain(import.meta.url)) (async () => {
   const argv = process.argv.slice(2);
   const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const has = (n) => argv.includes(`--${n}`);

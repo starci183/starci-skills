@@ -2,8 +2,8 @@
 # (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is api redesign).
 purpose: >-
   Edit this workflow's own queued units, logged and reversible: drop units whose paths are absent, widen a
-  unit inside its repository, add ONE serial wire unit for shared files, continue a partial commit as a
-  continuation unit, retry a failed unit with a CHANGED shape, reorder (--after), split or merge a few units,
+  unit inside its repository, add ONE serial wire unit for shared files, continue a failed unit's preserved work
+  (preserved/<wf>/<job>) as a continuation unit, retry a failed unit with a CHANGED shape, reorder (--after), split or merge a few units,
   set a unit's override (notes, commandTimeoutMs, difficulty, model, effort), start a fresh canon-scan and
   re-cut a canon cut's remaining units from it (the goal's own cut method), or undo an edit. The work graph
   (scripts/work/work-graph.mjs) and the leg plan stay the ops'.
@@ -21,7 +21,7 @@ guardrails:
   - a retry or widen that reproduces a shape that already failed for a shape cause is refused (shape-already-failed)
   - every edit is a kernel-graph-edit event holding its inverse; --edit undo --undo <edit> reverts it (a dropped unit comes back as a NEW try of its unit, resume_of the cancelled job: cancelled is terminal)
   - split, merge, wire and recut create units --derived-from the units they reshape: the new units inherit what is left of those try budgets, never a fresh one (H3)
-  - recut goes through the canon planner (scripts/kernel/cut-seam.mjs canonCutPlanOf): each slice owns its paths plus the relocation grants its findings need, contested moves go to one canon-wire leg per wave, and a slice with no fix target (its moves held by another slice) is refused and cut again (H6); the scan runs under the OS temp dir and the record a recut uses is kept as a kernel artifact (role scan)
+  - recut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths plus the relocation grants its findings need, contested moves go to one canon-wire leg per wave, and a slice with no fix target (its moves held by another slice) is refused and cut again (H6); the scan runs under the OS temp dir and the record a recut uses is kept as a kernel artifact (role scan)
 writes: [jobs payload (queued units only), jobs status queued->cancelled (dropped), a new try on undo, job_artifacts (the recut scan record), events kernel-graph-edit, logs kind decision]
 kernelOnly: true
 exit: 0 applied, 1 refused

@@ -24,14 +24,14 @@ test('the paths of an app root and of its snapshot follow the slots', () => {
 test('tsconfig path aliases resolve a specifier to its base, and a package specifier to nothing', () => {
   const root = path.resolve('/repo');
   const aliases = aliasesOf({ '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], exact: ['./x.ts'] }, root);
-  assert.equal(aliasTarget(aliases, '@features/identity'), path.join(root, 'src', 'features', 'identity'));
+  assert.equal(aliasTarget(aliases, '@features/api/identity'), path.join(root, 'src', 'features', 'api', 'identity'));
   assert.equal(aliasTarget(aliases, '@modules/platform/errors'), path.join(root, 'src', 'modules', 'platform', 'errors'));
   assert.equal(aliasTarget(aliases, '@nestjs/common'), null);
   assert.deepEqual(aliasesOf(undefined, root), []);
 });
 
 test('only api apps can serve GraphQL', () => {
-  const declaration = { apps: [{ name: 'identity', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }, { name: 'order', kind: 'api' }] };
+  const declaration = { apps: [{ name: 'identity', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }, { name: 'order', kind: 'api' }] };
   assert.deepEqual(apiApps(declaration), ['identity', 'order']);
   assert.deepEqual(apiApps({}), []);
 });

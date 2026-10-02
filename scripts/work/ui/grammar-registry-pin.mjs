@@ -3,8 +3,8 @@
 // registry spec, never a local path. This check does not validate semver syntax.
 //   node scripts/work/ui/grammar-registry-pin.mjs --repo <frontend repo> [--json]
 // The owner ruled on 2026-09-23 that consumers take the grammar from npm: a
-// `file:` link left starci-academy-fe on a hand-built dist, while nivo-fe and
-// miamia-fe pinned 0.4.x from the registry and never saw 0.5.0. Every
+// `file:` link left one consumer on a hand-built dist, while others
+// pinned 0.4.x from the registry and never saw 0.5.0. Every
 // package.json under the repo (node_modules excluded) is read.
 import path from 'node:path';
 import { readJsonFile } from '../../lib/json.mjs';

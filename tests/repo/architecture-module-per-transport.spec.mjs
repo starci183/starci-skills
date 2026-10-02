@@ -7,12 +7,12 @@ import { archFixture, runArch, findings } from '../helpers/hfs-arch-be-fixture.m
 // websocket, message; worker: message; cli: cli).
 const MODULE = (name, imports = '', importLine = '') => `import { Module } from '@nestjs/common';\n${importLine}@Module({ imports: [${imports}] })\nexport class ${name} {}\n`;
 const FEATURE = {
-  'src/features/a/index.ts': "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AMessageModule } from './transport/message/a-message.module';\nexport { AModule } from './a.module';\n",
-  'src/features/a/a.module.ts': MODULE('AModule'),
-  'src/features/a/transport/graphql/a-graphql.module.ts': MODULE('AGraphqlModule', 'AModule', "import { AModule } from '../../a.module';\n"),
-  'src/features/a/transport/message/a-message.module.ts': MODULE('AMessageModule', 'AModule', "import { AModule } from '../../a.module';\n"),
+  'src/features/api/a/index.ts': "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AMessageModule } from './transport/message/a-message.module';\nexport { AModule } from './a.module';\n",
+  'src/features/api/a/a.module.ts': MODULE('AModule'),
+  'src/features/api/a/transport/graphql/a-graphql.module.ts': MODULE('AGraphqlModule', 'AModule', "import { AModule } from '../../a.module';\n"),
+  'src/features/api/a/transport/message/a-message.module.ts': MODULE('AMessageModule', 'AModule', "import { AModule } from '../../a.module';\n"),
 };
-const APP = (imports, names = imports) => `import { Module } from '@nestjs/common';\nimport { ${names} } from '../../../src/features/a';\n@Module({ imports: [${imports}] })\nexport class AppModule {}\n`;
+const APP = (imports, names = imports) => `import { Module } from '@nestjs/common';\nimport { ${names} } from '../../../src/features/api/a';\n@Module({ imports: [${imports}] })\nexport class AppModule {}\n`;
 const APPS = [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }];
 const hits = report => findings(report, 'BE_MODULE_SHAPE').filter(item => item.message.includes('transport') || item.message.includes('module-definition') || item.message.includes('ConfigurableModule') || item.message.includes('Nest module'));
 const run = (t, files) => runArch(archFixture(t, {
@@ -31,21 +31,21 @@ test('one module per transport folder, composed by an app of the right kind, rai
 });
 
 test('a second module in a transport folder (a module per operation) is BE_MODULE_SHAPE', t => {
-  const report = run(t, { 'src/features/a/transport/graphql/run.module.ts': MODULE('RunModule') });
-  const found = hits(report).filter(item => item.path === 'src/features/a/transport/graphql/run.module.ts');
+  const report = run(t, { 'src/features/api/a/transport/graphql/run.module.ts': MODULE('RunModule') });
+  const found = hits(report).filter(item => item.path === 'src/features/api/a/transport/graphql/run.module.ts');
   assert.ok(found.some(item => /second module of the graphql transport/.test(item.message)), JSON.stringify(found));
   assert.ok(found.some(item => /declared in/.test(item.message)));
 });
 
 test('a @Module declared in application/, and a module-definition or ConfigurableModuleBuilder in a feature, are BE_MODULE_SHAPE', t => {
   const report = run(t, {
-    'src/features/a/application/run.handler.ts': MODULE('RunHandlerModule'),
-    'src/features/a/a.module-definition.ts': "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
+    'src/features/api/a/application/run.handler.ts': MODULE('RunHandlerModule'),
+    'src/features/api/a/a.module-definition.ts': "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
   });
   const found = hits(report);
-  assert.ok(found.some(item => item.path === 'src/features/a/application/run.handler.ts' && /RunHandlerModule/.test(item.message)), JSON.stringify(found));
-  assert.ok(found.some(item => item.path === 'src/features/a/a.module-definition.ts' && /module-definition inside feature a/.test(item.message)));
-  assert.ok(found.some(item => item.path === 'src/features/a/a.module-definition.ts' && /ConfigurableModuleBuilder/.test(item.message)));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/application/run.handler.ts' && /RunHandlerModule/.test(item.message)), JSON.stringify(found));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/a.module-definition.ts' && /module-definition inside feature a/.test(item.message)));
+  assert.ok(found.some(item => item.path === 'src/features/api/a/a.module-definition.ts' && /ConfigurableModuleBuilder/.test(item.message)));
 });
 
 test('a worker app listing a graphql module is BE_MODULE_SHAPE, while an api app may compose the message transport of its own service', t => {
@@ -64,4 +64,35 @@ test('an app listing a feature application module instead of its transport modul
   assert.equal(found.length, 1, JSON.stringify(found));
   assert.equal(found[0].module, 'AModule');
   assert.match(found[0].message, /application module of feature a/);
+});
+
+// be.cli is a composed root (owner slot with composedBy [cli]): one static module per folder, the cli app lists the root module.
+const CLI = {
+  'src/features/cli/index.ts': "export { CliModule } from './cli.module';\n",
+  'src/features/cli/cli.module.ts': MODULE('CliModule', 'MigrateModule', "import { MigrateModule } from './migrate/migrate.module';\n"),
+  'src/features/cli/migrate/migrate.module.ts': MODULE('MigrateModule'),
+};
+const CLI_APP = names => `import { Module } from '@nestjs/common';\nimport { CliModule } from '../../../src/features/cli';\nimport { MigrateModule } from '../../../src/features/cli/migrate/migrate.module';\n@Module({ imports: [${names}] })\nexport class AppModule {}\n`;
+const runCli = (t, files) => runArch(archFixture(t, {
+  apps: [...APPS, { name: 'cli', kind: 'cli' }],
+  files: { ...FEATURE, ...CLI, 'apps/core/src/app.module.ts': APP('AGraphqlModule'), 'apps/jobs/src/main.ts': 'void 0;\n', 'apps/jobs/src/app.module.ts': APP('AScheduleModule'), 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': CLI_APP('CliModule'), ...files },
+}));
+
+test('the cli app listing the cli root module, with one static module per group folder, raises no module-per-transport finding', t => {
+  const report = runCli(t, {});
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  assert.equal(report.coverage.hfsMachine.modulePerTransport.appReferences, 3);
+});
+
+test('a second module in a cli group folder, a cli app listing a group module, and an api app listing the cli root are BE_MODULE_SHAPE', t => {
+  const report = runCli(t, {
+    'src/features/cli/migrate/run.module.ts': MODULE('RunModule'),
+    'apps/cli/src/app.module.ts': CLI_APP('CliModule, MigrateModule'),
+    'apps/core/src/app.module.ts': `import { Module } from '@nestjs/common';\nimport { AGraphqlModule } from '../../../src/features/api/a';\nimport { CliModule } from '../../../src/features/cli';\n@Module({ imports: [AGraphqlModule, CliModule] })\nexport class AppModule {}\n`,
+  });
+  const found = hits(report).concat(findings(report, 'BE_MODULE_SHAPE').filter(item => /group module|composes that root/.test(item.message)));
+  assert.ok(found.some(item => item.path === 'src/features/cli/migrate/run.module.ts' && /one static module named after it/.test(item.message)), JSON.stringify(found));
+  assert.ok(found.some(item => item.app === 'cli' && item.module === 'MigrateModule' && /group module/.test(item.message)), JSON.stringify(found));
+  assert.ok(found.some(item => item.app === 'core' && item.module === 'CliModule' && /only an app of kind cli/.test(item.message)), JSON.stringify(found));
+  assert.equal(found.some(item => item.app === 'cli' && item.module === 'CliModule'), false);
 });

@@ -42,13 +42,16 @@ settle:
     never settled unconsumed; lease and budget_reservation rows released -
     a
     settle frees the slot; the worker terminal is closed (terminal-close for
-    a command terminal, worker-stop + worker-release for a managed worker)
-    and the op's Orca Task is closed with `task-update --status done`,
-    recorded as taskClosed on the receipt and the job payload - a settled op
-    leaves no live terminal, worker or open Task
+    a command terminal; worker-release for a managed worker, preceded by
+    worker-stop only when worker-show reads the Dispatch not settled by the
+    op's own worker_done - managedWorker.dispatch {state, workerDone} on the
+    receipt and the job payload). The op's Orca Task settled with its
+    Dispatch (the op sent worker_done after api report); settle never
+    issues task-update. A settled op leaves no live terminal, worker or
+    open Task
     (modules/kernel/start-workflow.yaml orcaTree is the rule);
     events 'op-settled' {verdict}; the settled op's agent session files may
-    then move under runtimes.yaml allocation.housekeeping.archiveRoot keeping
+    then move under the archive root (scripts/machine/home.mjs archiveRoot) keeping
     their relative path - a move, never a delete, and never the live kernel's
     own session or one whose terminal is still open (the per-op session
     release at settle). Worker-visible only as 'the session transcript may
@@ -161,6 +164,7 @@ settle:
     - 'draw-metrics-failed (field `reason`): an interface.draw pass admitted after contract change draw-loop-dna whose draw acceptance holds, but whose live parts fail when the RUNTIME re-renders each from its render source and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs, scripts/work/draw-loop.mjs verifyRecordParts): the capture, the DNA gate (draw-dna.mjs), the taste metrics (draw-taste.mjs), copy/badges/actions, the brand palette, grammar geometry, the ui-proof score and (contract change draw-devin-rationale) the decision evidence - rationale.json, data-why, every measured value covered, resolvable rule ids, a redline per part (scripts/work/draw/draw-rationale.mjs DRAW_RATIONALE_MISSING) - DRAW_METRICS_FAILED, or DRAW_METRICS_UNVERIFIED when a metric cannot run (fail closed). Prints {ok:false, jobId, op, reason:"draw-metrics-failed", codes, findings (first 50), findingCount, records, loops:[{loop, best, outcome}]} and exits 1; the draw is blocked with these remaining failures and its best round, never passed. A settled interface.draw job of any verdict also records one grammar-proposal-filed event per grammar proposal it carries (scripts/work/grammar-proposal.mjs; status proposed, never accepted by the runtime) and its receipt lists them as grammarProposals'
     - 'work-hygiene-red (field `reason`): a pass admitted after contract change work-hygiene-gate that changed files under .starciwork/ or .starcistacks/ (the files its report names plus every file its commits changed since its base) whose files fail scripts/work/validate/work-hygiene.mjs, the check the product repo pre-commit hook also runs: WORK_YAML_UNPARSEABLE (engine/yaml.mjs cannot read it), WORK_VALIDATE_REFUSED (work-validate --strict of the record directory, judged on the changed files only), WORK_SECRET_FILE, WORK_SECRET_PATTERN, WORK_SECRET_LITERAL, WORK_ACCOUNT_LITERAL (a non-.enc file carries a secret or a literal login). Prints {ok:false, jobId, op, reason:"work-hygiene-red", codes, findings:[{code, file, line, detail}] (first 50), findingCount, files} and exits 1; nothing is written and the job keeps its status. The op fixes the files and commits, then the Kernel settles again'
     - 'PROOF_MEDIA_MISSING (field `reason`): a pass whose files lack the visual proof its op owes (settle.proofMedia). Prints {ok:false, jobId, op, reason:"PROOF_MEDIA_MISSING", missing:[image (n/min) | video], detail:{images, videos, traces, browserRan, owes}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the op to capture the screenshots (and its browser video) into its evidence and name them in report.files'
+    - 'EVIDENCE_HOST_PATH (field `reason`): a pass whose Work evidence files (a record evidence.yaml, a draw prompt, a visual review, an assets JSON under .starciwork) still hold a hard-coded absolute host path (drive path, user-profile path, expanded AppData path). Prints {ok:false, jobId, op, reason:"EVIDENCE_HOST_PATH", missing:[<file>:<line> <path>], detail:{files, hits, advice}}; the job stays as it was. Rewrite the named evidence with repo-relative paths or <worktree>, <runtime>, <tmp>, <home> (scripts/lib/host-path.mjs normalizeHostPaths), then settle again. The matcher is the one runtime rule RT_ABSOLUTE_PATH uses.'
     # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
   usedBy: 'drive.settle - last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 

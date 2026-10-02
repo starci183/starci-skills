@@ -106,7 +106,7 @@ function checkGrammar(config, context) {
   const violations = [];
   const local = context.workspaces.find(workspace => workspace.name === grammar.package);
   // Node resolution per consumer: in an npm-workspaces monorepo a consumer whose range differs from the
-  // hoisted copy gets its own apps/<app>/node_modules/<package> (nivo-fe: apps/app on 0.5.0 beside a hoisted
+  // hoisted copy gets its own apps/<app>/node_modules/<package> (one consumer: apps/app on 0.5.0 beside a hoisted
   // 0.4.11). Every consumer is judged against the copy it actually resolves, never the hoisted one alone.
   // An app installs once, at its root (config.packageRoot): a side folder has no node_modules of its own.
   const installRoot = config.packageRoot ?? config.root;

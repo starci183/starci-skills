@@ -7,7 +7,7 @@ statement: >-
   shape, and everything it walks now exists and answers live. Lane v9-8 landed the harness
   (the former front-end repository's uat/, proven by a smoke run under checkout/uat/place-order/runs/). Lane v9-6
   landed the surface itself: the signed-out /en/account renders the auth split with a working
-  register/sign-in form (apps/shop/src/components/blocks/SessionForm), the landing-to-shop session
+  register/sign-in form (apps/app/src/components/blocks/SessionForm), the landing-to-shop session
   handoff is settled as the httpOnly northwind-session cookie the shop's own /api/session door
   sets after calling the identity GraphQL register/signIn server-side, and register + sign-in +
   the four refusals (INVALID_CREDENTIALS, REQUEST_INVALID, EMAIL_TAKEN, SESSION_INVALID) were

@@ -34,8 +34,8 @@ const fixture=(t)=>{
   file('cli/sessions.db',4096,30); // mtime is irrelevant: it is report-only, never moved
   file('cli/sessions.db-wal',1024,30);
   file('cli/sessions.db-shm',64,30);
-  const env={...process.env,APPDATA:appdata};
-  const allocation={housekeeping:{archiveRoot:archive,sessionArchiveAfterMs:3*DAY}};
+  const env={...process.env,APPDATA:appdata,STARCI_ARCHIVE_ROOT:archive};
+  const allocation={housekeeping:{sessionArchiveAfterMs:3*DAY}};
   const sweep=(opts={})=>sweepDevinData({env,now:NOW,allocation,processes:none,...opts});
   return {root,appdata,devin,archive,env,allocation,file,sweep};
 };
@@ -148,5 +148,6 @@ test('a missing devin root reports zeros and stays ok',async t=>{
 });
 
 test('devinRoot resolves under APPDATA on Windows spelling',()=>{
-  assert.equal(devinRoot({APPDATA:'C:/Users/X/AppData/Roaming'}),path.join('C:/Users/X/AppData/Roaming','devin'));
+  const appData=path.join(os.tmpdir(),'roaming');
+  assert.equal(devinRoot({APPDATA:appData}),path.join(appData,'devin'));
 });

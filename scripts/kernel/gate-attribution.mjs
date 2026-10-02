@@ -1,10 +1,9 @@
 // gate-attribution.mjs — whose change turned a repo-wide gate red.
 //
 // Several ops share one product working tree, so a repo-wide gate (test:ci, typecheck, lint) run for
-// op A reads op B's in-flight or landed change: nivo academy-debt's test:ci went red 812/813 on
-// module-studio's commit 9caa2d5c (inc-9474fe9ff445) and on module-studio's uncommitted
-// agentos-module-studio spec (inc-36b309cb9138), and academy-debt retried backend.implement for
-// breakage it did not cause. The rule (modules/kernel/api.yaml commands.check peerBlocked): a red
+// op A reads op B's in-flight or landed change: one workflow's test:ci went red 812/813 on a peer
+// workflow's commit 9caa2d5c and on that peer's uncommitted spec, and the first retried
+// backend.implement for breakage it did not cause. The rule (modules/kernel/api.yaml commands.check peerBlocked): a red
 // check names the files its failure implicates (`failing`: the failing spec and the source it
 // points at); api check attributes each file, and a red check none of whose files is this op's and
 // at least one of which a peer changed is `peer`: recorded peerBlocked, counted neither passed nor
@@ -34,18 +33,22 @@
 // A git read that fails leaves its file unknown, never peer. Ledger and git reads only.
 //
 // A failing file may live in another repository of the project binding (a backend op whose slice spans
-// the frontend: starci-next foundation's fe typecheck red on starci-next-fe's
-// ContentSectionLessons/index.spec.tsx): an absolute path under a bound root, or a path whose first
+// the frontend: a foundation leg's fe typecheck red on a component spec of the
+// frontend repository): an absolute path under a bound root, or a path whose first
 // segment names a bound repository holding it, is read with git in that repository.
 import fs from 'node:fs';
 import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { gitResultOf } from '../lib/git.mjs';
+
+// The git calls of the attribution, by verb (the `git` seam takes the whole argv): each through its scripts/api/git call file.
+const ATTRIBUTION_CALLS = { status: gitStatus, log: gitLog };
 import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
-export const ATTRIBUTION_CLASSES = Object.freeze(['own', 'peer', 'foreign', 'unknown']);
 /** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
 export const WORK_RECORD_PREFIX = '.starciwork/';
 const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
@@ -145,11 +148,11 @@ function locateFailing(value, { repo, roots }) {
  * attributeRedGate(db, {repo, job, failing, canon?, git?}) ->
  *   {class, files:[{path, owner, via?, workflowId?, jobId?, commit?}], peers:[{workflowId, via, jobId?, commit?, files[]}]}
  * `canon` is the ledger's lease canonicalizer (scripts/kernel/lease-canon.mjs; its `binding` names the
- * project's other repositories); `git(args, dir)` returns gitResult's {ok, stdout} and defaults to git
+ * project's other repositories); `git(args, dir)` returns {ok, stdout} (scripts/lib/git.mjs gitResultOf) and defaults to git
  * in `dir` (the repository holding the file).
  */
 export function attributeRedGate(db, { repo, job, failing = [], canon = null, git = null }) {
-  const run = git ?? ((args, dir = repo) => gitResult(args, { dir, timeout: 20_000 }));
+  const run = git ?? (([verb, ...rest], dir = repo) => gitResultOf(ATTRIBUTION_CALLS[verb](rest, { dir, timeout: 20_000 })));
   const payload = payloadOf(job);
   const op = job.op_id ?? payload.opId ?? null;
   const canonical = (file) => (canon ? canon.canonical(file, { op, payload }) : file);

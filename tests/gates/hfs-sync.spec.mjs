@@ -26,7 +26,7 @@ const jestPreset = require('../../packages/jest-preset/index.cjs');
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
-const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
+const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
 const rendered = (hfs = APP) => Object.fromEntries(renderTargets(hfs, PRESETS).map(target => [target.path, target.content]));
@@ -63,22 +63,22 @@ describe('the template renderer', () => {
 describe('hfs.json validation', () => {
   it('accepts an app and refuses everything else, the standalone back-end and front-end kinds included', () => {
     assert.doesNotThrow(() => validateHfs(APP));
-    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Nivo Backend' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
-      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../nivo-backend' }]) {
+    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Todo App Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
+      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../todo-app-be' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
   });
   it('refuses a declaration the canons would refuse, so a pin bump never leaves eslint unable to start', () => {
     // the pre-2.0 connections shape (names only) is what broke eslint in a product repo after a pin bump
-    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: ['primary', 'agentos'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
-    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] } })));
+    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: ['primary', 'my-app'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
+    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'my-app', envPrefix: 'MY_APP_DB', owner: 'core', isolation: 'database' }] } })));
   });
 });
 
 describe('the generated file set', () => {
   it('the root owns the package scripts, prettier, hooks, workflows, Sonar, Codecov and the .gitignore and .starciwork/.gitignore; each side owns its tool configuration', () => {
     assert.deepEqual(Object.keys(rendered()).sort(), [
-      '.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
+      '.dockerignore', '.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
       'be/eslint.config.mjs', 'be/jest.config.js', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json',
       'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'package.json', 'sonar-project.properties', 'turbo.json',
     ]);
@@ -164,7 +164,7 @@ describe('.gitignore', () => {
   it('carries the HFS never-tracked list of both sides and .starci/, inside the managed block', () => {
     const text = block();
     assert.ok(text.startsWith(`${BLOCK_BEGIN}\n`) && text.endsWith(`${BLOCK_END}\n`));
-    for (const entry of ['node_modules/', 'dist/', 'coverage/', '.scannerwork/', 'test-results/', '*.tsbuildinfo', '.turbo/', '.tools/', '.env', '.env.*', '!.env.example', 'report*.json', 'nul', '.qwen*/', '.artifacts/', '.starci/', 'schema.gql', '.next/', 'next-env.d.ts']) {
+    for (const entry of ['node_modules/', 'dist/', 'coverage/', '.scannerwork/', 'test-results/', '*.tsbuildinfo', '.turbo/', '.tools/', '.env', '.env.*', '!.env.example', 'report*.json', 'nul', '.artifacts/', '.starci/', 'schema.gql', '.next/', 'next-env.d.ts']) {
       assert.ok(text.split('\n').includes(entry), entry);
     }
   });
@@ -400,11 +400,14 @@ describe('the be side tool configuration', () => {
 });
 
 describe('the package.json scripts of the app', () => {
-  it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start and migrate per app', () => {
+  it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start per app and the cli', () => {
     const scripts = scriptsOf();
-    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'docker:build', 'docker:build:admin', 'docker:build:app', 'docker:build:cli', 'docker:build:core', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
-    assert.equal(scripts.migrate, 'node be/dist/apps/migrate/src/main.js');
+    assert.equal(scripts.cli, 'node be/dist/apps/cli/src/main.js', 'the cli app runs a command: npm run cli -- <group> <command>');
+    assert.equal(scripts.migrate, undefined, 'no connection, nothing to migrate');
+    const withDb = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }));
+    assert.equal(withDb.migrate, 'node be/dist/apps/cli/src/main.js migrate run', 'a back end with a connection migrates through the cli migrate command');
     assert.equal(scripts['dev:be'], 'cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/core/src/main.ts');
     assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && turbo run dev --filter=@nivo/app', 'turbo runs the workspace @<project>/<app> after the packages it imports');
     assert.equal(scripts['start:app'], 'npm run start -w @nivo/app');
@@ -426,12 +429,21 @@ describe('the package.json scripts of the app', () => {
     assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
     assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);
   });
-  it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
+  it('one api app and one Next app take the unsuffixed dev scripts; every api and worker app gets a start script, the cli app the cli script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
     assert.equal(one['dev:fe'], 'npm run codegen --silent && turbo run dev --filter=@nivo/web');
-    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] } }));
-    assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:admin', 'start:app', 'start:core', 'start:jobs']);
-    assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"start:x": "node be\/dist\/apps\/x\/src\/main\.js",/);
+    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'order', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }));
+    assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate|cli)/.test(name)).sort(), ['cli', 'migrate', 'start:admin', 'start:app', 'start:core', 'start:jobs', 'start:order']);
+    assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"cli": "node be\/dist\/apps\/x\/src\/main\.js",/);
+  });
+  it('build the image of every app, one after the other and never pushing: docker:build:<app> is the command the Dockerfile header states', () => {
+    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] } }));
+    assert.equal(many['docker:build:core'], 'docker build -f be/apps/core/Dockerfile -t nivo/core:dev .');
+    assert.equal(many['docker:build:cli'], 'docker build -f be/apps/cli/Dockerfile -t nivo/cli:dev .');
+    assert.equal(many['docker:build:app'], 'docker build -f fe/apps/app/Dockerfile -t nivo/app:dev .');
+    const all = many['docker:build'].split(' && ');
+    assert.deepEqual(all, ['core', 'cli', 'app', 'admin'].map(name => `npm run docker:build:${name}`));
+    assert.ok(Object.values(many).every(command => !/--push|docker push/.test(command)), 'no managed script pushes an image');
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t);
@@ -532,14 +544,33 @@ describe('hfs scaffold app: the first tree', () => {
     const { root } = scaffold(t);
     const files = filesUnder(root);
     for (const file of ['hfs.json', 'package.json', 'README.md', '.gitignore', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml', '.sops.yaml', 'scripts/codegen.mjs',
-      'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/api/src/main.ts', 'be/apps/api/src/app.module.ts', 'be/apps/api/src/api.options.ts',
-      'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
+      'be/nest-cli.json', 'be/tsconfig.json', 'be/apps/core/src/main.ts', 'be/apps/core/src/app.module.ts', 'be/apps/core/src/core.options.ts',
+      'be/apps/cli/Dockerfile', 'be/apps/cli/src/main.ts', 'be/apps/cli/src/app.module.ts', 'be/apps/cli/src/cli.options.ts',
+      'be/src/features/cli/index.ts', 'be/src/features/cli/cli.module.ts',
+      'be/src/features/cli/migrate/migrate.cli.ts', 'be/src/features/cli/migrate/migrate.cli.spec.ts', 'be/src/features/cli/migrate/subs/run.cli.ts', 'be/src/features/cli/migrate/subs/run.cli.spec.ts',
+      'be/src/features/cli/seed/seed.cli.ts', 'be/src/features/cli/seed/seed.cli.spec.ts', 'be/src/features/cli/seed/subs/run.cli.ts', 'be/src/features/cli/seed/subs/run.cli.spec.ts',
+      'be/src/modules/platform/database/primary.connection.ts', 'be/src/modules/platform/database/primary.config.ts', 'be/src/modules/platform/database/primary.decorators.ts',
+      'be/src/modules/domain/note/index.ts', 'be/src/modules/domain/note/note.service.ts', 'be/src/modules/domain/note/persistence/connection.ts',
+      'be/src/modules/domain/note/persistence/entities/note.entity.ts', 'be/src/modules/domain/note/persistence/migrations/1790000000000-init-note.ts', '.starcistacks/dev/seeds/primary-notes.sql',
+      'fe/tsconfig.json', ...['landing', 'app'].flatMap(name => [`fe/apps/${name}/next.config.ts`, `fe/apps/${name}/tsconfig.json`, `fe/apps/${name}/src/proxy.ts`, `fe/apps/${name}/src/app/[locale]/layout.tsx`]),
+      ...['ui', 'i18n'].flatMap(pkg => [`fe/packages/nivo-${pkg}/package.json`, `fe/packages/nivo-${pkg}/tsconfig.json`, `fe/packages/nivo-${pkg}/tsconfig.build.json`, `fe/packages/nivo-${pkg}/src/index.ts`])]) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => /^be\/(.*\/)?package\.json$/.test(file)), 'the back end holds no package.json');
     assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package-lock\.json$/.test(file)), 'no side and no workspace holds a lockfile');
-    const web = JSON.parse(read(root, 'fe/apps/web/package.json'));
-    assert.deepEqual([web.name, web.private, Object.keys(web.scripts).sort()], [`@${path.basename(root)}/web`, true, ['build', 'dev', 'lint', 'start', 'typecheck']], 'each fe app is a workspace with its own package.json');
+    assert.deepEqual(filesUnder(path.join(root, 'fe', 'apps')).map(file => file.split('/')[0]).filter((name, i, all) => all.indexOf(name) === i), ['app', 'landing'], 'the fe side has exactly the landing and the product app');
+    for (const name of ['landing', 'app']) {
+      const manifest = JSON.parse(read(root, `fe/apps/${name}/package.json`));
+      assert.deepEqual([manifest.name, manifest.private, Object.keys(manifest.scripts).sort()], [`@${path.basename(root)}/${name}`, true, ['build', 'dev', 'lint', 'start', 'typecheck']], 'each fe app is a workspace with its own package.json');
+      assert.deepEqual([manifest.dependencies['@nivo/ui'], manifest.dependencies['@nivo/i18n']], ['*', '*'], `${name} declares the shared workspace packages it imports`);
+    }
+    for (const pkg of ['ui', 'i18n']) {
+      const manifest = JSON.parse(read(root, `fe/packages/nivo-${pkg}/package.json`));
+      assert.deepEqual([manifest.name, manifest.private, manifest.scripts, manifest.exports['.'], manifest.types], [`@nivo/${pkg}`, true, { build: 'tsc -p tsconfig.build.json', lint: 'hfs lint --workspace .', typecheck: 'tsc --noEmit -p tsconfig.json' }, { types: './dist/index.d.ts', default: './dist/index.js' }, './dist/index.d.ts'], `@nivo/${pkg} is a private package built to dist`);
+    }
+    assert.deepEqual(JSON.parse(read(root, 'hfs.json')).sides.fe.optionalSlots, ['fe.package.ui', 'fe.package.i18n'], 'the shared packages are declared slots');
     const rootManifest = JSON.parse(read(root, 'package.json'));
     assert.deepEqual([rootManifest.workspaces, typeof rootManifest.packageManager, typeof rootManifest.devDependencies.turbo], [['fe/apps/*', 'fe/packages/*'], 'string', 'string'], 'the root is the monorepo root');
+    const feOnly = ['next', 'next-intl', 'react', 'react-dom', '@starci/grammar', '@heroui/react', '@heroui/styles', 'server-only', '@nivo/ui', '@nivo/i18n'];
+    assert.deepEqual(Object.keys(rootManifest.dependencies).filter(name => feOnly.includes(name)), [], 'the root runtime dependencies hold nothing fe-only: each fe workspace declares its own');
     assert.ok(files.includes('turbo.json'), 'the task graph sits at the app root');
     assert.ok(!files.includes('package-lock.json'), 'the scaffold writes no lockfile by hand: npm resolves it');
     // .starcistacks and its sops rule live at the app root, beside be/, fe/ and .starciwork; no side holds either.
@@ -558,7 +589,7 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal(validateWorkspace({ ...workspace, repositories: [{ role: 'be', name: 'be', apps: [{ name: 'api' }] }] }), false, 'the schema refuses apps: on a repository (hfs.json declares the apps)');
     assert.equal((await run(['--check'], root)).code, 0, 'a fresh app is in sync by construction');
     assert.throws(() => scaffoldApp({ name: 'nivo', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_EXISTS' });
-    assert.throws(() => scaffoldApp({ name: 'Nivo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
+    assert.throws(() => scaffoldApp({ name: 'Todo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
   });
   it('a lock step npm cannot complete fails the scaffold with HFS_SCAFFOLD_LOCK_FAILED, names the step and leaves no app behind', t => {
     const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));
@@ -569,11 +600,13 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal(ran, path.join(into, 'nivo'), 'the lock step runs in the new app root, after every file is written');
     assert.equal(fs.existsSync(path.join(into, 'nivo')), false, 'no app and no stub lock is left behind');
   });
-  it('the be skeleton follows the unit standard: only services have a spec, each service has one, no composition spec', t => {
+  it('the be skeleton follows the unit standard: only the unit-tested roles (services, cli commands) have a spec, each has one, no composition spec', t => {
     const { root } = scaffold(t);
     const files = filesUnder(root).filter(file => file.startsWith('be/'));
     const specs = files.filter(file => /\.spec\.ts$/.test(file));
-    assert.deepEqual(specs, files.filter(file => file.endsWith('.service.ts')).map(file => file.replace(/\.ts$/, '.spec.ts')).sort(), 'exactly one spec per service and no other spec');
+    const subjects = files.filter(file => file.endsWith('.service.ts') || (file.startsWith('be/src/features/cli/') && file.endsWith('.cli.ts')));
+    assert.deepEqual(specs, subjects.map(file => file.replace(/\.ts$/, '.spec.ts')).sort(), 'exactly one spec per service and per cli command and no other spec');
+    assert.ok(subjects.some(file => file.endsWith('.cli.ts')), 'the cli commands are unit-tested subjects');
     assert.ok(specs.length >= 3);
     for (const spec of specs) {
       const text = read(root, spec);
@@ -587,33 +620,56 @@ describe('hfs scaffold app: the first tree', () => {
     const { root } = scaffold(t);
     const sources = filesUnder(root).filter(file => file.startsWith('be/') && file.endsWith('.ts') && !file.endsWith('.spec.ts'));
     assert.deepEqual(sources.filter(file => /process\.env/.test(read(root, file))), ['be/src/modules/platform/config/env-source.config.ts'], 'process.env is read only by platform/config');
-    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron|new Date\(\)|Date\.now/.test(read(root, file)) || file === 'be/src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
+    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize(?!: false\b)|@Cron|new Date\(\)|Date\.now/.test(read(root, file)) || file === 'be/src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
+    // Migrations are the only schema authority (BE-PERSISTENCE-1): every data source the skeleton opens states `synchronize: false`.
+    const opened = sources.filter(file => /TypeOrmModule\.forRoot\(|new DataSource\(/.test(read(root, file)));
+    assert.deepEqual(opened, ['be/src/modules/platform/database/connection-source.client.ts', 'be/src/modules/platform/database/database.module.ts']);
+    for (const file of opened) assert.match(read(root, file), /synchronize: false/, file);
     assert.match(read(root, 'be/src/modules/platform/logging/logging.log-events.ts'), /export enum LoggingLogEvent/);
-    const door = read(root, 'be/src/features/system-health/transport/http/live.controller.ts');
+    const door = read(root, 'be/src/features/api/system-health/transport/http/live.controller.ts');
     assert.match(door, /@Get\("live"\)\s*@Public\(\{ reason: PublicReason\.Health \}\)[\s\S]*this\.queryBus\.execute\(new CheckLivenessQuery/);
     assert.doesNotMatch(door, /EntityManager|HealthCheckService|\bif \(/, 'a door injects the bus only and branches never');
-    assert.match(read(root, 'be/src/features/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
-    const module = read(root, 'be/apps/api/src/app.module.ts');
-    assert.match(module, /static register\(options: ApiOptions\): DynamicModule/);
+    assert.match(read(root, 'be/src/features/api/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
+    const module = read(root, 'be/apps/core/src/app.module.ts');
+    assert.match(module, /static register\(options: CoreOptions\): DynamicModule/);
     assert.match(module, /APP_FILTER, useClass: ErrorsFilter[\s\S]*APP_GUARD, useClass: RateLimitGuard[\s\S]*APP_GUARD, useClass: OriginGuard[\s\S]*APP_GUARD, useClass: AuthGuard/, 'throttler, then the CSRF origin guard, then AuthGuard');
-    assert.match(read(root, 'be/apps/api/src/main.ts'), /EnvSource\.fromProcess\(\)/);
+    assert.match(read(root, 'be/apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
+    // The core app opens the primary connection with the note capability's arrays; the cli app migrates the same arrays.
+    assert.match(module, /DatabaseModule\.register\(\{[\s\S]*connections: \[\{ \.\.\.options\.database, entities: noteEntities, migrations: noteMigrations \}\]/);
+    assert.match(read(root, 'be/apps/cli/src/cli.options.ts'), /entities: noteEntities,\s*migrations: noteMigrations/);
+    assert.match(read(root, 'be/apps/cli/src/main.ts'), /CommandFactory\.run\(/);
     assert.doesNotMatch(filesUnder(root).map(file => read(root, file)).join('\n'), /\{\{(project|app|appPascal|sonarGate)\}\}/i, 'no skeleton variable is left');
   });
-  it('the fe skeleton keeps the next-intl stack in the app: vi default, as-needed prefix, proxy.ts, every route slot mounting one pages feature, the health route', t => {
+  it('the fe skeleton writes the next-intl stack once in the i18n package (vi default, as-needed prefix, the proxy, createAppI18n), each app calling it, every route slot mounting one pages feature, the shared ui shell, the health route', t => {
     const { root } = scaffold(t);
     const files = filesUnder(root).filter(file => file.startsWith('fe/'));
     assert.ok(!files.some(file => file.endsWith('middleware.ts')), 'Next 16 uses proxy.ts');
     assert.ok(!files.some(file => /\.(spec|test)\.tsx?$/.test(file)), 'the fe side has no tests');
-    assert.match(read(root, 'fe/apps/web/src/modules/i18n/routing.ts'), /defaultLocale: DEFAULT_LOCALE[\s\S]*localePrefix: "as-needed"/);
-    assert.match(read(root, 'fe/apps/web/src/modules/i18n/config.ts'), /DEFAULT_LOCALE: Locale = "vi"/);
-    assert.match(read(root, 'fe/apps/web/src/proxy.ts'), /export default createMiddleware\(routing\)/);
-    for (const [slot, page] of [['[locale]/page.tsx', 'HomePage'], ['[locale]/error.tsx', 'ErrorPage'], ['[locale]/not-found.tsx', 'NotFoundPage'], ['[locale]/loading.tsx', 'LoadingPage'], ['global-error.tsx', 'GlobalErrorPage']]) {
-      assert.match(read(root, `fe/apps/web/src/app/${slot}`), new RegExp(`<${page}[ />]`), `${slot} mounts ${page}`);
-      assert.ok(files.includes(`fe/apps/web/src/features/pages/${page}/index.tsx`), page);
+    // The stack is written once: the routing, the request config and the locale negotiation live in the i18n package alone.
+    assert.match(read(root, 'fe/packages/nivo-i18n/src/routing.ts'), /DEFAULT_LOCALE = "vi"[\s\S]*defineRouting\(\{[\s\S]*defaultLocale: DEFAULT_LOCALE[\s\S]*localePrefix: "as-needed"/);
+    assert.match(read(root, 'fe/packages/nivo-i18n/src/index.ts'), /export const createAppI18n = [\s\S]*getRequestConfig\([\s\S]*readLocaleSegment/);
+    assert.match(read(root, 'fe/packages/nivo-i18n/src/proxy.ts'), /const negotiate = createMiddleware\(routing\)[\s\S]*export const proxy = /);
+    const stack = /defineRouting|getRequestConfig|createMiddleware|createNavigation/;
+    assert.deepEqual(files.filter(file => /\.tsx?$/.test(file) && stack.test(read(root, file))).sort(), ['fe/packages/nivo-i18n/src/index.ts', 'fe/packages/nivo-i18n/src/proxy.ts', 'fe/packages/nivo-i18n/src/routing.ts'], 'no app builds a layer of the next-intl stack');
+    // The brand shell is one ui component both apps mount.
+    assert.match(read(root, 'fe/packages/nivo-ui/src/composites/SiteShell/index.tsx'), /<TopBar brand=/);
+    for (const [name, prefix] of [['landing', 'Landing'], ['app', 'App']]) {
+      const at = `fe/apps/${name}`;
+      assert.match(read(root, `${at}/src/modules/i18n/index.ts`), new RegExp(`import \\{ createAppI18n \\} from "@nivo/i18n"[\\s\\S]*createAppI18n\\(\\s*"${name}"`), `${name} calls the package factory with its name`);
+      assert.match(read(root, `${at}/src/modules/i18n/request.ts`), /export default \w+I18n\.requestConfig/);
+      assert.equal(read(root, `${at}/src/proxy.ts`), 'export { proxy } from "@nivo/i18n/proxy"\n', `${name} re-exports the package proxy`);
+      assert.match(read(root, `${at}/src/features/layouts/${prefix}Layout/index.tsx`), /<SiteShell brand=/, `${name} mounts the shared brand shell`);
+      const home = name === 'app' ? 'AppHomePage' : 'LandingPage';
+      for (const [slot, page] of [['[locale]/page.tsx', home], ['[locale]/error.tsx', `${prefix}ErrorPage`], ['[locale]/not-found.tsx', `${prefix}NotFoundPage`], ['[locale]/loading.tsx', `${prefix}LoadingPage`], ['global-error.tsx', `${prefix}GlobalErrorPage`]]) {
+        assert.match(read(root, `${at}/src/app/${slot}`), new RegExp(`<${page}[ />]`), `${name} ${slot} mounts ${page}`);
+        assert.ok(files.includes(`${at}/src/features/pages/${page}/index.tsx`), page);
+      }
+      const catalog = JSON.parse(read(root, `${at}/src/modules/i18n/messages/vi.json`));
+      assert.deepEqual(Object.keys(catalog), [name], `${name}'s catalog sits under its own namespace`);
+      assert.deepEqual(['errors', 'home', 'loading', 'notFound', 'shell', 'title'].filter(key => !(key in catalog[name])), [], `${name}'s catalog holds every key its pages read`);
+      assert.equal(catalog[name].title, 'nivo', 'the skeleton names the app');
     }
-    assert.match(read(root, 'fe/apps/web/src/app/health/live/route.ts'), /\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}/);
-    assert.deepEqual(Object.keys(JSON.parse(read(root, 'fe/apps/web/src/modules/i18n/messages/vi.json'))).sort(), ['app', 'errors', 'home', 'loading', 'notFound']);
-    assert.match(read(root, 'fe/apps/web/src/modules/i18n/messages/vi.json'), /"title": "nivo"/, 'the skeleton names the app');
+    assert.match(read(root, 'fe/apps/app/src/app/health/live/route.ts'), /\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}/);
   });
 });
 

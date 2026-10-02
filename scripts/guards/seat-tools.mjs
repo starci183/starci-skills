@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guardsRoot } from './guards-root.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -22,7 +23,7 @@ export function seatToolDecision({ handle, toolName, root = skillRoot }) {
   return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents bypass [Worker] jobs, leases and the land gate - queue a [Worker] job instead (modules/supervisor/supervisor-prompt.md).` };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   let input = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => { input += chunk; });

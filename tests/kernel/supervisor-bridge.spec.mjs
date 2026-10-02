@@ -5,21 +5,21 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
-import { claimFoundation, declareDependent, readFoundation, writeFoundation } from '../../scripts/kernel/foundations.mjs';
+import { claimFoundation, declareDependent, readFoundation, writeFoundation } from '../../scripts/kernel/foundation-registry.mjs';
 import { HUB_STUCK_MS, RECORD_CHANGE_REFUSED, dependencyGraph, foundationAliasKey, readBridges } from '../../scripts/kernel/dependency-graph.mjs';
 import { createOwnership } from '../../scripts/kernel/work-ownership.mjs';
 import { approvalOf, commandFor, main } from '../../scripts/supervisor/bridge.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
-// Owner mandate 2026-09-28: the [Supervisor] adds supplementary (bridging) workflows when two workflows depend on
+// The [Supervisor] adds supplementary (bridging) workflows when two workflows depend on
 // each other and reorganizes workflows. Fixture ledgers reproduce the three shapes it must find - a circular wait,
-// a shared need nobody owns, duplicated work - and the nivo seam: module-studio and collab-group-chat both waiting
+// a shared need nobody owns, duplicated work - and a seam: module-studio and collab-group-chat both waiting
 // on ONE queued repair job of workspace-provision (op-e2e.verify-9fb01b4fe6), bridged by a Supervisor workflow.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
-const WSPV = 'wf-nivo-workspace-provision', STUDIO = 'wf-nivo-module-studio', COLLAB = 'wf-nivo-collab', MOD = 'wf-nivo-modules', AUTH = 'wf-nivo-auth', OLD = 'wf-nivo-fe-debt';
+const WSPV = 'wf-app-workspace-provision', STUDIO = 'wf-app-module-studio', COLLAB = 'wf-app-collab', MOD = 'wf-app-modules', AUTH = 'wf-app-auth', OLD = 'wf-app-fe-debt';
 const JOB = 'op-e2e.verify-9fb01b4fe6';
 
 const fixture = (t, { workflows = [WSPV, STUDIO, COLLAB, MOD, AUTH, OLD] } = {}) => {
@@ -65,7 +65,7 @@ const fixture = (t, { workflows = [WSPV, STUDIO, COLLAB, MOD, AUTH, OLD] } = {})
 };
 
 test('alias keys fold one foundation spelled two ways', () => {
-  assert.equal(foundationAliasKey('nivo.brand'), 'brand');
+  assert.equal(foundationAliasKey('app.brand'), 'brand');
   assert.equal(foundationAliasKey('starci-grammar'), 'grammar');
   assert.equal(foundationAliasKey('shell'), 'layout-tree');
   assert.equal(foundationAliasKey('layout-tree'), 'layout-tree');
@@ -87,7 +87,7 @@ test('circular wait: found, designated, and the lead side released', async (t) =
   assert.equal(cycle.proposal.owner, STUDIO, 'equal waiters: the oldest workflow leads');
   assert.deepEqual(cycle.proposal.releases, [a.incidentId]);
   assert.equal(cycle.proposal.clearCut, true);
-  assert.match(commandFor(fx.repo, cycle), /designate .*--lead wf-nivo-module-studio --waiter wf-nivo-workspace-provision --releases inc-/);
+  assert.match(commandFor(fx.repo, cycle), /designate .*--lead wf-app-module-studio --waiter wf-app-workspace-provision --releases inc-/);
 
   const out = await fx.bridge(['designate', '--lead', STUDIO, '--waiter', WSPV, '--reason', 'break the seam cycle', '--finding', cycle.key]);
   assert.equal(out.ok, true, JSON.stringify(out));
@@ -112,26 +112,26 @@ test('shared unowned need: an alias merges into the owned foundation, a stopped 
   fx.seed((ledger) => {
     const db = ledger.db, now = Date.now();
     writeFoundation(db, claimFoundation(null, { name: 'brand', workflowId: MOD, ownerRunning: false, kind: 'brand', now }).record, now);
-    writeFoundation(db, declareDependent(null, { name: 'nivo.brand', workflowId: AUTH, now }).record, now);
+    writeFoundation(db, declareDependent(null, { name: 'app.brand', workflowId: AUTH, now }).record, now);
     let contract = claimFoundation(null, { name: 'fe-contract', workflowId: OLD, ownerRunning: false, kind: 'contract', now }).record;
     contract = declareDependent(contract, { name: 'fe-contract', workflowId: COLLAB, now }).record;
     writeFoundation(db, contract, now);
     db.prepare('UPDATE workflows SET archived_at=? WHERE workflow_id=?').run(now, OLD);
   });
   const graph = fx.read((db) => dependencyGraph(db, { repo: fx.repo }));
-  const alias = graph.findings.find((f) => f.key === 'unowned-need|foundation:nivo.brand');
+  const alias = graph.findings.find((f) => f.key === 'unowned-need|foundation:app.brand');
   assert.deepEqual([alias.kind, alias.proposal.action, alias.proposal.mergeInto, alias.proposal.to, alias.proposal.clearCut], ['unowned-need', 'transfer', 'brand', MOD, true]);
   const stopped = graph.findings.find((f) => f.key === 'unowned-need|foundation:fe-contract');
   assert.deepEqual([stopped.proposal.action, stopped.proposal.to, stopped.proposal.clearCut], ['transfer', COLLAB, false]);
-  assert.match(stopped.summary, /owner nivo-fe-debt is not running/);
+  assert.match(stopped.summary, /owner app-fe-debt is not running/);
 
-  const merged = await fx.bridge(['transfer', '--foundation', 'nivo.brand', '--merge-into', 'brand', '--reason', alias.proposal.why, '--finding', alias.key]);
+  const merged = await fx.bridge(['transfer', '--foundation', 'app.brand', '--merge-into', 'brand', '--reason', alias.proposal.why, '--finding', alias.key]);
   assert.equal(merged.ok, true, JSON.stringify(merged));
   const moved = await fx.bridge(['transfer', '--foundation', 'fe-contract', '--to', COLLAB, '--reason', 'its owner stopped; collab builds it']);
   assert.deepEqual([moved.from, moved.to, moved.provisional], [OLD, COLLAB, true]);
   fx.read((db) => {
     assert.deepEqual(readFoundation(db, 'brand').dependents.map((d) => d.workflowId), [AUTH]);
-    assert.equal(readFoundation(db, 'nivo.brand').mergedInto, 'brand');
+    assert.equal(readFoundation(db, 'app.brand').mergedInto, 'brand');
     const fe = readFoundation(db, 'fe-contract');
     assert.deepEqual([fe.owner.workflowId, fe.owner.by, fe.dependents.length, fe.history.at(-1).event], [COLLAB, 'supervisor', 0, 'transferred']);
     const after = dependencyGraph(db, { repo: fx.repo });
@@ -167,7 +167,7 @@ test('duplicate work: two workflows own one path; shared wiring is not duplicati
 
 test('hub blocker: two workflows on one stuck job -> a bridging workflow owns it, their waits move onto it, its landing releases them', async (t) => {
   const fx = fixture(t, { workflows: [WSPV, STUDIO, COLLAB] });
-  fx.job(WSPV, JOB, { ago: 4 * 3_600_000, paths: ['src/tests/e2e/nivo/workspace-provision'] });
+  fx.job(WSPV, JOB, { ago: 4 * 3_600_000, paths: ['src/tests/e2e/app/workspace-provision'] });
   const s = fx.ok(['incident', '--workflow', STUDIO, '--kind', 'peer-wait', '--peer', WSPV, '--until-job', `${JOB}:succeeded`, '--holds', 'op-backend.implement-3333333333', '--detail', `seam settle waits on ${JOB}: TS18046 at workspace-purchase-flow.e2e-spec.ts:1045`]);
   const c = fx.ok(['incident', '--workflow', COLLAB, '--kind', 'peer-wait', '--peer', WSPV, '--until-job', `${JOB}:succeeded`, '--holds', 'op-backend.implement-4444444444', '--detail', `collab seam waits on ${JOB}`]);
   fx.ago(s.incidentId, 3 * 3_600_000); fx.ago(c.incidentId, 3 * 3_600_000);
@@ -180,8 +180,8 @@ test('hub blocker: two workflows on one stuck job -> a bridging workflow owns it
   assert.match(hub.proposal.goalDraft, /TS18046/);
 
   const out = await fx.bridge(['bridge', '--blocker', WSPV, '--dependents', `${STUDIO},${COLLAB}`, '--foundation', 'bridge-wspv-e2e-typecheck', '--kind', 'contract',
-    '--goal', 'Repair TS18046 at src/tests/e2e/nivo/workspace-provision/integration/workspace-purchase-flow.e2e-spec.ts:1045 so the repo typecheck is green for every workflow', '--title', 'bridge-wspv-typecheck',
-    '--paths', 'src/tests/e2e/nivo/workspace-provision/integration/workspace-purchase-flow.e2e-spec.ts', '--reason', hub.summary, '--finding', hub.key]);
+    '--goal', 'Repair TS18046 at src/tests/e2e/app/workspace-provision/integration/workspace-purchase-flow.e2e-spec.ts:1045 so the repo typecheck is green for every workflow', '--title', 'bridge-wspv-typecheck',
+    '--paths', 'src/tests/e2e/app/workspace-provision/integration/workspace-purchase-flow.e2e-spec.ts', '--reason', hub.summary, '--finding', hub.key]);
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.equal(out.rewire.pending, true, 'not running yet: the waits cannot name it');
   const bridgeWf = out.workflowId;

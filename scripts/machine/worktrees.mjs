@@ -16,8 +16,10 @@
 //            tree's live terminals are its liveTerminalCount; a tree stamped as the runtime's (scripts/lib/orca-orphans.mjs,
 //            written by worktree-provision.mjs at create) with no registry row - a crash between Orca's create and the bind
 //            - is adopted while its owner lives, or preserved to preserved/orphan/<id> and removed once its owner ended
-//            or is unknown, its row created then closed and an incident logged; an unstamped tree is foreign and never
-//            touched; a registered Orca tree that a complete ps page no longer lists is reported (orca-tree-unlisted),
+//            or is unknown, its row created then closed and an incident logged; an unstamped tree (no runtime stamp on an
+//            Orca tree, no job on a git tree's branch) is never removed: with no registry row, no live terminal and the owner
+//            grace spent it becomes ONE owner-review incident (machine_logs kind worktree.orphan-review) and a `review` item
+//            of every pass, for the owner to remove or adopt by hand; a registered Orca tree that a complete ps page no longer lists is reported (orca-tree-unlisted),
 //            never removed by other means. It also reclaims unregistered git trees under <repo>/.starciwork/worktrees
 //            whose job is not live. The reconciler GC controller runs it ACTIVE (controllers/gc.mjs key gc:worktrees).
 //   counts   worktreeCounts: each repo's live count against its cap and its orphans (start.mjs --check).
@@ -29,7 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import {
   worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason, pendingPathOf,
   treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ENDED_WORKFLOW_PHASES,
@@ -39,11 +41,12 @@ import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict } from
 import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
 import { mainRootOf, registeredAt, removeScratchWorktree } from './worktree-git.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
-import { isAncestor } from '../api/git/merge-base.mjs';
+import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
-import { pidAlive, machineLog } from '../../engine/db/machine.mjs';
+import { pidAlive, machineLog, withMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -199,6 +202,8 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
         const status = jobId ? lookup(null, jobId) : null;
         if (status && !SETTLED_JOBS.has(status)) continue;
         if (!status && ageOf(w.path, now) <= settings.ownerGoneMs) continue;
+        // No job on its branch: unstamped, so never removed here - the owner reviews it.
+        if (!jobId) { items.push(reviewUnstamped({ dir: path.resolve(w.path), repoRoot, home: 'git', detail: { branch: w.branch ?? null }, apply, env })); continue; }
         if (halt()) return items;
         items.push(collect({ row: null, repoRoot, dir: w.path, branch: w.branch, name: jobId ?? `orphan-${hashOf(w.path)}`, reason: status ? 'owner-settled' : 'orphan', merged: false, apply, env, git, orca }));
       }
@@ -224,9 +229,25 @@ function removeEmptyDirs(root) {
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 
 /** One incident line in machine_logs (actor gc, kind worktree.orphan): what the orphan scan found and did. */
-function orphanIncident({ level = 'warn', msg, owner = {}, data, env }) {
-  machineLog({ actor: 'gc', kind: 'worktree.orphan', level, msg: msg.slice(0, 500), ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null,
+function orphanIncident({ level = 'warn', kind = 'worktree.orphan', msg, owner = {}, data, env }) {
+  machineLog({ actor: 'gc', kind, level, msg: msg.slice(0, 500), ledgerId: owner.ledgerId ?? null, workflowId: owner.workflowId ?? null,
     jobId: owner.jobId ?? null, data }, { env });
+}
+
+/**
+ * An unstamped orphan tree (3.8): no runtime stamp (Orca) or no job (git), no registry row, idle past the owner grace. It is
+ * never removed - it may be the owner's own work: it is listed for the owner's review, one incident per tree for good
+ * (machine_logs kind worktree.orphan-review, deduplicated by path), and every pass reports it as a `review` item.
+ */
+function reviewUnstamped({ dir, repoRoot, home, detail, apply, env }) {
+  if (apply) {
+    try {
+      const seen = withMachine((m) => m.db.prepare("SELECT data_json FROM machine_logs WHERE kind='worktree.orphan-review'").all(), { env })
+        .some((r) => { try { return sameTree(JSON.parse(r.data_json)?.path, dir); } catch { return false; } });
+      if (!seen) orphanIncident({ kind: 'worktree.orphan-review', msg: `unstamped ${home} tree ${dir} has no registry row and no owner: awaiting the owner's review, never removed by the GC`, data: { path: dir, home, ...detail }, env });
+    } catch { /* the review item below still reports it */ }
+  }
+  return { path: dir, repoRoot: repoRoot ? path.resolve(repoRoot) : null, reason: 'unstamped-orphan', action: 'review', home, ok: true };
 }
 
 /** A registered Orca tree Orca no longer lists (orca-tree-unlisted): reported and marked, never removed by other means. */
@@ -256,8 +277,15 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
   for (const w of ps.worktrees) {
     if (w.isMainWorktree || !w.id || !w.path || w.hostId !== 'local') continue;
     const stamp = parseRuntimeStamp(w.comment);
-    if (!stamp || !ORCA_KINDS.includes(stamp.kind)) continue; // foreign: never touched
-    if (fresh.some((r) => r.orca_id === w.id || (!isPendingRow(r) && sameTree(r.path, w.path)))) continue; // registered
+    const registered = fresh.some((r) => r.orca_id === w.id || (!isPendingRow(r) && sameTree(r.path, w.path)));
+    if (!stamp) {
+      // Foreign or unstamped: never removed. One with no row, no live terminal and a spent grace is the owner's to review.
+      if (!registered && !w.liveTerminalCount && Math.min(ageOf(w.path, now), w.lastActivityAt ? now - w.lastActivityAt : Infinity) > settings.ownerGoneMs)
+        items.push(reviewUnstamped({ dir: path.resolve(w.path), repoRoot: mains.get(w.repoId) ?? null, home: 'orca', detail: { orcaId: w.id, branch: w.branch ?? null, comment: w.comment ?? null }, apply, env }));
+      continue;
+    }
+    if (!ORCA_KINDS.includes(stamp.kind)) continue; // a stamped kind that is not an Orca kind here: left for the lane that makes it one
+    if (registered) continue;
     const slotName = path.basename(pendingPathOf('', stamp.kind, stamp.slot));
     const inFlight = fresh.some((r) => isPendingRow(r) && r.kind === stamp.kind && path.basename(r.path) === slotName && !stalePending(r, now, settings.ownerGoneMs));
     const staging = stamp.kind === 'supervisor-staging';
@@ -325,4 +353,4 @@ function main(argv) {
   console.error('use: worktrees.mjs counts [--json] | gc [--plan] [--json] | resume');
   return 2;
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

@@ -2,7 +2,7 @@
 // warm off-white page, navy ink, a filled primary button, a text link, a soft tinted selection row and a status
 // dot - painted once in the brand's red and once in the image model's default blue. The nivo brand is ONE
 // accent, Unicorn red #e3001f, which is also its focus and danger colour; success, warning and info are its
-// declared status colours (nivo-backend .starciwork/brand/index.yaml).
+// declared status colours (the repo's .starciwork/brand/index.yaml).
 import { blankImage, drawOver } from '../../scripts/work/png.mjs';
 
 export const NIVO_BRAND = {

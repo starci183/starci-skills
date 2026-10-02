@@ -1,5 +1,5 @@
-// The declared-pattern tree checks (scripts/hfs/rules/event-bus.mjs): R131 BE_EVENT_CLASS_CONTRACT (a typed event class equals its entry
-// in the vendored contract) and R135 BE_PATTERN_SPEC_MISSING (a declared pattern has its proof scenarios on the test world).
+// The declared-pattern tree checks (scripts/hfs/rules/event-bus.mjs): R151 BE_EVENT_CLASS_CONTRACT (a typed event class equals its entry
+// in the vendored contract) and R155 BE_PATTERN_SPEC_MISSING (a declared pattern has its proof scenarios on the test world).
 // Fixtures are built from a temp directory; each violating case changes one fact of the passing base.
 import test from 'node:test';
 import assert from 'node:assert/strict';

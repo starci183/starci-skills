@@ -1,5 +1,5 @@
 /**
- * Twin tests for the `starciFeConfig` factory and the Vietnamese why map.
+ * Twin tests for the `starciFeConfig` factory and the why map.
  *
  *   node --test config.spec.mjs
  *
@@ -22,6 +22,7 @@ import plugin, {
 } from "./index.mjs"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { declaredHfsView } from "./runtime/scripts/hfs/view.mjs"
+import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
 import { appDeclaration } from "../be/fixtures/app.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "typed")
@@ -121,7 +122,7 @@ test("the factory's config lints a real file: a hardcoded copy string is an erro
 
 // -- the why map -----------------------------------------------------------------------------------
 
-/** Laws whose every rule carries a catalogue code, and so a Vietnamese why. */
+/** Laws whose every rule carries a catalogue code, and so a why. */
 const CATALOGUED_LAWS = [
   "env-owner",
   "transport",
@@ -150,18 +151,19 @@ const CATALOGUED_RULES = [
   "outcome-kinds-exhaustive",
 ]
 
-test("every catalogued rule has a why with a code, a Vietnamese headline and a Vietnamese next step", () => {
+test("every catalogued rule has a why with a code, an English headline and an English next step", () => {
   const needed = Object.entries(ruleOwners)
     .filter(([name, law]) => CATALOGUED_LAWS.includes(law) || CATALOGUED_RULES.includes(name))
     .map(([name]) => name)
   assert.ok(needed.length >= 30, `only ${needed.length} catalogued rules found`)
-  const vietnamese = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i
   for (const name of needed) {
     const entry = why[name]
     assert.ok(entry, `${name} has no why`)
     assert.match(entry.code, /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/, `${name}: code is not UPPER_SNAKE`)
-    assert.match(entry.vi, vietnamese, `${name}: vi is not Vietnamese`)
-    assert.match(entry.fixVi, vietnamese, `${name}: fixVi is not Vietnamese`)
+    assert.ok(entry.en?.length > 0, `${name}: en is empty`)
+    assert.ok(!hasSecondLanguage(entry.en), `${name}: en is not English`)
+    assert.ok(entry.fix?.length > 0, `${name}: fix is empty`)
+    assert.ok(!hasSecondLanguage(entry.fix), `${name}: fix is not English`)
   }
 })
 

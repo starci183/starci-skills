@@ -42,7 +42,7 @@ rules:
         write: 'the webhook door (webhooks.yaml) verifies the signature and calls one domain intake method; that method of the domain service claims (PAYOS_SOURCE, eventId) as its first awaited expression, returns when the claim answers false, and publishes the event in its transaction.'
       - id: case-2
         when: A consumer
-        write: 'be/src/features/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
+        write: 'be/src/features/api/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
     verification:
       automated:
         - BE_INBOX_DEDUPE_MISSING

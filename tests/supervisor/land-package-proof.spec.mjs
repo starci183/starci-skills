@@ -21,9 +21,9 @@ test('a candidate without the proof script has no package proof check', (t) => {
 test('the proof runs in the scratch against the land base, and its exit decides the check', (t) => {
   const dir = scratch(t, '');
   const calls = [];
-  const runner = (status) => (cmd, args, opts) => { calls.push({ cmd, args, cwd: opts.cwd }); return { ok: status === 0, status, stdout: `package-clean-test: exit ${status}\n`, stderr: '', error: null }; };
+  const runner = (status) => (args, opts) => { calls.push({ args, cwd: opts.cwd }); return { ok: status === 0, status, stdout: `package-clean-test: exit ${status}\n`, stderr: '', error: null }; };
   const green = packageProofCheck({ dir, base: 'abc123', runner: runner(0) });
-  assert.deepEqual(calls[0], { cmd: process.execPath, args: [PACKAGE_PROOF, '--base', 'abc123'], cwd: dir });
+  assert.deepEqual(calls[0], { args: [PACKAGE_PROOF, '--base', 'abc123'], cwd: dir });
   assert.equal(green.name, 'package-clean-test');
   assert.equal(green.ok, true);
   assert.equal(packageProofCheck({ dir, base: 'abc123', runner: runner(1) }).ok, false);

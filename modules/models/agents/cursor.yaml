@@ -1,0 +1,40 @@
+schema: starci/agent-card@1
+agent: cursor
+kind: native-managed-agent
+start:
+  api: orchestration.worker-start
+  agentArgument: cursor
+  # The CLI binary Orca launches (the agent id is `cursor`) and its own approval-bypass mode (Orca's agentDefaultArgs).
+  cli: cursor-agent
+  bypassFlag: '--yolo'
+readiness: worker-start-receipt
+roles:
+  - workflow-kernel
+  - operation-agent
+name:
+  api: terminal.rename
+release:
+  api: orchestration.worker-release
+# Orca's agent id is `cursor`; its binary is `cursor-agent` (Orca catalog: promptDelivery argv, modelSource dynamic via
+# `cursor-agent --list-models`, default model `auto`). worker-start takes --model for Cursor, so the route's model is sent.
+launchTrust: >-
+  Orca's own per-agent default args (settings agentDefaultArgs.cursor: --yolo) carry the permission bypass; the
+  runtime writes no Cursor trust file. A prompt that still appears is a gate to answer once, else refuse.
+verifiedAt: 2026-10-02
+verifiedAgainst: 'cursor-agent 2026.10.01-14929f9 (logged in; `cursor-agent --list-models` lists auto (default), composer-2.5, claude-opus-5-5-*, gpt-5.6-sol-*, grok-4.7-* and more; live worker-start --agent cursor --model auto reached worker_done and released, turnStart unsupported, no transcript: worker-read serves the terminal tail, fallbackReason session_not_reported)'
+forbidden:
+  - shell-only-role
+  - unsupervised-dispatch-inject-as-success
+capabilities:
+  schema: starci/cursor-capabilities@1
+  hostTools: []
+  orca:
+    nativeManagedAgent: supported
+    agentId: cursor
+    roles:
+      - workflow-kernel
+      - operation-agent
+knownFailures:
+  - signal: 'Authentication required'
+    meaning: cursor-agent is not logged in on this host (or its login expired); every launch exits before the prompt.
+    action: The owner runs `cursor-agent login` (or sets CURSOR_API_KEY) - the runtime never signs in. Do not retry the launch until then.

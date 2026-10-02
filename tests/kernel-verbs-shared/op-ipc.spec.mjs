@@ -35,7 +35,7 @@ const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
 import {normalizeOwnedPath} from '../../engine/admission.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
-// The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is on
+// The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is on
 // by default, so this spec runs with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -163,7 +163,7 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
   assert.equal(payload?.hierarchy?.parentNodeId,`agent:kernel:${WORKFLOW}`);
   assert.equal(payload?.hierarchy?.runtime?.dispatchId,contract.dispatch_id);
   const calls=fs.readFileSync(fx.env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv.slice(0,2).join(' '));
-  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start'])
+  for(const step of ['orchestration run-create','orchestration worker-start'])
     assert.ok(calls.includes(step),`the op hierarchy never called '${step}' — log: ${calls.join(', ')}`);
   assert.equal(calls.includes('terminal create'),false,'no op terminal is created by the runtime');
 

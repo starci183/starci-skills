@@ -23,8 +23,8 @@
 //           of another job of the same workflow still open or settled after it is
 //           progress the Kernel planned, never drift. Otherwise only a COMMITTED
 //           revision counts (an in-flight rewrite never does), judged by the
-//           record's ONE owner workflow (work-ownership.mjs, owner 2026-09-25,
-//           starci-next inc-1c7f7dad53e0 - peers re-staling each other's shared
+//           record's ONE owner workflow (work-ownership.mjs, owner 2026-09-25 -
+//           peers re-staling each other's shared
 //           records in a redo ping-pong): a peer's change is advisory `peerDrift`
 //           unless the OWNER marked it breaking (its change note or `api
 //           record-change --reach follow-up`), which owes ONE follow-up leg
@@ -43,7 +43,7 @@ import path from 'node:path';
 import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { admittedContractOf } from '../machine/contract-version.mjs';
-import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { changeNoteOf, committedMatches, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges, workflowCommittedReader } from './work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
@@ -386,11 +386,11 @@ export function inputDrift(db, workflowId, { root, repo = null, workDir = '.star
       }
     }
   }
-  // Only committed revisions count: one read of HEAD for every changed record file of this call. A
+  // Only committed revisions count (its own records at its workflow branch, others at main: workflowCommittedReader). A
   // file whose committed bytes are still the ones the job read is an in-flight rewrite, never a change.
   const perFile = workChanged.filter((item) => item.then);
-  const heads = perFile.length && repo ? (committed === undefined ? committedReader(repo, { workDir }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
   const ownerOf = perFile.length ? (ownership ?? createOwnership(db, { repo, workDir })) : null;
+  const heads = perFile.length && repo ? (committed === undefined ? workflowCommittedReader({ repo, workDir, workflowId, ownerOf }) : committed)?.(perFile.flatMap((item) => item.unexplained)) ?? null : null;
   let declarations;
   const textOf = (file) => {
     if (heads) return heads.get(file)?.toString('utf8') ?? null;

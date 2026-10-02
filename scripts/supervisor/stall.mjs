@@ -51,7 +51,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs, loadConfig } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -250,8 +250,8 @@ export const MESSAGE_GATE = /\bheads?-?up\b|\bmessage\b|\bnotif(?:y|ies|ied|icat
  *       ask is no evidence against it.
  * A gate that names a path is released by that path landing and by nothing else. A named peer's
  * message after the gate releases only a gate that names no checkable path and waits on a message
- * (MESSAGE_GATE): mia-mia base-repos inc-55060d946270 waited for .starciwork/brand/index.yaml to
- * settle, and the peer's "brand job admitted" heads-up (pm-a34aec2c6891) read as its release while the
+ * (MESSAGE_GATE): a base-repos gate once waited for .starciwork/brand/index.yaml to
+ * settle, and the peer's "brand job admitted" heads-up read as its release while the
  * record did not exist yet. A still-pending peer message that releases nothing is returned in
  * `unread` (stallFindings reports UNREAD-PEER: the Kernel reads its inbox), never as staleness.
  */
@@ -324,8 +324,8 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
   if (!running) reasons.push(`peer ${wait.peer} is ${peerRow.archived_at != null ? 'archived' : `phase ${peerRow.phase ?? 'unset'}`}, so it will land nothing more`);
   const unread = peerDeliveries(db, workflowId, [wait.peer], wait.raisedAt).filter((m) => m.status === 'pending');
   // The release: a wait with typed until conditions is judged by them alone, exactly as the runtime
-  // judges them (starci-next sn-subscription inc-6156f4a868e9: an until-job X:succeeded that already
-  // followed X's running retry head read stale when X, or any op id its text named, settled). Only a
+  // judges them (an until-job X:succeeded that already
+  // followed X's running retry head once read stale when X, or any op id its text named, settled). Only a
   // wait with no until falls back to the job ids its text and refs name - each at its lineage head.
   const until = typedRelease(db, workflowId, wait.incidentId, { repo });
   if (until) {
@@ -370,8 +370,8 @@ const jsonFrom = (stdout) => {
 export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   const env = { ...process.env };
   delete env.ORCA_TERMINAL_HANDLE;
-  const r = spawnSync(process.execPath, [API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
-    { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
+  const r = runNode([API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
+    { cwd: skillRoot, timeout: timeoutMs, env });
   const value = jsonFrom(r.stdout);
   if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
   return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, kernelRev: value.kernelRev ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],

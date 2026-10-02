@@ -5,7 +5,8 @@
 // Returns {ok, run, coordinator, missing, errorCode, error, hostUnavailable}:
 // `coordinator` is result.run.coordinator_handle, `missing` is Orca's typed
 // run_not_found (the Run is gone, not the host).
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function runShow({ id }) {
   const r = orcaCall('run-show', { id });

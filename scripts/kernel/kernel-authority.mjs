@@ -1,6 +1,7 @@
 // kernel-authority.mjs — what the Kernel may do INSIDE its own workflow without escalating, and the api-enforced
-// guardrails around it (owner 2026-09-28: "sao workflows không tự điều phối dc mà đợi supervisor", "kernel phải
-// brainstorm dc, xử lý lỗi dc ... làm mọi thứ để workflows tiến", refined: ops draw the graph, the Kernel only makes
+// guardrails around it (owner 2026-09-28: "why don't the workflows coordinate themselves instead of waiting for the
+// supervisor", "the kernel must be able to brainstorm, handle errors ... do everything so the workflows move forward",
+// refined: ops draw the graph, the Kernel only makes
 // LIGHT unit edits and dispatches the owning op for a heavy redesign). Shared by the api verbs graph-edit,
 // dispatch-ready, decide, redesign, op-override and kernel-proposal (scripts/kernel/verbs/).
 //
@@ -16,13 +17,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
-import { operationNodeId } from './verbs/shared/hierarchy.mjs';
+import { operationNodeId } from './verbs/shared/agent-hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
@@ -48,7 +49,7 @@ const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').re
 /** Run one api verb against the same repo: {ok, status, json, out, err}. The caller's env (Kernel identity) passes. */
 export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = {}) {
   // CHILD_ENV: a child of a resolving verb (graph-edit, redesign) passes the decisions-first guard (scripts/machine/decisions.mjs).
-  const r = spawnSync(process.execPath, [API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
+  const r = runNode([API_FILE, ...argv, '--repo', repo, '--json'], { cwd: skillRoot, timeout: timeoutMs, env: { ...env, [CHILD_ENV]: '1' }, maxBuffer: 64 * 1024 * 1024 });
   let json = null;
   const text = String(r.stdout ?? '').trim();
   try { json = JSON.parse(text); } catch { const i = text.indexOf('{'); if (i >= 0) { try { json = JSON.parse(text.slice(i)); } catch { json = null; } } }
@@ -184,7 +185,7 @@ export function failedShapesOf(db, workflowId, job) {
   for (const j of unit.jobs) {
     if (j.status !== 'failed' || j.job_id === job.job_id) continue;
     const causes = causesOf({ status: j.status, result: j.result, report: reports.get(j.job_id) ?? null });
-    if (causes.includes('partial-commit')) continue; // the base moved: a continuation of the same shape is new work
+    if (causes.includes('partial-work')) continue; // the base moved: a continuation of the same shape is new work
     if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes });
   }
   return out;

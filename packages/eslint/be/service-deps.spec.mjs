@@ -16,11 +16,11 @@ const tester = typedTester()
 
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const SERVICE_SPEC = at("src/modules/domain/order/order.service.spec.ts")
-const HANDLER = at("src/features/checkout/application/place.handler.ts")
+const HANDLER = at("src/features/api/checkout/application/place.handler.ts")
 const PLATFORM_DATABASE = at("src/modules/platform/database/database.service.ts")
 const REPOSITORY_FILE = at("src/modules/domain/order/persistence/order.repository.ts")
 const MAPPER = at("src/modules/domain/order/order.mapper.ts")
-const MIGRATE = at("apps/migrate/src/main.ts")
+const MIGRATE = at("apps/cli/src/main.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
 const FIXTURE = at("src/tests/fixtures/database.ts")
 const MIGRATION = at("src/modules/domain/order/persistence/migrations/1730000000000-create-orders.ts")
@@ -78,7 +78,7 @@ test("R83: a persistence class lives only where the manager may be held", () => 
             { filename: PLATFORM_DATABASE, code: wrapper },
             // a typed queue producer takes the transaction of its caller
             { filename: at("src/modules/queues/mail/mail.queue.ts"), code: `${TYPEORM}export class MailQueue { enqueueMail(payload: object, tx: EntityManager): Promise<void> { return tx.query("select 1") } }` },
-            // the migrate app, the test world and a migration receive a connection or a runner by nature
+            // the cli, the test world and a migration receive a connection or a runner by nature
             { filename: MIGRATE, code: `${TYPEORM}export class Runner { run(source: DataSource) { return source.query("select 1") } }` },
             { filename: WORLD, code: `${TYPEORM}export class World { constructor(readonly source: DataSource) {} }` },
             { filename: MIGRATION, code: `${TYPEORM}export class CreateOrders { up(runner: QueryRunner) { return runner.query("select 1") } }` },
@@ -118,7 +118,7 @@ export const x = load` },
             // renamed wrappers: a store, a dao, a gateway and a statements module, in persistence/ or anywhere else
             { filename: at("src/modules/domain/order/persistence/typeorm-order.store.ts"), code: `${TYPEORM}export class TypeOrmOrderStore { constructor(private readonly entityManager: EntityManager) {} }`, errors: [{ messageId: "repository" }] },
             { filename: at("src/modules/domain/order/order.dao.ts"), code: `${TYPEORM}export class OrderDao { find(em: EntityManager) { return em } }`, errors: [{ messageId: "repository" }] },
-            { filename: at("src/features/checkout/application/order.gateway.ts"), code: `${TYPEORM}export class OrderGateway { private manager!: EntityManager
+            { filename: at("src/features/api/checkout/application/order.gateway.ts"), code: `${TYPEORM}export class OrderGateway { private manager!: EntityManager
  set(em: EntityManager) { this.manager = em } }`, errors: [{ messageId: "repository" }] },
             { filename: at("src/modules/domain/order/persistence/order.statements.ts"), code: `${TYPEORM}export function insertOrder(em: EntityManager, id: string) { return em.query(id) }`, errors: [{ messageId: "statements" }] },
             { filename: at("src/modules/domain/order/persistence/order.statements.ts"), code: `${TYPEORM}export const insertOrder = async (em: EntityManager, id: string) => em.query(id)`, errors: [{ messageId: "statements" }] },

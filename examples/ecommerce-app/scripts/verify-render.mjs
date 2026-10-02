@@ -9,8 +9,8 @@ import {
     checkEntityListInCard,
     checkMascotSlot,
     cardClassesOf,
-} from "../../../scripts/checks/render.mjs"
-import { defaultGrammarRoot } from "../../../scripts/checks/brand.mjs"
+} from "../../../scripts/work/ui/render.mjs"
+import { defaultGrammarRoot } from "../../../scripts/work/brand/brand.mjs"
 
 /**
  * Running-page render proof for the ecommerce-app front end, per ui-screen record.
@@ -19,8 +19,7 @@ import { defaultGrammarRoot } from "../../../scripts/checks/brand.mjs"
  * only for `work/implementation@1` records: it returns no problems for any other schema, and this product's
  * Work tree authors no frontend implementation node at all (its two `impl/*` records are both
  * `repository: be`, the be side, and neither names a ui-screen in `proves`). So the ecommerce
- * captures have no gate-side proof path, and `scripts/checks/render.mjs` has to be called directly — the same thing
- * todo-app/scripts/verify-captures.mjs does for the todo app, for the same stated reason.
+ * captures have no gate-side proof path, and `scripts/work/ui/render.mjs` has to be called directly.
  *
  * Three modes, one per claim a ui record makes about its own render:
  *
@@ -172,7 +171,7 @@ if (args.mode === "custody") {
             "RENDER_BRAND_MISSING: the Work tree's brand/index.yaml carries no `brand:` specification block " +
                 `(its top-level keys are ${Object.keys(brandDoc).join(", ")}), so scripts/example/example-render-proof.mjs's ` +
                 "readExampleBrand refuses before any check runs and brandColours() reads no colour at all — the record " +
-                "authors a human-readable `colour:` map instead of the `color.tokens`/`color.scales` shape scripts/checks/render.mjs parses.",
+                "authors a human-readable `colour:` map instead of the `color.tokens`/`color.scales` shape scripts/work/ui/render.mjs parses.",
         )
     }
     const brandSpec = brandDoc?.brand ?? null

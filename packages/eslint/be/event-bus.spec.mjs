@@ -1,5 +1,5 @@
 /**
- * Twin tests for the event-bus and queue laws (R132 `BE_OUTBOX_WRITE_TX`, R133 `BE_EVENT_CONSUMER_SHAPE`, R134 `BE_QUEUE_PRODUCER_SHAPE`).
+ * Twin tests for the event-bus and queue laws (R152 `BE_OUTBOX_WRITE_TX`, R153 `BE_EVENT_CONSUMER_SHAPE`, R154 `BE_QUEUE_PRODUCER_SHAPE`).
  *
  *   node --test event-bus.spec.mjs
  *

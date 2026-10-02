@@ -1,6 +1,6 @@
 // task-spec.mjs — the Orca Task spec an operation is created with, sized for the host's argv.
 //
-// `orca orchestration task-create --spec <text>` takes the spec inline: there is no --spec-file, and
+// `orca orchestration worker-start --spec <text>` takes the spec inline: there is no --spec-file, and
 // scripts/api/orca/lib.mjs passes it as one argv element to spawnSync. Windows caps a whole command
 // line at 32767 UTF-16 units, so a packet above that fails at spawn with ENAMETOOLONG before Orca sees
 // it - deterministically, every retry (nivo wf-nivo-workspace-provision-mujek7cb inc-826e077777de: a
@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Head-room under 32767 for the rest of the task-create argv (run id, titles, parent, from, --json)
+// Head-room under 32767 for the rest of the worker-start argv (run id, titles, worktree, agent, model, from, --json)
 // and for the Orca preamble a command terminal receives around the spec.
 export const TASK_SPEC_MAX_CHARS = 16000;
 
@@ -28,7 +28,7 @@ export const packetFileOf = (jobDir, attempt) => path.join(jobDir, `packet.a${Nu
  * Returns {spec, spilled:false} for a prompt that fits, else writes it to `file` and returns
  * {spec: <pointer>, spilled:true, file, chars}; `heading` replaces the [Op] first line (a Kernel, Supervisor or
  * [Worker] spec). A spill with no file to write to returns the prompt
- * inline (spilled:false, tooLong:true) so the caller's task-create error stays the real one.
+ * inline (spilled:false, tooLong:true) so the caller's worker-start error stays the real one.
  */
 export function taskSpecOf({ prompt, file, op, jobId, attempt = 1, heading = null, max = TASK_SPEC_MAX_CHARS, write = fs.writeFileSync, mkdir = fs.mkdirSync }) {
   const text = String(prompt ?? '');

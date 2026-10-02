@@ -1,12 +1,11 @@
 // host-event.mjs — a worker death inside a host-wide terminal disconnect is the environment's, not the op's.
 //
-// 2026-09-27 13:20-13:30Z every Kernel terminal of the nivo and starci-next ledgers was cleared
+// Once, every Kernel terminal of two product ledgers was cleared
 // 'terminal disconnected' within ten minutes (Orca's terminal daemon dropped them), and the five op
-// workers alive then - nivo app-auth uat.verify a3, collab backend.implement a9, modules-agentos
-// interface.draw a3; starci-next learn-content and foundation backend.implement a2 - settled
+// workers alive then - three of one product's ops, two of the other's - settled
 // failed-no-report as the ops' own deaths: a business attempt spent each, their pools demoted, the
-// dead-worker pattern fed. The host samples around it (13:02Z 23.7% free RAM, 13:36Z 16.6%) show
-// pressure but no OOM floor; the signature is the simultaneous disconnect. cli.mjs hostTerminalWipeOf
+// dead-worker pattern fed. The host samples around it (free RAM in the teens, never an OOM floor)
+// show pressure but no OOM floor; the signature is the simultaneous disconnect. cli.mjs hostTerminalWipeOf
 // already recognised a wipe proven by the worker's OWN Kernel terminal being gone; a disconnect seen
 // through other workflows' Kernels was missed.
 //
@@ -92,11 +91,11 @@ export function hostWideDisconnectOf(db, now = Date.now(), { repos = null } = {}
   return enough(deaths) ? workflowsIn(deaths, from, now) : null;
 }
 
-// hostEventAround(db, at) -> [workflowId] | null: the same proof read in hindsight. 2026-09-28 04:19Z
-// (nivo wf-nivo-fe-canon) Orca dropped every terminal at once - four devin code.refactor workers of the
-// Run and the module-studio Kernel gone terminal_handle_stale within 13 s, the collab and fe-canon Kernels
-// unwritable then cleared 'terminal disconnected' by 04:35Z. The first worker reconciled
-// (op-code.refactor-b7f1b77a67, dirty tree) settled at 04:19:33, before any other death was in a ledger,
+// hostEventAround(db, at) -> [workflowId] | null: the same proof read in hindsight. In one incident
+// Orca dropped every terminal at once - four devin code.refactor workers of a Run and a peer
+// Kernel gone terminal_handle_stale within seconds, two more Kernels
+// unwritable then cleared 'terminal disconnected' minutes later. The first worker reconciled
+// (dirty tree) settled before any other death was in a ledger,
 // so hostWideDisconnectOf saw nothing and the death spent a business attempt and demoted devin for its
 // retry. A death is a host event when some HOST_EVENT_WINDOW_MS span containing it holds
 // HOST_EVENT_MIN_WORKFLOWS workflows' host deaths, the proof landing before or after it.

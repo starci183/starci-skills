@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { diffNames } from '../api/git/diff-names.mjs';
-import { spawnDetachedSilent } from '../api/process/spawn-detached.mjs';
+import { spawnDetachedSilent } from '../api/process/spawn-detached-silent.mjs';
 import { machineLog } from '../../engine/db/machine.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleep as sleepAsync } from '../lib/sleep.mjs';

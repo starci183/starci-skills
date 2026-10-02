@@ -1,7 +1,7 @@
-// The orchestration drain (scripts/kernel/verbs/shared/messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
+// The orchestration drain (scripts/kernel/verbs/shared/worker-messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
 // workflow is read through Orca's consuming check naming the Kernel terminal, every message of a Delivery is written into
 // the ledger in ONE transaction, and the Delivery is acknowledged only after that commit. A replayed Delivery writes
-// nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the orch-check
+// nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the scripts/api/orca/check.mjs
 // wrapper: nothing reaches a host.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
-import { drainWorkflowMessages, workerDoneOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/messages.mjs';
+import { drainWorkflowMessages, workerDoneOf, workerQuestionsOf, ORCHESTRATION_DELIVERY } from '../../scripts/kernel/verbs/shared/worker-messages.mjs';
 
 const WF = 'wf-drain', JOB = 'job-drain', KERNEL = 'term-kernel', RUN = 'run-wf', DISPATCH = 'ctx_op';
 
@@ -40,7 +40,7 @@ function fixture(t) {
 const msg = (id, type, extra = {}) => ({ id, run_id: RUN, from_handle: `dispatch:${DISPATCH}`, to_handle: `run:${RUN}`, type,
   subject: type, body: `${type} ${id}`, thread_id: null, payload: JSON.stringify({ dispatchId: DISPATCH, taskId: 'task_op', ...extra }), created_at: '2026-10-01T00:00:00Z' });
 
-/** A fake orch-check: `batches` are the Deliveries in order; one replays until acked. `trace` records calls and commits. */
+/** A fake check call: `batches` are the Deliveries in order; one replays until acked. `trace` records calls and commits. */
 function fakeCheck(batches, trace, { fenceFor = null, ackFails = false } = {}) {
   let i = 0;
   return ({ run, terminal, ack = null }) => {
@@ -83,9 +83,9 @@ test('a Delivery replayed after a lost ack writes nothing twice', (t) => {
 
 test('worker_done is handed to settlement with its job, outcome and report path', (t) => {
   const ledger = fixture(t), trace = [];
-  drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('m9', 'worker_done', { outcome: 'succeeded', reportPath: 'D:/w/report.json' })]], trace) });
+  drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('m9', 'worker_done', { outcome: 'succeeded', reportPath: 'w/report.json' })]], trace) });
   assert.deepEqual(workerDoneOf(ledger.db, WF).map(({ messageId, jobId, dispatchId, outcome, reportPath }) => ({ messageId, jobId, dispatchId, outcome, reportPath })),
-    [{ messageId: 'm9', jobId: JOB, dispatchId: DISPATCH, outcome: 'succeeded', reportPath: 'D:/w/report.json' }]);
+    [{ messageId: 'm9', jobId: JOB, dispatchId: DISPATCH, outcome: 'succeeded', reportPath: 'w/report.json' }]);
 });
 
 test("a consumer_fenced Kernel Run is re-bound once and checked again; another Run is never re-bound", (t) => {

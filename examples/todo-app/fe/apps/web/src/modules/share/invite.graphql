@@ -1,9 +1,0 @@
-mutation Invite($input: InviteInput!) {
-    invite(input: $input) {
-        invitationId
-        taskId
-        email
-        role
-        status
-    }
-}

@@ -22,13 +22,14 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
 import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../../api/git/lib.mjs';
+import { catFile } from '../../api/git/cat-file.mjs'; import { diff as gitDiff } from '../../api/git/diff.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -42,10 +43,8 @@ const trimOwned = (p) => norm(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/,
 export const parityEligible = (item) => item?.outcome === 'done' && PARITY_OPS.includes(item.op)
   && Boolean(item.payload?.cut) && Boolean(item.payload?.params?.canonFamilies);
 
-/** The slice's admission base: params.admissionBase, else the --base its checks (gate.mjs, canon-scan) measured against. */
+/** The slice's admission base: the --base its checks (gate.mjs, canon-scan) measured against. */
 export function sliceBaseOf(item) {
-  const param = String(item?.payload?.params?.admissionBase ?? '').trim();
-  if (/^[0-9a-f]{7,40}$/i.test(param)) return param;
   for (const c of Array.isArray(item?.report?.checks) ? item.report.checks : []) {
     const m = /--base\s+([0-9a-f]{7,40})\b/i.exec(String(c?.command ?? ''));
     if (m) return m[1];
@@ -98,25 +97,25 @@ export function declaredProjectsOf(checks, root) {
 
 /* ------------------------------------------------------------ git */
 
-export function git(root, args, { input = null, encoding = 'utf8', timeoutMs = 120_000 } = {}) {
-  const r = runGit(args, { dir: root, encoding, ...(input == null ? {} : { input: Buffer.from(input) }),
+export function git(call, root, args, { input = null, encoding = 'utf8', timeoutMs = 120_000 } = {}) {
+  const r = call(args, { dir: root, encoding, ...(input == null ? {} : { input: Buffer.from(input) }),
     timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: r.stdout, stderr: String(r.stderr ?? '') };
 }
 
 /** The owned files at the base commit: {rel (to root) -> content}. rels are root-relative posix paths. */
 export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
-  const top = run(root, ['rev-parse', '--show-toplevel']);
+  const top = run(revParseQuery, root, ['--show-toplevel']);
   if (!top.ok) return { ok: false, reason: 'not a git checkout' };
   const gitRoot = String(top.stdout).trim();
   const prefix = norm(path.relative(gitRoot, root));
   const full = (rel) => (prefix ? `${prefix}/${rel}` : rel);
-  const listed = run(gitRoot, ['ls-tree', '-r', '-z', '--full-name', '--name-only', base, '--', ...ownedRels.map(full)]);
+  const listed = run(lsTree, gitRoot, ['-r', '-z', '--full-name', '--name-only', base, '--', ...ownedRels.map(full)]);
   if (!listed.ok) return { ok: false, reason: `git ls-tree ${base}: ${listed.stderr.trim().slice(0, 200)}` };
   const names = String(listed.stdout).split('\0').filter(Boolean);
   const blobs = new Map();
   if (!names.length) return { ok: true, blobs };
-  const batch = run(gitRoot, ['cat-file', '--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: null });
+  const batch = run(catFile, gitRoot, ['--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: null });
   if (!batch.ok) return { ok: false, reason: 'git cat-file --batch failed' };
   const buf = batch.stdout;
   let at = 0;
@@ -270,7 +269,7 @@ export function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = pr
   const file = path.join(dir, `parity-lint-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(file, JSON.stringify({ root, files, base }));
   try {
-    const r = spawnSync(process.execPath, [selfFile, '--lint-child', file], { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
+    const r = runNode([selfFile, '--lint-child', file], { timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
     const line = String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '';
     try { return JSON.parse(line); } catch { return { exit: 2, findings: [], errors: [`the parity lint child printed no result: ${String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300)}`] }; }
   } finally { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
@@ -292,11 +291,11 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // H7: a measurement that could not run is tooling, never the slice's red (scripts/kernel/settle/check-verdict.mjs).
   const unavailable = (reason, detail) => ({ ...hand(reason, detail), unavailable: true });
   const base = sliceBaseOf(item);
-  if (!base) return hand('parity-no-base', 'no params.admissionBase and no --base in the report checks');
+  if (!base) return hand('parity-no-base', 'no --base in the report checks');
   const where = await resolveRoot(item, { repo });
   if (!where.ok) return hand('parity-unresolved', where.why);
   const { root, ownedRels } = where;
-  if (!git(root, ['cat-file', '-e', `${base}^{commit}`]).ok) return hand('parity-base-unknown', `admission base ${base} is not a commit in ${root}`);
+  if (!git(catFile, root, ['-e', `${base}^{commit}`]).ok) return hand('parity-base-unknown', `admission base ${base} is not a commit in ${root}`);
 
   // (c) every declared check is an action, a baseline, covered by an owned-scope measurement, or re-runs green.
   const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
@@ -330,7 +329,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   for (const c of covered.syntax) {
     const argv = String(c.command).trim().split(/\s+/).slice(1);
     const syntaxStarted = now();
-    const r = spawnSync(process.execPath, argv, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+    const r = runNode(argv, { cwd: root, timeout: 60_000 });
     await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
       exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
     if (r.status == null || r.error) return unavailable('parity-checker-unavailable', `${c.name}: ${r.error?.message ?? 'no exit'}`);
@@ -379,7 +378,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // git diff --check over the slice's diff (only when the worker declared one).
   let diffed = null;
   if (covered.diff.length) {
-    diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(root, ['diff', '--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
+    diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(gitDiff, root, ['--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
     await record({ name: PARITY_CHECKS.diff, command: `git diff --check ${base} -- <owned paths>`, cwd: root,
       phase: 'parity', runner: 'parity', exitCode: diffed.ok ? 0 : 1, output: diffed,
       summary: { ok: diffed.ok, tail: diffed.tail ?? null } });
@@ -402,7 +401,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts }, tsc: typed.projects, superseded } };
 }
 
-/** A path of a report or payload (maybe prefixed with the repository folder, e.g. nivo-fe/apps/...) relative to root. */
+/** A path of a report or payload (maybe prefixed with the repository folder, e.g. todo-app-fe/apps/...) relative to root. */
 const relOf = (p, root) => { const n = norm(p).replace(/\/+$/, ''); const head = path.basename(root); return n.startsWith(`${head}/`) ? n.slice(head.length + 1) : n; };
 
 /**
@@ -475,7 +474,7 @@ export async function parityFingerprint(item, { repo, resolveRoot = resolveOwned
   return h.digest('hex').slice(0, 16);
 }
 // The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile && process.argv[2] === '--lint-child') {
+if (isMain(import.meta.url) && process.argv[2] === '--lint-child') {
   const job = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
   const { runLintGate } = await import('../../gates/gate.mjs');
   const out = await runLintGate({ root: job.root, base: job.base, files: job.files });

@@ -1,7 +1,7 @@
 // proof-commands.mjs - HFS_PROOF_COMMAND_FILE_MISSING (R105): a proof command a `.starciwork` record names runs files that exist.
 // A record's `requiresProof.<kind>.command` is "the exact command that satisfies this kind, runnable as written" (work-implementation
 // schema); a command that names a spec, a script or a config the repository does not hold cannot be run as written, and a record that
-// keeps one goes quietly false (nivo-backend, 2026-09-30: `node --test scripts/provision-keycloak.spec.mjs` after the script was deleted).
+// keeps one goes quietly false (a product repo once kept `node --test scripts/provision-keycloak.spec.mjs` after the script was deleted).
 // Every argument of the command that is a repository-relative file path (an extension, no glob, no variable, not absolute, not a `..`
 // path into another repository) must be a tracked file or an existing one; a path an ignored slot owns (dist/, coverage/) is a build
 // product and is not judged. One finding per record, kind and missing path. The `.starciwork` of an app sits at the app root, and a

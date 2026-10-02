@@ -16,9 +16,10 @@
 //   disconnected      a responding Orca lists the terminal disconnected/unwritable
 //   unverified        Orca answered something else and the listing cannot settle it
 // Only gone/disconnected may lead to a replacement.
-import { terminalShow as defaultShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow as defaultShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalList as defaultList } from '../api/orca/terminal-list.mjs';
-import { sleepSync } from '../api/orca/lib.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 // The windows are modules/models/runtimes.yaml allocation.hostOutage; the env names are a spec's seam.

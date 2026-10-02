@@ -420,6 +420,24 @@ const isContainerBuilt = (context, constructor) => {
     return constructorParams(constructor).some((param) => decoratorsOfParam(param).decorators.length > 0)
 }
 
+/**
+ * The origin that makes an annotated type infrastructure: declared by a package, or by a `platform/*` or `integrations/*` owner other
+ * than `own`; null for a domain type, a type of the same owner or a language global.
+ */
+const infraOriginOf = (context, hfs, own, annotation) => {
+    const origins = typeOrigins(context, annotation)
+    // A language global (`ReadonlyArray`, `Array`) is declared in the TypeScript lib and may be augmented by a package
+    // (`@types/node`): the augmentation does not make it infrastructure.
+    const isLanguageGlobal = (origin) => origins.some((other) => other.name === origin.name && /\/node_modules\/typescript\/lib\//.test(other.file))
+    return origins.find((origin) => {
+        if (isLanguageGlobal(origin)) return false
+        if (origin.module !== null) return true
+        if (own !== null && hfs.ownerOf(origin.file) === own) return false
+        const tier = hfs.tierOf(origin.file)
+        return tier === "platform" || tier === "integrations"
+    }) ?? null
+}
+
 /** A constructor parameter of an infrastructure type carries an injector. */
 export const infraNeedsInjector = {
     meta: {
@@ -444,17 +462,7 @@ export const infraNeedsInjector = {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
                     if (!annotation) continue
-                    const origins = typeOrigins(context, annotation)
-                    // A language global (`ReadonlyArray`, `Array`) is declared in the TypeScript lib and may be augmented by a package
-                    // (`@types/node`): the augmentation does not make it infrastructure.
-                    const isLanguageGlobal = (origin) => origins.some((other) => other.name === origin.name && /\/node_modules\/typescript\/lib\//.test(other.file))
-                    const infra = origins.find((origin) => {
-                        if (isLanguageGlobal(origin)) return false
-                        if (origin.module !== null) return true
-                        if (own !== null && hfs.ownerOf(origin.file) === own) return false
-                        const tier = hfs.tierOf(origin.file)
-                        return tier === "platform" || tier === "integrations"
-                    })
+                    const infra = infraOriginOf(context, hfs, own, annotation)
                     if (!infra) continue
                     const carries = decorators.some((decorator) => {
                         const expression = decorator.expression
@@ -464,6 +472,48 @@ export const infraNeedsInjector = {
                     if (carries) continue
                     const where = infra.module !== null ? `package ${infra.module}` : `${hfs.tierOf(infra.file)} ${posix.basename(hfs.ownerOf(infra.file) ?? "")}`
                     context.report({ node: target, messageId: "missing", data: { type: infra.name || context.sourceCode.getText(annotation), where } })
+                }
+            },
+        }
+    },
+}
+
+// -- injected-param-name --------------------------------------------------------------------------
+
+/** The `ruleParams.be.paramNames` entry for an origin's declared name, or null. */
+const paramEntryOf = (entries, name) => entries.find((entry) => (entry.type !== undefined ? entry.type === name : name.length > entry.typeSuffix.length && name.endsWith(entry.typeSuffix))) ?? null
+
+/** An injected port of the table of `paramNames` is named the way every class names it. */
+export const injectedParamName = {
+    meta: {
+        type: "problem",
+        docs: { description: "A constructor parameter that injects a port named in `ruleParams.be.paramNames` (`Clock`, `Logger`, `Cache`, `CommandBus`, `QueryBus`, `EntityManager`, `<Owner>Options`) carries the name that table gives it." },
+        schema: [],
+        messages: {
+            name: "`{{param}}` injects `{{type}}`, and every class names that port {{expected}}. Rename the parameter so a reader finds the same dependency under the same name in every class.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const entries = hfs.ruleParams.paramNames
+        const own = hfs.ownerOf(context.filename || context.getFilename())
+        return {
+            MethodDefinition(node) {
+                if (!isContainerBuilt(context, node)) return
+                for (const param of constructorParams(node)) {
+                    const { target, decorators } = decoratorsOfParam(param)
+                    if (target.type !== "Identifier") continue
+                    const annotation = target.typeAnnotation?.typeAnnotation
+                    if (!annotation) continue
+                    const injected = decorators.some((decorator) => decorator.expression.type === "CallExpression" && (INJECT_NAME.test(calleeOf(context, decorator.expression).name ?? "") || injectedTypeOf(context, decorator.expression) !== null))
+                    if (!injected) continue
+                    const infra = infraOriginOf(context, hfs, own, annotation)
+                    if (!infra) continue
+                    const entry = paramEntryOf(entries, infra.name)
+                    if (!entry || entry.names.includes(target.name)) continue
+                    if (entry.nameSuffix !== undefined && target.name.length > entry.nameSuffix.length && target.name.endsWith(entry.nameSuffix)) continue
+                    const expected = [...entry.names.map((name) => `\`${name}\``), ...(entry.nameSuffix !== undefined ? [`\`<name>${entry.nameSuffix}\``] : [])].join(" or ")
+                    context.report({ node: target, messageId: "name", data: { param: target.name, type: infra.name, expected } })
                 }
             },
         }
@@ -585,6 +635,7 @@ export const rules = {
     "injector-shape": injectorShape,
     "injector-type-match": injectorTypeMatch,
     "infra-needs-injector": infraNeedsInjector,
+    "injected-param-name": injectedParamName,
     "no-module-ref": noModuleRef,
     "no-forward-ref": noForwardRef,
     "no-string-token": noStringToken,
@@ -596,6 +647,7 @@ export const recommended = {
     "starci-be/injector-shape": "error",
     "starci-be/injector-type-match": "error",
     "starci-be/infra-needs-injector": "error",
+    "starci-be/injected-param-name": "error",
     "starci-be/no-module-ref": "error",
     "starci-be/no-forward-ref": "error",
     "starci-be/no-string-token": "error",

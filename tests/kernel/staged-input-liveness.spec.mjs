@@ -10,8 +10,8 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../../scripts/lib/terminal-liveness.mjs';
 
-// Incident inc-06aeecf432f1 (starci-next base-repos, backend.scaffold cut ordinal 5): a Devin
-// command-terminal worker sat 13+ minutes with its pasted contract text still in the input row and no
+// A Devin
+// command-terminal worker (a backend.scaffold cut) sat 13+ minutes with its pasted contract text still in the input row and no
 // work. The contract says "Running", "Working" and "esc to interrupt", so the whole-screen activity test
 // read the frame `active`: dispatch's awaitSubmission called the paste submitted, status said active, and
 // `api nudge` skipped it as worker-active. A staged, unsubmitted paste is never `active`: the classifier

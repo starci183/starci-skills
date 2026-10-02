@@ -4,7 +4,7 @@
  * Unit specs sit beside their subject. Everything else lives under `src/tests/`, one folder per kind:
  *   - `world/`        the ONLY test infrastructure (slot `be.tests.world`): `global-setup.ts` starts (or attaches to) the stack
  *                     the repository declares in `.starcistacks/<env>` (the test-world library) - every service of it runs
- *                     REAL behind toxiproxy - and runs `apps/migrate`'s exported bootstrap once; `use-test-world.ts` exports
+ *                     REAL behind toxiproxy - and runs the migrations once over the cli app's connections; `use-test-world.ts` exports
  *                     `useTestWorld({ apps } | { modules })` -> `world.apps.<name>.api`, `world.db.<connection>`,
  *                     `world.infra.<service>` (`latency(ms)`, `cut()`, `restore()` on the real service),
  *                     `world.fake.<provider>` (network-edge fakes of external SaaS with failNext/replayWebhook/delay),
@@ -18,6 +18,7 @@
  * Receivers and origins are judged by type and by the slot of their declaring file, never by name.
  */
 import { hfsOf } from "./lib/hfs.mjs"
+import { inCli } from "./lib/persistence.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
 
 /** Every test slot under `src/tests/` except the world, where the infrastructure lives. */
@@ -46,7 +47,7 @@ export const testsInfraOnlyInWorld = {
         docs: { description: "Only src/tests/world starts infrastructure, migrates, holds a DataSource or writes process.env." },
         schema: [],
         messages: {
-            migration: "This test imports a migration or the migrate app. The schema is prepared once by `src/tests/world/global-setup.ts` running the real `apps/migrate` bootstrap; migration behaviour is tested through the e2e world.",
+            migration: "This test imports a migration or the cli. The schema is prepared once by `src/tests/world/global-setup.ts`, which runs the migrations over the cli app's connections; migration behaviour is tested through the e2e world.",
             call: "`{{name}}` builds or changes the schema outside `src/tests/world`. The world migrates once; a test uses `world.db.<connection>`.",
             infra: "This test imports or starts infrastructure (testcontainers, typeorm's DataSource). It belongs to `src/tests/world`; a test uses `useTestWorld(...)` and `world.db.<connection>`.",
             env: "This test writes `process.env`. The environment is set once by `src/tests/world`; a test takes the world as it is.",
@@ -57,7 +58,7 @@ export const testsInfraOnlyInWorld = {
         const filename = context.filename || context.getFilename()
         if (!OUTSIDE_WORLD.has(hfs.slotOf(filename))) return {}
         const isMigrationDecl = (file) => hfs.slotOf(file) === "be.persistence" && /\/migrations\/[^/]+$/.test(hfs.relative(file))
-        const fromMigrate = (file) => hfs.slotOf(file) === "be.app.migrate"
+        const fromMigrate = (file) => inCli(hfs, file)
         const migrationTyped = (node) => {
             const services = context.sourceCode.parserServices
             const checker = services.program.getTypeChecker()

@@ -15,8 +15,8 @@
 import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {startProgram} from '../api/process/start-program.mjs';
+import { isMain } from '../lib/is-main.mjs';
 import {machineFileFor, readMachine, withMachine} from '../../engine/db/machine.mjs';
 import {loadConfig, uatSettings, UAT_DEFAULTS} from '../../engine/config.mjs';
 import {recordAlive} from '../connectors/lib.mjs';
@@ -158,12 +158,12 @@ async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
   const recording=withRecording(command,{cwd:process.cwd(),outputDir:recordingDirUnder(path.resolve(recordDir))});
   if(recording.outputDir)console.error(`[uat-slots] recording video, trace and screenshots into ${recording.outputDir}`);
   const launch=launchFor(recording.command);
-  const child=spawn(launch.file,launch.args,{stdio:'inherit',windowsHide:false});
+  const child=startProgram(launch.file,launch.args,{stdio:'inherit',windowsHide:false});
   const code=await new Promise(resolve=>{child.once('exit',code=>resolve(Number.isInteger(code)?code:1));child.once('error',()=>resolve(1));});
   slot.release();process.exit(code);
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const [command,...rest]=process.argv.slice(2);
   if(command==='status')process.stdout.write(`${JSON.stringify(slotStatus(),null,2)}\n`);
   else if(command==='run'){

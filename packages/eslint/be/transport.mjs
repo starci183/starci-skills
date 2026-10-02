@@ -28,8 +28,8 @@ const HTTP_SLOT = "be.transport.http"
 /** The slot of provider webhook doors (the REST doors of the webhook kind). */
 const WEBHOOK_SLOT = "be.feature.webhooks.http"
 
-/** Slots whose classes are entered through a method the framework calls on a queue or a command line. */
-const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.feature.transport.cli"])
+/** Slots whose classes are entered through a method the framework calls on a queue. */
+const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message"])
 
 /** True for the decorators that make a method a transport handler (a socket handler belongs to the realtime kind, which has its own laws). */
 const isRouteDecorator = (context, decorator) => {
@@ -355,7 +355,7 @@ export const doorLivesInFeatures = {
         docs: { description: "A `@Controller` is declared in the `transport/http` slot of a feature." },
         schema: [],
         messages: {
-            wrongSlot: "A `@Controller` belongs in `src/features/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/transport/http/` (slot `be.feature.webhooks.http`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
+            wrongSlot: "A `@Controller` belongs in `src/features/api/<feature>/transport/http/` (slot `be.transport.http`) or, for a provider webhook, in `src/features/webhooks/<provider>/transport/http/` (slot `be.feature.webhooks.http`); this file is in slot `{{slot}}`. A door parked among the capabilities it calls reads as one and gets imported like one.",
         },
     },
     create(context) {

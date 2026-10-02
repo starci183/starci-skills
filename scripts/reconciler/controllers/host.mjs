@@ -3,7 +3,7 @@
 // Keys:
 //   host:boot                     the boot order of DESIGN 7.7, once per HOST boot (schedules host/boot, MB-01) and when Orca comes back
 //                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
-//                                 --orphan-kernel-jobs / --orca-tasks per ledger, then the seats. Seat keys wait for it.
+//                                 --orphan-kernel-jobs per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
 //   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/kernel-watchdog.mjs --once
@@ -205,7 +205,7 @@ export function createHostController(deps = {}) {
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../machine/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
   // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
-  const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../api/orca/worker-list.mjs')).activeWorkersAllRuns());
+  const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../machine/worker-list-all.mjs')).activeWorkersAllRuns());
   // The handles a responding Orca lists, or null when it does not answer (read-only: runs in both modes).
   const terminalHandles = deps.terminalHandles ?? (async () => {
     const r = await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST)], { timeoutMs: 60_000 });
@@ -522,10 +522,8 @@ export function createHostController(deps = {}) {
       steps.push({ step: 'dedupe', dryRun: true, wouldClose: (dry?.closed ?? []).length, ok: dry?.ok !== false });
     }
     for (const l of productLedgers(ctx)) {
-      for (const flag of ['--orphan-kernel-jobs', '--orca-tasks']) {
-        const r = await ctx.api(l.ledgerId, 'reconcile', [flag], { timeoutMs: 600_000 });
-        steps.push({ step: `reconcile ${flag}`, ledgerId: l.ledgerId, ok: r?.ok !== false });
-      }
+      const r = await ctx.api(l.ledgerId, 'reconcile', ['--orphan-kernel-jobs'], { timeoutMs: 600_000 });
+      steps.push({ step: 'reconcile --orphan-kernel-jobs', ledgerId: l.ledgerId, ok: r?.ok !== false });
     }
     state.bootPending = false;
     claimDue(ctx, { controller: 'host', duty: 'boot', intervalMs: BOOT_EVERY_MS, now: ctx.now(), force: true });

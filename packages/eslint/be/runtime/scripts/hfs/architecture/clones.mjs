@@ -76,7 +76,7 @@ function uniformByDesign(resolver, rel) {
   const base = rel.slice(rel.lastIndexOf('/') + 1);
   if (slot.appKind !== undefined) return base === APP_ENTRY && (slot.requires ?? []).includes(APP_ENTRY);
   const role = base.split('.').at(-2);
-  return (slot.composedBy?.length ?? 0) > 0 && DOOR_ROLES.has(role) && base.endsWith('.ts');
+  return !slot.owner && (slot.composedBy?.length ?? 0) > 0 && DOOR_ROLES.has(role) && base.endsWith('.ts');
 }
 
 function homeText(profile, sameOwner, crossApp) {

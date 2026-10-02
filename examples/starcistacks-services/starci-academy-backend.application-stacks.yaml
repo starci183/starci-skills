@@ -67,7 +67,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
-    qualityGate: starci-new-code
+    qualityGate: starci-quality
     projects:
       - {repository: starci-academy-backend, key: starci-academy-backend}
       - {repository: starci-academy-fe, key: starci-academy-fe}

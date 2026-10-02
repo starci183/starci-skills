@@ -28,7 +28,7 @@ import { opContextOf } from '../guards/op-context.mjs';
 import { loadSlotManifest, readRepoDeclaration } from '../hfs/slots.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { putBlob, blobAsFile } from '../../engine/db/blob.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
@@ -1313,7 +1313,7 @@ export function layoutTreeMain(argv = []) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = layoutTreeMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

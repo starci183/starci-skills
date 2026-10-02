@@ -3,8 +3,9 @@
 //                         feature, a declared kind whose patterns (ruleParams.be.kindPatterns) are not all in `sides.be.patterns`, and a declared
 //                         kind whose platform capabilities (the tier-platform slots that name those patterns) are not tracked are each a finding;
 //   BE_KIND_EMPTY         a kind folder `be/src/features/<kind>/` holds only instance folders `<kind>/<x>/`, and each instance holds source: a file
-//                         directly in the kind folder (a feature named like a kind, a `.gitkeep`) or an instance with no TypeScript file is a finding.
-// A kind is a folder name of `be/src/features/` read from `triggerKinds` of the slot manifest; every other first folder is an api feature.
+//                         directly in the kind folder (a `.gitkeep`) or an instance with no TypeScript file is a finding.
+// A kind is a folder name of `be/src/features/` read from `triggerKinds` of the slot manifest (api features live in `features/api/<feature>/`);
+// `features/cli/` is the one cli feature root (its module and group folders), so it is in use as soon as it holds a file.
 import { loadSlotManifest, ruleParams } from '../slots.mjs';
 import { found } from './read.mjs';
 
@@ -12,7 +13,7 @@ export const KIND_DECLARATION = 'BE_KIND_DECLARATION';
 export const KIND_EMPTY = 'BE_KIND_EMPTY';
 
 const FEATURES = 'be/src/features/';
-const API = 'api';
+const CLI = 'cli';
 
 let memo;
 /** The manifest facts the rules read: the trigger kinds, the patterns each kind needs, and the platform capability folders of each pattern. */
@@ -36,20 +37,21 @@ export function kindFindings({ files, repo }) {
   const be = repo.sides?.be;
   if (!be) return [];
   const { triggerKinds, kindPatterns, platform } = facts();
-  const kindFolders = new Set(triggerKinds.filter((kind) => kind !== API));
+  const kindFolders = new Set(triggerKinds);
   const findings = [];
   const instances = new Map();
   const sources = new Map();
-  const apiFeatures = new Set();
+  const roots = new Set();
   const tracked = new Set(files);
   for (const file of files) {
     if (!file.startsWith(FEATURES)) continue;
     const rest = file.slice(FEATURES.length).split('/');
     if (rest.length < 2) continue;
     const [first, second] = rest;
-    if (!kindFolders.has(first)) { apiFeatures.add(first); continue; }
+    if (!kindFolders.has(first)) continue;
+    if (first === CLI) { roots.add(CLI); continue; }
     if (rest.length === 2) {
-      findings.push(found(KIND_EMPTY, file, `${file} sits directly in the kind folder ${FEATURES}${first}/, which holds only instance folders (${first}/<name>/); a feature named like the kind \`${first}\` is refused, and an empty kind folder is never kept: run \`hfs add\` to create the first member.`, { kind: first }));
+      findings.push(found(KIND_EMPTY, file, `${file} sits directly in the kind folder ${FEATURES}${first}/, which holds only instance folders (${first}/<name>/); an empty kind folder is never kept: run \`hfs add\` to create the first member.`, { kind: first }));
       continue;
     }
     if (!instances.has(first)) instances.set(first, new Set());
@@ -60,12 +62,11 @@ export function kindFindings({ files, repo }) {
   for (const [key, count] of sources) {
     if (count === 0) findings.push(found(KIND_EMPTY, `${FEATURES}${key}/`, `${FEATURES}${key}/ holds no TypeScript source: a kind member without code is an empty folder; add its files with \`hfs add\` or remove the folder.`, { kind: key.split('/')[0] }));
   }
-  const present = new Set([...instances.keys()]);
-  if (apiFeatures.size > 0) present.add(API);
+  const present = new Set([...instances.keys(), ...roots]);
   const declared = new Set(be.kinds ?? []);
   const patterns = new Set(be.patterns ?? []);
   for (const kind of [...present].sort()) {
-    if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${kind === API ? 'api features' : `${FEATURES}${kind}/`} use; declare every kind in use (\`hfs add\` registers it).`, { kind }));
+    if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${FEATURES}${kind}/ uses; declare every kind in use (\`hfs add\` registers it).`, { kind }));
   }
   for (const kind of [...declared].sort()) {
     if (!present.has(kind)) {

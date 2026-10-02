@@ -1,5 +1,5 @@
 import test from 'node:test';
-import assert from 'node:assert/strict';
+import assert from 'node:assert/strict'; import path from 'node:path';
 import {
   hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, machineStore,
   orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES,
@@ -150,7 +150,7 @@ test('the registry marks the scheduled task unmanaged when it is absent and repa
 });
 
 test('Orca restarts through explorer.exe with no agent session variables', async () => {
-  const script = orcaRestartScript({ app: 'C:\\Orca\\Orca.exe', closeWaitMs: 30000 });
+  const script = orcaRestartScript({ app: path.join(path.parse(process.cwd()).root, 'Orca', 'Orca.exe'), closeWaitMs: 30000 });
   assert.match(script, /Start-Process -FilePath "\$env:WINDIR\\explorer\.exe"/);
   assert.doesNotMatch(script, /Start-Process -FilePath \$app/);
   const env = await cleanEnv({ PATH: 'x', CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDECODE: '1', CLAUDE_AGENT_SDK_VERSION: '1', STARCI_ACTOR: 'reconciler/host', STARCI_RECONCILER_EPOCH: '3' });

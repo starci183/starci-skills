@@ -3,7 +3,7 @@ reply:
   reads: 'the pending worker question or escalation (questions above), the job it belongs to'
   writes: >-
     the workflow's Orca Run bound to the current Kernel terminal (orca-runs.mjs bindWorkflowRun, a no-op once bound; event run-rebound), then
-    Orca `reply` to the exact question message through scripts/api/orca/orch-reply.mjs (calls.yaml
+    Orca `reply` to the exact question message through scripts/api/orca/reply.mjs (calls.yaml
     `reply`; --run is the question's Run and Orca resolves --from to the calling Kernel terminal), then
     the worker-question inbox row -> status applied {reply, toOwner, at} (inserted applied when it
     was never bridged) and event 'worker-question-answered'. A reply is technical guidance inside the

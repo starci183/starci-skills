@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // gate-stability.mjs — would a gate change newly fail work the live workflows already accepted?
 //
-// Owner ruling 2026-09-28 ("Đóng băng luật vẽ"): a gate or checker change of a frozen op family
+// Owner ruling 2026-09-28 ("Freeze the drawing rules"): a gate or checker change of a frozen op family
 // (modules/kernel/contract-freeze.yaml) is released to running workflows only at a release point the Supervisor
 // decides (api contract-release). To decide it, the land gate (scripts/supervisor/land.mjs) runs this report when a
 // land touches the family's gatePaths or registers a change that adds checks/codes for it: the family's gates, as
@@ -16,12 +16,13 @@
 // Exit 0 always when it could run (a report, never a refusal), 2 on bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { loadContractFreeze } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -102,7 +103,7 @@ export function compareSides(base, head) {
 export function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = null, timeout = 180_000, env = process.env }) {
   const args = [path.join(runner, 'scripts', 'supervisor', 'gate-stability.mjs'), '--family', family, '--tree', tree, '--json', ...(ledgers ?? []).flatMap((l) => ['--ledger', l]),
     ...(gates ?? []).flatMap((g) => ['--gate', `${g.module}#${g.export}`])];
-  const r = spawnSync(process.execPath, args, { cwd: runner, encoding: 'utf8', timeout, windowsHide: true, env, maxBuffer: 64 * 1024 * 1024 });
+  const r = runNode(args, { cwd: runner, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) return { error: String(r.stderr || r.error?.message || `exit ${r.status}`).trim().slice(-400) };
   return parseJson(r.stdout.trim().split(/\r?\n/).pop(), null) ?? { error: 'unparseable side output' };
 }
@@ -138,4 +139,4 @@ async function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exitCode = 2; });
+if (isMain(import.meta.url)) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exitCode = 2; });

@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {runCommand} from '../api/process/run-command.mjs';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from '../work/validate/check-example-work.mjs';
 import {loadRecords, resolveRecordRef} from '../work/record-ownership.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /**
  * Re-runs every assertion in one example record's evidence.yaml against a real --cwd and compares the
@@ -59,12 +60,8 @@ function replayAssertion(assertion, cwd) {
   if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
     return {id: assertion?.id ?? '(unnamed)', ok: false, reason: 'no command recorded; not replayable', claimedOutcome, replayedOutcome: null, replayedExit: null};
   }
-  let exit = 0;
-  try {
-    execFileSync(assertion.command, {cwd, shell: true, stdio: 'pipe'});
-  } catch (error) {
-    exit = typeof error?.status === 'number' ? error.status : 1;
-  }
+  const status = runCommand(assertion.command, {cwd}).status;
+  const exit = typeof status === 'number' ? status : 1;
   const replayedOutcome = exit === 0 ? 'pass' : 'fail';
   return {
     id: assertion.id, ok: replayedOutcome === claimedOutcome, reason: null,
@@ -95,7 +92,7 @@ export function verifyRecord({workRoot, recordId, cwd}) {
   return {ok, results, recordId, evidenceFile};
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));

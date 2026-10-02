@@ -18,10 +18,10 @@ export const connectionFiles = (name, prefix, constant) => ({
   [`src/modules/platform/database/${name}.config.ts`]: `export const ${name}Config = () => ({ host: process.env.${prefix}_HOST, port: process.env.${prefix}_PORT, name: process.env.${prefix}_NAME });\n`,
 });
 
-/** archFixture options: two declared connections need the migrate app hfs.json requires beside them. */
+/** archFixture options: two declared connections, with the cli app that migrates them. */
 export const TWO_CONNECTIONS = {
   declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS', owner: 'core', isolation: 'database' }] },
-  apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }],
+  apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }],
 };
 
 /** A domain capability with one entity: table, primary key column, optional extra column source. */

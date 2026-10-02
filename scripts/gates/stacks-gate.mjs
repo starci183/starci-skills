@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {slash} from '../lib/path-key.mjs';
 
@@ -87,7 +87,7 @@ function sopsEnvelope(file){
 
 function gitTrackedSet(root){
   try{
-    const result=runGit(['ls-files','--',STACKS_DIR],{dir:root,timeout:5000});
+    const result=lsFiles(['--',STACKS_DIR],{dir:root,timeout:5000});
     if(result.error||result.status!==0||typeof result.stdout!=='string')return null;
     return new Set(result.stdout.split(/\r?\n/).filter(Boolean).map(slash));
   }catch{return null;}

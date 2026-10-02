@@ -5,8 +5,8 @@
 // after the held job does. api status counted it as engaged work, so a workflow whose only open operations
 // were a peer-wait-held job and its dependant read frontier `engaged` instead of `peer-wait`, and the
 // supervisor's stall check (scripts/supervisor/stall.mjs, which reads that frontier) alerted STALLED on a
-// workflow correctly parked on its peer (starci-next wf-sn-subscription-mufrhhro inc-56d621d6359e: ord-6
-// --after ord-3, ord-3 held by peer-wait; nivo wf-nivo-academy-debt-mugycgwl "queued: peer-wait 1,
+// workflow correctly parked on its peer (a subscription workflow: ord-6
+// --after ord-3, ord-3 held by peer-wait; a debt workflow read "queued: peer-wait 1,
 // dependency 1"). api status (cmdStatus) is the one place that judges it; stall reads the frontier.
 
 /**
@@ -55,7 +55,7 @@ export function parkedBehindWaits(queued = [], heldSettle = []) {
  * parked behind an owner-gate-held queued job counts like that job does: as open). `parked` is
  * parkedBehindWaits' map.
  */
-// Autopilot (scripts/kernel/autopilot.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
+// Autopilot (scripts/kernel/autopilot-run.mjs): a job a supervisor-gate holds, or one deferred (to the final review, or
 // to the handover credential checklist), is no open work of the Kernel's either.
 const HELD_ELSEWHERE = ['peer-wait', 'supervisor-gate', 'deferred', 'deferred-to-handover'];
 export function waitHeldOperations(queued = [], heldSettle = [], parked = new Map()) {

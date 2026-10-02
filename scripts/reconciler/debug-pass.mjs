@@ -22,7 +22,7 @@
 // It never restarts, fixes or types into anything; dispatch is the chat's (a lane agent), recorded here with `claim`.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
 import { claudeDebugSettings } from '../../engine/config.mjs';
 import { readJsonFile } from '../lib/json.mjs';
@@ -143,4 +143,4 @@ async function main(argv = process.argv.slice(2)) {
   console.log(JSON.stringify(out));
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();

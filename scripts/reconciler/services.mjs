@@ -30,12 +30,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile, spawnSync } from 'node:child_process';
+import { execCapture } from '../api/process/exec-capture.mjs'; import { runPowershell } from '../api/process/run-powershell.mjs'; import { schtasks } from '../api/process/schtasks.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine } from '../../engine/db/machine.mjs';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-
+import { openMachine } from '../../engine/db/machine.mjs'; import { runNode } from '../api/node/run-node.mjs';
+import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
@@ -86,7 +86,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
     ledgerHealth: {
       ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs']),
       backupHour: Number(h?.ledgerHealth?.backupHour ?? 3),
-      backupDir: String(h?.ledgerHealth?.backupDir ?? 'D:/starci-archive/ledger-backups'),
+      backupDir: String(h?.ledgerHealth?.backupDir ?? path.join(archiveRootOf(), 'ledger-backups')),
     },
   };
 }
@@ -137,14 +137,7 @@ export function servicePorts({ allocation = null, config = null, harnessYml = nu
 /* ------------------------------------------------------------ probes (read-only, async) */
 
 /** One async child: {status, stdout, stderr, timedOut}. Never throws. */
-export function runChild(cmd, args, { timeoutMs = 60_000, env = process.env, cwd = SKILL_ROOT } = {}) {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, env, timeout: timeoutMs, windowsHide: true, maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-      const timedOut = Boolean(error?.killed && error?.signal) || error?.code === 'ETIMEDOUT';
-      resolve({ status: error ? (typeof error.code === 'number' ? error.code : null) : 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? '') || (error && !timedOut ? String(error.message) : ''), timedOut });
-    });
-  });
-}
+export const runChild = (cmd, args, { timeoutMs = 60_000, env = process.env, cwd = SKILL_ROOT } = {}) => execCapture(cmd, args, { timeoutMs, env, cwd });
 
 /** The last JSON line of a child's stdout, or null. */
 export const lastJson = (text) => {
@@ -260,7 +253,6 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
 
 /* ------------------------------------------------------------ the state machine (DESIGN 9.7) */
 
-export const SERVICE_STATES = Object.freeze(['declared', 'starting', 'healthy', 'degraded', 'failed', 'backoff', 'quarantined', 'unmanaged']);
 export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff', 'quarantined']);
 // The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
 export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
@@ -403,20 +395,13 @@ export function openServiceStore({ env = process.env } = {}) {
   return shared;
 }
 
-/** A checker's published availability for the job controller: 'available' | 'unavailable' | 'unknown'. */
-export function checkerAvailability(name, { store = openServiceStore() } = {}) {
-  const rec = store.get(`checker:${name}`);
-  if (!rec || rec.state === 'declared') return 'unknown';
-  return rec.state === 'healthy' ? 'available' : 'unavailable';
-}
-
 /* ------------------------------------------------------------ actuators (the CLI; active mode only) */
 
 const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
-/** Launch environment for a desktop host: no agent/Claude session variables (scripts/api/orca/lib.mjs hostLaunchEnv). */
+/** Launch environment for a desktop host: no agent/Claude session variables (scripts/lib/host-launch-env.mjs hostLaunchEnv). */
 export async function cleanEnv(env = process.env) {
-  const { hostLaunchEnv } = await import('../api/orca/lib.mjs');
+  const { hostLaunchEnv } = await import('../lib/host-launch-env.mjs');
   const scrubbed = hostLaunchEnv(env);
   for (const key of Object.keys(scrubbed)) if (/^STARCI_(?:ACTOR|RECONCILER_EPOCH)$/.test(key)) delete scrubbed[key];
   return scrubbed;
@@ -442,34 +427,32 @@ export function orcaRestartScript({ app, closeWaitMs }) {
   ].join('\n');
 }
 
-const sync = (cmd, args, opts = {}) => spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 120_000, cwd: SKILL_ROOT, ...opts });
 const connectorStart = (script, env) => {
-  const r = sync(process.execPath, [path.join(SKILL_ROOT, 'scripts', 'connectors', script), 'start'], { env });
+  const r = runNode([path.join(SKILL_ROOT, 'scripts', 'connectors', script), 'start'], { timeout: 120_000, cwd: SKILL_ROOT, env });
   return { ok: r.status === 0, answer: lastJson(r.stdout), stderr: String(r.stderr ?? '').trim().slice(0, 300) };
 };
 
-/** Start one service now. Only ever reached through ctx.run in active mode (or by hand). */
-export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, run = sync } = {}) {
+/** Start one service now. Only ever reached through ctx.run in active mode (or by hand). Seams: powershell, tasks. */
+export async function startService(name, { settings = hostSettings(), ports = servicePorts(), env = process.env, powershell = runPowershell, tasks = schtasks } = {}) {
   const clean = await cleanEnv(env);
   const s = settings.services[name] ?? {};
   switch (name) {
     case 'orca': {
-      const { orcaAppExe } = await import('../api/orca/lib.mjs');
-      const app = orcaAppExe();
+      const { status } = await import('../api/orca/status.mjs');
+      const app = status({ timeout: 5000 }).appExe;
       if (!app) return { ok: false, error: 'no Orca app beside the orca CLI' };
-      const r = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 })],
-        { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
+      const r = powershell(orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 }), { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
       return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
-      const task = s.task;
-      run('schtasks.exe', ['/End', '/TN', task]);
+      const task = s.task; // what harness-tunnel's task runs is registered by tunnel-task.mjs (node ui/start.mjs --tunnel)
+      tasks(['/End', '/TN', task]);
       if (name === 'harness-ui' && ports.harnessPort) {
         // A listener that holds the port but does not answer blocks the new server: stop it first.
-        run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-          `Get-NetTCPConnection -LocalPort ${Number(ports.harnessPort)} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`]);
+        powershell(
+          `Get-NetTCPConnection -LocalPort ${Number(ports.harnessPort)} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`);
       }
-      const r = run('schtasks.exe', ['/Run', '/TN', task]);
+      const r = tasks(['/Run', '/TN', task]);
       return { ok: r.status === 0, task, output: String(r.stdout || r.stderr || '').trim().slice(0, 300) };
     }
     case 'ask-gateway': return connectorStart('ask-gateway.mjs', clean);
@@ -543,7 +526,7 @@ export async function turnProbe({ terminal = null, supervisor = false } = {}) {
  * decision doorbell (top DI + its ranked actions) rung at once. Active mode only (reached through ctx.run).
  */
 export async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, supervisor = false, settings = hostSettings() }) {
-  const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../api/orca/lib.mjs')]);
+  const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../lib/sleep-sync.mjs')]);
   const keys = settings.turnBudget.interruptKeys[agent] ?? ['esc'];
   const sent = [];
   for (const key of keys) {
@@ -626,4 +609,4 @@ async function main() {
   process.exitCode = 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();

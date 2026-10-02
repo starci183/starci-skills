@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../record-ownership.mjs';
@@ -10,13 +10,13 @@ import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
 import { walkFiles } from '../../lib/walk.mjs';
 import {blobPath} from '../../../engine/db/blob.mjs';
 import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
-import { runGit } from '../../api/git/lib.mjs';
-import {sealedLocationProblem} from './check-work-artifacts.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs';
+import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
- * something checks it: renaming `impl/todo-app` to `impl/todo-app-backend` left thirteen records whose id
- * still said `todo-app`, and the YAML gate accepted every one of them because each file parsed. A record
+ * something checks it: renaming `impl/shop` to `impl/shop-backend` left thirteen records whose id
+ * still said `shop`, and the YAML gate accepted every one of them because each file parsed. A record
  * whose id does not match its place is the mismatch the layout forbids, and a ref to an id no record owns
  * is a dangling edge that reads as a satisfied dependency.
  *
@@ -65,7 +65,7 @@ const expectedId = segments => {
  * in step). The place rule derives an id from any depth, so without this a record can sit where its id
  * matches its place yet its own schema refuses the id: impl/index.yaml derives impl.<feature> and
  * impl/<repository>/index.yaml derives impl.<feature>.<repository>, both below
- * impl.<feature>.<repository>.<name> (starci-next inc-f2cfd86685a3).
+ * impl.<feature>.<repository>.<name>.
  */
 export const MIN_ID_SEGMENTS = Object.freeze({ impl: 3, ac: 3 });
 export const DEFAULT_MIN_ID_SEGMENTS = 2;
@@ -145,7 +145,7 @@ export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
  */
 export function trackedFilesUnder(dir) {
-  const r = runGit(['ls-files', '-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
+  const r = lsFiles(['-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
   if (r.error || r.status !== 0) return [];
   return r.stdout.split('\0').filter(Boolean).map((rel) => path.join(dir, rel));
 }
@@ -646,8 +646,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
 
     // ---- concept 10b: a ui record draws shapes, never a slot's data status (scripts/work/ui/ui-shapes.mjs) ----
-    // A record not yet on ui.shapes is warned until scripts/work/migrate-ui-shapes.mjs rewrites it.
-    for (const finding of uiShapeFindings(data)) (Array.isArray(data.ui?.shapes) ? problems : warnings).push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
+    for (const finding of uiShapeFindings(data)) problems.push(`${rec.shown}: ${finding.detail} [${finding.code}]`);
 
     // ---- concept 11: a generation-carrying asset is ui-owned direction, never an implementation capture ----
     if (Array.isArray(data.assets)) {
@@ -890,7 +889,7 @@ export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'modul
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const problems = [];
   const warnings = [];
   const infos = [];

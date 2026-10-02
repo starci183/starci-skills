@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { sweepAgentSessions, archiveSessionFiles, sessionSweepRoots } from '../../scripts/housekeeping/hk-sessions.mjs';
-import { safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { safeRemove } from '../../scripts/api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -18,13 +18,13 @@ const DAY = 24 * 60 * 60 * 1000;
 // os.tmpdir(), so a sweep can only ever see the fixture's own trees.
 const fixture = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-sessions-'));
-  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
+  t.after(() => { safeRemove(root, { hold: artifactHoldReason }); });
   const profile = path.join(root, 'profile');
   const appData = path.join(root, 'appdata');
   const archiveRoot = path.join(root, 'archive');
   fs.mkdirSync(profile, { recursive: true });
   fs.mkdirSync(appData, { recursive: true });
-  return { root, profile, appData, archiveRoot, env: { USERPROFILE: profile, APPDATA: appData } };
+  return { root, profile, appData, archiveRoot, env: { USERPROFILE: profile, APPDATA: appData, STARCI_ARCHIVE_ROOT: archiveRoot } };
 };
 
 const file = (p, { ageMs = 0, content = 'session-bytes' } = {}) => {
@@ -34,7 +34,7 @@ const file = (p, { ageMs = 0, content = 'session-bytes' } = {}) => {
   return p;
 };
 const exists = (p) => fs.existsSync(p);
-const allocation = (archiveRoot) => ({ housekeeping: { sessionArchiveAfterMs: 3 * DAY, archiveMaxAgeMs: 30 * DAY, archiveRoot } });
+const allocation = () => ({ housekeeping: { sessionArchiveAfterMs: 3 * DAY, archiveMaxAgeMs: 30 * DAY } });
 
 test('age boundary: files at or past sessionArchiveAfterMs archive, newer ones stay', async (t) => {
   const fx = fixture(t);
@@ -120,7 +120,7 @@ test('archive expiry: files past archiveMaxAgeMs under archiveRoot are deleted, 
 test('the housekeeping block may also be injected directly as allocation', async (t) => {
   const fx = fixture(t);
   const old = file(path.join(fx.profile, '.codex', 'sessions', 'old.jsonl'), { ageMs: 10 * DAY });
-  const run = await sweepAgentSessions({ apply: true, env: fx.env, allocation: { sessionArchiveAfterMs: 3 * DAY, archiveMaxAgeMs: 30 * DAY, archiveRoot: fx.archiveRoot } });
+  const run = await sweepAgentSessions({ apply: true, env: fx.env, allocation: { sessionArchiveAfterMs: 3 * DAY, archiveMaxAgeMs: 30 * DAY } });
   assert.equal(run.moved.length, 1);
   assert.equal(run.moved[0].from, old);
   assert.ok(exists(path.join(fx.archiveRoot, 'codex', 'sessions', 'old.jsonl')));

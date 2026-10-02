@@ -23,7 +23,7 @@
 // pixel digest scripts/work/ui/shell-conformance.mjs re-derives to prove the composite is exactly this.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { blankImage, cropImage, decodePng, dimImage, drawOver, encodePng, keyRect, resizeImage } from './png.mjs';
 import {
   OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
@@ -261,7 +261,7 @@ export function composeDirectionMain(argv = []) {
   return { exitCode: 0, text: argv.includes('--json') ? `${JSON.stringify(payload, null, 2)}\n` : `wrote ${slash(result.outFile)}\nrecord these under the ui record's assets (and ui.assets):\n${JSON.stringify(payload.assets, null, 2)}\n${result.promptExists ? '' : 'WARNING: the content prompt file does not exist yet - keep the exact prompt beside the content image.\n'}` };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = composeDirectionMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

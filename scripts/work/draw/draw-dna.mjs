@@ -55,7 +55,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs';
+import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 export const DRAW_OFF_GRAMMAR_COMPONENT = 'DRAW_OFF_GRAMMAR_COMPONENT';
 export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
@@ -654,6 +654,6 @@ async function main(argv) {
   return findings.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; });
 }

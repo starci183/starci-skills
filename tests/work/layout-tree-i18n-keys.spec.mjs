@@ -38,7 +38,7 @@ test('the scan records the used keys and a digest of their values per locale, an
   assert.deepEqual(scan.i18n.used.locales.map((l) => l.locale), ['en', 'vi']);
   const record = mergeScan(null, [scan], { at: '2026-09-25T00:00:00Z' }).record;
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
-  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Trợ lý' } }; });
+  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Tr\u1ee3 l\u00fd' } }; });
   assert.equal(scanOf(p).source.digest, scan.source.digest, 'a catalog edit does not move the code digest');
 });
 
@@ -47,7 +47,7 @@ test('an unrelated key added is not stale; a nav label edit is; a used key remov
   const record = mergeScan(null, [scanOf(p)], { at: '2026-09-25T00:00:00Z' }).record;
   assert.equal(sourceDrift(appOf(record), scanOf(p)).stale, false, 'nothing moved');
 
-  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Trợ lý', send: 'Gửi' } }; });
+  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Tr\u1ee3 l\u00fd', send: 'G\u1eedi' } }; });
   editCatalog(p, 'en', (d) => { d.modules = { chatbot: { title: 'Assistant', send: 'Send' } }; d.console.greeting = 'Hi'; });
   const unrelated = sourceDrift(appOf(record), scanOf(p));
   assert.equal(unrelated.stale, false, `an unrelated key is not drift: ${unrelated.changed.join('; ')}`);
@@ -55,11 +55,11 @@ test('an unrelated key added is not stale; a nav label edit is; a used key remov
   assert.equal(rescan.changed, false, 'a re-scan after an unrelated key does not bump the rev');
   assert.equal(rescan.record.rev, record.rev);
 
-  editCatalog(p, 'vi', (d) => { d.console.nav.photos = 'Hình ảnh'; });
+  editCatalog(p, 'vi', (d) => { d.console.nav.photos = 'H\u00ecnh \u1ea3nh'; });
   const label = sourceDrift(appOf(record), scanOf(p));
   assert.equal(label.stale, true, 'a nav label edit is drift');
   assert.ok(label.changed.some((c) => /nav photos vi label/.test(c)), label.changed.join('; '));
-  editCatalog(p, 'vi', (d) => { d.console.nav.photos = 'Ảnh'; });
+  editCatalog(p, 'vi', (d) => { d.console.nav.photos = '\u1ea2nh'; });
   assert.equal(sourceDrift(appOf(record), scanOf(p)).stale, false, 'the label restored is clean again');
 
   editCatalog(p, 'en', (d) => { delete d.console.nav.billing; });
@@ -71,7 +71,7 @@ test('an unrelated key added is not stale; a nav label edit is; a used key remov
 
 test('a layout title and a key a capture names are used keys too, and survive a re-scan', (t) => {
   const p = buildProduct(t);
-  editCatalog(p, 'vi', (d) => { d.console.title = 'Bảng điều khiển'; d.console.empty = 'Trống'; });
+  editCatalog(p, 'vi', (d) => { d.console.title = 'B\u1ea3ng \u0111i\u1ec1u khi\u1ec3n'; d.console.empty = 'Tr\u1ed1ng'; });
   editCatalog(p, 'en', (d) => { d.console.title = 'Console'; d.console.empty = 'Empty'; });
   const first = mergeScan(null, [scanOf(p)], { at: '2026-09-25T00:00:00Z' }).record;
   const layout = nodeById(appOf(first), CONSOLE).layout;
@@ -114,13 +114,13 @@ test('shell-conformance: LAYOUT_TREE_STALE only for a used key, never for an unr
   const shellDir = path.join(p.work, 'shell');
   const stale = () => checkShellConformance(shellDir).refused.filter((s) => s.includes('[LAYOUT_TREE_STALE]'));
   assert.deepEqual(stale(), []);
-  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Trợ lý' } }; });
+  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Tr\u1ee3 l\u00fd' } }; });
   editCatalog(p, 'en', (d) => { d.modules = { chatbot: { title: 'Assistant' } }; });
   assert.deepEqual(stale(), [], 'an unrelated key added is not stale');
-  editCatalog(p, 'vi', (d) => { d.console.nav.help = 'Hỗ trợ'; });
+  editCatalog(p, 'vi', (d) => { d.console.nav.help = 'H\u1ed7 tr\u1ee3'; });
   assert.equal(stale().length, 1, 'a nav label edit is stale');
   assert.match(stale()[0], /nav help vi label/);
-  editCatalog(p, 'vi', (d) => { d.console.nav.help = 'Trợ giúp'; });
+  editCatalog(p, 'vi', (d) => { d.console.nav.help = 'Tr\u1ee3 gi\u00fap'; });
   assert.deepEqual(stale(), []);
   editCatalog(p, 'en', (d) => { delete d.console.nav.photos; });
   assert.equal(stale().length, 1, 'a used key removed is stale');

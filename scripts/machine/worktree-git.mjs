@@ -11,7 +11,10 @@ import { SCRATCH_KINDS } from '../lib/worktree-kinds.mjs';
 import { samePath } from '../lib/path-key.mjs';
 import { PRESERVED_PREFIX, sameTree, withRegistry, claimWorktree, markRemoved } from './worktree-registry.mjs';
 import { artifactHoldReason } from './artifact-hold.mjs';
-import { forbiddenRoot, linksUnder, removeLinksUnder, safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { forbiddenRoot } from '../api/fs/forbidden-root.mjs';
+import { linksUnder } from '../api/fs/links-under.mjs';
+import { removeLinksUnder } from '../api/fs/remove-links-under.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
 import { worktreeAdd } from '../api/git/worktree-add.mjs';
 import { worktreePrune } from '../api/git/worktree-prune.mjs';
@@ -19,8 +22,8 @@ import { worktreeRemove } from '../api/git/worktree-remove.mjs';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { updateRef } from '../api/git/update-ref.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
-import { isAncestor } from '../api/git/merge-base.mjs';
-import { deleteBranch } from '../api/git/branch-delete.mjs';
+import { isAncestor } from '../api/git/is-ancestor.mjs';
+import { branchDelete } from '../api/git/branch-delete.mjs';
 import { snapshotCommit } from '../api/git/snapshot-commit.mjs';
 
 /** The repository's main checkout (the first `git worktree list` entry): the registry's repo key, from any of its trees. */
@@ -51,12 +54,12 @@ export function mainCheckoutDamage(before, after) {
 const gone = (p) => !fs.existsSync(p) && (() => { try { fs.lstatSync(p); return false; } catch { return true; } })();
 
 /**
- * Remove a git worktree (the one algorithm; the 490-file .claude incident and nivo-fe inc-c8fbf76aa499):
+ * Remove a git worktree (the one algorithm; the 490-file .claude incident and a live checkout emptied through a junction):
  *   1. enumerate every link in it WITHOUT following one (linksUnder);
  *   2. remove each as a link (removeLink: `cmd /c rmdir <link>`, never /s), outermost first;
  *   3. re-scan the same way and refuse (link-stuck, nothing deleted) unless ZERO links remain;
  *   4. only then `git worktree remove --force` (a link-free tree: git cannot walk out of it); a directory git does not know
- *      goes through safeRemoveTree (never follows a link); `git worktree prune`;
+ *      goes through safeRemove (never follows a link); `git worktree prune`;
  *   5. assert the main checkout is untouched: no new tracked deletion, node_modules and packages/node_modules entry counts
  *      unchanged - a violation is {ok:false, fatal:true, reason:'main-checkout-damaged'}: the caller (the GC) stops.
  * A tree holding an indexed job artifact is refused (artifact-hold.mjs). Never robocopy, rm -rf or rmdir /s. `git(args,
@@ -80,7 +83,7 @@ export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } =
     if (repo && trees.some((t) => samePath(t, target))) worktreeRemove(repo, target, { git });
     if (fs.existsSync(target)) {
       if (linksUnder(target).length) { out.errors.push({ path: target, code: 'LINK_STUCK', message: 'a link appeared during removal' }); out.reason = 'link-stuck'; return out; }
-      const rm = safeRemoveTree(target, { retries, hold: artifactHoldReason });
+      const rm = safeRemove(target, { retries, hold: artifactHoldReason });
       out.removed.files += rm.removed.files; out.removed.dirs += rm.removed.dirs;
       out.errors.push(...rm.errors);
     }
@@ -196,7 +199,7 @@ export function removeScratchWorktree({ repoRoot, dir, branch = null, deleteBran
     return { ...out, reason };
   }
   if (branch && mode && revParse(repoRoot, `refs/heads/${branch}`)) {
-    const deleted = deleteBranch({ repoRoot, branch, mode, main, git });
+    const deleted = branchDelete({ repoRoot, branch, mode, main, git });
     out.branch.deleted = deleted.ok;
     if (!deleted.ok) { markRemoved(target, { preservedRef: out.preserved?.ref ?? null, env }); return { ...out, ok: false, reason: 'branch-delete-failed', detail: deleted.detail }; }
   } else if (out.branch) out.branch.deleted = !revParse(repoRoot, `refs/heads/${branch}`);

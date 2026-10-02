@@ -60,7 +60,7 @@ test('the CLI reports the block drift with its Vietnamese why, and an app with n
   assert.equal(code, 1);
   const [finding] = JSON.parse(out).findings.filter((f) => f.code === 'HFS_GITIGNORE_BLOCK_DRIFT');
   assert.ok(finding);
-  assert.match(finding.titleVi, /[À-ỹ]/);
+  assert.match(finding.titleVi, /[\u00c0-\u1ef9]/);
   const refused = await main(['check', '--repo', dir], { ...seams, presets: undefined, stdout: () => {} });
   assert.equal(refused, 2);
   assert.match(err, /HFS_SYNC_PRESET_MISSING/);

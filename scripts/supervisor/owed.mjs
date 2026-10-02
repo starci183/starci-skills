@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // owed.mjs — what the running workflows wait on the SUPERVISOR for.
 //
-// Owner, 2026-09-24: "supervisor phải xử lý các conflict, chỉnh grammar, sửa lint, xác định vấn đề
-// out of scope workflow ... để sửa hết không? ... chứ để workflows stale/block/kẹt chờ sai là lỗi của
-// supervisor". That day the three ledgers' running workflows held ~90 open incidents addressed to the
-// supervisor, the runtime monitor or Source ("For the supervisor", "cần supervisor", "runtime
-// monitor", source-runtime-defect, knowledge churn, cross-workflow git effects, delegated rulings),
+// Owner, 2026-09-24: "the supervisor must handle the conflicts, fix grammar, fix lint, identify the
+// out-of-scope workflow problems ... are they all to be fixed? ... because leaving workflows
+// stale/blocked/stuck waiting wrongly is the supervisor's fault". That day the three ledgers' running
+// workflows held ~90 open incidents addressed to the supervisor, the runtime monitor or Source
+// ("For the supervisor", "needs supervisor", "runtime monitor", source-runtime-defect, knowledge churn, cross-workflow git effects, delegated rulings),
 // many already fixed by later .claude commits and never resolved, others still blocking. Nothing
 // surfaced them: poll printed a RUNTIME line only for a fixed list of kinds.
 //
@@ -46,7 +46,7 @@
 // poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
-// fixed used to re-alert every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
+// fixed used to re-alert every hour: one workflow's brand.decide a1-a8 failed, fixed by
 // 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
 // remaining OWED until the next success. Two ways out:
 //   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in
@@ -58,7 +58,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { logSince } from '../api/git/log-since.mjs'; import { revParse } from '../api/git/rev-parse.mjs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../../engine/config.mjs';
 import { retryDisposition } from '../../engine/admission.mjs';
@@ -73,7 +73,7 @@ import { readSupervisor, supervisorEvent, withSupervisor } from '../machine/home
 import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
-import { minutes } from '../lib/time.mjs';
+import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -236,17 +236,16 @@ let gitMemo = null;
  * The .claude commits since `since` (ms): [{sha, at, subject, message, lower}], newest first. One
  * `git log` per minute per root; an unreadable repository is [].
  */
-export function gitCommits({ root = SKILL_ROOT, since = 0, run = spawnSync, memoMs = 60_000, now = Date.now() } = {}) {
-  if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && run === spawnSync) return gitMemo.commits.filter((c) => c.at >= since);
-  const r = run('git', ['-C', root, 'log', `--since=${new Date(Math.max(0, since - 60_000)).toISOString()}`, '--format=%H%x1f%ct%x1f%s%x1f%b%x1e'],
-    { encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 * 1024 });
-  if (r.status !== 0) return [];
+export function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_000, now = Date.now() } = {}) {
+  if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && log === logSince) return gitMemo.commits.filter((c) => c.at >= since);
+  const r = log(root, new Date(Math.max(0, since - 60_000)).toISOString(), '%H%x1f%ct%x1f%s%x1f%b%x1e');
+  if (!r.ok) return [];
   const commits = String(r.stdout ?? '').split('\x1e').map((rec) => rec.replace(/^\s+/, '')).filter(Boolean).map((rec) => {
     const [sha, ct, subject = '', body = ''] = rec.split('\x1f');
     const message = `${subject}\n${body}`;
     return { sha, at: Number(ct) * 1000, subject, message, lower: message.toLowerCase() };
   }).filter((c) => /^[0-9a-f]{7,40}$/.test(c.sha));
-  if (run === spawnSync) gitMemo = { root, since, at: now, commits };
+  if (log === logSince) gitMemo = { root, since, at: now, commits };
   return commits;
 }
 
@@ -540,7 +539,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     } catch { /* no events */ }
     // Settled work that really owes work (api status staleOperations): an owner-declared breaking change or an
     // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
-    // counts (work-ownership.mjs, starci-next inc-1c7f7dad53e0).
+    // counts (work-ownership.mjs).
     try {
       const ops = staleOperationsOf(staleOf(db, wf, { root, repo }));
       if (ops.length) {
@@ -659,12 +658,11 @@ function collect(repos, { wanted = new Set(), now = Date.now(), acks = undefined
 }
 
 /** Full shas of `list` in the runtime's git, or {bad} naming one that is no commit. */
-export function resolveCommits(list, { root = SKILL_ROOT, run = spawnSync } = {}) {
+export function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
   const out = [];
   for (const sha of list) {
-    const r = run('git', ['-C', root, 'rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
-    const full = String(r.stdout ?? '').trim();
-    if (r.status !== 0 || !/^[0-9a-f]{40}$/.test(full)) return { bad: sha };
+    const full = String(resolve(root, sha) ?? '');
+    if (!/^[0-9a-f]{40}$/.test(full)) return { bad: sha };
     out.push(full);
   }
   return { commits: out };
@@ -722,4 +720,4 @@ function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

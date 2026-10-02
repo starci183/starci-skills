@@ -5,6 +5,8 @@ import type { DataSource } from "typeorm"
 import { BILLING_CONNECTION } from "./billing.connection"
 import { BILLING_ENTITY_MANAGER } from "./billing.decorators"
 import { DATABASE_MANAGERS, DatabaseProbe } from "./database-probe.service"
+import { openConnectionSource } from "./connection-source.client"
+import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { IDENTITY_CONNECTION } from "./identity.connection"
 import { IDENTITY_ENTITY_MANAGER } from "./identity.decorators"
@@ -22,8 +24,9 @@ const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, EntityManagerToken> = new Map<s
 
 @Module({})
 /**
- * The database capability: opens one named TypeORM connection per entry of the options and probes them for health.
- * Schema changes never happen here (`synchronize` is false, migrations run only in apps/migrate).
+ * The database capability: opens one named TypeORM connection per entry of the options and probes them for health; it
+ * provides its options and the opener of a one-off data source (the cli migrate command).
+ * Schema changes never happen here (`synchronize` is false, migrations run only in the cli migrate command).
  */
 export class DatabaseModule extends ConfigurableModuleClass {
     /** Registers the capability once per app with the connections it opens. */
@@ -65,8 +68,14 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 },
                 ...managers,
                 DatabaseProbe,
+                { provide: CONNECTION_SOURCE, useValue: openConnectionSource },
             ],
-            exports: [DatabaseProbe, ...managers.map((manager) => manager.provide)],
+            exports: [
+                DatabaseProbe,
+                DATABASE_OPTIONS,
+                CONNECTION_SOURCE,
+                ...managers.map((manager) => manager.provide),
+            ],
         }
     }
 }

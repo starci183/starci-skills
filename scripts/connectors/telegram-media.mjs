@@ -25,7 +25,7 @@
 //       --workflow <id> --job <id> --attempt <n> --op <op> --verdict pass|fail|blocked [--dispatch <id>]
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot } from '../../engine/config.mjs';
@@ -40,6 +40,7 @@ import { sleep } from '../lib/sleep.mjs';
 import { pathKey, slash } from '../lib/path-key.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
@@ -70,39 +71,26 @@ export const mediaKindOf = (op) => (DRAW_OPS.has(op) ? 'draw' : (UAT_OPS.has(op)
 
 /* ------------------------------------------------------------ texts */
 
-const TEXT = {
-  vi: {
-    drawn: (title, names) => `🎨 [StarCi] ${title} đã vẽ xong giao diện ${names}`,
-    screens: 'Màn hình', states: 'Trạng thái', variants: 'Biến thể', images: 'Ảnh gửi kèm', summary: 'Tóm tắt',
-    band: { desktop: 'desktop', tablet: 'tablet', mobile: 'mobile' }, theme: { light: 'sáng', dark: 'tối' },
-    review: 'Thầy xem kỹ khi bàn giao (handover), hoặc góp ý bất cứ lúc nào.',
-    tooBigPhoto: (n) => `${n} ảnh lớn hơn 10 MB không gửi qua Telegram, xem trên máy:`,
-    more: (n) => `và ${n} ảnh khác trên máy`,
-    uat: (name, verdict) => `🎬 [StarCi] UAT ${name}: ${verdict}`,
-    pass: 'ĐẠT', fail: 'KHÔNG ĐẠT', blocked: 'KHÔNG ĐẠT (bị chặn)',
-    workflow: 'Workflow', steps: 'Các bước', flows: 'Các luồng', video: 'video',
-    screenshotsOnly: (n) => `${n} ảnh chụp màn hình (không có video)`,
-    tooBigVideo: 'Video lớn hơn 50 MB nên không gửi qua Telegram; xem trên máy:',
-    cont: (i, n) => `(tiếp ${i}/${n})`,
-    prepare: 'bước chuẩn bị, video thử trình duyệt',
-  },
-  en: {
-    drawn: (title, names) => `🎨 [StarCi] ${title} finished drawing the interface for ${names}`,
-    screens: 'Screens', states: 'States', variants: 'Variants', images: 'Attached', summary: 'Summary',
-    band: { desktop: 'desktop', tablet: 'tablet', mobile: 'mobile' }, theme: { light: 'light', dark: 'dark' },
-    review: 'Review it at handover, or send feedback any time.',
-    tooBigPhoto: (n) => `${n} image(s) over 10 MB were not sent over Telegram; see them on the machine:`,
-    more: (n) => `and ${n} more on the machine`,
-    uat: (name, verdict) => `🎬 [StarCi] UAT ${name}: ${verdict}`,
-    pass: 'PASSED', fail: 'FAILED', blocked: 'FAILED (blocked)',
-    workflow: 'Workflow', steps: 'Steps', flows: 'Flows', video: 'video',
-    screenshotsOnly: (n) => `${n} screenshot(s) (no video)`,
-    tooBigVideo: 'The video is over 50 MB so it was not sent over Telegram; see it on the machine:',
-    cont: (i, n) => `(continued ${i}/${n})`,
-    prepare: 'preparation, browser probe video',
-  },
+// The English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs);
+// the width-band names are the same in every language.
+const textFor = (language) => {
+  const tr = translator(language);
+  return {
+    drawn: (title, names) => tr('🎨 [StarCi] {title} finished drawing the interface for {names}', { title, names }),
+    screens: tr('Screens'), states: tr('States'), variants: tr('Variants'), images: tr('Attached'), summary: tr('Summary'),
+    band: { desktop: 'desktop', tablet: 'tablet', mobile: 'mobile' }, theme: { light: tr('light'), dark: tr('dark') },
+    review: tr('Review it at handover, or send feedback any time.'),
+    tooBigPhoto: (n) => tr('{n} image(s) over 10 MB were not sent over Telegram; see them on the machine:', { n }),
+    more: (n) => tr('and {n} more on the machine', { n }),
+    uat: (name, verdict) => tr('🎬 [StarCi] UAT {name}: {verdict}', { name, verdict }),
+    pass: tr('PASSED'), fail: tr('FAILED'), blocked: tr('FAILED (blocked)'),
+    workflow: tr('Workflow'), steps: tr('Steps'), flows: tr('Flows'), video: tr('video'),
+    screenshotsOnly: (n) => tr('{n} screenshot(s) (no video)', { n }),
+    tooBigVideo: tr('The video is over 50 MB so it was not sent over Telegram; see it on the machine:'),
+    cont: (i, n) => tr('(continued {i}/{n})', { i, n }),
+    prepare: tr('preparation, browser probe video'),
+  };
 };
-const textFor = (language) => TEXT[language] ?? TEXT.en;
 const verdictText = (t, verdict) => (verdict === 'pass' ? t.pass : verdict === 'blocked' ? t.blocked : t.fail);
 
 /**
@@ -563,7 +551,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
  * media to send and Telegram is on, and return at once. Synchronous and never throws, so the settle
  * is never slowed or failed by Telegram; a launch failure is one stderr line.
  */
-export function queueSettleMedia(job, { env = process.env, config = undefined, spawnImpl = spawn, script = SELF } = {}) {
+export function queueSettleMedia(job, { env = process.env, config = undefined, spawnImpl = spawnNode, script = SELF } = {}) {
   try {
     const kind = mediaKindOf(job?.op);
     if (!kind) return { queued: false, skipped: 'not a media op' };
@@ -577,7 +565,7 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,
       '--attempt', String(job.attempt), '--op', job.op, '--verdict', job.verdict, ...(job.dispatchId ? ['--dispatch', String(job.dispatchId)] : [])];
     // The sender logs to machine_logs itself (actor connector, kind telegram-media.*): no output is kept.
-    const child = spawnImpl(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true, env });
+    const child = spawnImpl(args, { detached: true, stdio: 'ignore', env });
     child?.on?.('error', (error) => { try { process.stderr.write(`telegram-media: sender not started: ${redact(error?.message ?? error)}\n`); } catch { /* nothing */ } });
     child?.unref?.();
     return { queued: true, pid: child?.pid ?? null };

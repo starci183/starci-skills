@@ -1,0 +1,25 @@
+id: hfs-test-world-one-helper
+effectiveAt: '2026-10-02T11:40:00+07:00'
+summary: >-
+  One helper and one slot family for the test world (alpha.5 item 6.8). Every eslint-be rule that asked "is this the test world" by an
+  exact comparison of the slot with `be.tests.world` (module-shape, config-owner, naming, e2e-flow, testing) or by the second helper
+  `inTestBootstrap` of lib/persistence.mjs (connections, data-access, service-deps) now asks `inTestWorld` of lib/hfs.mjs, which
+  answers for the slot and its sub-slots (`be.tests.world.kit`); `inTestBootstrap` is deleted, no alias. The architecture machine
+  (entrypoint-only-in-apps R84, register-once R45) asks the one `isTestWorldSlot` of scripts/hfs/test-world-slot.mjs. The kit
+  sub-slot therefore joins the world's exemptions (it may hold a DataSource, as the world does). The checks that name the world's
+  root files (test-world-files, contract-fixture-guard, the world's one error class) keep the root slot on purpose.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-test-world-one-helper.yaml
+  - scripts/hfs/test-world-slot.mjs
+  - scripts/hfs/architecture/entrypoint.mjs
+  - scripts/hfs/architecture/register-once.mjs
+  - packages/eslint/be/lib/persistence.mjs
+  - packages/eslint/be/connections.mjs
+  - packages/eslint/be/data-access.mjs
+  - packages/eslint/be/service-deps.mjs
+  - packages/eslint/be/config-owner.mjs
+  - packages/eslint/be/module-shape.mjs
+  - packages/eslint/be/naming.mjs
+  - packages/eslint/be/e2e-flow.mjs
+  - packages/eslint/be/testing.mjs

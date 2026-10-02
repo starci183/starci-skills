@@ -110,18 +110,12 @@ test('the host contract and the owner-chat skills may quote orca commands',t=>{
   assert.equal(run(root).status,0,'the contract is data and those three skills are the owner\'s own tools');
 });
 
-test('the allow file exempts one path:line and records why',t=>{
-  const files={'CONTEXT.md':'x\nload `modules/host/orca/calls.yaml` first.\n'};
+test('there is no exemption list: a host-contract read is red until it is rewritten',t=>{
+  const files={'CONTEXT.md':'x\nload `modules/host/orca/calls.yaml` first.\n','scripts/checks/host-boundary.allow':'CONTEXT.md:2 # not honoured\n'};
   const red=run(fixture(t,files));
   assert.equal(red.status,1);
   assert.deepEqual(rules(red.report),['CONTEXT.md:2 reads-host-contract']);
-  const root=fixture(t,{...files,'scripts/checks/host-boundary.allow':'# header\nCONTEXT.md:2 # lane-E-rewrite-pending\n'});
-  const green=run(root);
-  assert.equal(green.status,0);
-  assert.deepEqual(green.report.allowed,[{where:'CONTEXT.md:2',reason:'lane-E-rewrite-pending'}]);
-  // The exemption is one line, not a file-wide pass.
-  fs.writeFileSync(path.join(root,'CONTEXT.md'),'load `modules/host/orca/calls.yaml` first.\nload `modules/host/orca/api.yaml` too.\n');
-  assert.deepEqual(rules(run(root).report),['CONTEXT.md:1 reads-host-contract']);
+  assert.equal(red.report.allowed,undefined);
 });
 
 test('an agent CLI spawned as a child process is red, through a literal, a constant, a shim, a shell string or a cmd argv',t=>{
@@ -135,7 +129,7 @@ test('an agent CLI spawned as a child process is red, through a literal, a const
       "execSync('devin -p \"judge\"');",
     ].join('\n'),
     'engine/runner.cjs':"const cp = require('child_process');\ncp.spawnSync('cmd', ['/c', 'cursor-agent', '-p']);\n",
-    'bin/x.mjs':"import * as cp from 'node:child_process';\nconst GEMINI = 'C:/tools/gemini.exe';\ncp.execFile(GEMINI, []);\n",
+    'bin/x.mjs':"import * as cp from 'node:child_process';\nconst GEMINI = '/opt/tools/gemini.exe';\ncp.execFile(GEMINI, []);\n",
   });
   const r=run(root);
   assert.equal(r.status,1);
@@ -167,10 +161,8 @@ test('a mention of an agent CLI is not a spawn; git, node and npm spawns pass',t
   assert.equal(r.status,0,JSON.stringify(r.report.violations));
 });
 
-test('this repo is clean once its allow file is applied',()=>{
+test('this repo is clean',()=>{
   const r=spawnSync(process.execPath,[CHECK],{cwd:ROOT,encoding:'utf8',timeout:60000,windowsHide:true});
   const report=JSON.parse(r.stdout.trim());
   assert.equal(r.status,0,`host boundary violations: ${JSON.stringify(report.violations,null,2)}`);
-  for(const {where,reason} of report.allowed)
-    assert.ok(reason&&reason!=='no reason given',`${where} is exempted without a reason`);
 });

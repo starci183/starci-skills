@@ -14,7 +14,8 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow, clipDraft } from '../lib/terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
-import { draftText, sleepSync } from '../api/orca/lib.mjs';
+import { draftText } from '../lib/orca-terminal.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 // The quit input each agent CLI understands at its prompt. Claude gets two

@@ -13,7 +13,7 @@
 //
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app","todo-app"]) for $GITHUB_OUTPUT
+//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
 //   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml from the render
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +21,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { coverageScope } from '../../packages/hfs/sync/index.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WORKFLOW = '.github/workflows/examples.yml';
@@ -138,4 +139,4 @@ export function examplesCiMain(argv = [], { root = ROOT, out = (s) => process.st
   return findings.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = examplesCiMain(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = examplesCiMain(process.argv.slice(2));

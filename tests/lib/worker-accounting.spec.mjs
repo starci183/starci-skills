@@ -1,5 +1,5 @@
 // worker-accounting.spec.mjs — worker accounting through Orca's orchestration worker-list (lane WLIST): the
-// scripts/api/orca/worker-list.mjs wrapper (driven through the shared fake Orca, never the live host), the pure reads of
+// scripts/machine/worker-list-all.mjs pager over the scripts/api/orca/worker-list.mjs call (driven through the shared fake Orca, never the live host), the pure reads of
 // scripts/lib/worker-accounting.mjs, the lane-owner rule, and machine.sqlite 0004 (terminals keeps shell sightings only).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,15 +8,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
-import { workerListAll, activeWorkersAllRuns } from '../../scripts/api/orca/worker-list.mjs';
+import { workerListAll, activeWorkersAllRuns } from '../../scripts/machine/worker-list-all.mjs';
 import { releasePlan, workerTerminalHandles, activeWorkerOn, worktreePathOf } from '../../scripts/lib/worker-accounting.mjs';
 import { laneOwnerOf } from '../../scripts/machine/lane-owner.mjs';
 import { MACHINE_VERSION, openMachine } from '../../engine/db/machine.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const WRAPPER = path.join(ROOT, 'scripts', 'api', 'orca', 'worker-list.mjs');
+const WRAPPER = path.join(ROOT, 'scripts', 'machine', 'worker-list-all.mjs');
 
-const row = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', liveness = 'exited', argv = null, worktree = 'D:/lanes/x' } = {}) => ({
+const row = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', liveness = 'exited', argv = null, worktree = 'lanes/x' } = {}) => ({
   dispatchId, runId: run, workerState: 'succeeded', terminalState, agentTerminalHandle: `term_${dispatchId}`,
   resource: { terminalHandle: `term_${dispatchId}`, worktreeId: `repo-1::${worktree}` },
   projection: { liveness: { verdict: liveness }, nextAction: { kind: argv ? 'release' : 'none', argv: argv ?? [] } },
@@ -31,7 +31,7 @@ test('worker-list wrapper: --run and --terminal-state reach Orca, and every page
   const rows = [...Array.from({ length: 230 }, (_, i) => row(`ctx_${i}`)), row('ctx_other', { run: 'run_b' }), row('ctx_live', { terminalState: 'active' })];
   fs.writeFileSync(state, JSON.stringify({ workerRows: rows }));
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]), STARCI_FAKE_ORCA_STATE: state, STARCI_FAKE_ORCA_LOG: log };
-  const r = spawnSync(process.execPath, [WRAPPER, '--run', 'run_a', '--terminal-state', 'reclaimable', '--all-pages'], { encoding: 'utf8', env, windowsHide: true, timeout: 60_000 });
+  const r = spawnSync(process.execPath, [WRAPPER, '--run', 'run_a', '--terminal-state', 'reclaimable'], { encoding: 'utf8', env, windowsHide: true, timeout: 60_000 });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
   assert.equal(out.ok, true);
@@ -78,8 +78,8 @@ test('releasePlan: release only a reclaimable, verifiable worker whose nextActio
 test('workerTerminalHandles names every terminal Orca has not released; worktreePathOf reads Orca\'s worktree id', () => {
   const handles = workerTerminalHandles([row('a', { terminalState: 'active' }), row('b'), row('c', { terminalState: 'released' }), row('d', { terminalState: 'release_unknown' })]);
   assert.deepEqual([...handles].sort(), ['term_a', 'term_b', 'term_d']);
-  assert.equal(worktreePathOf(row('a', { worktree: 'D:/starci-lanes/dv/c0-wlist' })), 'D:/starci-lanes/dv/c0-wlist');
-  assert.equal(worktreePathOf({ projection: { workspace: { id: 'repo::D:/x' } } }), 'D:/x');
+  assert.equal(worktreePathOf(row('a', { worktree: 'starci-lanes/dv/c0-wlist' })), 'starci-lanes/dv/c0-wlist');
+  assert.equal(worktreePathOf({ projection: { workspace: { id: 'repo::wt-x' } } }), 'wt-x');
   assert.equal(worktreePathOf({}), null);
 });
 

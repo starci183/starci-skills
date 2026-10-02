@@ -18,11 +18,11 @@ const plan = (text) => {
 
 test('a canon-conformance phrase in Vietnamese or English routes to the canon-conformance chain: a lint scan, then the refactor slices and the verify leg', () => {
   for (const text of [
-    'dọn nợ nivo-fe theo chuẩn starci',
-    'chuẩn hoá source starci-academy-fe',
-    'Dọn nợ kỹ thuật starci-next-fe: sửa hết lint canon',
-    'conform the nivo-fe frontend to the starci canon, zero lint findings',
-    'clean up the canon debt in the starci-next-fe screens',
+    'd\u1ecdn n\u1ee3 todo-app-fe theo chu\u1ea9n starci',
+    'chu\u1ea9n ho\u00e1 source ecommerce-app-fe',
+    'D\u1ecdn n\u1ee3 k\u1ef9 thu\u1eadt my-app-fe: s\u1eeda h\u1ebft lint canon',
+    'conform the todo-app-fe frontend to the starci canon, zero lint findings',
+    'clean up the canon debt in the my-app-fe screens',
   ]) {
     const result = plan(text);
     assert.equal(result.status, 'ok', text);
@@ -51,9 +51,9 @@ test('the kernel cuts a canon code.refactor leg by canon-scan slices, each still
 
 test('the conformance leg carries the owner families as a declared code.refactor param', () => {
   const brief = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'ops', 'ops', 'code.refactor.yaml'), 'utf8'));
-  // code.refactor also declares kernel params with defaults (canonWire, resumeFrom, admissionBase - canon slice wire).
+  // code.refactor also declares kernel params with defaults (canonWire, resumeFrom - canon slice wire).
   assert.deepEqual(resolveOpParams(brief, { leg: { canonFamilies: 'shape-slot,architecture' }, enforceRequired: true }).params,
-    { gateRounds: 5, canonFamilies: 'shape-slot,architecture', canonWire: false, resumeFrom: '', admissionBase: '' });
+    { gateRounds: 5, canonFamilies: 'shape-slot,architecture', canonWire: false, resumeFrom: '' });
   assert.equal(resolveOpParams(brief, { enforceRequired: true }).params.canonFamilies, '');
   assert.equal(resolveOpParams(brief, { flag: { canonFamilies: 'all' } }).ok, false, 'the kernel cannot set an owner param the leg does not carry');
 });

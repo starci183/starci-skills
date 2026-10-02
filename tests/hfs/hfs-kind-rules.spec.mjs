@@ -1,5 +1,5 @@
-// The trigger kinds of a back end (scripts/hfs/rules/kinds.mjs): R159 BE_KIND_DECLARATION (the kinds in use are declared in
-// hfs.json sides.be.kinds, with their patterns and platform capabilities) and R160 BE_KIND_EMPTY (a kind folder has members, each with code).
+// The trigger kinds of a back end (scripts/hfs/rules/kinds.mjs): R179 BE_KIND_DECLARATION (the kinds in use are declared in
+// hfs.json sides.be.kinds, with their patterns and platform capabilities) and R180 BE_KIND_EMPTY (a kind folder has members, each with code).
 // The tracked file list is the whole input, so each case lists the files of one back end.
 import test from 'node:test';
 import assert from 'node:assert/strict';

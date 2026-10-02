@@ -16,7 +16,7 @@ import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CH
  * test succeeded is not cleanup.
  */
 const runtime=path.resolve(import.meta.dirname,'..', '..');
-const EXAMPLE=path.join(runtime,'examples/todo-app/.starciwork');
+const EXAMPLE=path.join(runtime,'examples/ecommerce-app/.starciwork');
 const AT='2026-01-01T00:00:00.000Z';
 const LATER='2026-02-01T00:00:00.000Z';
 /** What a proof was captured against; these stand in for the capturing kernel's own tokens. */
@@ -286,16 +286,23 @@ test('the example tree declares its own revisions the way the change model requi
   for(const record of report.records) if(record.declaredKind) assert.ok(CHANGE_KINDS.includes(record.declaredKind),`${record.id} declares ${record.declaredKind}`);
 });
 
-test('the example withdrawal is recorded as breaking and keeps the clauses it removed',()=>{
-  const report=checkWorkChange({workRoot:EXAMPLE});
-  const gap=only(report,'gap.plan.sepay-not-reachable');
+test('a withdrawal is recorded as breaking and keeps the clauses it removed',t=>{
+  const root=path.join(world(t),'withdrawal');
+  const withdraws=['no module exists yet at src/plan/payments (gap.plan.unbuilt-module)',
+    "no request has ever reached the sandbox merchant account for real"];
+  write(path.join(root,'features/plan/gap/sandbox-not-reachable/index.yaml'),['schema: work/gap@1','id: gap.plan.sandbox-not-reachable',
+    'title: No live run has completed a checkout against the real sandbox','state: todo',
+    'statement: The integration requires a live proof and none exists.','closedBy: integration.plan.sandbox',
+    'change:','  rev: 2','  kind: breaking',`  at: ${LATER}`,'  withdraws:',quoted(withdraws),
+    '  reason: Both withdrawn clauses are now false and the measurement replaces them.',''].join('\n'));
+  const report=checkWorkChange({workRoot:root});
+  const gap=only(report,'gap.plan.sandbox-not-reachable');
   assert.deepEqual([gap.rev,gap.declaredKind,gap.state],[2,'breaking','todo']);
-  assert.deepEqual(gap.withdraws,['no module exists yet at src/plan/payments (gap.plan.unbuilt-module)',
-    "no request has ever reached SePay's sandbox merchant account for real"],
+  assert.deepEqual(gap.withdraws,withdraws,
     'a withdrawn clause is written out rather than deleted, because it is what any proof of the old revision was proving');
   // The withdrawn clauses are gone from the record itself, so the transition it declares is a break and
   // not an author's opinion of one.
-  const tree=readWorkTree(EXAMPLE),current=tree.records.get('gap.plan.sepay-not-reachable');
+  const tree=readWorkTree(root),current=tree.records.get('gap.plan.sandbox-not-reachable');
   const previous={...current,meta:{...current.meta,statements:[...gap.withdraws,...(current.meta.statements??[])]}};
   assert.equal(classifyChange(previous,current),'breaking');
 });

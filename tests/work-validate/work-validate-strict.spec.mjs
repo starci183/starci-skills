@@ -11,7 +11,7 @@ import { validateWork } from '../../scripts/work/validate/work-validate.mjs';
 // because live trees still carry records written before it, and ops run strict on what they write.
 
 const root = path.resolve(import.meta.dirname, '..', '..');
-const exampleRule = fs.readFileSync(path.join(root, 'examples', 'todo-app', '.starciwork', 'features', 'task', 'br', 'complete', 'once', 'index.yaml'), 'utf8');
+const exampleRule = fs.readFileSync(path.join(root, 'examples', 'ecommerce-app', '.starciwork', 'features', 'checkout', 'br', 'cart', 'index.yaml'), 'utf8');
 
 function tree(t, files) {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-strict-'));
@@ -51,7 +51,7 @@ test('a key the closed schema refuses is a strict refusal and stays invisible to
 });
 
 test('a slug or timestamp outside its pattern is refused under strict', (t) => {
-  const bad = exampleRule.replace('at: 2026-09-19T15:59:33.966Z', 'at: yesterday afternoon');
+  const bad = exampleRule.replace('at: 2026-09-19T15:58:00.000Z', 'at: yesterday afternoon');
   assert.notEqual(bad, exampleRule, 'the fixture edit must land');
   const work = tree(t, { 'features/task/br/complete/once/index.yaml': bad });
   const lines = schemaLines(validateWork(recordDir(work), { strict: true }));

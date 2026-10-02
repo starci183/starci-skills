@@ -5,7 +5,8 @@
 // `visualLayouts` (with includeVisualLayouts) carries each tab's own title: a
 // provider TUI rewrites the pane title (Codex sets it to the cwd name), while
 // the tab keeps the title `terminal create --title` gave it.
-import { orcaCall, arg, flag } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg, flag } from '../../lib/cli-arg.mjs';
 
 export function terminalList({ worktree, includeVisualLayouts = false } = {}) {
   const r = orcaCall('terminal-list', { worktree, 'include-visual-layouts': includeVisualLayouts === true });

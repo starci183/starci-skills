@@ -277,11 +277,10 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
   const { startAgent } = await import('../../scripts/agent/lib.mjs');
   const starts = [];
   const io = {
-    runShow: () => ({ ok: false }), runCreate: () => ({ ok: true, runId: 'run_1' }), taskCreate: () => ({ ok: true, taskId: 'task_1' }),
+    runShow: () => ({ ok: false }), runCreate: () => ({ ok: true, runId: 'run_1' }),
     spawn: {
       trust: () => ({ status: 'skipped', paths: [] }),
-      start: (a) => { starts.push(a); return { ok: true, outcome: 'ok', dispatchId: `ctx_${starts.length}` }; },
-      assignee: () => ({ ok: true, assigneeHandle: 'term_1' }),
+      start: (a) => { starts.push(a); return { ok: true, outcome: 'ok', dispatchId: `ctx_${starts.length}`, taskId: `task_${starts.length}`, agentTerminalHandle: 'term_1' }; },
       rename: () => ({ ok: true }),
       show: () => ({ ok: true, state: 'ready', effective: { agent: 'claude', model: 'claude-opus-5-5' } }),
       stop: () => ({ ok: true }), release: () => ({ ok: true }),
@@ -289,11 +288,11 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
   };
   const spec = workflowWorktreeSpec({ workflowId: 'wf-k', appRepo: path.resolve('/apps/k') });
   const kernel = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: 'new-child', repo: `path:${posix(path.resolve('/apps/k'))}`, baseBranch: spec.baseBranch, name: spec.name, setup: 'run',
-    title: '[Kernel] k', prompt: 'go', objective: 'k', io });
+    title: '[Kernel] k', prompt: 'go', objective: 'k', request: { workflow: 'wf-k', kernelAttempt: 1 }, io });
   assert.ok(kernel.ok, JSON.stringify(kernel));
   assert.deepEqual({ worktree: starts[0].worktree, repo: starts[0].repo, baseBranch: starts[0].baseBranch, name: starts[0].name, setup: starts[0].setup },
     { worktree: 'new-child', repo: `path:${posix(path.resolve('/apps/k'))}`, baseBranch: 'main', name: 'wf-wf-k', setup: 'run' });
-  const op = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: path.resolve('/orca/k/wf-wf-k'), repo: 'path:/ignored', name: 'ignored', title: '[Op] x', prompt: 'go', objective: 'x', io });
+  const op = startAgent({ provider: 'claude', model: 'claude-opus-5-5', worktree: path.resolve('/orca/k/wf-wf-k'), repo: 'path:/ignored', name: 'ignored', title: '[Op] x', prompt: 'go', objective: 'x', request: { job: 'op-x' }, io });
   assert.ok(op.ok, JSON.stringify(op));
   assert.equal(starts[1].worktree, path.resolve('/orca/k/wf-wf-k'));
   for (const k of ['repo', 'baseBranch', 'name', 'setup']) assert.equal(starts[1][k], undefined, `an existing worktree takes no --${k}`);

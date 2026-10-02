@@ -1,13 +1,13 @@
 import os from 'node:os';
-import { execFile } from 'node:child_process';
+import { runPowershellAsync } from '../../../scripts/api/process/run-powershell-async.mjs';
+import { gpuQuery } from '../../../scripts/api/process/gpu-query.mjs';
 import { sendJson } from '../envelope.mjs';
+import { translator } from '../../../scripts/lib/i18n.mjs';
+
+const tr = translator('vi');
 
 // Read-only host telemetry. Every external command is a fixed argv (never built from request input) and cached.
-const run = (file, args, timeout) => new Promise(resolve => {
-  try { execFile(file, args, { timeout, windowsHide: true, maxBuffer: 1 << 20 }, (error, stdout) => resolve(error ? null : String(stdout))); }
-  catch { resolve(null); }
-});
-const ps = (script, timeout = 8000) => run('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], timeout);
+const ps = (script, timeout = 8000) => runPowershellAsync(script, timeout);
 const num = value => { const n = Number(String(value).trim()); return Number.isFinite(n) ? n : null; };
 
 // Lazy TTL cache: returns the last value immediately, refreshes in the background when stale.
@@ -34,7 +34,7 @@ const tempInfo = cached(Infinity, async () => {
   return out && value != null && value > 0 && value < 130 ? value : null;
 }, null);
 const gpuInfo = cached(10_000, async () => {
-  const out = await run('nvidia-smi', ['--query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw', '--format=csv,noheader,nounits'], 3000);
+  const out = await gpuQuery(['name', 'temperature.gpu', 'utilization.gpu', 'memory.used', 'memory.total', 'power.draw'], 3000);
   if (!out) return [];
   return out.split(/\r?\n/).filter(Boolean).map(line => {
     const [name, temp, util, used, total, power] = line.split(',').map(part => part.trim());
@@ -83,7 +83,7 @@ export async function handleHost(request, response, store, url) {
   const gpuTemp = gpuInfo()[0]?.tempC ?? null;
   const view = {
     at: Date.now(), name: os.hostname() || null, os: `${os.type()} ${os.release()}`, uptimeSec: Math.round(os.uptime()),
-    cpu: { model: (cpus[0]?.model ?? 'không rõ').replace(/\s+/g, ' ').trim(), cores: cores?.cores ?? cpus.length, threads: cores?.threads ?? cpus.length,
+    cpu: { model: (cpus[0]?.model ?? tr('unknown')).replace(/\s+/g, ' ').trim(), cores: cores?.cores ?? cpus.length, threads: cores?.threads ?? cpus.length,
       loadPct: latest?.cpu_pct ?? loadPct(), tempC: tempInfo() },
     ram: { totalMb, freeMb, usedPct: Math.round((1 - freeMb / totalMb) * 1000) / 10 },
     gpus: gpuInfo(), disks: diskInfo(),

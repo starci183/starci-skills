@@ -15,6 +15,8 @@
 //   preserveAndReset  an op failed or was blocked: its owned paths' work (and any foreign change) is kept as
 //                     preserved/<workflowId>/<op> (a snapshot commit) and put back on the last checkpoint.
 //   rebaseWorkflow    the workflow branch rebased onto main's tip (a milestone when main moved, and the finish); the checkpoint follows.
+//   (api settle runs these through scripts/kernel/workflow-settle.mjs: settleCheckpoint, the Work-record owner rule and
+//                     the milestone rebase.)
 //   finishWorkflow    main is touched only here, in this order: the full gate of the whole branch against its merge-base
 //                     with main, the merge guard, review.verify of the exact head that lands, the rebase (a rebase that
 //                     moves the head forces a re-review), the fast-forward of main and its push, then the worktree is
@@ -28,9 +30,28 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../api/git/lib.mjs';
+import { add as gitAdd } from '../api/git/add.mjs';
+import { commitTree } from '../api/git/commit-tree.mjs';
+import { isAncestor } from '../api/git/is-ancestor.mjs';
+import { mergeBase } from '../api/git/merge-base.mjs';
+import { readTree } from '../api/git/read-tree.mjs';
+import { rebase as gitRebase } from '../api/git/rebase.mjs';
+import { rmCached } from '../api/git/rm-cached.mjs';
+import { symbolicRef } from '../api/git/symbolic-ref.mjs';
+import { updateRef } from '../api/git/update-ref.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { writeTree } from '../api/git/write-tree.mjs';
+import { lsTree } from '../api/git/ls-tree.mjs';
+import { restore as gitRestore } from '../api/git/restore.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { reset as gitReset } from '../api/git/reset.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { remote as gitRemote } from '../api/git/remote.mjs';
+import { push as gitPush } from '../api/git/push.mjs';
 import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
@@ -38,7 +59,7 @@ import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
-import { gateBaseOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
 
@@ -47,7 +68,7 @@ const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'gates', 'gate.mjs');
 export const PRESERVED_WORKFLOW_PREFIX = 'preserved';
 export const FINISH_STEPS = Object.freeze(['gate', 'merge-guard', 'review-verify', 'rebase', 'fast-forward', 'push', 'release-pending']);
 export const CHECKPOINT_EVENTS = Object.freeze({ checkpoint: 'workflow-checkpoint', preserved: 'workflow-op-preserved', landed: 'workflow-landed' });
-const RUNTIME_IDENTITY = ['-c', 'user.name=starci', '-c', 'user.email=runtime@starci.local'];
+const RUNTIME_IDENTITY = { 'user.name': 'starci', 'user.email': 'runtime@starci.local' };
 const NO_MODULES = [':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_modules/**'];
 const SHA = /^[0-9a-f]{40,64}$/;
 
@@ -67,19 +88,19 @@ function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = process.env
 export const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
-function git(cwd, args, { env = null, timeout = 600_000, input } = {}) {
-  const r = runGit(args, { cwd, timeout, input, env: env ? { ...process.env, ...env } : process.env, maxBuffer: 256 * 1024 * 1024 });
+/** One git call (a scripts/api/git call file) in `cwd`: {ok, status, stdout, stderr}. */
+function git(call, cwd, args, { env = null, timeout = 600_000, input, config = null } = {}) {
+  const r = call(args, { cwd, timeout, input, config, env: env ? { ...process.env, ...env } : process.env, maxBuffer: 256 * 1024 * 1024 });
   return { ok: !r.error && r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() };
 }
-const revParse = (cwd, ref) => { const r = git(cwd, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]); return r.ok && SHA.test(r.stdout) ? r.stdout : null; };
-const isAncestor = (cwd, a, b) => git(cwd, ['merge-base', '--is-ancestor', a, b]).ok;
+const revParse = (cwd, ref) => { const r = git(revParseQuery, cwd, ['--verify', '--quiet', `${ref}^{commit}`]); return r.ok && SHA.test(r.stdout) ? r.stdout : null; };
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const mainOf = (ctx) => ctx?.main ?? 'main';
 /** Part A's functions: ctx.worktree in a spec, the module itself in the runtime. */
 const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending, TERMINAL_JOB_STATUSES, ...(ctx?.worktree ?? {}) });
 
 /** The registry row of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
-function recordOf(ctx, workflowId) {
+export function recordOf(ctx, workflowId) {
   const rec = wt(ctx).workflowWorktreeOf(ctx, workflowId);
   if (!rec) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no workflow worktree in the registry`);
   if (!rec.path || !fs.existsSync(rec.path)) throw fail({ code: 'workflow-worktree-missing' }, `the worktree of workflow ${workflowId} (${rec.path ?? '-'}) is gone`);
@@ -88,7 +109,7 @@ function recordOf(ctx, workflowId) {
 }
 /** The branch the worktree is on must be the workflow branch: a checkpoint never lands on another branch. */
 function requireOnBranch(rec) {
-  const head = git(rec.path, ['symbolic-ref', '-q', 'HEAD']).stdout;
+  const head = symbolicRef(rec.path);
   if (head !== `refs/heads/${rec.branch}`) throw fail({ code: 'workflow-branch-mismatch' }, `the workflow worktree ${rec.path} is on ${head || 'a detached HEAD'}, not ${rec.branch}`);
 }
 
@@ -109,18 +130,20 @@ export function leasesOf(ctx, { workflowId, opId }) {
   const live = ctx.db.prepare(`SELECT job_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${statuses.map(() => '?').join(',')})`).all(workflowId, opId, ...statuses);
   return { own: ownedOf(row.payload_json), others: live.flatMap((r) => ownedOf(r.payload_json)) };
 }
+/** The gate bases an op's settle accepts (gateBasesOf over its owned paths), newest first; [] outside a workflow worktree. */
+export const opGateBasesOf = (ctx, { workflowId, opId }) => (wt(ctx).workflowWorktreeOf(ctx, workflowId) ? gateBasesOf(ctx, workflowId, { owned: leasesOf(ctx, { workflowId, opId }).own }) : []);
 const under = (file, owned) => owned.some((o) => o === '.' || file === o || file.startsWith(`${o}/`));
 const literal = (files) => files.map((f) => `:(literal)${f}`);
 const zlist = (text) => String(text ?? '').split('\0').map((l) => l.trim()).filter(Boolean);
 /** Every path of the worktree that differs from HEAD: tracked changes (staged or not, deletions included) and untracked files. */
 function changedFiles(dir) {
-  const tracked = git(dir, ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', '.', ...NO_MODULES]);
-  const untracked = git(dir, ['ls-files', '--others', '--exclude-standard', '-z', '--', '.', ...NO_MODULES]);
+  const tracked = git(gitDiff, dir, ['--name-only', '--no-renames', '-z', 'HEAD', '--', '.', ...NO_MODULES]);
+  const untracked = git(lsFiles, dir, ['--others', '--exclude-standard', '-z', '--', '.', ...NO_MODULES]);
   if (!tracked.ok || !untracked.ok) throw fail({ code: 'workflow-snapshot-failed' }, `the changes of ${dir} could not be listed: ${(tracked.stderr || untracked.stderr).slice(0, 200)}`);
   return [...new Set([...zlist(tracked.stdout), ...zlist(untracked.stdout)])].sort();
 }
 /** The changed files an op answers for: `mine` under its owned paths, `stray` under no live op's leases at all. */
-function splitChanges(dir, { own, others }) {
+export function splitChanges(dir, { own, others }) {
   const files = changedFiles(dir);
   return { mine: files.filter((f) => under(f, own)), stray: files.filter((f) => !under(f, own) && !under(f, others)) };
 }
@@ -134,14 +157,14 @@ function snapshotFiles(dir, parent, files, message) {
   const index = path.join(os.tmpdir(), `starci-wf-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
   const env = { GIT_INDEX_FILE: index };
   try {
-    for (const args of [['read-tree', parent], ['add', '-A', '--', ...literal(files)]]) {
-      const r = git(dir, args, { env });
-      if (!r.ok) throw fail({ code: 'workflow-snapshot-failed' }, `git ${args.slice(0, 2).join(' ')} in ${dir}: ${r.stderr.slice(0, 200)}`);
+    for (const [call, args, what] of [[readTree, [parent], 'read-tree'], [gitAdd, ['-A', '--', ...literal(files)], 'add -A']]) {
+      const r = git(call, dir, args, { env });
+      if (!r.ok) throw fail({ code: 'workflow-snapshot-failed' }, `git ${what} in ${dir}: ${r.stderr.slice(0, 200)}`);
     }
-    const tree = git(dir, ['write-tree'], { env }).stdout;
+    const tree = git(writeTree, dir, [], { env }).stdout;
     if (!SHA.test(tree)) throw fail({ code: 'workflow-snapshot-failed' }, `git write-tree in ${dir} printed no tree`);
-    if (tree === git(dir, ['rev-parse', `${parent}^{tree}`]).stdout) return { tree, sha: null };
-    const sha = git(dir, [...RUNTIME_IDENTITY, 'commit-tree', tree, '-p', parent, '-m', message]).stdout;
+    if (tree === git(revParseQuery, dir, [`${parent}^{tree}`]).stdout) return { tree, sha: null };
+    const sha = git(commitTree, dir, [tree, '-p', parent, '-m', message], { config: RUNTIME_IDENTITY }).stdout;
     if (!SHA.test(sha)) throw fail({ code: 'workflow-snapshot-failed' }, `git commit-tree in ${dir} printed no commit`);
     return { tree, sha };
   } finally { try { fs.rmSync(index, { force: true }); } catch { /* temp */ } }
@@ -150,14 +173,14 @@ function snapshotFiles(dir, parent, files, message) {
 /** `files` put back as they are at `base`: restored when base has them, removed (index and disk) when it does not. */
 function resetFiles(dir, base, files) {
   if (!files.length) return;
-  const inBase = new Set(zlist(git(dir, ['ls-tree', '-r', '-z', '--name-only', base, '--', ...literal(files)]).stdout));
+  const inBase = new Set(zlist(git(lsTree, dir, ['-r', '-z', '--name-only', base, '--', ...literal(files)]).stdout));
   const restore = files.filter((f) => inBase.has(f)), remove = files.filter((f) => !inBase.has(f));
   if (restore.length) {
-    const r = git(dir, ['restore', `--source=${base}`, '--staged', '--worktree', '--', ...literal(restore)]);
+    const r = git(gitRestore, dir, [`--source=${base}`, '--staged', '--worktree', '--', ...literal(restore)]);
     if (!r.ok) throw fail({ code: 'workflow-reset-failed' }, `git restore in ${dir}: ${r.stderr.slice(0, 200)}`);
   }
   if (remove.length) {
-    const r = git(dir, ['rm', '--cached', '-q', '--ignore-unmatch', '--', ...literal(remove)]);
+    const r = rmCached(dir, remove);
     if (!r.ok) throw fail({ code: 'workflow-reset-failed' }, `git rm --cached in ${dir}: ${r.stderr.slice(0, 200)}`);
     for (const f of remove) fs.rmSync(path.join(dir, f), { force: true });
   }
@@ -173,7 +196,7 @@ export function requireCheckpointChain(ctx, rec, workflowId) {
   const base = gateBaseOf(ctx, workflowId);
   const head = revParse(rec.path, 'HEAD');
   if (head === base) return base;
-  const foreign = lines(git(rec.path, ['rev-list', '--max-count=20', head, `^${base}`]).stdout);
+  const foreign = lines(git(revList, rec.path, ['--max-count=20', head, `^${base}`]).stdout);
   throw Object.assign(fail({ code: 'workflow-foreign-commit' }, `${rec.branch} carries ${foreign.length || 'a'} commit(s) the runtime did not make past its checkpoint ${base.slice(0, 12)} (${foreign.slice(0, 3).map((c) => c.slice(0, 12)).join(', ') || head.slice(0, 12)}): only checkpointOp commits on a workflow branch`), { commits: foreign });
 }
 
@@ -193,10 +216,10 @@ export function checkpointOp(ctx, { workflowId, opId }) {
   const snap = snapshotFiles(rec.path, head, mine, `checkpoint ${workflowId}: ${opId}`);
   let sha = head;
   if (snap.sha) {
-    const cas = git(rec.path, ['update-ref', '-m', `checkpoint ${opId}`, `refs/heads/${rec.branch}`, snap.sha, head]);
+    const cas = updateRef(rec.path, `refs/heads/${rec.branch}`, snap.sha, { message: `checkpoint ${opId}`, old: head });
     if (!cas.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `${rec.branch} moved during the checkpoint of ${opId}: ${cas.stderr.slice(0, 200)}`);
     // The worktree's index follows the new commit for the scope only; the files already are the commit's.
-    const idx = git(rec.path, ['reset', '-q', snap.sha, '--', ...literal(mine)]);
+    const idx = git(gitReset, rec.path, ['-q', snap.sha, '--', ...literal(mine)]);
     if (!idx.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `the index of ${rec.path} could not follow ${snap.sha}: ${idx.stderr.slice(0, 200)}`);
     sha = snap.sha;
   }
@@ -219,17 +242,17 @@ export function preserveAndReset(ctx, { workflowId, opId }) {
   const answer = () => { const { mine, stray } = splitChanges(rec.path, leases); return [...mine, ...stray]; };
   const snap = snapshotFiles(rec.path, head, answer(), `preserve ${workflowId}/${opId}: the work of a failed or blocked op`);
   const kept = snap.sha ?? head;
-  const hasWork = kept !== base && git(rec.path, ['diff', '--quiet', base, kept]).status === 1;
+  const hasWork = kept !== base && git(gitDiff, rec.path, ['--quiet', base, kept]).status === 1;
   let preservedRef = null;
   if (hasWork) {
     preservedRef = `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/${opId}`;
-    const u = git(rec.path, ['update-ref', preservedRef, kept]);
+    const u = updateRef(rec.path, preservedRef, kept);
     if (!u.ok) throw fail({ code: 'workflow-preserve-failed' }, `${preservedRef} could not be written: ${u.stderr.slice(0, 200)}`);
   }
   if (head !== base) {
     // Foreign commits past the checkpoint: the branch goes back; their changes now show against HEAD and are reset below
     // with the op's own. Another op's files are untouched by a soft reset.
-    const soft = git(rec.path, ['reset', '--soft', base]);
+    const soft = git(gitReset, rec.path, ['--soft', base]);
     if (!soft.ok) throw fail({ code: 'workflow-reset-failed' }, `${rec.branch} could not go back to ${base}: ${soft.stderr.slice(0, 200)}`);
   }
   resetFiles(rec.path, base, answer());
@@ -240,7 +263,7 @@ export function preserveAndReset(ctx, { workflowId, opId }) {
 
 /* ------------------------------------------------------------ rebase + finish */
 
-const conflictFiles = (dir) => lines(git(dir, ['diff', '--name-only', '--diff-filter=U']).stdout).slice(0, 20);
+const conflictFiles = (dir) => lines(git(gitDiff, dir, ['--name-only', '--diff-filter=U']).stdout).slice(0, 20);
 
 /**
  * The workflow branch rebased onto main's tip in its worktree (a no-op when main is already in it). The tracked tree must be clean (no
@@ -255,12 +278,12 @@ export function rebaseWorkflow(ctx, { workflowId }) {
   if (!onto) return { ok: false, code: 'workflow-rebase-failed', onto: null, detail: `${main} does not resolve in ${rec.path}` };
   const before = revParse(rec.path, 'HEAD');
   if (isAncestor(rec.path, onto, before)) return { ok: true, onto, head: before, already: true };
-  const dirty = lines(git(rec.path, ['status', '--porcelain', '--untracked-files=no', '--', '.', ...NO_MODULES]).stdout);
+  const dirty = lines(git(gitStatus, rec.path, ['--porcelain', '--untracked-files=no', '--', '.', ...NO_MODULES]).stdout);
   if (dirty.length) return { ok: false, code: 'workflow-rebase-dirty', onto, files: dirty.slice(0, 20) };
-  const r = git(rec.path, [...RUNTIME_IDENTITY, 'rebase', '--no-autostash', onto]);
+  const r = git(gitRebase, rec.path, ['--no-autostash', onto], { config: RUNTIME_IDENTITY });
   if (!r.ok) {
     const files = conflictFiles(rec.path);
-    git(rec.path, ['rebase', '--abort']);
+    git(gitRebase, rec.path, ['--abort']);
     if (files.length) return { ok: false, code: 'workflow-rebase-conflict', onto, files, detail: r.stderr.slice(-300) };
     return { ok: false, code: 'workflow-rebase-failed', onto, files, detail: r.stderr.slice(-300) };
   }
@@ -271,39 +294,45 @@ export function rebaseWorkflow(ctx, { workflowId }) {
 
 /** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
 export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
-  const run = spawnSync(process.execPath, [GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const run = runNode([GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
 }
 
 /**
- * review.verify passed on what lands: the workflow's last settled op is a succeeded review.verify (no op settled after it),
- * and the head its report names is the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
+ * review.verify passed on what lands, pinned to the head (WFWT2 2.5): the workflow's last settled op is a succeeded
+ * review.verify (no op settled after it); the head the runtime recorded at its settle (its workflow-checkpoint event: a
+ * review.verify owns no path, so that checkpoint is the tree it verified) equals the head its report names (no op
+ * checkpointed while it ran), and both equal the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
  */
 export function reviewVerifiedOf(ctx, { workflowId, head }) {
   if (!ctx?.db?.prepare) return { ok: false, code: 'workflow-finish-verify-missing', detail: 'no ledger to read review.verify from' };
   const last = ctx.db.prepare("SELECT job_id, op_id, status FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('succeeded','failed') ORDER BY updated_at DESC, job_id DESC LIMIT 1").get(workflowId);
   if (!last) return { ok: false, code: 'workflow-finish-verify-missing', detail: `workflow ${workflowId} has no settled op` };
   if (last.op_id !== 'review.verify' || last.status !== 'succeeded') return { ok: false, code: 'workflow-finish-verify-missing', detail: `the last settled op is ${last.job_id} (${last.op_id} ${last.status}), not a passing review.verify` };
-  const verifiedHead = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
-  if (!verifiedHead || verifiedHead !== head) return { ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead, detail: `review.verify ${last.job_id} verified ${verifiedHead ?? 'no head'}, not the head ${head} that lands: run review.verify again` };
-  return { ok: true, jobId: last.job_id, verifiedHead };
+  const reported = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
+  const settledAt = ctx.db.prepare("SELECT json_extract(payload_json,'$.sha') AS sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, last.job_id, CHECKPOINT_EVENTS.checkpoint)?.sha ?? null;
+  const stale = (detail) => ({ ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead: settledAt ?? reported, detail });
+  if (!settledAt) return stale(`the runtime recorded no checkpoint at the settle of review.verify ${last.job_id}: run review.verify again`);
+  if (!reported || !settledAt.startsWith(reported)) return stale(`review.verify ${last.job_id} reported ${reported ?? 'no head'}, but the tree at its settle was ${settledAt}: an op checkpointed while it ran; run review.verify again`);
+  if (settledAt !== head) return stale(`review.verify ${last.job_id} verified ${settledAt}, not the head ${head} that lands: run review.verify again`);
+  return { ok: true, jobId: last.job_id, verifiedHead: settledAt };
 }
 
 function pushMain(repoRoot, main) {
-  if (!git(repoRoot, ['remote', 'get-url', 'origin']).ok) return { ok: true, pushed: false, skipped: 'no-origin' };
-  const p = git(repoRoot, ['push', 'origin', `refs/heads/${main}:refs/heads/${main}`]);
+  if (!git(gitRemote, repoRoot, ['get-url', 'origin']).ok) return { ok: true, pushed: false, skipped: 'no-origin' };
+  const p = git(gitPush, repoRoot, ['origin', `refs/heads/${main}:refs/heads/${main}`]);
   return p.ok ? { ok: true, pushed: true } : { ok: false, pushed: false, detail: p.stderr.slice(-300) };
 }
 
 /** main compare-and-swap fast-forwarded to `head` (the live checkout's changed paths with it when main is checked out there). */
 function fastForwardMain(ctx, { repoRoot, from, head }) {
   const main = mainOf(ctx);
-  const checkedOut = git(repoRoot, ['symbolic-ref', '-q', 'HEAD']).stdout === `refs/heads/${main}`;
+  const checkedOut = symbolicRef(repoRoot) === `refs/heads/${main}`;
   if (!checkedOut) {
-    const cas = git(repoRoot, ['update-ref', '-m', `land wf ${head}`, `refs/heads/${main}`, head, from]);
+    const cas = updateRef(repoRoot, `refs/heads/${main}`, head, { message: `land wf ${head}`, old: from });
     return cas.ok ? { ok: true } : { ok: false, reason: 'main-moved', detail: cas.stderr.slice(0, 200) };
   }
-  const rows = lines(git(repoRoot, ['diff', '--name-status', '--no-renames', from, head]).stdout).map((l) => l.split('\t'));
+  const rows = lines(git(gitDiff, repoRoot, ['--name-status', '--no-renames', from, head]).stdout).map((l) => l.split('\t'));
   return (ctx?.fastForward ?? fastForwardLive)({ root: repoRoot, base: from, head, rows });
 }
 
@@ -323,12 +352,12 @@ export function finishWorkflow(ctx, { workflowId }) {
   const repoRoot = mainRootOf(dir);
   const out = withLock(landLockName(repoRoot), () => {
     const gate = ctx?.gate ?? runWorkflowGate;
-    const dirty = lines(git(dir, ['status', '--porcelain', '--untracked-files=all', '--', '.', ...NO_MODULES]).stdout);
+    const dirty = lines(git(gitStatus, dir, ['--porcelain', '--untracked-files=all', '--', '.', ...NO_MODULES]).stdout);
     if (dirty.length) return refuse('gate', 'workflow-finish-dirty', `${dir} has work no checkpoint carries: ${dirty.slice(0, 3).join('; ')}`, { files: dirty.slice(0, 20) });
     try { requireCheckpointChain(ctx, rec, workflowId); } catch (error) { return refuse('gate', 'workflow-foreign-commit', error.message, { commits: error.commits ?? [] }); }
     const gateOn = (step) => {
       const head = revParse(dir, 'HEAD');
-      const base = git(dir, ['merge-base', `refs/heads/${main}`, head]).stdout;
+      const base = mergeBase(dir, `refs/heads/${main}`, head) ?? '';
       const g = gate({ root: dir, base });
       const summary = { exit: g.exit, base, head, counts: g.counts ?? null, findings: (g.findings ?? []).slice(0, 40), errors: g.errors ?? [] };
       if (g.exit === 1) return refuse(step, 'workflow-finish-gate-red', `the whole branch ${rec.branch} has ${g.counts?.new ?? summary.findings.length} new finding(s) against ${main}`, { gate: summary });
@@ -342,7 +371,7 @@ export function finishWorkflow(ctx, { workflowId }) {
     // 2. the merge guard over the branch's own history.
     const tip = revParse(dir, `refs/heads/${main}`);
     const head = revParse(dir, 'HEAD');
-    const guarded = (ctx?.guard ?? mergeGuard)(dir, { base: git(dir, ['merge-base', tip, head]).stdout, head, mainTip: tip });
+    const guarded = (ctx?.guard ?? mergeGuard)(dir, { base: mergeBase(dir, tip, head) ?? '', head, mainTip: tip });
     if (guarded.errors?.length) return refuse('merge-guard', 'workflow-finish-guard-unavailable', `the merge guard could not recompute a merge: ${guarded.errors[0]}`);
     if (guarded.findings?.length) return refuse('merge-guard', 'workflow-finish-merge-dropped-main', `a merge on ${rec.branch} kept the lane side over main's change of ${guarded.findings.length} path(s)`, { paths: guarded.findings.slice(0, 40).map((f) => f.path) });
     steps.push({ step: 'merge-guard', ok: true, merges: (guarded.checked ?? []).length });

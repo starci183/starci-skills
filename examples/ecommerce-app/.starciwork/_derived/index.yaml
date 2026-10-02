@@ -24,7 +24,9 @@ records:
     usedBy:
       refs:
         - contract.checkout.order-for-identity
+        - data.checkout.order
         - integration.checkout.redis
+        - nfr.checkout.place-order-idempotent
         - sds.checkout.order-flow
         - ui.checkout.stock-refused
       composes:
@@ -86,6 +88,14 @@ records:
     state: done
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
+  data.checkout.order:
+    schema: work/data@1
+    feature: checkout
+    state: todo
+    effectiveState: todo
+    usedBy:
+      refs:
+        - event.checkout.order-placed
   decision.checkout.ops-doors:
     schema: work/policy-decision@1
     feature: checkout
@@ -104,6 +114,11 @@ records:
     feature: null
     state: null
     effectiveState: null
+  event.checkout.order-placed:
+    schema: work/event@1
+    feature: checkout
+    state: todo
+    effectiveState: todo
   fr.checkout.cart.add:
     schema: work/functional-requirement@1
     feature: checkout
@@ -136,6 +151,9 @@ records:
     usedBy:
       refs:
         - contract.checkout.order-for-identity
+        - data.checkout.order
+        - event.checkout.order-placed
+        - nfr.checkout.place-order-idempotent
         - sds.checkout.order-flow
         - ui.checkout.cart
         - ui.checkout.landing-home
@@ -165,6 +183,9 @@ records:
     feature: checkout
     state: done
     effectiveState: done
+    usedBy:
+      blockedBy:
+        - journey.checkout.first-purchase
   gap.checkout.second-example-gates:
     schema: work/gap@1
     feature: checkout
@@ -224,6 +245,21 @@ records:
   integration.identity.keycloak:
     schema: work/integration@1
     feature: identity
+    state: todo
+    effectiveState: todo
+  journey.checkout.first-purchase:
+    schema: work/customer-journey@1
+    feature: checkout
+    state: todo
+    effectiveState: todo
+    blockers:
+      - id: gap.checkout.live-proof
+        rootKind: gap
+        cyclic: false
+        because: The journey needs the live uat run that gap.checkout.live-proof still owes.
+  nfr.checkout.place-order-idempotent:
+    schema: work/non-functional-requirement@1
+    feature: checkout
     state: todo
     effectiveState: todo
   sds.checkout.order-flow:
@@ -286,17 +322,17 @@ records:
 tally:
   overall:
     done: 3
-    todo: 12
+    todo: 16
     stale: 17
     blocked: 0
-    total: 32
+    total: 36
   byFeature:
     checkout:
       done: 2
-      todo: 9
+      todo: 13
       stale: 10
       blocked: 0
-      total: 21
+      total: 25
     identity:
       done: 1
       todo: 3
@@ -326,6 +362,12 @@ frontier:
   - id: br.checkout.cart
     feature: checkout
     title: A cart is the person's own accumulating list of product lines
+  - id: data.checkout.order
+    feature: checkout
+    title: Order
+  - id: event.checkout.order-placed
+    feature: checkout
+    title: An order was placed
   - id: fr.checkout.cart.add
     feature: checkout
     title: Add a line to the cart
@@ -340,7 +382,7 @@ frontier:
     title: Download the receipt of an order
   - id: gap.checkout.second-example-gates
     feature: checkout
-    title: No host port-registry entry exists for this second example yet
+    title: No host port-registry entry exists for this example yet
   - id: integration.checkout.minio
     feature: checkout
     title: MinIO archives the receipts of placed orders
@@ -350,6 +392,12 @@ frontier:
   - id: integration.checkout.redis
     feature: checkout
     title: Redis is the identity service's session store
+  - id: journey.checkout.first-purchase
+    feature: checkout
+    title: A new person signs in, fills a cart and places a first order
+  - id: nfr.checkout.place-order-idempotent
+    feature: checkout
+    title: Placing the same order twice charges once and confirms one order
   - id: ui.checkout.cart
     feature: checkout
     title: Populated cart direction
@@ -372,6 +420,9 @@ frontier:
     feature: identity
     title: Account sign-in direction
 unclassifiedEdges:
+  - from: event.checkout.order-placed
+    field: producer
+    target: fr.checkout.place-order
   - from: gap.checkout.live-proof
     field: closedBy
     target: uat.checkout.place-order
@@ -407,6 +458,21 @@ unclassifiedEdges:
     target: contract.identity.internal.sessions
   - from: impl.identity.be.identity-account
     field: proves
+    target: fr.identity.sign-in
+  - from: journey.checkout.first-purchase
+    field: requirements
+    target: fr.checkout.cart.add
+  - from: journey.checkout.first-purchase
+    field: requirements
+    target: fr.checkout.cart.list
+  - from: journey.checkout.first-purchase
+    field: requirements
+    target: fr.checkout.download-receipt
+  - from: journey.checkout.first-purchase
+    field: requirements
+    target: fr.checkout.place-order
+  - from: journey.checkout.first-purchase
+    field: requirements
     target: fr.identity.sign-in
   - from: uat.checkout.place-order
     field: proves

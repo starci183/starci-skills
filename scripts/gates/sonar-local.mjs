@@ -2,19 +2,19 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn,spawnSync} from 'node:child_process';
+import {decrypt} from '../api/sops/decrypt.mjs';import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
+import {safeRemove} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
 import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from './runtime-host.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
@@ -34,7 +34,7 @@ import {createRequire} from 'node:module';
  * through the stack-secret tool the first time (the example apps' tokens, whose declared custody is a runtime extension's
  * ext/<service>/secrets directory, are sealed there by sealExtCustody). No op ever asks the owner for a Sonar token or a GitHub
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
- * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
+ * (a container and database recreated behind custody) is re-minted with a
  * valid admin token through the same mint path, stored over the rejected member through the same
  * stack-secret tool, and recorded as a `sonar-token-reminted` Supervisor audit event (machine.sqlite sup_events).
  *
@@ -51,12 +51,11 @@ import {createRequire} from 'node:module';
  *                                            of every file of the coverage scope), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
- * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
- * op-backend.implement-792d53da0b: `--cwd starci-next` from inside starci-next read
- * D:/Repositories/starci-next/starci-next and was blocked). --isolate analyses the slice alone: the
+ * directory beside or above the current one, never to <cwd>/<name> (a `--cwd <name>` run from inside
+ * that same repository once read <cwd>/<name> and was blocked). --isolate analyses the slice alone: the
  * scanner indexes only --paths (sonar.inclusions, and the repository's test patterns under them) into
  * a throwaway project <key>-slice-<hash> scanned with the admin token, judged, then deleted. A whole
- * nivo-backend analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
+ * repository analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
  * the slice verdict reads only the slice's files, so the isolated analysis proves the same verdict.
  * Without the admin token in custody --isolate falls back to the full analysis and says so.
  *
@@ -282,8 +281,7 @@ export function readCustody(cfg,ref){
     else if(!fs.existsSync(cfg.identity))reasons.push(`master identity ${cfg.identity} is missing`);
     else{
       const [bin,args]=launcher(sops,['--decrypt','--input-type','binary','--output-type','binary',enc]);
-      const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],
-        env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+      const result=decrypt(bin,args,{env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
       const value=result.status===0?String(result.stdout??'').trim():'';
       if(value)return {present:true,value:remember(value),via:'sops',name};
       reasons.push(result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
@@ -331,7 +329,7 @@ function writeCustody(cfg,ref,value){
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
-    const result=spawnSync(process.execPath,[tool,'set',target,'--from-file',tmp],{cwd:path.dirname(stacksRoot),encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']});
+    const result=runNode([tool,'set',target,'--from-file',tmp],{cwd:path.dirname(stacksRoot),stdio:['ignore','pipe','pipe']});
     return result.status===0?{ok:true}:{ok:false,reason:scrub(`stack-secret set ${target} exited ${result.status}: ${String(result.stderr||result.stdout).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
   }finally{
     try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
@@ -484,8 +482,7 @@ async function call(cfg,method,pathname,{token,form,timeoutMs}={}){
 
 /** docker inspect of the SonarQube container: state/health, or why docker could not say. */
 export function containerState(cfg){
-  const result=spawnSync(cfg.docker,['inspect','--format','{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}',cfg.container],
-    {encoding:'utf8',windowsHide:true,timeout:15000});
+  const result=containerInspect(cfg.container,'{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}',{docker:cfg.docker,timeout:15000});
   if(result.error)return {container:cfg.container,state:'docker-unavailable',detail:String(result.error.code??result.error.message)};
   if(result.status!==0)return {container:cfg.container,state:'missing',detail:String(result.stderr||'').trim().split(/\r?\n/)[0]||'no such container'};
   const [state,health]=String(result.stdout).trim().split('|');
@@ -619,27 +616,19 @@ export function scannerCommand({pkg,props,host,key,workDir,extra=[]}){
   return {runner:'npx @sonar/scan',command:'npx',args:['--yes','@sonar/scan',...defines]};
 }
 
-function runScanner(cwd,{command,args},env,timeoutMs){
-  return new Promise(resolve=>{
-    const started=Date.now();
-    const line=[command,...args].map(quote).join(' ');
-    const child=spawn(line,{cwd,env,shell:true,windowsHide:true});
-    let log='';
-    const take=chunk=>{if(log.length<LOG_CAP)log+=chunk.toString('utf8');};
-    child.stdout.on('data',take);child.stderr.on('data',take);
-    const timer=setTimeout(()=>{log+=`\n[sonar-local] scanner exceeded ${Math.round(timeoutMs/1000)}s and was stopped\n`;child.kill();},timeoutMs);
-    child.on('error',error=>{log+=`\n[sonar-local] scanner failed to start: ${error.message}\n`;});
-    child.on('close',code=>{clearTimeout(timer);resolve({exitCode:code??1,durationMs:Date.now()-started,log:scrub(log),display:line});});
-  });
+async function runScanner(cwd,{command,args},env,timeoutMs){
+  const line=[command,...args].map(quote).join(' ');
+  const run=await scanRun(line,{cwd,env,timeoutMs,logCap:LOG_CAP});
+  return {...run,log:scrub(run.log),display:line};
 }
 
-const git=(cwd,args)=>runGit(['-c','core.quotepath=off',...args],{cwd,maxBuffer:64*1024*1024});
+const git=(call,cwd,args)=>call(args,{cwd,config:{'core.quotepath':'off'},maxBuffer:64*1024*1024});
 
 function gitRevision(cwd){
-  const head=git(cwd,['log','-1','--format=%H %ct','HEAD']);
+  const head=git(gitLog,cwd,['-1','--format=%H %ct','HEAD']);
   if(head.status!==0)return {commit:null};
   const [commit,seconds]=head.stdout.trim().split(' ');
-  const dirty=git(cwd,['status','--porcelain','--untracked-files=no']);
+  const dirty=git(gitStatus,cwd,['--porcelain','--untracked-files=no']);
   return {commit,committedAt:new Date(Number(seconds)*1000).toISOString(),dirty:dirty.status===0?dirty.stdout.trim().length>0:null};
 }
 
@@ -687,15 +676,15 @@ const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v?
 export function sliceChanges(cwd,{base,paths}={}){
   const scope=splitList(paths);
   const baseRef=base||'HEAD';
-  const resolved=git(cwd,['rev-parse','--verify','--quiet',`${baseRef}^{commit}`]);
-  if(resolved.error||(resolved.status!==0&&git(cwd,['rev-parse','--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
+  const resolved=git(revParseQuery,cwd,['--verify','--quiet',`${baseRef}^{commit}`]);
+  if(resolved.error||(resolved.status!==0&&git(revParseQuery,cwd,['--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
   if(resolved.status!==0)return {ok:false,code:'SLICE_BASE_UNKNOWN',reason:`the slice base ${baseRef} is not a commit in ${cwd}`};
   const pathspec=scope.length?['--',...scope]:[];
   const collect=commit=>{
-    const diff=git(cwd,['diff','--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
+    const diff=git(gitDiff,cwd,['--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
     if(diff.status!==0)return {error:String(diff.stderr).trim().split(/\r?\n/)[0]};
     const files=parseDiffNewLines(diff.stdout);
-    const untracked=git(cwd,['ls-files','--others','--exclude-standard','-z',...pathspec]);
+    const untracked=git(lsFiles,cwd,['--others','--exclude-standard','-z',...pathspec]);
     for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
       if(files.some(f=>f.path===file))continue;
       let lines=0;
@@ -711,10 +700,9 @@ export function sliceChanges(cwd,{base,paths}={}){
   // An attempt that authored no delta of its own (its slice was committed by an earlier attempt, so the base the op
   // recorded is HEAD) read as SLICE_EMPTY and left backend.implement red in ops (nivo, 2 of 5 scans). The slice is then
   // what the branch carries inside --paths beyond its merge-base with the trunk: the same code the gate has to judge.
-  if(!files.length&&git(cwd,['rev-parse','--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
+  if(!files.length&&git(revParseQuery,cwd,['--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
     for(const ref of ['@{upstream}','origin/main','main','origin/master','master']){
-      const mergeBase=git(cwd,['merge-base','HEAD',ref]);
-      const sha=mergeBase.status===0?mergeBase.stdout.trim():'';
+      const sha=mergeBaseOf(cwd,'HEAD',ref)??'';
       if(!sha||sha===baseCommit)continue;
       const alt=collect(sha);
       if(alt.files?.length){files=alt.files;used=sha;baseFallback={requested:baseRef,merged:ref,baseCommit:sha,reason:'the attempt changed nothing after its recorded base; the slice is the branch delta since its merge-base with the trunk'};break;}
@@ -817,7 +805,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
   try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
   catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
   const collect=files.flatMap(file=>['--collectCoverageFrom',file]);
-  const run=spawnSync(process.execPath,[bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:64*1024*1024});
+  const run=runNode([bin,'--selectProjects','unit','--coverage','--ci','--coverageReporters','lcov',...collect,'--findRelatedTests',...files],{cwd:jestCwd,timeout:timeoutMs,maxBuffer:64*1024*1024});
   return {exitCode:run.status,error:run.error?String(run.error.message):null};
 }
 
@@ -1006,8 +994,8 @@ export function isolationDefines(cwd,props,scope){
       }
     }
   }else if(props['sonar.tests'])tests=main;
-  // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: nivo-backend
-  // held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
+  // SonarJS builds one TypeScript program per tsconfig.json it finds anywhere in the tree: one product
+  // repository held 31 (stray copies under .starciwork/kernel-strays and .infra), and a 9-file isolated analysis
   // still spent 19.7 minutes in the JS/TS sensor. The repository's own root tsconfig is the one that
   // types the slice; a declared sonar.typescript.tsconfigPath(s) wins.
   const declaredTsconfig=props['sonar.typescript.tsconfigPaths']||props['sonar.typescript.tsconfigPath'];
@@ -1157,7 +1145,7 @@ export async function scan(cfg,options={}){
     if(judged.result.verdict==='pass')return finish('pass');
     return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
-    safeRemoveTree(workDir,{hold:artifactHoldReason});
+    safeRemove(workDir,{hold:artifactHoldReason});
     // The throwaway slice project is judged and gone: the next scan of the same scope re-creates it.
     if(isolated&&!options.keepSliceProject){
       const removed=await call(cfg,'POST','/api/projects/delete',{token:admin.value,form:{project:isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));
@@ -1278,8 +1266,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
     if(!child.ok||!args.rest?.length)report={schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'};
     else{
       // A shell resolves npm/npx .cmd shims on Windows; each argument is quoted so paths with spaces survive.
-      const result=spawnSync(args.rest.map(quote).join(' '),{stdio:'inherit',env:child.env,shell:true,windowsHide:true});
-      return {exitCode:result.status??1};
+      return {exitCode:runShell(args.rest.map(quote).join(' '),child.env)};
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
@@ -1294,7 +1281,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
   return {exitCode:exitFor(report.outcome),report:safeReport,...(blob?{blob}:{})};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   sonarLocalMain(process.argv.slice(2)).then(({exitCode,report,text,blob})=>{
     if(text)process.stdout.write(`${text}\n`);
     if(blob)process.stdout.write(`${JSON.stringify(blob)}\n`);

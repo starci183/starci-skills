@@ -28,7 +28,7 @@
 // (scripts/machine/worktree-orca.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
 import { mainRootOf } from '../machine/worktree-git.mjs';
@@ -48,7 +48,7 @@ const WORK_DIR = '.starciwork';
 
 const posix = (p) => String(p).replace(/\\/g, '/');
 const ctxOf = (ctx) => ({ env: ctx?.env ?? process.env, orca: ctx?.orca ?? orcaWorktreeClient, git: ctx?.git ?? null });
-const gitIn = (cwd, args) => { const r = runGit(args, { cwd, timeout: 60_000 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() }; };
+const gitIn = (call, cwd, args) => { const r = call(args, { cwd, timeout: 60_000 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() }; };
 const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 
 /**
@@ -74,7 +74,7 @@ export function workflowAppRepo(repo, { binding = undefined } = {}) {
   const appRoot = b?.appRoot ?? null;
   if (appRoot && fs.existsSync(path.join(appRoot, '.git'))) return path.resolve(appRoot);
   if (!repo) return null;
-  const top = gitIn(path.resolve(repo), ['rev-parse', '--show-toplevel']);
+  const top = gitIn(revParseQuery, path.resolve(repo), ['--show-toplevel']);
   return top.ok && top.stdout ? mainRootOf(path.resolve(top.stdout)) : null;
 }
 

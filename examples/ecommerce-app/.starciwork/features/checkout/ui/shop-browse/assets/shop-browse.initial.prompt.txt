@@ -3,7 +3,7 @@ Generate a polished flat product UI screenshot, 1536x1024, light theme, straight
 SUBJECT: shop Browse of "Northwind Supply" at http://localhost:4069/browse.
 
 FIXED ANATOMY (must not change):
-- Anatomy reference images only, not edit targets: Image 1 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png; Image 2 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png. Preserve their raised surfaces, spacing and pill-control shapes, not their blue palette or todo content.
+- Anatomy reference images only, not edit targets: Image 1 is examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png; Image 2 is examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png. Preserve their raised surfaces, spacing and pill-control shapes, not their blue palette or todo content.
 - White top bar with "Northwind Supply" at left and "Browse", "Cart", "Checkout", "Account" in a single horizontal navigation. "Browse" selected with one thin teal underline. No sidebar, avatar, sign-out or extra navigation.
 - Main content centered with comfortable side margins. "Browse" heading and "Everything Northwind stocks." subtitle sit ON THE PAGE BACKGROUND, OUTSIDE the cards.
 - A section line directly ON THE PAGE BACKGROUND has "The catalogue" on the left and "6 items" at the far right, ABOVE the product grid.

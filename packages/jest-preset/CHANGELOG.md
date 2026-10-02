@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- New: `fakeInbox()` (also `@starci/jest-preset/inbox`), the twin of `recordingOutbox()` for the delivery side: `claim` answers true for the first call of a (source, eventId) pair and false afterwards, `release` gives the claim back, `seen` marks a redelivery, and `claims`, `claimed`, `released`, `failNext` and `clear` let a spec assert what a consumer or a signed webhook did. A spec no longer stubs `mock<Inbox>()` by hand.
+
+## 2.2.4 - 2026-10-02
+
+- Changed: the world runner runs up to `min(--maxWorkers, slots)` files of the integration, e2e and contract projects at once,
+  each still in a fresh process of its own (never in band), each bound to one data slot of `@starci/test-world` 1.1.0: the
+  file's process is forked with `STARCI_TEST_WORLD_SLOT=<k>`, and no two files ever hold one slot at the same time. The slot
+  count is the one the world's globalSetup published in its state file. This lifts the 2.2.0 limitation "one file at a time".
+- Changed: the runner reads test-world state protocol 2 only. A missing state file or another protocol fails the run with
+  `JEST_PRESET_WORLD_PAIR_MISMATCH`, naming this preset, the test-world that wrote the file and the fix (pin both together per
+  knowledge/hfs/canon-pins.yaml); there is no fallback mode.
+## Unreleased
+
 - Removed (breaking): `recordingOutbox()` and the `./outbox` entry, superseded by the event bus and the queue outbox. Added `recordingEventBus()` (the `EventBus` port: `publish(event, tx)`, scripted pending retries, dead letters and one-shot failures) and `recordingQueueOutbox()` (the `QueueOutbox` port: `write(tx, queue, payload)`), each recording whether `tx` was a `fakeTransaction` manager, and the `./event-bus` and `./queue` entries. Contract change `patterns-event-bus`.
 
 ## 2.2.2 - 2026-10-01

@@ -21,8 +21,8 @@ import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { supervisorEvent, supervisorLog, withSupervisor } from '../machine/home.mjs';
 import { recordAction } from './actions.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const NOTICE_TAG = '[supervisor]';
 
 // One tag, even when the caller's text already carries it (seen: "[supervisor] [supervisor] ...").
@@ -69,7 +69,7 @@ export async function notifyKernel({ repo, workflowId, text, item = null, entity
   return { ...result, workflowId, repo };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const text = value('text-file') ? fs.readFileSync(value('text-file'), 'utf8') : value('text');

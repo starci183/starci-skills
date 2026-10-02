@@ -299,11 +299,11 @@ steps:
       - repo
     writes: [source]
     action:
-      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/cut-seam.mjs,
+      en: "CUT SEAM CONTRACT-FIRST (only when the packet carries context.cut; scripts/kernel/seam-policy.mjs,
         modules/kernel/driver-loop.yaml enqueue.cutExecution seamContractFirst). As ordinal 1 of a cut of
-        more than one you are the seam: before anything else author and commit its interface - types,
+        more than one you are the seam: before anything else author its interface - types,
         DTOs, ports/contracts and a stub implementation inside your owned paths - then publish it with
-        `api cut-seam --publish-interface --job <your job> --files <committed interface files>` so every
+        `api cut-seam --publish-interface --job <your job> --files <interface files>` so every
         sibling ordinal starts on it at once; then finish the seam and keep the published signatures
         stable (a change after publishing owes the siblings a reconcile). As a sibling (ordinal > 1)
         whose packet carries context.cut.seamStub the seam has not landed: never wait for it and never
@@ -495,7 +495,7 @@ steps:
         required acceptance states. Stamp every capture with source revision, served-build identity
         and capture time; a capture made before the last edit is stale and cannot be handed to
         interface.audit. A capture driver that signs in generates its test account's password per run or reads
-        it with testSecret(<name>, {repo}) from the repo's .starcistacks sops twin (scripts/lib/test-secrets.mjs;
+        it with testSecret(<name>, {repo}) from the repo's .starcistacks sops twin (scripts/uat/test-secret.mjs;
         owner:push-scan-test-secrets-encrypted), never a literal. Open the captures and compare each mapped draw with its corresponding
         rendered evidence and applicable knowledge rules. Record coverage per input image and all
         deviations; no representative screenshot may stand in for unobserved screens. Repair within

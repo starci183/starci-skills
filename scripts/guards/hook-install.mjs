@@ -21,8 +21,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn } from '../api/git/lib.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { checkIgnore } from '../api/git/check-ignore.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
@@ -65,9 +68,10 @@ function writeGuardFile(dir, name, body) {
 export const GUARD_ROLES = Object.freeze(['op', 'kernel']);
 
 /** <guards root>/jobs/<job>.json — who the worker is, its role and which absolute paths it owns. */
-export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op' }) {
+export function writeJobGuard({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned, workflowWorktree = null, role = 'op', op = null }) {
   if (!GUARD_ROLES.includes(role)) throw new Error(`unknown guard role ${role}`);
-  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId,
+  // op: the job's op id, for the rules one op family owes (a uat op never starts a test world, launch-verdict.mjs).
+  return writeGuardFile(path.join(guardsRoot(skillRoot), 'jobs'), jobId, { schema: 'starci/op-guard@1', role, jobId, workflowId, op: op ?? null,
     ledgerRepo: ledgerRepo ? path.resolve(ledgerRepo) : null, owned: [...new Set((owned ?? []).filter(Boolean).map(normOwned))],
     // The workflow worktree the op works in (scripts/kernel/workflow-worktree.mjs), or null: the guard refuses git history
     // and ref changes inside it - only the runtime's checkpoint commits there.
@@ -105,7 +109,8 @@ export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..')
   return true;
 }
 
-const git = (cwd, args) => gitSpawn('git', ['-C', cwd, ...args], { timeout: 20_000 });
+/** One git call (a scripts/api/git call file) in the repository at `cwd`. */
+const git = (call, cwd, args) => call(args, { dir: cwd, timeout: 20_000 });
 
 export function historyHookBody({ branches = [], verify, nodePath = process.execPath, terminals = terminalsDir() }) {
   const protectedList = [...new Set(['main', 'master', ...branches.filter((b) => /^[A-Za-z0-9._/-]+$/.test(b))])].join(' ');
@@ -131,14 +136,14 @@ op_worktree_refused=0
 while read -r old new ref; do
   case "$ref" in
     HEAD)
-      # An op worker never creates a git worktree (nivo-fe inc-c8fbf76aa499). \`git worktree add\` writes the new
+      # An op worker never creates a git worktree. \`git worktree add\` writes the new
       # worktree's HEAD from the checkout it runs in, whose own HEAD is not locked: however the worker ran git, the
       # new worktree's first ref update is refused here.
       if [ -n "$guard" ] && [ "$op_worktree_refused" = 0 ]; then
         gd=$(git rev-parse --git-dir 2>/dev/null)
         fmt=$(git rev-parse --show-ref-format 2>/dev/null)
         if [ -n "$gd" ] && [ "$fmt" = "files" ] && [ ! -e "$gd/HEAD.lock" ]; then
-          echo "starci history guard: refused - an op worker never creates a git worktree; work in the checkout you were dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)" >&2
+          echo "starci history guard: refused - an op worker never creates a git worktree; work in the checkout you were dispatched to (a private worktree with links into the live repository deleted live files)" >&2
           op_worktree_refused=1; status=1
         fi
       fi ;;
@@ -172,10 +177,10 @@ exit $status
  * gets husky's own self-ignoring `.gitignore` of `*`.
  */
 function hookTarget(repoRoot, name) {
-  const top = git(repoRoot, ['rev-parse', '--show-toplevel']);
+  const top = git(revParseQuery, repoRoot, ['--show-toplevel']);
   if (top.status !== 0) return { installed: false, reason: 'not-a-git-checkout' };
   const root = path.resolve(top.stdout.trim());
-  const hooks = git(root, ['rev-parse', '--git-path', 'hooks']);
+  const hooks = git(revParseQuery, root, ['--git-path', 'hooks']);
   if (hooks.status !== 0) return { installed: false, reason: 'no-hooks-path' };
   const hooksDir = path.resolve(root, hooks.stdout.trim());
   const file = path.join(hooksDir, name);
@@ -183,21 +188,21 @@ function hookTarget(repoRoot, name) {
   const inWorktree = inside(root, hooksDir) && !inside(path.join(root, '.git'), hooksDir);
   if (inWorktree && !fs.existsSync(file)) {
     const rel = path.relative(root, file).replace(/\\/g, '/');
-    const isIgnored = () => git(root, ['check-ignore', '-q', '--no-index', '--', rel]).status === 0;
+    const isIgnored = () => git(checkIgnore, root, ['-q', '--no-index', '--', rel]).status === 0;
     if (!isIgnored()) {
       // A relative core.hooksPath (husky's .husky/_) resolves per checkout: husky generates that directory, with
-      // its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none (nivo-fe
-      // wf-nivo-collab-mum8xsop). A hooks directory that does not exist yet, holds no file and has nothing tracked
+      // its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none. A hooks directory
+      // that does not exist yet, holds no file and has nothing tracked
       // is given husky's own self-ignoring layout; anything else stays refused.
       const relDir = path.relative(root, hooksDir).replace(/\\/g, '/');
       const absent = !fs.existsSync(hooksDir);
       const empty = absent || (fs.statSync(hooksDir).isDirectory() && fs.readdirSync(hooksDir).length === 0);
-      const tracked = git(root, ['ls-files', '--', relDir]);
+      const tracked = git(lsFiles, root, ['--', relDir]);
       if (!empty || tracked.status !== 0 || tracked.stdout.trim()) return { installed: false, reason: 'hooks-dir-tracked', path: file };
       fs.mkdirSync(hooksDir, { recursive: true });
       fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
       if (!isIgnored()) {
-        if (absent) safeRemoveTree(hooksDir, { hold: artifactHoldReason });
+        if (absent) safeRemove(hooksDir, { hold: artifactHoldReason });
         else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
         return { installed: false, reason: 'hooks-dir-tracked', path: file };
       }
@@ -216,7 +221,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   if (target.installed === false) return target;
   const { root, hooksDir, file } = target;
   const branches = [];
-  const list = git(root, ['worktree', 'list', '--porcelain']);
+  const list = git(worktreeListQuery, root, ['--porcelain']);
   if (list.status === 0) for (const line of list.stdout.split(/\r?\n/)) if (line.startsWith('branch refs/heads/')) branches.push(line.slice('branch refs/heads/'.length));
   const body = historyHookBody({ branches, verify: path.join(skillRoot, 'scripts', 'guards', 'verify-commit.mjs'), nodePath, terminals: terminalsDir(skillRoot) });
   if (fs.existsSync(file)) {
@@ -281,14 +286,14 @@ const guardSettings = (config) => ({
 });
 
 /**
- * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree, role}) -> {receipt}
+ * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, workflowWorktree, role, op}) -> {receipt}
  * receipt rides on the dispatch record. The caller binds receipt.jobFile to the agent's Orca terminal once
  * worker-start returns it (bindGuardTerminal), which is what the command guard and the history hook read.
  */
-export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null, role = 'op' }) {
+export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, workflowWorktree = null, role = 'op', op = null }) {
   const settings = guardSettings(config);
   const receipt = { jobFile: null, hooks: [] };
-  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role }); }
+  try { receipt.jobFile = writeJobGuard({ skillRoot, jobId, workflowId, ledgerRepo, owned, workflowWorktree, role, op }); }
   catch (e) { receipt.jobFile = { error: String(e?.message ?? e) }; }
   if (settings.historyHook) {
     for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {

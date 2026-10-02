@@ -7,7 +7,7 @@ summary: >-
   transport slots accept the `cli/` kind prefix. Duplicates are removed: BE-TRANSPORT-4 (replaced by the per-kind topics), BE-BACKGROUND-1 and -4 (the event-bus, queues
   and jobs topics own them; the two that stay are renumbered BE-BACKGROUND-1 and -2), the in-process event wording of BE-CQRS-4 (event-bus.yaml owns it) and the error text
   sentence of BE-MESSAGES-1 (error.yaml owns it). event-bus.yaml lists `contracts/<service>/events.json` again (slot be.contract.events). BE-PROJECTIONS-5 holds a projection
-  to its own context (R155 BE_CONTEXT_COUPLING), and the slot be.projections lists the rule. The files-tree spec accepts a rule id or a failure code in `rules:`.
+  to its own context (R175 BE_CONTEXT_COUPLING), and the slot be.projections lists the rule. The files-tree spec accepts a rule id or a failure code in `rules:`.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/patterns-kind-topics.yaml

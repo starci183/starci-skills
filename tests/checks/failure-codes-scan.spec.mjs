@@ -13,7 +13,7 @@ function fixture(t, source) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-failure-codes-scan-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
-  write('scripts/checks/failure-codes.not-codes', '# none\n');
+  write('modules/kernel/failure-codes.not-codes', '# none\n');
   write('scripts/land.mjs', source);
   write('modules/models/kinds.yaml', 'vocabularies: {}\n');
   write('engine/db/migrations/runtime/0001-init.sql', '');
@@ -34,7 +34,7 @@ test('a computed member access with a constant key is not an emitted code', (t) 
 
 test('an array literal or a computed key holding one constant is not an emitted code', (t) => {
   const found = codes(t, [
-    "export const SKILL_ROOT = 'D:/runtime';",
+    "export const SKILL_ROOT = 'runtime';",
     'export const plan = { repos: [SKILL_ROOT], byRoot: { [SKILL_ROOT]: true } };',
   ]);
   assert.ok(!found.includes('SKILL_ROOT'), found.join(', '));

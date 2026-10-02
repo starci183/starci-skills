@@ -139,9 +139,9 @@ export interface AppDeclaration<TModule extends RegisterableModule<never> = Regi
     readonly graphqlPath?: string
 }
 
-/** The `migrate` block: `apps/migrate` runs once per run inside the globalSetup, over the run's databases. */
+/** The `migrate` block: the migrations run once per run inside the globalSetup (the runner of the cli migrate command), over the run's databases. */
 export interface MigrateDeclaration<TOptions = never, TWiring = WorldWiring> {
-    /** The migrate entry: the module namespace of `apps/migrate/src/main` (exports `bootstrap`), a bare bootstrap function, or a Nest `AppModule` with `register`. */
+    /** The migrate entry: a module namespace that exports `bootstrap`, a bare bootstrap function, or a Nest `AppModule` with `register`. */
     readonly module: MigrateEntry<TOptions>
     /** The typed options of the migrate app, from the wiring (databases of the run). */
     readonly options: (wiring: TWiring) => TOptions

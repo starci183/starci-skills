@@ -2,10 +2,10 @@ import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {agentContext} from '../api/orca/agent-context.mjs';
-import {missingFrom} from '../api/orca/lib.mjs';
+import {missingFrom} from '../lib/orca-listing.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 
 
 const add=(errors,condition,message)=>{if(!condition)errors.push(message);};
@@ -146,6 +146,13 @@ export function validateCallContract(docs){
       add(errors,!forbidden.has(call?.command),`calls.${name} names a forbidden command: ${call?.command}`);
     }
     add(errors,['read','mutation'].includes(call?.kind),`calls.${name} must declare kind read or mutation`);
+    const modes=calls.idempotency?.modes??[];
+    if(call?.kind==='mutation')
+      add(errors,modes.includes(call?.replay),`calls.${name} is a mutation and must declare replay ${modes.join('|')} — scripts/api/orca/lib.mjs refuses it otherwise`);
+    else
+      add(errors,call?.replay===undefined,`calls.${name} is a read and must not declare replay`);
+    if(call?.replay==='request')
+      add(errors,declared.has(calls.idempotency?.flag),`calls.${name} is replay: request and must declare --${calls.idempotency?.flag}`);
     if(Array.isArray(call?.classify)){
       const last=call.classify.at(-1);
       add(errors,last&&Object.keys(last.when??{}).length===0,
@@ -198,7 +205,7 @@ export function providersMain(argv=[]){
     report:{schema:'starci/providers-check-report@1',ok:result.ok&&live.ok,errors:result.errors,live}};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const result=providersMain(process.argv.slice(2));
   process.stdout.write(result.report.help?`${result.report.help}\n`:`${JSON.stringify(result.report,null,2)}\n`);
   process.exitCode=result.exitCode;

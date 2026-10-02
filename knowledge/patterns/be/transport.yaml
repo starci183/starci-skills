@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: be.transport
 title: Backend transport
 purpose: |-
-  Given a door into the application, how is it written? Every kind of door (api, webhooks, realtime, cli, reactors, jobs) follows these rules and has its own topic. A transport
+  Given a door into the application, how is it written? Every kind of door (api, webhooks, realtime, reactors, jobs) follows these rules and has its own topic; a cli command is not a transport, it is an action runner (cli.yaml). A transport
   maps its input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else,
   returns no envelope and takes no `GraphQLJSON`.
 appliesTo:
@@ -61,7 +61,7 @@ rules:
       A transport file may import its feature's `application/` messages and contracts, `platform/*`, the public decorators of
       `domain/identity` and its own `dto/`. It injects only `InjectCommandBus` / `InjectQueryBus` (and `InjectRequestLocale`
       for REST content negotiation): no EntityManager, no domain service, no logic beyond mapping. Every transport handler
-      (resolver method, controller action, gateway handler, consumer, job, cli) dispatches exactly one command or query. A
+      (resolver method, controller action, gateway handler, consumer, job) dispatches exactly one command or query. A
       refusal in the result becomes a throw only here, with `unwrapOutcome(outcome, <C>Error)`.
     rationale: |-
       A transport that reaches the database or a service can bypass the handler's authorization and its transaction, and a

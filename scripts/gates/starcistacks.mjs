@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// check-starcistacks.mjs - the .starcistacks services contract (owner ruling 2026-09-24: "stacks làm rõ
-// sonar ... update .claude và enforce định dạng .starcistacks").
+// check-starcistacks.mjs - the .starcistacks services contract (owner ruling 2026-09-24: "the stacks make sonar
+// clear ... update .claude and enforce the .starcistacks format").
 //
 // Every product states the delivery and quality services its code and CI use - Sonar, a
 // container registry, analytics, error tracking - in the `services` block of its stack declaration
@@ -27,9 +27,9 @@
 // Exit 0 clean (suspects allowed), 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs'; import { checkIgnore } from '../api/git/check-ignore.mjs';
 import { repositoryName, repositoryHome } from '../hfs/repo-identity.mjs';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -233,9 +233,9 @@ function readProperties(file) {
   return out;
 }
 
-function git(repo, args) {
+function git(call, repo, args) {
   try {
-    const result = runGit(args, { dir: repo, timeout: 8000 });
+    const result = call(args, { dir: repo, timeout: 8000 });
     if (result.error) return null;
     return { status: result.status, stdout: String(result.stdout ?? '') };
   } catch { return null; }
@@ -381,7 +381,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
 
   // Custody layout (modules/schemas/stacks-layout.yaml custody, the product repositories' secrets-guard).
   for (const root of own.rooted ? [STACK_ROOT] : []) {
-    const tracked = git(repo, ['ls-files', '--', root]);
+    const tracked = git(lsFiles, repo, ['--', root]);
     if (tracked?.status === 0) {
       for (const file of tracked.stdout.split(/\r?\n/).filter(Boolean)) {
         const parts = slash(file).split('/');
@@ -413,18 +413,18 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
     // that do not exist yet, so the probe proves the rule, not today's files.
     for (const env of fs.readdirSync(path.join(repo, root), { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
       const open = INFRA_VALUE_PROBES.map((probe) => `${root}/${env.name}/${probe}`)
-        .filter((rel) => git(repo, ['check-ignore', '-q', '--no-index', '--', rel])?.status === 1);
+        .filter((rel) => git(checkIgnore, repo, ['-q', '--no-index', '--', rel])?.status === 1);
       if (open.length) add('refuse', 'STACKS_GITIGNORE_VALUE_OPEN', '.gitignore',
         `the ignore rules leave plaintext value files under ${root}/${env.name}/infra trackable (${open.join(', ')}); deny them after the infra re-includes and re-include *.enc last (modules/schemas/stacks-layout.yaml custody.gitignoreRules)`);
       // The environment runbook is part of the layout contract (stacks-layout.yaml shape.runbook);
-      // rules that hide it strand it on one machine (mia-mia-backend inc-5b22edbb4e62).
+      // rules that hide it strand it on one machine.
       const runbook = `${root}/${env.name}/README.md`;
-      if (git(repo, ['check-ignore', '-q', '--no-index', '--', runbook])?.status === 0)
+      if (git(checkIgnore, repo, ['-q', '--no-index', '--', runbook])?.status === 0)
         add('suspect', 'STACKS_RUNBOOK_IGNORED', runbook, `the ignore rules hide the ${env.name} runbook; re-include it (!${runbook}) so every machine reads it`);
     }
   }
   if (!own.missing && own.file) {
-    const ignored = git(repo, ['check-ignore', '-q', '--', slash(path.relative(repo, own.file))]);
+    const ignored = git(checkIgnore, repo, ['-q', '--', slash(path.relative(repo, own.file))]);
     if (ignored?.status === 0)
       add('suspect', 'STACKS_DECLARATION_IGNORED', shown(own.file), `the ignore rules hide the declaration; re-include it (!${slash(path.relative(repo, own.file))}) so every machine reads the same services`);
   }
@@ -515,7 +515,7 @@ export async function checkStarciStacksMain(argv = []) {
   return { exitCode: result.ok ? 0 : 1, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${result.ok ? 'OK' : 'FAIL'}: starcistacks ${result.repository} - ${result.refused.length} refused, ${result.suspect.length} suspect, services: ${Object.keys(result.services).join(', ') || 'none declared'}.\n` };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   checkStarciStacksMain(process.argv.slice(2)).then(({ exitCode, text: out }) => { process.stdout.write(out); process.exitCode = exitCode; },
     (error) => { process.stderr.write(`check-starcistacks: ${error?.stack ?? error}\n`); process.exitCode = 2; });
 }

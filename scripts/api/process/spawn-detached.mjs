@@ -7,13 +7,3 @@ import { spawn } from 'node:child_process';
  * close-verify.mjs closeSelfSafe/releaseSelfSafe take as `spawnFn` (a spec passes a fake with the same shape).
  */
 export const spawnDetached = (file, args, options = {}) => spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true, ...options });
-
-/** spawn node <script> ...args detached and hidden, its stdio discarded; {pid, exited()}. */
-export function spawnDetachedSilent({ execPath = process.execPath, script, args = [], env, cwd }) {
-  let gone = false;
-  const child = spawn(execPath, [script, ...args], { detached: true, stdio: 'ignore', windowsHide: true, cwd, env });
-  child.on('exit', () => { gone = true; });
-  child.on('error', () => { gone = true; });
-  child.unref();
-  return { pid: child.pid ?? null, exited: () => gone };
-}

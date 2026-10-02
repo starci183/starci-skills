@@ -1,5 +1,5 @@
 /**
- * Twin tests for the service-isolation rule (R148).
+ * Twin tests for the service-isolation rule (R168).
  *
  *   node --test service-isolation.spec.mjs
  *
@@ -16,9 +16,9 @@ const TWO_SERVICES = {
   apps: [
     { name: "order", kind: "api" },
     { name: "billing", kind: "worker" },
-    { name: "migrate", kind: "migrate" },
+    { name: "cli", kind: "cli" },
   ],
-  connections: [{ name: "primary", envPrefix: "PRIMARY_DB" }],
+  connections: [{ name: "primary", envPrefix: "PRIMARY_DB", owner: "order", isolation: "database" }],
 }
 const tester = typedTester({ declaration: TWO_SERVICES })
 
@@ -31,7 +31,7 @@ test("the rule is published under its name at error", () => {
   assert.equal(recommended["starci-be/service-isolation"], "error")
 })
 
-test("R148: a service app imports no sibling service app", () => {
+test("R168: a service app imports no sibling service app", () => {
   tester.run("service-isolation", serviceIsolation, {
   valid: [
     { name: "a service app imports its own files", filename: IN_ORDER, code: 'import { options } from "./order.options"\nexport const x = options\n' },

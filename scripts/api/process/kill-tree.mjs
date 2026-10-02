@@ -6,15 +6,15 @@
 // (scripts/uat/env-health.mjs). Reconciler controllers do not import it: they go through ctx.run so shadow mode
 // can record the stop instead of doing it.
 //
-//   killProcessTree(pid, {timeoutMs, run, platform}) -> {ok, status, output}
+//   killTree(pid, {timeoutMs, run, platform}) -> {ok, status, output}
 //
 // Never throws. Off Windows it stops nothing and says so (`ok: false`); a caller with a POSIX path keeps its own.
 import { spawnSync } from 'node:child_process';
 
-export const KILL_TREE_COMMAND = 'taskkill.exe';
-export const killTreeArgs = (pid) => ['/F', '/T', '/PID', String(pid)];
+const KILL_TREE_COMMAND = 'taskkill.exe';
+const killTreeArgs = (pid) => ['/F', '/T', '/PID', String(pid)];
 
-export function killProcessTree(pid, { timeoutMs = 60_000, run = spawnSync, platform = process.platform } = {}) {
+export function killTree(pid, { timeoutMs = 60_000, run = spawnSync, platform = process.platform } = {}) {
   if (platform !== 'win32') return { ok: false, status: null, output: 'not windows' };
   try {
     const r = run(KILL_TREE_COMMAND, killTreeArgs(pid), { encoding: 'utf8', windowsHide: true, timeout: timeoutMs });

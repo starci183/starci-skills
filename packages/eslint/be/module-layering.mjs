@@ -6,7 +6,7 @@
  * view; none of them reads a path pattern, and an alias is resolved through the program's own `compilerOptions.paths`:
  *
  *   - `import-owner-entry` - a cross-owner import targets the owner's `index.ts` (`@modules/domain/plan`,
- *     `@features/plan`), never a file inside it, and an alias that names a tier but no owner (`@modules/domain`) names
+ *     `@features/api/plan`), never a file inside it, and an alias that names a tier but no owner (`@modules/domain`) names
  *     nothing importable. A same-owner import is relative and never goes through the owner's own `index.ts`.
  *   - `no-self-module-alias` - inside an owner, imports are relative, never the owner's own alias.
  *   - `no-relative-capability-escape` - a relative import never walks out of its own owner.
@@ -105,7 +105,7 @@ export const importOwnerEntry = {
     schema: [],
     messages: {
       barrel:
-        "`{{specifier}}` names a tier, not an owner. Import an owner's public entry, for example `@modules/domain/plan` or `@features/plan`.",
+        "`{{specifier}}` names a tier, not an owner. Import an owner's public entry, for example `@modules/domain/plan` or `@features/api/plan`.",
       deep:
         "`{{specifier}}` reaches into a file of another owner. Import the owner's public entry (its `index.ts`) and export what you need from there.",
       ownIndex:

@@ -2,10 +2,10 @@
 // progress-report.mjs — the supervisor's periodic progress report, sent to the
 // owner's Telegram.
 //   node scripts/supervisor/progress-report.mjs [--repo <path>]... [--send] [--json]
-// Owner, 2026-09-23: "supervisor cứ 10 phút kẻ bảng báo cáo tiến độ và dự tính
-// phần còn lại và gửi qua telegram", then, on the first terse table: "quá đơn
-// giản, ghi rõ ràng ra mọi thứ". So each workflow gets a readable Vietnamese
-// section: its goal, every leg by name (done / running / waiting / not yet),
+// Owner, 2026-09-23: "every 10 minutes the supervisor draws a progress table with the
+// estimate of what is left and sends it over telegram", then, on the first terse table:
+// "too simple, write everything out clearly". So each workflow gets a readable section in
+// the owner's language: its goal, every leg by name (done / running / waiting / not yet),
 // what is running and for how long, the latest report, the owner's pending
 // approval questions (with a link only while a form serves; forms are served on
 // demand from the ask's Telegram button or /asks), what is stuck, and a finish
@@ -13,7 +13,7 @@
 // Owner asks still reach Telegram only from the kernel (api serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
@@ -23,28 +23,31 @@ import { askClassOf } from '../kernel/ask-server.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
 import { productRepos, supervisorSettings } from '../machine/home.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { opLabelMap } from '../lib/display-names.mjs';
+import { opLabel, opLabelMap } from '../lib/display-names.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const TZ = 'Asia/Ho_Chi_Minh';
 
-// Plain Vietnamese for each leg, so the owner never has to decode an op id: the shared op labels
+// A plain-language label for each leg, so the owner never has to decode an op id: the shared op labels
 // (modules/ops/_labels.yaml through scripts/lib/display-names.mjs), the same words the UI and Orca show.
 export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
-const legVi = (op) => LEG_VI[op] ?? op;
-const ALIASES = { 'nivo-app-auth': 'AUTH (đăng nhập)', 'nivo-workspace-provision': 'WSPV (mua & cấp workspace)',
-  'nivo-modules-agentos': 'Modules (AgentOS)', 'nivo-collab-group-chat': 'Collab (chat nhóm)',
+// The label in the report's language (modules/ops/_labels.yaml carries vi and en), the vi one when neither is declared.
+const legLabel = (op, language) => opLabel(op, language);
+// English alias sources; the i18n catalog carries the owner's wording for each.
+const ALIASES = { 'nivo-app-auth': 'AUTH (sign-in)', 'nivo-workspace-provision': 'WSPV (buy & provision workspace)',
+  'nivo-modules-agentos': 'Modules (AgentOS)', 'nivo-collab-group-chat': 'Collab (group chat)',
   'starci-next-work-and-stacks': 'StarCi Next – work & stacks', 'starci-next-base-repos': 'StarCi Next – base repos',
   'miamia-work-and-stacks': 'Mia Mia – work & stacks', 'miamia-base-repos': 'Mia Mia – base repos' };
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
 // The workflow's display name (api rename / define-goal: workflows.display_name) when the ledger has one,
 // else the older alias, else the goal slug.
-const displayName = (wf, names = null) => names?.get(wf) ?? ALIASES[baseName(wf)] ?? baseName(wf);
+const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(ALIASES[baseName(wf)] ?? baseName(wf));
 /** workflow_id -> display_name for the workflows of `db` that have one. */
 const namedWorkflows = (db) => { try { return new Map(db.prepare('SELECT * FROM workflows').all().filter((w) => w.display_name).map((w) => [w.workflow_id, w.display_name])); } catch { return new Map(); } };
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const dur = (ms) => (ms == null ? '?' : ms < 60000 ? '<1 phút' : ms < 3600000 ? `${Math.round(ms / 60000)} phút` : `${(ms / 3600000).toFixed(1)} giờ`);
+const dur = (ms, tr) => (ms == null ? '?' : ms < 60000 ? tr('<1 minute') : ms < 3600000 ? tr('{n} minutes', { n: Math.round(ms / 60000) }) : tr('{h} hours', { h: (ms / 3600000).toFixed(1) }));
 const clock = (ms) => new Date(ms).toLocaleString('vi-VN', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
 /** The repos to report on: --repo args, else config.yaml supervisor.repos (productRepos). */
@@ -60,8 +63,8 @@ const publicBaseOf = (config) => {
 /**
  * Jobs of one workflow that are DONE but held: the worker filed its report, the Kernel consumed it,
  * and an open peer-wait or owner-gate incident naming the job (--holds, else --op) keeps its settle
- * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "job xong/treo cũng
- * không ai nhắn" (2026-09-25; nivo op-integration.verify-25532858e7 sat done behind peer-wait
+ * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "nobody messages
+ * when a job finishes or gets stuck" (2026-09-25; nivo op-integration.verify-25532858e7 sat done behind peer-wait
  * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
  * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).
  */
@@ -96,7 +99,8 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
 }
 
 /** One running workflow's progress, read from its ledger. */
-export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null } = {}) {
+export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, blocking = null, language = 'vi' } = {}) {
+  const tr = translator(language);
   const goalRow = db.prepare('SELECT json, markdown FROM goals WHERE workflow_id=? ORDER BY goal_seq DESC LIMIT 1').get(wf.workflow_id);
   const g = parseJson(goalRow?.json, {}) ?? {};
   const goalText = clipLine(g.opChain?.input?.text ?? goalRow?.markdown ?? '', 220);
@@ -134,7 +138,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
     });
   const incidents = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at DESC").all(wf.workflow_id);
   const names = namedWorkflows(db);
-  const holds = settleHoldsOf(db, wf.workflow_id, { now }).map((h) => (h.peer ? { ...h, peerName: displayName(h.peer, names) } : h));
+  const holds = settleHoldsOf(db, wf.workflow_id, { now }).map((h) => (h.peer ? { ...h, peerName: displayName(h.peer, names, tr) } : h));
   const runtime = incidents.filter((i) => RUNTIME_INCIDENT.test(i.last_progress ?? ''));
   const ownerGates = incidents.filter((i) => /^\[owner-gate/.test(i.last_progress ?? ''));
   const last = db.prepare('SELECT a.op_id, r.outcome, r.report_json, r.created_at FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? ORDER BY r.report_id DESC LIMIT 1').get(wf.workflow_id);
@@ -144,16 +148,16 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   let blockingOthers = [];
   try { blockingOthers = blockingOthersOf(blocking ?? blockingJobs(db, { now }), wf.workflow_id, { now }); } catch { blockingOthers = []; }
   return {
-    id: wf.workflow_id, name: displayName(wf.workflow_id, names), goal: goalText, done, total,
+    id: wf.workflow_id, name: displayName(wf.workflow_id, names, tr), goal: goalText, done, total,
     legs: counted,
     lastReport: last ? { op: last.op_id, outcome: last.outcome, summary: clipLine(parseJson(last.report_json, {})?.summary ?? '', 260), at: last.created_at } : null,
     asks, holds, runtime: runtime.map((i) => clipLine(i.last_progress, 140)), ownerGates: ownerGates.map((i) => clipLine(i.last_progress, 140)),
     startedAt: Number(wf.created_at), elapsedMs: elapsed, etaMs, etaAt: etaMs != null ? now + etaMs : null,
-    blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map((id) => displayName(id, names)), since: b.since })),
+    blocking: blockingOthers.map((b) => ({ jobId: b.jobId, op: b.opId, status: b.status, workflows: b.workflows.map((id) => displayName(id, names, tr)), since: b.since })),
   };
 }
 
-export function collectProgress(repos, { now = Date.now(), config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
+export function collectProgress(repos, { now = Date.now(), language = 'vi', config = (() => { try { return loadConfig(); } catch { return null; } })() } = {}) {
   const publicBase = publicBaseOf(config);
   const out = [];
   for (const repo of repos) {
@@ -163,71 +167,78 @@ export function collectProgress(repos, { now = Date.now(), config = (() => { try
       const wfs = handle.db.prepare("SELECT workflow_id, created_at FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY workflow_id").all();
       let blocking = null;
       try { blocking = blockingJobs(handle.db, { now }); } catch { blocking = null; }
-      for (const wf of wfs) out.push({ repo, ...workflowProgress(handle.db, wf, { now, publicBase, blocking }) });
+      for (const wf of wfs) out.push({ repo, ...workflowProgress(handle.db, wf, { now, publicBase, blocking, language }) });
     } finally { try { handle.close(); } catch { /* closed */ } }
   }
   return out;
 }
 
-const OUTCOME_VI = { done: 'xong', partial: 'xong một phần', failed: 'thất bại', ask: 'hỏi thầy', blocked: 'bị chặn' };
+// The report's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
+const OUTCOME = { done: 'done', partial: 'partially done', failed: 'failed', ask: 'asked you', blocked: 'blocked' };
+const outcomeText = (outcome, tr) => tr(OUTCOME[outcome] ?? outcome);
 
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
-export function holdLine(h, { now = Date.now() } = {}) {
+export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
+  const tr = translator(language);
   const on = h.heldBecause === 'peer-wait'
-    ? `${h.peer ? h.peerName ?? displayName(h.peer) : 'workflow khác'}${h.peerJob ? `/${h.peerJob}` : ''}`
-    : 'thầy';
-  return `⏸ ${esc(legVi(h.op))} (${esc(h.jobId)}): ${esc(OUTCOME_VI[h.outcome] ?? h.outcome)}, đang chờ ${esc(on)} (${esc(h.incident)}) — đã ${esc(dur(now - h.since))}${h.workerReleased ? ', worker đã đóng' : ''}`;
+    ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`
+    : tr('you');
+  return tr('⏸ {op} ({jobId}): {outcome}, waiting on {on} ({incident}) — for {ago}', {
+    op: esc(legLabel(h.op, language)), jobId: esc(h.jobId), outcome: esc(outcomeText(h.outcome, tr)), on: esc(on), incident: esc(h.incident), ago: esc(dur(now - h.since, tr)) })
+    + (h.workerReleased ? tr(', worker released') : '');
 }
 
 /** One readable section for one workflow (HTML). */
-export function workflowSection(r, { now = Date.now() } = {}) {
+export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
+  const tr = translator(language);
   const line = [];
-  line.push(`<b>▶ ${esc(r.name)}</b> — ${r.done}/${r.total} chặng xong`);
-  if (r.goal) line.push(`Mục tiêu: ${esc(r.goal)}`);
-  const doneLegs = r.legs.filter((l) => l.state === 'done' && !l.rework).map((l) => legVi(l.op));
+  line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: esc(r.name), done: r.done, total: r.total }));
+  if (r.goal) line.push(tr('Goal: {goal}', { goal: esc(r.goal) }));
+  const doneLegs = r.legs.filter((l) => l.state === 'done' && !l.rework).map((l) => legLabel(l.op, language));
   const active = r.legs.filter((l) => l.state === 'running' || l.rework);
-  const queued = r.legs.filter((l) => l.state === 'queued').map((l) => legVi(l.op));
-  const failed = r.legs.filter((l) => l.state === 'failed').map((l) => legVi(l.op));
-  const todo = r.legs.filter((l) => l.state === 'todo').map((l) => legVi(l.op));
-  if (doneLegs.length) line.push(`✅ Đã xong: ${esc(doneLegs.join(', '))}`);
-  for (const l of active) line.push(`🔄 Đang làm: <b>${esc(legVi(l.op))}</b>${l.rework ? ' (làm lại)' : ''}${l.count > 1 ? ` — ${l.count} op song song` : ''}${l.since ? `, đã chạy ${esc(dur(now - l.since))}` : ''}`);
-  if (queued.length) line.push(`⏳ Chờ tới lượt: ${esc(queued.join(', '))}`);
-  if (failed.length) line.push(`⚠️ Lần gần nhất thất bại, kernel sẽ thử lại: ${esc(failed.join(', '))}`);
-  if (todo.length) line.push(`⬜ Còn lại: ${esc(todo.join(' → '))}`);
-  if (r.lastReport) line.push(`📝 Báo cáo gần nhất (${esc(legVi(r.lastReport.op))}, ${esc(OUTCOME_VI[r.lastReport.outcome] ?? r.lastReport.outcome)}, ${esc(clock(r.lastReport.at))}): ${esc(r.lastReport.summary)}`);
-  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`❓ Đang chờ thầy trả lời (${esc(legVi(a.op))}): ${esc(a.text)}${a.link ? `\n   ${esc(a.link)}` : '\n   (bấm /asks để lấy link trả lời)'}`);
-  for (const h of r.holds ?? []) line.push(holdLine(h, { now }));
-  for (const g of r.ownerGates) line.push(`🔒 Chờ thầy: ${esc(g)}`);
-  for (const b of r.blocking ?? []) line.push(`⛓ Đang chặn workflow khác: <b>${esc(legVi(b.op))}</b> (${esc(b.jobId)}) — ${b.workflows.length} workflow đang chờ (${esc(b.workflows.join(', '))}), đã ${esc(dur(now - b.since))}${b.status === 'queued' ? ', chưa được giao chạy' : ''}`);
-  if (r.runtime.length) line.push(`🐞 Sạn runtime đang mở: ${r.runtime.length} (supervisor đang xử lý)`);
+  const queued = r.legs.filter((l) => l.state === 'queued').map((l) => legLabel(l.op, language));
+  const failed = r.legs.filter((l) => l.state === 'failed').map((l) => legLabel(l.op, language));
+  const todo = r.legs.filter((l) => l.state === 'todo').map((l) => legLabel(l.op, language));
+  if (doneLegs.length) line.push(tr('✅ Done: {legs}', { legs: esc(doneLegs.join(', ')) }));
+  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: esc(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: esc(dur(now - l.since, tr)) }) : ''}`);
+  if (queued.length) line.push(tr('⏳ Waiting its turn: {legs}', { legs: esc(queued.join(', ')) }));
+  if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: esc(failed.join(', ')) }));
+  if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: esc(todo.join(' → ')) }));
+  if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: esc(legLabel(r.lastReport.op, language)), outcome: esc(outcomeText(r.lastReport.outcome, tr)), at: esc(clock(r.lastReport.at)), summary: esc(r.lastReport.summary) }));
+  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`${tr('❓ Waiting on your answer ({op}): {text}', { op: esc(legLabel(a.op, language)), text: esc(a.text) })}${a.link ? `\n   ${esc(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`}`);
+  for (const h of r.holds ?? []) line.push(holdLine(h, { now, language }));
+  for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: esc(g) }));
+  for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: esc(legLabel(b.op, language)), jobId: esc(b.jobId), count: b.workflows.length, workflows: esc(b.workflows.join(', ')), ago: esc(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
+  if (r.runtime.length) line.push(tr('🐞 Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
   line.push(r.etaAt == null
-    ? '🕒 Dự kiến xong: chưa ước được (chưa có chặng nào xong)'
-    : r.etaMs <= 0 ? '🕒 Mọi chặng đã xong, chờ bàn giao'
-    : `🕒 Dự kiến xong: ~${esc(dur(r.etaMs))} nữa (khoảng ${esc(clock(r.etaAt))}), tính theo tốc độ từ lúc bắt đầu (${esc(clock(r.startedAt))})`);
+    ? tr('🕒 ETA: cannot estimate yet (no leg done)')
+    : r.etaMs <= 0 ? tr('🕒 All legs done, waiting for handover')
+    : tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: esc(dur(r.etaMs, tr)), etaAt: esc(clock(r.etaAt)), startedAt: esc(clock(r.startedAt)) }));
   return line.join('\n');
 }
 
 /** The report as Telegram messages (HTML), split under the message size limit. */
-export function progressMessages(rows, { now = Date.now() } = {}) {
+export function progressMessages(rows, { now = Date.now(), language = 'vi' } = {}) {
+  const tr = translator(language);
   const ok = rows.filter((r) => !r.error);
   const creds = ok.reduce((n, r) => n + r.asks.filter((a) => a.askClass === 'credential').length, 0);
   const asks = ok.reduce((n, r) => n + r.asks.length, 0) - creds;
   const runtime = ok.reduce((n, r) => n + r.runtime.length, 0);
   const etas = ok.map((r) => r.etaAt).filter((x) => x != null);
   const header = [
-    `<b>[StarCi] Báo cáo tiến độ lúc ${esc(clock(now))}</b>`,
-    `${ok.length} workflow đang chạy · ${ok.reduce((n, r) => n + r.done, 0)}/${ok.reduce((n, r) => n + r.total, 0)} chặng đã xong`,
-    asks ? `❓ ${asks} câu hỏi đang chờ thầy trả lời (/asks gửi từng câu kèm nút tạo link)` : '❓ Không có câu hỏi nào đang chờ thầy',
-    ...(creds ? [`🔑 ${creds} yêu cầu credential đang chờ, không chặn việc chính: /creds`] : []),
-    `🐞 ${runtime} sạn runtime đang mở`,
-    ...(ok.some((r) => r.holds?.length) ? [`⏸ ${ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0)} việc đã xong đang chờ workflow khác hoặc thầy trước khi chốt (xem ⏸ từng workflow)`] : []),
-    etas.length ? `🕒 Dự kiến xong tất cả: khoảng ${esc(clock(Math.max(...etas)))}` : '',
-    ...rows.filter((r) => r.error).map((r) => `⚠️ Không đọc được ledger ${esc(r.repo)}: ${esc(r.error)}`),
+    tr('<b>[StarCi] Progress report at {now}</b>', { now: esc(clock(now)) }),
+    tr('{running} workflow(s) running · {done}/{total} legs done', { running: ok.length, done: ok.reduce((n, r) => n + r.done, 0), total: ok.reduce((n, r) => n + r.total, 0) }),
+    asks ? tr('❓ {count} question(s) waiting on you (/asks sends each with a link button)', { count: asks }) : tr('❓ No questions waiting on you'),
+    ...(creds ? [tr('🔑 {count} credential request(s) waiting, not blocking the main work: /creds', { count: creds })] : []),
+    tr('🐞 {count} open runtime defect(s)', { count: runtime }),
+    ...(ok.some((r) => r.holds?.length) ? [tr('⏸ {count} done job(s) waiting on another workflow or on you before settling (see ⏸ per workflow)', { count: ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0) })] : []),
+    etas.length ? tr('🕒 All done by: around {eta}', { eta: esc(clock(Math.max(...etas))) }) : '',
+    ...rows.filter((r) => r.error).map((r) => tr('⚠️ Cannot read ledger {repo}: {error}', { repo: esc(r.repo), error: esc(r.error) })),
   ].filter(Boolean).join('\n');
   const messages = [];
   let current = header;
   for (const r of ok) {
-    const section = workflowSection(r, { now });
+    const section = workflowSection(r, { now, language });
     if ((current + '\n\n' + section).length > TEXT_MAX) { messages.push(current); current = section.slice(0, TEXT_MAX); }
     else current += `\n\n${section}`;
   }
@@ -261,4 +272,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

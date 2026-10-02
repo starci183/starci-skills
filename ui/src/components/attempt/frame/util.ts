@@ -1,15 +1,16 @@
 import type { AttemptStep } from '../../../router';
+import { t } from '../../../i18n/t';
 
-/** "12 phút 52 giây" style duration; null when the span is unknown. */
+/** "12 min 52 sec" style duration; null when the span is unknown. */
 export function formatSpan(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms) || ms < 0) return '—';
   const total = Math.round(ms / 1000);
-  if (total < 60) return `${total} giây`;
+  if (total < 60) return t('{n} sec', { n: total });
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
-  if (minutes < 60) return seconds ? `${minutes} phút ${seconds} giây` : `${minutes} phút`;
+  if (minutes < 60) return seconds ? t('{m} min {s} sec', { m: minutes, s: seconds }) : t('{m} min', { m: minutes });
   const hours = Math.floor(minutes / 60);
-  return `${hours} giờ ${minutes % 60} phút`;
+  return t('{h} h {m} min', { h: hours, m: minutes % 60 });
 }
 
 export function formatClock(at: number | null | undefined): string {

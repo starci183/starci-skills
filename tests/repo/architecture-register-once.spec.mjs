@@ -21,15 +21,15 @@ const REPRESENTATIVES = {
   'src/modules/domain/billing/invoice.module.ts': MODULE('InvoiceModule'),
 };
 const FEATURE = {
-  'src/features/a/index.ts': "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AHttpModule } from './transport/http/a-http.module';\n",
-  'src/features/a/a.module.ts': "import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
-  'src/features/a/transport/graphql/a-graphql.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
-  'src/features/a/transport/http/a-http.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
+  'src/features/api/a/index.ts': "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AHttpModule } from './transport/http/a-http.module';\n",
+  'src/features/api/a/a.module.ts': "import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
+  'src/features/api/a/transport/graphql/a-graphql.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
+  'src/features/api/a/transport/http/a-http.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
 };
 const APP = imports => `import { Module } from '@nestjs/common';
 import { ConfigModule } from '../../../src/modules/platform/config';
 import { BillingModule } from '../../../src/modules/domain/billing';
-import { AGraphqlModule, AHttpModule } from '../../../src/features/a';
+import { AGraphqlModule, AHttpModule } from '../../../src/features/api/a';
 @Module({ imports: [${imports.join(', ')}] })
 export class AppModule {}
 `;
@@ -102,8 +102,8 @@ test('BE: a sub-module imported by two modules, or also listed in an app root, i
 test('BE: the feature case is bounded to the feature owner: another feature importing the application module is a second importer', t => {
   const report = run(t, {
     'apps/core/src/app.module.ts': APP(GOOD),
-    'src/features/b/index.ts': "export { BModule } from './b.module';\n",
-    'src/features/b/b.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../a/a.module';\n@Module({ imports: [AModule] })\nexport class BModule {}\n",
+    'src/features/api/b/index.ts': "export { BModule } from './b.module';\n",
+    'src/features/api/b/b.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../a/a.module';\n@Module({ imports: [AModule] })\nexport class BModule {}\n",
   });
   assert.equal(about(report, 'AModule is imported by 3 modules').length, 2);
 });
@@ -134,6 +134,6 @@ test('BE: the test world (be.tests.world) is a composition root: isGlobal true a
   assert.deepEqual(hits(world).filter(item => item.path.startsWith('src/tests/')), []);
   const spec = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/tests/fixtures/compose.ts': compose });
   assert.ok(hits(spec).some(item => item.path === 'src/tests/fixtures/compose.ts' && item.message.includes('isGlobal: true')));
-  const feature = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/features/a/compose.ts': compose.replaceAll('../../modules', '../../modules') });
-  assert.ok(hits(feature).some(item => item.path === 'src/features/a/compose.ts'));
+  const feature = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/features/api/a/compose.ts': compose.replaceAll('../../modules', '../../modules') });
+  assert.ok(hits(feature).some(item => item.path === 'src/features/api/a/compose.ts'));
 });

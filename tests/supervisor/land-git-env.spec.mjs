@@ -16,7 +16,7 @@ import { fastForwardLive } from '../../scripts/machine/live-fast-forward.mjs';
 import { GIT_LOCAL_ENV_VARS } from '../../scripts/lib/git.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const LEAKED = { GIT_DIR: 'C:/live/.git/worktrees/wt', GIT_WORK_TREE: 'C:/live', GIT_INDEX_FILE: 'C:/live/.git/index', GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.bare', GIT_CONFIG_VALUE_0: 'true' };
+const LIVE = path.join(os.tmpdir(), 'live'), LEAKED = { GIT_DIR: path.join(LIVE, '.git', 'worktrees', 'wt'), GIT_WORK_TREE: LIVE, GIT_INDEX_FILE: path.join(LIVE, '.git', 'index'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.bare', GIT_CONFIG_VALUE_0: 'true' };
 const cleanEnv = () => { const env = { ...process.env }; for (const k of Object.keys(env)) if (k.startsWith('GIT_')) delete env[k]; delete env.NODE_TEST_CONTEXT; return env; };
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, env: cleanEnv() });

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 
 /** Diagnose the explicitly supplied host, not the current FE directory. Read-only. */
 export function checkEntry(host,{claimedEntry}={}) {
@@ -16,7 +16,7 @@ export function checkEntry(host,{claimedEntry}={}) {
   bootstraps:bootstraps.map(({text,...b})=>b),runtimeWriteRequired:!exists,
   guidance:exists&&current?'Read the current host bootstrap and CONTEXT.md. A missing INDEX.md or dirty Git tree does not require a runtime update/push. If explicit older instructions conflict, obtain a replacement instruction, not permission to recreate the entry.':'Inspect the actual bootstrap/installation mismatch; this diagnostic grants no repair, install or push authority.'};
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
+if(isMain(import.meta.url)) {
  const [host,claimedEntry]=process.argv.slice(2);
  if(!host){process.stderr.write('Usage: node scripts/checks/check-entry.mjs <explicit-host> [claimed-entry]\n');process.exitCode=1;}
  else {const result=checkEntry(host,{claimedEntry});process.stdout.write(JSON.stringify(result)+'\n');if(!['ready','context-refresh-required'].includes(result.status))process.exitCode=1;}

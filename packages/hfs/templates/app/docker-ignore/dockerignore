@@ -1,0 +1,50 @@
+{{header}}
+# The build context of every image (be/apps/<app>/Dockerfile, fe/apps/<app>/Dockerfile) is the app root, so every Dockerfile
+# shares this file. It does two jobs, and the second is the one that matters: it keeps the context small, and it keeps
+# secrets out of the context altogether (a file that is never COPYed is still uploaded to the daemon and cached).
+
+node_modules
+**/node_modules
+dist
+**/dist
+build
+coverage
+**/coverage
+.next
+**/.next
+.turbo
+**/.turbo
+**/*.tsbuildinfo
+
+.git
+.github
+.husky
+
+# runtime and developer state
+.claude
+.starciwork
+.tools
+.workspaces
+.artifacts
+**/.artifacts
+reports
+test-results
+
+# secrets and credential material: mounted at run time, never part of an image
+.secrets
+.starcistacks
+.volume
+**/.env
+**/.env.*
+!**/.env.example
+**/*.key
+**/*.pem
+**/kubeconfig*
+
+# tests never enter an image
+**/*.spec.ts
+**/*.e2e-spec.ts
+be/src/tests
+**/__generated__
+docs
+*.log

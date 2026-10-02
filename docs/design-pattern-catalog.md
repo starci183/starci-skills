@@ -1,6 +1,6 @@
 # Enterprise design pattern catalog for Next.js and NestJS
 
-Reviewed against primary framework/database documentation, original engineering pattern analyses and selected Academy/Nivo source on **2026-09-16**. Links identify each source's author/maintainer; recommendations below are this standard's design judgments, not an industry certification. This is the agent's semantic design reference under the [common rules](architecture-rules.md). It does not replace the executable [code-pattern contract](code-pattern-enforcement.md), select infrastructure, authorize product changes or certify the inspected source.
+Reviewed against primary framework/database documentation and original engineering pattern analyses on **2026-09-16**. Links identify each source's author/maintainer; recommendations below are this standard's design judgments, not an industry certification. This is the agent's semantic design reference under the [common rules](architecture-rules.md). It does not replace the executable [code-pattern contract](code-pattern-enforcement.md), select infrastructure, authorize product changes or certify the inspected source.
 
 The standard fixes TypeScript, Next.js, NestJS and the owner's adopted Academy code forms. The choices below concern consistency, ownership and failure handling within that stack. Use the smallest design that satisfies the actual invariant. A pattern name in a class, dependency list or SDS is not evidence that its guarantees hold.
 
@@ -163,4 +163,3 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 An accepted semantic review records: source/input identities; applicable DP IDs and rejected alternatives; owners and state transitions; transaction/effect boundary; failure and recovery cases; commands/tests actually executed; unresolved assumptions and their effect on acceptance. Link that record from the existing owning Work design/implementation evidence. Do not duplicate SRS/SDS into runtime knowledge.
 
-The [source research note](design-pattern-source-review-20260916.md) distinguishes inspected implementations from untested guarantees. It is a point-in-time investigation, not a current product conformance certificate. Re-scan changed source before applying its conclusions. Passing stale/lint audits settles a measurement; findings still require separately authorized repair and fresh validation.

@@ -51,7 +51,8 @@ The examples use NestJS backend and Next.js frontend applications.
 
 This repository is the StarCi runtime package: `modules/` holds contracts, `engine/` and
 `scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
-human guidance, and `examples/` holds four backend/frontend product repositories. Each
+human guidance, and `examples/` holds two backend/frontend product examples (todo-app, ecommerce-app) and
+shape-slot, the front-end slot-teaching fixture (not a product). Each
 product example follows the [HFS tree](docs/source-layout.md); [Detailed layout](#detailed-layout)
 maps the runtime directories below.
 
@@ -132,7 +133,7 @@ init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/
 docs/               documentation
-examples/           reference projects with recorded .starciwork evidence
+examples/           todo-app and ecommerce-app (reference products with recorded .starciwork evidence) and shape-slot (a slot-teaching fixture, not a product)
 tests/              node:test specs — npm test
 packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
 ```
@@ -164,7 +165,6 @@ api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli
 - [Host contracts and agent cards](docs/host-contract.md)
 - [CLI and script reference](docs/cli.md)
 - [Build, test, package and release](docs/releasing.md)
-- [The todo-app standard example](docs/examples/todo-app-standard.md)
 
 Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need this page and `docs/`.
 

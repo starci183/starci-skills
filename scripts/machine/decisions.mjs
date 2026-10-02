@@ -24,11 +24,12 @@
 //   node scripts/machine/decisions.mjs supervisor --ring [--json]
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { execFile, spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
+import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
-import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs';
+import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -38,7 +39,7 @@ export const DI_SCHEMA = 'starci/decision-item@1';
 export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'checks-needed', 'graph-edit-needed', 'progress-stall',
   'stale-gate', 'stale-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
-  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis']);
+  'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict']);
 export const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,
@@ -212,7 +213,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
 }
 
 /**
- * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:nivo-fe:'
+ * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:my-app:'
  * with an empty head merged 73 later refusals into the first DI). Throws decision-key-invalid.
  */
 export function checkKey(key) {
@@ -359,7 +360,7 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   const outcome = pending?.outcome ?? report?.outcome ?? null;
   const failures = (refusal?.failures ?? []).map(String);
   const owned = (payload.owned_paths ?? []).map(String);
-  // Owned paths may carry the product repo's folder (nivo-fe/apps/...) while a report names repo-relative files.
+  // Owned paths may carry the product repo's folder (my-app/apps/...) while a report names repo-relative files.
   const repoPrefix = owned.map((p) => p.replace(/\\/g, '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
   const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
   const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
@@ -468,7 +469,7 @@ export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.no
 
 /** Run `api decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
 export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
-  const r = spawnSync(process.execPath, [API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
+  const r = runNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env });
   let json = null;
   for (const text of [r.stdout, String(r.stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
   return { ok: r.status === 0 && json?.ok !== false, status: r.status, json, err: String(r.stderr ?? '').slice(0, 1000) };
@@ -479,13 +480,11 @@ export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60
  * timeoutMs there stops every timer (the lease and the heartbeat) for that long (ENGINE-STALL).
  */
 export function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
-  return new Promise((resolve) => {
-    execFile(process.execPath, [API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
-      const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
-      let json = null;
-      for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
-      resolve({ ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) });
-    });
+  return execNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }).then(({ error, stdout, stderr }) => {
+    const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
+    let json = null;
+    for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
+    return { ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) };
   });
 }
 
@@ -516,7 +515,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 /* ------------------------------------------------------------ the doorbell */
 
-export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} việc chờ: api decisions --workflow ${workflowId}`,
+export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: api decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
     `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
@@ -693,7 +692,7 @@ export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, not
   });
 }, { env, now });
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} việc chờ: node scripts/machine/decisions.mjs supervisor --list`;
+export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: node scripts/machine/decisions.mjs supervisor --list`;
 /** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
 export const SUP_RING_KIND = 'supervisor-ring';
 
@@ -780,7 +779,7 @@ export async function escalateDue({ now = Date.now(), apply = false, repos = nul
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

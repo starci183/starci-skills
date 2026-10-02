@@ -8,7 +8,7 @@ autopilot:
     attempts=<n>,tokens=<n>,wallMs=<n> --reason <s>; [--by supervisor|kernel|autopilot] (default supervisor)
   reads: >-
     modules/models/runtimes.yaml allocation.autopilot; the workflow's asks, incidents, jobs and autopilot-* events;
-    the product records a gate reads (draw loop, rationale, brand.direction) - scripts/kernel/autopilot.mjs
+    the product records a gate reads (draw loop, rationale, brand.direction) - scripts/kernel/autopilot-run.mjs
   writes: >-
     Owner ruling 2026-09-28 autopilot-run-to-finish (modules/kernel/owner-rulings.yaml). Only autopilot-* events,
     autopilot answer receipts (starci/ask-answer@1, answeredBy autopilot - never owner) and supervisor-gate

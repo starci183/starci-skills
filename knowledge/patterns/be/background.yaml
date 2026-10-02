@@ -3,7 +3,7 @@ id: be.background
 title: Backend background work
 purpose: |-
   Given work that runs without a request (a schedule, a sweep, event or queue consumption, retry), where does it live and which
-  process runs it? Background work is a transport that dispatches one command, run only by an app of kind worker. Events travel
+  process runs it? Background work is a transport that dispatches one command, composed by the api app that owns it or by a worker app scaled apart. Events travel
   through event-bus.yaml and jobs through queues.yaml; this topic keeps the rule that a runner must exist.
 appliesTo:
   - backend
@@ -18,12 +18,12 @@ provenance:
     - docs/backend-source-pattern.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
-    Static checks prove that a background method has a runner and that a worker composes it. They do not prove lease
+    Static checks prove that a background method has a runner and that an app composes it. They do not prove lease
     correctness, fencing at the remote resource or crash recovery; those need failure-injection tests against the actual
     authority.
 rules:
   - id: BE-BACKGROUND-1
-    title: Only a worker app runs it
+    title: The owning api app runs it; a worker app only scales it apart
     kind: mandatory
     hfsRules: [R46, R31]
     requirement: |-
@@ -57,7 +57,7 @@ rules:
     cases:
       - id: case-1
         when: A new sweep
-        write: 'add a scheduler to the queue and a processor that dispatches the sweep command, and compose the processor in the worker in the same change.'
+        write: 'add a scheduler to the queue and a processor that dispatches the sweep command, and compose the processor in the owning api app (or the worker app) in the same change.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED

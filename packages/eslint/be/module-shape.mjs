@@ -29,7 +29,7 @@
 import ts from "typescript"
 import { decoratorName, keyName, walk } from "./lib/ast.mjs"
 import { importsFrom } from "./lib/declared.mjs"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isDeclarationFile, isSpecFile, normalizePath } from "./lib/path.mjs"
 import { typed } from "./lib/types.mjs"
 
@@ -70,7 +70,7 @@ const isAppModule = (hfs, filename) => (hfs.slotOf(filename) ?? "").startsWith("
  * capability modules with `isGlobal: true` the way `apps/<app>/src/app.module.ts` does in production. A spec (integration,
  * contract, e2e) does not compose and stays refused: it calls `useTestWorld(...)` only.
  */
-const isWorld = (hfs, filename) => hfs.slotOf(filename) === "be.tests.world"
+const isWorld = inTestWorld
 
 const isTrue = (node) => node?.type === "Literal" && node.value === true
 

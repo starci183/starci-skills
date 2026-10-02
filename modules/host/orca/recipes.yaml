@@ -8,11 +8,9 @@ recipes:
     sequence:
       - assert-expected-active-dag-operation
       - assert-explicit-capacity-gated-candidate
-      - orchestration.task-create
+      - orchestration.worker-start-spec-agent-devin
       - assert-canonical-task-display-name
-      - orchestration.worker-start-agent-devin
-      - orchestration.dispatch-show-attest-assignee
-      - orchestration.worker-show-attest-effective-agent
+      - orchestration.worker-show-attest-assignee-and-effective-agent
     terminalName: "[Op] <operation> a<attempt> · <Workflow>"
     taskCardinality: one
     dispatchCardinality: one
@@ -24,11 +22,9 @@ recipes:
     sequence:
       - assert-expected-active-dag-operation
       - resolve-operation-provider-chain
-      - orchestration.task-create
+      - orchestration.worker-start-spec-current-worktree-with-resolved-model
       - assert-canonical-task-display-name
-      - orchestration.worker-start-current-worktree-with-resolved-model
-      - orchestration.dispatch-show-assignee
-      - terminal.rename-assignee
+      - terminal.rename-agent-terminal
       - orchestration.worker-show-and-attest-provider-identity
     terminalName: "[Op] <operation>"
   operation-candidate-fallthrough:

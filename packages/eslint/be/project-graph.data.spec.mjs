@@ -242,7 +242,7 @@ test("connection-map: one connection file set per declared connection, one regis
     const f = projectFixture({
         files: CONNECTION_FILES,
         declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY", owner: "core", isolation: "database" }, { name: "agentos", envPrefix: "AGENTOS", owner: "core", isolation: "database" }, { name: "billing", envPrefix: "BILLING", owner: "core", isolation: "database" }] },
-        apps: [{ name: "core", kind: "api" }, { name: "worker", kind: "worker" }, { name: "migrate", kind: "migrate" }],
+        apps: [{ name: "core", kind: "api" }, { name: "worker", kind: "worker" }, { name: "cli", kind: "cli" }],
     })
     t.after(f.cleanup)
     f.tester.run("connection-map", rules["connection-map"], {
@@ -522,5 +522,37 @@ test("source-names: the names and forms inside a source file follow its role", (
             [`${C}/enums/bad-status.ts`]: [1, 1],
             [`${C}/transport/graphql/create-order.resolver.ts`]: [1, 1],
         })],
+    })
+})
+
+// ---------------------------------------------------------------------------------------------------------------------
+// sql-returning (BE_SQL_RETURNING_SHAPE): EntityManager.query returns UPDATE/DELETE ... RETURNING as [rows, count]
+// ---------------------------------------------------------------------------------------------------------------------
+const RETURNING_FILES = {
+    ...databaseFiles,
+    ...entityFiles("stock", "stock_items", "  @Column({ name: 'qty', type: 'int' }) qty!: number;\n"),
+    // wrapped in a CTE, INSERT ... RETURNING, no RETURNING, a RETURNING-looking string and comment, and an upsert whose DO UPDATE is not the statement verb
+    "src/modules/domain/stock/persistence/stock.sql.ts": `import { sql } from '../../../platform/database';
+export const RELEASE = sql\`WITH changed AS (UPDATE stock_items SET qty = qty + $2 WHERE id = $1 RETURNING id, qty) SELECT id, qty FROM changed\`;
+export const PURGE = sql\`WITH gone AS (DELETE FROM stock_items WHERE id = $1 RETURNING id) SELECT id FROM gone\`;
+export const ADD = sql\`INSERT INTO stock_items (id, qty) VALUES ($1, $2) RETURNING id\`;
+export const BUMP = sql\`UPDATE stock_items SET qty = qty + 1 WHERE id = $1\`;
+export const NOTE = sql\`UPDATE stock_items SET qty = 0 WHERE id = $1 /* RETURNING id */\`;
+export const UPSERT = sql\`INSERT INTO stock_items (id, qty) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET qty = EXCLUDED.qty RETURNING id\`;
+`,
+    // an UPDATE and a DELETE returning rows directly, and the second of two statements
+    "src/modules/domain/stock/persistence/stock-bad.sql.ts": `import { sql } from '../../../platform/database';
+export const TAKE = sql\`UPDATE stock_items SET qty = qty - $2 WHERE id = $1 RETURNING id, qty\`;
+export const DROP = sql\`DELETE FROM stock_items WHERE id = $1 RETURNING id\`;
+export const TWO = sql\`SELECT 1; UPDATE stock_items SET qty = 0 WHERE id = $1 RETURNING id\`;
+`,
+}
+
+test("sql-returning: a CTE-wrapped RETURNING, an INSERT RETURNING and plain writes pass; an UPDATE or DELETE returning rows directly does not", (t) => {
+    const f = projectFixture({ files: RETURNING_FILES })
+    t.after(f.cleanup)
+    f.tester.run("sql-returning", rules["sql-returning"], {
+        valid: valid(f, RETURNING_FILES, ["src/modules/domain/stock/persistence/stock.sql.ts"]),
+        invalid: [...invalid(f, RETURNING_FILES, { "src/modules/domain/stock/persistence/stock-bad.sql.ts": [2, 3, 4] })],
     })
 })

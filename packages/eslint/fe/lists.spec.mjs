@@ -18,7 +18,7 @@ const tester = new RuleTester({
   },
 })
 
-const FILE = "D:/repo/src/components/blocks/Feed/component.tsx"
+const FILE = "src/components/blocks/Feed/component.tsx"
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)

@@ -44,13 +44,4 @@ export const operationDispatchOf = (payload) => payload?.managed?.dispatchId
   ?? payload?.hierarchy?.runtime?.dispatchId
   ?? null;
 
-// The operation Task an op holds, whichever launch kind opened it, and the
-// Run/kernel-terminal identity task-update needs to address it. Returns null
-// when the attempt never got a Task — there is then nothing to close.
-export const operationTaskOf = (payload) => {
-  const taskId = payload?.orca?.taskId ?? payload?.managed?.taskId ?? payload?.hierarchy?.runtime?.taskId ?? null;
-  if (!taskId) return null;
-  return { taskId, runId: payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null };
-};
-
 export const contractDispatchIdOf = (db, job) => latestContractOf(db, job.job_id)?.dispatch_id ?? null;

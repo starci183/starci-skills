@@ -13,8 +13,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { SKILL_ROOT, readSupervisor } from '../machine/home.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 
 /** Every sha a `land-passed` event (machine.sqlite sup_events) moved main to, oldest first. `m` is a machine handle. */
 export function gateLandedShas(m) {
@@ -46,7 +46,7 @@ export function directCommits({ root = SKILL_ROOT, env = process.env, m = null }
 
 export const describeDirect = (c) => `DIRECT-COMMIT ${c.sha} ${c.subject}`;
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const i = argv.indexOf('--repo');
   const commits = directCommits({ root: i >= 0 && argv[i + 1] ? path.resolve(argv[i + 1]) : SKILL_ROOT });

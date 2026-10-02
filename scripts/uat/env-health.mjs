@@ -36,15 +36,16 @@
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
-import http from 'node:http';
-import https from 'node:https';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { probe as probeUrl } from '../api/http/probe.mjs';
+import { portListener } from '../api/process/port-listener.mjs';
+import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 export const EXIT_READY = 0, EXIT_NOT_READY = 3, EXIT_USAGE = 2;
@@ -63,41 +64,12 @@ const ENV_ID = /^environment\.[a-z0-9-]+\.[a-z0-9-]+$/;
 
 /* ------------------------------------------------------------------------ probing */
 
-/**
- * One HTTP probe that tells refused from hung: {state:'answered', status, ms} | {state:'down', code} |
- * {state:'hung', ms} (TCP connected, no answer before timeoutMs) | {state:'error', code}.
- */
-export function probeHttp(url, { method = 'GET', body = null, timeoutMs = DEFAULT_PROBE_TIMEOUT_MS } = {}) {
-  return new Promise((resolve) => {
-    let target;
-    try { target = new URL(url); } catch { resolve({ state: 'error', code: 'URL_INVALID' }); return; }
-    const lib = target.protocol === 'https:' ? https : http;
-    const started = Date.now();
-    let connected = false, done = false;
-    const finish = (value) => { if (!done) { done = true; resolve(value); } };
-    const req = lib.request(target, { method, headers: body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } : {}, agent: false });
-    req.on('socket', (socket) => {
-      if (socket.connecting === false && !socket.pending) connected = true;
-      socket.on('connect', () => { connected = true; });
-    });
-    req.setTimeout(timeoutMs, () => {
-      finish(connected ? { state: 'hung', ms: Date.now() - started } : { state: 'down', code: 'CONNECT_TIMEOUT', ms: Date.now() - started });
-      req.destroy();
-    });
-    req.on('response', (res) => { res.resume(); finish({ state: 'answered', status: res.statusCode, ms: Date.now() - started }); });
-    req.on('error', (error) => finish(['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ENOTFOUND', 'EADDRNOTAVAIL'].includes(error.code)
-      ? { state: 'down', code: error.code } : { state: 'error', code: error.code ?? String(error.message ?? error) }));
-    if (body) req.write(body);
-    req.end();
-  });
-}
-
 /** The first health endpoint an origin answers 2xx on, or null. */
 export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HEALTH_CANDIDATES, skip = [] } = {}) {
   for (const candidate of candidates) {
     const url = new URL(candidate.path, origin).toString();
     if (skip.includes(url) && candidate.method === 'GET') continue;
-    const r = await probeHttp(url, { method: candidate.method, body: candidate.body ?? null, timeoutMs });
+    const r = await probeUrl(url, { method: candidate.method, body: candidate.body ?? null, timeoutMs, follow: 0 });
     if (r.state === 'answered' && r.status >= 200 && r.status < 300) return { method: candidate.method, url, status: r.status };
     if (r.state !== 'answered') return null; // the origin itself stopped answering: nothing to discover
   }
@@ -106,28 +78,9 @@ export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HE
 
 /* ---------------------------------------------------------------- listeners, processes */
 
-/** The process listening on a TCP port: {pid, commandLine} or null. */
-export function listenerOf(port, { platform = process.platform } = {}) {
+export function stopListener(pid, { platform = process.platform } = {}) {
   try {
-    if (platform === 'win32') {
-      const out = spawnSync('netstat', ['-ano'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '';
-      const line = out.split(/\r?\n/).find((l) => new RegExp(`^\\s*TCP\\s+\\S*:${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`, 'i').test(l));
-      const pid = line ? Number(/LISTENING\s+(\d+)/i.exec(line)[1]) : null;
-      if (!pid) return null;
-      const cmd = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', `(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine`], { encoding: 'utf8', timeout: 20000 });
-      return { pid, commandLine: String(cmd.stdout ?? '').trim() || null };
-    }
-    const out = spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8', timeout: 15000 }).stdout ?? '';
-    const pid = Number(out.split(/\s+/).find(Boolean));
-    if (!pid) return null;
-    const cmd = spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 5000 });
-    return { pid, commandLine: String(cmd.stdout ?? '').trim() || null };
-  } catch { return null; }
-}
-
-export function killTree(pid, { platform = process.platform } = {}) {
-  try {
-    if (platform === 'win32') return killProcessTree(pid, { platform, timeoutMs: 20000 }).ok;
+    if (platform === 'win32') return killTree(pid, { platform, timeoutMs: 20000 }).ok;
     try { process.kill(-pid, 'SIGTERM'); } catch { process.kill(pid, 'SIGTERM'); }
     return true;
   } catch { return false; }
@@ -179,7 +132,7 @@ export function startServer({ command, cwd, envId, service, env = process.env })
   fs.mkdirSync(path.dirname(log), { recursive: true });
   const fd = fs.openSync(log, 'w');
   const { file, args } = launchFor(command);
-  const child = spawn(file, args, { cwd, detached: true, stdio: ['ignore', fd, fd], windowsHide: true, env });
+  const child = spawnDetached(file, args, { cwd, stdio: ['ignore', fd, fd], env });
   child.unref();
   fs.closeSync(fd);
   return { pid: child.pid, log };
@@ -189,7 +142,7 @@ async function waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs }) {
   const until = Date.now() + readyTimeoutMs;
   let last = null;
   while (Date.now() < until) {
-    last = await probeHttp(url, { timeoutMs: Math.min(probeTimeoutMs, 15000) });
+    last = await probeUrl(url, { timeoutMs: Math.min(probeTimeoutMs, 15000), follow: 0 });
     if (last.state === 'answered' && (last.status === expect || (last.status >= 200 && last.status < 400))) return { ready: true, last };
     await new Promise((r) => setTimeout(r, 2000));
   }
@@ -274,8 +227,8 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
     const url = String(probe?.target ?? ''), expect = Number(probe?.expect ?? 200);
     const { service, port } = serviceOfUrl(doc, url);
     const name = service ?? probe?.id ?? url;
-    let r = await probeHttp(url, { timeoutMs: probeTimeoutMs });
-    if (r.state === 'hung') r = await probeHttp(url, { timeoutMs: probeTimeoutMs }); // a first compile can be slow; a second wait decides
+    let r = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 });
+    if (r.state === 'hung') r = await probeUrl(url, { timeoutMs: probeTimeoutMs, follow: 0 }); // a first compile can be slow; a second wait decides
     const row = { service: name, probe: probe?.id ?? null, url, expect, port };
     if (r.state === 'answered' && r.status === expect) { services.push({ ...row, state: 'ready', ready: true, status: r.status, ms: r.ms }); continue; }
     if (r.state === 'answered') {
@@ -290,7 +243,7 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
     }
     let state = r.state === 'answered' ? 'wrong-status' : r.state === 'hung' ? 'hung' : r.state === 'down' ? 'down' : 'error';
     const registered = readRegistered(doc.id, name, env);
-    const listener = port && state !== 'down' ? listenerOf(port) : null;
+    const listener = port && state !== 'down' ? portListener(port) : null;
     const actions = [];
     if (listener && ['hung', 'wrong-status'].includes(state)) {
       const own = (registered && registered.pid === listener.pid) || ownedByWorkspace(listener.commandLine, roots);
@@ -299,7 +252,7 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
           remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` });
         continue;
       }
-      if (restart) { const killed = killTree(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
+      if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
     }
     const start = registered?.command ? { command: registered.command, cwd: registered.cwd, from: 'registry' }
       : doc?.configuration?.start?.[name] ? { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null } : null;
@@ -378,15 +331,15 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
     const url = typeof args.url === 'string' ? args.url : (doc?.probes ?? []).map((p) => p.target).find((t) => serviceOfUrl(doc, t).service === args.service) ?? null;
     const port = url ? serviceOfUrl(doc ?? {}, url).port ?? Number(new URL(url).port) : null;
     const prior = readRegistered(args.env, args.service, env);
-    const listener = port ? listenerOf(port) : null;
+    const listener = port ? portListener(port) : null;
     const actions = [];
     if (listener && ((prior && prior.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]))) {
-      const answered = url ? await probeHttp(url, { timeoutMs: 8000 }) : null;
+      const answered = url ? await probeUrl(url, { timeoutMs: 8000, follow: 0 }) : null;
       if (answered?.state === 'answered' && answered.status < 500) {
         writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
         return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url }, EXIT_READY);
       }
-      if (killTree(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
+      if (stopListener(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
     } else if (listener) {
       return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
     }
@@ -401,4 +354,4 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
   return emit({ ok: false, error: 'usage: env-health.mjs check|serve|status (see header)' }, EXIT_USAGE);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await envHealthMain(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = await envHealthMain(process.argv.slice(2));

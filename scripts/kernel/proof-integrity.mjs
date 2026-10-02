@@ -18,7 +18,8 @@
 //              (api verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engine/db/ledger.mjs';
 import { getBlob } from '../../engine/db/blob.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -168,7 +169,7 @@ export function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [
   return { job: withSpecFrs(job0), byArtifact, frRecords };
 }
 
-const gitHead = (repo) => { try { return gitOutput(['rev-parse', 'HEAD'], { dir: repo }).trim() || null; } catch { return null; } };
+const gitHead = (repo) => { try { return gitOutputOf(revParseQuery(['HEAD'], { dir: repo })).trim() || null; } catch { return null; } };
 const codeDigester = (repo) => createDigester(repo, { skip: CODE_SKIP_DIRS });
 
 /** The paths a job's proofs depend on: {code[], work[]}, relative to the ledger repository. */

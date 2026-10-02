@@ -13,6 +13,7 @@ import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
     infraNeedsInjector,
+    injectedParamName,
     injectorOnly,
     injectorShape,
     injectorTypeMatch,
@@ -30,7 +31,7 @@ const SERVICE = at("src/modules/domain/order/order.consumer.ts")
 /** A spec beside it. */
 const SPEC = at("src/modules/domain/order/order.consumer.spec.ts")
 /** A handler of a feature (a different owner from every module). */
-const HANDLER = at("src/features/shop/application/open.handler.ts")
+const HANDLER = at("src/features/api/shop/application/open.handler.ts")
 /** The decorators file of the `platform/clock` owner, at its owner root. */
 const DECORATORS = at("src/modules/platform/clock/probe.decorators.ts")
 /** A decorators-named file one folder below the owner root. */
@@ -389,6 +390,34 @@ export const providers = [{ provide: APP_GUARD, useClass: Object }]`, errors: [{
             { filename: DECORATORS, code: `import { injector } from "@modules/platform/composition"\nimport type { Clock } from "@modules/platform/clock"\nexport const build = () => injector<Clock>("clock")`, errors: [{ messageId: "string" }] },
             { filename: SERVICE, code: `import { getEntityManagerToken } from "@nestjs/typeorm"\nexport const token = getEntityManagerToken("primary")`, errors: [{ messageId: "connection" }] },
             { filename: SERVICE, code: `import { getEntityManagerToken as token } from "@nestjs/typeorm"\nexport const t = token(\`primary\`)`, errors: [{ messageId: "connection" }] },
+        ],
+    })
+})
+
+test("injected-param-name: a port the paramNames table names is named the same way in every class", () => {
+    const INJ = `import { Injectable } from "@nestjs/common"\n`
+    const EM = `import type { EntityManager } from "typeorm"\nimport { Inject } from "@nestjs/common"\nconst T: unique symbol = Symbol("shop.em")\n`
+    const OPTIONS = `import type { PlatformOptions } from "@modules/platform/config/platform.options"\n`
+    tester.run("injected-param-name", injectedParamName, {
+        valid: [
+            { filename: HANDLER, code: `${INJ}${CLOCK}@Injectable()\nexport class H { constructor(@InjectClock() private readonly clock: Clock) {} }` },
+            // a connection-qualified manager, and the plain one
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()\nexport class H { constructor(@Inject(T) private readonly entityManager: EntityManager, @Inject(T) private readonly orderEntityManager: EntityManager) {} }` },
+            // options are `options`, or `<owner>Options` beside another
+            { filename: HANDLER, code: `${INJ}${EM}${OPTIONS}@Injectable()\nexport class H { constructor(@Inject(T) private readonly options: PlatformOptions, @Inject(T) private readonly platformOptions: PlatformOptions) {} }` },
+            // a type the table does not name is free to be named for what it is
+            { filename: HANDLER, code: `${INJ}${EM}import type { Readable } from "node:stream"\n@Injectable()\nexport class H { constructor(@Inject(T) private readonly source: Readable) {} }` },
+            // a class the container does not build, and a parameter that injects nothing
+            { filename: HANDLER, code: `${CLOCK}export class Adapter { constructor(private readonly time: Clock) {} }` },
+            { filename: HANDLER, code: `${INJ}${CLOCK}@Injectable()\nexport class H { constructor(private readonly ids: Array<number>) {} }` },
+        ],
+        invalid: [
+            { filename: HANDLER, code: `${INJ}${CLOCK}@Injectable()\nexport class H { constructor(@InjectClock() private readonly time: Clock) {} }`, errors: [{ messageId: "name" }] },
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()\nexport class H { constructor(@Inject(T) private readonly em: EntityManager) {} }`, errors: [{ messageId: "name" }] },
+            // the name must be the whole suffix applied to something, not the bare suffix word of another case
+            { filename: HANDLER, code: `${INJ}${EM}${OPTIONS}@Injectable()\nexport class H { constructor(@Inject(T) private readonly settings: PlatformOptions) {} }`, errors: [{ messageId: "name" }] },
+            // a spec is not exempt
+            { filename: SPEC, code: `${INJ}${CLOCK}@Injectable()\nexport class H { constructor(@InjectClock() private readonly now: Clock) {} }`, errors: [{ messageId: "name" }] },
         ],
     })
 })

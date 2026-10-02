@@ -206,4 +206,4 @@ ORDER BY l.seq DESC LIMIT 50;
 
 ## Why an attempt ended as it did
 
-Every failed, blocked, refused, requeued or waiting attempt has a plain-language `why` (`op_attempts.why_json`, `v_op_history.why_json`, `api status` legs/frontier, `scripts/kernel/why.mjs`). Read it before the raw codes; the contract and the code catalog are in [why](why.md). Dry-run for existing attempts: `node scripts/supervisor/why-backfill.mjs --ledger <name>`.
+Every failed, blocked, refused, requeued or waiting attempt has a plain-language `why` (`op_attempts.why_json`, `v_op_history.why_json`, `api status` legs/frontier, `scripts/kernel/why.mjs`). Read it before the raw codes; the contract and the code catalog are in [why](why.md).

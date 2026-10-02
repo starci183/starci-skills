@@ -36,7 +36,7 @@ import path from 'node:path';
 import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
@@ -210,14 +210,14 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
   try { fs.renameSync(from, to); } catch (error) {
     if (error?.code !== 'EXDEV') throw error;
     // A cross-device move copies first; the source goes only after the copy is verified to hold the same top-level
-    // entries (moves, never deletes), and removal goes through safeRemoveTree — the one runtime tree delete, which
-    // unlinks links and never descends into one (nivo-fe inc-c8fbf76aa499).
+    // entries (moves, never deletes), and removal goes through safeRemove — the one runtime tree delete, which
+    // unlinks links and never descends into one.
     fs.cpSync(from, to, { recursive: true });
     const wanted = fs.readdirSync(from).sort();
     const copied = fs.readdirSync(to).sort();
     if (wanted.length !== copied.length || wanted.some((name, i) => name !== copied[i]))
       throw Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
-    const removed = safeRemoveTree(from, { hold: artifactHoldReason });
+    const removed = safeRemove(from, { hold: artifactHoldReason });
     if (!removed.ok) throw Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
   }
   withMachine((m) => m.setLedgerState(finding.ledgerId, 'retired', { reason: `orphan ledger archived (${finding.reason})` }), { env });

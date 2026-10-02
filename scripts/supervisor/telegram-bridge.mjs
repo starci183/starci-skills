@@ -34,7 +34,7 @@
 // is held and delivered once the owner picks one. Replies follow config.yaml
 // `language` (vi, else en). The supervisor side is scripts/supervisor/channel.mjs.
 //
-// Owner asks on demand (owner, 2026-09-24: "khi yêu cầu thì mới serve url"):
+// Owner asks on demand (owner, 2026-09-24: "serve the url only when asked"):
 // a kernel's `api serve-ask` only sends the question with a "Generate URL"
 // button (callback_data `ask:<16 hex>`, telegram.mjs askKeyOf). Pressing it
 // here answers the callback, launches scripts/kernel/ask-server.mjs for that ask
@@ -49,7 +49,7 @@
 //
 // Draw review by reply (owner ruling 2026-09-27): a reply to a draw-review notice (its album, one image, or its
 // text; telegram.mjs drawReviewEntryByMessage) is the owner's answer, recorded as a verified owner answer by
-// serve-ask.mjs answerDrawReviewByReply: "ok" / "duyệt" accepts, anything else is feedback (a note per line, or a
+// serve-ask.mjs answerDrawReviewByReply: "ok" / the accept words accept, anything else is feedback (a note per line, or a
 // note on the replied image) and the drawing is redrawn (scripts/work/draw-feedback.mjs).
 //
 // Registry: the connectors row 'supervisor-channel:<id>' (config_json {id, label,
@@ -81,6 +81,7 @@ import { collectProgress, progressMessages, reportRepos } from './progress-repor
 import { answerDrawReviewByReply, askClassOf } from '../kernel/ask-server.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../machine/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
@@ -95,67 +96,39 @@ const MAX_PENDING = 20;
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
 export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
 
-const TEXT = {
-  en: {
-    chooser: 'Choose the supervisor to talk to:',
-    none: 'No supervisor is registered yet.',
-    held: 'Your message is held and goes to the supervisor you pick.',
-    heldNone: 'No supervisor is registered yet. Your message is held and goes to the first one you pick (/choose).',
-    talking: (label) => `Now talking to ${label}.`,
-    forwarded: (label) => `📥 Forwarded to ${label}.`,
-    offline: '(supervisor offline — it will pick this up when it is back)',
-    gone: 'That supervisor is no longer registered. /choose another one.',
-    textOnly: 'Only text messages are forwarded to a supervisor.',
-    statusFailed: 'The progress report could not be built right now.',
-    asksNone: 'No question is waiting for you.',
-    asksHead: (n) => `${n} open question(s). Press "Generate URL" under the one you want to answer:`,
-    credsHint: (n) => `${n} credential ask(s) wait for values: /creds`,
-    credsNone: 'No credential ask is waiting.',
-    credsHead: (n) => `🔑 ${n} credential ask(s) wait for values. They never hold the main line; only live proof (UAT) waits on them. Press one to open its form:`,
-    askClosed: 'This question no longer needs an answer.',
-    askGenerating: 'Opening the answer form…',
-    unknown: 'Unknown command.',
+// The bridge's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
+export const bridgeText = (language) => {
+  const tr = translator(language);
+  return {
+    chooser: tr('Choose the supervisor to talk to:'),
+    none: tr('No supervisor is registered yet.'),
+    held: tr('Your message is held and goes to the supervisor you pick.'),
+    heldNone: tr('No supervisor is registered yet. Your message is held and goes to the first one you pick (/choose).'),
+    talking: (label) => tr('Now talking to {label}.', { label }),
+    forwarded: (label) => tr('📥 Forwarded to {label}.', { label }),
+    offline: tr('(supervisor offline — it will pick this up when it is back)'),
+    gone: tr('That supervisor is no longer registered. /choose another one.'),
+    textOnly: tr('Only text messages are forwarded to a supervisor.'),
+    statusFailed: tr('The progress report could not be built right now.'),
+    asksNone: tr('No question is waiting for you.'),
+    asksHead: (n) => tr('{n} open question(s). Press "Generate URL" under the one you want to answer:', { n }),
+    credsHint: (n) => tr('{n} credential ask(s) wait for values: /creds', { n }),
+    credsNone: tr('No credential ask is waiting.'),
+    credsHead: (n) => tr('🔑 {n} credential ask(s) wait for values. They never hold the main line; only live proof (UAT) waits on them. Press one to open its form:', { n }),
+    askClosed: tr('This question no longer needs an answer.'),
+    askGenerating: tr('Opening the answer form…'),
+    unknown: tr('Unknown command.'),
     help: [
-      'Commands:',
-      '/choose — pick the supervisor to talk to',
-      '/status — the progress report',
-      '/asks — the decisions waiting on you, each with a Generate URL button',
-      '/creds — the credential asks (keys, secrets) in one list; they never hold the main line',
-      '/help — this list',
-      'Any other text goes to the supervisor you picked.',
+      tr('Commands:'),
+      tr('/choose — pick the supervisor to talk to'),
+      tr('/status — the progress report'),
+      tr('/asks — the decisions waiting on you, each with a Generate URL button'),
+      tr('/creds — the credential asks (keys, secrets) in one list; they never hold the main line'),
+      tr('/help — this list'),
+      tr('Any other text goes to the supervisor you picked.'),
     ].join('\n'),
-  },
-  vi: {
-    chooser: 'Chọn supervisor để nói chuyện:',
-    none: 'Chưa có supervisor nào đăng ký.',
-    held: 'Tin nhắn của thầy được giữ lại và sẽ chuyển cho supervisor thầy chọn.',
-    heldNone: 'Chưa có supervisor nào đăng ký. Tin nhắn của thầy được giữ lại và sẽ chuyển cho supervisor đầu tiên thầy chọn (/choose).',
-    talking: (label) => `Đang nói chuyện với ${label}.`,
-    forwarded: (label) => `📥 Đã chuyển cho ${label}.`,
-    offline: '(supervisor đang offline — sẽ xử lý khi quay lại)',
-    gone: 'Supervisor này không còn đăng ký. Thầy /choose supervisor khác nhé.',
-    textOnly: 'Chỉ tin nhắn chữ mới được chuyển cho supervisor.',
-    statusFailed: 'Chưa dựng được báo cáo tiến độ lúc này.',
-    asksNone: 'Không có câu hỏi nào đang chờ thầy.',
-    asksHead: (n) => `${n} câu hỏi đang chờ thầy. Thầy bấm "Tạo link trả lời" dưới câu muốn trả lời:`,
-    credsHint: (n) => `${n} yêu cầu thông tin bí mật (credential) đang chờ: /creds`,
-    credsNone: 'Không có yêu cầu credential nào đang chờ.',
-    credsHead: (n) => `🔑 ${n} yêu cầu thông tin bí mật (credential) đang chờ thầy. Không chặn việc chính, chỉ phần chạy thử thật (UAT) chờ. Thầy bấm nút tương ứng để mở form:`,
-    askClosed: 'Câu hỏi này không cần trả lời nữa.',
-    askGenerating: 'Đang mở form trả lời…',
-    unknown: 'Lệnh không có.',
-    help: [
-      'Các lệnh:',
-      '/choose — chọn supervisor để nói chuyện',
-      '/status — báo cáo tiến độ',
-      '/asks — các quyết định đang chờ thầy, mỗi câu có nút tạo link trả lời',
-      '/creds — các yêu cầu credential (key, secret) gộp một danh sách; không chặn việc chính',
-      '/help — danh sách lệnh',
-      'Tin nhắn thường sẽ được chuyển cho supervisor thầy đang chọn.',
-    ].join('\n'),
-  },
+  };
 };
-export const bridgeText = (language) => TEXT[language] ?? TEXT.en;
 
 const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !== '' ? String(Number(v)) : '?');
 
@@ -262,8 +235,9 @@ export async function getUpdates({ token, offset = null, timeoutS = POLL_TIMEOUT
 
 const defaultStatusMessages = (config, env) => {
   const source = starciSourceRoot(env);
+  const language = typeof config?.language === 'string' ? config.language : undefined;
   const repos = reportRepos([], config).map((repo) => path.resolve(source, repo));
-  return progressMessages(collectProgress(repos, { config }));
+  return progressMessages(collectProgress(repos, { config, language }), { language });
 };
 
 // The repositories whose open asks /asks and /creds list: the connector repos, every product repo
@@ -521,7 +495,7 @@ export function createBridge({
   /**
    * The owner's reply to a draw-review notice (its album, one image, or its text): the ask's answer, recorded as a
    * verified owner answer (serve-ask.mjs answerDrawReviewByReply; the update already passed `authorized`). "ok" /
-   * "duyệt" accepts; anything else is feedback and the drawing is redrawn. Never the runtime's own accept.
+   * the accept words accept; anything else is feedback and the drawing is redrawn. Never the runtime's own accept.
    */
   const onDrawReply = async (message, text) => {
     const replyTo = message.reply_to_message?.message_id;
@@ -531,10 +505,10 @@ export function createBridge({
       workflowId: entry.workflowId, dispatchId: entry.dispatchId, text, partPath: entry.partPath,
       telegram: { chatId: current.chatId, messageId: message.message_id ?? null, replyTo } });
     say(`draw review ${entry.key}: owner reply ${r?.ok ? r.decision : `not recorded (${r?.why ?? 'error'})`}`);
-    const vi = current.language === 'vi';
-    const ack = !r?.ok ? (vi ? `Chưa ghi nhận được: ${r?.why ?? 'lỗi'}.` : `Not recorded: ${r?.why ?? 'error'}.`)
-      : r.decision === 'accept' ? (vi ? `Đã ghi nhận: thầy duyệt hình${r.golden ? ' và đặt làm hình chuẩn' : ''}.` : `Recorded: you accepted the drawing${r.golden ? ' as the golden reference' : ''}.`)
-        : (vi ? 'Đã ghi nhận góp ý của thầy: hình sẽ được vẽ lại theo từng ghi chú.' : 'Recorded your feedback: the drawing will be redrawn to address every note.');
+    const tr = translator(current.language);
+    const ack = !r?.ok ? tr('Not recorded: {why}.', { why: r?.why ?? tr('error') })
+      : r.decision === 'accept' ? tr(r.golden ? 'Recorded: you accepted the drawing as the golden reference.' : 'Recorded: you accepted the drawing.')
+        : tr('Recorded your feedback: the drawing will be redrawn to address every note.');
     await send(ack, { replyTo: message.message_id });
     return r ?? { ok: false };
   };

@@ -8,7 +8,7 @@ import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { drawImageRefs, isPartName, ownerImages, partNameOf, partOf } from '../../scripts/work/direction-part.mjs';
 import { drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
 
-// Owner ruling 2026-09-24 ("thầy nghĩ in ra không phải bản ghép, là bản cho phần đó thôi"): what the owner
+// Owner ruling 2026-09-24 ("what you print should not be the composite, only the drawing for that part"): what the owner
 // reviews for a drawing is the drawn PART - a page's slot content, an overlay's panel alone, a layout's own
 // drawing - never the composite placed into the layout capture, which stays evidence for implement/audit.
 const CONSOLE = '/[locale]/(console)';

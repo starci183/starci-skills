@@ -15,8 +15,9 @@
 //                      kernel or op worker (settled worker, leftover shell)
 //   TITLE_DRIFT        a live managed op worker whose [Op] tab-title rename did
 //                      not apply (the unnamed worker-task_<id> sidebar row)
-//   TASK_OUTSIDE_RUN   a job whose Orca Run is not the workflow's current Run,
-//                      so its Task hangs outside the workflow's tree
+//   TASK_OUTSIDE_RUN   a live job whose Orca Run is not the workflow's current Run,
+//                      so its Task hangs outside the workflow's tree (a settled job's
+//                      Task settled with its Dispatch: worker_done or settle's fence)
 //
 // ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or
 // a worker Orca accounts for in one of this ledger's Runs (orchestration
@@ -37,10 +38,10 @@
 // cycle against the listing it already fetches.
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { SCHEMA, readTerminals, readWorkers, ledgerRuns, orcaTreeFindings, formatFinding } from '../supervisor/orca-tree.mjs';
 
@@ -98,4 +99,4 @@ function main(argv) {
   process.exit(findings.length ? 1 : 0);
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) main(process.argv.slice(2));
+if (isMain(import.meta.url)) main(process.argv.slice(2));

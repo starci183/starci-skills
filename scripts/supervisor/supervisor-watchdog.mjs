@@ -16,7 +16,7 @@
 //
 //   node scripts/supervisor/supervisor-watchdog.mjs --once [--json] one pass; the reconciler Host controller runs it
 //                                                        (concern host.supervisor-seat). There is no loop (owner ruling
-//                                                        2026-09-28 "có lỗi xóa luôn": the reconciler is the only loop).
+//                                                        2026-09-28 "on error just delete it": the reconciler is the only loop).
 //
 // It serves only the optional [Supervisor] kernel (config.yaml supervisor.mode kernel). In chat mode (the default;
 // owner, 2026-09-25: the Supervisor is the owner's desktop chat again), or while the seat is DISABLED
@@ -24,7 +24,7 @@
 import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
@@ -42,11 +42,9 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 import { supervisorDecisions } from '../machine/decisions.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
-export const LOOP_MS = 30_000;
-export const LIVENESS_MS = 180_000;
 export const INBOX_REWAKE_MS = 10 * 60_000;
 export const WAKE_TAG = '[Supervisor watchdog]';
 
@@ -190,7 +188,7 @@ async function hostDeps() {
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
     replace: () => {
-      const r = spawnSync(process.execPath, [START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
+      const r = runNode([START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, timeout: 600_000 });
       try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
     },
     sleep: sleepSync,
@@ -227,8 +225,8 @@ const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false
 /**
  * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.
  * Liveness is worker-show on the job's Dispatch; a reported or dead worker is fenced and released (worker-stop +
- * worker-release, which archives its output). A job with no Dispatch is a terminal-launched [Worker] from before every
- * launch went through worker-start: its terminal is closed and, unreported, the job fails (worker-retired-terminal-launch).
+ * worker-release, which archives its output). A job with no Dispatch is not a worker-start worker (every [Worker]
+ * is one): the sweep proves nothing about it and leaves it.
  */
 export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   const out = { deaths: [], closed: [] };
@@ -243,14 +241,7 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
     const dispatch = job.payload.dispatch ?? null;
     if (!handle || job.payload.self || job.payload.terminalClosed) continue;
     const reported = job.status === 'reported' || Boolean(reportOf(m, job.job_id));
-    if (!dispatch) {
-      const closed = bestEffort(() => d.close(handle));
-      if (reported) { if (closed?.ok) { markClosed(job); out.closed.push({ jobId: job.job_id, handle }); } continue; }
-      const reason = 'terminal-launched worker retired: every [Worker] is now a worker-start worker';
-      fail(job, reason, { reason: 'worker-retired-terminal-launch', detail: reason }, closed?.ok === true);
-      out.deaths.push({ jobId: job.job_id, reason });
-      continue;
-    }
+    if (!dispatch) continue;
     const shown = bestEffort(() => d.show(dispatch));
     if (shown?.hostUnavailable) return { ...out, skipped: shown.error ?? 'worker-show did not answer' };
     if (!shown?.ok) continue; // an unreadable worker proves nothing
@@ -374,7 +365,7 @@ export function noteInputOutcome(terminal, action, { env = process.env } = {}) {
   catch (error) { return { failures: 0, since: null, replace: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   if (!process.argv.includes('--once')) {
     console.error('use: node scripts/supervisor/supervisor-watchdog.mjs --once [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);

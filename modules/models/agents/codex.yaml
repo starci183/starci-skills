@@ -4,6 +4,12 @@ kind: native-managed-agent
 start:
   api: orchestration.worker-start
   agentArgument: codex
+  # The agent's own approval-bypass mode. Orca applies it from settings.agentDefaultArgs; the host preflight refuses a launch
+  # when that setting lacks it (the agent would stop at an approval prompt no one answers).
+  bypassFlag: '--dangerously-bypass-approvals-and-sandbox'
+  # A launch that names no model starts this one, never the model of the user's ~/.codex/config.toml (a dead default there
+  # answers 400 and the worker never reaches a prompt: live smoke 2026-10-02).
+  defaultModel: gpt-6-luna
 readiness: worker-start-receipt
 roles:
   - workflow-kernel

@@ -23,12 +23,11 @@
 //   node scripts/work/grammar-proposal.mjs check <file|dir>... [--json]    exit 1 when one is incomplete
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { isDir, isFile } from './work-io.mjs';
 
-export const GRAMMAR_PROPOSAL_SCHEMA = 'starci/grammar-proposal@1';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
 export const PROPOSAL_FILE_NAMES = Object.freeze(['grammar-proposal.yaml', 'grammar-proposal.yml', 'grammar-proposal.md']);
@@ -194,4 +193,4 @@ function main(argv) {
   return cmd === 'check' && incomplete.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

@@ -11,8 +11,7 @@ export const INSERT_ORDER_IF_NEW = sql`INSERT INTO orders (person_id, status, to
 /** Cancels a pending order ($1 order id); answers its id, or no row when it was not pending (already paid or cancelled, or unknown). */
 export const CANCEL_ORDER_IF_PENDING = sql`WITH cancelled AS (
     UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status = 'pending' RETURNING id
-)
-SELECT id FROM cancelled`
+) SELECT id FROM cancelled`
 
 /** Counts the orders of one person ($1). */
 export const COUNT_PERSON_ORDERS = sql`SELECT count(*)::int AS order_count FROM orders WHERE person_id = $1`

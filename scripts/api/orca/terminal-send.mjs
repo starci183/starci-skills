@@ -2,13 +2,15 @@
 // terminal-send.mjs — the calls.yaml `terminal-send` call as a callable function.
 //   node scripts/api/orca/terminal-send.mjs --terminal <handle> (--text <t> | --text-file <f>) [--enter] [--wait-submit <s>] [--json]
 import fs from 'node:fs';
-import { orcaCall, arg, flag, sleepSync } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg, flag } from '../../lib/cli-arg.mjs';
+import { sleepSync } from '../../lib/sleep-sync.mjs';
 import { terminalShow } from './terminal-show.mjs';
 
 const codeOf = (r) => { const e = r.receipt?.error; return typeof e === 'object' && e ? (e.code ?? null) : null; };
 const dataOf = (r) => { const d = r.receipt?.error?.data; return d && typeof d === 'object' ? d : {}; };
 // The seconds a --retry-request reissue watches its prompt get submitted (Orca never resends on timeout).
-export const RETRY_WAIT_SUBMIT_S = 5;
+const RETRY_WAIT_SUBMIT_S = 5;
 // A text+Enter prompt's receipt on an Orca with prompt delivery: {requestId, stages, processIncarnation}.
 const promptOf = (r) => {
   const p = r.receipt?.result?.send?.prompt;

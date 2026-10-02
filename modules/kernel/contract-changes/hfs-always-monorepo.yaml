@@ -8,9 +8,9 @@ summary: >-
   and the slot fe.tool-config-repo are deleted. Each fe app is the workspace @<project>/<app> with its own package.json
   (required by fe.app.next) and the fixed scripts build, dev, lint (`hfs lint --workspace .`), start and typecheck. New
   `hfs lint --workspace <dir>` scopes the one lint of the app to one fe workspace. The managed root scripts run the fe side
-  through turbo (build:fe, typecheck, dev:fe) and npm -w (start). New rules R127 HFS_MONO_WORKSPACES, R128
-  HFS_MONO_FE_WORKSPACE, R129 HFS_MONO_NEST_PROJECTS and R130 HFS_MONO_WORKSPACE_DEP (hfs enforcer
-  scripts/hfs/rules/monorepo.mjs; ids provisional, renumbered to the next free ids at land). R59 reads next-intl from the fe
+  through turbo (build:fe, typecheck, dev:fe) and npm -w (start). New rules R143 HFS_MONO_WORKSPACES, R144
+  HFS_MONO_FE_WORKSPACE, R145 HFS_MONO_NEST_PROJECTS and R146 HFS_MONO_WORKSPACE_DEP (hfs enforcer
+  scripts/hfs/rules/monorepo.mjs). R59 reads next-intl from the fe
   workspace manifests.
 reach: new-legs
 paths:

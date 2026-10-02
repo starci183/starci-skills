@@ -5,6 +5,7 @@ export const concept: Concept = 'frame';
 
 import { useState, type ReactNode } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { t } from '../../i18n/t';
 
 /** Compact number: 12 345 -> 12,3k. */
 export const compactNumber = (value: number | null | undefined): string => {
@@ -36,9 +37,9 @@ export function CopyId({ value, copy, title }: { value: string | null | undefine
   const full = copy ?? value;
   return <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
     <code className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs [overflow-wrap:anywhere]" title={title ?? full}>{value}</code>
-    <button type="button" className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground" title="Chép giá trị đầy đủ"
+    <button type="button" className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground" title={t('Copy the full value')}
       onClick={() => { void navigator.clipboard?.writeText(full).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined); }}>
-      {copied ? <Check className="size-3" aria-hidden="true" /> : <Copy className="size-3" aria-hidden="true" />}{copied ? 'Đã chép' : 'Chép'}
+      {copied ? <Check className="size-3" aria-hidden="true" /> : <Copy className="size-3" aria-hidden="true" />}{copied ? t('Copied') : t('Copy')}
     </button>
   </span>;
 }

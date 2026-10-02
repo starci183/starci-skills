@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} from '../../engine/digest.mjs';
 import {ID_RE, walk as walkAll} from '../work/validate/check-example-work.mjs';
@@ -402,7 +402,7 @@ export function runDerive(workRoot, {write} = {}) {
   return {ok, derived, doc, onDisk};
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const workFlagIndex = args.indexOf('--work');
   const workArg = workFlagIndex >= 0 ? args[workFlagIndex + 1] : null;

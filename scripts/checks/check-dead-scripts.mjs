@@ -2,23 +2,68 @@
 // check-dead-scripts.mjs - no runtime script lives without a reader (redundancy RED18; part of `npm run check`).
 //   node scripts/checks/check-dead-scripts.mjs [--json]
 //
-// A tracked `.mjs` under scripts/, engine/, modules/, bin/ or ext/ is alive when another tracked file that is not a
-// test names it: an import or dynamic import (by relative specifier), a `node scripts/...` command in package.json, a
-// spawn argument, a skill, a doc or a YAML contract (by its repository path or its file name). A script only tests read
-// is dead code with a test attached: both go. Refuses a script no non-test tracked file names (RT_DEAD_SCRIPT).
+// A tracked `.mjs` under scripts/, engine/, modules/, bin/ or ext/ is alive only when something EXECUTABLE names it:
+//   - code: an import or dynamic import (by relative specifier), a spawn argument or a path literal in another code file
+//     (comment lines do not count), a package.json script, a hook of .claude/settings.json;
+//   - an agent command: a `node <script>` line of a skill (skills/**/SKILL.md) or of a YAML contract, or a YAML key that is
+//     an executable position (run, check, script, executable, entry, command, exec, cmd, handler) holding the script path;
+//   - a directory the runtime loads by listing it (DYNAMIC_ROOTS: verbs, status views, reconciler controllers);
+//   - an entry of scripts/checks/dead-scripts.entries: a CLI nothing imports (owner or agent tool), declared once with the
+//     reason it has no code reader.
+// A mention in a doc, a README, retired-paths.yaml, a contract-change, a benchmark finding or YAML prose is NOT a reader:
+// that is how a one-off script (why-backfill, migrate-ui-shapes, repair-rejected-attempts) survived its own removal.
+// A script only tests read is dead code with a test attached: both go (RT_DEAD_SCRIPT). An entry whose script is gone, or
+// that code now reads, is stale and goes too (RT_DEAD_ENTRY): the list only shrinks.
 // Untracked scratch files are the working copy's business (git status), not this check's: it reads tracked files only.
 // The owner ruling behind it: a superseded or unused mechanism is deleted with every reference (owner-rulings.yaml).
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { gitOutput } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
-/** Tracked text files whose mention keeps a script alive (tests excluded: a script only a test reads is dead). */
-const TEXT = /\.(mjs|cjs|js|json|ya?ml|md|ps1|sh|txt)$/;
-const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
+export const ENTRIES_FILE = 'scripts/checks/dead-scripts.entries';
+/**
+ * Directories the runtime loads by listing them, never by naming a file. The loader is named so a removed loader makes the
+ * directory dead again (the spec asserts each loader still lists its directory).
+ */
+export const DYNAMIC_ROOTS = Object.freeze({
+  'scripts/kernel/verbs/': 'scripts/kernel/cli.mjs lists the verb files',
+  'scripts/kernel/status/': 'scripts/kernel/api-extensions.mjs lists the status views',
+  'scripts/reconciler/controllers/': 'scripts/reconciler/engine.mjs loads each controller of modules/reconciler/reconciler.yaml by name',
+});
+const CODE = /\.(mjs|cjs|js|ts|tsx|ps1|sh|cmd)$/;
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
+const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
+const HISTORY = /^modules\/kernel\/(contract-changes\/|retired-paths\.yaml|owner-rulings\.yaml)/;
+const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
+const EXEC_KEY = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(node\s+|npm run\s+)?[\w./-]+\.mjs/;
+const NODE_COMMAND = /(^|[\s`'"(])node\s+[\w./-]+\.mjs/;
+
+/** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
+function executableText(rel, text) {
+  if (CODE.test(rel) || rel === 'package.json' || rel === '.claude/settings.json') {
+    return CODE.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
+  }
+  if (/\.ya?ml$/.test(rel) || /^skills\/.*SKILL\.md$/.test(rel)) {
+    return text.split('\n').filter((line) => (EXEC_KEY.test(line) && !/^\s*#/.test(line)) || NODE_COMMAND.test(line)).join('\n');
+  }
+  return '';
+}
+
+/** The declared entries: `path<TAB>reason` lines of ENTRIES_FILE (`#` lines and blanks skipped). */
+export function parseEntries(text) {
+  const entries = new Map();
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const [entry, ...reason] = line.split('\t');
+    entries.set(entry.trim(), reason.join('\t').trim());
+  }
+  return entries;
+}
 
 /**
  * The dead scripts of a tree: [{code, path, message}].
@@ -26,25 +71,37 @@ const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime
  */
 export function deadScriptFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel));
-  const readers = tracked.filter((rel) => TEXT.test(rel) && !isTest(rel) && !GENERATED.test(rel));
-  const texts = new Map(readers.map((rel) => [rel, read(rel)]));
-  const findings = [];
-  for (const rel of scripts) {
+  const entries = parseEntries(tracked.includes(ENTRIES_FILE) ? read(ENTRIES_FILE) : '');
+  const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !HISTORY.test(rel));
+  const texts = new Map();
+  for (const rel of readers) { const text = executableText(rel, read(rel)); if (text) texts.set(rel, text); }
+  const readBy = (rel) => {
     const base = path.posix.basename(rel);
     const stem = rel.replace(/\.mjs$/, '');
-    let alive = false;
     for (const [reader, text] of texts) {
-      if (reader === rel) continue;
-      if (text.includes(base) || text.includes(stem)) { alive = true; break; }
+      if (reader !== rel && (text.includes(base) || text.includes(stem))) return reader;
     }
-    if (!alive) findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is named by no tracked file except tests: delete it with its tests, or wire it where it is used` });
+    return null;
+  };
+  const findings = [];
+  for (const rel of scripts) {
+    if (Object.keys(DYNAMIC_ROOTS).some((root) => rel.startsWith(root))) continue;
+    const reader = readBy(rel);
+    if (entries.has(rel)) {
+      if (reader && CODE.test(reader)) findings.push({ code: 'RT_DEAD_ENTRY', path: rel, message: `${ENTRIES_FILE} lists ${rel}, but ${reader} reads it: delete the entry` });
+      continue;
+    }
+    if (!reader) findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is read by no code, package script, hook or agent command (a doc or YAML prose mention is not a reader): delete it with its tests, wire it where it is used, or declare a CLI in ${ENTRIES_FILE}` });
+  }
+  for (const [entry] of entries) {
+    if (!scripts.includes(entry)) findings.push({ code: 'RT_DEAD_ENTRY', path: entry, message: `${ENTRIES_FILE} lists ${entry}, which is not a tracked runtime script: delete the entry` });
   }
   return findings;
 }
 
 /** Run the check on the runtime at `root`. */
 export function checkDeadScripts(root = skillRoot) {
-  const tracked = gitOutput(['ls-files', '-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
+  const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
   return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
 }
 
@@ -53,7 +110,7 @@ if (isMain(import.meta.url)) {
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
   else {
     for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log('OK: every runtime script has a reader outside the tests.');
+    if (!findings.length) console.log('OK: every runtime script has an executable reader or a declared entry.');
   }
   process.exit(findings.length ? 1 : 0);
 }

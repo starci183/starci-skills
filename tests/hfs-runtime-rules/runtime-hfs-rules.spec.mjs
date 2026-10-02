@@ -21,8 +21,11 @@ import { tierFindings } from '../../scripts/hfs/runtime-rules/tier-direction.mjs
 import { applyPending, pendingMatcher } from '../../scripts/hfs/runtime-rules/pending.mjs';
 import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-link.mjs';
 import { controlCharFinding } from '../../scripts/hfs/runtime-rules/control-chars.mjs';
+import { absolutePathFindings, absolutePathRepoFindings } from '../../scripts/hfs/runtime-rules/absolute-path.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
+const old = (...segments) => segments.join('/');
 const MANIFEST = loadSlotManifest({ root: ROOT, file: path.join(ROOT, RUNTIME_MANIFEST_FILE) });
 const RESOLVER = createSlotResolver(MANIFEST, resolveRepoDeclaration(MANIFEST, { hfs: 1, kind: 'runtime', project: 'starci' }));
 const PARAMS = ruleParams(MANIFEST, 'runtime');
@@ -134,10 +137,10 @@ test('RT_SPEC_PLACEMENT: tests/<area>/<module>[.<topic>].spec.mjs, helpers, setu
 
 test('RT_SOURCE_NAME: one-off names, a non-kebab name and a basename repeated inside a tier are refused', () => {
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/tmp-quota.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  assert.deepEqual(codesOf(nameFindings('scripts/kernel/verbs/shared/status-view.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  assert.deepEqual(codesOf(nameFindings('scripts/supervisor/why-backfill.mjs', PARAMS)), ['RT_SOURCE_NAME']);
+  assert.deepEqual(codesOf(nameFindings(old('scripts', 'kernel', 'api-status', '_view.mjs'), PARAMS)), ['RT_SOURCE_NAME']);
+  assert.deepEqual(codesOf(nameFindings('scripts/supervisor/owner-backfill.mjs', PARAMS)), ['RT_SOURCE_NAME']);
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/camelCase.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  const dup = sourceNameFindings(ctxOf({ 'scripts/agent/install.mjs': '', 'scripts/guards/hook-install.mjs': '' }));
+  const dup = sourceNameFindings(ctxOf({ 'scripts/agent/install.mjs': '', [old('scripts', 'guards', 'install.mjs')]: '' }));
   assert.deepEqual(codesOf(dup), ['RT_SOURCE_NAME', 'RT_SOURCE_NAME']);
 });
 
@@ -150,17 +153,29 @@ test('RT_SOURCE_NAME: kebab names, and lib.mjs repeated across api systems, are 
 
 test('RT_RETIRED_PRESENT: a retired path, a moved-from path or a retired symbol that comes back is refused', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': 'export function closeOperationTask() {}\n' }, {
-    files: ['scripts/lib/kill-tree.mjs', 'scripts/gates/gate.mjs'],
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: 'scripts/gates/gate.mjs', to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    files: ['scripts/lib/kill-tree.mjs', old('scripts', 'checks', 'gate.mjs')],
+    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(codesOf(retiredFindings(ctx)), ['RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT']);
 });
 
 test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called, never declared, are clean', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': "import { other } from './x.mjs';\nother('closeOperationTask');\n" }, {
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: 'scripts/gates/gate.mjs', to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(retiredFindings(ctx), []);
+});
+
+test('RT_RETIRED_PRESENT: a migration comment that names a retired symbol is a stale cite; the replacement and SQL code are clean', () => {
+  const sql = {
+    'engine/db/migrations/machine/0001-init.sql': 'CREATE TABLE t(x);\n-- removed by safeRemoveTree, never followed\n',
+    'engine/db/migrations/runtime/0001-init.sql': "-- removed by safeRemove\nCREATE TABLE safeRemoveTree_log(x); INSERT INTO t VALUES('safeRemoveTree');\n",
+  };
+  const ctx = (files) => ctxOf({}, { files: Object.keys(files), read: (p) => files[p] ?? null, retiredPaths: { retiredSymbols: [{ symbol: 'safeRemoveTree', replacedBy: 'safeRemove' }] } });
+  const found = retiredFindings(ctx(sql));
+  assert.deepEqual(found.map((f) => [f.code, f.path, f.line]), [['RT_RETIRED_PRESENT', 'engine/db/migrations/machine/0001-init.sql', 2]]);
+  assert.match(found[0].message, /names safeRemoveTree in a comment/);
+  assert.deepEqual(retiredFindings(ctx({ 'engine/db/migrations/runtime/0001-init.sql': sql['engine/db/migrations/runtime/0001-init.sql'] })), []);
 });
 
 const PINNED_FILES = ['bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
@@ -192,8 +207,8 @@ test('HFS_SIZE_GROWTH: an oversized runtime source that grows, or a new one abov
 
 test('HFS_SIZE_GROWTH: an oversized file that shrinks, a moved one that keeps its size, and no base revision are clean', () => {
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(590) }, { base: baseRev({ 'scripts/kernel/big.mjs': lines(600) }) })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ 'scripts/machine/decisions.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/machine/decisions.mjs', to: 'scripts/machine/decisions.mjs' }] } })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ 'scripts/kernel/verbs/big.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/kernel/verbs/', to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'reconciler', 'decisions.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'reconciler', 'decisions.mjs'), to: 'scripts/machine/decisions.mjs' }] } })), []);
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'kernel', 'api-verbs', 'big.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'kernel', 'api-verbs', ''), to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(900) })), []);
 });
 
@@ -225,6 +240,67 @@ test('RT_CONTROL_CHARACTER: a raw backspace, NUL or DEL in tracked text source i
 
 test('RT_CONTROL_CHARACTER: tab, CR, LF and an escaped \\b are clean', () => {
   assert.equal(controlCharFinding('scripts/x.mjs', Buffer.from('const r = /\\bx\\b/;\r\n\tok\n')), null);
+});
+
+// ------------------------------------------------------------------------------------------- RT_ABSOLUTE_PATH
+
+// The fixtures below build their drive letters from parts: this spec is itself tracked and judged by the rule.
+const DR = 'D';
+const CR = 'C';
+const BS = String.fromCharCode(92);
+const abs = (file, text) => absolutePathFindings(file, text);
+
+test('RT_ABSOLUTE_PATH: a drive literal in a .mjs string, a template, a comment or a spec fixture is refused', () => {
+  assert.deepEqual(codesOf(abs('scripts/a.mjs', `export const root = '${DR}:/Repositories/x';\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('scripts/b.mjs', `export const p = (n) => \`${CR}:${BS}${BS}Users${BS}${BS}Hi${BS}${BS}\${n}\`;\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('scripts/c.mjs', `// lanes live under ${DR}:/starci-lanes\nexport const c = 1;\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('tests/x.spec.mjs', `test('x', () => { const prompt = 'PS ${CR}:${BS}${BS}work> '; });\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.equal(abs('scripts/a.mjs', `\n\nexport const root = '${DR}:/x';\n`)[0].line, 3);
+  assert.deepEqual(codesOf(abs('packages/x/a.ts', `const p: string = '${DR}:/x';\n`)), ['RT_ABSOLUTE_PATH']);
+});
+
+test('RT_ABSOLUTE_PATH: a drive path in a yaml value, a json value or a doc line is refused', () => {
+  assert.deepEqual(codesOf(abs('knowledge/x.yaml', `root: ${DR}:/starci-tmp/x\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('examples/e.json', `{"cwd": "${CR}:${BS}${BS}Users${BS}${BS}Hi"}\n`)), ['RT_ABSOLUTE_PATH']);
+  const doc = abs('docs/x.md', `# x\n\nRun it from ${DR}:/Repositories/x.\n`);
+  assert.deepEqual(codesOf(doc), ['RT_ABSOLUTE_PATH']);
+  assert.equal(doc[0].line, 3);
+});
+
+test('RT_ABSOLUTE_PATH: a user-profile path and an expanded AppData path are refused, once per path', () => {
+  assert.deepEqual(codesOf(abs('docs/a.md', ['', 'Users', 'someone', 'work', 'x'].join('/'))), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('docs/b.md', ['', 'home', 'someone', 'work', 'x'].join('/'))), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('docs/c.md', `under ${['AppData', 'Local', 'starci'].join('/')}`)), ['RT_ABSOLUTE_PATH']);
+  assert.equal(abs('docs/d.md', [`${CR}:`, 'Users', 'someone', 'AppData', 'Local', 'x'].join('/')).length, 1, 'the profile and AppData parts of a drive path are one finding');
+});
+
+test('RT_ABSOLUTE_PATH: a URL, a generic drive regular expression, a relative path, an unexpanded name are clean', () => {
+  assert.deepEqual(abs('scripts/a.mjs', "export const u = 'http://localhost:3000/x';\nexport const f = 'file:///tmp/x';\nexport const h = 'https://example.com/a';\n"), []);
+  assert.deepEqual(abs('scripts/b.mjs', "export const isDrive = (p) => /^[A-Za-z]:[\\/]/.test(p);\nexport const rx = new RegExp('^[a-z]:[\\\\/]');\n"), []);
+  assert.deepEqual(abs('docs/c.md', 'Set %LOCALAPPDATA% to the state root; use <runtime>/scripts and <lanes root>/dv.\n'), []);
+  assert.deepEqual(abs('docs/d.md', 'key: value\nnote: a:b and 12:30 and e.g. ratio 1:2\n'), []);
+  assert.deepEqual(abs('package-lock.json', `{"resolved": "${DR}:/x"}\n`), [], 'a lock file is not judged');
+  assert.deepEqual(abs('scripts/goal.mjs', "// Goal Grüße:\\n\\nnull\nexport const goal = 'Goal Grüße:\\n';\n"), [], 'a letter that ends a non-ASCII word is not a drive');
+  assert.deepEqual(abs('assets/x.png', `${DR}:/x`), [], 'a binary extension is not read');
+});
+
+test('RT_ABSOLUTE_PATH: a path built from os.tmpdir() or the runtime root is clean', () => {
+  assert.deepEqual(abs('tests/y.spec.mjs', "import os from 'node:os';\nimport path from 'node:path';\nconst tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-'));\nconst prompt = `PS ${tmp}> `;\nconst repo = path.join(tmp, 'repo');\n"), []);
+});
+
+test('RT_ABSOLUTE_PATH: a real path-parsing vector is allowed only by a pending entry with a reason', () => {
+  const findings = absolutePathFindings('tests/path-parse.spec.mjs', `assert.equal(parse('${CR}:${BS}${BS}x'), 1);\n`);
+  assert.deepEqual(codesOf(findings), ['RT_ABSOLUTE_PATH']);
+  const pending = [{ path: 'tests/path-parse.spec.mjs', rule: 'RT_ABSOLUTE_PATH', lane: 'ABSPATH', since: '2026-10-02', reason: 'feeds the Windows path parser its drive input' }];
+  const judged = applyPending({ findings, pending, basePending: pending, codes: new Set(['RT_ABSOLUTE_PATH']) });
+  assert.deepEqual(judged.errors, []);
+  assert.equal(judged.allowed[0].level, 'pending');
+});
+
+test('RT_ABSOLUTE_PATH: the repo scan reads tracked files through ctx.read', () => {
+  const texts = { 'scripts/a.mjs': `export const a = '${DR}:/x';\n`, 'scripts/b.mjs': "export const b = 'ok';\n" };
+  const found = absolutePathRepoFindings({ files: Object.keys(texts), read: (p) => texts[p] ?? null });
+  assert.deepEqual(found.map((f) => f.path), ['scripts/a.mjs']);
 });
 
 // ------------------------------------------------------------------------------------------- the whole check on a fixture tree
@@ -329,18 +405,13 @@ test('RT_PENDING_ADDED: an entry the base had, a narrowed one, and one that foll
 });
 
 test('applyPending: matching is by code and path glob, a trailing / covers a directory', () => {
-  assert.ok(pendingMatcher('scripts/kernel/verbs/')('scripts/kernel/verbs/x.mjs'));
+  assert.ok(pendingMatcher(old('scripts', 'kernel', 'api-verbs', ''))(old('scripts', 'kernel', 'api-verbs', 'x.mjs')));
   assert.ok(pendingMatcher('tests/*.spec.mjs')('tests/a.spec.mjs') && !pendingMatcher('tests/*.spec.mjs')('tests/x/a.spec.mjs'));
   const { errors, allowed } = applyPending({ findings: [{ code: 'RT_SOURCE_NAME', level: 'error', path: 'scripts/a.mjs' }], pending: [{ path: 'scripts/a.mjs', rule: 'RT_API_SHAPE', lane: 'C6' }], codes: new Set(['RT_SOURCE_NAME', 'RT_API_SHAPE']) });
   assert.deepEqual(allowed, []);
   assert.deepEqual(errors.map((f) => f.code), ['RT_SOURCE_NAME', 'RT_PENDING_STALE'], 'an entry of another code allows nothing and is stale');
 });
 
-test('the runtime manifest: every pending entry names its chunk, a date and a runtime code', () => {
-  assert.ok(MANIFEST.pending.length > 0);
-  for (const e of MANIFEST.pending) {
-    assert.match(e.lane, /^C[1-8][ab]?$/, JSON.stringify(e));
-    assert.match(e.since, /^\d{4}-\d{2}-\d{2}$/);
-    assert.ok(e.reason.trim().length > 10);
-  }
+test('the runtime manifest: every cut landed, so the shrink-only pending allowlist is empty', () => {
+  assert.deepEqual(MANIFEST.pending, [], 'a runtime finding is fixed, never allowlisted again');
 });

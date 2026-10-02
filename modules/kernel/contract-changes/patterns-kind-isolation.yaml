@@ -3,7 +3,7 @@ effectiveAt: '2026-10-02T14:00:00+07:00'
 summary: >-
   Lane PATTERNS (lead C1), unit U2a: a feature has a trigger kind. New slot field `trigger` (a manifest triggerKinds entry: api, webhooks,
   realtime, saga, reactors, jobs, cli; feature-tier slots only) and top-level `triggerKinds`; be.feature is the api kind, and the owner
-  slots be.feature.reactors (src/features/reactors/<reactor>/) and be.feature.jobs (src/features/jobs/<job>/) are new opt-in kinds. R136
+  slots be.feature.reactors (src/features/reactors/<reactor>/) and be.feature.jobs (src/features/jobs/<job>/) are new opt-in kinds. R156
   BE_KIND_ISOLATION (architecture machine tiers.mjs, and the ESLint rule `kind-isolation` the project graph derives from it) refuses an
   import between features whose owner slots name different kinds and replaces BE_FEATURE_IMPORTS_FEATURE for that edge; the fix is the event
   bus. Other kinds (webhooks, realtime, saga, cli) add their owner slots with the same field.

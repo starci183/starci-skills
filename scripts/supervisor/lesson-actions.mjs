@@ -9,12 +9,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { createScratchWorktree, removeScratchWorktree } from '../machine/worktree-git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { entryFileOf } from '../lib/contract-changes-path.mjs';
 import { SKILL_ROOT, lanesRoot } from '../machine/home.mjs';
-import { KINDS, commitFiles, git, guardLand, landedWithin, learningSettings, one, readLearning, write } from '../machine/lessons.mjs';
+import { add as gitAdd } from '../api/git/add.mjs';
+import { commit as gitCommit } from '../api/git/commit.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { revert as gitRevert } from '../api/git/revert.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { show as gitShow } from '../api/git/show.mjs';
+import { KINDS, commitFiles, guardLand, landedWithin, learningSettings, one, readLearning, write } from '../machine/lessons.mjs';
 import { land, governedPaths } from './land.mjs';
 import { ownerPush } from '../connectors/telegram.mjs';
 
@@ -25,7 +31,7 @@ const norm = posixPath;
  * {ok, refused?, land?, experiment?}.
  */
 export async function landExperiment({ signature, commits, lane, specs = [], wronglyBlocked = null, reason = null, env = process.env, now = Date.now,
-  waitMs = null, landFn = null, filesOf = commitFiles, readSpec = (rel, sha) => git(['show', `${sha}:${rel}`]).out, settings = learningSettings(), baseline = null }) {
+  waitMs = null, landFn = null, filesOf = commitFiles, readSpec = (rel, sha) => String(gitShow([`${sha}:${rel}`], { cwd: SKILL_ROOT, maxBuffer: 64 * 1024 * 1024 }).stdout ?? '').trim(), settings = learningSettings(), baseline = null }) {
   if (!signature || !commits?.length || !lane) throw Object.assign(new Error('land needs --signature, --commit and --lane'), { code: 'land-incomplete' });
   const files = filesOf(commits);
   const state = readLearning({ env });
@@ -48,7 +54,7 @@ export async function landExperiment({ signature, commits, lane, specs = [], wro
 /**
  * The revert lane of an experiment: a worktree on lane/revert-<id> off main, `git revert --no-commit` of its commits
  * newest first, a contract-changes entry covering reverted contract files, one commit, the land gate, the result.
- * `apply` false only plans. Seams: git, landFn, lanesRoot.
+ * `apply` false only plans. Seams: landFn, lanes.
  */
 export async function revertExperiment({ id, apply = false, env = process.env, now = Date.now, landFn = null, root = SKILL_ROOT, lanes = null }) {
   const state = readLearning({ env });
@@ -59,13 +65,18 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
   const dir = path.join(lanesDir, name);
   const plan = { id, signature: e.signature, commits: e.commits, lane: name, dir };
   if (!apply) return { ok: true, planned: true, ...plan };
-  const step = (args, cwd = dir) => { const r = git(args, { cwd }); if (!r.ok) throw Object.assign(new Error(`git ${args.join(' ')}: ${r.err}`), { code: 'revert-git' }); return r.out; };
+  // One git call (a scripts/api/git call file) in the revert lane: its trimmed stdout, or a revert-git error.
+  const step = (call, verb, args, cwd = dir) => {
+    const r = call(args, { cwd, maxBuffer: 64 * 1024 * 1024 });
+    if (r.status !== 0) throw Object.assign(new Error(`git ${verb} ${args.join(' ')}: ${String(r.stderr ?? r.error?.message ?? '').trim()}`), { code: 'revert-git' });
+    return String(r.stdout ?? '').trim();
+  };
   // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed in the finally below.
-  const made = createScratchWorktree({ repoRoot: root, dir, kind: 'lane', branch: `lane/${name}`, newBranch: true, base: 'main', owner: { lane: name }, env, git: (args, o) => git(args, o) });
+  const made = createScratchWorktree({ repoRoot: root, dir, kind: 'lane', branch: `lane/${name}`, newBranch: true, base: 'main', owner: { lane: name }, env });
   if (!made.ok) throw Object.assign(new Error(`worktree ${dir}: ${made.detail ?? made.reason}`), { code: 'revert-git' });
   try {
-    for (const sha of [...e.commits].reverse()) step(['revert', '--no-commit', sha]);
-    const changed = step(['diff', '--cached', '--name-only']).split(/\r?\n/).filter(Boolean).map(norm);
+    for (const sha of [...e.commits].reverse()) step(gitRevert, 'revert', ['--no-commit', sha]);
+    const changed = step(gitDiff, 'diff', ['--cached', '--name-only']).split(/\r?\n/).filter(Boolean).map(norm);
     const governed = governedPaths(changed);
     if (governed.length) {
       // One file per contract change (scripts/lib/contract-changes-path.mjs).
@@ -75,10 +86,10 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
         'reach: new-legs', 'paths:', ...governed.map((p) => `  - ${p}`), ''].join('\n');
       fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
       fs.writeFileSync(path.join(dir, rel), entry);
-      step(['add', rel]);
+      step(gitAdd, 'add', [rel]);
     }
-    step(['commit', '-q', '-m', `revert(self-learning): ${e.signature} - experiment ${id} did not work\n\nReverts ${e.commits.join(', ')}: ${one(state.experiments[id].result?.reason ?? '', 400)}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`]);
-    const sha = step(['rev-parse', 'HEAD']);
+    step(gitCommit, 'commit', ['-q', '-m', `revert(self-learning): ${e.signature} - experiment ${id} did not work\n\nReverts ${e.commits.join(', ')}: ${one(state.experiments[id].result?.reason ?? '', 400)}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`]);
+    const sha = step(revParseQuery, 'rev-parse', ['HEAD']);
     const doLand = landFn ?? land;
     const landed = await doLand({ commits: [sha], lane: name, env });
     write(env, KINDS.result, { id, signature: e.signature, outcome: landed?.ok ? 'reverted' : 'revert-due', reason: landed?.ok ? `reverted by ${sha.slice(0, 9)}` : `revert land failed: ${one(landed?.error ?? landed?.reason ?? JSON.stringify(landed), 200)}`, revertCommit: sha }, now());
@@ -87,7 +98,7 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
     return { ok: landed?.ok === true, ...plan, revertCommit: sha, land: landed };
   } finally {
     // Never `git worktree remove --force` (it follows junctions): removeScratchWorktree removes every link as a link, then the tree.
-    removeScratchWorktree({ repoRoot: root, dir, branch: `lane/${name}`, deleteBranch: 'force', env, git: (args, o) => git(args, o) });
+    removeScratchWorktree({ repoRoot: root, dir, branch: `lane/${name}`, deleteBranch: 'force', env });
   }
 }
 
@@ -107,7 +118,7 @@ export async function propose({ title, evidence, options, recommendation, send =
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const verb = argv[0];
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };

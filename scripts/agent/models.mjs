@@ -474,7 +474,6 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
 //   limited     — the probe reads 'limited' (near the window cap, or a
 //                 refreshable stale token): still launchable, ordered last;
 //   available   — 'ok' or 'unknown' (an unanswered probe never blocks).
-export const PROVIDER_HEALTH_SCOPE = 'provider-health';
 const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
 
 // The OPEN provider-health circuit for a provider in one ledger, or null.

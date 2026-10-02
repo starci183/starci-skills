@@ -8,7 +8,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {notOwnerWorkOf,ownerClaimAudit,ownerClaimOf} from '../../scripts/machine/owner-claim.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -59,14 +59,14 @@ const incidentRow=(repo,id)=>{
 
 test('ownerClaimOf reads English and Vietnamese owner claims, accented or not, and not a wait or a negation',()=>{
   for(const text of ['Owner confirmed: work-debt reconcile attributed the files','the owner has approved the plan','Settled by owner-approved landing',
-    'Owner answer relayed by supervisor','approved by the owner','Thầy xác nhận dùng mặc định','Chủ dự án xác nhận phạm vi','owner đã trả lời trước đó',
-    'Chu du an da duyet','được owner duyệt','theo xác nhận của chủ sở hữu'])
+    'Owner answer relayed by supervisor','approved by the owner','Th\u1ea7y x\u00e1c nh\u1eadn d\u00f9ng m\u1eb7c \u0111\u1ecbnh','Ch\u1ee7 d\u1ef1 \u00e1n x\u00e1c nh\u1eadn ph\u1ea1m vi','owner \u0111\u00e3 tr\u1ea3 l\u1eddi tr\u01b0\u1edbc \u0111\u00f3',
+    'Chu du an da duyet','\u0111\u01b0\u1ee3c owner duy\u1ec7t','theo x\u00e1c nh\u1eadn c\u1ee7a ch\u1ee7 s\u1edf h\u1eefu'])
     assert.ok(ownerClaimOf(text),text);
-  for(const text of ['peer.ts reverted by its author workflow','Debt đã land: work.author commit 80910660','no owner answer yet',
-    'waiting until the owner approved it','Chờ chủ sở hữu duyệt drawing','gate không chờ câu trả lời của owner','the owner has not confirmed'])
+  for(const text of ['peer.ts reverted by its author workflow','Debt \u0111\u00e3 land: work.author commit 80910660','no owner answer yet',
+    'waiting until the owner approved it','Ch\u1edd ch\u1ee7 s\u1edf h\u1eefu duy\u1ec7t drawing','gate kh\u00f4ng ch\u1edd c\u00e2u tr\u1ea3 l\u1eddi c\u1ee7a owner','the owner has not confirmed'])
     assert.equal(ownerClaimOf(text),null,text);
-  assert.ok(notOwnerWorkOf('RUNTIME LIMIT (ghi hold): packet vượt Windows spawn limit'));
-  assert.ok(notOwnerWorkOf('DEFERRED SETTLE (không phải việc owner thực hiện — ghi để hold theo contract)'));
+  assert.ok(notOwnerWorkOf('RUNTIME LIMIT (ghi hold): packet v\u01b0\u1ee3t Windows spawn limit'));
+  assert.ok(notOwnerWorkOf('DEFERRED SETTLE (kh\u00f4ng ph\u1ea3i vi\u1ec7c owner th\u1ef1c hi\u1ec7n — ghi \u0111\u1ec3 hold theo contract)'));
   assert.equal(notOwnerWorkOf('Owner decision pending on ask ctx_b313f1b0b0b6'),null);
 });
 
@@ -77,7 +77,7 @@ test('an unproven owner claim is refused owner-claim-unproven and writes nothing
   assert.equal(fake.r.status,1,fake.r.stdout);
   assert.equal(fake.body.code,'owner-claim-unproven');
   assert.match(fake.body.error,/--owner-answer <dispatchId>/);
-  const vi=resolve(repo,id,'--detail','Thầy xác nhận: nhận nợ qua commit-only');
+  const vi=resolve(repo,id,'--detail','Th\u1ea7y x\u00e1c nh\u1eadn: nh\u1eadn n\u1ee3 qua commit-only');
   assert.equal(vi.body.code,'owner-claim-unproven');
   // An ask answered automatically is no owner answer.
   answerAsk(repo,'ctx_auto0000001','auto-recommended');
@@ -136,7 +136,7 @@ test('the audit lists a past resolution whose owner claim no answer backs, and a
     const found=ownerClaimAudit(ro.db);
     assert.deepEqual(found.map(f=>[f.incidentId,f.claim]),[[fakeId,'owner confirmed']]);
   }finally{ro.close();}
-  const gate=raise(repo,'owner-gate','DEFERRED SETTLE (không phải việc owner thực hiện): settle waits on adoption commits');
+  const gate=raise(repo,'owner-gate','DEFERRED SETTLE (kh\u00f4ng ph\u1ea3i vi\u1ec7c owner th\u1ef1c hi\u1ec7n): settle waits on adoption commits');
   const status=runApi('status','--repo',repo,'--workflow',WF,'--json');
   assert.equal(status.status,0,status.stderr);
   const frontier=JSON.parse(status.stdout).frontier;

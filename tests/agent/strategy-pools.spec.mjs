@@ -10,7 +10,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {kindOrder} from '../../scripts/agent/models.mjs';
 
-// Owner decision 2026-09-25 ("khoá decide cho claude/codex"): strategy kinds - every kind whose order is
+// Owner decision 2026-09-25 ("lock decide to claude/codex"): strategy kinds - every kind whose order is
 // think, decide or plan - run only on claude-agent or codex-agent. Owner routing 2026-09-26 adds the kernel
 // calls' sol-think order to that frontier-only contract (Sol first, Opus overflow). Route walks that order;
 // api dispatch launches only inside the kind's order at its tier, whatever names the pool (--model, the

@@ -33,7 +33,7 @@ test("R47: only src/tests/world starts infrastructure, migrates, holds a DataSou
         invalid: [
             { filename: E2E, code: `import { CreateOrders1700000000000 } from ${MIGRATION}\nexport const m = CreateOrders1700000000000`, errors: [{ messageId: "migration" }] },
             { filename: INTEGRATION, code: `import { orderMigrations } from ${'"../../../modules/domain/order/order.migrations"'}\nexport const m = orderMigrations`, errors: [{ messageId: "migration" }] },
-            { filename: E2E, code: 'import { migrate } from "../../../../apps/migrate/src/main"\nexport const run = migrate', errors: [{ messageId: "migration" }] },
+            { filename: E2E, code: 'import { migrate } from "../../../../apps/cli/src/main"\nexport const run = migrate', errors: [{ messageId: "migration" }] },
             { filename: FIXTURE, code: 'import { DataSource } from "typeorm"\nexport type S = DataSource', errors: [{ messageId: "infra" }] },
             { filename: INTEGRATION, code: `${MANAGER}declare const manager: EntityManager\nconst db = manager\nvoid db.synchronize()`, errors: [{ messageId: "call" }] },
             { filename: CONTRACT, code: 'import { PostgreSqlContainer } from "@testcontainers/postgresql"\nexport const db = new PostgreSqlContainer("postgres:16")', errors: [{ messageId: "infra" }, { messageId: "infra" }] },

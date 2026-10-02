@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import module from 'node:module';
-import {pathToFileURL,fileURLToPath} from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {slash} from '../../lib/path-key.mjs';
@@ -859,7 +859,7 @@ export async function main(argv=process.argv.slice(2)){
   return {exitCode:result.ok?0:1,text:`${lines.join('\n')}\n`};
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const {exitCode,text}=await main();
   process.stdout.write(text);
   process.exitCode=exitCode;

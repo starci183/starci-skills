@@ -1,7 +1,7 @@
 // notifier-ended-workflow-dis.spec.mjs — the owner digest's ownerWaits never lists an owner Decision Item of an
 // ended workflow (cluster notifier-ended-workflow-dis, follow-up of decisions-archived-workflow 38071f3a2).
-// Evidence 2026-09-30 nivo-backend: di-876124d7 (decider 'owner', still live) sits on wf-nivo-module-studio,
-// archived 2026-09-29; the raw `decision_items` read in notifier.mjs digestInputs kept pushing it to Telegram.
+// A live owner DI (decider 'owner') sat on an archived workflow; the raw `decision_items` read in
+// notifier.mjs digestInputs kept pushing it to Telegram.
 //   1. An owner DI left open on an archived|finished workflow yields no ownerWaits line.
 //   2. An owner DI on a running workflow still does (and a kernel-decider DI never did).
 import test from 'node:test';
@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { changeWorkflowPhase, openLedger } from '../../engine/db/ledger.mjs';
+import { changeWorkflowPhase, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { openDecisionRow } from '../../scripts/machine/decisions.mjs';
 import { digestInputs } from '../../scripts/reconciler/notifier.mjs';
 
@@ -18,15 +18,14 @@ const WF_ARCH = 'wf-owner-di-archived', WF_FIN = 'wf-owner-di-finished', WF_RUN 
 const repoWithLedger = (t) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-notifier-ended-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-notifier-ended-sup-'));
-  // digestInputs reads the legacy in-repo store <repo>/.starciwork/runtime.sqlite (not ledgerFileFor's projects root).
-  fs.mkdirSync(path.join(repo, '.starciwork'), { recursive: true });
-  const ledger = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
+  // digestInputs reads the one ledger ledgerFileFor resolves for the repo (the projects root; no in-repo store).
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite'), STARCI_PROJECTS_ROOT: path.join(home, 'projects'), NODE_NO_WARNINGS: '1' };
+  const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
   t.after(() => {
     try { ledger.close(); } catch { /* closed */ }
     fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
     fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
   });
-  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite'), NODE_NO_WARNINGS: '1' };
   for (const id of [WF_ARCH, WF_FIN, WF_RUN]) ledger.ensureWorkflow({ workflowId: id, title: 'owner-di' });
   return { repo, ledger, env };
 };

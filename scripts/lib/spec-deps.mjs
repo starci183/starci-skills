@@ -33,7 +33,22 @@ export function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(
     });
     if (hit && !path.relative(root, hit).startsWith('..')) out.push(posix(path.relative(root, hit)));
   }
+  // A runtime entry a file starts as a process (`path.join(ROOT, 'scripts', 'kernel', 'cli.mjs')`, 'scripts/x/y.mjs') is a
+  // dependency too: the spec exercises that entry and everything it imports.
+  for (const rel of spawnedEntriesOf(text)) if (fs.existsSync(path.join(root, rel))) out.push(rel);
   return out;
+}
+
+const ENTRY_ROOTS = '(?:scripts|engine|bin)';
+/** Repository-relative runtime .mjs paths `text` names as a string ('scripts/a/b.mjs') or as path segments ('scripts', 'a', 'b.mjs'). */
+export function spawnedEntriesOf(text) {
+  const out = new Set();
+  for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);
+  for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS})['"\`]((?:\\s*,\\s*['"\`][\\w.-]+['"\`])+)`, 'g'))) {
+    const parts = [m[1], ...[...m[2].matchAll(/['"`]([\w.-]+)['"`]/g)].map((p) => p[1])];
+    if (parts.at(-1).endsWith('.mjs')) out.add(parts.join('/'));
+  }
+  return [...out];
 }
 
 /** Every repository file reachable from `entry` (repository-relative) through relative imports, the entry included. */
@@ -64,9 +79,15 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
   });
 }
 
-// CLI: node scripts/lib/spec-deps.mjs <root> <changed-file>... -> prints the dependent spec paths, one per line.
+// CLI: node scripts/lib/spec-deps.mjs <root> <changed-file>...  -> prints the dependent spec paths, one per line.
+//      git diff --name-only <base> <head> | node scripts/lib/spec-deps.mjs <root> -
+// `-` reads the changed files from stdin, one per line: a large change (a tree move) exceeds the Windows command line
+// (about 32K characters), where passing them as arguments fails before node starts.
 if (isMain(import.meta.url)) {
-  const [root, ...changed] = process.argv.slice(2);
+  const [root, ...args] = process.argv.slice(2);
+  const changed = args.includes('-')
+    ? [...args.filter((a) => a !== '-'), ...fs.readFileSync(0, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)]
+    : args;
   const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => name.endsWith('.spec.mjs'), exclude: (name) => name === 'node_modules' })
     .map((file) => path.relative(root, file).split(path.sep).join('/'));
   for (const spec of specsDependingOn(path.resolve(root), changed, specs)) console.log(spec);

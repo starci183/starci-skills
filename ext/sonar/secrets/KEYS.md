@@ -11,7 +11,6 @@ SOPS/age ciphertext twins of the host-level SonarQube secrets, moved read-only f
 | `sonarqube-admin-password.txt.enc` | `secrets/sonarqube-admin-password.txt` | `compose.yaml` `sonarqube-bootstrap` mount (replaces the default admin password once) |
 | `sonarqube-admin-token.key.enc` | `secrets/sonarqube-admin-token.key` | `scripts/gates/sonar-local.mjs` — creates projects and mints per-project analysis tokens |
 | `sonarqube-analysis-token.txt.enc` | `secrets/sonarqube-analysis-token.txt` | `sonar-local.mjs` — the server-wide fallback analysis token |
-| `sonarqube-starci-todo-app-token.key.enc` | `secrets/sonarqube-starci-todo-app-token.key` | `sonar-local.mjs` — the PROJECT_ANALYSIS_TOKEN of the example app `examples/todo-app` (its declaration's analysis credential) |
 | `sonarqube-starci-ecommerce-app-token.key.enc` | `secrets/sonarqube-starci-ecommerce-app-token.key` | `sonar-local.mjs` — the PROJECT_ANALYSIS_TOKEN of the example app `examples/ecommerce-app` (its declaration's analysis credential) |
 | `cloudflare-starci-local-services-tunnel-token.key.enc` | `secrets/cloudflare-starci-local-services-tunnel-token.key` | `cloudflared.yaml` mount (profile `public`) — publishes the server as the public host URL |
 

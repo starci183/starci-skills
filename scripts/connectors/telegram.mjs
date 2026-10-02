@@ -5,8 +5,8 @@
 // when an ask is parked; only an approval ask is pushed, a credential ask waits
 // under the bridge's /creds (serve-ask.mjs askClassOf). The message carries
 // the workflow, the question and its numbered options, and ONE inline button "Generate URL" — never a link:
-// no form is served until the owner asks for one (owner, 2026-09-24: "khi yêu
-// cầu thì mới serve url"). Pressing the button reaches the command bridge
+// no form is served until the owner asks for one (owner, 2026-09-24: "serve the
+// url only when asked"). Pressing the button reaches the command bridge
 // (telegram-bridge.mjs), which serves the form on demand and edits this same
 // message to carry the link (showAskLink). When the ask is answered or retired
 // the message is DELETED (markAskClosed; a message Telegram refuses to delete,
@@ -43,7 +43,7 @@
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
@@ -53,37 +53,28 @@ import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
 export const TEXT_MAX = 3900;
 
-const TEXT = {
-  en: {
-    ask: '[StarCi] A question for you',
-    workflow: 'Workflow', job: 'Step', question: 'Question', options: 'Options', link: 'Answer here', expires: 'Link expires',
-    onDemand: 'The answer form is not open yet. When you want to answer, press "Generate URL": the link is made only then.',
-    generate: 'Generate URL',
-    credential: 'This question asks for secrets (keys, secret files), so it is NOT exposed. Answer it ON THE MACHINE by opening this localhost link there:',
-    localOnly: 'No public tunnel is running, so this form opens only on the machine, at this localhost link:',
-    serveFailed: 'The answer form could not be started just now. Press "Generate URL" again.',
-    test: '[StarCi] Telegram connector test: this chat will receive owner questions.',
-    answered: '[StarCi] Answered', retired: '[StarCi] No longer needs an answer', at: 'at',
-  },
-  vi: {
-    ask: '[StarCi] Có câu hỏi cần thầy trả lời',
-    workflow: 'Workflow', job: 'Việc', question: 'Câu hỏi', options: 'Lựa chọn', link: 'Trả lời tại', expires: 'Link hết hạn lúc',
-    onDemand: 'Form trả lời chưa mở. Khi thầy muốn trả lời, bấm "Tạo link trả lời": lúc đó link mới được tạo.',
-    generate: 'Tạo link trả lời',
-    credential: 'Câu hỏi này cần nhập thông tin bí mật (key, file secret) nên KHÔNG đưa ra ngoài. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:',
-    localOnly: 'Chưa có tunnel công khai đang chạy nên form chỉ mở được trên máy, tại link localhost này:',
-    serveFailed: 'Chưa mở được form trả lời lúc này. Thầy bấm "Tạo link trả lời" lại nhé.',
-    test: '[StarCi] Kiểm tra kết nối Telegram: chat này sẽ nhận câu hỏi của workflow.',
-    answered: '[StarCi] Đã trả lời', retired: '[StarCi] Câu hỏi này không cần trả lời nữa', at: 'lúc',
-  },
+// The English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
+export const textFor = (language) => {
+  const tr = translator(language);
+  return {
+    ask: tr('[StarCi] A question for you'),
+    workflow: tr('Workflow'), job: tr('Step'), question: tr('Question'), options: tr('Options'), link: tr('Answer here'), expires: tr('Link expires'),
+    onDemand: tr('The answer form is not open yet. When you want to answer, press "Generate URL": the link is made only then.'),
+    generate: tr('Generate URL'),
+    credential: tr('This question asks for secrets (keys, secret files), so it is NOT exposed. Answer it ON THE MACHINE by opening this localhost link there:'),
+    localOnly: tr('No public tunnel is running, so this form opens only on the machine, at this localhost link:'),
+    serveFailed: tr('The answer form could not be started just now. Press "Generate URL" again.'),
+    test: tr('[StarCi] Telegram connector test: this chat will receive owner questions.'),
+    answered: tr('[StarCi] Answered'), retired: tr('[StarCi] No longer needs an answer'), at: tr('at'),
+  };
 };
-export const textFor = (language) => TEXT[language] ?? TEXT.en;
 
 const parse = parseJson;
 const optionLabel = (o) => (typeof o === 'string' ? o : o?.label ?? o?.id ?? '');
@@ -149,11 +140,9 @@ export function askMessage({ workflow, question, link = null, expiresAt = null, 
  * asks.autoAcceptRecommended; serve-ask.mjs autoAcceptAsk): the pick and the question, no form link.
  */
 export function autoAcceptedMessage({ workflow, question, label, language }) {
-  const t = textFor(language);
+  const t = textFor(language), tr = translator(language);
   const text = clip(String(question?.text ?? '').trim(), 2500), pick = clip(String(label ?? '').trim(), 300);
-  const line = language === 'vi'
-    ? `Đã tự chọn phương án đề xuất: ${pick} — câu hỏi: ${text}. Thầy muốn đổi thì trả lời lại kernel / supervisor.`
-    : `Auto-picked the recommended option: ${pick} — question: ${text}. To change it, answer the kernel / supervisor again.`;
+  const line = tr('Auto-picked the recommended option: {pick} — question: {text}. To change it, answer the kernel / supervisor again.', { pick, text });
   return clip([line, '', workflowLine(t, workflow)].join('\n'), TEXT_MAX);
 }
 /** The text a message is edited to when Telegram refuses to delete it (answered / retired). */
@@ -329,22 +318,21 @@ export const recordAskMessage = ({ workflowId, dispatchId, repo = null, ledgerFi
 const DRAW_REVIEW_ASK = 'draw-review';
 const CAPTION_MAX = 1000;
 /** The line under a draw-review notice: how the owner answers by replying. */
-export const drawReplyHint = (language) => (language === 'vi'
-  ? 'Thầy trả lời bằng cách REPLY tin này (hoặc reply vào từng hình): "ok" / "duyệt" = chấp nhận (thêm "golden" để đặt làm hình chuẩn); nội dung khác = ghi chú để vẽ lại.'
-  : 'Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
+export const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
 
 /** The caption of a draw-review album: the shapes, the round and the notes this drawing answers. */
 export function drawAlbumCaption(question, language) {
+  const tr = translator(language);
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];
   const round = Number.isInteger(review.round) ? review.round : 1;
   const answers = /(?:Round \d+|Vòng \d+);[^\[]*(.*?)(?:\.\s|$)/.exec(String(question.text ?? ''))?.[1] ?? '';
-  const head = language === 'vi' ? `[StarCi] Cần thầy duyệt hình: ${review.record ?? ''}` : `[StarCi] Please review: ${review.record ?? ''}`;
-  const lines = [head, `${language === 'vi' ? 'Hình dạng' : 'Shapes'}: ${shapes.join(', ') || '-'}`, `${language === 'vi' ? 'Vòng' : 'Round'} ${round}`];
-  if (round > 1 && answers) lines.push(`${language === 'vi' ? 'Ghi chú đã xử lý' : 'Notes addressed'}: ${answers}`);
+  const head = tr('[StarCi] Please review: {record}', { record: review.record ?? '' });
+  const lines = [head, `${tr('Shapes')}: ${shapes.join(', ') || '-'}`, tr('Round {round}', { round })];
+  if (round > 1 && answers) lines.push(`${tr('Notes addressed')}: ${answers}`);
   // The evidence (owner ruling 2026-09-27): redline images ride in the album, rationale.json is named here.
   const why = Array.isArray(question.rationale) ? question.rationale : [];
-  if (why.length) lines.push(`${language === 'vi' ? 'Lý do từng quyết định' : 'Rationale'}: ${why.map((r) => `${r.file} (${r.decisions} ${language === 'vi' ? 'quyết định' : 'decisions'})`).join(', ')}${(review.redlines ?? []).length ? `; ${language === 'vi' ? 'kèm hình redline' : 'redline images attached'}` : ''}`);
+  if (why.length) lines.push(`${tr('Rationale')}: ${why.map((r) => `${r.file} (${r.decisions} ${tr('decisions')})`).join(', ')}${(review.redlines ?? []).length ? `; ${tr('redline images attached')}` : ''}`);
   return clip(lines.join('\n'), CAPTION_MAX);
 }
 
@@ -433,7 +421,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       const entry = store.asks[askKey];
       if (entry?.key && !entry.closed && messageIdsOf(entry).length) return { ok: true, skipped: 'already notified', key, messageId: messageIdsOf(entry).at(-1) };
       // A draw-review ask shows the owner the drawing itself: the desktop and mobile images as an album captioned with
-      // the shape, the round and the notes it answers; a reply ("ok"/"duyệt" accepts, anything else is feedback) is
+      // the shape, the round and the notes it answers; a reply ("ok" or another accept word accepts, anything else is feedback) is
       // the owner's answer (telegram-bridge.mjs -> serve-ask.mjs answerDrawReviewByReply).
       const drawReview = view.question?.kind === DRAW_REVIEW_ASK && view.question?.review && repo;
       const album = drawReview ? await sendDrawAlbum({ question: view.question, repo, settings, apiBase, fetchImpl, sleepImpl, warn }) : null;
@@ -456,7 +444,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
 /**
  * Take one ask off the chat once it no longer waits: answered (serve-ask on submit, auto-accept) or
  * retired (api retire-ask, a superseding ask). Every message that shows it is DELETED (owner,
- * 2026-09-24: "trả lời xong xóa"); one Telegram refuses to delete is edited to say it was answered,
+ * 2026-09-24: "delete it once answered"); one Telegram refuses to delete is edited to say it was answered,
  * with the question kept and no link or button. Never throws; an ask with no message (or Telegram
  * off) is a no-op. Returns {ok, reason, deleted:[ids], edited:[ids], failed:[ids]}; a failed one
  * stays in the store for the bridge's sweep to retry.
@@ -623,7 +611,7 @@ async function main() {
   process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();
 
 /**
  * The owner push. One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or

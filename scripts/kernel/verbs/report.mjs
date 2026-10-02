@@ -14,7 +14,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { validateOpReport } from '../report-envelope.mjs';
 import { jobPayloadOf, jobOpOf, operationDispatchOf } from './shared/rows.mjs';
 import { HANDOVER_OP, handoverAskProblem } from '../handover.mjs';
-import { autopilotOn, autopilotBundle } from '../autopilot.mjs';
+import { autopilotOn, autopilotBundle } from '../autopilot-run.mjs';
 import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../../work/draw-review.mjs';
 import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-feedback.mjs';
 import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../../machine/contract-version.mjs';
@@ -22,10 +22,37 @@ import { ownerAskConflict } from '../../gates/starcistacks.mjs';
 import { repeatedAnswerOf, ownerAnswersOf } from '../../machine/owner-answers.mjs';
 import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../settle/job-settle.mjs';
-import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit } from '../../../engine/db/ledger.mjs';
+import { appendEvent, fileReport, idempotent, setJobStatus, setUnitState, getUnit, updateJob } from '../../../engine/db/ledger.mjs';
 import { requireReportAttempt } from './shared/report-binding.mjs';
 import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch } from './shared/report-evidence.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
+import { send } from '../../api/orca/send.mjs';
+
+// orca-deep-map REPLACE #9: the op settles its own Orca Task and Dispatch. After the report row committed - and
+// before the settler starts, which would otherwise race it - api report, running in the op's own pane, sends exactly
+// one worker_done (an ask keeps its worker: no worker_done). A refile is a replay and sends nothing. The receipt is
+// payload.workerDone; a failed send is recorded, never fatal: settle then reads the Dispatch not settled and fences it.
+const WORKER_DONE_OUTCOME = { done: 'succeeded', partial: 'succeeded', failed: 'failed', blocked: 'failed' };
+function sendOpWorkerDone(ledger, job, payload, report, reportPath) {
+  const managed = payload?.managed;
+  const outcome = WORKER_DONE_OUTCOME[report?.outcome];
+  if (!outcome || !managed?.dispatchId || !managed?.taskId) return null;
+  let sent;
+  try {
+    sent = send({ taskId: managed.taskId, dispatchId: managed.dispatchId, from: managed.agentTerminalHandle ?? null,
+      outcome, reportPath, subject: `${jobOpOf(job)} ${report.outcome}` });
+  } catch (error) { sent = { ok: false, outcome: 'failed', error: String(error?.message ?? error) }; }
+  const workerDone = { at: Date.now(), outcome, ok: sent.ok === true, ...(sent.ok ? {} : { code: 'worker-done-unsent', errorCode: sent.errorCode ?? null, error: String(sent.error ?? '').slice(0, 300) }) };
+  try {
+    ledger.transaction(() => {
+      const stored = parseJson(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id)?.payload_json) ?? {};
+      updateJob(ledger.db, { jobId: job.job_id, at: workerDone.at, payload: { ...stored, workerDone } });
+      appendEvent(ledger.db, { workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'worker-done-sent', createdAt: workerDone.at,
+        payload: { dispatchId: managed.dispatchId, taskId: managed.taskId, ...workerDone } });
+    });
+  } catch { /* the Orca message is the effect; settle reads the Dispatch state either way */ }
+  return workerDone;
+}
 
 export default {
   verb: 'report',
@@ -71,7 +98,7 @@ export default {
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
   if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
-  // Autopilot: the handover is the owner's one review, so its ask carries the "sổ chờ thầy xem lại" bundle - every
+  // Autopilot: the handover is the owner's one review, so its ask carries the owner review ledger bundle - every
   // provisional acceptance (with its images), deferred leg, deferred-to-handover proof and autopilot decision.
   if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' && autopilotOn(db, job.workflow_id)) {
     const bundle = autopilotBundle(db, job.workflow_id);
@@ -200,8 +227,9 @@ export default {
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}) };
-  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
+  const workerDone = sendOpWorkerDone(ledger, job, jobPayload, report, reportAbs);
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}), ...(workerDone ? { workerDone } : {}) };
+  emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})${workerDone ? `; worker_done ${workerDone.outcome} ${workerDone.ok ? 'sent' : `NOT sent (${workerDone.errorCode})`}` : ''}`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
   console.log(renderReportBlock(report));

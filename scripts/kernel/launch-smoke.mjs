@@ -8,7 +8,7 @@
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
 //   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
 //                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
-//                      <kernel terminal>, task-create --run --from, worker-start --task --run --from); the critic by
+//                      <kernel terminal>, worker-start --spec --run --from); the critic by
 //                      scripts/work/draw-critic.mjs launchCriticWorker on its criticWorkspace placement, from the Op's
 //                      terminal.
 //   workflow-worktree  before the Kernel starts, scripts/kernel/workflow-worktree.mjs ensureWorkflowWorktree has Orca create
@@ -54,10 +54,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import { gitResult } from '../api/git/lib.mjs';
-import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
+import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -136,10 +136,10 @@ export async function defaultClient() {
       sideOf: wt.sideOf, canDispatchConcurrently: wt.canDispatchConcurrently, release: wt.releaseWorkflowWorktree,
       checkpointOp: cp.checkpointOp, gateBaseOf: tree.gateBaseOf, preserveAndReset: cp.preserveAndReset, finish: cp.finishWorkflow,
     },
-    git: (args, dir) => gitResult(args, { dir }),
+    git: (args, dir) => smokeGit(args, dir),
   };
 }
-
+const SMOKE_CALLS = { 'rev-parse': revParseQuery, 'ls-files': lsFiles, status: gitStatus, show: gitShow, branch: (rest, options) => branchList(rest.filter((a) => a !== '--list'), options) }; /* the smoke's git calls by verb: the git seam takes the whole argv */ const smokeGit = ([verb, ...rest], dir) => (verb === 'merge-base' && rest[0] === '--is-ancestor' ? { ok: isAncestor(dir, rest[1], rest[2]), stdout: '', error: '' } : gitResultOf(SMOKE_CALLS[verb](rest, { dir })));
 // ------------------------------------------------------------------ state directory
 /** Where every smoke run keeps its state directory. */
 export const stateParentOf = (tmp = os.tmpdir()) => path.join(tmp, 'starci-launch-smoke');
@@ -170,7 +170,7 @@ export function feAppOf(appRoot) {
 }
 /** The bytes an op role writes into its owned file. */
 export const ownedTextOf = (role, workflowId) => (ROLES[role].side === 'be'
-  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role })}\n`
+  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role }, null, 2)}\n`
   : `${SMOKE_SCHEMA} ${workflowId} ${role}\n`);
 /** The op record the dispatcher judges (sideOf, canDispatchConcurrently): its owned paths, app-relative. */
 export const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });
@@ -241,9 +241,9 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   const record = (extra) => writeJson(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
   const onCreated = (terminal, dispatchId) => record({ terminal, dispatchId });
   const route = { provider: noop.provider, model: noop.model, effort: noop.effort };
-  let launched;
+  const request = { smoke: state, role }; let launched; // request: the launch's ledger identity (calls.yaml replay: request)
   if (role === 'worker') {
-    launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, onCreated });
+    launched = orca.startWorkerAgent({ route: { agent: noop.provider, model: noop.model, effort: noop.effort }, worktree: root, title, prompt, objective, entry, request, onCreated });
   } else if (role === 'critic') {
     // draw-critic's own placement, in the runtime repository (no op job owns it: the smoke removes it).
     const placed = orca.criticWorkspace({ repoRoot: root, context: null });
@@ -256,16 +256,16 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   } else if (role === 'kernel') {
     // The workflow worktree exists before the Kernel starts (ensureWorkflowWorktree): an existing tree takes launch trust.
     launched = plan.workflow?.path
-      ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, onCreated })
+      ? orca.startAgent({ ...route, worktree: plan.workflow.path, title, prompt, objective, entry, request, onCreated })
       : { ok: false, step: 'worktree', error: 'the workflow worktree was never created' };
   } else if (ROLES[role].side) {
     const args = settle(() => orca.workflow.opArgs(orca.ctx, { workflowId: plan.workflow?.workflowId }));
     const params = Array.isArray(args) ? worktreeParamsOf(args) : {};
     launched = params.worktree
-      ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, onCreated })
+      ? orca.startAgent({ ...route, worktree: params.worktree, title, prompt, objective, entry, request, onCreated })
       : { ok: false, step: 'worktree', error: `opWorktreeArgs: ${args?.error ?? 'no --worktree for the workflow'}` };
   } else {
-    launched = orca.startAgent({ ...route, worktree: root, title, prompt, objective, entry, onCreated });
+    launched = orca.startAgent({ ...route, worktree: root, title, prompt, objective, entry, request, onCreated });
   }
   return Promise.resolve(launched).then((r) => {
     record({ ok: r?.ok === true, terminal: r?.terminal ?? agentOf(state, role)?.terminal ?? null, dispatchId: r?.dispatchId ?? agentOf(state, role)?.dispatchId ?? null,
@@ -613,7 +613,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     // A workflow that never finished, or a worktree the controller never removed, is still given back (link check,
     // Orca's worktree removal, the row closed).
     if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await settleAsync(() => orca.workflow.release(orca.ctx, workflowId));
-    safeRemoveTree(state, { hold: artifactHoldReason });
+    safeRemove(state, { hold: artifactHoldReason });
   }
   for (const [name, roles] of Object.entries(PATHS)) {
     const problems = [];
@@ -662,6 +662,6 @@ async function main(argv) {
   return result.ok ? 0 : result.entry ? 1 : 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (e) => { console.error(e?.stack ?? e); process.exitCode = 1; });
 }

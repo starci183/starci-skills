@@ -13,19 +13,21 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
+import { runNpx } from '../api/npm/run-npx.mjs';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const keep = process.argv.includes('--keep');
 const into = fs.mkdtempSync(path.join(os.tmpdir(), 'release-app-'));
 const app = path.join(into, 'release-app');
-const step = (label, cmd, args, opts = {}) => {
+const step = (label, run, args, opts = {}) => {
   console.log(`release-app-installs: ${label}`);
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx'), ...opts });
+  const r = run(args, { stdio: 'inherit', ...opts });
   if (r.status !== 0) {
     console.error(`release-app-installs: FAILED at ${label} (exit ${r.status ?? r.error?.message})`);
     process.exit(r.status || 1);
@@ -38,18 +40,18 @@ try {
   // versions: this proves the registry packages, not the runtime's source copy.
   const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
   const pinned = (name) => `${name}@${pins[name].version}`;
-  step(`npx ${pinned('@starci/hfs')} scaffold app release-app`, 'npx', ['-y', '-p', pinned('@starci/hfs'), '-p', pinned('@starci/jest-preset'), 'hfs', 'scaffold', 'app', 'release-app', '--into', into], { cwd: into });
+  step(`npx ${pinned('@starci/hfs')} scaffold app release-app`, runNpx, ['-y', '-p', pinned('@starci/hfs'), '-p', pinned('@starci/jest-preset'), 'hfs', 'scaffold', 'app', 'release-app', '--into', into], { cwd: into });
   const lock = fs.existsSync(path.join(app, 'package-lock.json'));
-  step(lock ? 'npm ci (registry)' : 'npm install (registry)', 'npm', [lock ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: app });
+  step(lock ? 'npm ci (registry)' : 'npm install (registry)', runNpm, [lock ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: app });
   const env = { ...process.env, STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
-  const r = spawnSync(process.execPath, ['--test', path.join(root, 'tests/packages-hfs/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
+  const r = runNode(['--test', path.join(root, 'tests/packages-hfs/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
   exit = r.status ?? 1;
   console.log(exit === 0 ? 'release-app-installs: OK (scaffold lint, typecheck and api boot ran against fresh registry installs)' : `release-app-installs: FAILED (spec exit ${exit})`);
 } finally {
   if (keep) console.log(`release-app-installs: kept ${app}`);
   else {
     // The fresh install is real npm output (links included): removed without ever following a link.
-    const removed = safeRemoveTree(into, { hold: artifactHoldReason });
+    const removed = safeRemove(into, { hold: artifactHoldReason });
     if (!removed.ok) console.log(`release-app-installs: could not remove ${into}: ${removed.errors.map((e) => `${e.code} ${e.path}`).join('; ')}`);
   }
 }

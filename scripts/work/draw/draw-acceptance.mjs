@@ -38,19 +38,18 @@
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { sha256File } from '../../../engine/digest.mjs';
 import { isFile, isDir } from '../../lib/fs-kind.mjs';
 import { assetsOf, list, slash } from '../work-io.mjs';
 import { DATA_STATUS_DRAWN, DRAWING_ROLES, DRAW_TOOL, RASTER_TOOL, assetStateOf, dataStatusOf, drawingsOf, recipeRenderedOf, uiShapeFindings } from '../ui/ui-shapes.mjs';
-import { DRAW_QUALITY_CODES, DRAW_SCOPE_FULL_PAGE, drawQualityFindings } from './draw-quality.mjs';
+import { DRAW_SCOPE_FULL_PAGE, drawQualityFindings } from './draw-quality.mjs';
 
 export const DRAW_ASSET_NOT_TOKEN_RENDERED = 'DRAW_ASSET_NOT_TOKEN_RENDERED';
 export const DRAW_NOT_SHAPES = 'DRAW_NOT_SHAPES';
 export const DRAW_NOT_REDRAWN = 'DRAW_NOT_REDRAWN';
 export { DATA_STATUS_DRAWN };
-export const DRAW_ACCEPTANCE_CODES = Object.freeze([DRAW_ASSET_NOT_TOKEN_RENDERED, DATA_STATUS_DRAWN, DRAW_NOT_SHAPES, DRAW_NOT_REDRAWN, ...DRAW_QUALITY_CODES]);
 /** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes.yaml). */
 export const DRAW_ACCEPTANCE_CHANGE = 'draw-adopt-gate';
 export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
@@ -266,7 +265,7 @@ export function drawAcceptanceFindings({ repo, files }) {
       if (sha && receipts.has(sha)) { drawn = true; continue; }
       if (asset && !DRAWING_ROLES.has(asset.role) && asset.generation?.tool === RASTER_TOOL && owner.drawn) continue;
       // What draw-loop finish installs beside a token-rendered part is evidence, not a drawing: the annotated redline
-      // and the art placeholder the draw source imports (reference draw D:/starci-tmp/draw-components was refused on both).
+      // and the art placeholder the draw source imports (reference draw <tmp>/draw-components was refused on both).
       if (asset && EVIDENCE_ROLES.has(asset.role) && owner.drawn) continue;
       if (asset && DRAWING_ROLES.has(asset.role)) continue; // judged with its record above
       if (recordFound.has(rel.toLowerCase())) continue; // its record already refused this file (coverage.map)
@@ -316,16 +315,9 @@ async function main(argv) {
   let job = null;
   if (jobId) {
     const { openLedgerReader, ledgerFileFor } = await import('../../../engine/db/ledger.mjs');
-    const { readMachine } = await import('../../../engine/db/machine.mjs');
-    // Decision Q1: the repo's runtime ledger is the file machine.ledgers names for it — never the pre-Q1 in-repo
-    // .starciwork/runtime.sqlite. That legacy store is opened only when the registry names no ledger for the
-    // repo at all (a never-registered checkout's in-repo file is its only record).
+    // The repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it).
     const resolved = ledgerFileFor(path.resolve(repo));
-    let file = fs.existsSync(resolved) ? resolved : null;
-    if (!file && !readMachine((m) => m.resolveLedger({ repoRoot: path.resolve(repo) }), null, { env: process.env })) {
-      const legacy = path.join(repo, '.starciwork', 'runtime.sqlite');
-      if (fs.existsSync(legacy)) file = legacy;
-    }
+    const file = fs.existsSync(resolved) ? resolved : null;
     if (!file) { process.stderr.write(`no runtime ledger for ${repo}\n`); return 2; }
     const db = openLedgerReader(file);
     try {
@@ -341,6 +333,6 @@ async function main(argv) {
   return out.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => process.exit(code), (error) => { process.stderr.write(`${error?.stack ?? error}\n`); process.exit(2); });
 }

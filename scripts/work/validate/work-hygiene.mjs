@@ -16,11 +16,13 @@
 //                stand-in (fixture, example, changeme) is not a literal.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../../api/git/lib.mjs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { diff as gitDiff } from '../../api/git/diff.mjs';
+import { show as gitShow } from '../../api/git/show.mjs';
+import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../../lib/secret-patterns.mjs';
 import { scopeToOwned, validateWork } from './work-validate.mjs';
+import { isMain } from '../../lib/is-main.mjs';
 
 export const WORK_YAML_UNPARSEABLE = 'WORK_YAML_UNPARSEABLE';
 export const WORK_VALIDATE_REFUSED = 'WORK_VALIDATE_REFUSED';
@@ -28,7 +30,6 @@ export const WORK_SECRET_FILE = 'WORK_SECRET_FILE';
 export const WORK_SECRET_PATTERN = 'WORK_SECRET_PATTERN';
 export const WORK_SECRET_LITERAL = 'WORK_SECRET_LITERAL';
 export const WORK_ACCOUNT_LITERAL = 'WORK_ACCOUNT_LITERAL';
-export const WORK_HYGIENE_CODES = Object.freeze([WORK_YAML_UNPARSEABLE, WORK_VALIDATE_REFUSED, WORK_SECRET_FILE, WORK_SECRET_PATTERN, WORK_SECRET_LITERAL, WORK_ACCOUNT_LITERAL]);
 export const WORK_HYGIENE_CHANGE = 'work-hygiene-gate';
 
 const slashed = (p) => String(p).replace(/\\/g, '/');
@@ -126,7 +127,7 @@ export function scanSecrets(rel, text) {
 
 // ------------------------------------------------------------------------------------------------- the check
 const relTo = (root, abs) => slashed(path.relative(root, abs));
-const gitOut = (root, args) => runGit(args, { dir: root, maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
+const gitOut = (call, root, args) => call(args, { dir: root, maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
 
 /**
  * checkWorkFiles({repo, files, read, strict}) -> {ok, findings[], files: n, checked: {parse, validate, secrets}}
@@ -193,21 +194,21 @@ export function checkWorkFilesAbs(files, options = {}) {
 /** The staged (added, copied, modified, renamed) files of `repo`, read from the index. */
 export function stagedFiles(repo) {
   const root = path.resolve(repo);
-  const out = gitOut(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']);
+  const out = gitOut(gitDiff, root, ['--cached', '--name-only', '--diff-filter=ACMR', '-z']);
   if (out.status !== 0) throw new Error(`git diff --cached failed: ${(out.stderr || '').trim().slice(0, 200)}`);
   return out.stdout.split('\0').filter(Boolean).map(slashed);
 }
 export function stagedCheck(repo, options = {}) {
   const root = path.resolve(repo);
   const files = stagedFiles(root).filter(inSecretScope);
-  const read = (rel) => { const r = gitOut(root, ['show', `:${rel}`]); return r.status === 0 ? r.stdout : null; };
+  const read = (rel) => { const r = gitOut(gitShow, root, [`:${rel}`]); return r.status === 0 ? r.stdout : null; };
   return checkWorkFiles({ repo: root, files, read, ...options });
 }
 
 /** The files a committed range changed (repo-relative), for settle: base..head, added/copied/modified/renamed. */
 export function rangeFiles(repo, base, head) {
   if (!base || !head) return [];
-  const out = gitOut(path.resolve(repo), ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${base}..${head}`]);
+  const out = gitOut(gitDiff, path.resolve(repo), ['--name-only', '--diff-filter=ACMR', '-z', `${base}..${head}`]);
   return out.status === 0 ? out.stdout.split('\0').filter(Boolean).map(slashed) : [];
 }
 
@@ -217,8 +218,7 @@ export function formatFindings(result, { limit = 30 } = {}) {
   return lines.join('\n');
 }
 
-const isMain = () => import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
-if (isMain()) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const mode = argv[0];
   const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };

@@ -1,0 +1,29 @@
+id: hfs-docker-per-app
+effectiveAt: '2026-10-02T09:30:00+07:00'
+summary: >-
+  Lane DOCKER (lead C1): every app builds its own image. The slot repo.app-image (apps/<app>/Dockerfile of the be and fe sides) is
+  now required per declared app, app-owned (hfs scaffold writes it once from templates/<side>/image/<kind>) and judged by the new
+  rules R187 HFS_DOCKER_BUILD_CONTEXT, R188 HFS_DOCKER_STAGES, R189 HFS_DOCKER_ENTRY, R190 HFS_DOCKER_BASE_PIN and R191
+  HFS_DOCKER_SECRETS (hfs enforcer scripts/hfs/rules/docker.mjs over scripts/lib/dockerfile.mjs).
+  The build context of every image is the app root: the slot repo.dockerignore (per side) becomes app.dockerignore, a managed file of
+  the app root (template templates/app/docker-ignore/dockerignore). A new managed CI workflow of the app, images.yml (slot
+  app.ci-images) builds every image, path-filtered per app, never pushes. A Next app sets output "standalone" (checked by R189).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-docker-per-app.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/docker.md
+  - knowledge/hfs/slots.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/hfs/rules/docker.mjs
+  - scripts/lib/dockerfile.mjs
+  - scripts/hfs/check.mjs
+  - packages/hfs/sync/index.mjs
+  - packages/hfs/scaffold/app.mjs
+  - packages/hfs/templates/be/image/api/Dockerfile
+  - packages/hfs/templates/be/image/worker/Dockerfile
+  - packages/hfs/templates/be/image/cli/Dockerfile
+  - packages/hfs/templates/fe/image/next/Dockerfile
+  - packages/hfs/templates/app/docker-ignore/dockerignore
+  - packages/hfs/templates/app/ci-workflows/github/workflows/images.yml

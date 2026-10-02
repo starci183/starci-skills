@@ -2,13 +2,15 @@
 // It owns: binary resolution (orca.cmd cannot spawn on Windows without a
 // shell), STARCI_ORCA_COMMAND/STARCI_ORCA_ARGS overrides, the calls.yaml
 // contract (argv assembly, declared-flag refusal, timeouts, receipt
-// classification), the live agent-context comparison before the first
-// mutation, terminal frame extraction and sleepSync.
+// classification) and the live agent-context comparison before the first
+// mutation (scripts/lib/orca-listing.mjs compares).
 // Wrappers name a verb and shape its receipt; they never build argv.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readModuleJson } from '../../../engine/runtime-root.mjs';
+import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
 
 export const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
@@ -26,12 +28,6 @@ export const orcaAppExe = (cli = ORCA) => {
   const exe = path.resolve(path.dirname(cli), '..', '..', 'Orca.exe');
   return fs.existsSync(exe) ? exe : null;
 };
-
-/** Launch the desktop host without inheriting an agent's Claude/ACP session. */
-export function hostLaunchEnv(env = process.env) {
-  return Object.fromEntries(Object.entries(env).filter(([key]) =>
-    !/^(?:CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_AGENT_.*|CLAUDE_SESSION_ID|AGENT_SESSION_ID|SESSION_ID|ACP_BACKEND)$/i.test(key)));
-}
 
 export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
@@ -75,33 +71,8 @@ export function hostUnavailableOf(run, receipt) {
   return run.status !== 0 && HOST_DOWN_TEXT.test(`${message ?? ''}\n${run.stderr ?? ''}\n${receipt ? '' : run.stdout ?? ''}`);
 }
 
-export { sleepSync } from '../../lib/sleep-sync.mjs';
 export const jsonOf = (text) => { try { return JSON.parse(text || 'null'); } catch { return null; } };
 export const terminalOf = (envelope) => envelope?.result?.terminal ?? jsonOf(envelope?.stdout)?.result?.terminal ?? null;
-
-export function frameText(terminal) {
-  if (!terminal) return '';
-  if (typeof terminal.screen === 'string') return terminal.screen;
-  if (Array.isArray(terminal.tail)) return terminal.tail.join('\n');
-  if (typeof terminal.tail === 'string') return terminal.tail;
-  return terminal.preview ?? '';
-}
-
-/**
- * The unsubmitted text an agent's input box holds, or null. Orca's `terminal read` answers it as
- * `draft` beside the frame and leaves it OUT of the rendered rows: a Kernel whose input box held
- * '[watchdog] wake: api status' (2026-09-25) showed a bare '❯' on every screen read, so a send without
- * Enter, or one whose Enter was dropped, left text no reader saw, and the next send appended to it.
- * Whitespace alone is no draft.
- */
-export const draftText = (terminal) => (typeof terminal?.draft === 'string' && terminal.draft.trim() ? terminal.draft : null);
-
-// --name value CLI arg reader shared by the thin wrappers.
-export const arg = (argv, name, fallback = null) => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : fallback;
-};
-export const flag = (argv, name) => argv.includes(`--${name}`);
 
 const JSON_FLAG = CALLS.defaults?.jsonFlag ?? 'json';
 const ENVELOPE_SCHEMA = CALLS.envelope?.schema ?? 'starci/orca-call-result@1';
@@ -167,42 +138,6 @@ function classify(entry, exitCode, receipt) {
 // before any effect; the listing itself failing to read is the same refusal.
 let liveListing;
 
-const commandName = (c) => typeof c === 'string' ? c
-  : (typeof c?.command === 'string' ? c.command
-    : typeof c?.name === 'string' ? c.name
-      : typeof c?.usage === 'string' ? c.usage.split(/\s+--?/)[0].trim() : null);
-
-function liveFlags(c) {
-  const out = new Set();
-  if (!c || typeof c !== 'object') return out;
-  const raw = c.flags ?? c.options ?? c.arguments ?? [];
-  for (const f of Array.isArray(raw) ? raw : Object.keys(raw)) {
-    const name = typeof f === 'string' ? f : (f?.flag ?? f?.name ?? f?.long ?? null);
-    if (typeof name === 'string') out.add(name.replace(/^--?/, '').split(/[\s=,]/)[0]);
-  }
-  return out;
-}
-
-/** An agent-context `commands` array as Map<command, Set<flag>>, or null. */
-export function listingOf(commands) {
-  if (!Array.isArray(commands)) return null;
-  const listing = new Map();
-  for (const c of commands) {
-    const name = commandName(c);
-    if (name) listing.set(name, liveFlags(c));
-  }
-  return listing.size ? listing : null;
-}
-
-/** The commands calls.yaml requires of `listing`, or null when it satisfies them. */
-export function missingFrom(listing, entry, jsonFlag = JSON_FLAG) {
-  if (!listing) return { listing: 'unreadable' };
-  const flags = listing.get(entry?.command);
-  if (!flags) return { command: entry?.command ?? null };
-  const missing = (entry.flags ?? []).filter((f) => f !== jsonFlag && !flags.has(f));
-  return missing.length ? { command: entry.command, flags: missing } : null;
-}
-
 // Only a read listing is kept: a host that did not answer is asked again at the
 // next mutation instead of refusing every later call of this process.
 let listingHostUnavailable = false;
@@ -218,7 +153,7 @@ function agentContextListing() {
   return liveListing;
 }
 
-const liveDrift = (entry) => missingFrom(agentContextListing(), entry);
+const liveDrift = (entry) => missingFrom(agentContextListing(), entry, JSON_FLAG);
 
 const driftEnvelope = (verb, entry, missing) => ({
   hostUnavailable: missing.listing === 'unreadable' && listingHostUnavailable,
@@ -262,26 +197,70 @@ export function receiptErrorText(receipt) {
   return String(e);
 }
 
-/** The error an envelope reports: spawn error, stderr, the receipt's own error, else a failed call's stdout. */
-const envelopeError = (r, receipt) => r.error || r.stderr || receiptErrorText(receipt)
+/**
+ * The error an envelope reports: spawn error, the receipt's own error (it names the refusal; stderr may carry only a
+ * harmless crashpad line of the orca CLI), then stderr, else a failed call's stdout.
+ */
+const envelopeError = (r, receipt) => r.error || receiptErrorText(receipt) || r.stderr
   || (r.status !== 0 && r.status != null ? String(r.stdout ?? '').slice(0, 500) || `exit ${r.status}` : r.stderr);
 
+// ---- replay (calls.yaml idempotency) ------------------------------------------
+// Every mutation declares `replay`:
+//   none     never re-issued by the runner; the caller reconciles from a read.
+//   reissue  naturally idempotent on its target (stop, release, a status write):
+//            a lost receipt is recovered by issuing the same call once more.
+//   request  not idempotent (a second Run, a second rebind, a second worker): the
+//            first issue already carries --retry-request <id>, the id derived
+//            from the caller's ledger identity, so a lost receipt is settled by
+//            request-show and one replay under the same id. Orca answers a
+//            replay with the recorded outcome instead of a second effect, also
+//            after a process restart that re-derives the same id.
+export const REPLAY_MODES = Object.freeze(['none', 'reissue', 'request']);
+const RETRY_FLAG = CALLS.idempotency?.flag ?? 'retry-request';
+
+const canonical = (v) => Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
+  : (v && typeof v === 'object'
+    ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
+    : JSON.stringify(v ?? null));
+
 /**
- * Issue one calls.yaml call. `params` are keyed by the flag names calls.yaml
- * declares; anything else is a contract violation and throws. Returns the
- * starci/orca-call-result@1 envelope — never a raw SpawnResult.
+ * The deterministic --retry-request id of one mutation: the verb plus the
+ * caller's ledger identity (workflow, job, lease, run, handle - never a clock
+ * or a random value), so a restarted process derives the same id. Orca 1.4.209
+ * accepts only a UUID here, so the id is the UUIDv5 of that name under the one
+ * namespace below.
  */
-export function orcaCall(verb, params = {}, { timeout } = {}) {
-  const entry = entryOf(verb);
-  const argv = buildArgv(verb, entry, params);
-  if (entry.kind === 'mutation' && process.env.STARCI_ORCA_SKIP_LIVE_CHECK !== '1') {
-    const missing = liveDrift(entry);
-    if (missing) return driftEnvelope(verb, entry, missing);
-  }
+// The namespace of every --retry-request id the runtime derives: generated once, never changed (a new value would
+// make a restarted process derive different ids and lose its replays).
+export const ORCA_REQUEST_NAMESPACE = '96fe63b0-5b42-4411-8490-6b5ae7b7dcb2';
+
+/** RFC 9562 UUIDv5: SHA-1 over the namespace's 16 bytes then the name's UTF-8 bytes, version 5, variant 10. */
+export function uuidv5(namespace, name) {
+  const ns = Buffer.from(String(namespace).replace(/-/g, ''), 'hex');
+  const b = crypto.createHash('sha1').update(ns).update(Buffer.from(String(name), 'utf8')).digest().subarray(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x50;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = b.toString('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+export function orcaRequestIdOf(verb, identity) {
+  if (!identity || typeof identity !== 'object' || !Object.keys(identity).some((k) => filled(identity[k])))
+    throw new Error(`orcaCall ${verb}: a request-replay mutation needs its ledger identity (request: {...})`);
+  return uuidv5(ORCA_REQUEST_NAMESPACE, `${verb}\0${canonical(identity)}`);
+}
+
+/** The process timed out, or Orca answered without a JSON receipt: the effect is unknown, not refused. */
+export const receiptLost = (r, receipt) => r.spawnError === 'ETIMEDOUT' || (r.status !== null && r.status !== undefined && !r.spawnError && receipt === null);
+
+function issue(verb, entry, argv, timeout) {
   const r = orcaRun(argv, { timeout: timeout ?? entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000,
     ...(entry.kind === 'read' ? { maxBuffer: READ_MAX_BUFFER } : {}) });
-  const receipt = jsonOf(r.stdout);
-  const { outcome, effectState, reason } = classify(entry, r.status, receipt);
+  return { r, receipt: jsonOf(r.stdout) };
+}
+
+function envelopeOf(verb, entry, { r, receipt }, request = null, override = null) {
+  const { outcome, effectState, reason } = override ?? classify(entry, r.status, receipt);
   return {
     schema: ENVELOPE_SCHEMA,
     verb,
@@ -298,5 +277,51 @@ export function orcaCall(verb, params = {}, { timeout } = {}) {
     stdout: r.stdout,
     stderr: r.stderr,
     error: envelopeError(r, receipt),
+    request,
   };
+}
+
+/** request-show for one id: its state (completed | pending | absent) or null when Orca gave no readable answer. */
+export function requestStateOf(id) {
+  const entry = entryOf('request-show');
+  const { receipt } = issue('request-show', entry, buildArgv('request-show', entry, { request: id }));
+  const state = receipt?.result?.state;
+  return ['completed', 'pending', 'absent'].includes(state) ? state : null;
+}
+
+/**
+ * Issue one calls.yaml call. `params` are keyed by the flag names calls.yaml
+ * declares; anything else is a contract violation and throws. A `replay:
+ * request` mutation needs `request` (its ledger identity); no other call takes
+ * one. Returns the starci/orca-call-result@1 envelope — never a raw SpawnResult.
+ */
+export function orcaCall(verb, params = {}, { timeout, request } = {}) {
+  const entry = entryOf(verb);
+  const mode = entry.replay ?? null;
+  if (entry.kind === 'mutation' && !REPLAY_MODES.includes(mode))
+    throw new Error(`orcaCall ${verb}: calls.yaml must declare replay ${REPLAY_MODES.join('|')} for a mutation`);
+  if (Object.hasOwn(params, RETRY_FLAG) && mode === 'request')
+    throw new Error(`orcaCall ${verb}: --${RETRY_FLAG} is derived from the request identity, never passed`);
+  if (request !== undefined && request !== null && mode !== 'request')
+    throw new Error(`orcaCall ${verb}: a request identity is only for replay: request mutations (calls.yaml declares ${mode ?? 'a read'})`);
+  const requestId = mode === 'request' ? orcaRequestIdOf(verb, request) : null;
+  const argv = buildArgv(verb, entry, requestId ? { ...params, [RETRY_FLAG]: requestId } : params);
+  if (entry.kind === 'mutation' && process.env.STARCI_ORCA_SKIP_LIVE_CHECK !== '1') {
+    const missing = liveDrift(entry);
+    if (missing) return driftEnvelope(verb, entry, missing);
+  }
+  const first = issue(verb, entry, argv, timeout);
+  if (entry.kind !== 'mutation' || !receiptLost(first.r, first.receipt)) {
+    return envelopeOf(verb, entry, first, requestId ? { id: requestId, replayed: first.receipt?.result?.mutation?.replayed === true, state: null } : null);
+  }
+  if (mode === 'reissue') return envelopeOf(verb, entry, issue(verb, entry, argv, timeout), { id: null, replayed: true, state: 'reissued' });
+  if (mode === 'none') return envelopeOf(verb, entry, first);
+  const state = requestStateOf(requestId);
+  if (state === 'completed' || state === 'pending')
+    return envelopeOf(verb, entry, issue(verb, entry, argv, timeout), { id: requestId, replayed: true, state });
+  // Absent is not proof that nothing happened (request-show): unknown, never a blind second issue.
+  const unsettled = state === 'absent'
+    ? { outcome: 'unknown', effectState: 'unknown', reason: 'request-absent' }
+    : { outcome: 'unknown', effectState: 'unknown', reason: 'request-show-unreadable' };
+  return envelopeOf(verb, entry, first, { id: requestId, replayed: false, state }, unsettled);
 }

@@ -66,7 +66,7 @@ test('rules() and openHfs().rules() give the same frozen catalog', () => {
   assert.equal(list.length, loadRuleCatalog().rules.length);
   assert.ok(Object.isFrozen(list) && Object.isFrozen(list[0]) && Object.isFrozen(list[0].enforcers));
   const app = { hfs: 2, kind: 'app', project: 'nivo', sides: {
-    be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] },
+    be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
   } };
   assert.equal(openHfs({ declaration: app }).rules().rules.length, list.length);
@@ -123,7 +123,7 @@ test('a catalog whose major differs from the slot manifest is refused', () => {
 
 // ------------------------------------------------------------------------------------------------ the check
 
-const codeEntry = { title_vi: 'Tiêu đề', meaning_vi: 'Ý nghĩa của lỗi', nextStep_vi: 'Bước tiếp theo' };
+const codeEntry = { title_vi: 'Ti\u00eau \u0111\u1ec1', meaning_vi: '\u00dd ngh\u0129a c\u1ee7a l\u1ed7i', nextStep_vi: 'B\u01b0\u1edbc ti\u1ebfp theo' };
 const failureCatalog = (catalog, without = []) => Object.fromEntries(catalog.rules.flatMap((r) => r.failureCodes).filter((c) => !without.includes(c)).map((c) => [c, { ...codeEntry }]));
 // The real enforcer files of this runtime: every `at` exists and emits its rule's codes (the check itself proves it).
 const allFiles = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
@@ -177,7 +177,7 @@ test('a failure code with no catalog entry, or an entry that is not Vietnamese, 
   const gone = run(catalog, { failureCodes: failureCatalog(catalog, ['FE_NEXT_CONVENTIONS']) });
   assert.deepEqual(gone.map((f) => [f.code, f.rule]), [['HFS_RULE_CODE_UNCATALOGUED', 'R54']]);
   const english = failureCatalog(catalog);
-  english.HFS_SLOT_UNDECLARED = { title_vi: 'Path matches no slot', meaning_vi: 'Đường dẫn không hợp lệ', nextStep_vi: '' };
+  english.HFS_SLOT_UNDECLARED = { title_vi: 'Path matches no slot', meaning_vi: '\u0110\u01b0\u1eddng d\u1eabn kh\u00f4ng h\u1ee3p l\u1ec7', nextStep_vi: '' };
   const findings = run(catalog, { failureCodes: english });
   assert.deepEqual(findings.map((f) => f.message.includes('title_vi') || f.message.includes('nextStep_vi')), [true, true]);
   assert.ok(findings.every((f) => f.code === 'HFS_RULE_CODE_UNCATALOGUED' && f.rule === 'R01'));

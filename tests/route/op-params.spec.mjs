@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -229,7 +229,7 @@ test('brand.decide takes the owner ruling and the reference sources it names fro
     assert.equal(brief.params?.[name]?.setBy, 'kernel');
     assert.equal(brief.params?.[name]?.type, 'string');
   }
-  const ruled = resolveOpParams(brief, { flag: { ownerRulings: 'Core grammar; identity as the Academy dashboard', referenceSources: 'D:/x/globals.css' }, enforceRequired: true });
+  const ruled = resolveOpParams(brief, { flag: { ownerRulings: 'Core grammar; identity as the Academy dashboard', referenceSources: 'x/globals.css' }, enforceRequired: true });
   assert.equal(ruled.ok, true, ruled.detail);
   assert.equal(ruled.params.ownerRulings, 'Core grammar; identity as the Academy dashboard');
   assert.equal(resolveOpParams(brief, { enforceRequired: true }).ok, true, 'a brand op with no ruling to pass still enqueues');

@@ -45,7 +45,8 @@ versioning:
 #   requiredWhen       connections: required only when hfs.json declares a database connection.
 #   allows / forbids   names inside the instance; the loader exposes them, slot-check enforces them.
 #   tests       unit-beside | e2e | none.
-#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
+#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules); on an
+#               owner slot (be.cli) the app kinds that list its root module, every folder of the root holding one static module.
 #   budget      size budgets (lines per file, files per slot, exports).
 #   trigger     the trigger kind (triggerKinds) of a feature-tier slot: api, webhooks, realtime, saga, reactors, jobs or cli. A feature of one kind
 #               never imports a feature of another (BE_KIND_ISOLATION); the two meet only through the event bus.
@@ -73,7 +74,7 @@ sides:
 triggerKinds: [api, webhooks, realtime, saga, reactors, jobs, cli]
 
 appKinds:
-  be: [api, worker, migrate, cli]
+  be: [api, worker, cli]
   fe: [next]
 
 # ---------------------------------------------------------------------------------------------------------
@@ -165,10 +166,24 @@ ruleParams:
         - {token: "(?:^|_)CLOCK$", double: FakeClock, forms: [new]}
         - {token: "(?:^|_)EVENT_BUS$", double: recordingEventBus, forms: [call]}
         - {token: "(?:^|_)QUEUE_OUTBOX$", double: recordingQueueOutbox, forms: [call]}
+        - {token: "(?:^|_)INBOX(?:_|$)", double: fakeInbox, forms: [call]}
         - {token: "(?:^|_)CACHE(?:_|$)", double: fakeCache, forms: [call]}
         - {token: "(?:^|_)(?:LOCK|LEASE|FENCE|HOLD)(?:_|$)", double: fakeLock, forms: [call]}
         - {token: "(?:^|_)(?:IDS|ID_GENERATOR|ID_FACTORY)$", double: fakeIds, forms: [call]}
       fallback: {double: mock, forms: [call, primitive, array]}
+    # R85 BE_RAW_INJECT injected-param-name: the names of the ports every class injects the same way (BE-CONVENTION 1.6: the parameter name
+    # is the camelCase of the port). An entry matches a constructor parameter that carries an injector and is annotated with a type
+    # declared outside the owner (a package, platform/* or integrations/*): `type` is the exact declared name, `typeSuffix` the end of
+    # it. The parameter is named one of `names`, or ends in `nameSuffix` when the entry has one (`orderEntityManager` for a class that
+    # injects two connections, `paymentOptions` beside `options`). A type no entry names is free to be named for what it is.
+    paramNames:
+      - {type: Clock, names: [clock]}
+      - {type: Logger, names: [logger]}
+      - {type: Cache, names: [cache]}
+      - {type: CommandBus, names: [commandBus]}
+      - {type: QueryBus, names: [queryBus]}
+      - {type: EntityManager, names: [entityManager], nameSuffix: EntityManager}
+      - {typeSuffix: Options, names: [options], nameSuffix: Options}
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
@@ -176,6 +191,15 @@ ruleParams:
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
+    # THE list of unit-tested roles of a back end (the ONE source every consumer reads: the eslint unit-test rules, hfs
+    # spec-placement and the cli spec check, the architecture machine's unit-spec checks, the unit-run gate, the jest preset's
+    # coverage sources, held equal by spec, and the Sonar and Codecov coverage scope rendered from them). A role's subject is
+    # `<name>.<role>.ts` (inside `slot` when one is named), its unit spec `<name>.<spec>.ts` beside it, and `coverage` the be-relative
+    # glob the unit run measures at 100 per file. `thin` lists the thin-door rules the role is exempt from: a cli command is an
+    # action runner, not a thin transport (R149). A lane that adds a unit-tested role adds its entry here and nowhere else.
+    unitRoles:
+      - {role: service, spec: service.spec, coverage: "src/**/*.service.ts"}
+      - {role: cli, spec: cli.spec, slot: be.cli, coverage: "src/features/cli/**/*.cli.ts", exempt: [BE_TRANSPORT_SHAPE]}
     # BE_PATTERN_SPEC_MISSING: a declared pattern (hfs.json sides.be.patterns) is proven on the test world. Each id below needs a test titled
     # "<pattern>/<id>: ..." in an e2e or integration spec (be/src/tests/e2e, be/src/tests/integration).
     patternScenarios:
@@ -185,7 +209,6 @@ ruleParams:
       realtime: [subscriber-receives-push, foreign-topic-is-isolated, disconnect-releases-subscription]
       fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
       projection: [recompute-is-idempotent, replay-rebuilds]
-      cli: [effect-then-exit-zero, repeat-is-safe, bad-argument-exits-nonzero]
     # BE_KIND_DECLARATION: the patterns an app that uses a trigger kind declares in hfs.json sides.be.patterns; the platform capabilities of those
     # patterns (the slots of tier platform that name the pattern) must exist.
     kindPatterns:
@@ -195,7 +218,7 @@ ruleParams:
       saga: [saga]
       reactors: [event-bus]
       jobs: [fenced-job, queue]
-      cli: [cli]
+      cli: []
     # hfs add <noun> <name>: the pattern topic (knowledge/patterns/be/<topic>.yaml) whose files tree is generated, the path variable of the
     # instance, what it registers in hfs.json, the options it needs (--<option>), the other nouns generated with it under the same name (a job is
 # the consumer of its queue, so `also: [queue]`) and the defaults of the other variables ("@name" = the name).
@@ -208,7 +231,6 @@ ruleParams:
       saga: {topic: saga, variable: saga, trigger: saga, patterns: [saga], needs: [owner, from, failed, done, service], defaults: {step: "@name"}}
       projection: {topic: projections, variable: name, patterns: [projection], needs: [connection]}
       api: {topic: api, variable: feature, trigger: api, patterns: [], needs: [service], defaults: {action: "@name"}}
-      cli: {topic: cli, variable: command, trigger: cli, patterns: [cli], needs: [service], defaults: {action: "@name"}}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -343,6 +365,26 @@ slots:
     tests: none
     managedBy: ci-workflows
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: app.ci-images
+    profiles: [app]
+    # Builds every image of the app (one matrix entry per declared app, path-filtered), never pushes: rendered by hfs sync.
+    path: ".github/workflows/images.yml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_MANAGED_FILE_DRIFT]
+  - id: app.dockerignore
+    profiles: [app]
+    # The one build-context filter of every image (the context is the app root): rendered by hfs sync; it keeps secrets and build output out.
+    path: .dockerignore
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: docker-ignore
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.github-meta
     profiles: [app]
     path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
@@ -422,7 +464,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: app.agent-output
     profiles: [app]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none
@@ -436,7 +478,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository) for a lane; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, never tracked, and removed by the runtime's host-side controller once the workflow's finish marked it release-pending"
+    goesTo: "<lanes root>/<project>/<lane>/ (outside every repository) for a lane; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, never tracked, and removed by the runtime's host-side controller once the workflow's finish marked it release-pending"
   - id: app.plaintext-env
     profiles: [app]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
@@ -544,18 +586,15 @@ slots:
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: repo.app-image
     profiles: [be, fe]
+    # One image per app: every declared app has its own Dockerfile (apps/<app>/Dockerfile), built from the APP ROOT (the folder with
+    # the one package.json). It is app-owned (hfs scaffold writes it once from templates/<side>/image) and judged by the docker rules.
+    # A Dockerfile anywhere else is owned by no slot.
     path: "apps/<app>/Dockerfile"
-    presence: optional
+    presence: required
     tracked: tracked
     tier: none
     tests: none
-  - id: repo.dockerignore
-    profiles: [be, fe]
-    path: .dockerignore
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
+    rules: [HFS_DOCKER_BUILD_CONTEXT, HFS_DOCKER_STAGES, HFS_DOCKER_ENTRY, HFS_DOCKER_BASE_PIN, HFS_DOCKER_SECRETS]
 
   # ----- never tracked: build output the tools need in place ---------------------------------------------
   - id: repo.build-output
@@ -585,7 +624,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: repo.agent-output
     profiles: [be, fe]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none
@@ -599,7 +638,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+    goesTo: "<lanes root>/<project>/<lane>/ (outside every repository)"
   - id: repo.plaintext-env
     profiles: [be, fe]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
@@ -644,7 +683,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R146 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
     profiles: [be]
@@ -653,7 +692,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R157 BE_CONTRACT_BREAKING)
+    why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R177 BE_CONTRACT_BREAKING)
     rules: [BE_CONTRACT_BREAKING]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -674,7 +713,7 @@ slots:
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
-    appKind: worker               # composes transport/message modules and job processors only
+    appKind: worker               # composes transport/message modules and job processors only (an api app may compose them too: a worker app is for separate scaling)
     presence: opt-in
     tracked: tracked
     tier: app
@@ -683,21 +722,13 @@ slots:
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
-  - id: be.app.migrate
-    profiles: [be]
-    path: "apps/<app>/src/"
-    appKind: migrate              # the ONLY process that runs migrations (one run per connection, before api/worker start)
-    presence: required
-    requiredWhen: connections     # required as soon as hfs.json declares a connection
-    tracked: tracked
-    tier: app
-    owner: true
-    requires: [main.ts]
-    allows: [main.ts, "<app>.options.ts"]
-    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
-    rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS, BE_CONTEXT_OWNER]
   - id: be.app.cli
     profiles: [be]
+    # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
+    # main.ts boots with CommandFactory.run (BE_CLI_BOOTSTRAP); app.module.ts composes the platform and the cli feature root
+    # (src/features/cli/cli.module.ts); cli.options.ts carries what it needs from the environment, the connections it migrates
+    # among them (the test world migrates through the same list). It is required as soon as the back end declares a connection
+    # or tracks a command, with its image apps/cli/Dockerfile (BE_CLI_REQUIRED): one image, run as `cli <group> <command>`.
     path: "apps/<app>/src/"
     appKind: cli
     presence: opt-in
@@ -707,11 +738,15 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    rules: [BE_CLI_REQUIRED, BE_CLI_BOOTSTRAP, BE_CLI_OWNER, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: features ------------------------------------------------------------------------------------
+  # src/features/ is grouped by TRIGGER KIND (owner decision 2026-10-02): features/api/<feature>/ (a request: application/ and
+  # transport/<protocol>/, composed by the api apps), features/cli/ (a one-off action: the cli feature root, compiled only into
+  # apps/cli). Every kind imports only downward into modules/*; no kind imports another.
   - id: be.feature
     profiles: [be]
-    path: "src/features/<feature>/"
+    path: "src/features/api/<feature>/"
     presence: required
     trigger: api                  # a request-driven feature (graphql, http); the other trigger kinds have their own roots below
     tracked: tracked
@@ -725,7 +760,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/{,jobs/,reactors/,saga/,cli/}<feature>/application/"     # inside a trigger kind the feature folder is one level down
+    path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/"     # inside a trigger kind (jobs, reactors, saga) the feature folder is one level down
     presence: required
     tracked: tracked
     tier: feature
@@ -736,7 +771,7 @@ slots:
   - id: be.feature.saga
     profiles: [be]
     path: "src/features/saga/<saga>/"
-    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R149 to R153); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R169 to R173); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
     presence: opt-in              # a saga: the orchestrator of a business flow that crosses services, started and advanced only by events (knowledge/patterns/be/saga.yaml)
     trigger: saga
     tracked: tracked
@@ -768,7 +803,7 @@ slots:
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/{,jobs/,reactors/,saga/,cli/}<feature>/application/support/"
+    path: "src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -779,7 +814,7 @@ slots:
     since: 1.0.0
   - id: be.transport.http
     profiles: [be]
-    path: "src/features/<feature>/transport/http/"
+    path: "src/features/api/<feature>/transport/http/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -790,7 +825,7 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
     profiles: [be]
-    path: "src/features/<feature>/transport/graphql/"
+    path: "src/features/api/<feature>/transport/graphql/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -801,8 +836,8 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
-    path: "src/features/{,reactors/,saga/}<feature>/transport/message/"
-    presence: opt-in              # queue worker: consumed only by a worker app
+    path: "src/features/{api/,reactors/,saga/}<feature>/transport/message/"
+    presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
     pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
     tier: feature
@@ -906,18 +941,27 @@ slots:
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
-  - id: be.feature.transport.cli
+  - id: be.cli
     profiles: [be]
-    path: "src/features/{,cli/}<feature>/transport/cli/"
-    presence: opt-in              # a command line entry: dispatches one command or query, composed by an app of kind cli
+    # The cli feature root: every one-off action of the back end, compiled only into apps/cli. A group is a nest-commander
+    # @Command (<group>/<group>.cli.ts) whose sub-commands are @SubCommand classes extending CommandRunner
+    # (<group>/subs/<name>.cli.ts), each with its unit spec beside it (<name>.cli.spec.ts): a command is an action runner, not a
+    # thin transport (BE_CLI_COMMAND_SHAPE). `.cli.ts` because `.command.ts` is the CQRS message (HFS delta 3). Every module of
+    # the root is a static @Module (a feature holds no module definition): cli.module.ts imports each group module, a group
+    # module provides its commands, and a command takes its inputs from a platform capability (the connections and their opener
+    # from platform/database) or from a command-line @Option.
+    path: "src/features/cli/"
+    presence: optional
+    trigger: cli                  # the one cli feature root: a one-off action never imports a feature of another kind (BE_KIND_ISOLATION)
     tracked: tracked
     tier: feature
-    requires: ["<feature>-cli.module.ts"]
-    allows: ["<name>.cli.ts", "dto/*.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
-    tests: none
+    owner: true
+    requires: [index.ts, cli.module.ts]
+    # A composed root: an app of kind cli lists cli.module.ts, never a group module (BE_MODULE_SHAPE).
     composedBy: [cli]
-    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
-    since: 1.0.0
+    allows: [index.ts, cli.module.ts, "<group>/<group>.cli.ts", "<group>/<group>.cli.spec.ts", "<group>/<group>.module.ts", "<group>/subs/<name>.cli.ts", "<group>/subs/<name>.cli.spec.ts"]
+    tests: unit-beside
+    rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_MODULE_SHAPE, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain
@@ -954,7 +998,7 @@ slots:
     since: 1.0.0
   - id: be.feature.messages
     profiles: [be]
-    path: "src/features/<feature>/messages/"
+    path: "src/features/api/<feature>/messages/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -965,7 +1009,7 @@ slots:
   - id: be.persistence
     profiles: [be]
     path: "src/modules/{domain,platform,projections}/<capability>/persistence/"
-    # R158: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the inbox of every service, the job table); their arrays may be
+    # R178: the platform capabilities whose tables exist on EVERY connection that uses them (the event-bus outbox, the inbox of every service, the job table); their arrays may be
     # registered on several declared connections. Any other capability registers its arrays on exactly one (BE_SCHEMA_OWNER).
     perConnection: [event-bus, inbox, jobs]
     presence: optional
@@ -975,7 +1019,7 @@ slots:
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
     tests: none
-    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
+    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_SQL_RETURNING_SHAPE, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
   - id: be.platform
     profiles: [be]
     path: "src/modules/platform/<capability>/"
@@ -1045,19 +1089,6 @@ slots:
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
-  - id: be.feature.cli
-    profiles: [be]
-    path: "src/features/cli/<command>/"
-    presence: opt-in              # an operator command line: dispatches one command or query, composed only by an app of kind cli
-    pattern: cli                  # declaring the pattern (hfs.json sides.be.patterns) enables the kind and its platform capability (knowledge/patterns/be/cli.yaml)
-    trigger: cli
-    tracked: tracked
-    tier: feature
-    owner: true
-    requires: [index.ts, "<command>.module.ts", application/, transport/]
-    allows: [index.ts, "<command>.module.ts", application/, transport/]
-    tests: none
-    rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.reactors
     profiles: [be]
     path: "src/features/reactors/<reactor>/"
@@ -1118,18 +1149,6 @@ slots:
     tests: unit-beside
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
-  - id: be.platform.cli
-    profiles: [be]
-    path: "src/modules/platform/cli/"
-    presence: opt-in
-    pattern: cli                  # the command line of an app of kind cli: a registry the command modules register with and the runner the app entry calls
-    tracked: tracked
-    tier: platform
-    owner: true
-    requires: [index.ts, cli.module.ts, cli.port.ts, cli.contracts.ts, cli-runner.service.ts, cli-runner.service.spec.ts]
-    tests: unit-beside
-    budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   - id: be.projections
     profiles: [be]
     path: "src/modules/projections/<name>/"
@@ -1175,7 +1194,7 @@ slots:
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
-      infrastructure (containers) and runs apps/migrate's exported bootstrap once; use-test-world.ts exports
+      infrastructure (containers) and runs the migrations once over the cli app's connections; use-test-world.ts exports
       useTestWorld({ apps: { <name>: { module, listen? } } } | { modules: [...] }) -> world.apps.<name>.api,
       world.db.<connection> (the shared EntityManager), world.infra.<service> (latency/cut/restore on a REAL service of the repository's
       own stack, the app root's `.starcistacks/<env>`, each behind toxiproxy), world.fake.<provider> (a network-edge fake of an external SaaS started by the world, with

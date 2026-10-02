@@ -11,8 +11,11 @@ import { treeOf } from './required-files.mjs';
  *     anywhere in a feature, and an `@Module` class (or a `ConfigurableModuleBuilder`/`ConfigurableModuleClass` use) in a
  *     feature file that is neither the application module nor the transport module of its own folder are refused;
  *   - apps import only transport modules, of the kinds their app kind allows: the `composedBy` list of each transport slot
- *     in knowledge/hfs/slots.yaml (api: graphql, http, websocket; worker: schedule, message; cli: cli). An app root that
- *     lists a feature's application module, or the transport module of another kind, is refused.
+ *     in knowledge/hfs/slots.yaml (api: graphql, http, websocket; worker: schedule, message). An app root that
+ *     lists a feature's application module, or the transport module of another kind, is refused;
+ *   - a composed root (an owner slot with `composedBy`, be.cli) holds one static module per folder, named after the folder
+ *     (cli.module.ts, <group>/<group>.module.ts); an app of a composing kind lists the root module only, and an app of any
+ *     other kind lists none of its modules.
  */
 export const MODULE_PER_TRANSPORT_RULE_IDS = ['BE_MODULE_SHAPE'];
 
@@ -31,18 +34,30 @@ export function checkModulePerTransport(input) {
     const owner = resolver.ownerOf(rel);
     return owner && resolver.slot(owner.slot)?.tier === 'feature' ? owner : null;
   };
-  /** {feature, root, protocol} of a file inside a feature: protocol is the transport folder, null for the application side. */
+  /**
+   * {feature, root, protocol, composed} of a file inside a feature: protocol is the transport folder, null for the application
+   * side. composed is set for a composed root, an owner slot with `composedBy` (be.cli): an app of those kinds lists its root
+   * module, and every folder of the root holds one static module named after the folder.
+   */
   const placeOf = rel => {
     const owner = featureOf(rel);
     if (!owner) return null;
+    const slot = resolver.slot(owner.slot);
     const below = rel.slice(owner.root.length + 1).split('/');
-    return { root: owner.root, feature: path.posix.basename(owner.root), protocol: below[0] === 'transport' && below.length > 2 ? below[1] : null, below };
+    const feature = path.posix.basename(owner.root);
+    if (slot.composedBy) return { root: owner.root, feature, protocol: null, below, composed: slot };
+    return { root: owner.root, feature, protocol: below[0] === 'transport' && below.length > 2 ? below[1] : null, below, composed: null };
+  };
+  /** The one module file a folder of a composed root may hold: <folder>/<folder>.module.ts. */
+  const composedModuleOf = rel => {
+    const dir = path.posix.dirname(rel);
+    return `${dir}/${path.posix.basename(dir)}.module.ts`;
   };
 
   // The transport slots and the app kinds that compose them, by protocol folder name.
   const composedBy = new Map();
   for (const slot of resolver.slots()) {
-    if (!slot.composedBy) continue;
+    if (!slot.composedBy || slot.owner) continue;
     composedBy.set(path.posix.basename(slot.path.replace(/\/+$/u, '')), slot.composedBy);
   }
 
@@ -74,6 +89,11 @@ export function checkModulePerTransport(input) {
       if (!isModule) continue;
       modules.set(statement, { name: statement.name.text, file });
       if (!place) continue;
+      if (place.composed) {
+        const own = composedModuleOf(file.rel);
+        if (file.rel !== own) report(file, statement.name, `${statement.name.text} is a Nest module declared in ${file.rel}; every folder of ${place.root} holds exactly one static module named after it (${own}), never a module per command.`, { feature: place.feature });
+        continue;
+      }
       const own = place.protocol === null
         ? `${place.root}/${place.feature}.module.ts`
         : `${place.root}/transport/${place.protocol}/${place.feature}-${place.protocol}.module.ts`;
@@ -111,7 +131,11 @@ export function checkModulePerTransport(input) {
         if (!place || seen.has(node)) continue;
         seen.add(node);
         references += 1;
-        if (place.protocol === null) {
+        if (place.composed) {
+          const rootModule = `${place.root}/${place.feature}.module.ts`;
+          if (!place.composed.composedBy.includes(app.kind)) report(root, node, `App ${app.name} is of kind ${app.kind} and lists ${module.name} from ${place.root}; only an app of kind ${place.composed.composedBy.join(', ')} composes that root.`, { app: app.name, module: module.name });
+          else if (module.file.rel !== rootModule) report(root, node, `App ${app.name} lists ${module.name}, a group module inside ${place.root}; the app lists the root module (${rootModule}), which imports every group module.`, { app: app.name, module: module.name });
+        } else if (place.protocol === null) {
           report(root, node, `App ${app.name} lists ${module.name}, the application module of feature ${place.feature}; apps import only transport modules (${place.feature}-<protocol>.module.ts), which import the application module themselves.`, { app: app.name, module: module.name });
         } else if (!(composedBy.get(place.protocol) ?? []).includes(app.kind)) {
           const allowed = [...composedBy].filter(([, kinds]) => kinds.includes(app.kind)).map(([protocol]) => protocol).sort();

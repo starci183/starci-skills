@@ -23,11 +23,11 @@
       "entryFile": "main",
       "sourceRoot": "apps/billing/src"
     },
-    "migrate": {
+    "cli": {
       "type": "application",
-      "root": "apps/migrate",
+      "root": "apps/cli",
       "entryFile": "main",
-      "sourceRoot": "apps/migrate/src"
+      "sourceRoot": "apps/cli/src"
     }
   }
 }

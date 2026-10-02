@@ -99,11 +99,11 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       mode: generate-with-anatomy-references
     provenance:
       stage: initial
@@ -130,12 +130,12 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png
       mode: edit-with-anatomy-references
     provenance:
@@ -152,10 +152,10 @@ ui:
       sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
       rev: 1
     anatomyReferences:
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
       sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
       role: actual-installed-grammar-render; read-only reuse
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
       role: actual-installed-grammar-render; read-only reuse
     grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not reinstalled or recaptured
@@ -182,17 +182,17 @@ ui:
     - path: examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
       sha256: 652c16c914e566da909b400864f7e769c24702c18c204283026691cfddd4c632
     frontendContext:
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/browse/page.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/browse/page.tsx
       sha256: b1d5be469ffd94eb4c1e20ef5e7f3f444ab584ea2e687974ff99974f8689ba7d
-    - path: examples/ecommerce-app/fe/apps/shop/src/components/ProductTile.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/components/ProductTile.tsx
       sha256: 8a385f326ef32508a2bf19a26c56ee96d4aaef3ba441b3579e9a7deb5bfeab7f
-    - path: examples/ecommerce-app/fe/apps/shop/src/components/AppNav.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/components/AppNav.tsx
       sha256: ac7d46b5f513b087ee36baeb25bb69475218430fc48173161eb81671e8781917
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/page.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/page.tsx
       sha256: 95e20ad4ee355b0165c8e8a4412db39b3f84e1d6b16f2b1a3fd6a5235117c290
     - path: examples/ecommerce-app/fe/apps/landing/src/data/catalog.ts
       sha256: 407fa5dcd5b6c97cca07c2716c5f0903b4d68b88b6ebe31f507cea0d0fb57936
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/layout.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/layout.tsx
       sha256: 5c4d20f851083a183b0fe9eee2481b2834f89254ecffd6e1da29a3abcb417f0d
   review:
     status: agent-reviewed-proposal; owner acceptance not claimed
@@ -222,7 +222,7 @@ ui:
   - Live shop data comes from the order API. These six products are editorial sample data from the landing catalogue; Add
     to cart is not implemented by ProductTile.
 change:
-  rev: 1
+  rev: 2
   kind: clarifying
   at: '2026-09-19T15:30:00.000Z'
   reason: 'v9-7 wired the screen to the real backend and the uat.checkout.place-order walk exercised it live (runs/20260919T152927Z-5c10a673):

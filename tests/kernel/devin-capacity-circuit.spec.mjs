@@ -1,7 +1,7 @@
 // A Devin capacity outage opens the devin provider-health circuit (failureKind capacity), and a retry routes
 // around Devin.
 //
-// Live defect (starci-next wf-sn-foundation, inc-d1385efd312f / inc-8ef8c5b48e15, 2026-09-25): three sibling
+// Live defect: three sibling
 // interface.audit workers on devin-agent (SWE-2 Max) worked for 20 minutes, then every turn failed with
 // "Client error: Protocol error (unimplemented): We are currently experiencing capacity issues with this
 // serving model." Nudges failed again with fresh traces. The Kernel settled them failed with no report, and

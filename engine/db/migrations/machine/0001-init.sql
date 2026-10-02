@@ -540,7 +540,7 @@ CREATE TABLE IF NOT EXISTS host_locks(
   state TEXT NOT NULL DEFAULT 'held' CHECK(state IN ('starting','held','released'))) STRICT;
 
 -- claims (G14, MB-04, MB-17): temporary resources (temp dirs, temp worktrees, lock files) are CLAIMED before
--- creation; GC removes them safely (safeRemoveTree, never follows junctions) once the owner pid is dead.
+-- creation; GC removes them safely (safeRemove, never follows junctions) once the owner pid is dead.
 CREATE TABLE IF NOT EXISTS claims(
   claim_id        INTEGER PRIMARY KEY AUTOINCREMENT,
   resource_path   TEXT NOT NULL,

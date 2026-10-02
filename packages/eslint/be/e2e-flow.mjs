@@ -1,8 +1,8 @@
 /**
- * The rules that hold `e2e-flow.md` (catalog R48 `BE_SPEC_QUALITY`, the e2e half).
+ * The rules that hold the e2e half of `knowledge/patterns/be/test.yaml` (catalog R48 `BE_SPEC_QUALITY`).
  *
  * A rule earns its place by being exact: it fires on a syntactic or typed shape, never on a judgement, or it becomes
- * something authors learn to work around. What these four enforce is transport bypass (a bus or an actor called
+ * something authors learn to work around. What these four rules enforce is transport bypass (a bus or an actor called
  * directly), a sleep instead of a poll, a branch inside a step, and a testing module built inside a spec instead of
  * booted by the test world (`useTestWorld({ apps })`, `src/tests/world/`). They do not pretend to judge business meaning: whether a file is one flow, whether
  * its steps are named, and what the absence of an effect is proved by are read by a person.
@@ -13,7 +13,7 @@
  */
 import { basename } from "node:path"
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -172,7 +172,7 @@ export const noBranchInFlowStep = {
             !call.callee.computed &&
             call.callee.property.type === "Identifier" &&
             call.callee.property.name === "waitFor" &&
-            typeOrigins(context, call.callee.object).some((origin) => hfs.slotOf(origin.file) === "be.tests.world")
+            typeOrigins(context, call.callee.object).some((origin) => inTestWorld(hfs, origin.file))
 
         /** True when this node sits inside the callback of an `it(...)` or `test(...)`, and not inside a `waitFor` probe. */
         const insideStep = (node) => {

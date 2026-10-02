@@ -8,11 +8,11 @@
  *     `@nestjs/typeorm` options type) with no literal `synchronize: false`; a `synchronize` that is anything but
  *     the literal `false`; `new DataSource(<not an object literal>)` whose options cannot be read; a
  *     `dataSource.synchronize()` or `.dropDatabase()` call; the `migrationsRun` option in any form and a `runMigrations()` /
- *     `undoLastMigration()` call outside `apps/migrate` and the test world; `dropSchema` set to anything but `false`; a schema
+ *     `undoLastMigration()` call outside the cli (apps/cli and src/features/cli) and the test world; `dropSchema` set to anything but `false`; a schema
  *     builder (`createSchemaBuilder()`, `.build()` of typeorm's `SchemaBuilder`); a `synchronize` key in the options of typeorm's
  *     `@Entity` (a per-entity switch is a second authority); a lifecycle hook (`onModuleInit`, `onApplicationBootstrap`) that
- *     writes rows through an `EntityManager` or `DataSource` (seeding runs in `apps/migrate`); a DDL statement in any string
- *     outside the migrations of `persistence/`; and an entity or migration glob. Only `apps/migrate` runs migrations and seeds.
+ *     writes rows through an `EntityManager` or `DataSource` (seeding is a cli command); a DDL statement in any string
+ *     outside the migrations of `persistence/`; and an entity or migration glob. Only the cli (its migrate and seed commands) runs migrations and seeds.
  *   - `no-entity-in-contract` (R37 `BE_ENTITY_IN_CONTRACT`) keeps ORM entities out of the types that cross a boundary:
  *     any type whose declaration carries `@Entity` (from `typeorm`), reached through the type arguments and properties of
  *     a transport signature, the `execute` of a handler, or a `*.contracts.ts`, `*.command.ts` or `*.query.ts` file; and
@@ -26,6 +26,7 @@ import { isTransportSlot } from "./lib/transport-slots.mjs"
 import { keyName, walk } from "./lib/ast.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { baseName, isMigrationFile, packageOfFile } from "./lib/ports.mjs"
+import { inCli } from "./lib/persistence.mjs"
 import { isPackageType, typed } from "./lib/types.mjs"
 import { isDeclarationFile } from "./lib/path.mjs"
 
@@ -38,7 +39,7 @@ const OPTION_PACKAGES = new Set(["typeorm", "@nestjs/typeorm"])
 /** The DataSource operations that change the schema at runtime. */
 const SCHEMA_OPERATIONS = new Set(["synchronize", "dropDatabase"])
 
-/** The DataSource operations that run migrations: allowed only in `apps/migrate` and the test world that runs its bootstrap. */
+/** The DataSource operations that run migrations: allowed only in the cli (apps/cli, src/features/cli) and the test world. */
 const MIGRATION_RUNNERS = new Set(["runMigrations", "undoLastMigration"])
 
 /** The typeorm types whose methods write rows. */
@@ -100,8 +101,8 @@ const isOperationsObject = (context, node) => {
     return members.length > 0 && members.every(isMethod)
 }
 
-/** Whether a file is `apps/migrate` (slot `be.app.migrate`) or the test world that runs its bootstrap: the only places that run migrations and seed. */
-const isMigrationHost = (hfs, filename) => hfs.slotOf(filename) === "be.app.migrate" || inTestWorld(hfs, filename)
+/** Whether a file is the cli (the cli app or the cli feature root, whose migrate and seed commands run them) or the test world: the only places that run migrations and seed. */
+const isMigrationHost = (hfs, filename) => inCli(hfs, filename) || inTestWorld(hfs, filename)
 
 /** The SQL text of a call argument: a literal, a template, or the quasis of a tagged template. */
 const sqlTextOf = (argument) => (argument ? stringsUnder(argument).join(" ") : "")
@@ -134,7 +135,7 @@ const bootWriteOf = (context, method, klass, visited) => {
 /** Whether an object literal has a property called `name`. */
 const hasKey = (objectNode, name) => objectNode.properties.some((property) => property.type === "Property" && !property.computed && keyName(property.key) === name)
 
-/** The schema is decided by migrations run by `apps/migrate`, never by the running process. */
+/** The schema is decided by migrations run by the cli migrate command, never by the running process. */
 export const noRuntimeSchema = {
     meta: {
         type: "problem",
@@ -144,13 +145,13 @@ export const noRuntimeSchema = {
             synchronize: "`synchronize` is set to something other than the literal `false`. The schema changes by migration only; a boot-time ORM diff decides it otherwise.",
             synchronizeMissing: "This DataSource options object does not state `synchronize: false`. Write the literal `false` in every options object, so what the connection may do to the schema is readable where it is built.",
             optionsNotLiteral: "`new DataSource(...)` is given options that are not an object literal, so `synchronize: false` cannot be seen. Pass the options as an object literal that states `synchronize: false`.",
-            synchronizeCall: "`.{{name}}()` changes the schema at runtime. Write a migration and let `apps/migrate` run it.",
-            migrationsRun: "`migrationsRun` is banned. Only `apps/migrate` runs migrations, once per connection, before api and worker start.",
-            runMigrations: "`.{{name}}()` runs migrations outside `apps/migrate`. Only `apps/migrate` (and the test world, which runs its bootstrap) runs them, once per connection, before api and worker start.",
+            synchronizeCall: "`.{{name}}()` changes the schema at runtime. Write a migration and let the cli migrate command run it.",
+            migrationsRun: "`migrationsRun` is banned. Only the cli migrate command (`cli migrate run`) runs migrations, once per connection, before api and worker start.",
+            runMigrations: "`.{{name}}()` runs migrations outside the cli. Only the cli migrate command (and the test world, over the same connections) runs them, once per connection, before api and worker start.",
             dropSchema: "`dropSchema` is set to something other than the literal `false`. A connection never drops the schema it opens; a migration changes it.",
             schemaBuilder: "`{{name}}` builds or logs the schema from the entity metadata at runtime. The schema changes by migration only.",
             entitySynchronize: "`synchronize` is set in the options of `@Entity`. A per-entity switch is a second schema authority next to the connection's literal `false`; delete the key.",
-            bootSeed: "`{{hook}}` writes rows (`{{call}}`), so every process that composes this provider seeds at boot. Seeding runs in `apps/migrate` only, once per connection.",
+            bootSeed: "`{{hook}}` writes rows (`{{call}}`), so every process that composes this provider seeds at boot. Seeding is a cli command, run once per connection.",
             ddl: "A schema-changing statement (`CREATE|ALTER|DROP ...`) outside `persistence/migrations/`. Schema-changing SQL belongs in a migration.",
             glob: "`{{key}}` is found by glob. List the entities and migrations explicitly from each capability's `index.ts` so what runs is what was reviewed.",
         },

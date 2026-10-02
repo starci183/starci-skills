@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
-import { readFoundation } from '../../scripts/kernel/foundations.mjs';
+import { readFoundation } from '../../scripts/kernel/foundation-registry.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, gateShellFoundation, landShellFoundationIfSettled, shellFoundationNeed, shellFoundationWaitOf } from '../../scripts/kernel/shell-foundation.mjs';
 import { checkPrerequisites, prerequisiteDetail, DESIGN_NOT_SETTLED } from '../../scripts/kernel/prerequisites.mjs';
 import { nodeById, treeOf } from '../../scripts/work/layout-tree.mjs';
@@ -128,7 +128,7 @@ test('hard design gate: interface.implement is refused until the ui record it pr
   assert.match(missing[0].why, /does not exist/);
   const detail = prerequisiteDetail({ op: 'interface.implement', jobId: 'j1', unmet: missing });
   assert.match(detail, /DESIGN_NOT_SETTLED/);
-  assert.match(detail, /chưa được chốt nên chưa được viết code/);
+  assert.match(detail, /ch\u01b0a \u0111\u01b0\u1ee3c ch\u1ed1t n\u00ean ch\u01b0a \u0111\u01b0\u1ee3c vi\u1ebft code/);
   // Drawn but not yet accepted (state todo): still refused.
   const ui = uiSkeleton('ui.reports.board', { route: `${CONSOLE}/reports`, surface: 'page' });
   write('.starciwork/features/reports/ui/board/index.yaml', stringifyYaml({ ...ui, state: 'todo' }));

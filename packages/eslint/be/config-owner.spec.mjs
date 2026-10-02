@@ -40,7 +40,7 @@ test("the process environment is read only by the file that declares EnvSource i
         ],
         invalid: [
             { filename: at("src/tests/e2e/plan.e2e-spec.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
-            { filename: at("src/features/plan/application/plan.handler.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
+            { filename: at("src/features/api/plan/application/plan.handler.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
@@ -128,6 +128,9 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
             // a Secret compared for presence, and a value that is not read out of a Secret
             { filename: SERVICE, code: `${CFG}if (maybeSecret === undefined) {}` },
             { filename: SERVICE, code: `${CFG}if (url === other) {}` },
+            // a digest of a Hash is an integrity fingerprint only when it is not compared as the answer of a keyed hash; the call is read by where `digest` is declared
+            { filename: SERVICE, code: 'declare const reader: { digest(encoding: string): string }\nif (reader.digest("hex") === "x") {}' },
+            { filename: SERVICE, code: 'import { createHash } from "crypto"\nconst a = createHash("sha256").update("x").digest("hex")\nconst b = a.length\nif (b === 3) {}' },
         ],
         invalid: [
             { filename: SERVICE, code: "if (token === expected) {}", errors: [{ messageId: "compare" }] },
@@ -140,6 +143,9 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
             // by TYPE: the Secret brand of platform/config, or a value read out of it, whatever it is called
             { filename: SERVICE, code: `${CFG}if (secret.reveal() === provided) {}`, errors: [{ messageId: "compare" }] },
             { filename: SERVICE, code: `${CFG}const expectedValue = secret\nif (incoming !== expectedValue) {}`, errors: [{ messageId: "compare" }] },
+            // by TYPE: the digest of a Hash or Hmac of Node's crypto, whatever the variable is called
+            { filename: SERVICE, code: 'import { createHmac } from "crypto"\ndeclare const provided: string\nif (createHmac("sha256", "k").update("body").digest("hex") === provided) {}', errors: [{ messageId: "compare" }] },
+            { filename: SERVICE, code: 'import { createHash } from "crypto"\ndeclare const provided: string\nif (provided !== createHash("sha256").update("body").digest("base64")) {}', errors: [{ messageId: "compare" }] },
         ],
     })
 })
@@ -156,7 +162,7 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
         valid: [
             { filename: MAIN, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
             { filename: MAIN, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
-            { filename: at("apps/migrate/src/main.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
+            { filename: at("apps/cli/src/main.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
             // the config file calls its own parser (its real content, so the fixture project keeps one truth)
             { filename: PLATFORM_CONFIG_FILE, code: readFileSync(PLATFORM_CONFIG_FILE, "utf8") },
             { filename: CONFIG_SPEC, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },

@@ -38,7 +38,7 @@ import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mj
 import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
-import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
+import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -267,7 +267,6 @@ export const isArchivedRefusal = (r) => ARCHIVED_REFUSAL.test(`${r?.error ?? ''}
 ${r?.stderr ?? ''}
 ${r?.stdout ?? ''}
 ${JSON.stringify(r?.value ?? null)}`);
-export const _terminalRuns = terminalRuns;
 
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
@@ -494,7 +493,7 @@ export default {
 
 /* ------------------------------------------------------------------------------------------------ --dry */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   if (!argv.includes('--dry')) { console.error('use: job.mjs --dry [--repo <path>] [--workflow <id>] [--json]'); process.exit(2); }

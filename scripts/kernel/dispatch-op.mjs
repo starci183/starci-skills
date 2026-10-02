@@ -18,8 +18,8 @@
 // owner's and the kernel's overrides against the brief with the same function
 // that resolves them here, so a value refused at enqueue cannot appear in a packet.
 //
-// The preview's orca commands are the launch api dispatch issues: task-create, then
-//   orca orchestration worker-start --task <task> --worktree <sel> --agent <provider> [--model <id> --effort <level>]
+// The preview's orca command is the launch api dispatch issues (it files the Task itself):
+//   orca orchestration worker-start --spec <prompt> --worktree <sel> --agent <provider> [--model <id> --effort <level>]
 // CLI:
 //   node scripts/kernel/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
 //       [--params '<json>'] [--model <target>] [--budget <n>] [--lease <token>]
@@ -33,6 +33,7 @@ import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-own
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
 import { buildOpPrompt } from './op-prompt.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -257,8 +258,7 @@ function main() {
   // The launch api dispatch issues for this packet (modules/kernel/dispatch.yaml spawnMechanics).
   const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel, modelsDir });
   const orcaCommands = [
-    { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${args.op} #<attempt>`, '--display-name', title, '--spec', '<prompt>', '--json'] },
-    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<operation-task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>',
+    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${args.op} #<attempt>`, '--display-name', title, '--worktree', worktree, '--agent', model.provider ?? '<agent>',
       ...(launchModel.error ? [] : ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])]), '--run', '<workflow-run-id>', '--json'],
       ...(launchModel.error ? { note: `${model.target} has no launch model: ${launchModel.error}` } : {}) },
   ];
@@ -301,4 +301,4 @@ function main() {
   for (const line of prompt.split('\n')) console.log(`  | ${line}`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

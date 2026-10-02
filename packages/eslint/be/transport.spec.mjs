@@ -23,7 +23,7 @@ const tester = typedTester()
 /** The fixture with the feature kinds enabled (a webhook door has its own slot). */
 const kinds = typedTester({ declaration: { ...BE_DECLARATION, patterns: ["webhooks", "realtime"] } })
 const WEBHOOK = at("src/features/webhooks/payment/transport/http/payment.webhook.ts")
-const T = "src/features/plan/transport"
+const T = "src/features/api/plan/transport"
 const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)
 const DTO = at(`${T}/graphql/dto/place-order.input.ts`)
 const CONTROLLER = at(`${T}/http/pay.controller.ts`)
@@ -211,16 +211,16 @@ test("no-capability-imports-features: a capability never imports a feature", () 
             { filename: DOMAIN, code: `import { x } from "@modules/platform/cqrs"\nexport { x }` },
             // a feature importing a capability, or another file of its own owner
             { filename: RESOLVER, code: `import { x } from "@modules/domain/order"\nexport { x }` },
-            { filename: RESOLVER, code: `import { x } from "@features/plan"\nexport { x }` },
+            { filename: RESOLVER, code: `import { x } from "@features/api/plan"\nexport { x }` },
             // a package whose name spells features
             { filename: DOMAIN, code: `import { x } from "features"\nexport { x }` },
         ],
         invalid: [
-            { filename: DOMAIN, code: `import { x } from "@features/plan"\nexport { x }`, errors: [{ messageId: "reversed" }] },
-            { filename: DOMAIN, code: `import { x } from "../../../features/plan"\nexport { x }`, errors: [{ messageId: "reversed" }] },
-            { filename: PLATFORM, code: `export { x } from "@features/plan"`, errors: [{ messageId: "reversed" }] },
-            { filename: INTEGRATION, code: `export const load = () => import("@features/plan")`, errors: [{ messageId: "reversed" }] },
-            { filename: DOMAIN, code: `const plan = require("@features/plan")\nexport { plan }`, errors: [{ messageId: "reversed" }] },
+            { filename: DOMAIN, code: `import { x } from "@features/api/plan"\nexport { x }`, errors: [{ messageId: "reversed" }] },
+            { filename: DOMAIN, code: `import { x } from "../../../features/api/plan"\nexport { x }`, errors: [{ messageId: "reversed" }] },
+            { filename: PLATFORM, code: `export { x } from "@features/api/plan"`, errors: [{ messageId: "reversed" }] },
+            { filename: INTEGRATION, code: `export const load = () => import("@features/api/plan")`, errors: [{ messageId: "reversed" }] },
+            { filename: DOMAIN, code: `const plan = require("@features/api/plan")\nexport { plan }`, errors: [{ messageId: "reversed" }] },
         ],
     })
 })

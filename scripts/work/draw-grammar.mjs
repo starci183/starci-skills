@@ -18,12 +18,13 @@
 //        without a built dist points it at the live checkout's)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from './draw/draw-source.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { isFile } from './work-io.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const GRAMMAR_SOURCES = Object.freeze(['product', 'claude-dist']);
 export const PREFERENCES = Object.freeze(['auto', ...GRAMMAR_SOURCES]);
@@ -44,7 +45,7 @@ export const builtGrammar = (root) => isFile(path.join(root, 'package.json')) &&
  */
 export function mainWorktreeOf(dir) {
   try {
-    const r = runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], { dir, timeout: 10_000 });
+    const r = revParseQuery(['--path-format=absolute', '--git-common-dir'], { dir, timeout: 10_000 });
     const common = r.status === 0 ? r.stdout.trim() : '';
     if (!common || path.basename(common) !== '.git') return null;
     const main = path.dirname(common);
@@ -149,6 +150,6 @@ async function main(argv) {
   return r.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-grammar: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

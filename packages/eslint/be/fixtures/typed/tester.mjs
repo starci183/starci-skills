@@ -16,7 +16,7 @@ export const TYPED_ROOT = dirname(fileURLToPath(import.meta.url))
 
 /** The default be side of the fixture app (hfs.json sides.be). */
 export const BE_DECLARATION = Object.freeze({
-    apps: [{ name: "api", kind: "api" }, { name: "migrate", kind: "migrate" }],
+    apps: [{ name: "api", kind: "api" }, { name: "cli", kind: "cli" }],
     connections: [{ name: "primary", envPrefix: "PRIMARY_DB", owner: "api", isolation: "database" }],
 })
 

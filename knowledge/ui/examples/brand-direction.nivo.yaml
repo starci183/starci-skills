@@ -569,7 +569,6 @@ direction:
   voice:
     locale: vi
     keepEnglish:
-      - AgentOS
       - Workspace
       - Site
       - Context
@@ -837,7 +836,7 @@ direction:
       ruling: "black - the brand ink #040d1c is the main colour (accent: primary buttons, meters, emphasis);
         red #e3001f only for artwork/mascot and danger"
       receipt: "owner, desktop chat 2026-09-27 - 'lock it' on 'lock the main black colour into the Nivo brand' (owner-rulings.yaml
-        nivo-main-colour-ink). Owed: nivo-fe binds --nivo-accent to #040d1c with accent-foreground #fff, and
+        nivo-main-colour-ink). Owed: the Nivo front end binds --nivo-accent to #040d1c with accent-foreground #fff, and
         brand.decide records it in the Nivo brand record colour section"
   conflicts:
     - id: D1

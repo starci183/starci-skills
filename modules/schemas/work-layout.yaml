@@ -127,7 +127,7 @@ shape:
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
     - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
-      STARCIWORK_GITIGNORE, written by scripts/example/work-example.mjs for the example trees): deny the root,
+      STARCIWORK_GITIGNORE): deny the root,
       re-admit the productPaths roots, deny agent output inside them. Side folders have no .starciwork."
     - "/*"
     - "!/.gitignore !/.gitattributes !/workspace.yaml !/index.yaml"
@@ -499,8 +499,8 @@ rules:
 example:
   _resources/:
     - environments/dev/resource.yaml
-    - identities/todo-app-demo/resource.yaml
-    - fixtures/todo-app-seed/resource.yaml
+    - identities/ecommerce-app-demo/resource.yaml
+    - fixtures/ecommerce-app-seed/resource.yaml
   brand/:
     - index.yaml
     - assets/mascot/rest.png

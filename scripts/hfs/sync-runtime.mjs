@@ -15,7 +15,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CHECK_CODES } from './check.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The runtime files the slot resolver needs; both bundles carry them. */
@@ -30,8 +31,8 @@ const SLOT_FILES = [
   'scripts/hfs/allows.mjs',
   'knowledge/hfs/slots.yaml',
 ];
-/** The entry modules of `hfs check`; everything they import, statically, is bundled. */
-const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs'];
+/** The entry modules of `hfs check` and `hfs secret`; everything they import, statically, is bundled. */
+const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs'];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
 /** A read of the migration DDL of one store: `migrations/runtime` or `migrations/machine`. */
@@ -119,7 +120,7 @@ export function driftOfRuntime() {
   return problems;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const problems = driftOfRuntime();
     for (const p of problems) process.stderr.write(`${GENERATED_DRIFT} runtime copy drift: ${p} (run node scripts/hfs/sync-runtime.mjs)\n`);
@@ -130,7 +131,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const bundle of Object.keys(BUNDLES)) {
       const bundleRoot = path.join(runtimeRoot, bundle);
       // A generated copy is never a held artifact: nothing but this script writes it.
-      const removed = safeRemoveTree(bundleRoot, { hold: () => null });
+      const removed = safeRemove(bundleRoot, { hold: () => null });
       if (!removed.ok) throw new Error(`cannot clear ${bundle}: ${removed.errors.map((e) => e.message).join("; ")}`);
       for (const [file, text] of expectedBundle(bundle)) {
         const target = path.join(bundleRoot, file);

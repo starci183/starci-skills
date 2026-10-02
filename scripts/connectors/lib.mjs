@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawnNode } from '../api/node/spawn-node.mjs';
 import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/db/ledger.mjs';
 import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
@@ -213,7 +213,7 @@ export const connectorLog = (source, msg, { env = process.env, level = 'info', k
 
 /** Launch `node <script> ...args` detached from this process, output discarded. */
 export const spawnDetached = (script, args = [], { env = process.env } = {}) => {
-  const child = spawn(process.execPath, [script, ...args], { detached: true, stdio: 'ignore', windowsHide: true, cwd: skillRoot, env });
+  const child = spawnNode([script, ...args], { detached: true, stdio: 'ignore', cwd: skillRoot, env });
   child.unref();
   return child.pid ?? null;
 };

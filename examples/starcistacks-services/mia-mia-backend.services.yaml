@@ -30,7 +30,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
-    qualityGate: starci-new-code
+    qualityGate: starci-quality
     projects:
       - {repository: mia-mia-backend, key: mia-mia-backend}
     credentials:

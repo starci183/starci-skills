@@ -6,18 +6,18 @@ import { archFixture, runArch, findings } from '../helpers/hfs-arch-be-fixture.m
 // and messages/ only, and each of those holds only what its slot allows (knowledge/hfs/slots.yaml).
 const E = 'export const value = 1;\n';
 const GOOD = {
-  'src/features/a/index.ts': E,
-  'src/features/a/a.module.ts': E,
-  'src/features/a/application/run.command.ts': E,
-  'src/features/a/application/run.handler.ts': E,
-  'src/features/a/application/support/run-order.policy.ts': E,
-  'src/features/a/transport/graphql/a-graphql.module.ts': E,
-  'src/features/a/transport/graphql/run.resolver.ts': E,
-  'src/features/a/transport/graphql/run.mapper.ts': E,
-  'src/features/a/transport/graphql/dto/run.input.ts': E,
-  'src/features/a/transport/http/a-http.module.ts': E,
-  'src/features/a/transport/http/run.controller.ts': E,
-  'src/features/a/messages/a.messages.ts': E,
+  'src/features/api/a/index.ts': E,
+  'src/features/api/a/a.module.ts': E,
+  'src/features/api/a/application/run.command.ts': E,
+  'src/features/api/a/application/run.handler.ts': E,
+  'src/features/api/a/application/support/run-order.policy.ts': E,
+  'src/features/api/a/transport/graphql/a-graphql.module.ts': E,
+  'src/features/api/a/transport/graphql/run.resolver.ts': E,
+  'src/features/api/a/transport/graphql/run.mapper.ts': E,
+  'src/features/api/a/transport/graphql/dto/run.input.ts': E,
+  'src/features/api/a/transport/http/a-http.module.ts': E,
+  'src/features/api/a/transport/http/run.controller.ts': E,
+  'src/features/api/a/messages/a.messages.ts': E,
 };
 const DECLARE = { declaration: { optionalSlots: [] } };
 const hits = report => findings(report, 'BE_FEATURE_SHAPE');
@@ -34,21 +34,21 @@ test('a feature with the allowed root, application, transport and messages files
 
 test('a stray file, a transport module, or a folder at the feature root is BE_FEATURE_SHAPE', t => {
   const report = run(t, {
-    'src/features/a/helper.ts': E,
-    'src/features/a/a-graphql.module.ts': E,
-    'src/features/a/README.md': '# a\n',
-    'src/features/a/shared/clock.ts': E,
+    'src/features/api/a/helper.ts': E,
+    'src/features/api/a/a-graphql.module.ts': E,
+    'src/features/api/a/README.md': '# a\n',
+    'src/features/api/a/shared/clock.ts': E,
   });
-  assert.deepEqual(paths(report), ['src/features/a/README.md', 'src/features/a/a-graphql.module.ts', 'src/features/a/helper.ts', 'src/features/a/shared/clock.ts']);
+  assert.deepEqual(paths(report), ['src/features/api/a/README.md', 'src/features/api/a/a-graphql.module.ts', 'src/features/api/a/helper.ts', 'src/features/api/a/shared/clock.ts']);
   assert.match(hits(report).find(item => item.folder === 'shared').message, /no slot owns/);
 });
 
 test('a protocol-named folder under application/ and an unknown transport protocol are BE_FEATURE_SHAPE', t => {
   const report = run(t, {
-    'src/features/a/application/graphql/run.resolver.ts': E,
-    'src/features/a/transport/grpc/run.service.ts': E,
+    'src/features/api/a/application/graphql/run.resolver.ts': E,
+    'src/features/api/a/transport/grpc/run.service.ts': E,
   });
-  assert.deepEqual(paths(report), ['src/features/a/application/graphql/run.resolver.ts', 'src/features/a/transport/grpc/run.service.ts']);
+  assert.deepEqual(paths(report), ['src/features/api/a/application/graphql/run.resolver.ts', 'src/features/api/a/transport/grpc/run.service.ts']);
 });
 
 // A handler has no spec of its own (BE-CONVENTION 1.16 unit standard, owner-locked lane UT; slot be.feature.application
@@ -56,20 +56,20 @@ test('a protocol-named folder under application/ and an unknown transport protoc
 // the folder does not allow.
 test('a file of a role its folder does not allow is BE_FEATURE_SHAPE (application and transport slots)', t => {
   const report = run(t, {
-    'src/features/a/application/run.handler.spec.ts': E,
-    'src/features/a/application/run.use-case.ts': E,
-    'src/features/a/application/run.service.ts': E,
-    'src/features/a/transport/graphql/run.controller.ts': E,
-    'src/features/a/transport/http/dto/run.input.ts': E,
-    'src/features/a/messages/other.messages.ts': E,
+    'src/features/api/a/application/run.handler.spec.ts': E,
+    'src/features/api/a/application/run.use-case.ts': E,
+    'src/features/api/a/application/run.service.ts': E,
+    'src/features/api/a/transport/graphql/run.controller.ts': E,
+    'src/features/api/a/transport/http/dto/run.input.ts': E,
+    'src/features/api/a/messages/other.messages.ts': E,
   });
   assert.deepEqual(paths(report), [
-    'src/features/a/application/run.handler.spec.ts',
-    'src/features/a/application/run.service.ts',
-    'src/features/a/application/run.use-case.ts',
-    'src/features/a/messages/other.messages.ts',
-    'src/features/a/transport/graphql/run.controller.ts',
-    'src/features/a/transport/http/dto/run.input.ts',
+    'src/features/api/a/application/run.handler.spec.ts',
+    'src/features/api/a/application/run.service.ts',
+    'src/features/api/a/application/run.use-case.ts',
+    'src/features/api/a/messages/other.messages.ts',
+    'src/features/api/a/transport/graphql/run.controller.ts',
+    'src/features/api/a/transport/http/dto/run.input.ts',
   ]);
 });
 

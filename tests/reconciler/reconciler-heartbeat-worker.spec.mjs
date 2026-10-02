@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { STALL_MIN_MS, STALL_LOG_MS, STALL_REPEAT_MS, heartbeatPlan, startHeartbeatWorker } from '../../scripts/reconciler/heartbeat-worker.mjs';
 import { Engine, safeForStart } from '../../scripts/reconciler/engine.mjs';
 import { engineIsSafe, engineItems, safeShadowOf } from '../../scripts/reconciler/start.mjs';
-import { listHostProcessesAsync } from '../../scripts/api/process/process-list.mjs';
+import { processListAsync } from '../../scripts/api/process/process-list-async.mjs';
 import { tempState } from '../../scripts/reconciler/testing.mjs';
 
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
@@ -83,15 +83,15 @@ test('start.mjs reads safe mode from the live state: a self-reload run that forc
   assert.deepEqual(safeShadowOf({ leader: { ...leader, fresh: false }, modes: modes('shadow') }), [], 'a stale engine is reported as stale, not as safe');
 });
 
-test('listHostProcessesAsync reads the table without blocking: rows parsed, a failed read is null', async () => {
+test('processListAsync reads the table without blocking: rows parsed, a failed read is null', async () => {
   const seen = [];
-  const rows = await listHostProcessesAsync({ platform: 'win32', cpu: true, run: async (cmd, args) => { seen.push(cmd); return { status: 0, stdout: JSON.stringify([{ pid: 4, ppid: 0, name: 'System', cmd: '', cpu: 1.5 }, { pid: 9, ppid: 4, name: 'node.exe', cmd: 'node x.mjs' }]) }; } });
+  const rows = await processListAsync({ platform: 'win32', cpu: true, run: async (cmd, args) => { seen.push(cmd); return { status: 0, stdout: JSON.stringify([{ pid: 4, ppid: 0, name: 'System', cmd: '', cpu: 1.5 }, { pid: 9, ppid: 4, name: 'node.exe', cmd: 'node x.mjs' }]) }; } });
   assert.deepEqual(seen, ['powershell.exe']);
   assert.deepEqual(rows.map((r) => r.pid), [4, 9]);
   assert.equal(rows[1].cmd, 'node x.mjs');
-  assert.equal((await listHostProcessesAsync({ platform: 'win32', match: /x\.mjs/, run: async () => ({ status: 0, stdout: JSON.stringify({ pid: 9, ppid: 4, name: 'node.exe', cmd: 'node x.mjs' }) }) })).length, 1);
-  assert.equal(await listHostProcessesAsync({ platform: 'win32', run: async () => ({ status: 1, stdout: '' }) }), null);
-  assert.equal(await listHostProcessesAsync({ platform: 'win32', run: async () => { throw new Error('boom'); } }), null);
+  assert.equal((await processListAsync({ platform: 'win32', match: /x\.mjs/, run: async () => ({ status: 0, stdout: JSON.stringify({ pid: 9, ppid: 4, name: 'node.exe', cmd: 'node x.mjs' }) }) })).length, 1);
+  assert.equal(await processListAsync({ platform: 'win32', run: async () => ({ status: 1, stdout: '' }) }), null);
+  assert.equal(await processListAsync({ platform: 'win32', run: async () => { throw new Error('boom'); } }), null);
 });
 
 test('leaderState reads the live leader and safe mode from machine.sqlite (mode_changes reason of the current mode)', async (t) => {

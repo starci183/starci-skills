@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { AgentFamily } from '../../contract';
 import type { Concept } from '../concept';
+import { t } from '../../i18n/t';
 import claudeSvg from './logos/claude.svg?raw';
 import openaiSvg from './logos/openai.svg?raw';
 import devinPng from './logos/devin.png';
@@ -33,7 +34,7 @@ export const familyTint: Record<AgentFamily, { name: string; tone: string }> = {
   claude: { name: 'Claude', tone: 'neutral' },
   codex: { name: 'Codex', tone: 'neutral' },
   devin: { name: 'Devin', tone: 'neutral' },
-  unknown: { name: 'Chưa rõ', tone: 'skipped' },
+  unknown: { name: t('Unknown'), tone: 'skipped' },
 };
 
 /** Logos sit on a plain card-coloured circle so the brand colours read as-is in both themes. */

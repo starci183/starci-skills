@@ -7,14 +7,13 @@ import {spawnSync} from 'node:child_process';
 import {changeWorkflowPhase,inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../../scripts/supervisor/stall.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
-// mia-mia wf-miamia-work-and-stacks-mud7kjun sat at orphaned-frontier / actionable:true with zero open
-// operations: its next approved op (brand.decide) cannot pass preflight until PEER workflow
-// wf-miamia-base-repos-mud7kk5c installs @starci/grammar 0.5.0 (inc-0aebf976e625, inc-64d1d237f5e0, peer
-// requests pm-ab67deff28d8 / pm-fe941a794752). The projection woke the Kernel for nothing and hid the
+// A workflow sat at orphaned-frontier / actionable:true with zero open
+// operations: its next approved op (brand.decide) cannot pass preflight until a PEER workflow
+// installs @starci/grammar 0.5.0. The projection woke the Kernel for nothing and hid the
 // cause. `api incident --kind peer-wait --peer <workflowId>` records the wait: the frontier reads peer-wait,
 // not actionable; the held jobs read queuedBecause peer-wait; a message from that peer wakes the Kernel
 // (and resolves an --until-message wait); the supervisor judges the wait instead of alerting STALLED.
@@ -23,7 +22,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const lastLine=text=>json(String(text).trim().split('\n').at(-1));
 
-const WORK='wf-miamia-work-and-stacks-mud7kjun',BASE='wf-miamia-base-repos-mud7kk5c',DONE='wf-miamia-finished',OTHER='wf-miamia-other';
+const WORK='wf-todo-app-work-and-stacks-mud7kjun',BASE='wf-todo-app-base-repos-mud7kk5c',DONE='wf-todo-app-finished',OTHER='wf-todo-app-other';
 const DETAIL='brand.decide preflight needs installed @starci/grammar 0.5.0 in FE; peer owns the FE upgrade (pm-ab67deff28d8)';
 
 const fixture=t=>{
@@ -141,9 +140,9 @@ test('a peer-wait on a peer that stopped running can never be met: the frontier 
 });
 
 /* ------------------------------------------------ settles deferred behind a wait */
-// nivo wf-nivo-app-auth-mudqjob3 consumed op-backend.implement-86ff31372a's report and deliberately held
-// its cut-closing settle until peer wf-nivo-workspace-provision-mudqjokb landed a commit, recorded as
-// peer-wait inc-9f2e1e7ff1f6 --holds <that job>. Status still read settle-ready ACTIONABLE (a wait held
+// A workflow consumed a backend.implement job's report and deliberately held
+// its cut-closing settle until a peer workflow landed a commit, recorded as
+// a peer-wait --holds <that job>. Status still read settle-ready ACTIONABLE (a wait held
 // only queued jobs), so the watchdog re-woke the Kernel every tick and stall.mjs alerted STALLED.
 const SETTLE_JOB='op-backend.implement-86ff31372a',OTHER_SETTLE='op-backend.implement-1234567890';
 const seedConsumed=(ledger,workflowId,jobId,{op='backend.implement',at=Date.now()}={})=>{
@@ -256,8 +255,8 @@ test('stall: STALE-PEER-WAIT when the peer is idle too',t=>{
 });
 
 test('stall: a peer whose ledger is quiet but whose worker or Kernel is mid-turn is working, not idle',t=>withLedger(t,({repoRoot,ledger})=>{
-  // nivo AUTH inc-9f2e1e7ff1f6 read STALE-PEER-WAIT + STALLED while its peer's
-  // op-backend.implement-82b3110067 worker (Devin) was active: only ledger events counted.
+  // A workflow read STALE-PEER-WAIT + STALLED while its peer's
+  // backend.implement worker (Devin) was active: only ledger events counted.
   seedPair(ledger,{peerMovedAgoMin:90});
   const asked=[];
   const workerBusy=(repo,wf)=>{asked.push(wf);return wf===BASE?{...parked(),workers:[{jobId:'op-backend.implement-82b3110067',liveness:'active'}]}:parked();};
@@ -345,7 +344,7 @@ test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD
   });
 });
 
-/* sn-subscription inc-6156f4a868e9: judgePeerWait read the job ids in the wait's text and refs, never its
+/* judgePeerWait read the job ids in the wait's text and refs, never its
  * typed until set, and followed no retry lineage - a wait whose until-job already followed the running retry
  * head read STALE-PEER-WAIT once the named attempt settled failed. */
 const FAILED_JOB='op-backend.implement-fa50f7be16',RETRY_JOB='op-backend.implement-77798b1b10';

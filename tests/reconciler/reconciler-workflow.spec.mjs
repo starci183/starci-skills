@@ -17,7 +17,7 @@ const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-collab-group-chat-mudqjp5g';
 const PEER = 'wf-nivo-app-auth-mudqjob3';
-const LEDGER = 'nivo-backend';
+const LEDGER = 'todo-app-be';
 const HELD = ['op-interface.implement-0a1619a4ac', 'op-interface.implement-a485eea143', 'op-interface.implement-490960859c'];
 const GATE_TEXT = `Runtime now requires the product app shell record .starciwork/shell/index.yaml (work/app-shell@1) before interface.draw/implement dispatch; it is absent. Owner decision pending in peer ${PEER}'s ask. Resolve when the shell record exists (peer heads-up).`;
 const GOAL = { markdown: '# Collab\nGroup chat for the Nivo app.' };
@@ -109,7 +109,7 @@ test('a stall past progress.supervisorGraceMs escalates the same progress-stall 
 }));
 
 test('a running workflow with a null goal text gets a critical GOAL_TEXT_MISSING clock, which the SLA pass reports with one DI', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
-  seed(ledger, { goal: { markdown: 'Goal gốc: null' }, progressAgoMin: 5 });
+  seed(ledger, { goal: { markdown: 'Goal g\u1ed1c: null' }, progressAgoMin: 5 });
   const { ctx } = fakeCtx({ repoRoot, ledgerFile });
   await reconcileWorkflow(keyOf(LEDGER, WF), ctx);
   const clock = clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).find((c) => c.state === 'GOAL_TEXT_MISSING');

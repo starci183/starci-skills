@@ -1,0 +1,15 @@
+# source-language.pending - source files that still carry Vietnamese (shrink-only; scripts/checks/check-doc-language.mjs, HFS_SOURCE_NOT_ENGLISH).
+# Convert a file (comments to English, owner-visible strings through scripts/lib/i18n.mjs or ui/src/i18n/t.ts) and delete its line.
+scripts/agent/bias.mjs
+scripts/checks/check-guidance-commands.mjs
+scripts/checks/check-hfs-rules.mjs
+scripts/connectors/telegram.mjs
+scripts/kernel/ask-server.mjs
+scripts/kernel/progress-rca.mjs
+scripts/lib/redact.mjs
+scripts/machine/owner-claim.mjs
+scripts/supervisor/owed.mjs
+scripts/work/draw-feedback.mjs
+scripts/work/draw/draw-quality.mjs
+scripts/work/grammar-proposal.mjs
+scripts/work/ui-archetype.mjs

@@ -9,8 +9,8 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,bindKernelJob,crea
 import {allocationMs} from '../../engine/config.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
 
-// nivo inc-f1b576fb6006 (2026-09-25, wf-nivo-collab-group-chat-mudqjp5g): Codex op
-// op-interface.implement-2face44a5b froze its frame at "Working (5m 30s • esc to interrupt)" for 50
+// A Codex op
+// froze its frame at "Working (5m 30s • esc to interrupt)" for 50
 // minutes. status read it turn-idle (stale-active) and nudge-ready; Orca showed the terminal writable but
 // refused both nudges terminal_not_writable; reconcile --dead-worker refused it as worker-alive. No verb
 // could move it. Meanwhile its Orca dispatch heartbeat every 5-10 minutes: the worker was working.
@@ -31,7 +31,7 @@ const FROZEN_CODEX=[
   '    454:       invite: {','    455:         title: t("invite.title"),',
   '• Working (5m 30s • esc to interrupt)',
   '› Ask Codex to do anything',
-  '  gpt-6-sol high · D:\\Repositories\\nivo-backend · Report task outcome',
+  `  gpt-6-sol high · ${path.join(os.tmpdir(), 'todo-app-be')} · Report task outcome`,
 ].join('\n');
 
 const fixture=t=>{
@@ -174,7 +174,7 @@ test('terminal-send reissues an ambiguous prompt failure once with its --retry-r
   assert.deepEqual(sends.map(s=>[s.retryRequest,s.waitSubmit]),[[null,null],['req_7f3a','5']],'one blind send, one reissue bound to its request id');
 });
 
-// starci-next inc-5e126e55cef4 / inc-32adb2f77bf5 (2026-09-26 01:13): after three Orca restarts every
+// After three Orca restarts every
 // worker terminal came back with an empty lastOutputAt. observeOperationWorker read Number('') / Number(null)
 // as 0, aged the output from the epoch (outputAgeMs ~1.79e12), and every spinning worker read
 // turn-idle stale-active and nudge-ready. An unknown output time is never an age.

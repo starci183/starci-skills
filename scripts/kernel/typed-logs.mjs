@@ -2,8 +2,7 @@
 // (engine/db/ledger.mjs ledgerFileFor; engine/db/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
 // workflow is archived and deleted as a unit).
 // Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
-// BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold
-// the ledger's write lock for more than milliseconds.
+// BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold the ledger's write lock for more than milliseconds.
 //
 //   logs(seq, at, workflow_id -> workflows, job_id?, actor, node_id?, level, kind, msg, data_json, refs_json, src?)
 //
@@ -35,8 +34,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
@@ -278,11 +278,11 @@ const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v 
 
 /**
  * The typed rows one ledger event stands for, without writing: pure but for `ctx` lookups —
- * ctx.jobOf(jobId) -> {op_id, attempt (try_no), result_json (settle result)}, ctx.checksOf({jobId, attemptId}) -> [{name, command, exitCode, evidence}]
- * (the independent check runs of the event's attempt, else the job's newest attempt).
+ * ctx.jobOf(jobId) -> {op_id, attempt (try_no), result_json (settle result)}, ctx.checksOf({jobId, attemptId}) -> [{name, command, exitCode, evidence}] (the independent check runs of the event's attempt, else the job's newest attempt).
  * Each row carries src `ev:<ledger>:<seq>[:i]`, so re-deriving stores nothing twice.
  */
 export function rowsOfEvent(event, ctx = {}) {
+  const tr = translator(ownerLanguage());
   const p = event.payload ?? (() => { try { return JSON.parse(event.payload_json || '{}') ?? {}; } catch { return {}; } })();
   const base = { at: event.created_at, workflowId: event.workflow_id, actor: 'runtime' };
   const src = (i = null) => `ev:${ctx.ledgerKey ?? 'l'}:${event.seq}${i == null ? '' : `:${i}`}`;
@@ -292,24 +292,24 @@ export function rowsOfEvent(event, ctx = {}) {
   const attempt = intOr(p.attempt) ?? intOr(job?.attempt);
   switch (event.kind) {
     case 'op-dispatched':
-      return [{ ...base, jobId, kind: 'dispatch', src: src(), msg: `Giao ${op ?? 'op'}${attempt ? ` (lần ${attempt})` : ''} cho ${p.model ?? 'agent'}${p.modelId ? ` · ${p.modelId}` : ''}`,
+      return [{ ...base, jobId, kind: 'dispatch', src: src(), msg: tr('Dispatch {op}{try} to {model}{modelId}', { op: op ?? 'op', try: attempt ? tr(' (try {n})', { n: attempt }) : '', model: p.model ?? 'agent', modelId: p.modelId ? ` · ${p.modelId}` : '' }),
         data: compact({ op: op ?? 'op', attempt, model: strOr(p.model), modelId: strOr(p.modelId), effort: strOr(p.effort), dispatchId: strOr(p.dispatch) }) }];
     case 'dispatch-rejected': {
       // The error is often the host's whole JSON reply: its failed stage and last error say what happened.
       const raw = String(p.error ?? '');
       const stage = /"failedStage"\s*:\s*"([^"]+)"/.exec(raw)?.[1], lastError = /"lastError"\s*:\s*"([^"]+)"/.exec(raw)?.[1];
-      return [{ ...base, jobId, kind: 'error', level: 'error', src: src(), msg: `Giao ${op ?? 'op'} thất bại ở bước ${p.step ?? '?'}${lastError ? ` (${lastError})` : ''}`,
+      return [{ ...base, jobId, kind: 'error', level: 'error', src: src(), msg: tr('Dispatch of {op} failed at step {step}{err}', { op: op ?? 'op', step: p.step ?? '?', err: lastError ? ` (${lastError})` : '' }),
         data: compact({ code: 'dispatch-rejected', message: stage || lastError ? `${stage ?? '?'}: ${lastError ?? '?'}` : (clipText(raw, 600) || 'dispatch rejected'),
           hint: [p.step ? `step ${p.step}` : null, p.provider ? `provider ${p.provider}` : null].filter(Boolean).join(' · ') || undefined }) }];
     }
     case 'report-filed':
-      return [{ ...base, jobId, kind: 'report', src: src(), msg: `Op nộp báo cáo: ${p.outcome ?? '?'}`, refs: strOr(p.report) ? [p.report] : [],
+      return [{ ...base, jobId, kind: 'report', src: src(), msg: tr('The op filed its report: {outcome}', { outcome: p.outcome ?? '?' }), refs: strOr(p.report) ? [p.report] : [],
         data: compact({ outcome: String(p.outcome ?? 'unknown'), op, attempt, reportRef: strOr(p.report) }) }];
     case 'checks-recorded': {
       const checks = jobId && ctx.checksOf ? ctx.checksOf({ jobId, attemptId: event.attempt_id ?? null }) : [];
       const results = checks.map((c, i) => {
         const pass = Number(c?.exitCode) === 0;
-        return { ...base, actor: 'check', jobId, kind: 'check.result', src: src(i), msg: `${pass ? 'Đạt' : 'Trượt'}: ${clipText(c?.name ?? 'check', 120)}`,
+        return { ...base, actor: 'check', jobId, kind: 'check.result', src: src(i), msg: pass ? tr('Pass: {name}', { name: clipText(c?.name ?? 'check', 120) }) : tr('Fail: {name}', { name: clipText(c?.name ?? 'check', 120) }),
           data: compact({ name: String(c?.name ?? 'check'), pass, command: strOr(c?.command), exit: intOr(c?.exitCode), evidence: strOr(c?.evidence) && clipText(c.evidence, 600) }) };
       });
       // The command each recorded check ran, as the runtime knows it: exit, duration when recorded, the evidence file.
@@ -320,7 +320,7 @@ export function rowsOfEvent(event, ctx = {}) {
         const evidenceRef = evidence && PATHISH.test(evidence.trim()) ? evidence.trim() : undefined;
         const exit = Number.isInteger(c?.exitCode) ? c.exitCode : (Number.isInteger(Number(c?.exitCode)) && c?.exitCode !== null && c?.exitCode !== '' ? Number(c.exitCode) : -1);
         const durationMs = c?.durationMs != null && Number.isFinite(Number(c.durationMs)) ? Number(c.durationMs) : undefined;
-        return [{ ...base, actor: 'check', jobId, kind: 'cmd.run', src: `${src()}:cmd:${i}`, msg: `${exit === 0 ? 'Chạy' : 'Lỗi'} ${clipText(c?.name ?? cmd, 100)} (exit ${exit})`,
+        return [{ ...base, actor: 'check', jobId, kind: 'cmd.run', src: `${src()}:cmd:${i}`, msg: exit === 0 ? tr('Ran {name} (exit {exit})', { name: clipText(c?.name ?? cmd, 100), exit }) : tr('Failed {name} (exit {exit})', { name: clipText(c?.name ?? cmd, 100), exit }),
           refs: evidenceRef ? [evidenceRef] : [],
           data: compact({ cmd: clipText(cmd, 1000), exit, durationMs, checkName: strOr(c?.name), evidenceRef, evidence: !evidenceRef && evidence ? clipText(evidence, 400) : undefined }) }];
       });
@@ -337,7 +337,7 @@ export function rowsOfEvent(event, ctx = {}) {
         if (typeof file?.path !== 'string' || !file.path) continue;
         const added = intOr(file.added), removed = intOr(file.removed);
         rows.push({ ...base, jobId, kind: 'file.edit', src: `ev:${ak}:f:${shortHash(`${jobId}\n${patchRef}\n${file.path}`)}`,
-          msg: `${({ A: 'Thêm', D: 'Xoá', R: 'Đổi tên', M: 'Sửa' })[file.status] ?? 'Sửa'} ${clipText(file.path, 160)}${added != null || removed != null ? ` (+${added ?? 0} -${removed ?? 0})` : ''}`,
+          msg: `${({ A: tr('Added'), D: tr('Deleted'), R: tr('Renamed'), M: tr('Modified') })[file.status] ?? tr('Modified')} ${clipText(file.path, 160)}${added != null || removed != null ? ` (+${added ?? 0} -${removed ?? 0})` : ''}`,
           refs: [patchJsonRef], data: compact({ path: file.path, added, removed, status: strOr(file.status), oldPath: strOr(file.oldPath), binary: file.binary === true ? true : undefined, image: file.image === true ? true : undefined, diffRef: `${patchJsonRef}#${file.path}` }) });
       }
       let media = 0;
@@ -351,7 +351,7 @@ export function rowsOfEvent(event, ctx = {}) {
         media += 1;
         const subkind = strOr(row?.subkind) ?? strOr(a.subkind);
         const label = strOr(row?.label);
-        const noun = logKind === 'render' ? 'Ảnh' : logKind === 'video' ? 'Video' : 'Trace';
+        const noun = logKind === 'render' ? tr('Image') : logKind === 'video' ? tr('Video') : tr('Trace');
         rows.push({ ...base, jobId, kind: logKind, src: `ev:${ak}:a:${shortHash(`${jobId}\n${a.path}\n${a.sha256 ?? ''}`)}`,
           msg: `${noun}${subkind ? ` ${subkind}` : ''}: ${clipText(label ?? a.path.split('/').pop(), 160)}`, refs: [a.path],
           data: compact({ artifactRef: a.path, label, subkind, bytes: intOr(row?.bytes), mime: logKind === 'trace' ? undefined : strOr(row?.mime), sha256: strOr(a.sha256) ?? strOr(row?.sha256) }) });
@@ -360,7 +360,7 @@ export function rowsOfEvent(event, ctx = {}) {
     }
     case 'op-settled': {
       const e = p.checkEvidence ?? {};
-      const rows = [{ ...base, jobId, kind: 'settle', src: src(0), msg: `Kernel chốt verdict ${p.verdict ?? '?'}${e.observed != null ? ` · ${e.passed ?? 0}/${e.observed} check đạt` : ''}`,
+      const rows = [{ ...base, jobId, kind: 'settle', src: src(0), msg: tr('Kernel settled the verdict {verdict}{ev}', { verdict: p.verdict ?? '?', ev: e.observed != null ? tr(' · {passed}/{observed} checks passed', { passed: e.passed ?? 0, observed: e.observed }) : '' }),
         data: compact({ verdict: String(p.verdict ?? 'unknown'), status: strOr(p.status), observed: intOr(e.observed), passed: intOr(e.passed), failed: intOr(e.failed), leasesReleased: intOr(p.leasesReleased) }) }];
       let result = null;
       try { result = JSON.parse(job?.result_json ?? 'null'); } catch { result = null; }
@@ -368,7 +368,7 @@ export function rowsOfEvent(event, ctx = {}) {
       const head = typeof landed === 'string' ? landed : strOr(landed?.head);
       if (p.verdict === 'pass' && head) {
         const paths = (Array.isArray(landed?.repos) ? landed.repos : []).flatMap((r) => (Array.isArray(r?.paths) ? r.paths : [])).slice(0, 20);
-        rows.push({ ...base, actor: 'land', jobId, kind: 'land', src: src(1), msg: `Đã land ${head.slice(0, 10)}${landed?.repo ? ` vào ${path.basename(String(landed.repo))}` : ''}`,
+        rows.push({ ...base, actor: 'land', jobId, kind: 'land', src: src(1), msg: tr('Landed {head}{repo}', { head: head.slice(0, 10), repo: landed?.repo ? tr(' into {repo}', { repo: path.basename(String(landed.repo)) }) : '' }),
           refs: [`commit:${head}`], data: compact({ head, repo: strOr(landed?.repo), headCheck: strOr(landed?.headCheck), paths: paths.length ? paths : undefined }) });
       }
       return rows;
@@ -379,20 +379,20 @@ export function rowsOfEvent(event, ctx = {}) {
       const raised = event.kind === 'incident-raised';
       const holds = Array.isArray(p.holds) ? p.holds.filter((h) => typeof h === 'string') : [];
       const heldJob = holds.find((h) => h.startsWith('op-')) ?? null;
-      return [{ ...base, jobId: heldJob, kind: 'incident', src: src(), msg: `${raised ? 'Sự cố' : 'Gỡ sự cố'}${p.kind ? ` ${p.kind}` : ''}: ${clipText(p.detail, 200)}`,
+      return [{ ...base, jobId: heldJob, kind: 'incident', src: src(), msg: raised ? tr('Incident{kind}: {detail}', { kind: p.kind ? ` ${p.kind}` : '', detail: clipText(p.detail, 200) }) : tr('Incident cleared{kind}: {detail}', { kind: p.kind ? ` ${p.kind}` : '', detail: clipText(p.detail, 200) }),
         data: compact({ id: event.entity_id, state: raised ? 'raised' : 'resolved', kind: strOr(p.kind), detail: strOr(p.detail) && clipText(p.detail, 800), holds: holds.length ? holds.slice(0, 20) : undefined }) }];
     }
     case 'worker-failed-no-report':
-      return [{ ...base, jobId, kind: 'error', level: 'error', src: src(), msg: `Op dừng mà không nộp báo cáo (${p.liveness ?? '?'})`,
+      return [{ ...base, jobId, kind: 'error', level: 'error', src: src(), msg: tr('The op stopped without filing a report ({liveness})', { liveness: p.liveness ?? '?' }),
         data: compact({ code: 'worker-failed-no-report', message: `liveness ${p.liveness ?? '?'}, effect ${p.effectState ?? '?'}`, hint: Array.isArray(p.evidence) ? clipText(p.evidence.join(', '), 400) : undefined }) }];
     case 'job-dropped':
-      return [{ ...base, jobId, kind: 'job.drop', src: src(), msg: `Bỏ job: ${clipText(p.reason, 200)}`, data: compact({ reason: clipText(p.reason ?? 'dropped', 600), op, attempt }) }];
+      return [{ ...base, jobId, kind: 'job.drop', src: src(), msg: tr('Job dropped: {reason}', { reason: clipText(p.reason, 200) }), data: compact({ reason: clipText(p.reason ?? 'dropped', 600), op, attempt }) }];
     case 'op-rev-drift':
       // api settle: the op's contract changed on the runtime after the leg was dispatched (runtime-rev.mjs); WARN only.
-      return [{ ...base, jobId, kind: 'warning', level: 'warn', src: src(), msg: `Hợp đồng op ${op ?? '-'} đổi sau khi giao (${String(p.from ?? '').slice(0, 12)} → ${String(p.to ?? '').slice(0, 12)})`,
+      return [{ ...base, jobId, kind: 'warning', level: 'warn', src: src(), msg: tr('The contract of op {op} changed after dispatch ({from} → {to})', { op: op ?? '-', from: String(p.from ?? '').slice(0, 12), to: String(p.to ?? '').slice(0, 12) }),
         data: compact({ code: 'op-rev-drift', message: clipText(`contract files changed after dispatch: ${(Array.isArray(p.files) ? p.files : []).join(', ')}`, 600) }) }];
     case 'foundation-landed':
-      return [{ ...base, actor: 'land', jobId: null, kind: 'land', src: src(), msg: `Nền móng ${p.name ?? event.entity_id} đã land ${p.version ?? ''}`.trim(),
+      return [{ ...base, actor: 'land', jobId: null, kind: 'land', src: src(), msg: tr('Foundation {name} landed {version}', { name: p.name ?? event.entity_id, version: p.version ?? '' }).trim(),
         refs: Array.isArray(p.refs) ? p.refs.filter((r) => typeof r === 'string').slice(0, 10) : [], data: compact({ head: String(p.version ?? p.name ?? event.entity_id), repo: undefined }) }];
     default:
       return [];
@@ -550,4 +550,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); });
+if (isMain(import.meta.url)) main().catch((error) => { console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code })); process.exit(1); });

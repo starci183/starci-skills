@@ -36,7 +36,7 @@
 // Path/record ownership transfers live in path_transfers (work-ownership.mjs ownerOf, rule 0).
 import { blockingJobs } from './waiter-priority.mjs';
 import { typedIncidents } from './gate-conditions.mjs';
-import { readFoundations } from './foundations.mjs';
+import { readFoundations } from './foundation-registry.mjs';
 import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, ownedOf, readTransfers } from './work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
@@ -46,7 +46,6 @@ import { list } from '../lib/list.mjs';
 
 export const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
-export const BRIDGE_ACTIONS = Object.freeze(['bridge', 'transfer', 'revise', 'designate']);
 export const FINDING_KINDS = Object.freeze(['circular-wait', 'unowned-need', 'hub-blocker', 'duplicate-work']);
 export const RECORD_CHANGE_REFUSED = 'record-change-refused';
 // A blocking job queued at least this long with >= 2 workflows on it is stuck, not merely next.

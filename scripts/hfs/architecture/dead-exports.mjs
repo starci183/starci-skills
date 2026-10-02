@@ -16,14 +16,16 @@
  * namespace import, `import x = require`, a dynamic import()/require(), an `export *` or `export * as` of the entry make
  * every name used. A file outside the owner that re-exports the name (`export { n as m } from`) uses it when `m` is itself
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
- * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with one exception (unit test
- * standard): a `<name>.service.spec.ts`, the unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`,
- * `.subscription.spec.ts`: a door has no service of its own) and a `*.builder.ts` under src/tests/fixtures/builders read from
- * disk count as consumers, because a spec can only provide an Inject*() token or a param type the entry exports. An integration
+ * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with these exceptions (unit test
+ * standard): the unit spec of every unit role (ruleParams.be.unitRoles: `<name>.service.spec.ts`, `<name>.cli.spec.ts`), a
+ * unit spec of a webhook, gateway or subscription door (`.webhook.spec.ts`, `.gateway.spec.ts`, `.subscription.spec.ts`: a door has no service of its own), a
+ * `*.builder.ts` under src/tests/fixtures/builders, and a file of the test world (slots be.tests.world and be.tests.world.kit, which
+ * open and migrate the real databases of the e2e run) read from disk count as consumers, because a spec can only provide an
+ * Inject*() token or a param type the entry exports, and the world wires the same capabilities the apps do. An integration
  * spec (slot be.tests.integration, `src/tests/integration/<capability>/*.integration-spec.ts`) counts as a consumer of exactly one
  * owner: the integration (slot be.integrations, `src/modules/integrations/<provider>/`) whose provider folder is its capability
  * folder, because R112 makes that spec register the integration module and reference its ErrorCode enum. Specs of any other kind,
- * an integration spec importing another owner, e2e specs and world files still do not count. A consumer inside the owner is
+ * an integration spec importing another owner, and e2e specs still do not count. A consumer inside the owner is
  * skipped like any inside consumer.
  */
 import fs from 'node:fs';
@@ -172,7 +174,21 @@ function deadFiles(graph, config) {
   return { violations, judged, roots: roots.size };
 }
 
-const TEST_CONSUMER = /^(?:(?:src|apps)\/.+\.(?:service|webhook|gateway|subscription)\.spec\.ts|src\/tests\/fixtures\/builders\/.+\.builder\.ts)$/u;
+/** The unit spec of a webhook, gateway or subscription door: a door has no service of its own, so its spec is the only unit spec of its kind. */
+const DOOR_SPEC = /^src\/features\/(?:webhooks|realtime)\/.+\.(?:webhook|gateway|subscription)\.spec\.ts$/u;
+const BUILDER_CONSUMER = /^src\/tests\/fixtures\/builders\/.+\.builder\.ts$/u;
+/** The test world slots (knowledge/hfs/slots.yaml): their files wire the real capabilities of the e2e run. */
+const WORLD_SLOTS = new Set(['be.tests.world', 'be.tests.world.kit']);
+
+/** Whether `rel` is a test file that counts as a consumer of any owner: a unit role spec, a fixture builder, a world file. */
+function testConsumer(graph, rel) {
+  const roles = graph.resolver.ruleParams().unitRoles ?? [];
+  if (/^(?:src|apps)\//u.test(rel) && roles.some(role => rel.endsWith(`.${role.spec}.ts`))) return true;
+  if (DOOR_SPEC.test(rel)) return true;
+  if (BUILDER_CONSUMER.test(rel)) return true;
+  const classified = graph.resolver.classifyPath(rel);
+  return WORLD_SLOTS.has(classified.slot) && classified.status !== 'forbidden' && /\.tsx?$/u.test(rel);
+}
 /** The slot of integration specs and the slot of the integrations they pair with by folder (knowledge/hfs/slots.yaml). */
 const INTEGRATION_SPEC_SLOT = 'be.tests.integration';
 const INTEGRATION_SLOT = 'be.integrations';
@@ -190,16 +206,17 @@ function inIntegrationOf(graph, to, provider) {
 }
 
 /**
- * Pseudo edges (read from disk, outside the production program) to graph files: from the unit specs of services and the fixture
- * builders to anything, and from an integration spec only to the integration of its own provider folder.
+ * Pseudo edges (read from disk, outside the production program) to graph files: from the unit role specs, the fixture builders and
+ * the test world files to anything, and from an integration spec only to the integration of its own provider folder.
  */
 function testConsumerEdges({ context, graph, config }) {
   const { ts } = context;
   const options = context.projects?.[0]?.options ?? {};
   const edges = [];
   const consumers = [...treeOf(config.root).files]
-    .map(file => ({ file, provider: TEST_CONSUMER.test(file) ? null : integrationSpecProvider(graph, file) }))
-    .filter(({ file, provider }) => provider !== null || TEST_CONSUMER.test(file))
+    .map(file => ({ file, any: testConsumer(graph, file) }))
+    .map(({ file, any }) => ({ file, provider: any ? null : integrationSpecProvider(graph, file), any }))
+    .filter(({ any, provider }) => any || provider !== null)
     .sort((a, b) => a.file.localeCompare(b.file));
   for (const { file: rel, provider } of consumers) {
     const abs = path.join(config.root, ...rel.split('/'));
@@ -281,7 +298,7 @@ export function checkDeadExports({ context, graph, config }) {
         ruleId: 'HFS_UNUSED_EXPORT',
         path: entry, line, column: 1,
         name, owner: owner.root, slot: owner.slot,
-        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a service unit spec, a fixture builder, or an integration spec of this integration's own provider folder counts besides production files).`,
+        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a unit role spec, a fixture builder, a test world file, or an integration spec of this integration's own provider folder counts besides production files).`,
       });
     }
   }

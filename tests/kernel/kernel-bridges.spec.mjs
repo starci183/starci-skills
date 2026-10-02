@@ -9,12 +9,12 @@ import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { resolveIntroducer } from '../../scripts/kernel/introducer.mjs';
 
-// The runtime defects the running workflows filed on 2026-09-23/24, each proven through the api:
-//  - orchestration notices the Kernel could not read (starci-next inc-81559e3a064b, mia inc-c55b52879387)
-//  - a shared blocker nobody owned (nivo WSPV inc-be78a39b6b50, Modules inc-b6f66a0d29ce)
-//  - contract-missing read inside the dispatch window (nivo inc-e09140ad9c22, inc-7f437d11edae)
-//  - uncut retry lineage across unrelated work (nivo inc-6a0cfe1b39d4, mia inc-bca4d2034f8c, inc-2f7968ede59c)
-//  - the landed proof: filed report files and foreign paths (inc-5d7ce049e810, inc-40fed684fff8)
+// The runtime defects the running workflows filed, each proven through the api:
+//  - orchestration notices the Kernel could not read
+//  - a shared blocker nobody owned
+//  - contract-missing read inside the dispatch window
+//  - uncut retry lineage across unrelated work
+//  - the landed proof: filed report files and foreign paths
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
@@ -124,53 +124,53 @@ test('a shared blocker is routed to the workflow whose code introduced it, as a 
   const g = gitRepo(w.repo);
   fs.mkdirSync(path.join(w.repo, 'platform'), { recursive: true });
   fs.writeFileSync(path.join(w.repo, 'platform', 'recovery.ts'), 'import type { Backend } from "./backend"\n');
-  g('add', '.'); g('commit', '-q', '-m', 'chore(agentos): checkpoint backend and canonical work');
+  g('add', '.'); g('commit', '-q', '-m', 'chore(orders): checkpoint backend and canonical work');
   const scoped = g('rev-parse', 'HEAD').stdout.trim();
   fs.writeFileSync(path.join(w.repo, 'platform', 'shell.ts'), 'export const shell = 1\n');
   g('add', '.'); g('commit', '-q', '-m', 'feat(shell): prove the shell routes (cut be-r0-modules 1/6)');
   const reported = g('rev-parse', 'HEAD').stdout.trim();
-  w.workflow('wf-nivo-workspace-provision-x', { title: 'nivo-workspace-provision' });
-  w.workflow('wf-nivo-modules-agentos-old', { title: 'nivo-modules-agentos', phase: 'finished' });
-  w.workflow('wf-nivo-modules-agentos-x', { title: 'nivo-modules-agentos' });
+  w.workflow('wf-app-workspace-provision-x', { title: 'app-workspace-provision' });
+  w.workflow('wf-app-modules-orders-old', { title: 'app-modules-orders', phase: 'finished' });
+  w.workflow('wf-app-modules-orders-x', { title: 'app-modules-orders' });
   w.seed((l) => {
-    w.unit(l, 'wf-nivo-modules-agentos-x', 'u-r1', 'backend.implement', 'platform/shell.ts');
-    l.enqueueJob({ jobId: 'op-backend.implement-1111111111', workflowId: 'wf-nivo-modules-agentos-x', unitId: 'u-r1', opId: 'backend.implement', kind: 'op', payload: { opId: 'backend.implement', owned_paths: ['platform/shell.ts'] } });
+    w.unit(l, 'wf-app-modules-orders-x', 'u-r1', 'backend.implement', 'platform/shell.ts');
+    l.enqueueJob({ jobId: 'op-backend.implement-1111111111', workflowId: 'wf-app-modules-orders-x', unitId: 'u-r1', opId: 'backend.implement', kind: 'op', payload: { opId: 'backend.implement', owned_paths: ['platform/shell.ts'] } });
     // A reports row is attempt-bound (H10): the job leases, the dispatch opens an op_attempts row, the
     // report files on it - resolveIntroducer reads report_json.head for the 'report-head' route.
     w.settleTo(l, 'op-backend.implement-1111111111', 'leased');
-    const attempt = l.write.startAttempt({ workflowId: 'wf-nivo-modules-agentos-x', jobId: 'op-backend.implement-1111111111', dispatchId: 'ctx_r1' });
+    const attempt = l.write.startAttempt({ workflowId: 'wf-app-modules-orders-x', jobId: 'op-backend.implement-1111111111', dispatchId: 'ctx_r1' });
     l.write.fileReport({ attemptId: attempt.attempt_id, outcome: 'done', report: { outcome: 'done', head: reported.slice(0, 10) } });
   });
-  const raise = (extra) => w.api(['incident', '--workflow', 'wf-nivo-workspace-provision-x', '--kind', 'shared-blocker',
+  const raise = (extra) => w.api(['incident', '--workflow', 'wf-app-workspace-provision-x', '--kind', 'shared-blocker',
     '--detail', 'Nest cannot resolve ModuleRecoveryClientService (?, MODULE_RECOVERY_RECONCILERS)', ...extra]);
   const viaScope = raise(['--introduced-by', scoped.slice(0, 8), '--fix', 'value-import BackendClientService in platform/recovery.ts']);
   assert.equal(viaScope.status, 0, viaScope.stderr);
   const routed = json(viaScope.stdout).sharedBlocker;
   assert.equal(routed.routed, true, JSON.stringify(routed));
-  assert.equal(routed.to, 'wf-nivo-modules-agentos-x', 'the running line of the scope that introduced it');
+  assert.equal(routed.to, 'wf-app-modules-orders-x', 'the running line of the scope that introduced it');
   assert.equal(routed.via, 'commit-scope');
-  const inbox = w.read((db) => db.prepare("SELECT key,payload_json,status FROM inbox WHERE workflow_id=? AND kind='peer-message'").all('wf-nivo-modules-agentos-x'));
+  const inbox = w.read((db) => db.prepare("SELECT key,payload_json,status FROM inbox WHERE workflow_id=? AND kind='peer-message'").all('wf-app-modules-orders-x'));
   assert.equal(inbox.length, 1);
   const message = json(inbox[0].payload_json);
   assert.equal(message.kind, 'follow-up');
-  assert.equal(message.from, 'wf-nivo-workspace-provision-x');
+  assert.equal(message.from, 'wf-app-workspace-provision-x');
   assert.equal(message.followUp.commit, scoped);
   assert.match(message.body, /value-import BackendClientService/);
   assert.ok(message.refs.includes(json(viaScope.stdout).incidentId));
-  const target = json(w.api(['status', '--workflow', 'wf-nivo-modules-agentos-x']).stdout);
+  const target = json(w.api(['status', '--workflow', 'wf-app-modules-orders-x']).stdout);
   assert.equal(target.frontier.actionable, true, 'the introducer\'s frontier is actionable on its follow-up');
   const viaHead = json(raise(['--introduced-by', reported]).stdout).sharedBlocker;
   assert.deepEqual([viaHead.routed, viaHead.via], [true, 'report-head']);
-  const self = json(w.api(['incident', '--workflow', 'wf-nivo-modules-agentos-x', '--kind', 'shared-blocker', '--detail', 'x', '--introduced-by', reported]).stdout).sharedBlocker;
+  const self = json(w.api(['incident', '--workflow', 'wf-app-modules-orders-x', '--kind', 'shared-blocker', '--detail', 'x', '--introduced-by', reported]).stdout).sharedBlocker;
   assert.deepEqual([self.routed, /introduced it/.test(self.why)], [false, true]);
   const none = json(raise(['--introduced-by', '0123456789abcdef']).stdout).sharedBlocker;
   assert.equal(none.routed, false);
   assert.ok(w.read((db) => db.prepare("SELECT count(*) n FROM events WHERE kind='shared-blocker-routed'").get().n) >= 4);
   // the resolver alone: an explicit introducer wins
-  w.read((db) => assert.equal(resolveIntroducer(db, { explicit: 'wf-nivo-modules-agentos-old', roots: [w.repo] }).workflowId, 'wf-nivo-modules-agentos-x'));
+  w.read((db) => assert.equal(resolveIntroducer(db, { explicit: 'wf-app-modules-orders-old', roots: [w.repo] }).workflowId, 'wf-app-modules-orders-x'));
 });
 
-// nivo academy-debt inc-9474fe9ff445: 9caa2d5c (module-studio a5, op-backend.implement-9785552dcb) broke
+// A commit (module-studio a5, op-backend.implement-9785552dcb) broke
 // pod-registration.controller.spec.ts; the blocker was routed to module-studio, whose queued retry
 // op-backend.implement-853af99286 owns the file, yet the reporter's incident carried no typed release and
 // sat OWED on the supervisor. Routing now types it as a wait on the owning job, through its retry lineage.
@@ -181,7 +181,7 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
   fs.writeFileSync(path.join(w.repo, 'src', 'pod.controller.ts'), 'export const verify = 1\n');
   g('add', '.'); g('commit', '-q', '-m', 'feat: verify documents');
   const commit = g('rev-parse', 'HEAD').stdout.trim();
-  const REPORTER = 'wf-nivo-academy-debt-x', STUDIO = 'wf-nivo-module-studio-x';
+  const REPORTER = 'wf-app-debt-x', STUDIO = 'wf-app-module-studio-x';
   const INTRO = 'op-backend.implement-9785552dcb', OWNER = 'op-backend.implement-853af99286', OTHER = 'op-backend.implement-aaaaaaaaaa';
   w.workflow(REPORTER); w.workflow(STUDIO);
   w.seed((l) => {
@@ -207,7 +207,7 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
   assert.deepEqual(viaCommit.sharedBlocker.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], 'the open job owning a file the commit changed');
   const unnamed = raise('the shared module is broken');
   assert.deepEqual(unnamed.sharedBlocker.until, [{ type: 'message', peer: STUDIO, kind: 'reply' }], 'no owning job: the introducer\'s reply releases it');
-  // A blocker routed before routing typed it (the live inc-9474fe9ff445) reads typed all the same.
+  // A blocker routed before routing typed it reads typed all the same.
   const legacy = 'inc-000000legacy';
   w.seed((l) => {
     const text = `Commit 9caa2d5c (${INTRO} a5) broke the spec; queued sibling ${OWNER} owns the fix`;
@@ -296,7 +296,7 @@ test('an uncut retry chains to its own unit of work; --retry-of pins it; the goa
   assert.match(dry.prompt, /the runtime is the only committer/);
 });
 
-test('an answered ask stays awaiting its owner-answer retry until a job of ITS work exists (mia inc-2f7968ede59c)', (t) => {
+test('an answered ask stays awaiting its owner-answer retry until a job of ITS work exists', (t) => {
   const w = world(t);
   w.workflow('wf-ask');
   // "A job of ITS work" is the next try of the same unit (status.mjs stillWaits): the retry carries
@@ -339,7 +339,7 @@ test('dispatch files the contract row for the worker-start Dispatch; an early op
   const guard = w.read((db) => json(db.prepare("SELECT payload_json FROM events WHERE kind='op-dispatched' AND entity_id='op-code.refactor-cf00000001'").get().payload_json).guard);
   assert.ok(guard?.jobFile, 'the dispatch receipt names the shared-checkout guard');
   // A worker-start worker can read its contract before the running transaction commits it (fast Codex workers read
-  // contract-missing, nivo Modules inc-e09140ad9c22): op-contract waits while its job is still leased.
+  // contract-missing): op-contract waits while its job is still leased.
   const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'verbs', 'op-contract.mjs'), 'utf8');
   assert.match(code, /if \(status !== 'leased'\) break;/, 'op-contract waits out the leased window instead of answering missing');
 });

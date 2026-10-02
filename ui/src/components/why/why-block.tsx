@@ -2,17 +2,18 @@ import { ArrowRight } from 'lucide-react';
 import type { Why } from '../../contract';
 import type { Concept } from '../concept';
 import { Advanced } from '../motion';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C10';
 
-/** Who acts next (docs/why.md `owner`), in Vietnamese, with a tone. */
+/** Who acts next (docs/why.md `owner`), owner-visible label with a tone. */
 export function whyOwner(owner: string | null | undefined): { label: string; tone: 'owner' | 'warning' | 'failed' | 'running' | 'queued' } {
-  if (!owner) return { label: 'Chưa rõ ai xử lý', tone: 'queued' };
-  if (owner === 'owner') return { label: 'Chờ thầy', tone: 'owner' };
-  if (owner === 'op-retry') return { label: 'Op tự thử lại', tone: 'running' };
-  if (owner === 'supervisor') return { label: 'Supervisor xử lý', tone: 'warning' };
-  if (owner === 'runtime-core') return { label: 'Lỗi runtime · core sửa', tone: 'failed' };
-  if (owner.startsWith('other-op:')) return { label: `Chờ op ${owner.slice('other-op:'.length)}`, tone: 'warning' };
+  if (!owner) return { label: t('Handler unknown'), tone: 'queued' };
+  if (owner === 'owner') return { label: t('Waiting for the owner'), tone: 'owner' };
+  if (owner === 'op-retry') return { label: t('The op retries itself'), tone: 'running' };
+  if (owner === 'supervisor') return { label: t('The supervisor handles it'), tone: 'warning' };
+  if (owner === 'runtime-core') return { label: t('Runtime error · core fixes'), tone: 'failed' };
+  if (owner.startsWith('other-op:')) return { label: t('Waiting for op {op}', { op: owner.slice('other-op:'.length) }), tone: 'warning' };
   return { label: owner, tone: 'queued' };
 }
 
@@ -34,7 +35,7 @@ function CodeChips({ why }: { why: Why }) {
 
 /**
  * The owner-facing reason (starci/why@1). `compact`: headline + who acts next (cards, headers, drawers).
- * Full: headline, cause, op-vs-runtime disagreement, what happens next; codes and refs under "Nâng cao".
+ * Full: headline, cause, op-vs-runtime disagreement, what happens next; codes and refs under "Advanced".
  */
 export function WhyBlock({ why, compact = false, className = '' }: { why: Why | null | undefined; compact?: boolean; className?: string }) {
   if (!why?.headline) return null;
@@ -45,10 +46,10 @@ export function WhyBlock({ why, compact = false, className = '' }: { why: Why | 
     <div className="flex min-w-0 flex-wrap items-start gap-2"><p className="m-0 min-w-0 flex-1 text-[15px] font-medium leading-6">{why.headline}</p><WhyOwnerBadge owner={why.owner} /></div>
     {why.cause ? <p className="m-0 text-sm leading-6 text-muted-foreground">{why.cause}</p> : null}
     {why.disagreement ? <div data-tone="warning" className="rounded-lg border border-[var(--tone-line)] bg-[var(--tone-bg)] p-3 text-sm leading-6">
-      <strong className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--tone)]">Op và runtime lệch nhau</strong>{why.disagreement}
+      <strong className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--tone)]">{t('Op and runtime disagree')}</strong>{why.disagreement}
     </div> : null}
-    {why.next ? <p className="m-0 flex items-start gap-2 text-sm leading-6"><ArrowRight className="mt-1 size-3.5 shrink-0 text-primary" aria-hidden="true" /><span><strong className="font-medium">Bước tiếp:</strong> {why.next}</span></p> : null}
-    {why.codes.length || why.refs?.length ? <Advanced summary={`${why.codes.length} mã · ${why.refs?.length ?? 0} tham chiếu`}>
+    {why.next ? <p className="m-0 flex items-start gap-2 text-sm leading-6"><ArrowRight className="mt-1 size-3.5 shrink-0 text-primary" aria-hidden="true" /><span><strong className="font-medium">{t('Next step:')}</strong> {why.next}</span></p> : null}
+    {why.codes.length || why.refs?.length ? <Advanced summary={t('{codes} codes · {refs} references', { codes: why.codes.length, refs: why.refs?.length ?? 0 })}>
       <div className="flex flex-col gap-3">
         <CodeChips why={why} />
         {why.refs?.length ? <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-xs text-muted-foreground">{why.refs.map((ref, i) => <li key={i} className="break-all">

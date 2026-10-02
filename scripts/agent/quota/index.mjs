@@ -18,7 +18,7 @@
 //       for the others); production callers pass nothing and get the defaults.
 //
 // Provider names are normalized: lowercase, '-agent' suffix stripped.
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { probe as probeClaude } from './claude.mjs';
 import { probe as probeCodex } from './codex.mjs';
 import { probe as probeDevin } from './devin.mjs';
@@ -54,8 +54,8 @@ export function probeAll(opts = {}) {
 }
 
 // CLI: node scripts/agent/quota/index.mjs [provider|--all] -> JSON
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isMain) {
+const entry = isMain(import.meta.url);
+if (entry) {
   const target = process.argv[2];
   if (!target || target === '--all') console.log(JSON.stringify(probeAll(), null, 2));
   else console.log(JSON.stringify(probeQuota(target), null, 2));

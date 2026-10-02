@@ -170,7 +170,7 @@ progress:
     toward the goal - units that PASSED their gates per hour vs
     progress.minUnitsPerHour, running vs progress.allowedParallel,
     queued-ready, ETA? (2) if not, why - rca.clusters (dead workers, absent
-    paths, grants too narrow, tool timeouts, test gaps, partial commits,
+    paths, grants too narrow, tool timeouts, test gaps, preserved partial work,
     canon conflicts, runtime/binding defects, upstream peers)? (3) which ONE
     change fixes the most - rca.actions[0] that is not already tried? Only
     then continue with nextActions. A stall (progress.stall.stalled) is your
@@ -185,7 +185,7 @@ progress:
     light: >-
       Tier 1, act now, inside your workflow: `api graph-edit` (drop units whose
       paths are absent, widen a unit inside its repository, ONE serial wire
-      unit for shared files, continue a partial commit, retry a failed unit
+      unit for shared files, continue a unit's preserved work, retry a failed unit
       with a CHANGED shape, reorder/split/merge a few units, per-unit params,
       canon scan + re-cut of a canon cut from it), `api op-override` (a local,
       additive variant of an op for this workflow: notes, commandTimeoutMs,
@@ -413,7 +413,7 @@ tick:
       sized by `api estimate --paths`. Its owned paths are the slice's paths
       PLUS the relocation destinations its findings need, and each wave's
       shared-root files go to ONE serial canon-wire leg: run `node
-      scripts/kernel/cut-seam.mjs canon-plan --scan <that canon-scan json>
+      scripts/kernel/seam-policy.mjs canon-plan --scan <that canon-scan json>
       --cut-id <id>` and enqueue its `commands` in order, each slice with
       --canon-scan <that json> (api enqueue refuses a canon slice without it or
       without the plan grants, H6) - each slice with its
@@ -424,15 +424,14 @@ tick:
       owedToWire path a slice reports (a wire still queued when a slice reports
       one outside it is dropped with `api reconcile --drop` and re-enqueued on
       the union). A canon slice that settled blocked or failed after
-      committing is redone from its commit, never from scratch: `node
-      scripts/kernel/cut-seam.mjs canon-redispatch --repo ROOT --job <job>
+      leaving work is redone from its preserved work, never from scratch: `node
+      scripts/kernel/seam-policy.mjs canon-redispatch --repo ROOT --job <job>
       [--paths <grants it lacked>]` prints the `api enqueue ... --cut-id <id>
       --cut-ordinal <n> --cut-total <N> --retry-of <job> --params
-      '{"resumeFrom":"<its patch head>","admissionBase":"<its admission
-      base>"}'` to run. A canon slice that settles blocked with a filed report
+      '{"resumeFrom":"refs/heads/preserved/<workflow>/<job>"}'` to run. A canon slice that settles blocked with a filed report
       is followed up by settle itself (result nextStep kind canon-follow-up,
-      scripts/kernel/cut-seam.mjs canonSettleFollowUpOf) - a continuation from
-      its commit owning its page relocations, its shared-root needs added to
+      scripts/kernel/seam-policy.mjs canonSettleFollowUpOf) - a continuation from
+      its preserved work owning its page relocations, its shared-root needs added to
       the queued canon-wire leg - so the Kernel never enqueues a second redo
       of that job; every slice packet carries context.cut.manifest (the path
       union and passed ordinals) from dispatch. A canon slice's
@@ -486,8 +485,8 @@ tick:
     seamContractFirst: >-
       A cut's seam never stalls the chain (owner ruling 2026-09-28: "A seam must not block the whole chain: if a seam
       slips, re-cut it or let the later slices run in parallel with a stub, do not wait 3 hours";
-      scripts/kernel/cut-seam.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
-      and runs contract-first: its op publishes the committed interface (types, contracts, a stub) with
+      scripts/kernel/seam-policy.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
+      and runs contract-first: its op publishes the interface (types, contracts, a stub) with
       `api cut-seam --publish-interface` before finishing, and every sibling ordinal is released to
       build against it at once. A sibling also stops waiting - `api status` frontier.queued reads it
       `ready` with seamStub {mode} - when the seam's latest attempt settled failed/blocked
@@ -517,7 +516,7 @@ tick:
       decomposed into exact selected migration node/resource/stack slices when
       those slices are derivable. In multi-repository projects each product
       prefix is qualified by its stable repository binding (for example
-      `nivo-fe/apps/landing`); canonical Work remains `.starciwork/...`.
+      `todo-app-fe/apps/landing`); canonical Work remains `.starciwork/...`.
 
   drive:
     nextActions: >-
@@ -1124,7 +1123,7 @@ autopilot:
     says the owner decided (owner-claim.mjs keeps refusing an unproven owner claim).
   asks: >-
     File asks exactly as the op contract says; `api serve-ask` (and every api status) hands each to autopilot first
-    (scripts/kernel/autopilot.mjs autopilotAnswerAsk). A draw-review or brand-direction-review ask whose machine gates
+    (scripts/kernel/autopilot-run.mjs autopilotAnswerAsk). A draw-review or brand-direction-review ask whose machine gates
     pass - draw loop metrics with the DNA gate, the independent critic's beauty >= allocation.drawLoop.beautyMin,
     rationale.json, the direction checks - is answered PROVISIONALLY (answeredBy autopilot, receipt provisional:true
     with the gate evidence): nextActions names the retry, and the retried op applies the receipt exactly like an
@@ -1171,7 +1170,7 @@ autopilot:
   rereadRev: >-
     These rules reach a running Kernel through the runtime-rev re-read (survey.runtimeRev): re-read this section and
     api.yaml commands.autopilot when a wake names the rev that brought them, then api kernel-ack-rev. No restart.
-  citation: "scripts/kernel/autopilot.mjs; modules/models/runtimes.yaml allocation.autopilot; modules/kernel/api.yaml commands.autopilot"
+  citation: "scripts/kernel/autopilot-run.mjs; modules/models/runtimes.yaml allocation.autopilot; modules/kernel/api.yaml commands.autopilot"
 
 handoverLoop:
   why: >-
@@ -1303,7 +1302,7 @@ replanTriggers:
   - trigger: retry-budget-exhausted
     when: "a route's limit fired its last allowed time for a node group"
     driverDoes: "api settle opens an owner gate on the failed job (settle.nextStep owner-gate); other legs keep running; once the owner resolves it nextActions names the retry. Under autopilot (autopilot section) it is a supervisor-gate instead - never the owner's - and past supervisorExtraBudget the leg is deferred to the final review"
-    citation: "modules/models/kinds.yaml routes; modules/kernel/api.yaml settle.nextStep; scripts/kernel/autopilot.mjs"
+    citation: "modules/models/kinds.yaml routes; modules/kernel/api.yaml settle.nextStep; scripts/kernel/autopilot-run.mjs"
 
   - trigger: goal-completes
     when: "every leg settled, the gates ran and the owner approved the handover"
@@ -1399,7 +1398,7 @@ peers:
 
 # ============================================================================
 # FOUNDATIONS — workflows of one ledger plan their SHARED foundations together
-#    (modules/kernel/api.yaml foundations, foundation; scripts/kernel/foundations.mjs).
+#    (modules/kernel/api.yaml foundations, foundation; scripts/kernel/foundation-registry.mjs).
 # ============================================================================
 foundations:
   what: >-
@@ -1523,7 +1522,7 @@ failureHandling:
   agentChildExit:
     symptom: >-
       The spawned agent's process is gone but no verdict arrived — the
-      terminal shows a bare shell ('exited', `PS D:\>`), or the screen still
+      terminal shows a bare shell ('exited', `PS <worktree>>`), or the screen still
       shows activity while nothing moves.
     detection-output-staleness: >-
       The api classifies each worker from its screen and output age

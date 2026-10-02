@@ -65,15 +65,15 @@ test('a workflow takes its children with it', ()=>withLedger(ledger=>{
   seedWorkflow(ledger,{id:'wf-parent',state:{phase:'queued',job:'parent'}});
   ledger.transaction(db=>{
     db.prepare('INSERT INTO blobs(sha256,bytes,media_type,file_uri,created_at) VALUES(?,?,?,?,?)')
-      .run('a'.repeat(64),7,'text/markdown','D:/owner/handoff.md',at);
+      .run('a'.repeat(64),7,'text/markdown','owner/handoff.md',at);
     db.prepare('INSERT INTO goal_inputs(workflow_id,key,goal_revision,sha256,origin,created_at) VALUES(?,?,?,?,?,?)')
-      .run('wf-parent','1-handoff.md',1,'a'.repeat(64),'D:/owner/handoff.md',at);
+      .run('wf-parent','1-handoff.md',1,'a'.repeat(64),'owner/handoff.md',at);
   });
   assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM goal_inputs WHERE workflow_id=?').get('wf-parent').n,1);
 
   // The child cannot outlive the parent, and it cannot be created without one either.
   assert.throws(()=>ledger.db.prepare('INSERT INTO goal_inputs(workflow_id,key,goal_revision,sha256,origin,created_at) VALUES(?,?,?,?,?,?)')
-    .run('wf-absent','1-orphan.md',1,'a'.repeat(64),'D:/owner/orphan.md',at),/FOREIGN KEY/);
+    .run('wf-absent','1-orphan.md',1,'a'.repeat(64),'owner/orphan.md',at),/FOREIGN KEY/);
   ledger.db.prepare('DELETE FROM workflows WHERE workflow_id=?').run('wf-parent');
   assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM goal_inputs WHERE workflow_id=?').get('wf-parent').n,0);
 }));

@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 
 /** The command's exit status (1 when it reported none). `env` is added to this process's environment. */
-export function runShellInherit(command, env = {}) {
+export function runShell(command, env = {}) {
   const child = spawnSync(command, { shell: true, stdio: 'inherit', env: { ...process.env, ...env } });
   return child.status ?? 1;
 }

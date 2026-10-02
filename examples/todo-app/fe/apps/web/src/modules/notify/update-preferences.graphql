@@ -1,7 +1,0 @@
-mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) {
-    updateNotificationPreferences(input: $input) {
-        channel
-        unsubscribed
-        digestWindowMinutes
-    }
-}

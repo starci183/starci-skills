@@ -15,7 +15,8 @@ npx hfs emit-contracts [--repo <dir>]         # write be/contracts/<app>/schema.
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard: staged .starciwork / .starcistacks paths, and the secrets guard over every staged file (read from the index)
-npx hfs add <job|reactor|queue|projection> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]   # exactly that kind's file tree, generated from the pattern knowledge, plus the platform capabilities it needs and the hfs.json registration
+npx hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]   # exactly that kind's file tree, generated from the pattern knowledge, plus the platform capabilities it needs and the hfs.json registration
+npx hfs secret list|show|set|gen ...              # the sealed secrets of .starcistacks/<env>/secrets (sops through the runtime's api): list names the keys, show decrypts one value, set seals the value read from stdin, gen seals a random one; --env, --key, --age, --bytes, --repo
 npx hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]   # a back-end service and its unit spec skeleton
 npx hfs new spec <file>.service.ts [--repo <dir>]                                                              # the spec skeleton of an existing service
 ```
@@ -59,22 +60,23 @@ Its own checks (`scripts/hfs/check.mjs`, `scripts/hfs/rules/`; the rendered-file
 | `HFS_CI_MISSING_CANON` | error | `ci.yml` without a `run:` step of `hfs lint` (`npm run lint`, or `npx hfs lint` at the pinned version), or `.husky/pre-push` without `npm run typecheck` and `npm run lint` (R13) |
 | `HFS_DEP_VERSION_SKEW` | error | a dependency at two specs across the root and workspace `package.json` files, a dependency declared at another version than the root `overrides` pin, or a nested copy of a declared dependency in `package-lock.json` (R14) |
 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | error | a back-end api app serving GraphQL without `be/contracts/<app>/schema.graphql` (R23); the front end reads that snapshot in place, so there is no copy to drift |
-| `BE_TEST_TOPOLOGY` | error | a `*.test.*` file, a `testing/` folder, a second jest configuration or a `jest` key in `package.json` (R47; `int-spec`, `harness-spec` and the retired test folders are the machine's `HFS_TEST_KIND_RETIRED`) |
+| `BE_TEST_TOPOLOGY` | error | a `*.test.*` file, a `testing/` folder, a second jest configuration or a `jest` key in `package.json` (R47; `int-spec`, `harness-spec`, the retired test folders and a per-lane test config are the machine's, under the same code) |
 | `BE_SPEC_PLACEMENT` | error | a `*.spec.*`, `*.test.*` or `*-spec.*` file outside the four test layers, `scripts/` and `tools/` included (R102) |
 | `HFS_REPO_LOCAL_CHECK` | error | a `check-*` file in `scripts/` or `tools/`, an `eslint-local-rules*` file or local eslint plugin, or a script that runs a local check (R103) |
 | `HFS_LINT_SUPPRESSION_FILE` | error | an `eslint.suppressions*` file, a `lint:suppressions` script, an eslint suppress flag or a suppressions config (R104) |
 | `HFS_PROOF_COMMAND_FILE_MISSING` | error | a `.starciwork` `requiresProof.<kind>.command` that runs a file the repository does not hold (R105) |
 | `FE_GRAPHQL_CONTRACT` | error | a front-end `.graphql` document that the back end's contract snapshot (`be/contracts/<service>/schema.graphql`) does not serve: an unknown field, argument or input field, a missing required argument, a variable of another type, or a selection that does not fit (R113) |
-| `HFS_SERVICE_PLACEMENT` | error | a folder outside `be/apps/<service>/` with a `Dockerfile` or a `package.json` of its own (R143): a back-end service is a Nest app of the one repository |
-| `HFS_IMAGE_UNPINNED` | error | in a product with more than one service, a stack component whose `image` has no tag, `latest`, a branch word or a major or minor-only tag instead of a digest or an exact version (R144) |
-| `HFS_SERVICE_STACK_DECLARATION` | error | an api or worker app of a multi-service product that is not a `role: service` component of `application-stacks.yaml` (R145) |
-| `HFS_EVENT_CONTRACT` | error | the vendored async contract: a missing or stale `be/contracts/<service>/events.json`, a `consumes.ts` entry the provider's snapshot does not declare at that version, a `compensates` naming no declared event, or a consumer queue no consumes table lists (R146) |
-| `BE_ASYNC_SPEC_MISSING` | error | a consumed event no e2e spec through `useTestWorld` names, or a saga step whose spec does not also name the compensated event (R147) |
+| `HFS_SERVICE_PLACEMENT` | error | a folder outside `be/apps/<service>/` with a `Dockerfile` or a `package.json` of its own (R163): a back-end service is a Nest app of the one repository |
+| `HFS_IMAGE_UNPINNED` | error | in a product with more than one service, a stack component whose `image` has no tag, `latest`, a branch word or a major or minor-only tag instead of a digest or an exact version (R164) |
+| `HFS_SERVICE_STACK_DECLARATION` | error | an api or worker app of a multi-service product that is not a `role: service` component of `application-stacks.yaml` (R165) |
+| `HFS_EVENT_CONTRACT` | error | the vendored async contract: a missing or stale `be/contracts/<service>/events.json`, a `consumes.ts` entry the provider's snapshot does not declare at that version, a `compensates` naming no declared event, or a consumer queue no consumes table lists (R166) |
+| `BE_ASYNC_SPEC_MISSING` | error | a consumed event no e2e spec through `useTestWorld` names, or a saga step whose spec does not also name the compensated event (R167) |
 | `BE_INTEGRATION_SPEC_MISSING` | error | an integration (`src/modules/integrations/<provider>/` with `<provider>.config.ts`) without a `src/tests/integration/<provider>/*.integration-spec.ts` that registers its module through `useTestWorld({ modules })`, references its ErrorCode enum and drives an outage through the world (R112) |
-| `HFS_MONO_WORKSPACES` | error | the app root `package.json` without `workspaces` exactly `["fe/apps/*", "fe/packages/*"]`, `packageManager` `npm@<version>` or a `turbo` devDependency (R127) |
-| `HFS_MONO_FE_WORKSPACE` | error | an fe app `package.json` not named `@<project>/<app>`, not private, or without exactly the workspace scripts; an fe package without `build`, `typecheck` and the workspace `lint` (R128) |
-| `HFS_MONO_NEST_PROJECTS` | error | `be/nest-cli.json` not `monorepo: true`, its default project not an api app, or its `projects` not exactly the declared be apps (R129) |
-| `HFS_MONO_WORKSPACE_DEP` | error | an fe workspace imports a package its own `package.json` does not declare, or the root `package.json` declares a workspace package (R130) |
+| `HFS_MONO_WORKSPACES` | error | the app root `package.json` without `workspaces` exactly `["fe/apps/*", "fe/packages/*"]`, `packageManager` `npm@<version>` or a `turbo` devDependency (R143) |
+| `HFS_MONO_FE_WORKSPACE` | error | an fe app `package.json` not named `@<project>/<app>`, not private, or without exactly the workspace scripts; an fe package without `build`, `typecheck` and the workspace `lint` (R144) |
+| `HFS_MONO_NEST_PROJECTS` | error | `be/nest-cli.json` not `monorepo: true`, its default project not an api app, or its `projects` not exactly the declared be apps (R145) |
+| `HFS_MONO_WORKSPACE_DEP` | error | an fe workspace imports a package its own `package.json` does not declare, or the root `package.json` declares a workspace package (R146) |
+| `BE_CLI_REQUIRED` | error | a back end with a connection or a command under `src/features/cli/` and no cli app `be/apps/cli`, a cli app of another name, or no `be/apps/cli/Dockerfile` (R147) |
 | `HFS_PEER_INTEGRATION_MISSING` | error | the app root `package.json` depends on a driver integration (a pair of `knowledge/hfs/peer-integrations.yaml`) without its runtime peer, e.g. `@nestjs/apollo` on `@nestjs/platform-express` 11 without `@as-integrations/express5` (R111) |
 | `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
@@ -145,7 +147,7 @@ derived from the machine's rule id lists). After changing any of those files, `k
 `tests/packages-hfs/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
 The examples gate `node scripts/checks/check-example-architecture.mjs` runs `hfs lint` of this CLI at the root of every `examples/*`
-app with an `hfs.json` (`examples/todo-app`, `examples/ecommerce-app`) and fails on any finding or any tool that could not run;
+app with an `hfs.json` (`examples/ecommerce-app`) and fails on any finding or any tool that could not run;
 `hfs check` alone would miss the machine's source rules, which the canons judge. It is heavy: run it once, by hand, after `npm ci`
 in each app.
 

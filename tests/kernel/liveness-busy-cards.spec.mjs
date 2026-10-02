@@ -8,7 +8,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {classifyAgentScreen,cardLivenessPatterns} from '../../scripts/lib/terminal-liveness.mjs';
 
-// "job xong/treo cũng không ai nhắn" (owner, 2026-09-25). Four defects, one spec each:
+// "nobody tells you a job finished or hung" (owner, 2026-09-25). Four defects, one spec each:
 //  A. busy frames read turn-idle: a wrapped Devin spinner block, Claude's effort row under its spinner
 //     (mia inc-1b82f657a6a8, inc-fcd1c1c10d8a; nivo inc-266976b75b25) - the patterns live on the cards;
 //  C. one long bounded command read wedged (nivo inc-d8f08b77ca8b);
@@ -184,7 +184,7 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
     const now=Date.now(), start=now-5*HOUR;
     ledger.db.prepare("UPDATE workflows SET phase='running', created_at=? WHERE workflow_id=?").run(start,wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(wf,1,'g','hoàn thiện đăng nhập',JSON.stringify({derivedPlan:{legs:['integration.verify']}}),start);
+      .run(wf,1,'g','ho\u00e0n thi\u1ec7n \u0111\u0103ng nh\u1eadp',JSON.stringify({derivedPlan:{legs:['integration.verify']}}),start);
     const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(job).attempt_id;
     ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at)
       VALUES(?,?,?,?,'done','{"outcome":"done","summary":"verified"}',?,?)`).run(wf,attemptId,'ctx_47c2cd765a50',job,now-50*MIN,now-51*MIN);
@@ -197,8 +197,8 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
     assert.ok(Math.abs(holds[0].ageMs-40*MIN)<MIN,'the age runs from the later of the wait and the consumed report');
     const row=ledger.db.prepare('SELECT workflow_id, created_at FROM workflows WHERE workflow_id=?').get(wf);
     const text=progressMessages([{repo:'r',...workflowProgress(ledger.db,row,{now})}],{now}).join('\n');
-    assert.match(text,/⏸ Kiểm thử tích hợp \(op-integration\.verify-25532858e7\): xong, đang chờ Modules \(AgentOS\)\/op-backend\.implement-1747a01ad5 \(inc-8cce1cf1b330\) — đã 40 phút/);
-    assert.match(text,/⏸ 1 việc đã xong đang chờ/);
+    assert.match(text,/⏸ Ki\u1ec3m th\u1eed t\u00edch h\u1ee3p \(op-integration\.verify-25532858e7\): xong, \u0111ang ch\u1edd Modules \(AgentOS\)\/op-backend\.implement-1747a01ad5 \(inc-8cce1cf1b330\) — \u0111\u00e3 40 ph\u00fat/);
+    assert.match(text,/⏸ 1 vi\u1ec7c \u0111\u00e3 xong \u0111ang ch\u1edd/);
     // Resolved: no hold is listed.
     ledger.write.resolveIncident({incidentId:'inc-8cce1cf1b330',reason:'fixed'});
     assert.deepEqual(settleHoldsOf(ledger.db,wf,{now}),[]);

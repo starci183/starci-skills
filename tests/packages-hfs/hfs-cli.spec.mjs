@@ -40,7 +40,7 @@ const cli = async (argv, seams = {}) => {
   const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: presetsOf(argv), prettier: FORMATTED, ...seams });
   return { code, out, err };
 };
-const HAS_VIETNAMESE = /[À-ỹ]/;
+const HAS_VIETNAMESE = /[\u00c0-\u1ef9]/;
 
 test('a clean app passes with no findings', () => {
   const result = checkRepo({ repoRoot: repoOf(APP) });
@@ -77,8 +77,8 @@ test('HFS_SLOT_REQUIRED_MISSING is reported per slot, and per app of a side with
   assert.equal(perApp.app, 'admin');
   assert.equal(perApp.slot, 'fe.app.next');
 
-  const feature = checkRepo({ repoRoot: repoOf(APP, (dir) => drop(dir, 'be/src/features/orders/index.ts')) });
-  assert.deepEqual(only(feature, 'HFS_SLOT_REQUIRED_MISSING').map((f) => f.path), ['be/src/features/orders/index.ts']);
+  const feature = checkRepo({ repoRoot: repoOf(APP, (dir) => drop(dir, 'be/src/features/api/orders/index.ts')) });
+  assert.deepEqual(only(feature, 'HFS_SLOT_REQUIRED_MISSING').map((f) => f.path), ['be/src/features/api/orders/index.ts']);
 });
 
 test('HFS_SLOT_REQUIRED_MISSING and HFS_MIN_INSTANCES are silent when every required file and instance is tracked', () => {
@@ -120,10 +120,10 @@ test('a tracked path in a forbidden (external) slot is HFS_FORBIDDEN_PRESENT and
 
 test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabulary is refused; a role name, index, main and a migration are not', () => {
   const dir = repoOf(APP, (repo) => {
-    for (const ok of ['cancel-order.command.ts', 'cancel-order.query.ts', 'cancel-order.handler.spec.ts']) put(repo, `be/src/features/orders/application/${ok}`);
+    for (const ok of ['cancel-order.command.ts', 'cancel-order.query.ts', 'cancel-order.handler.spec.ts']) put(repo, `be/src/features/api/orders/application/${ok}`);
     put(repo, 'be/src/modules/domain/stock/index.ts');
     put(repo, 'be/src/modules/domain/stock/persistence/migrations/20260101000000-create-stock.ts');
-    for (const bad of ['cancel-order.use-case.ts', 'order.types.ts', 'CancelOrder.handler.ts', 'helpers.ts', 'order.repository.ts']) put(repo, `be/src/features/orders/application/${bad}`);
+    for (const bad of ['cancel-order.use-case.ts', 'order.types.ts', 'CancelOrder.handler.ts', 'helpers.ts', 'order.repository.ts']) put(repo, `be/src/features/api/orders/application/${bad}`);
     put(repo, 'be/apps/core/src/core.options.ts');
     // kit/ is a slot whose allows names plain <name>.ts files: kebab plain names pass there (not at the world root, not unless kebab).
     for (const ok of ['poll.ts', 'free-ports.ts']) put(repo, `be/src/tests/world/kit/${ok}`);
@@ -147,11 +147,11 @@ test('BE_SOURCE_FORM: a test data builder is <area>.builder.ts under src/tests/f
     put(repo, 'be/src/tests/fixtures/builders/order.builder.ts');
     for (const bad of ['order.builder.ts', 'order.fixture.ts', 'order.factory.ts', 'order.repository.ts']) put(repo, `be/src/tests/fixtures/${bad}`);
     put(repo, 'be/src/tests/fixtures/builders/order.fixture.ts');
-    put(repo, 'be/src/features/orders/application/order.builder.ts');
+    put(repo, 'be/src/features/api/orders/application/order.builder.ts');
   });
   const refused = only(checkRepo({ repoRoot: dir }), 'BE_SOURCE_FORM').map((f) => f.path).sort();
   assert.ok(!refused.includes('be/src/tests/fixtures/builders/order.builder.ts'));
-  for (const bad of ['be/src/tests/fixtures/order.builder.ts', 'be/src/tests/fixtures/order.fixture.ts', 'be/src/tests/fixtures/order.factory.ts', 'be/src/tests/fixtures/order.repository.ts', 'be/src/features/orders/application/order.builder.ts']) assert.ok(refused.includes(bad), bad);
+  for (const bad of ['be/src/tests/fixtures/order.builder.ts', 'be/src/tests/fixtures/order.fixture.ts', 'be/src/tests/fixtures/order.factory.ts', 'be/src/tests/fixtures/order.repository.ts', 'be/src/features/api/orders/application/order.builder.ts']) assert.ok(refused.includes(bad), bad);
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(APP, (repo) => put(repo, 'be/src/tests/fixtures/builders/order.builder.ts')) }), 'BE_SOURCE_FORM'), []);
 });
 
@@ -253,10 +253,10 @@ test('every code the check can emit has a Vietnamese catalog entry, and the pack
 
 test('explain names the slot, tier, allowed imports and required tests of a path', () => {
   const dir = repoOf(APP);
-  const owned = explainPath({ repoRoot: dir, input: 'be/src/features/orders/application/place-order.handler.ts' });
+  const owned = explainPath({ repoRoot: dir, input: 'be/src/features/api/orders/application/place-order.handler.ts' });
   assert.equal(owned.slot, 'be.feature.application');
   assert.equal(owned.tier, 'feature');
-  assert.deepEqual(owned.owner, { slot: 'be.feature', root: 'be/src/features/orders' });
+  assert.deepEqual(owned.owner, { slot: 'be.feature', root: 'be/src/features/api/orders' });
   assert.deepEqual(owned.allowedImports, ['domain', 'events', 'queues', 'projections', 'platform', 'integrations', 'package']);
   assert.equal(owned.tests, 'none');
 
@@ -301,10 +301,10 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
 });
 
 test('the CLI: report-only backlog leaves the exit code 0; explain prints what it found', async () => {
-  const dir = repoOf(APP, (d) => put(d, 'be/src/features/orders/application/place-order.handler.ts', 'export {};\n'.repeat(600)));
+  const dir = repoOf(APP, (d) => put(d, 'be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n'.repeat(600)));
   assert.equal((await cli(['check', '--repo', dir])).code, 0);
 
-  const explained = await cli(['explain', 'be/src/features/orders/index.ts', '--repo', dir]);
+  const explained = await cli(['explain', 'be/src/features/api/orders/index.ts', '--repo', dir]);
   assert.equal(explained.code, 0);
   assert.match(explained.out, /be\.feature/);
   assert.match(explained.out, /may import domain, events, queues, projections, platform, integrations, package/);
@@ -407,7 +407,7 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
 test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
-  const [finding] = only(result, 'BE_REQUIRED_MODULE_MISSING');
+  const [finding] = only(result, 'HFS_REQUIRED_FILE_MISSING');
   assert.equal(result.ok, false);
   assert.equal(finding.level, 'error');
   assert.equal(finding.source, 'machine');
@@ -415,7 +415,7 @@ test('hfs check runs the architecture machine: its violation is a finding under 
   assert.match(finding.whyVi, HAS_VIETNAMESE);
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
-  assert.equal(result.counts.byCode.BE_REQUIRED_MODULE_MISSING.count, 1);
+  assert.equal(result.counts.byCode.HFS_REQUIRED_FILE_MISSING.count, 1);
   assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a hfs check finding');
 });
 
@@ -432,12 +432,12 @@ test('machine errors and violations merge as findings with path, line and messag
   // The machine runs once per side folder; this one reports on the be side and finds nothing on the fe side.
   const machine = (input) => (path.basename(input.repositoryRoot) !== 'be' ? { ok: true, files: 1, kinds: ['frontend'], violations: [], errors: [] } : {
     ok: false, files: 4, kinds: ['backend'],
-    violations: [{ ruleId: 'BE_TIER_DIRECTION', path: 'be/src/features/orders/index.ts', line: 3, column: 1, message: 'goes the wrong way' }],
+    violations: [{ ruleId: 'BE_TIER_DIRECTION', path: 'be/src/features/api/orders/index.ts', line: 3, column: 1, message: 'goes the wrong way' }],
     errors: [{ ruleId: 'ARCH_TYPESCRIPT_MISSING', message: 'install TypeScript' }],
   });
   const result = checkRepository({ repoRoot: dir, machine });
   assert.deepEqual(codesOf(result).sort(), ['ARCH_TYPESCRIPT_MISSING', 'BE_TIER_DIRECTION']);
-  assert.equal(only(result, 'BE_TIER_DIRECTION')[0].message, 'be/src/features/orders/index.ts:3: goes the wrong way');
+  assert.equal(only(result, 'BE_TIER_DIRECTION')[0].message, 'be/src/features/api/orders/index.ts:3: goes the wrong way');
   assert.equal(only(result, 'BE_TIER_DIRECTION')[0].line, 3);
   assert.match(only(result, 'ARCH_TYPESCRIPT_MISSING')[0].whyVi, HAS_VIETNAMESE);
   const unknown = () => ({ ok: false, files: 0, kinds: [], violations: [{ ruleId: 'BE_NOT_IN_ANY_CATALOG', message: 'x' }], errors: [] });
@@ -485,15 +485,15 @@ test('--fast judges the changed owners only: the machine gets their paths and sk
   assert.equal(none.machine.status, 'skipped');
   assert.equal(none.fast.changed, 0);
 
-  put(dir, 'be/src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  put(dir, 'be/src/features/api/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const changed = checkRepository({ repoRoot: dir, fast: true, machine });
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0].paths, ['src/features/orders'], 'the machine of the be side gets side-relative owner paths');
+  assert.deepEqual(calls[0].paths, ['src/features/api/orders'], 'the machine of the be side gets side-relative owner paths');
   assert.equal(calls[0].fast, true);
   assert.match(calls[0].base, /^[0-9a-f]{40}$/);
   assert.equal(changed.fast.changed, 1);
-  assert.deepEqual(changed.machine.paths, ['be/src/features/orders']);
+  assert.deepEqual(changed.machine.paths, ['be/src/features/api/orders']);
 });
 
 test('--fast: slot checks run on the changed paths only, and the tree checks do not run', async () => {
@@ -514,13 +514,13 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
 });
 
 test('--fast with the real machine: a Vietnamese document already on main is not judged, a full check reports it', async () => {
-  const dir = branched((d) => { put(d, 'be/docs/adr/0001-old.md', 'Đây là một tài liệu viết bằng tiếng Việt, không phải tiếng Anh.\n'); });
-  put(dir, 'be/src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  const dir = branched((d) => { put(d, 'be/docs/adr/0001-old.md', '\u0110\u00e2y l\u00e0 m\u1ed9t t\u00e0i li\u1ec7u vi\u1ebft b\u1eb1ng ti\u1ebfng Vi\u1ec7t, kh\u00f4ng ph\u1ea3i ti\u1ebfng Anh.\n'); });
+  put(dir, 'be/src/features/api/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const fast = await cli(['check', '--repo', dir, '--fast']);
   assert.equal(fast.code, 0, fast.out);
   assert.match(fast.out, /--fast/);
-  assert.match(fast.out, /owners be\/src\/features\/orders/);
+  assert.match(fast.out, /owners be\/src\/features\/api\/orders/);
   const full = await cli(['check', '--repo', dir]);
   assert.equal(full.code, 1);
   assert.match(full.out, /HFS_DOC_NOT_ENGLISH x1/);
@@ -566,7 +566,7 @@ export const OPERATIONS = defineOperations({ 'shop.total@1': query<Ask, Answer, 
 
 test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {
   const dir = branched();
-  put(dir, 'be/src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  put(dir, 'be/src/features/api/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   let calls = 0;
   const counting = { ...FORMATTED, check: async () => { calls += 1; return true; } };
@@ -584,7 +584,7 @@ test('the CLI: machine findings fail the exit code and print with their Vietname
   const text = await cli(['check', '--repo', dir]);
   assert.equal(text.code, 1);
   assert.match(text.out, /architecture machine: ran over \d+ source files/);
-  assert.match(text.out, /BE_REQUIRED_MODULE_MISSING x1/);
+  assert.match(text.out, /HFS_REQUIRED_FILE_MISSING x1/);
   assert.match(text.out, HAS_VIETNAMESE);
   const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
   assert.equal(json.machine.status, 'ran');

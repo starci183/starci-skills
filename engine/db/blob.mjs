@@ -82,8 +82,6 @@ export function blobPath(sha) {
   return fs.existsSync(file) && fs.statSync(file).isFile() ? file : null;
 }
 
-export const hasBlob = sha => blobPath(sha) !== null;
-
 export function getBlob(sha) {
   const file = blobPath(sha);
   if (!file) throw Object.assign(new Error(`blob not found: ${sha}`), { code: 'ENOENT' });

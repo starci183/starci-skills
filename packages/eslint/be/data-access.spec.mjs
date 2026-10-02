@@ -23,11 +23,11 @@ import { at, typedTester } from "./fixtures/typed/tester.mjs"
 
 const tester = typedTester()
 
-const HANDLER = at("src/features/checkout/application/place.handler.ts")
-const HANDLER_SPEC = at("src/features/checkout/application/place.handler.spec.ts")
+const HANDLER = at("src/features/api/checkout/application/place.handler.ts")
+const HANDLER_SPEC = at("src/features/api/checkout/application/place.handler.spec.ts")
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const DATABASE_MODULE = at("src/modules/platform/database/database.module.ts")
-const MIGRATE = at("apps/migrate/src/main.ts")
+const MIGRATE = at("apps/cli/src/main.ts")
 const E2E_WORLD = at("src/tests/world/use-test-world.ts")
 const E2E_SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
 const ENTITY = at("src/modules/domain/order/persistence/entities/order.entity.ts")
@@ -71,7 +71,7 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
     tester.run("named-entity-manager-only", namedEntityManagerOnly, {
         valid: [
             { filename: HANDLER, code: constructorOf("@InjectPrimaryEntityManager() private readonly entityManager: EntityManager") },
-            // the platform database capability and the migrate app hold the connections
+            // the platform database capability and the cli hold the connections
             { filename: DATABASE_MODULE, code: constructorOf("private readonly dataSource: DataSource") },
             { filename: DATABASE_MODULE, code: constructorOf("private readonly runner: QueryRunner") },
             { filename: MIGRATE, code: constructorOf("private readonly dataSource: DataSource") },

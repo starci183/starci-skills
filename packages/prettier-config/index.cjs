@@ -1,11 +1,11 @@
 /**
  * The one StarCi Prettier config, for back end and front end alike.
  *
- * Chosen from what the repositories already wrote, not from taste: none of nivo-backend, nivo-fe,
- * starci-next, starci-next-fe, mia-mia-backend or miamia-fe carries a Prettier file today; their layout came from ESLint
- * formatting rules (nivo-backend: indent 4, double quotes, no semicolons) and every source file in the
- * front ends already follows the same four rules. nivo-backend is the largest repo, so its dialect gives
- * the smallest reformat diff. See README.md.
+ * The shared Prettier config of the StarCi monorepos, chosen from what the repositories already wrote,
+ * not from taste: none of them carries a Prettier file today; their layout came from ESLint formatting
+ * rules (the largest back end: indent 4, double quotes, no semicolons) and every source file in the
+ * front ends already follows the same four rules. The largest repository's dialect gives the smallest
+ * reformat diff. See README.md.
  *
  * @type {import("prettier").Config}
  */

@@ -4,20 +4,20 @@ import path from 'node:path';
 import { newToken } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { getWorkflow, latestGoal, jobPayloadOf, ownedPathsOf } from './shared/rows.mjs';
-import { peerOverlapHeadsUp } from './shared/peers.mjs';
+import { peerOverlapHeadsUp } from './shared/peer-waits.mjs';
 import { splitGoalLegParams, resolveOpParams } from '../dispatch-op.mjs';
-import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot.mjs';
+import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot-run.mjs';
 import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
 import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
 import { loadContractChanges, changeById } from '../../machine/contract-version.mjs';
-import { normalizeFoundationName, readFoundation } from '../foundations.mjs';
+import { normalizeFoundationName, readFoundation } from '../foundation-registry.mjs';
 import { admitUnit, writeUnitTry } from '../units.mjs';
 import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
-import { requirePhase, ACCEPTS_WORK } from './shared/lifecycle.mjs';
-import { seamPriorityOf } from '../cut-seam.mjs';
+import { requirePhase, ACCEPTS_WORK } from './shared/workflow-transitions.mjs';
+import { seamPriorityOf } from '../seam-policy.mjs';
 import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../../route/spec-deferral.mjs';
 
 export default {
@@ -55,7 +55,7 @@ export default {
   }
   const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
   const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
-  // Autopilot (owner ruling 2026-09-28 "hạn chế provision ask"): no provision.ask leg opens mid-flow - the code
+  // Autopilot (owner ruling 2026-09-28 "limit provision asks"): no provision.ask leg opens mid-flow - the code
   // proceeds on sandbox/stub/mocks and every credential or approval need is recorded deferred-to-handover
   // (api autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.

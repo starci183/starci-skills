@@ -1,6 +1,6 @@
 # shape-slot
 
-Standard FE sample for the shape + slot pattern, going through every layer of an HFS app.
+Standard FE sample for the shape + slot pattern, going through every layer of an HFS app. Role: the slot-teaching fixture that the grammar and the knowledge read; it is NOT a product example (no examples-ci matrix entry, no codecov flag, no recorded product evidence).
 
 ## Overview
 

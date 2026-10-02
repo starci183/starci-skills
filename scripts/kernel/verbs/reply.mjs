@@ -1,8 +1,8 @@
 // api reply: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatusByKey } from '../../../engine/db/ledger.mjs';
-import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/messages.mjs';
-import { orchReply } from '../../api/orca/orch-reply.mjs';
+import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
+import { reply as orcaReply } from '../../api/orca/reply.mjs';
 
 export default {
   verb: 'reply',
@@ -25,7 +25,7 @@ export default {
     }
     const body = toOwner ? `${OWNER_ROUTED_REPLY}${args.body ? ` Kernel note: ${args.body}` : ''}` : String(args.body);
     internals.bindRunToKernel({ db, ledger, workflowId, runId: item.runId, by: `reply:${messageId}` });
-    const sent = orchReply({ id: messageId, body, run: item.runId });
+    const sent = orcaReply({ id: messageId, body, run: item.runId });
     if (!sent.ok) {
       const out = { ok: false, workflowId, messageId, jobId: item.jobId, reason: 'reply-failed', error: sent.error ?? sent.outcome };
       emit(out, `reply FAILED for ${messageId}: ${out.error}`, args.json);

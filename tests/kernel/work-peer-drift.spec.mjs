@@ -8,23 +8,23 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,PROJECTS_ROOT_ENV,writeContract} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {claimFoundation,writeFoundation} from '../../scripts/kernel/foundations.mjs';
+import {claimFoundation,writeFoundation} from '../../scripts/kernel/foundation-registry.mjs';
 import {baselineWorkInputs,inputDrift,peerDriftSummaryOf,recordInputs,staleOperationsOf} from '../../scripts/kernel/input-digests.mjs';
 import {changeNoteOf,committedMatches,committedReader,createOwnership,ownerDeclarationFor} from '../../scripts/kernel/work-ownership.mjs';
 
-// starci-next inc-1c7f7dad53e0 (2026-09-25): three workflows on one ledger - sn-foundation,
-// sn-learn-content, sn-subscription - share Work records (challenges, commerce/br/single-subscription,
-// the learning-paths foundation contract). Work-input staleness listed a settled job whenever a record
-// it read changed from outside its workflow, so each peer rewrite re-staled settled work, the Kernels
-// redid it, the redo rewrote records and re-staled the peers: sn-subscription redid its scope 5 times
-// and its business seam 6 times, mostly re-verifying unchanged content, often against a file a peer
-// had not even committed. The fix: every shared record has ONE owner workflow; a peer's committed
-// change is advisory peerDrift; only the OWNER marking it breaking owes ONE follow-up leg; an
-// in-flight (uncommitted) rewrite never counts.
+// Three workflows on one ledger - foundation, learn-content, subscription - share Work records
+// (challenges, commerce/br/single-subscription, the learning-paths foundation contract). Work-input
+// staleness listed a settled job whenever a record it read changed from outside its workflow, so
+// each peer rewrite re-staled settled work, the Kernels redid it, the redo rewrote records and
+// re-staled the peers: subscription redid its scope 5 times and its business seam 6 times, mostly
+// re-verifying unchanged content, often against a file a peer had not even committed. The fix:
+// every shared record has ONE owner workflow; a peer's committed change is advisory peerDrift; only
+// the OWNER marking it breaking owes ONE follow-up leg; an in-flight (uncommitted) rewrite never
+// counts.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-const F='wf-sn-foundation',L='wf-sn-learn-content',S='wf-sn-subscription',DONE='wf-finished-import';
+const F='wf-ecommerce-foundation',L='wf-ecommerce-learn-content',S='wf-ecommerce-subscription',DONE='wf-finished-import';
 const SUB='.starciwork/features/commerce/br/single-subscription';
 const CH='.starciwork/features/challenges/fr/submit-code-and-evaluate';
 const LPC='.starciwork/features/learning-paths/contract/foundation/learner-progress-contract';
@@ -43,9 +43,9 @@ const scopeIndex=(feature,workflow,nodes)=>['schema: work/feature@1',`id: ${feat
   ...nodes.flatMap(([id,kind,p])=>[`        - id: ${id}`,`          kind: ${kind}`,`          path: ${p}/index.yaml`]),''].join('\n');
 
 /**
- * The starci-next world: a git product repo whose catalog places commerce, challenges, concepts and
- * learning-paths; sn-subscription's scope record is commerce's, sn-learn-content's is concepts' (it
- * names the challenges records as nodes it authors), sn-foundation's is learning-paths' (it also names
+ * The ecommerce-app world: a git product repo whose catalog places commerce, challenges, concepts and
+ * learning-paths; subscription's scope record is commerce's, learn-content's is concepts' (it
+ * names the challenges records as nodes it authors), foundation's is learning-paths' (it also names
  * single-subscription, as the live one does) and it owns the learner-progress-contract foundation.
  * Every workflow has settled a scope leg and a 3-slice business cut that read all three shared records.
  */
@@ -63,7 +63,7 @@ const world=t=>{
   const work=(rel,text)=>{const file=path.join(repo,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   git(repo,['init','-q']);
   work('.gitignore','.starciwork/runtime.sqlite*\n');
-  work('.starciwork/index.yaml',['schema: work/catalog@1','id: starci-next','features:',...['commerce','challenges','concepts','learning-paths'].flatMap(f=>[`  - id: ${f}`,`    directory: features/${f}`]),''].join('\n'));
+  work('.starciwork/index.yaml',['schema: work/catalog@1','id: ecommerce-app','features:',...['commerce','challenges','concepts','learning-paths'].flatMap(f=>[`  - id: ${f}`,`    directory: features/${f}`]),''].join('\n'));
   work('.starciwork/features/commerce/index.yaml',scopeIndex('commerce',S,[['br.commerce.single-subscription','revision',SUB],['fr.challenges.submit-code-and-evaluate','foundation-dependency',CH]]));
   work('.starciwork/features/concepts/index.yaml',scopeIndex('concepts',L,[['fr.challenges.submit-code-and-evaluate','revision',CH]]));
   work('.starciwork/features/learning-paths/index.yaml',scopeIndex('learning-paths',F,[['br.commerce.single-subscription','business-rule',SUB],['contract.learning-paths.foundation.learner-progress-contract','contract',LPC]]));

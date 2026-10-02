@@ -14,7 +14,7 @@ export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
 
 /*
- * runtime.sqlite — the ONE writer (and the reader opener) of a project's runtime ledger (DBTREE.sql PHẦN A,
+ * runtime.sqlite — the ONE writer (and the reader opener) of a project's runtime ledger (DBTREE.sql PART A,
  * ARCHITECTURE-DB §4, RESEARCH-STORAGE §3). The DDL is engine/db/migrations/runtime/0001-init.sql, executed as is:
  * STRICT tables, state machines, append-only guards and views live IN the database, so an invalid write is refused
  * at the write whatever code issued it. Clean slate (alpha.3): a file that is not 'starci/runtime@1' is refused;
@@ -30,8 +30,6 @@ const require=createRequire(import.meta.url);
 // Vocabulary
 // ---------------------------------------------------------------------------------------------------------
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
-/** The TRACEPARENT an op receives: 00-<trace>-<span>-01. */
-export const traceparent=(traceId,spanId)=>`00-${traceId}-${spanId}-01`;
 /**
  * jobs.status (DBTREE A4 job_transitions), grouped by what a row in that state still owes: `dispatchable` rows are the
  * live frontier, `awaiting` wait on a settle or decision, `fenced` keeps a launch whose effect is unproven, `settled`
@@ -44,7 +42,6 @@ export const JOB_STATUSES=Object.freeze({
   settled:SETTLED_JOB_LIST,
 });
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
-export const WORKFLOW_PHASES=Object.freeze(['awaiting-approval','queued','running','paused','stopped','finished','archived']);
 export const UNIT_STATES=Object.freeze(['planned','queued','running','reported','deciding','done','failed','dropped']);
 export const DEFAULT_TRY_BUDGET=5;
 export const JOB_ARTIFACT_KINDS=Object.freeze(['diff','patch','image','video','report','log','trace','file']);
@@ -121,7 +118,7 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 };
 
 // ---------------------------------------------------------------------------------------------------------
-// Connection policy (DBTREE header "PRAGMA lúc mở", RESEARCH-STORAGE §3)
+// Connection policy (DBTREE header "PRAGMA at open", RESEARCH-STORAGE §3)
 // ---------------------------------------------------------------------------------------------------------
 const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
@@ -137,12 +134,6 @@ export const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON
 export const CHECKPOINTER_AUTOCHECKPOINT=8000;
 const READ_PRAGMAS=Object.freeze({query_only:'ON',temp_store:'MEMORY',cache_size:-16000,trusted_schema:'OFF'});
 const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
-/** The pragma values a handle actually runs with. */
-export const connectionFacts=db=>({journalMode:String(db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase(),
-  synchronous:Number(db.prepare('PRAGMA synchronous').get().synchronous),busyTimeoutMs:Number(db.prepare('PRAGMA busy_timeout').get().timeout),
-  tempStore:Number(db.prepare('PRAGMA temp_store').get().temp_store),cacheSize:Number(db.prepare('PRAGMA cache_size').get().cache_size),
-  walAutocheckpoint:Number(db.prepare('PRAGMA wal_autocheckpoint').get().wal_autocheckpoint),
-  foreignKeys:Number(db.prepare('PRAGMA foreign_keys').get().foreign_keys),queryOnly:Number(db.prepare('PRAGMA query_only').get().query_only)});
 /** BEGIN IMMEDIATE: spin for `spinMs` without the busy handler's 15 ms sleeps, then wait with the connection's busy_timeout. */
 export const LEDGER_SPIN_MS=20;
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){

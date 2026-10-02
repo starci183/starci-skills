@@ -18,14 +18,17 @@
 //                                                       the owner or the coordinator runs --apply.
 import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { runPowershell } from '../api/process/run-powershell.mjs';
+import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs';
 import { stopTree } from '../supervisor/host-health.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export const TASK_NAME = 'StarCi-Reconciler';
@@ -102,8 +105,8 @@ export function crashLoopPlan(record, { now = Date.now(), max = 3, windowMs = 1_
  * pid.
  */
 export function spawnEngine({ safe = false, env = process.env, startReason = 'boot' } = {}) {
-  const child = spawn(process.execPath, [ENGINE_FILE, ...(safe ? ['--safe'] : [])], { cwd: SKILL_ROOT, env: { ...env, [START_REASON_ENV]: startReason },
-    detached: true, stdio: 'ignore', windowsHide: true });
+  const child = spawnNode([ENGINE_FILE, ...(safe ? ['--safe'] : [])], { cwd: SKILL_ROOT, env: { ...env, [START_REASON_ENV]: startReason },
+    detached: true, stdio: 'ignore' });
   child.unref();
   return child.pid ?? null;
 }
@@ -153,9 +156,7 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   const safe = plan.looping;
   if (plan.alertDue) {
     const minutes = Math.round(numbers.crashLoop.windowMs / 60_000);
-    out.alert = await push((language) => (language === 'vi'
-      ? `KHẨN: StarCi reconciler khởi động lại ${plan.starts.length + 1} lần trong ${minutes} phút; chạy safe mode (chỉ đọc). Xem machine_logs actor reconciler (boot.mjs --status).`
-      : `URGENT: the StarCi reconciler restarted ${plan.starts.length + 1} times in ${minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).`));
+    out.alert = await push((language) => translator(language)('URGENT: the StarCi reconciler restarted {count} times in {minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).', { count: plan.starts.length + 1, minutes }));
     record((m) => m.log({ actor: 'reconciler', kind: CRASH_ALERT_KIND, level: 'error', msg: `crash loop: ${plan.starts.length + 1} starts in ${minutes} min; safe mode`, data: { starts: plan.starts, alert: out.alert ?? null }, at: now }));
   }
   // A caller-named reason (owner-restart, start) or a previous engine that ended on purpose is a planned start: never a crash.
@@ -258,7 +259,7 @@ function installTask({ apply, json }) {
     return;
   }
   if (process.platform !== 'win32') { console.log(JSON.stringify({ ok: false, reason: 'not-windows' })); process.exitCode = 1; return; }
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const r = runPowershell(script);
   const out = { ok: r.status === 0, applied: true, task: TASK_NAME, output: String(r.stdout || r.stderr || '').trim().slice(0, 600) };
   console.log(json ? JSON.stringify(out) : `${out.ok ? 'created' : 'FAILED'} ${TASK_NAME}: ${out.output}`);
   if (!out.ok) process.exitCode = 1;
@@ -284,4 +285,4 @@ async function main(argv = process.argv.slice(2)) {
   process.exitCode = r.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) await main();
+if (isMain(import.meta.url)) await main();

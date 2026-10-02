@@ -3,13 +3,11 @@
 // (a PreToolUse hook) applies it to the agent's shell command before it runs, and the
 // reference-transaction hook git itself runs backs it (scripts/guards/hook-install.mjs).
 //
-// Several workflows of one product ledger build in ONE checkout on ONE branch
-// (nivo: Login, workspace provision, modules and collab on nivo-backend main).
+// Several workflows of one product ledger build in ONE checkout on ONE branch.
 // Their workers damaged each other with commands that are harmless alone:
-//  - a Collab worker ran `git reset --soft HEAD~1` over a peer's landed commit
-//    and re-committed it under its own message (nivo inc-40fed684fff8,
-//    inc-cb721b99fdd1);
-//  - a commit swept a foreign file a hook had re-staged (inc-5d7ce049e810);
+//  - a worker ran `git reset --soft HEAD~1` over a peer's landed commit
+//    and re-committed it under its own message;
+//  - a commit swept a foreign file a hook had re-staged;
 //  - `git stash`, `git clean -fd`, `git checkout -- <path>` and `git restore`
 //    discard every peer's uncommitted work under the paths they name.
 // The rule (modules/ops/_common.yaml "Evidence, completion and commits",
@@ -77,7 +75,7 @@ const norm = pathKey;
 // carries `[` but is a literal directory name - the reading owned-path admission gives it
 // (engine/admission.mjs isAppRouterSegment, ownedPathspec). Cutting every pathspec at its first `[`
 // scoped `src/app/[locale]/x` to `src/app/`, outside the grant `src/app/[locale]`, and refused the op's
-// own paths PATH_NOT_OWNED (nivo-fe inc-21f76abb6d10). Git, though, still reads a plain `[...slug]` as a
+// own paths PATH_NOT_OWNED. Git, though, still reads a plain `[...slug]` as a
 // character class (`src/app/[...slug]/page.tsx` also matches a peer's `src/app/l/page.tsx`), so a pathspec
 // the guard reads literally must reach git literally too: the command guard (command-guard.mjs) refuses a
 // command whose glob reading reaches a path the literal reading does not, naming the literalAppRouterArgv form. A pathspec that also carries a real glob, or `:(glob)` magic, keeps git's glob
@@ -406,7 +404,7 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       return scoped(specs, 'git commit');
     }
     case 'stash':
-      // lint-staged's pre-commit backup (mia, starci-next) is `stash create` + `stash store`, dropped
+      // lint-staged's pre-commit backup is `stash create` + `stash store`, dropped
       // after a clean run: it copies, it never sweeps the worktree. push/save/pop/apply/clear do.
       if (['list', 'show', 'create', 'store', 'drop'].includes(words[0])) return ALLOW;
       return refusal('SHARED_WORKTREE_DISCARD', 'git stash sweeps every workflow\'s uncommitted changes out of the shared checkout', 'leave other files alone; commit or restore only your owned paths');
@@ -483,11 +481,11 @@ export function classifyGit(argv, { cwd = process.cwd(), owned = null, top = nul
       if (['expire', 'delete'].includes(words[0])) return refusal('HISTORY_REWRITE', 'git reflog expire/delete destroys the recovery record', 'leave the reflog alone');
       return ALLOW;
     case 'worktree':
-      // nivo-fe inc-c8fbf76aa499: a Devin op worker added its own worktree beside nivo-fe, junctioned the live
+      // A Devin op worker once added its own worktree beside a live repository, junctioned the live
       // node_modules into it, and `git worktree remove --force` followed the junctions and deleted 674 live files.
       // An op works in the checkout it was dispatched to; it never creates, moves or removes a worktree.
       if (['add', 'move', 'remove'].includes(words[0]))
-        return refusal('WORKTREE_NOT_OPS', `git worktree ${words[0]}: an op worker never creates, moves or removes a git worktree - it works in the checkout it was dispatched to (a private worktree with links into the live repository deleted live files, nivo-fe inc-c8fbf76aa499)`,
+        return refusal('WORKTREE_NOT_OPS', `git worktree ${words[0]}: an op worker never creates, moves or removes a git worktree - it works in the checkout it was dispatched to (a private worktree with links into the live repository deleted live files)`,
           'work in your dispatched checkout; a worktree is created and removed only by the runtime worktree API (scripts/machine/worktree-git.mjs createScratchWorktree, removeScratchWorktree and safeRemoveWorktree, scripts/machine/worktree-orca.mjs createOrcaWorktree and removeOrcaWorktree) - a build or measurement that needs another revision is reported as a need (report blocked environment), never done in a worktree of your own, and never with a junction or symlink');
       return ALLOW;
     case 'merge':

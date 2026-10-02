@@ -121,12 +121,12 @@ test('TASK_OUTSIDE_RUN: an open Task in a Run the workflow no longer uses',t=>{
   });
 });
 
-test('a Task the settle already closed is out of the tree, not a finding',t=>{
+test('a settled job\'s Task settled with its Dispatch: out of the tree, not a finding',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
     ledger.db.prepare("UPDATE jobs SET status='reported' WHERE job_id='job-op-1'").run();
     ledger.db.prepare("UPDATE jobs SET status='succeeded',worker_id=NULL,payload_json=? WHERE job_id='job-op-1'")
-      .run(JSON.stringify({managed:{runId:'run-0',taskId:'task-old'},taskClosed:{taskId:'task-old',status:'done',ok:true}}));
+      .run(JSON.stringify({managed:{runId:'run-0',taskId:'task-old'}}));
     assert.deepEqual(orcaTreeFindings(ledger.db,seen(term(KERNEL,'[Kernel] wf-tree'))),[]);
   });
 });
@@ -201,7 +201,7 @@ test('a [Kernel] terminal naming a workflow from another ledger is not an orphan
 test('TITLE_DRIFT names a live managed worker whose [Op] tab rename did not apply, never a pane title',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    const rows=seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | nivo-backend'));
+    const rows=seen(term(KERNEL,'devin.exe: Kernel orchestration for nivo'),term('term-op-1','Report task outcome | todo-app-be'));
     assert.deepEqual(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT'),[],'the pane title an agent CLI writes is not the sidebar tab title');
     ledger.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='job-op-1'").run(JSON.stringify({orca:{runId:'run-1',taskId:'task-1',agentTerminalHandle:'term-op-1'},managed:{assignee:'term-op-1',terminalTitle:{ok:false,title:'[Op] code.refactor a1 · wf-tree',error:'rename refused'}}}));
     const f=orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='TITLE_DRIFT');
@@ -212,20 +212,20 @@ test('TITLE_DRIFT names a live managed worker whose [Op] tab rename did not appl
 test('STRAY_TERMINAL names a live terminal in the project worktree that is no live kernel or op',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    const at=p=>x=>({...x,worktreePath:p});
+    const at=p=>x=>({...x,worktreePath:p}); const R=path.parse(process.cwd()).root.replace(/\\/g,'/'),TODO=R+'Repositories/todo-app-be';
     const rows=readTerminals([
-      ...healthyTerminals().map(at('D:/Repositories/nivo-backend')),
-      at(String.raw`D:\Repositories\nivo-backend`)(term('term-shell','nivo-backend')),
-      at('D:/Repositories/nivo-backend')(term('term-old','worker-task_9572ffbea332')),
-      at('D:/Repositories/mia-mia-backend')(term('term-other','x')),
+      ...healthyTerminals().map(at(TODO)),
+      at(TODO.replace(/\//g,'\\'))(term('term-shell','todo-app-be')),
+      at(TODO)(term('term-old','worker-task_9572ffbea332')),
+      at(R+'Repositories/my-app')(term('term-other','x')),
     ]);
-    const f=orcaTreeFindings(ledger.db,rows,{repo:'D:/Repositories/nivo-backend'});
+    const f=orcaTreeFindings(ledger.db,rows,{repo:TODO});
     assert.deepEqual(f.filter(x=>x.code==='STRAY_TERMINAL').map(x=>x.terminal).sort(),['term-old','term-shell']);
     assert.equal(orcaTreeFindings(ledger.db,rows).filter(x=>x.code==='STRAY_TERMINAL').length,0,'without a repo the placement check is off');
     // Another project's worker is in another Run: never this ledger's orphan, whatever its title.
-    const other=readTerminals([...healthyTerminals().map(at('D:/Repositories/nivo-backend')),at('D:/Repositories/nivo-backend')(term('term-nivo-op','[Op] architecture.decide'))]);
-    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/starci-next'}).some(x=>x.terminal==='term-nivo-op'),false,'another project [Op] worker is not this ledger orphan');
-    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend'}).find(x=>x.terminal==='term-nivo-op')?.code,'STRAY_TERMINAL','in its own project with no worker of its Runs it is stray');
-    assert.equal(orcaTreeFindings(ledger.db,other,{repo:'D:/Repositories/nivo-backend',workers:[worker('term-nivo-op')]}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','a worker of its Run no job holds is an orphan');
+    const other=readTerminals([...healthyTerminals().map(at(TODO)),at(TODO)(term('term-nivo-op','[Op] architecture.decide'))]);
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:R+'Repositories/ecommerce-app'}).some(x=>x.terminal==='term-nivo-op'),false,'another project [Op] worker is not this ledger orphan');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:TODO}).find(x=>x.terminal==='term-nivo-op')?.code,'STRAY_TERMINAL','in its own project with no worker of its Runs it is stray');
+    assert.equal(orcaTreeFindings(ledger.db,other,{repo:TODO,workers:[worker('term-nivo-op')]}).find(x=>x.terminal==='term-nivo-op')?.code,'ORPHAN_TERMINAL','a worker of its Run no job holds is an orphan');
   });
 });

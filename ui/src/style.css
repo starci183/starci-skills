@@ -56,7 +56,7 @@
   --st-done: var(--status-success);
   --st-unknown: var(--status-queued);
   /* Semantic status scale (one system for chips, steps, check rows, graph nodes, bars).
-     success = passed/succeeded/đạt; running = blue; queued = neutral; failed/blocked = red;
+     success = passed/succeeded/done; running = blue; queued = neutral; failed/blocked = red;
      warning = stale/retry; skipped = deferred/external. Contrast >= 4.5:1 on --card. */
   --status-success: #15803d; --status-success-bg: #e8f6ed; --status-success-line: #9fd9b3;
   --status-running: #1d5fd6; --status-running-bg: #e8effd; --status-running-line: #a8c3f5;

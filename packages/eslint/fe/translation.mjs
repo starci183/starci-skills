@@ -92,7 +92,7 @@ const RESOLVES_COPY = /^(?:useTranslations|useLocale|useFormatter|getTranslation
  * True when the text contains a word: two or more letters in any script.
  *
  * TWO LETTERS, NOT ONE, AND THE SAME AS THE REPOSITORY GATE. A lone letter is a unit, a separator or a
- * key cap (`x`, `k`, `A`); a word is where copy starts. nivo-fe's `scripts/check-i18n-catalog.mjs`
+ * key cap (`x`, `k`, `A`); a word is where copy starts. The repository's i18n catalog check
  * draws the line at two letters for JSX text and copy attributes, and this rule draws it in the same
  * place so the lint and the gate never disagree about what a literal is. Neither has a suppression
  * marker.

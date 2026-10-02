@@ -51,10 +51,12 @@ test('a calls.yaml flag the entry does not declare fails the static check',t=>{
   const root=fixtureRoot(t,text=>text.replace(`  worker-stop:
     command: orchestration worker-stop
     kind: mutation
+    replay: reissue
     timeoutMs: 60000
     flags: [dispatch]`,`  worker-stop:
     command: orchestration worker-stop
     kind: mutation
+    replay: reissue
     timeoutMs: 60000
     flags: []`));
   const r=run(['--root',root]);
@@ -84,13 +86,13 @@ test('--live compares every calls.yaml entry against the agent-context listing',
 test('--live exits 1 with the diff when the binary is missing a command or a flag',t=>{
   const env={...stub(t),
     STARCI_FAKE_ORCA_OMIT_COMMAND:'orchestration worker-stop',
-    STARCI_FAKE_ORCA_OMIT_FLAG:'orchestration worker-start:retry-of,orchestration worker-start:effort'};
+    STARCI_FAKE_ORCA_OMIT_FLAG:'orchestration worker-start:retry-request,orchestration worker-start:effort'};
   const r=run(['--live'],env);
   assert.equal(r.status,1,'drift against the live binary must be red');
   assert.equal(r.report.ok,false);
   const byCall=Object.fromEntries(r.report.live.drift.map(d=>[d.call,d]));
   assert.equal(byCall['worker-stop']?.missingCommand,true);
-  assert.deepEqual(byCall['worker-start']?.missingFlags,['effort','retry-of']);
+  assert.deepEqual(byCall['worker-start']?.missingFlags,['effort','retry-request']);
   assert.equal(byCall['worker-start']?.missingCommand,false);
   assert.equal(Object.keys(byCall).length,2,`only the drifted calls are reported: ${JSON.stringify(r.report.live.drift)}`);
 });

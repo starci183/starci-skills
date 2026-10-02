@@ -12,7 +12,7 @@
 //   info/exclude (excludeFromGit). The only per-user records are the ones a host keeps nowhere else: its trust of
 //   the directory, and Codex's trusted hash of the project hook.
 //     claude → ~/.claude.json projects[<cwd>].hasTrustDialogAccepted = true, in
-//              every key form Claude writes (win32: `D:/…` and `D:\…`); in
+//              every key form Claude writes (win32: `<drive>:/…` and `<drive>:\…`); in
 //              <cwd>/.claude/settings.local.json: skipDangerousModePermissionPrompt
 //              (set only when missing), each agents/claude.yaml launchEnv key under
 //              env (DISABLE_AUTOUPDATER: Orca composes a worker's command, so its
@@ -20,7 +20,7 @@
 //     codex  → [projects."<path>"] trust_level = "trusted" in every Codex home
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
-//              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic), plus the
+//              writes (win32: a '<drive>:\lower\case' literal and a "<DRIVE>:\\exact" basic), plus the
 //              update-check and model-nudge notices; the guard hook in the project
 //              layer <cwd>/.codex/config.toml, and in each home only the hash Codex
 //              trusts it by (codex app-server hooks/list, then config/batchWrite
@@ -41,9 +41,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -111,13 +111,13 @@ export const projectTargets = (dir) => ({
  * that is no git checkout, or a file git already tracks, is left alone. Returns {file, state} or null.
  */
 export function excludeFromGit(dir, file) {
-  const topOut = runGit(['rev-parse', '--show-toplevel'], { cwd: dir });
-  const excludeOut = runGit(['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { cwd: dir });
+  const topOut = revParseQuery(['--show-toplevel'], { cwd: dir });
+  const excludeOut = revParseQuery(['--path-format=absolute', '--git-path', 'info/exclude'], { cwd: dir });
   if (topOut?.status !== 0 || excludeOut?.status !== 0) return null;
   const top = String(topOut.stdout).trim();
   const rel = path.relative(top, file).split(path.sep).join('/');
   if (!rel || rel.startsWith('..')) return null;
-  if (runGit(['ls-files', '--error-unmatch', '--', rel], { cwd: top })?.status === 0) return { file: rel, state: 'tracked' };
+  if (lsFiles(['--error-unmatch', '--', rel], { cwd: top })?.status === 0) return { file: rel, state: 'tracked' };
   const target = String(excludeOut.stdout).trim();
   const line = '/' + rel;
   let text = '';
@@ -132,14 +132,14 @@ export function excludeFromGit(dir, file) {
 
 const upperDrive = (p) => p.replace(/^([a-z]):/, (m, d) => `${d.toUpperCase()}:`);
 
-/** Claude's project keys for `dir`: win32 writes both `D:/…` and `D:\…`. */
+/** Claude's project keys for `dir`: win32 writes both `<drive>:/…` and `<drive>:\…`. */
 export function claudeKeyForms(dir, platform = process.platform) {
   if (platform !== 'win32') return [path.posix.resolve(String(dir))];
   const abs = upperDrive(path.win32.resolve(String(dir)));
   return [...new Set([abs.replaceAll('\\', '/'), abs.replaceAll('/', '\\')])];
 }
 
-/** Codex's project keys for `dir`: win32 writes 'd:\lower' (its own form) and "D:\\Exact". */
+/** Codex's project keys for `dir`: win32 writes '<drive>:\lower' (its own form) and "<DRIVE>:\\exact". */
 export function codexKeyForms(dir, platform = process.platform) {
   if (platform !== 'win32') return [path.posix.resolve(String(dir))];
   const abs = upperDrive(path.win32.resolve(String(dir))).replaceAll('/', '\\');
@@ -151,13 +151,13 @@ export function codexTrustPaths(cwd) {
   const out = [path.resolve(cwd)];
   const git = (...args) => {
     try {
-      const r = runGit(args, { dir: cwd, timeout: 10000 });
+      const r = revParseQuery(args, { dir: cwd, timeout: 10000 });
       return r.status === 0 ? r.stdout.trim() : null;
     } catch { return null; }
   };
-  const top = git('rev-parse', '--show-toplevel');
+  const top = git('--show-toplevel');
   if (top) out.push(path.resolve(top));
-  const common = git('rev-parse', '--path-format=absolute', '--git-common-dir');
+  const common = git('--path-format=absolute', '--git-common-dir');
   if (common && path.basename(common) === '.git') out.push(path.resolve(path.dirname(common)));
   const seen = new Set();
   return out.filter((p) => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
@@ -447,7 +447,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 /* ------------------------------------------------------ the command guard */
 
 const GUARD_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'guards', 'command-guard.mjs');
-export const TOOL_GUARD_MARKER = 'command-guard.mjs';
+export const TOOL_GUARD_MARKER = 'command-guard.mjs', TOOL_GUARD_MATCHER = 'Bash|PowerShell', TOOL_GUARD_TIMEOUT_S = 30; // the tracked .claude/settings.json registers the same entry
 /** The hook command every host runs: forward slashes, since Claude and Devin run hooks through Git Bash on Windows. */
 export const toolGuardCommand = (script = GUARD_SCRIPT) => `node "${String(script).replace(/\\/g, '/')}"`;
 const isGuardHandler = (h) => typeof h?.command === 'string' && h.command.includes(TOOL_GUARD_MARKER);
@@ -459,7 +459,7 @@ const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandl
  * runtime path) is replaced; every other hook is kept. `edit(doc)` -> true when it changed doc, in the same write.
  */
 export function assertJsonToolGuard({ file, command, matcher = null, edit = null, hooks }) {
-  const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: 30 }] };
+  const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: TOOL_GUARD_TIMEOUT_S }] };
   const holds = (d) => {
     const list = Array.isArray(d?.hooks?.PreToolUse) ? d.hooks.PreToolUse.filter(isGuardGroup) : [];
     return list.length === 1 && JSON.stringify(list[0]) === JSON.stringify(group);
@@ -537,7 +537,7 @@ send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'starci-launch
  * {error}). Codex computes the hash it trusts a hook by; the runtime asks it, the way Orca trusts its own hooks.
  */
 export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
-  const r = spawnSync(process.execPath, ['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
+  const r = runNode(['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { timeout: timeoutMs,
     env: { ...process.env, CODEX_HOME: home } });
   const results = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
   if (!Array.isArray(results)) throw new Error(`codex app-server answered nothing (exit ${r.status}${r.error ? `: ${r.error.message}` : ''})`);
@@ -613,7 +613,7 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
     const launchEnv = guard(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
     receipt.launchEnv = launchEnv.state ?? 'failed';
     if (!launchEnv.ok) receipt.errors.push({ file, error: launchEnv.error ?? launchEnv.state });
-    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: 'Bash|PowerShell', hooks }));
+    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: TOOL_GUARD_MATCHER, hooks }));
     receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
     if (!toolGuard.ok) receipt.errors.push({ file, error: toolGuard.error ?? toolGuard.state });
     if (consent.ok || launchEnv.ok || toolGuard.ok) excluded(file);

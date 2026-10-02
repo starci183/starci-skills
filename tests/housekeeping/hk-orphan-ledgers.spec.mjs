@@ -126,7 +126,7 @@ test('sourceRootsFromLedgerFile reads workflows.source_roots_json from an orphan
   assert.deepEqual(sourceRootsFromLedgerFile(noneFile), [], 'a workflow with no source_roots_json (6335dccf in the 2026-09-30 incident) yields no roots');
 
   const oneFile = path.join(root, 'one', 'runtime.sqlite');
-  const probeRepo = 'C:/Users/x/AppData/Local/Temp/probe-x/repo';
+  const probeRepo = path.join(os.tmpdir(), 'probe-x', 'repo');
   makeUnregisteredLedger(oneFile, { sourceRoots: [probeRepo] });
   assert.deepEqual(sourceRootsFromLedgerFile(oneFile), [probeRepo]);
 });
@@ -167,7 +167,7 @@ test('orphanLedgerFindings: a registered ledger whose directory is gone entirely
 
 test('starciSourceRoot: STARCI_SOURCE_ROOT overrides it, else it is the directory holding this runtime checkout', () => {
   assert.equal(starciSourceRoot({}), path.dirname(REPO_ROOT));
-  assert.equal(starciSourceRoot({ STARCI_SOURCE_ROOT: 'D:/somewhere/else' }), path.resolve('D:/somewhere/else'));
+  assert.equal(starciSourceRoot({ STARCI_SOURCE_ROOT: path.join(os.tmpdir(), 'somewhere-else') }), path.join(os.tmpdir(), 'somewhere-else'));
 });
 
 test('workspaceBoundRepoRoots resolves one app root per binding, pathFromSource "." included', (t) => {

@@ -11,9 +11,9 @@ calls:
   prompt: assets/landing-home.initial.prompt.txt
   promptSha256: 1bd025671188c371811d950db965bf59b8c6cdb33fdae3f71d2645b327e359d4
   referencedImages:
-  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+  - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
     sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
-  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+  - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
     sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
 - stage: final
   tool: image_gen.imagegen
@@ -24,9 +24,9 @@ calls:
   prompt: assets/landing-home.prompt.txt
   promptSha256: 74847f3eef8be350bfd991ba43c413514bc92ed4f8d24054563021df3a8afd40
   referencedImages:
-  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+  - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
     sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
-  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+  - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
     sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
   - path: examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/landing-home.initial.png
     sha256: d2c642b450547785bf42b0ce3c4cac21295014f08d9203c807d4d362c060c04b

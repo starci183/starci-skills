@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { linterReport, mergeReports, sonarReport, sourceRootsOf } from '../report/sonar.mjs';
 import { SIDES, appRelativeMessages, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { STYLE_GLOB } from '../sync/index.mjs';
@@ -57,8 +58,12 @@ export function parseLintArgs(argv) {
   return opts;
 }
 
+/** The typed ESLint run reads nothing above the app root: its TypeScript `sys` is bound by this preload (3.3, bound-sys.cjs). */
+export const BOUND_ENV = 'STARCI_LINT_BOUND';
+export const linterBoundArgs = () => ['--require', fileURLToPath(new URL('./bound-sys.cjs', import.meta.url))];
+
 /** A linter's json results through the app's own install, run from `cwd` (a side folder): `{ results }` or `{ error }`. */
-function runLinter({ cwd, pkg, bin, args }) {
+function runLinter({ cwd, pkg, bin, args, bound = null }) {
   let entry;
   try {
     const manifest = createRequire(path.join(cwd, 'package.json')).resolve(`${pkg}/package.json`);
@@ -67,7 +72,7 @@ function runLinter({ cwd, pkg, bin, args }) {
   } catch {
     return { error: `${pkg} is not installed for ${cwd}` };
   }
-  const run = spawnSync(process.execPath, [entry, ...args], { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  const run = spawnSync(process.execPath, [...(bound ? linterBoundArgs() : []), entry, ...args], { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, ...(bound ? { env: { ...process.env, [BOUND_ENV]: bound } } : {}) });
   // The linters exit 1 when they found something; no json at all means they could not run. ESLint prints its report on stdout,
   // stylelint (16 and later) its formatter output on stderr.
   let results;
@@ -123,7 +128,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (workspace !== null && side !== STYLE_SIDE) { engines.eslint.sides[side] = { files: 0, skipped: `outside --workspace ${workspace}` }; continue; }
     const sources = onSide(existing, side).filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
     if (changed !== null && !sources.length) { engines.eslint.sides[side] = { files: 0, skipped: 'no changed source file' }; continue; }
-    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : [onFe ?? '.'])] });
+    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : [onFe ?? '.'])], bound: repoRoot });
     if (linted.error) errors.push(linted.error);
     else {
       // The side canon names side-relative paths in its messages; the report names every path from the app root.

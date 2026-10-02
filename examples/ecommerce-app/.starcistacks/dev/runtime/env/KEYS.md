@@ -97,6 +97,6 @@ DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expec
 writes its decrypted member to `runtime/env/keycloak.env`, which Compose reads and git never tracks; `secrets/minio-env.enc`
 likewise decrypts to `runtime/env/minio.env`.
 
-## migrate (`apps/migrate`)
+## cli (`apps/cli`)
 
-`IDENTITY_DB_URL` and `ORDER_DB_URL`, the same keys the apis read.
+`IDENTITY_DB_URL`, `ORDER_DB_URL` and `BILLING_DB_URL`, the same keys the apis and the billing worker read; `cli migrate run` migrates every connection.

@@ -2,7 +2,7 @@ incident:
   args: '--workflow <id> --kind <k> --detail <s> [--op <opId>] [--holds <opId|jobId>,...] [--peer <workflowId> [--refs <csv>] [--until-message]] [--until-foundation <name>] [--until-landed <workflowId>@<repository>]  |  --workflow <id> --resolve <incidentId> [--detail <s>] [--by kernel|owner|supervisor] [--owner-answer <dispatchId>]'
   reads: 'the workflows row for --workflow'
   supervisorGate: >-
-    Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): nothing waits on the
+    Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot-run.mjs): nothing waits on the
     owner mid-flow. --kind owner-gate on an autopilot workflow is recorded as kind supervisor-gate (payload rerouted
     {from, to}); settle's retry cap and an environment blocker open one (settle.nextStep kind supervisor-gate, with
     the attempts' evidence); api status re-routes any older open owner-gate. A supervisor-gate holds its jobs like an
@@ -29,8 +29,8 @@ incident:
     --kind peer-wait --peer <workflowId> records a typed, durable wait on a
     PEER workflow: the next step (--holds ops or job ids, else --op) cannot
     pass its preflight until that peer lands something - installs a
-    dependency, writes a record (mia-mia work-and-stacks brand.decide waited
-    on wf-miamia-base-repos' Grammar 0.5.0 install, inc-0aebf976e625). --peer
+    dependency, writes a record (a brand.decide job once waited on a peer's
+    Grammar 0.5.0 install). --peer
     must be a running peer of this workflow (the notify PEER RULE); --refs
     names the peer messages or jobs the wait is about; --until-message lets
     the peer's next message resolve it. While it is open, held queued jobs
@@ -69,9 +69,9 @@ incident:
     raise is the introducer, not the repair), else [{message <introducer>:reply}]; recorded as
     shared-blocker-routed.until and released by the runtime like any --until-* (an explicit --until-*
     on the raise wins; a blocker routed before this reads the same, derived from its text) - never
-    OWED on the supervisor (nivo academy-debt inc-9474fe9ff445).
+    OWED on the supervisor.
     Event 'shared-blocker-routed' records either answer. Victims no longer each wait for the owner to
-    pick a repairer (nivo WSPV inc-be78a39b6b50, Modules inc-b6f66a0d29ce).
+    pick a repairer.
   foundationWait: >-
     --kind peer-wait --until-foundation <name> is the typed wait on a SHARED FOUNDATION
     (api foundation): its release condition is the landing - a typed condition of
@@ -102,15 +102,14 @@ incident:
     Otherwise it refuses owner-claim-unproven and writes nothing: keep the incident
     open and raise or keep an owner ask, or resolve --by kernel|supervisor stating
     what landed. incident-resolved records ownerAnswer {dispatchId, workflowId,
-    receiptPath}. scripts/machine/owner-claim.mjs; nivo wf-nivo-workspace-provision-mujek7cb
-    inc-2474f6593dfe and inc-f19d118298f1 were resolved "Owner confirmed" with no owner
-    answer)
+    receiptPath}. scripts/machine/owner-claim.mjs; past incidents were resolved
+    "Owner confirmed" with no owner answer)
   ownerClaimLint: >-
     api status carries two lints, each key present only when non-empty:
     frontier.ownerGatesNotOwnerWork [{incidentId, kind, marker, detail}] - an open
     owner-gate whose own text says it is not the owner's step (RUNTIME LIMIT,
     runtime defect, deferred settle, "not the owner's job", waits on the
-    supervisor; nivo inc-1d6e73af51cc, inc-c85f3b0c1603). The gate is the only
+    supervisor). The gate is the only
     mechanism that holds jobs, so the raise is not refused; the runtime defect itself
     goes to the supervisor as --kind source-runtime-defect and the gate resolves
     --by kernel|supervisor. frontier.ownerClaimsUnproven [{incidentId, kind,
@@ -147,9 +146,9 @@ incident:
     read, and the evidence names change.rev when that is the source), --until-job <jobId>[:settled|succeeded]
     (any job of the ledger settled pass or fail, the default, or succeeded; a CANCELLED job is not
     settled - the condition follows the job that replaced it, a later same-op job that retries it or
-    holds its cut ordinal, and stays unmet while there is none, nivo auth inc-7c46a61faba1; a FAILED
+    holds its cut ordinal, and stays unmet while there is none; a FAILED
     job is followed to the retry that names it retry.retryOf/resumeOf, so the wait is on the unit's
-    newest attempt and reads unmeetable only while nothing retries it, starci-next inc-da9c2be0115a;
+    newest attempt and reads unmeetable only while nothing retries it;
     gate-conditions.mjs lineageHeadOf, which --after and the cut seam in frontier.queued follow too),
     --until-message <peer>[:<kind>] (a
     peer message from <peer>, of <kind>, reached this workflow after the wait was raised; a BARE

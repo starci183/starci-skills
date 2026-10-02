@@ -1,7 +1,7 @@
 schema: starci/reconciler-controller@1
 name: host
 title: Host controller - host services, Kernel and Supervisor seats, orphan processes, the boot order, ledger health
-# DESIGN (D:/starci-tmp/reconciler-design/DESIGN.md) sections 7.7, 8.4, 9.4, 9.5, 9.7 and 12; LANES.md Lane D.
+# DESIGN (<tmp>/reconciler-design/DESIGN.md) sections 7.7, 8.4, 9.4, 9.5, 9.7 and 12; LANES.md Lane D.
 # The code is scripts/reconciler/controllers/host.mjs, scripts/reconciler/services.mjs and
 # scripts/reconciler/ledger-health.mjs. Every number the host controller acts on is here; ports and URLs are NOT:
 # services.mjs servicePorts reads them once from their one source each (runtimes.yaml
@@ -66,6 +66,6 @@ turnBudget:
 processes: {everyMs: 60000, orphanMinAgeMs: 1800000, orphanSlaMs: 60000, footprintEveryMs: 600000, terminalSlack: 5, terminalDriftSlaMs: 600000}
 
 # Ledger health (DESIGN 13): PRAGMA quick_check (read-only) every quickCheckEveryMs; nightly (from backupHour local
-# time) VACUUM INTO <backupDir>/<ledgerId>-<yyyymmdd>.sqlite, the newest keep kept. Restore is manual and
-# owner-approved; nothing here restores.
-ledgerHealth: {quickCheckEveryMs: 3600000, backupHour: 3, backupDir: 'D:/starci-archive/ledger-backups', keep: 7, backupTimeoutMs: 1800000}
+# time) VACUUM INTO <backupDir>/<ledgerId>-<yyyymmdd>.sqlite, the newest keep kept; backupDir defaults to
+# <archive root>/ledger-backups (services.mjs). Restore is manual and owner-approved; nothing here restores.
+ledgerHealth: {quickCheckEveryMs: 3600000, backupHour: 3, keep: 7, backupTimeoutMs: 1800000}

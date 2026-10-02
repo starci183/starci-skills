@@ -3,7 +3,7 @@ import path from 'node:path';
 import {openLedgerReader,ledgerFileFor} from '../../../engine/db/ledger.mjs';
 import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../../machine/ask-receipts.mjs';
 import {sha256} from '../../../engine/digest.mjs';
-import {fileURLToPath} from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {skillRoot} from '../../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from '../../gates/grammar-dist.mjs';
@@ -376,7 +376,7 @@ const isPlannedToken=token=>token?.valueSource!==undefined&&token?.valueSource!=
 /**
  * A token the app has not written yet may name the external render it was read from:
  * `valueSource: {path, value, token?, line?, sha256?}`. `path` is relative to the same --source root as
- * `sources[]` (for example `starci-academy-fe/src/app/globals.css`) and is only ever read; `token` is the
+ * `sources[]` (for example `ecommerce-app-fe/src/app/globals.css`) and is only ever read; `token` is the
  * name the reference declares (default: the brand token's own name); `value` is the exact value it declares
  * there. The reference passes when that declaration exists in the default (light) scope with exactly that
  * text, its colour is the brand value, and a declared sha256 still names the file's bytes.
@@ -866,7 +866,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
   return {ok:true,receipt:receipt.file};
 }
 
-/** Autopilot's provisional accept (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
+/** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
 export const AUTOPILOT_ANSWERER='autopilot';
 /**
  * Whether an archetype's `provisional` block is backed by an autopilot receipt for the rev it names, with passing gate
@@ -1049,7 +1049,7 @@ export function brandMain(argv=[]){
   }catch(error){return {exitCode:1,text:`brand check: ${String(error?.message??error)}\n`};}
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(isMain(import.meta.url)){
   const {exitCode,text}=brandMain(process.argv.slice(2));
   (exitCode?process.stderr:process.stdout).write(text);
   process.exitCode=exitCode;

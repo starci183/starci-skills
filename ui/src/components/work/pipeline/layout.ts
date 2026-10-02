@@ -1,4 +1,5 @@
 import type { LegRow, LegStatus, PipelineView } from '../../../contract';
+import { t } from '../../../i18n/t';
 
 export const NODE_H = 116, COL_GAP = 20, ROW_GAP = 16, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
 
@@ -7,12 +8,15 @@ export type Column = { level: number; index: number; label: string; legs: LegRow
 export type PlacedEdge = { from: string; to: string; path: string; tone: 'current' | 'done' | 'plain' };
 
 const domainLabels: [RegExp, string][] = [
-  [/^request\./, 'YÊU CẦU'], [/^scope\./, 'PHẠM VI'], [/^(business|architecture|brand)\./, 'QUYẾT ĐỊNH'],
-  [/^provision\./, 'CHUẨN BỊ'], [/^work\./, 'LẬP KẾ HOẠCH'], [/^interface\.draw/, 'THIẾT KẾ'],
-  [/\.implement$/, 'TRIỂN KHAI'], [/\.(verify|audit)$/, 'KIỂM CHỨNG'], [/^(review|handover)\./, 'BÀN GIAO'],
+  [/^request\./, 'REQUEST'], [/^scope\./, 'SCOPE'], [/^(business|architecture|brand)\./, 'DECISION'],
+  [/^provision\./, 'PREPARATION'], [/^work\./, 'PLANNING'], [/^interface\.draw/, 'DESIGN'],
+  [/\.implement$/, 'IMPLEMENT'], [/\.(verify|audit)$/, 'VERIFY'], [/^(review|handover)\./, 'HANDOVER'],
 ];
 export const columnLabel = (legs: LegRow[]) => {
-  const labels = legs.map(leg => domainLabels.find(([re]) => re.test(leg.op))?.[1] ?? leg.op.split('.')[0].toUpperCase());
+  const labels = legs.map(leg => {
+    const label = domainLabels.find(([re]) => re.test(leg.op))?.[1];
+    return label ? t(label) : leg.op.split('.')[0].toUpperCase();
+  });
   return [...new Set(labels)].join(' · ');
 };
 

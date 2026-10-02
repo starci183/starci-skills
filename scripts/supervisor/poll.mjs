@@ -28,7 +28,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
+import { probe as probeUrl } from '../api/http/probe.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -37,7 +38,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { hhmmss } from '../lib/time.mjs';
 import { classifyAgentScreen } from '../lib/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding, ledgerRuns } from './orca-tree.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
@@ -80,11 +81,10 @@ const lastEvent = (db, kind, dispatchId) => db.prepare(
   `SELECT seq, payload_json FROM events WHERE kind=?
      AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(kind, dispatchId);
 
-const probe = async (url, timeoutMs) => {
-  try {
-    const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
-    return res.status >= 200 && res.status < 300 ? 'live' : 'stale';
-  } catch { return 'stale'; }
+/** The ask form at `url`: 'live' on a 2xx, else 'stale' (a redirect is not followed). The seam askLiveness and openAsks take. */
+export const probeAsk = async (url, timeoutMs) => {
+  const r = await probeUrl(url, { timeoutMs, follow: 0 });
+  return r.state === 'answered' && r.status >= 200 && r.status < 300 ? 'live' : 'stale';
 };
 
 // An open ask's URL is worth relaying only when it still answers. The ledger
@@ -95,7 +95,7 @@ const probe = async (url, timeoutMs) => {
 // An ask the kernel parked on Telegram (`ask-notified`) is served only when the
 // owner presses its "Generate URL" button: with no live form it is `on-demand`,
 // which is healthy — never relayed, never re-served.
-export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
+export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS, probe = probeAsk } = {}) => {
   const notified = lastEvent(db, 'ask-notified', dispatchId);
   const idle = (fallback) => (notified ? { url: null, liveness: 'on-demand' } : fallback);
   const serving = lastEvent(db, 'ask-serving', dispatchId);
@@ -108,7 +108,7 @@ export const askLiveness = async (db, dispatchId, { timeoutMs = PROBE_TIMEOUT_MS
   return liveness === 'live' ? { url, liveness } : idle({ url, liveness });
 };
 
-export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEOUT_MS } = {}) => {
+export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEOUT_MS, probe = probeAsk } = {}) => {
   const asks = db.prepare(
     `SELECT r.workflow_id, r.dispatch_id, r.report_id, r.created_at FROM reports r
       WHERE r.outcome='ask' AND NOT EXISTS (
@@ -127,7 +127,7 @@ export const openAsks = async (db, wanted = new Set(), { timeoutMs = PROBE_TIMEO
   for (const a of asks) {
     if (seen.has(a.dispatch_id) || !mine(wanted, a.workflow_id)) continue;
     seen.add(a.dispatch_id);
-    out.push({ ...a, ...(await askLiveness(db, a.dispatch_id, { timeoutMs })) });
+    out.push({ ...a, ...(await askLiveness(db, a.dispatch_id, { timeoutMs, probe })) });
   }
   return out;
 };
@@ -331,4 +331,4 @@ export function runEvery(run, intervalMs) {
   return () => { stopped = true; clearTimeout(timer); };
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) main();
+if (isMain(import.meta.url)) main();

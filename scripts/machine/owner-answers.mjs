@@ -1,12 +1,11 @@
 // owner-answers.mjs — the owner answers a job's retry lineage already holds.
 //
-// Defect (starci-next wf-starci-next-work-and-stacks-mud4qamv): ordinal 1 of
-// business.decide asked the owner (ctx_3074731253e3); config.yaml
+// Defect: ordinal 1 of a business.decide asked the owner; config.yaml
 // asks.autoAcceptRecommended answered it (answeredBy auto-recommended), and the
-// owner-answer retry (attempt 12, op-business.decide-7f71843aaa) filed the SAME
-// question again (ctx_cc73a111de44). Its packet carried no record of the
+// owner-answer retry (attempt 12) filed the SAME
+// question again. Its packet carried no record of the
 // answered ask: "re-enqueue with the answer bound" was left to the Kernel's free
-// text. The same shape hit mia-mia architecture.decide (inc-614950d297bb).
+// text. The same shape hit another product's architecture.decide.
 //
 // Now dispatch binds the answers into the packet (context.owner_answers) and the
 // op prompt, and `api report` refuses an ask that repeats one of them

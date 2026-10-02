@@ -15,7 +15,7 @@
 // --backup writes a file, so the Host controller reaches it only through ctx.run (recorded, not run, in shadow).
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 
 // A read-only handle through the ledger module (check-db-openers); unverified so a damaged file still gets its
@@ -91,7 +91,7 @@ const argsOf = (argv) => {
   return a;
 };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const a = argsOf(process.argv.slice(2));
   let r;
   if (a.check && a.file) r = quickCheck(a.file);

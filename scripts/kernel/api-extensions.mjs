@@ -25,7 +25,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const VERBS_DIR = 'scripts/kernel/verbs';
 export const STATUS_DIR = 'scripts/kernel/status';
 export const FLAGS_FILE = 'scripts/kernel/api-boolean-flags.txt';
-export const COMMANDS_DIR = 'modules/kernel/api-commands';
 const SLUG = /^[a-z][a-z0-9-]*$/;
 
 const modulesIn = (dir) => {

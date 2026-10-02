@@ -1,8 +1,8 @@
 questions:
   args: '--workflow <id>'
   reads: >-
-    the drain of scripts/kernel/verbs/shared/messages.mjs: each Run of the workflow (payload orca/managed/hierarchy
-    runId of its jobs) through scripts/api/orca/orch-check.mjs (calls.yaml `check`, Orca's consuming FIFO
+    the drain of scripts/kernel/verbs/shared/worker-messages.mjs: each Run of the workflow (payload orca/managed/hierarchy
+    runId of its jobs) through scripts/api/orca/check.mjs (calls.yaml `check`, Orca's consuming FIFO
     Delivery, --run <run> --terminal <Kernel terminal>; a consumer_fenced answer on the Kernel's own Run re-binds it
     once with run-use); every `question` and `escalation` row is joined to the job whose dispatch
     (from_handle dispatch:<id> or payload.dispatchId) or terminal handle asked it; inbox rows of

@@ -9,7 +9,9 @@ findings:
       - br.checkout.place-order
       - contract.checkout.order-for-identity
       - contract.identity.health
+      - data.checkout.order
       - decision.checkout.ops-doors
+      - event.checkout.order-placed
       - fr.checkout.download-receipt
       - fr.checkout.place-order
       - impl.checkout.be.order-checkout
@@ -17,15 +19,16 @@ findings:
       - integration.checkout.minio
       - integration.checkout.postgres
       - integration.checkout.redis
+      - nfr.checkout.place-order-idempotent
       - sds.checkout.order-flow
       - uat.checkout.place-order
       - ui.checkout.cart
       - ui.checkout.landing-home
       - ui.checkout.shop-browse
       - ui.checkout.stock-refused
-    because: A breaking change to br.checkout.place-order sends 16 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+    because: A breaking change to br.checkout.place-order sends 19 other record(s) back to todo, would
+      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
       be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,
@@ -50,8 +53,8 @@ findings:
       - uat.identity.sign-in
       - ui.identity.sign-in
     because: A breaking change to br.identity.sign-in sends 13 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 14 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      9 evidence file(s), and touches 14 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/domain/session,
       be/src/modules/integrations/identity-api, be/src/modules/integrations/keycloak,
@@ -73,8 +76,8 @@ findings:
       - integration.checkout.redis
       - sds.checkout.order-flow
     because: A breaking change to br.identity.account sends 9 other record(s) back to todo, would stale
-      5 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      5 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
       be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,
@@ -91,22 +94,30 @@ findings:
     because: A breaking change to br.checkout.cart sends 3 other record(s) back to todo, would stale 0
       evidence file(s), and touches 1 code path(s) (be/src/modules/domain/cart) - this is the number
       a reviewer wants before approving the change.
-  - id: fan-in-hotspot:br.checkout.place-order
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.checkout.place-order
-    because: br.checkout.place-order is used 6 time(s) (top decile of fan-in); it is owned by checkout
-      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:fr.checkout.place-order
     kind: fan-in-hotspot
     severity: info
     records:
       - fr.checkout.place-order
-    because: fr.checkout.place-order is used 6 time(s) (top decile of fan-in); it is owned by checkout
+    because: fr.checkout.place-order is used 9 time(s) (top decile of fan-in); it is owned by checkout
       and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.checkout.place-order
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.checkout.place-order
+    because: br.checkout.place-order is used 8 time(s) (top decile of fan-in); it is owned by checkout
+      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
+      here is cross-feature coupling, not a local edit.
+  - id: designed-todo:journey.checkout.first-purchase
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.checkout.first-purchase
+      - gap.checkout.live-proof
+    because: journey.checkout.first-purchase is todo, blocked on gap.checkout.live-proof - a real
+      product question, not missing code; it moves once that is settled.
   - id: stale-evidence-bulk-edit:br.checkout.place-order
     kind: stale-evidence-bulk-edit
     severity: warn

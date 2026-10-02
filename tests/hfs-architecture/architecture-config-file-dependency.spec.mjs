@@ -44,7 +44,7 @@ function project(write, manifest, at, dependencies) {
   manifest(at, {name: path.posix.basename(at) || 'app', version: '0.0.0', dependencies});
   write(path.posix.join(at, 'hfs.json'), appDeclarationText('be', {apps: [{name: 'core', kind: 'api'}]}));
   write(path.posix.join(at, 'be/src/modules/thing/thing.service.ts'), 'export class ThingService {}\n');
-  write(path.posix.join(at, 'be/src/features/thing/thing.module.ts'), 'export class ThingModule {}\n');
+  write(path.posix.join(at, 'be/src/features/api/thing/thing.module.ts'), 'export class ThingModule {}\n');
   write(path.posix.join(at, 'be/tsconfig.json'), '{"compilerOptions":{"strict":true}}\n');
 }
 

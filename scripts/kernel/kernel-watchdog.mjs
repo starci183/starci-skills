@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // watchdog.mjs — one liveness pass over one durable Kernel seat. The reconciler's Host controller runs it for every
 // running workflow (scripts/reconciler/controllers/host.mjs, concern host.kernel-seat); it is no longer a loop (owner
-// ruling 2026-09-28 "có lỗi xóa luôn": the reconciler is the only loop). It never plans, routes, dispatches, settles or
+// ruling 2026-09-28 "on error, delete it outright": the reconciler is the only loop). It never plans, routes, dispatches, settles or
 // finishes a workflow: settles and worker recovery are the Job controller's, quota probes the Resource controller's,
 // housekeeping the GC controller's, the footprint scan the Host controller's own step.
 //
@@ -21,7 +21,7 @@
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -33,7 +33,7 @@ import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefuse
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
-import { sleepSync } from '../api/orca/lib.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
@@ -41,6 +41,7 @@ const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { readJsonFile } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -76,10 +77,8 @@ const jsonFrom = stdout => {
 };
 
 const runNodeJson = (file, args) => {
-  const result = spawnSync(process.execPath, [file, ...args], {
+  const result = runNode([file, ...args], {
     cwd: skillRoot,
-    encoding: 'utf8',
-    windowsHide: true,
     timeout: 120_000,
   });
   return {
@@ -186,7 +185,7 @@ const exitedTwice = (handle) => {
 };
 // A host call, not typed input: it lands where a quit send cannot. A worker-start Kernel is fenced and released by its
 // Dispatch (worker-stop + worker-release), so Orca never reports it live again and start-workflow replaces it; a seat
-// with no Dispatch (terminal-launched) has only its terminal to close.
+// with no Dispatch has only its terminal to close.
 const closeKernelTerminal = (handle, dispatch = null) => {
   if (dispatch) {
     const released = stopAndRelease(dispatch);
@@ -351,10 +350,9 @@ function kernelTick(status, phase) {
   }
 
   // The Kernel is a worker-start worker: its Dispatch's worker state is the first liveness proof. A seat with no
-  // Dispatch is a terminal-launched Kernel from before every launch went through worker-start: start-workflow
-  // retires it and starts a worker in its place.
+  // Dispatch is not one: start-workflow replaces it with a worker.
   if (!signalValue.dispatch) {
-    const deathReason = 'terminal-launched kernel: every Kernel is now a worker-start worker';
+    const deathReason = 'seat has no worker';
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'restart-needed', reason: deathReason };
     return replaceKernel({ workflowId, phase, terminal, deathReason });
   }
@@ -405,7 +403,7 @@ function kernelTick(status, phase) {
   const screen = classifyKernelScreen(read.screen);
   const { lastOutputAt, outputAgeMs } = outputAgeOf(shown.terminal?.lastOutputAt);
   // An `active` classification is trusted only while output is recent: two
-  // starci-next Kernels printed nothing for 3.7 hours while an old spinner row
+  // Kernels of one product printed nothing for 3.7 hours while an old spinner row
   // kept them "active" and the watchdog never woke them.
   const liveness = staleAwareState(screen.state, outputAgeMs, ACTIVE_STALE_MS);
   const classified = liveness.staleActive ? { ...screen, state: liveness.state } : screen;
@@ -481,7 +479,7 @@ const print = result => {
 };
 
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
     console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);

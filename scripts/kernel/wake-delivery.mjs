@@ -29,7 +29,7 @@
 // (agent_prompt_blocked) is that same split and is not repeated.
 //
 // Every frame here carries the input box's draft. Orca lifts the text of an agent's input box out of
-// the frame and answers it as `draft` (scripts/api/orca/lib.mjs draftText); read without it, a wake
+// the frame and answers it as `draft` (scripts/lib/orca-terminal.mjs draftText); read without it, a wake
 // whose Enter was dropped sat invisible in the box and the next wake was appended to it (nivo collab
 // Kernel, 2026-09-25). So the draft is written back into the input row before any proof
 // (terminal-liveness.mjs frameWithDraft), and a draft found BEFORE typing decides first
@@ -49,7 +49,8 @@
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
-import { draftText, sleepSync } from '../api/orca/lib.mjs';
+import { draftText } from '../lib/orca-terminal.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, wakeDeliveryOf, exitedAgentPromptRow, shellReceivedText, frameWithDraft, draftOwnership,
   collapse, clipDraft, DEFAULT_STAGED_PATTERN, WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';

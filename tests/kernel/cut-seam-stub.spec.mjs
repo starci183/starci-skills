@@ -1,5 +1,5 @@
-// A cut's seam never stalls the chain (owner ruling 2026-09-28: "Seam không làm nghẽn cả chuỗi: seam trượt
-// thì tách lại hoặc cho các lát sau chạy song song với stub, không để chờ 3 tiếng"; scripts/kernel/cut-seam.mjs,
+// A cut's seam never stalls the chain (owner ruling 2026-09-28: "a seam must not stall the whole
+// chain: a slipped seam is cut again or the later slices run in parallel with a stub, never a 3-hour wait"; scripts/kernel/seam-policy.mjs,
 // modules/kernel/driver-loop.yaml enqueue.seamContractFirst). nivo wf-nivo-collab-group-chat-mujek7ue held seven
 // backend.implement ordinals for more than a day behind seam op-backend.implement-9a2c4c2f03 (attempt 11, queued
 // under a peer-wait after three failed attempts).
@@ -11,8 +11,9 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
-import {cutSeamSettings,seamPriorityOf,seamPromptLines,seamReconcileOf,siblingSeamHold,SEAM_RECONCILED_EVENT} from '../../scripts/kernel/cut-seam.mjs';
+import {cutSeamSettings,seamPriorityOf,seamPromptLines,seamReconcileOf,siblingSeamHold,SEAM_RECONCILED_EVENT} from '../../scripts/kernel/seam-policy.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
+import {registerWorkflowWorktree} from '../../scripts/kernel/workflow-worktree.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -145,6 +146,16 @@ test('the seam publishes its interface: every sibling starts on it at once',t=>{
     assert.equal(q(job).queuedBecause,'ready');
     assert.equal(q(job).seamStub.mode,'interface');
   }
+  // In a workflow worktree the seam writes (never commits) its interface there: publish reads that tree, not the ledger checkout.
+  const tree=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'starci-seam-wt-')));
+  t.after(()=>fs.rmSync(tree,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  assert.equal(spawnSync('git',['init','-q','-b','main',tree],{windowsHide:true}).status,0);
+  fs.mkdirSync(path.join(tree,'src/features/chat/composition'),{recursive:true});
+  fs.writeFileSync(path.join(tree,'src/features/chat/composition/contract.ts'),'export interface ChatPort { close(): void; }\n');
+  registerWorkflowWorktree({env:process.env},{workflowId:'wf-seam-interface',orcaWorktreeId:'repo-seam::wf-seam-interface',path:tree,branch:'wf-seam-interface'});
+  const inTree=api('cut-seam','--publish-interface','--job',seam,'--files','src/features/chat/composition/contract.ts');
+  assert.equal(inTree.status,0,inTree.stderr);
+  assert.notEqual(out(inTree).files[0].sha256,out(r).files[0].sha256,'the interface is digested from the workflow worktree');
 });
 
 test('the Kernel releases a stuck cut; a sibling dispatched on a stub is told stub-first',t=>{

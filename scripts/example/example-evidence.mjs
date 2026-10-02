@@ -1,10 +1,14 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {runCommand} from '../api/process/run-command.mjs';
+import { fileURLToPath } from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
+import {skillRoot} from '../../engine/runtime-root.mjs';
+import {normalizeHostPaths} from '../lib/host-path.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from '../work/record-ownership.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
@@ -91,14 +95,12 @@ function findRecordFile(workRoot, recordId) {
  * Always returns both `command` (the exact string run) and `exit` (its numeric exit code), so the written
  * evidence is replayable (concept 2) and not just a prose claim that something passed. */
 function runAssertion({id, command}, cwd) {
-  let exit = 0;
-  try {
-    execFileSync(command, {cwd, shell: true, stdio: 'pipe'});
-  } catch (error) {
-    exit = typeof error?.status === 'number' ? error.status : 1;
-  }
+  const status = runCommand(command, {cwd}).status;
+  const exit = typeof status === 'number' ? status : 1;
   const outcome = exit === 0 ? 'pass' : 'fail';
-  return {id, command, exit, outcome, observation: `${command} exited ${exit}`};
+  // The record is portable: the command is written with repo-relative paths and without the host location of its shell (scripts/lib/host-path.mjs).
+  const recorded = normalizeHostPaths(command, {repo: cwd, runtime: skillRoot, tmp: os.tmpdir(), home: os.homedir()});
+  return {id, command: recorded, exit, outcome, observation: `${recorded} exited ${exit}`};
 }
 
 export function generateEvidence({workRoot, recordId, cwd, assertions, now = () => new Date()}) {
@@ -143,7 +145,7 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
   return {evidenceFile, evidence, ok: outcome === 'pass'};
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));

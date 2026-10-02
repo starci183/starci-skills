@@ -1,7 +1,7 @@
 id: checker-repo-identity
 effectiveAt: '2026-09-29T00:00:00+07:00'
 summary: >-
-  Checkers derived a repository's identity from path.basename(root), so any git worktree (D:/starci-lanes/<lane>/<name>)
+  Checkers derived a repository's identity from path.basename(root), so any git worktree (<lanes root>/<lane>/<name>)
   failed checks its main checkout passes: the README title (HFS_README_TITLE_INVALID) and the stack-declaration project
   name (STACKS_PROJECT_MISSING). scripts/lib/repo-identity.mjs derives the name from repository identity (the main
   checkout folder via the git common dir, else the origin remote, else package.json outside Git, else the folder) and

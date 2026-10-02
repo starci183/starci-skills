@@ -1,8 +1,8 @@
 # job.yaml — the Job controller (lane rc-job): scripts/reconciler/controllers/job.mjs.
 #
-# Design: D:/starci-tmp/reconciler-design/DESIGN.md §8.1 (Job controller), §9.1 (job state machine + SLA table),
+# Design: <tmp>/reconciler-design/DESIGN.md §8.1 (Job controller), §9.1 (job state machine + SLA table),
 # §8.8 (SLA/Invariant), §10.3 (Decision Item), §16.7 (product worktrees). Engine contract:
-# D:/starci-tmp/reconciler-design/LANES.md "Shared contract".
+# <tmp>/reconciler-design/LANES.md "Shared contract".
 #
 # Mode: config.yaml reconciler.controllers.job.mode (off | shadow | active; lane rc-engine). In shadow every api call,
 # settler run and DI is a would-row (ctx.api / ctx.run / ctx.openDecision); SLA clocks are recorded in every mode. The

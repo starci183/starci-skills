@@ -15,6 +15,7 @@ import { loadUiRecords } from '../work/layout-tree.mjs';
 import { drawingAcceptance } from '../work/direction-part.mjs';
 import { isGlobSegment } from '../../engine/admission.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
 
 const WORK_ROOT = '.starciwork';
@@ -99,7 +100,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
   const lines = unmet.map((item) => (item.kind === 'record-missing'
     ? `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`
     : item.kind === 'design-not-settled'
-      ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. Tiếng Việt: bản vẽ (interface.draw) của ${item.ui} chưa được chốt nên chưa được viết code; vẽ xong và được chấp nhận rồi mới dispatch implement`
+      ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. ${translator(ownerLanguage())('Vietnamese: the drawing (interface.draw) of {ui} is not settled yet, so code must not be written; dispatch implement only once it is drawn and accepted', { ui: item.ui })}`
       : item.kind === 'direction-unaccepted'
         ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
       : `${op} has an unmet prerequisite (${item.kind})`));

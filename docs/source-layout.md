@@ -57,12 +57,13 @@ configuration (`app.tool-config-local`).
 be/
 ├── tsconfig.json, tsconfig.build.json, eslint.config.mjs, jest.config.js   # managed by hfs sync
 ├── nest-cli.json
-├── apps/<app>/src/                  # composition only (kind api | worker | migrate | cli)
+├── apps/<app>/src/                  # composition only (kind api | worker | cli; the one cli app runs every one-off action)
 │   ├── main.ts                      # reads EnvSource once, parses options, bootstraps
 │   ├── app.module.ts                # AppModule.register(options): transport and capability modules
 │   └── <app>.options.ts             # optional options type
 ├── src/
-│   ├── features/<feature>/          # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule,...}/
+│   ├── features/api/<feature>/      # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule,...}/
+│   ├── features/cli/                # the cli feature root: <group>/<group>.cli.ts, <group>/subs/<name>.cli.ts with its spec
 │   ├── modules/
 │   │   ├── domain/<capability>/     # business invariants, owned state, errors/, persistence/
 │   │   ├── platform/<capability>/   # config, logging, errors, primitives (required), database, scheduling, messaging, ...
@@ -99,7 +100,7 @@ integrations; integrations to platform; platform to platform; a feature never im
 no cycles, `import type` included.
 
 **Tests: unit automatic, the rest by hand.** The back end's unit specs (only
-`<name>.service.spec.ts` beside each `*.service.ts`) are the only tests an automatic gate runs; the
+`<name>.service.spec.ts` beside each `*.service.ts` and `<name>.cli.spec.ts` beside each `*.cli.ts`) are the only tests an automatic gate runs; the
 front end has no tests at all (R97). The back end also has integration
 (`be/src/tests/integration/<capability>/*.integration-spec.ts`), e2e
 (`be/src/tests/e2e/<area>/*.e2e-spec.ts`) and contract
@@ -139,7 +140,7 @@ Storage states. Ignored (may exist, must be gitignored): `node_modules/`, `dist/
 `coverage/`, `reports/`, `test-results/`, `next-env.d.ts`, `*.tsbuildinfo`, and generated code
 (`__generated__/`, Nest `schema.gql`). External (must not exist in the working tree): tool caches
 (redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon presets), lane worktrees
-(`D:/starci-lanes/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
+(`<lanes root>/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
 rounds, UAT captures: the scratchpad or the blob store, cited by `{name, sha256}`) and plaintext
 secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). A Kernel workflow's worktree is
 created and owned by Orca outside the app checkout, one per workflow, and is removed through
@@ -238,5 +239,5 @@ level pending and never fails. The list only shrinks:
 - `RT_PENDING_ADDED`: an entry that allows a finding the base revision's list did not allow (the base is the merge-base
   of HEAD with main). A file moved through `modules/kernel/retired-paths.yaml` `moved[]` keeps its allowance.
 
-Files move with the codemod of the migration (`D:/starci-tmp/hfs/devin/c0/rh-move.mjs`, outside the repository), which
+Files move with the codemod of the migration (`<tmp>/rh-move.mjs`, outside the repository), which
 runs `git mv`, rewrites relative imports and cited paths, rewrites the pending paths, and appends the `moved[]` entries.

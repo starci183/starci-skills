@@ -109,7 +109,7 @@ const liveDeps = {
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
   // Orca's worker accounting of one Run (every page).
-  workers: async (run) => (await import('../../api/orca/worker-list.mjs')).workerListAll({ run }),
+  workers: async (run) => (await import('../../machine/worker-list-all.mjs')).workerListAll({ run }),
   worktrees: async ({ env, repos }) => (await import('../../machine/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
   worktreeSettings: async () => (await import('../../machine/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
@@ -242,7 +242,7 @@ export function createGcController(overrides = {}) {
       schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: ledgerId, workflowId: leaks[0]?.workflowId ?? null,
       idempotencyKey: `lease-leak:${ledgerId}:${entity}`, entity: { type: 'job', id: String(entity) }, summary,
       evidence: leaks.slice(0, 10).map((l) => ({ ref: `lease:${l.resourceKey}`, why: l.why })),
-      options: [{ key: 'fix-release-step', verb: 'fix the settle/reconcile step that left the lease (DESIGN §15.3 lease mồ côi)', recommended: true }],
+      options: [{ key: 'fix-release-step', verb: 'fix the settle/reconcile step that left the lease (DESIGN §15.3 orphan lease)', recommended: true }],
       allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
     });
     return leaks.length;
@@ -440,8 +440,8 @@ export function createGcController(overrides = {}) {
         { controller: NAME, items: items.slice(0, 50) });
       try {
         await deps.recordRun({ trigger: 'sweep', items: items.map((i) => ({ collector: 'gc-worktrees', kind: 'worktree', target: String(i.path ?? ''), ownerRef: i.preserved ?? null,
-          action: i.ok === false ? 'failed' : i.action === 'adopt' ? 'keep' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
-          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : i.action === 'adopt' ? {} : { verifiedGoneAt: ctx.now() }) })) });
+          action: i.ok === false ? 'failed' : i.action === 'adopt' || i.action === 'review' ? 'keep' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
+          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : i.action === 'adopt' || i.action === 'review' ? {} : { verifiedGoneAt: ctx.now() }) })) });
       } catch (error) { ctx.log('reconciler.gc.record.error', `gc_items write failed: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
     }
     finishDuty(ctx, { controller: NAME, duty: 'worktrees', result: failed.length ? 'failed' : 'done', now: ctx.now() });

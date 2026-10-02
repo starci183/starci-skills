@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {capturesOf} from './impl-captures.mjs';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {decodePng, checkPalette, checkEntityListInCard, checkMascotSlot, cardClassesOf} from './ui/render.mjs';
 import {readWorkspace, loadRecords} from './record-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /**
- * Grit item 55 (docs/examples/todo-app-grit.md): scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
+ * Grit item 55: scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
  * capture's PNG bytes plus its kept markup are checked against the brand record, palette and component
  * anatomy both - but nothing ever ran them against this example tree, so a frontend work/implementation@1
  * record could reach `done` with no capture at all. This module is the mechanical wiring: for every done
@@ -177,7 +178,7 @@ export function renderProofProblems({rec, records, workspaceDoc, workRoot}) {
   return problems;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const args = {};
   for (let i = 2; i < process.argv.length; i += 1) {
     const token = process.argv[i];

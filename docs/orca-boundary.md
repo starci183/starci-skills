@@ -8,7 +8,7 @@ C0 deep map (`orca-deep-map.md`, rows by ID). It covers three sets:
 - the worker-handle census (coordinator item 11): every `terminal` read on a worker handle, and whether it became
   `worker-read`.
 
-The REPLACE rows are not listed here. Each one deletes runtime code once it lands, and its contract-change entry
+The REPLACE rows are not listed here, except the two that lane SETTLED landed (the last section). Each one deletes runtime code once it lands, and its contract-change entry
 records it. Read `host-contract.md` for the call contract (`modules/host/orca/calls.yaml`).
 
 ## KEEP: the runtime's own mechanisms, and why
@@ -16,7 +16,7 @@ records it. Read `host-contract.md` for the call contract (`modules/host/orca/ca
 | ID | Mechanism | Why it stays |
 |---|---|---|
 | T4 | `kernel/reap-agent-process.mjs`, `close-verify --tree` | `worker-release` has no proven tree-kill on Windows (`exitCause stop_unverified`). It stays until smoke E1 proves no agent process remains. |
-| T6 | Screen-proven wakes and nudges (`kernel/wake-delivery.mjs`, `api nudge`, `agent/lib.mjs` delivery, `terminal-send` Enter retry) | Orca proves `turn_started` only on hosts with prompt receipts, and a mailbox `send` is a durable enqueue with a best-effort wake. Only the frame proves that a turn began on Codex and Devin (the 2026-09-23/24 incidents). Revisit after smoke E6. |
+| T6 | Screen-proven wakes and nudges (`kernel/wake-delivery.mjs`, `api nudge`, `agent/lib.mjs` delivery, `terminal-send` Enter retry) | Orca proves `turn_started` only on hosts with prompt receipts, and a mailbox `send` is a durable enqueue with a best-effort wake. Only the frame proves that a turn began on Codex and Devin (the 2026-09-23/24 incidents). Smoke E6 (live, Orca 1.4.209, 2026-10-02) settled it: `orchestration send --to dispatch:<id>` to an idle worker that already sent worker_done is refused `dispatch_inactive` ("Dispatch <id> is completed; its worker will never read that mailbox. Send to run:<id> instead, or start a new Dispatch for follow-up work."). A worker is re-engaged only through the terminal (`terminal send` with Enter) or a new Dispatch, so this row stays. No runtime caller issues `send --to dispatch:`. |
 | T7 | `terminal-rename` with the `[Op]`/`[Kernel]` title | `--display-name` names the Task, not the tab. This is presentation; the handle comes from the start receipt. |
 | M3 | Decision Items plus the doorbell | DIs carry the decider, escalation and claims. Orca's `send` is transport only (the doorbell follows T6). |
 | M4 | Peer messages between workflows (`api notify`/`api inbox`) | Peer-wait gating and dispositions are ledger semantics, and the Kernel never calls Orca. |
@@ -52,7 +52,7 @@ Each adapter carries a one-line `// Deep map WRAP <IDs>: <reason>` comment namin
 | W6 | none yet | When the ledger fences `effect_unknown`, the attempt should also be `worker-abandon`ed. There is no adapter yet; adding one is pending. |
 | W7 | `worker-show.mjs`, `worker-list.mjs` | The seat state machine (parked, quarantined, replacement rate limit, `kernel_rev` ack). The death proof is a positive `exited`. |
 | A2 | `worker-list.mjs` | The admission policy (fair-share slots, hysteresis, RAM throttle). The live count is Orca's. |
-| M2 | `orch-reply.mjs` | The ledger disposition of a worker question. |
+| M2 | `reply.mjs` | The ledger disposition of a worker question. |
 | M6 | `worker-show.mjs` | Lease renewal from `dispatch.lastHeartbeatAt`. |
 | R1 | `run-show.mjs`, `run-use.mjs`, `run-create.mjs` | The rebind-once guard, because a repeated `run-use` fences live consumers. |
 | R2 | `run-create.mjs`, `worker-start.mjs` | Which Run a seat or [Worker] launch reuses. |
@@ -73,7 +73,7 @@ Each adapter carries a one-line `// Deep map WRAP <IDs>: <reason>` comment namin
 Orca 1.4.209 states that not every worker has a terminal and that `orca terminal` verbs do not accept every worker
 handle; `worker-read --source auto` always works. A worker's **output** is therefore read by Dispatch only:
 
-- `scripts/api/orca/worker-read.mjs`: `workerRead` reads one page; `workerOutput` follows the top-level cursor
+- `scripts/api/orca/worker-read.mjs` `workerRead` reads one page; `scripts/machine/worker-output.mjs` `workerOutput` follows the top-level cursor
   unchanged until a page is empty, and restarts once without the cursor on `source_changed`. Its `contentComplete`
   is true only when every page said so; `clipping` is kept.
 - `api observe` returns `output` (read by the job's Dispatch). The turn state is still classified from the frame (T2).
@@ -105,3 +105,10 @@ is), so such a worker reads unverified, never dead.
 | `kernel/op-session.mjs` (terminal still open before the session archive) | PTY state | RR6 | WRAP, pending the transcript-source identity |
 | `lib/close-verify.mjs` | PTY state after a close | T3 | non-worker terminals stay; worker paths go with lane SETTLED |
 | `reconciler/controllers/gc.mjs` screens | frame | A1 | lane WLIST (worker accounting through `worker-list`) |
+
+## REPLACE rows landed by lane SETTLED (guarded by smoke E3)
+
+| ID | Was | Now |
+|---|---|---|
+| W4 | Settle, finish, `reconcile --release-worker` and the [Worker] report ran `worker-stop` + `worker-release`, then close, then reap | `api report` (in the op's pane) sends one `worker_done` through `scripts/api/orca/send.mjs`; settle reads the Dispatch (`worker-show`) and releases. `worker-stop` is only the fallback for a Dispatch that did not settle. The close, quit and reap paths stay until smoke E1 (#10). |
+| D2 | One Task per op attempt, closed by hand (`closeOperationTask`, `staleTasks`, `reconcile --orca-tasks`, the gc tasks collector) | The `worker_done` settlement closes the Task. All four are deleted. |

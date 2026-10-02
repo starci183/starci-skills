@@ -1,4 +1,4 @@
-// Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot.mjs): "Run to the finish in
+// Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; scripts/kernel/autopilot-run.mjs): "Run to the finish in
 // one go. Don't stop to ask the owner - not even UX/UI review. When everything is done, the owner reviews once."
 // Machine-gated reviews are accepted provisionally (never golden, never an owner answer), runtime/process gates go
 // to the Supervisor, credentials / real money / shared systems are deferred to handover, and provision.ask is only
@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot.mjs';
+import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../../scripts/kernel/autopilot-run.mjs';
 import { ownerAnswerProof } from '../../scripts/machine/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
@@ -57,9 +57,9 @@ const seedAsk = (repo, { jobId, op, dispatchId, question, params = null }) => se
 });
 const status = (repo, env = {}) => { const r = run(env, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
 
-const CREDENTIAL = { kind: 'credential', text: 'VNPAY sandbox: nhập vnpay-hash-secret.key và VNPAY_TMN_CODE', options: [], refs: [] };
-const PAYOS = { kind: 'irreversible-confirmation', text: 'Đăng ký webhook dev lên kênh PayOS dùng chung của Academy và một giao dịch thật 229.000 VND',
-  options: ['Cho phép cả ba phần (giao dịch thật)', 'Chỉ webhook', 'Không'], recommended: 0, recommendedReason: 'chứng minh trực tiếp' };
+const CREDENTIAL = { kind: 'credential', text: 'VNPAY sandbox: nh\u1eadp vnpay-hash-secret.key v\u00e0 VNPAY_TMN_CODE', options: [], refs: [] };
+const PAYOS = { kind: 'irreversible-confirmation', text: '\u0110\u0103ng k\u00fd webhook dev l\u00ean k\u00eanh PayOS d\u00f9ng chung c\u1ee7a Academy v\u00e0 m\u1ed9t giao d\u1ecbch th\u1eadt 229.000 VND',
+  options: ['Cho ph\u00e9p c\u1ea3 ba ph\u1ea7n (giao d\u1ecbch th\u1eadt)', 'Ch\u1ec9 webhook', 'Kh\u00f4ng'], recommended: 0, recommendedReason: 'ch\u1ee9ng minh tr\u1ef1c ti\u1ebfp' };
 
 test('ask classes: reviews are provisional candidates; credentials, real money and shared systems wait for the end; handover stays the owner\'s', () => {
   assert.equal(autopilotAskClass({ opId: 'interface.draw', question: { kind: 'draw-review', text: 'x', options: ['a', 'b'] } }).class, 'draw-review');
@@ -68,9 +68,9 @@ test('ask classes: reviews are provisional candidates; credentials, real money a
   const payos = autopilotAskClass({ opId: 'provision.ask', question: PAYOS });
   assert.equal(payos.class, 'real-money', 'a recommended option never answers a real payment');
   assert.ok(payos.classes.includes('shared-system'));
-  // "chưa thu tiền thật" (no real money yet) is no real-money ask.
-  assert.equal(autopilotAskClass({ opId: 'provision.ask', question: { kind: 'credential', text: 'sandbox, chưa thu tiền thật: MOMO_PARTNER_CODE', options: [] } }).class, 'credential');
-  assert.equal(autopilotAskClass({ opId: 'business.decide', question: { kind: 'decision', text: 'Which tax?', options: ['A (khuyến nghị)', 'B'] } }).class, 'recommended');
+  // "ch\u01b0a thu ti\u1ec1n th\u1eadt" (no real money yet) is no real-money ask.
+  assert.equal(autopilotAskClass({ opId: 'provision.ask', question: { kind: 'credential', text: 'sandbox, ch\u01b0a thu ti\u1ec1n th\u1eadt: MOMO_PARTNER_CODE', options: [] } }).class, 'credential');
+  assert.equal(autopilotAskClass({ opId: 'business.decide', question: { kind: 'decision', text: 'Which tax?', options: ['A (khuy\u1ebfn ngh\u1ecb)', 'B'] } }).class, 'recommended');
   assert.equal(autopilotAskClass({ opId: 'business.decide', question: { kind: 'decision', text: 'Which tax?', options: ['A', 'B'] } }).class, 'owner-decision');
   assert.equal(autopilotAskClass({ opId: 'handover.review', question: { text: 'x', options: ['a', 'b', 'c'] } }).class, 'owner-handover');
   assert.equal(autopilotAskClass({ opId: 'provision.ask', question: CREDENTIAL, subject: 'handover-credentials' }).class, 'owner-handover');
@@ -125,7 +125,7 @@ test('real money and a shared external system are deferred, never taken on their
 
 test('autopilot answers a recommended ask in one ledger transaction: the receipt joins the open transaction', (t) => {
   const repo = world(t);
-  seedAsk(repo, { jobId: 'job-rec', op: 'business.decide', dispatchId: 'ctx_rec00001', question: { kind: 'decision', text: 'Which tax?', options: ['A (khuyến nghị)', 'B'] } });
+  seedAsk(repo, { jobId: 'job-rec', op: 'business.decide', dispatchId: 'ctx_rec00001', question: { kind: 'decision', text: 'Which tax?', options: ['A (khuy\u1ebfn ngh\u1ecb)', 'B'] } });
   const l = openLedger({ file: ledgerFileFor(repo) });
   try {
     const report = l.db.prepare("SELECT r.*, a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.dispatch_id='ctx_rec00001'").get();
@@ -254,7 +254,7 @@ const autopilotReceipt = (p, question, { provisional = true, optionIndex = 0 } =
   return file;
 };
 
-test('a provisional acceptance settles the drawing done (tự nhận tạm), owes nothing now, is never golden and never an owner acceptance', (t) => {
+test('a provisional acceptance settles the drawing done (self-accepted provisional), owes nothing now, is never golden and never an owner acceptance', (t) => {
   const p = greenfield(t);
   const q = drawReviewQuestion(p.dir);
   assert.throws(() => applyDrawReview(p.dir, autopilotReceipt(p, q, { provisional: false }), { write: true }), /only provisionally/);
@@ -269,12 +269,12 @@ test('a provisional acceptance settles the drawing done (tự nhận tạm), owe
   const s = drawReviewStatus(p.dir);
   assert.equal(s.owed, false, s.why);
   assert.equal(s.provisional, true);
-  assert.match(s.why, /tự nhận tạm/);
+  assert.match(s.why, /provisionally accepted by autopilot/);
 });
 
 test('an autopilot answer is never an owner answer, and a handover re-open needs the owner\'s own handover answer', (t) => {
   const repo = world(t);
-  seedAsk(repo, { jobId: 'job-ho', op: 'handover.review', dispatchId: 'ctx_handover1', question: { text: 'Bàn giao', options: ['Duyệt', 'Góp ý', 'Hỏi'] } });
+  seedAsk(repo, { jobId: 'job-ho', op: 'handover.review', dispatchId: 'ctx_handover1', question: { text: 'B\u00e0n giao', options: ['Duy\u1ec7t', 'G\u00f3p \u00fd', 'H\u1ecfi'] } });
   const dir = path.join(repo, '.starciwork', 'kernel-evidence', WF, 'serve-ask');
   fs.mkdirSync(dir, { recursive: true });
   const receiptPath = path.join(dir, 'answer-1.json');
@@ -294,7 +294,7 @@ test('an autopilot answer is never an owner answer, and a handover re-open needs
 });
 
 test('a brand-direction review repeats only by its text: a revised rev is a new question', () => {
-  const answers = [{ dispatchId: 'ctx_a', question: 'Duyệt hướng rev 1 [desktop aaaa]', options: ['Chấp nhận', 'Sửa lại'], attempt: 1 }];
-  assert.equal(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duyệt hướng rev 2 [desktop bbbb]', options: ['Chấp nhận', 'Sửa lại'] }, answers, { op: 'brand.decide' }), null);
-  assert.ok(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duyệt hướng rev 1 [desktop aaaa]', options: ['Chấp nhận', 'Sửa lại'] }, answers, { op: 'brand.decide' }));
+  const answers = [{ dispatchId: 'ctx_a', question: 'Duy\u1ec7t h\u01b0\u1edbng rev 1 [desktop aaaa]', options: ['Ch\u1ea5p nh\u1eadn', 'S\u1eeda l\u1ea1i'], attempt: 1 }];
+  assert.equal(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duy\u1ec7t h\u01b0\u1edbng rev 2 [desktop bbbb]', options: ['Ch\u1ea5p nh\u1eadn', 'S\u1eeda l\u1ea1i'] }, answers, { op: 'brand.decide' }), null);
+  assert.ok(repeatedAnswerOf({ kind: 'brand-direction-review', text: 'Duy\u1ec7t h\u01b0\u1edbng rev 1 [desktop aaaa]', options: ['Ch\u1ea5p nh\u1eadn', 'S\u1eeda l\u1ea1i'] }, answers, { op: 'brand.decide' }));
 });

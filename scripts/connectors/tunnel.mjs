@@ -43,16 +43,17 @@
 // (more than one is a leak), `healthy`, and `problems`.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import http from 'node:http';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { tunnelRun } from '../api/cloudflared/tunnel-run.mjs';
+import { probe } from '../api/http/probe.mjs';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { pidAlive, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, recordAlive, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
-import { listHostProcesses } from '../api/process/process-list.mjs';
+import { processList } from '../api/process/process-list.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
 
@@ -162,7 +163,7 @@ export function superviseTunnel(cf, { port, env = process.env, secretEnv = env, 
     const startedAt = Date.now();
     if (cf.mode === 'quick') state.baseUrl = null;
     state.connected = false;
-    child = spawn(plan.command, plan.args, { env: plan.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    child = tunnelRun(plan.args, { command: plan.command, env: plan.env });
     state.childPid = child.pid ?? null; save();
     const onData = (chunk) => {
       const text = chunk.toString();
@@ -278,19 +279,15 @@ export function ensureAskConnectors({ env = process.env, config = undefined, spa
 }
 
 /** Whether something answers HTTP on 127.0.0.1:<port> — the gateway 404s `/` with its no-store headers. */
-export const probeGateway = (port, { timeoutMs = 3000 } = {}) => new Promise((resolve) => {
-  if (!Number.isInteger(Number(port)) || Number(port) <= 0) { resolve({ reachable: false, status: null }); return; }
-  const req = http.get({ host: '127.0.0.1', port: Number(port), path: '/', timeout: timeoutMs }, (res) => {
-    res.resume();
-    resolve({ reachable: true, status: res.statusCode ?? null, gateway: res.headers['x-robots-tag'] === 'noindex, nofollow' });
-  });
-  req.on('timeout', () => req.destroy(new Error('timeout')));
-  req.on('error', () => resolve({ reachable: false, status: null }));
-});
+export const probeGateway = async (port, { timeoutMs = 3000 } = {}) => {
+  if (!Number.isInteger(Number(port)) || Number(port) <= 0) return { reachable: false, status: null };
+  const r = await probe(`http://127.0.0.1:${Number(port)}/`, { timeoutMs, follow: 0 });
+  return r.state === 'answered' ? { reachable: true, status: r.status ?? null, gateway: r.headers?.['x-robots-tag'] === 'noindex, nofollow' } : { reachable: false, status: null };
+};
 
 /** Every `tunnel.mjs run` process on this host ({pid, commandLine}), or null when the table cannot be read. */
 export function tunnelProcesses() {
-  const rows = listHostProcesses({ where: "Name='node.exe'", match: /tunnel\.mjs\S*\s+run\b/, timeoutMs: 20000 });
+  const rows = processList({ where: "Name='node.exe'", match: /tunnel\.mjs\S*\s+run\b/, timeoutMs: 20000 });
   return rows ? rows.filter((p) => p.pid !== process.pid).map((p) => ({ pid: p.pid, commandLine: p.cmd })) : null;
 }
 
@@ -371,4 +368,4 @@ async function main() {
   console.error('usage: tunnel.mjs start|run|status|stop|dry-run [--port <n>]'); process.exit(2);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

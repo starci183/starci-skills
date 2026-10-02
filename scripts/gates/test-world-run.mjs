@@ -6,7 +6,8 @@
 //
 // Over the app at --root it records, and `api settle` re-reads (scripts/kernel/gate-settle.mjs):
 //   harness  the be jest config is @starci/jest-preset's starciJestConfig() (its world projects run on the preset's world
-//            runner: one file at a time, each in a fresh process) and the world declaration be/src/tests/world/test-world.config.ts
+//            runner: up to min(--maxWorkers, slots) files at once, each in a fresh process on its own data slot) and the world
+//            declaration be/src/tests/world/test-world.config.ts
 //            calls defineTestWorld;
 //   specs    every spec of the project (be/src/tests/{e2e,integration,contract}/**/*.<project>-spec.ts, narrowed by --tests)
 //            takes its world from the library in the layer's form - useTestWorld({ apps }) for e2e, useTestWorld({ modules })
@@ -19,7 +20,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -101,11 +102,11 @@ export function reduceJest(report) {
 }
 
 /** Run the managed `npm run test:<project>` with jest's JSON report; {command, exit, ...reduceJest, error}. */
-export function runWorldProject(root, project, tests = null, { spawn = spawnSync } = {}) {
+export function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-world-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const args = ['run', `test:${project}`, '--', '--json', `--outputFile=${outFile}`, ...(tests ? ['--testPathPattern', tests] : [])];
-  const run = spawn('npm', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, shell: process.platform === 'win32' });
+  const run = npm(args, { cwd: root, maxBuffer: 512 * 1024 * 1024 });
   let report = null;
   try { report = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { report = null; }
   try { fs.rmSync(outFile, { force: true }); fs.rmdirSync(outDir); } catch { /* a temp file of this run */ }
@@ -131,14 +132,14 @@ export function testWorldFindings(summary) {
   return out;
 }
 
-export function buildTestWorldRun({ root, project, tests = null, rules = testWorldRules(), spawn = spawnSync, run = true }) {
+export function buildTestWorldRun({ root, project, tests = null, rules = testWorldRules(), npm = runNpm, run = true }) {
   if (!WORLD_PROJECTS[project]) throw new Error(`--project must be one of ${Object.keys(WORLD_PROJECTS).join(', ')}; ${USAGE}`);
   const abs = path.resolve(root);
   const specs = specsOf(abs, project, tests).map((rel) => judgeSpec(rel, fs.readFileSync(path.join(abs, rel), 'utf8'), rules));
   const summary = { schema: TEST_WORLD_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), project, tests, harness: harnessOf(abs), specs,
     outageCalls: specs.reduce((n, s) => n + s.outage, 0), run: null, findings: [], exit: 2 };
   summary.findings = testWorldFindings(summary);
-  summary.run = run ? runWorldProject(abs, project, tests, { spawn }) : null;
+  summary.run = run ? runWorldProject(abs, project, tests, { npm }) : null;
   const red = !summary.run || summary.run.error || summary.run.exit !== 0 || summary.run.failed > 0 || summary.run.skipped > 0 || summary.run.total === 0;
   summary.exit = summary.run?.error ? 2 : summary.findings.length || red ? 1 : 0;
   return summary;

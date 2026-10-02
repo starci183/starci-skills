@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { translator } from '../../lib/i18n.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -103,7 +104,8 @@ export function waitCycles(edges) {
  * The deps pass: one `deadlock` DI per wait cycle, one `cross-workflow` DI per hub-blocker / unowned-need finding.
  * `graphs` [{ledgerId, edges: [{from, to, via}], findings: [{kind, workflows, summary, proposal}]}]. Pure.
  */
-export function planDeps({ graphs = [], now, settings = DEFAULTS }) {
+export function planDeps({ graphs = [], now, settings = DEFAULTS, language = 'vi' }) {
+  const tr = translator(language);
   const edges = graphs.flatMap((g) => (g.edges ?? []).map((e) => ({ ...e, ledgerId: g.ledgerId })));
   const ledgerOf = (wf) => graphs.find((g) => (g.edges ?? []).some((e) => e.from === wf || e.to === wf))?.ledgerId ?? null;
   const decisions = [];
@@ -112,12 +114,12 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS }) {
     decisions.push(fleetDecision({
       kind: 'deadlock', key: `deadlock:${cycle.join('+')}`, now, dueMs: settings.decisionDueMs, productLedger: ledgerOf(cycle[0]),
       entity: { type: 'workflow', id: cycle.join('+') },
-      summary: `Chờ vòng tròn giữa ${cycle.length} luồng: ${cycle.join(' -> ')} -> ${cycle[0]}`,
-      evidence: via.map((e) => `${e.from} chờ ${e.to}${e.via ? ` qua ${e.via}` : ''}`),
+      summary: tr('A circular wait across {count} workflows: {cycle} -> {first}', { count: cycle.length, cycle: cycle.join(' -> '), first: cycle[0] }),
+      evidence: via.map((e) => tr('{from} waits on {to}', { from: e.from, to: e.to }) + (e.via ? tr(' via {via}', { via: e.via }) : '')),
       options: [
-        { key: 'seam-stub', title: 'Công bố một seam stub để một nhánh chạy tiếp', recommended: true },
-        { key: 'bridge', verb: 'node scripts/supervisor/bridge.mjs', title: 'Supervisor bridge: chuyển hoặc chỉ định chủ của nhu cầu chung' },
-        { key: `lower-priority:${cycle[cycle.length - 1]}`, title: `Hạ ưu tiên nhánh ${cycle[cycle.length - 1]}` },
+        { key: 'seam-stub', title: tr('Publish a seam stub so one branch keeps running'), recommended: true },
+        { key: 'bridge', verb: 'node scripts/supervisor/bridge.mjs', title: tr('Supervisor bridge: transfer or assign the owner of the shared need') },
+        { key: `lower-priority:${cycle[cycle.length - 1]}`, title: tr('Lower the priority of branch {branch}', { branch: cycle[cycle.length - 1] }) },
       ],
     }));
   }
@@ -135,14 +137,15 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS }) {
 }
 
 /** The owed pass: one Supervisor DI per open cluster (cluster.mjs clusterOwed), keyed by the cluster id. Pure. */
-export function planOwed({ clusters = [], now, settings = DEFAULTS }) {
+export function planOwed({ clusters = [], now, settings = DEFAULTS, language = 'vi' }) {
+  const tr = translator(language);
   return clusters.filter((c) => !c.fixedBy).map((c) => {
     const first = c.items?.[0] ?? {};
     return fleetDecision({
       kind: first.class === 'owner' ? 'supervisor-ruling' : 'runtime-defect', key: `owed:${c.id}`, now, dueMs: settings.decisionDueMs,
       productLedger: first.repo ? path.basename(first.repo) : null, workflowId: c.workflows?.[0] ?? null,
       entity: { type: 'owed-cluster', id: c.id },
-      summary: `${c.size} việc nợ (${c.id}), cũ nhất ${c.oldestMin} phút: ${first.summary ?? first.kind ?? ''}`,
+      summary: tr('{size} owed items ({id}), oldest {oldestMin} min: {summary}', { size: c.size, id: c.id, oldestMin: c.oldestMin, summary: first.summary ?? first.kind ?? '' }),
       evidence: (c.items ?? []).slice(0, 6).map((i) => i.line ?? `${i.workflowId} ${i.incidentId ?? i.key}`),
       options: first.action ? [{ key: 'owed-action', title: clipLine(first.action, 200), recommended: true }] : [],
     });
@@ -176,7 +179,8 @@ const sigId = (signature) => crypto.createHash('sha256').update(String(signature
  * instead. A changed signature or head is a new key that supersedes the repo's older push DI (supersedeEntity), so
  * the one live DI always carries the current reason with its full output blob (MB-03). Pure.
  */
-export function planPush({ results = [], now, settings = DEFAULTS }) {
+export function planPush({ results = [], now, settings = DEFAULTS, language = 'vi' }) {
+  const tr = translator(language);
   const decisions = [], incomplete = [];
   for (const r of results.filter((x) => x?.refused || (x?.pushed === false && x?.error && !x?.skipped))) {
     const repo = path.basename(String(r.repo ?? ''));
@@ -187,9 +191,9 @@ export function planPush({ results = [], now, settings = DEFAULTS }) {
     decisions.push({
       ...fleetDecision({
         kind: 'push-refused', key: `push-refused:${repo}:${sigId(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
-        entity: { type: 'repo', id: repo }, summary: `Push main bị từ chối ở ${repo} (${signature}${r.repeat > 1 ? `, lần ${r.repeat} cùng head` : ''}): ${why}`,
-        evidence: [String(why ?? ''), r.outputSha ? `blob:${r.outputSha} (toàn bộ output push/hook, ${r.outputBytes ?? '?'} bytes)` : null, `head ${r.head}`],
-        options: [{ key: 'fix-and-push', title: 'Sửa nguyên nhân rồi để lượt push sau chạy lại', recommended: true }],
+        entity: { type: 'repo', id: repo }, summary: tr('Push to main refused at {repo} ({signature}{repeat}): {why}', { repo, signature, repeat: r.repeat > 1 ? tr(', attempt {n} at the same head', { n: r.repeat }) : '', why }),
+        evidence: [String(why ?? ''), r.outputSha ? tr('blob:{sha} (the full push/hook output, {bytes} bytes)', { sha: r.outputSha, bytes: r.outputBytes ?? '?' }) : null, `head ${r.head}`],
+        options: [{ key: 'fix-and-push', title: tr('Fix the cause and let the next push run retry it'), recommended: true }],
       }),
       keyParts: { kind: 'push-refused', repo, signature, head: String(r.head) }, supersedeEntity: true,
       ...(r.outputSha ? { refs: { outputSha: r.outputSha } } : {}),
@@ -199,21 +203,25 @@ export function planPush({ results = [], now, settings = DEFAULTS }) {
 }
 
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
-export function planDirect({ commits = [], now, settings = DEFAULTS }) {
+export function planDirect({ commits = [], now, settings = DEFAULTS, language = 'vi' }) {
+  const tr = translator(language);
   return commits.map((c) => fleetDecision({
     kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,
     entity: { type: 'commit', id: String(c.sha).slice(0, 12) },
-    summary: `Commit thẳng lên main không qua cổng land: ${String(c.sha).slice(0, 9)} ${c.subject ?? ''}`,
+    summary: tr('Direct commit on main bypassing the land gate: {sha} {subject}', { sha: String(c.sha).slice(0, 9), subject: c.subject ?? '' }),
     evidence: [`DIRECT-COMMIT ${c.sha} ${c.subject ?? ''}`, 'config.yaml supervisor.landGate.mode: exclusive'],
-    options: [{ key: 'revert-reland', title: 'Revert commit rồi land lại qua land.mjs (lane + contract change)', recommended: true },
-      { key: 'accept', title: 'Chấp nhận và ghi lý do (commit hạ tầng đã được duyệt)' }],
+    options: [{ key: 'revert-reland', title: tr('Revert the commit and re-land through land.mjs (lane + contract change)'), recommended: true },
+      { key: 'accept', title: tr('Accept and record the reason (the infrastructure commit was already approved)') }],
   }));
 }
 
 /** Supervisor DIs escalated `min` times or more and past due: the urgent items (DESIGN §19). Pure. */
-export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations }) => dis
-  .filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && (d.escalations ?? 0) >= min && d.dueAt != null && d.dueAt < now)
-  .map((d) => ({ class: 'supervisor-di-overdue', key: `di:${d.id}`, text: `Supervisor DI quá hạn x${d.escalations}: ${clipLine(d.summary, 200)}` }));
+export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalations, language = 'vi' } = {}) => {
+  const tr = translator(language);
+  return dis
+    .filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && (d.escalations ?? 0) >= min && d.dueAt != null && d.dueAt < now)
+    .map((d) => ({ class: 'supervisor-di-overdue', key: `di:${d.id}`, text: tr('Supervisor DI overdue x{count}: {summary}', { count: d.escalations, summary: clipLine(d.summary, 200) }) }));
+};
 
 /* ------------------------------------------------------------ reads */
 
@@ -255,9 +263,16 @@ async function landEventsOf(ctx, now) {
 
 /* ------------------------------------------------------------ reconcile */
 
+/** config.yaml language for the owner-visible DI text ('vi' unless it says 'en'); `deps.language` overrides. */
+const languageOf = async (deps) => {
+  if (deps.language) return deps.language;
+  try { const { loadConfig } = await import('../../../engine/config.mjs'); return loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
+};
+
 export async function reconcileFleet(key, ctx, { settings = fleetSettings(), deps = {} } = {}) {
   const now = ctx.now();
   const force = deps.force === true;
+  const language = await languageOf(deps);
   if (key === KEYS.deps) {
     if (!force && !due(ctx, key, settings.depsEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
     const depGraph = deps.dependencyGraph ?? (await import('../../kernel/dependency-graph.mjs')).dependencyGraph;
@@ -265,7 +280,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
       try { const g = depGraph(r.db, { repo: r.repo, now, light: true }); return { ledgerId: r.ledgerId, edges: g.edges.filter((e) => e.strength === 'hard'), findings: g.findings }; }
       catch { return { ledgerId: r.ledgerId, edges: [], findings: [] }; }
     }));
-    const plan = planDeps({ graphs, now, settings });
+    const plan = planDeps({ graphs, now, settings, language });
     return { ok: true, key, cycles: plan.filter((d) => d.kind === 'deadlock').length, ...(await openAll(ctx, plan)) };
   }
   if (key === KEYS.owed) {
@@ -274,7 +289,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     const owed = withReaders(ctx, (readers) => readers.flatMap((r) => {
       try { return owedFindings(r.db, { repo: r.repo, ledgers: readers.map((x) => ({ repo: x.repo, db: x.db })), now }).map((i) => ({ ...i, repo: r.repo })); } catch { return []; }
     }));
-    const plan = planOwed({ clusters: clusterOwed(owed), now, settings });
+    const plan = planOwed({ clusters: clusterOwed(owed), now, settings, language });
     return { ok: true, key, owed: owed.length, clusters: plan.length, ...(await openAll(ctx, plan)) };
   }
   if (key === KEYS.land) {
@@ -292,7 +307,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     const r = await ctx.run('node', ['scripts/supervisor/push-mains.mjs', '--json'], { timeoutMs: PUSH_RUN_TIMEOUT_MS });
     if (r?.shadow) return { ok: true, key, shadow: true };
     const results = Array.isArray(r?.value) ? r.value : [];
-    const plan = planPush({ results, now, settings });
+    const plan = planPush({ results, now, settings, language });
     if (plan.incomplete.length) ctx.log('reconciler.error', `push: ${plan.incomplete.length} refusal(s) lack a repo, head or signature; no Decision Item opened`, { kind: 'reconciler.fleet.push-key-incomplete', incomplete: plan.incomplete });
     return { ok: r?.ok !== false, key, actionId: r?.actionId ?? null, pushed: results.filter((x) => x.pushed).length, held: results.filter((x) => x.held).length, ...(await openAll(ctx, plan)) };
   }
@@ -325,7 +340,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     if (mode === undefined) { try { mode = (await import('../../machine/home.mjs')).supervisorSettings().landGate?.mode ?? 'shared'; } catch { mode = 'shared'; } }
     if (mode !== 'exclusive') return { ok: true, key, skipped: `land gate ${mode}` };
     const commits = deps.directCommits ? deps.directCommits() : (await import('../../supervisor/direct-commits.mjs')).directCommits({ env: ctx.env ?? process.env });
-    return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings }))) };
+    return { ok: true, key, direct: commits.length, ...(await openAll(ctx, planDirect({ commits, now, settings, language }))) };
   }
   if (key === KEYS.notify) {
     if (!force && !due(ctx, key, settings.notifyEveryMs, now)) return { ok: true, key, skipped: 'not-due' };
@@ -335,7 +350,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
       // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
       const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../../machine/decisions.mjs'), import('../../machine/home.mjs')]);
       const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
-      urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations });
+      urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations, language });
     } catch { urgentItems = []; }
     const urgent = [];
     for (const u of urgentItems) urgent.push(await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'urgent', '--class', u.class, '--key', u.key, '--text', u.text, '--send', '--json'], { timeoutMs: 60_000 }));

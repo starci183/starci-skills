@@ -14,12 +14,12 @@ import tsParser from "@typescript-eslint/parser"
 import { executeParamsShape, handlerIsThin, handlerOverridesProcess, messageCarriesParamsOnly, messageTypedResult, noEventBus, noUseCase, rules } from "./cqrs.mjs"
 
 const tester = typedTester()
-const APP = "src/features/plan/application"
+const APP = "src/features/api/plan/application"
 const COMMAND = at(`${APP}/place-order.command.ts`)
 const QUERY = at(`${APP}/list-orders.query.ts`)
 const HANDLER = at(`${APP}/place-order.handler.ts`)
 const SUPPORT = at(`${APP}/support/order-math.service.ts`)
-const RESOLVER = at("src/features/plan/transport/graphql/place-order.resolver.ts")
+const RESOLVER = at("src/features/api/plan/transport/graphql/place-order.resolver.ts")
 const DOMAIN = at("src/modules/domain/order/order.service.ts")
 
 const HANDLER_HEAD = `
@@ -147,7 +147,7 @@ test("message-carries-params-only: a message is one params and nothing else", ()
             { filename: COMMAND, code: `${head}export class PlaceOrderCommand extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },
             { filename: QUERY, code: `${head}export class ListOrdersQuery extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },
             // a `.command.ts` of a CLI transport is not an application message
-            { filename: at("src/features/plan/transport/cli/seed.command.ts"), code: "export class Seed { run() { return 1 } }" },
+            { filename: at("src/features/api/plan/transport/cli/seed.command.ts"), code: "export class Seed { run() { return 1 } }" },
             // a handler file is not a message file
             { filename: HANDLER, code: "export class H { run() { return 1 } }" },
         ],
@@ -171,7 +171,7 @@ test("message-typed-result: a message extends Command<R> / Query<R> from @nestjs
             // a renamed import is the same class
             { filename: COMMAND, code: `import { Command as Message } from "@nestjs/cqrs"\nimport type { ExecuteParams } from "@modules/platform/cqrs"\nexport class PlaceOrderCommand extends Message<string> { constructor(readonly params: ExecuteParams<string>) { super() } }` },
             // outside the application slot the rule is silent
-            { filename: at("src/features/plan/transport/cli/seed.command.ts"), code: "export class Seed {}" },
+            { filename: at("src/features/api/plan/transport/cli/seed.command.ts"), code: "export class Seed {}" },
         ],
         invalid: [
             { filename: COMMAND, code: `${head}export class PlaceOrderCommand { constructor(readonly params: ExecuteParams<string>) {} }`, errors: [{ messageId: "base" }] },
@@ -240,7 +240,7 @@ test("no-use-case: no use-case file, no UseCase class, no forwarder service", ()
             // a renamed receiver, an awaited dispatch and a query bus are still a forwarder
             { filename: at(`${APP}/list-orders.service.ts`), code: `${bus}export class ListOrdersService { constructor(private readonly q: QueryBus) {} async run(x: never) { return await this.q.execute(x) } }`, errors: [{ messageId: "forwarder" }] },
             // a forwarder parked in a transport slot
-            { filename: at("src/features/plan/transport/graphql/place-order.service.ts"), code: `${bus}export class PlaceOrderService { constructor(private readonly b: CommandBus) {} go(x: never) { return this.b.execute(x) } }`, errors: [{ messageId: "forwarder" }] },
+            { filename: at("src/features/api/plan/transport/graphql/place-order.service.ts"), code: `${bus}export class PlaceOrderService { constructor(private readonly b: CommandBus) {} go(x: never) { return this.b.execute(x) } }`, errors: [{ messageId: "forwarder" }] },
         ],
     })
 })

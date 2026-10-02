@@ -17,7 +17,8 @@
 // Exit 0 every step passed, 1 a step is red or skipped, 2 the proof could not be built.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { posixPath } from '../lib/path-key.mjs';
 import { isMain } from '../lib/is-main.mjs';
@@ -32,11 +33,12 @@ const tail = (text, n = 3) => String(text ?? '').trim().split(/\r?\n/).slice(-n)
 
 const isApp = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'hfs.json'), 'utf8'))?.kind === 'app'; } catch { return false; } };
 
-/** The default runner of a step's process: {status, stdout, stderr, error}. */
-const defaultSpawn = (cmd, args, opts) => spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, ...opts });
+/** The default runners of a step's process (node <args>, npm <args>): {status, stdout, stderr, error}. */
+const defaultNode = (args, opts) => runNode(args, { maxBuffer: 512 * 1024 * 1024, ...opts });
+const defaultNpm = (args, opts) => runNpm(args, { maxBuffer: 512 * 1024 * 1024, ...opts });
 
-export function appInstallsStep({ runtime = runtimeRoot, spawn = defaultSpawn } = {}) {
-  const run = spawn(process.execPath, [path.join(runtime, 'scripts', 'gates', 'release-app-installs.mjs')], { cwd: runtime });
+export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = {}) {
+  const run = node([path.join(runtime, 'scripts', 'gates', 'release-app-installs.mjs')], { cwd: runtime });
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const skipped = output.split(/\r?\n/).filter((l) => /\bSKIPPED:/.test(l));
   const status = run.error || run.status === null ? STEP_STATUS.toolFailed : skipped.length ? STEP_STATUS.skipped : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
@@ -44,11 +46,11 @@ export function appInstallsStep({ runtime = runtimeRoot, spawn = defaultSpawn } 
     detail: skipped.length ? `a proof skipped: ${skipped.slice(0, 3).join(' | ')}` : tail(output) };
 }
 
-export function canonPinsStep({ repo, runtime = runtimeRoot, spawn = defaultSpawn } = {}) {
+export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode } = {}) {
   const script = path.join(runtime, 'scripts', 'checks', 'check-canon-pins.mjs');
   const runs = [{ label: 'runtime', args: [script, '--json'] }, ...(repo && isApp(repo) ? [{ label: 'app', args: [script, '--repo', repo, '--json'] }] : [])];
   const results = runs.map(({ label, args }) => {
-    const run = spawn(process.execPath, args, { cwd: runtime });
+    const run = node(args, { cwd: runtime });
     let doc = null;
     try { doc = JSON.parse(run.stdout); } catch { doc = null; }
     return { label, exit: run.status ?? null, ok: doc?.ok === true, pins: doc?.pins ?? null, profiles: doc?.profiles ?? null, errors: doc?.errors ?? [], parsed: Boolean(doc), error: run.error };
@@ -76,15 +78,15 @@ export function mergeGuardStep({ repo, base, main = null }) {
   }
 }
 
-export function checkStep({ runtime = runtimeRoot, spawn = defaultSpawn } = {}) {
-  const run = spawn('npm', ['run', 'check'], { cwd: runtime, shell: process.platform === 'win32' });
+export function checkStep({ runtime = runtimeRoot, npm = defaultNpm } = {}) {
+  const run = npm(['run', 'check'], { cwd: runtime });
   return { id: 'check', command: 'npm run check', exit: run.status ?? null,
     status: run.error || run.status === null ? STEP_STATUS.toolFailed : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
 }
 
-export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRoot, spawn = defaultSpawn }) {
+export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRoot, node = defaultNode, npm = defaultNpm }) {
   const abs = path.resolve(repo);
-  const steps = [appInstallsStep({ runtime, spawn }), canonPinsStep({ repo: abs, runtime, spawn }), mergeGuardStep({ repo: abs, base, main }), checkStep({ runtime, spawn })];
+  const steps = [appInstallsStep({ runtime, node }), canonPinsStep({ repo: abs, runtime, node }), mergeGuardStep({ repo: abs, base, main }), checkStep({ runtime, npm })];
   const ok = steps.every((s) => s.status === STEP_STATUS.pass);
   return { schema: RELEASE_PROOF_SCHEMA, at: new Date().toISOString(), repo: posixPath(abs), base, runtime: posixPath(runtime), steps, ok,
     exit: ok ? 0 : steps.some((s) => s.status === STEP_STATUS.toolFailed) ? 2 : 1 };

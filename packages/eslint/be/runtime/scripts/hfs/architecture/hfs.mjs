@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isIP } from 'node:net';
-import { gitOutput } from '../../api/git/lib.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { configGet } from '../../api/git/config-get.mjs'; import { gitOutputOf } from '../../lib/git.mjs';
 import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
@@ -17,6 +16,7 @@ import { isFeTestPath } from '../rules/fe-no-tests.mjs';
  */
 
 export const HFS_RULE_IDS = [
+  'BE_TEST_TOPOLOGY',
   'HFS_APPS_REQUIRED',
   'HFS_APP_LAYOUT_INVALID',
   'HFS_E2E_IN_AUTOMATIC_GATE',
@@ -37,7 +37,6 @@ export const HFS_RULE_IDS = [
   'HFS_ROOT_SRC_FORBIDDEN_FE',
   'HFS_SRC_LAYOUT_INVALID',
   'HFS_STACKS_IN_SIDE',
-  'HFS_TEST_KIND_RETIRED',
   'HFS_WORK_IN_FE',
 ];
 
@@ -46,8 +45,7 @@ const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
 const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
-/** The folders of `src/modules/` the slot manifest knows (domain, platform, integrations and the pattern tiers events, queues, projections), read from the slot paths. */
-const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean));
+const moduleTiersOf = resolver => new Set(resolver.slots().filter(slot => slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path)).map(variant => /^src\/modules\/([a-z][a-z-]*)\//.exec(variant)?.[1]).filter(Boolean)); // the folders of src/modules/ the slot manifest knows (domain, platform, integrations, events, queues, projections)
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
 const RETIRED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
 const RETIRED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
@@ -101,7 +99,7 @@ function slotTestChildren(resolver) {
  */
 function ownsGitTopLevel(root) {
   try {
-    const top = gitOutput(['rev-parse', '--show-toplevel'], { cwd: root }).trim();
+    const top = gitOutputOf(revParseQuery(['--show-toplevel'], { cwd: root }), 'git rev-parse --show-toplevel').trim();
     const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
     return same(fs.realpathSync(path.resolve(top)), fs.realpathSync(path.resolve(root)));
   } catch {
@@ -114,8 +112,8 @@ function gitPaths(root) {
   try {
     // An empty index is still a Git tree. Falling back to disk in that case would count
     // untracked build output as repository content.
-    gitOutput(['rev-parse', '--is-inside-work-tree'], { cwd: root });
-    const out = gitOutput(['ls-files', '--cached', '-z', '--', '.'], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+    gitOutputOf(revParseQuery(['--is-inside-work-tree'], { cwd: root }), 'git rev-parse --is-inside-work-tree');
+    const out = gitOutputOf(lsFiles(['--cached', '-z', '--', '.'], { cwd: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files');
     return out.split('\0').filter(Boolean);
   } catch {
     return null;
@@ -182,11 +180,12 @@ function treeView(root) {
   };
 }
 
+// `hostname` is a WHATWG URL hostname: a name never holds ':', so after the brackets go only an IPv6 literal does.
 function privateHost(hostname) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (host === 'localhost' || host === '::1' || host === '0.0.0.0' ||
       /(?:\.localhost|\.local|\.internal|\.lan)$/u.test(host)) return true;
-  if (isIP(host) === 6) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
+  if (host.includes(':')) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
   if (!host.includes('.')) return true;
   const octets = host.split('.');
   if (octets.length !== 4 || !octets.every(part => /^\d{1,3}$/u.test(part) && Number(part) <= 255)) return false;
@@ -332,10 +331,9 @@ const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
 /** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
 function hooksPathNotRedirected({ root, finding }) {
   if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
-  let value = '';
-  try {
-    value = gitOutput(['config', '--local', '--get', 'core.hooksPath'], { cwd: root }).trim();
-  } catch { return { status: 'checked' }; } // key not set: nothing is redirected
+  const set = configGet(root, 'core.hooksPath', { local: true });
+  if (!set.ok) return { status: 'checked' }; // key not set: nothing is redirected
+  const value = set.stdout;
   if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
     finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
   return { status: 'checked' };
@@ -451,7 +449,7 @@ export function checkHfs(config) {
       continue;
     }
     if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
-    // A back-end app must hold exactly what the slot of its kind requires (be.app.migrate has no app.module.ts).
+    // A back-end app must hold exactly what the slot of its kind requires (each kind's slot names its own requires).
     if (backend) for (const required of resolver.requiredFiles(`apps/${app}/src/main.ts`)) {
       const directory = required.endsWith('/');
       if (!(directory ? tree.hasDir(required.slice(0, -1)) : tree.hasFile(required))) missing.push(required.slice(`apps/${app}/`.length));
@@ -471,10 +469,9 @@ export function checkHfs(config) {
         finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
       }
     }
-    const moduleTiers = moduleTiersOf(resolver);
     for (const tier of tree.children('src/modules').sort()) {
-      if (!moduleTiers.has(tier)) {
-        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiers].sort().join(', ')}.`);
+      if (!moduleTiersOf(resolver).has(tier)) {
+        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of ${[...moduleTiersOf(resolver)].sort().join(', ')}.`);
       }
     }
     const testChildren = slotTestChildren(resolver);
@@ -490,11 +487,11 @@ export function checkHfs(config) {
   // live/; a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
   for (const file of tree.files()) {
     if (RETIRED_TEST_SUFFIX.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} uses a retired test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} uses a retired test kind. Only unit *.spec.ts, *.integration-spec.ts, *.e2e-spec.ts and *.contract-spec.ts exist, each in its own folder under src/tests/.`);
     else if (backend && RETIRED_TEST_FOLDER.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
     else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
+      finding('BE_TEST_TOPOLOGY', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 
   if (backend) testTreesOutOfDefaultProgram({ root: config.root, tree, finding });

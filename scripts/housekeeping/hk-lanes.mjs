@@ -1,27 +1,38 @@
 // hk-lanes.mjs — the lane-worktree root and the merged-worktree sweep of host housekeeping
-// (modules/models/runtimes.yaml allocation.housekeeping.*).
+// (modules/models/runtimes.yaml allocation.housekeeping.*; the lanes root itself: the owner config roots.lanes).
 //
 // Every ephemeral checkout the runtime's lanes make — agent lane worktrees, worker staging
 // (workers.mjs), the land gate's scratch (land.mjs) — lives under ONE root, lanesRoot():
 //   1. STARCI_LANES_ROOT            a one-off/spec override
-//   2. allocation.housekeeping.lanesRoot   runtimes.yaml (allocationSettings)
-//   3. DEFAULT_LANES_ROOT           D:/starci-lanes — lanes stay off C:, which filled 2026-09-26
+//   2. roots.lanes                  the owner config (config.yaml, gitignored)
+//   3. <starciLocalRoot>/lanes      the state-root default (the owner moves it off C: with STARCI_LANES_ROOT or the key)
 //
 // sweepLanes removes the registered worktrees under that root whose branch is fully landed on main
 // (git cherry finds no '+') and that stayed idle for allocation.housekeeping.laneGraceMs, after
-// proving the tree holds no link. A lane made by `git worktree add -b lane/<x> main` has no commit
+// safeRemoveWorktree unlinks every link as a link first. A lane made by `git worktree add -b lane/<x> main` has no commit
 // of its own yet, so git cherry reads it as landed: its branch never moved since creation (tip equals
 // its merge-base with main, one reflog position) and it is skipped as no-work-yet; a landed lane still
 // in use (its HEAD/branch reflog or directory changed within the grace) is skipped as recent-activity.
 // laneGraceMs unset or not a positive number sweeps nothing (lane-grace-unset). A reparse point
-// inside a worktree means `git worktree remove` could be made to walk out of it (nivo-fe inc-c8fbf76aa499), so that
-// worktree is skipped, never unlinked here. The main checkout, the checkout the sweep runs from, a
+// inside a worktree is enumerated without following it and removed as a link before `git worktree remove`.
+// The main checkout, the checkout the sweep runs from, a
 // detached or dirty tree and anything outside the lanes root are skipped with a reason.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitResult } from '../api/git/lib.mjs';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { reflog as gitReflog } from '../api/git/reflog.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { mergeBase } from '../api/git/merge-base.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { worktreePrune } from '../api/git/worktree-prune.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { cherry as gitCherry } from '../api/git/cherry.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { diffTree } from '../api/git/diff-tree.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { branchDelete } from '../api/git/branch-delete.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -44,21 +55,6 @@ export function parseWorktreeList(text) {
     else if (line.startsWith('prunable')) cur.prunable = true;
   }
   return out;
-}
-
-/** The first link-like entry inside `dir` (or `dir` itself), null when the tree is link-free. */
-export function linkInside(dir) {
-  if (isLinkLike(dir)) return dir;
-  let entries;
-  try { entries = fs.readdirSync(dir); } catch { return null; }
-  for (const name of entries) {
-    const p = path.join(dir, name);
-    let st;
-    try { st = fs.lstatSync(p); } catch { continue; }
-    if (isLinkLike(p, { stat: st })) return p;
-    if (st.isDirectory()) { const hit = linkInside(p); if (hit) return hit; }
-  }
-  return null;
 }
 
 /** Bytes `dir` holds in regular files, never descending into a link. */
@@ -117,9 +113,28 @@ export function laneActivity({ worktree, branch, root, run }) {
  * nothing. `git` is an injectable runner `(args, {cwd}) -> {ok, stdout, error}`.
  * Returns {ok, apply, at, lanesRoot, freedBytes, removed, wouldRemove, skipped, errors}.
  */
-export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
-  const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
-  const base = lanesRoot({ env, allocation });
+// The git calls of a lane sweep (this one and scripts/supervisor/gc.mjs collectLanes), by verb: the `git` seam takes the
+// whole argv (a spec's fake), so the default picks the call file each verb names (scripts/api/git/) and folds its result
+// to {ok, stdout, error}.
+const LANE_CALLS = {
+  reflog: (rest, opts) => gitResultOf(gitReflog(rest, opts)),
+  'rev-parse': (rest, opts) => gitResultOf(revParseQuery(rest, opts)),
+  'merge-base': ([a, b], { cwd }) => { const sha = mergeBase(cwd, a, b); return { ok: Boolean(sha), stdout: sha ?? '', error: sha ? '' : `no merge-base of ${a} and ${b}` }; },
+  worktree: ([sub, ...rest], opts) => (sub === 'list' ? gitResultOf(worktreeListQuery(rest, opts)) : (({ ok, stdout, stderr }) => ({ ok, stdout, error: stderr }))(worktreePrune(opts.cwd))),
+  status: (rest, opts) => gitResultOf(gitStatus(rest, opts)),
+  cherry: (rest, opts) => gitResultOf(gitCherry(rest, opts)),
+  'rev-list': (rest, opts) => gitResultOf(revList(rest, opts)),
+  diff: (rest, opts) => gitResultOf(gitDiff(rest, opts)),
+  'diff-tree': (rest, opts) => gitResultOf(diffTree(rest, opts)),
+  log: (rest, opts) => gitResultOf(gitLog(rest, opts)),
+  branch: ([, branch], { cwd }) => { const r = branchDelete({ repoRoot: cwd, branch, mode: 'merged' }); return { ok: r.ok, stdout: '', error: r.detail ?? '' }; },
+};
+/** The default lane git runner: (args, {cwd}) -> {ok, stdout, error}. */
+export const laneGit = ([verb, ...rest], opts) => LANE_CALLS[verb](rest, opts);
+
+export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
+  const run = git ?? laneGit;
+  const base = lanesRoot({ env, config });
   const out = { ok: true, apply: apply === true, at: new Date(now).toISOString(), lanesRoot: base, freedBytes: 0, removed: [], wouldRemove: [], skipped: [], errors: [] };
   const skip = (p, reason, detail = null) => out.skipped.push({ path: p, reason, ...(detail ? { detail } : {}) });
   const fail = (p, error) => { out.ok = false; out.errors.push({ path: p ?? null, error: String(error ?? 'error') }); };
@@ -142,8 +157,6 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     if (w.detached || !w.branch) { skip(w.path, 'detached-head'); continue; }
     if (w.locked) { skip(w.path, 'locked'); continue; }
     if (!fs.existsSync(w.path)) { skip(w.path, 'missing'); continue; }
-    const link = linkInside(w.path);
-    if (link) { skip(w.path, 'contains-links', link); continue; }
     if (w.dirty) { skip(w.path, 'dirty'); continue; }
     const status = run(['status', '--porcelain', '--untracked-files=all'], { cwd: w.path });
     if (!status.ok) { skip(w.path, 'status-unreadable', status.error); continue; }
@@ -166,7 +179,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }
-    const removed = safeRemoveWorktree(w.path, { repo: root, git: run });
+    const removed = safeRemoveWorktree(w.path, { repo: root, git });
     // A removal that changed the main checkout stops housekeeping's lane pass at once (safe-remove.mjs mainCheckoutGuard).
     if (removed.fatal) { fail(w.path, `main checkout damaged: ${(removed.damage ?? []).join('; ')}`); out.stopped = { path: w.path, damage: removed.damage }; break; }
     if (!removed.ok) { fail(w.path, (removed.errors ?? [])[0]?.message || removed.reason || 'worktree removal failed'); continue; }

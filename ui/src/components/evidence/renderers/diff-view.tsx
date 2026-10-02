@@ -3,6 +3,7 @@ export const concept: Concept = 'C8';
 import type { ReactNode } from 'react';
 import { CopyButton, Frame, Toolbar } from './common';
 import { cleanLines } from './text-view';
+import { t } from '../../../i18n/t';
 
 type Kind = 'file' | 'hunk' | 'add' | 'del' | 'ctx' | 'meta';
 type Row = { kind: Kind; text: string; a: number | null; b: number | null };
@@ -41,7 +42,7 @@ export function DiffTextView({ text }: { text: string }) {
   return (
     <Frame>
       <Toolbar right={<><span data-tone="success" className="text-[var(--tone)]">+{adds}</span><span data-tone="failed" className="text-[var(--tone)]">−{dels}</span></>}>
-        <CopyButton value={text} label="Chép hết" />
+        <CopyButton value={text} label={t('Copy all')} />
       </Toolbar>
       <div className="max-h-[70vh] overflow-auto bg-background py-1">
         {rows.map((r, i) => (

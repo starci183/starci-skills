@@ -34,6 +34,21 @@ export const TRACKED = ['tracked', 'ignored', 'external'];
 export const RUNTIME_TRACKED = [...TRACKED, 'generated'];
 export const TESTS = ['unit-beside', 'e2e', 'none'];
 export const APP_KIND = 'app';
+
+/**
+ * The unit-tested roles of a back end (ruleParams.be.unitRoles of the slot manifest): [{ role, spec, coverage, slot?, exempt? }].
+ * THE one list: every check that asks "is this file unit-tested, and where is its spec" asks it here.
+ */
+export const unitRolesOf = (manifest) => manifest.ruleParams.be.unitRoles;
+
+/** Shape problems of ruleParams.be.unitRoles: unique roles of the suffix vocabulary, each spec `<role>.spec` and coverage `<glob>/*.<role>.ts`. */
+export function unitRolesProblems(be) {
+  const roles = be.unitRoles;
+  const roleOk = (r) => r !== null && typeof r === 'object' && !Array.isArray(r) && Object.keys(r).every((k) => ['role', 'spec', 'slot', 'coverage', 'exempt'].includes(k)) && NAME.test(String(r.role)) && String(r.spec) === `${r.role}.spec` && typeof r.coverage === 'string' && r.coverage.endsWith(`/*.${r.role}.ts`) && (r.slot === undefined || /^be\.[a-z0-9.-]+$/.test(String(r.slot))) && (r.exempt === undefined || (Array.isArray(r.exempt) && r.exempt.every((c) => /^[A-Z][A-Z0-9_]+$/.test(String(c)))));
+  if (!Array.isArray(roles) || !roles.length || !roles.every(roleOk) || new Set(roles.map((r) => r.role)).size !== roles.length) return ['ruleParams.be.unitRoles must be a non-empty list of unique {role, spec: <role>.spec, coverage: <be glob ending /*.<role>.ts>, slot?, exempt?: [rule codes]}'];
+  if (Array.isArray(be.suffixes) && roles.some((r) => !be.suffixes.includes(r.role))) return ['ruleParams.be.unitRoles names a role that is not in ruleParams.be.suffixes'];
+  return [];
+}
 /** The kind of a manifest and of a declaration that describes the StarCi runtime repository; also its one profile. */
 export const RUNTIME_KIND = 'runtime';
 export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];

@@ -25,7 +25,7 @@ function product(t) {
 test('an html direction is measured at the breakpoint it names; each off-grammar element is refused', (t) => {
   const p = product(t);
   const calls = [];
-  const run = (exe, args) => {
+  const run = (args) => {
     calls.push(args);
     return { status: 1, stdout: JSON.stringify({ ok: false, findings: [{ element: 'button', at: 'button "Send"', property: 'border-radius', got: '8px', expected: 'a pill: 24px' }] }) };
   };
@@ -40,7 +40,7 @@ test('an html direction is measured at the breakpoint it names; each off-grammar
 test('an html naming no breakpoint is measured at every breakpoint; a check that cannot run fails closed', (t) => {
   const p = product(t);
   const views = [];
-  const run = (exe, args) => { views.push(args[6]); return args[6] === '1440x900' ? { status: 0, stdout: JSON.stringify({ ok: true, findings: [] }) } : { status: 2, stdout: JSON.stringify({ ok: false, error: 'Playwright is not installed' }) }; };
+  const run = (args) => { views.push(args[6]); return args[6] === '1440x900' ? { status: 0, stdout: JSON.stringify({ ok: true, findings: [] }) } : { status: 2, stdout: JSON.stringify({ ok: false, error: 'Playwright is not installed' }) }; };
   const out = checkDrawGeometry(p.work, p.uiFile, { assets: [{ path: 'assets/draw.html' }] }, p.shell, { run });
   assert.deepEqual(views, ['1440x900', '390x844']);
   assert.deepEqual(out.map((f) => [f.level, f.code]), [['refuse', 'GEOMETRY_CHECK_FAILED']]);

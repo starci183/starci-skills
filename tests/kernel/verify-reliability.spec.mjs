@@ -1,9 +1,9 @@
-// Verify-op reliability (lane op-verify, 2026-09-28). Measured before: nivo app-auth uat.verify ran
-// five times into an owner gate (inc-2a2228098860) - each attempt restarted dead login-local servers by
+// Verify-op reliability. Measured before: an app-auth uat.verify ran
+// five times into an owner gate - each attempt restarted dead login-local servers by
 // hand, then walked the same 3 red steps at an unchanged HEAD because the defect's owner
-// (impl.login.nivo-backend.session-custody) was a Work record id the router could not read, so it fell
-// to failed-retries-the-same-op; nivo fe-canon review.verify (lint MEASUREMENT leg) ran four times into
-// inc-46ce3d247d77 because its findings - the very measurement the chain asked for - were filed failed.
+// was a Work record id the router could not read, so it fell
+// to failed-retries-the-same-op; an fe-canon review.verify (lint MEASUREMENT leg) ran four times into
+// an owner gate because its findings - the very measurement the chain asked for - were filed failed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,11 +16,12 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {classifyFailure,measurementCheckClass,resolveRootOwner,failureSignature} from '../../scripts/kernel/verify-failure.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
+import {probe} from '../../scripts/api/http/probe.mjs';
+import {checkEnvironments,discoverHealth,envHealthMain,environmentIdsOfPaths,readRegistered} from '../../scripts/uat/env-health.mjs';
 import {recordEnvelopeChecks} from '../../scripts/kernel/verbs/shared/check-evidence.mjs';
 
-// These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot.mjs, owner ruling
-// 2026-09-28) is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
+// These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot-run.mjs)
+// is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
 // tests/kernel/autopilot.spec.mjs covers the autopilot flow (same as tests/kernel-verbs-shared/op-ipc.spec.mjs).
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -31,11 +32,11 @@ const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.y
 
 // The fe-canon attempt-4 checks the kernel recorded, verbatim in shape.
 const CANON_CHECKS=[
-  {name:'canon-scan',command:'node .claude/scripts/gates/canon-scan.mjs --root ../nivo-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
-  {name:'hfs-lint',command:'npx hfs lint --repo ../nivo-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
-  {name:'lint-check',command:'npm run lint:check (root ../nivo-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
+  {name:'canon-scan',command:'node .claude/scripts/gates/canon-scan.mjs --root ../todo-app-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
+  {name:'hfs-lint',command:'npx hfs lint --repo ../todo-app-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
+  {name:'lint-check',command:'npm run lint:check (root ../todo-app-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
 ];
-const UAT_ROOT_CAUSE={node:'impl.login.nivo-backend.session-custody',self:false,category:'contract-gap',
+const UAT_ROOT_CAUSE={node:'impl.login.todo-app-be.session-custody',self:false,category:'contract-gap',
   claim:'refresh-session.handler re-checks twoFactorEnabled on restore; the FE maps requiresTwoFactor to anonymous',
   evidence:['manifest.yaml step-6/step-7 observed no'],counterCheck:'a served revisit lands without a fresh prompt',
   expectedFix:'refreshSession stops re-demanding the factor for a verified session',recheck:'node --test e2e/login-password-sign-in.spec.mjs'};
@@ -45,10 +46,10 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(workspace){
     const work=path.join(repo,'.starciwork');
-    fs.mkdirSync(path.join(work,'features','login','impl','nivo-backend','session-custody'),{recursive:true});
-    fs.writeFileSync(path.join(work,'workspace.yaml'),'schema: work/workspace@1\nid: t\nrepositories:\n  - {role: be, name: nivo-backend}\n  - {role: fe, name: nivo-fe}\n');
-    fs.writeFileSync(path.join(work,'features','login','impl','nivo-backend','session-custody','index.yaml'),
-      'schema: work/implementation@1\nid: impl.login.nivo-backend.session-custody\nrepository: nivo-backend\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
+    fs.mkdirSync(path.join(work,'features','login','impl','todo-app-be','session-custody'),{recursive:true});
+    fs.writeFileSync(path.join(work,'workspace.yaml'),'schema: work/workspace@1\nid: t\nrepositories:\n  - {role: be, name: todo-app-be}\n  - {role: fe, name: todo-app-fe}\n');
+    fs.writeFileSync(path.join(work,'features','login','impl','todo-app-be','session-custody','index.yaml'),
+      'schema: work/implementation@1\nid: impl.login.todo-app-be.session-custody\nrepository: todo-app-be\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
   }
   const wf='wf-verify-rel';
   const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
@@ -116,8 +117,8 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(measurementCheckClass(CANON_CHECKS[0]),'findings','canon-scan exit 1 is findings');
   assert.equal(measurementCheckClass({...CANON_CHECKS[0],exitCode:3}),'error','canon-scan exit 3: a machine could not run');
   assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository hfs lint with findings is measured');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../nivo-fe',exitCode:1}),'findings','gate exit 1: new findings');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../nivo-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
+  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../todo-app-fe',exitCode:1}),'findings','gate exit 1: new findings');
+  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../todo-app-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:[{...CANON_CHECKS[0],exitCode:3}]},measurement:true}).class,'tool');
   // app-auth a1: the UAT names its owner as a Work record.
   assert.equal(classifyFailure({op:'uat.verify',report:{outcome:'failed',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test x',exitCode:1}]}}).class,'product');
@@ -139,8 +140,8 @@ test('a Work record id resolves to the build op of its repository role, with the
   const w=world(t);
   const owner=resolveRootOwner({repo:w.repo,rootCause:UAT_ROOT_CAUSE,kinds:KINDS});
   assert.equal(owner.op,'backend.implement');
-  assert.equal(owner.record,'.starciwork/features/login/impl/nivo-backend/session-custody');
-  assert.deepEqual(owner.ownedPaths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
+  assert.equal(owner.record,'.starciwork/features/login/impl/todo-app-be/session-custody');
+  assert.deepEqual(owner.ownedPaths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/todo-app-be/session-custody']);
   assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,op:'interface.implement',files:['fe/apps/app/src/session.tsx']},kinds:KINDS}).op,'interface.implement','an explicit rootCause.op wins');
   assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,node:'impl.login.nowhere.x'},kinds:KINDS}),null,'an unresolvable record names no owner');
 });
@@ -160,8 +161,8 @@ test('a red UAT naming a backend record repairs that record with a fresh backend
   const repair=w.row(repairId),rerun=w.row(rerunId);
   assert.equal(repair.op_id,'backend.implement');
   assert.equal(repair.status,'queued');
-  assert.deepEqual(repair.payload.owned_paths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/nivo-backend/session-custody']);
-  assert.deepEqual(repair.payload.records,['.starciwork/features/login/impl/nivo-backend/session-custody']);
+  assert.deepEqual(repair.payload.owned_paths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/todo-app-be/session-custody']);
+  assert.deepEqual(repair.payload.records,['.starciwork/features/login/impl/todo-app-be/session-custody']);
   assert.equal(repair.payload.repository,undefined,'a backend repair is not placed in the fe checkout the UAT ran from');
   assert.equal(repair.payload.repairFor.rootCause.claim,UAT_ROOT_CAUSE.claim);
   assert.equal(rerun.op_id,'uat.verify');
@@ -257,8 +258,8 @@ test('env-health: ready, probe-drift with a discovered health endpoint, down, hu
   t.after(()=>hung.close());
   const deadPort=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p));});});
 
-  assert.equal((await probeHttp(`http://127.0.0.1:${deadPort}/`,{timeoutMs:2000})).state,'down');
-  assert.equal((await probeHttp(`http://127.0.0.1:${hungPort}/`,{timeoutMs:800})).state,'hung');
+  assert.equal((await probe(`http://127.0.0.1:${deadPort}/`,{timeoutMs:2000})).state,'down');
+  assert.equal((await probe(`http://127.0.0.1:${hungPort}/`,{timeoutMs:800})).state,'hung');
   assert.deepEqual(await discoverHealth(`http://127.0.0.1:${apiPort}`,{timeoutMs:2000}),{method:'POST',url:`http://127.0.0.1:${apiPort}/graphql`,status:200});
 
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-health-'));
@@ -352,7 +353,7 @@ test('api dispatch runs the environment pre-step for a walk: a foreign hung port
   const {spawn}=await import('node:child_process');
   const web=spawn(process.execPath,['-e',`require('http').createServer((q,s)=>{s.writeHead(200);s.end('ok')}).listen(${webPort},'127.0.0.1')`],{stdio:'ignore',windowsHide:true});
   t.after(()=>{try{web.kill();}catch{}});
-  for(let i=0;i<50&&(await probeHttp(`http://127.0.0.1:${webPort}/`,{timeoutMs:500})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
+  for(let i=0;i<50&&(await probe(`http://127.0.0.1:${webPort}/`,{timeoutMs:500})).state!=='answered';i+=1)await new Promise(r=>setTimeout(r,100));
   const writeEnv=port=>{
     const dir=path.join(repo,'.starciwork','_resources','environments','login-local');fs.mkdirSync(dir,{recursive:true});
     fs.writeFileSync(path.join(dir,'resource.yaml'),`schema: work/resource@1\nid: environment.t.login-local\nkind: environment\ntarget:\n  origins:\n    web: http://127.0.0.1:${port}\nconfiguration:\n  ports:\n    web: ${port}\nprobes:\n  - {id: web-ready, method: http-get, target: 'http://127.0.0.1:${port}/', expect: 200}\n`);

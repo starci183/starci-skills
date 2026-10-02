@@ -31,7 +31,8 @@
 // The kernel-rev-stale gate (opRevStale) is unchanged: it still reads every op contract change since the ack
 // (the non-enumerable kernelRev.gate), so a leg is never built from a contract its Kernel has not read.
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from '../machine/contract-version.mjs';
 import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
@@ -64,9 +65,9 @@ export const revRootOf = (env = process.env) => (env.STARCI_KERNEL_REV_ROOT ? pa
 export const shortRev = (sha) => (typeof sha === 'string' ? sha.slice(0, SHORT) : null);
 const clip = (text, max) => { const one = String(text ?? '').replace(/\s+/g, ' ').trim(); return one.length > max ? `${one.slice(0, max - 1)}…` : one; };
 
-const git = (root, args) => {
+const git = (call, root, args) => {
   try {
-    const r = runGit(args, { dir: root, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
+    const r = call(args, { dir: root, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
     return r.status === 0 ? String(r.stdout ?? '') : null;
   } catch { return null; }
 };
@@ -77,7 +78,7 @@ export const currentRuntimeRev = (root = revRootOf()) => runtimeShaOf(root);
 /** `rev` (a sha or a unique prefix) resolved to a full commit sha in `root`, or null. */
 export function resolveRev(root, rev) {
   if (typeof rev !== 'string' || !/^[0-9a-f]{4,40}$/i.test(rev.trim())) return null;
-  const out = git(root, ['rev-parse', '--verify', '--quiet', `${rev.trim()}^{commit}`]);
+  const out = git(revParseQuery, root, ['--verify', '--quiet', `${rev.trim()}^{commit}`]);
   const sha = out?.trim();
   return sha && /^[0-9a-f]{40}$/.test(sha) ? sha : null;
 }
@@ -115,7 +116,7 @@ export function revDiff(root, from, to) {
   let result;
   if (!resolveRev(root, from) || !resolveRev(root, to)) result = { known: false, files: [], changes: [] };
   else {
-    const out = git(root, ['diff', '--name-only', from, to, '--', ...KERNEL_REV_PATHS]);
+    const out = git(gitDiff, root, ['--name-only', from, to, '--', ...KERNEL_REV_PATHS]);
     if (out == null) result = { known: false, files: [], changes: [] };
     else {
       const files = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter(underRevPaths);
@@ -241,7 +242,7 @@ export function opRevDrift(root, op, from, to) {
   if (!from || !to || from === to) return null;
   if (!resolveRev(root, from) || !resolveRev(root, to)) return null;
   const files = opRevFiles(root, op).filter((rel) => !rel.includes('..'));
-  const out = git(root, ['diff', '--name-only', from, to, '--', ...files]);
+  const out = git(gitDiff, root, ['--name-only', from, to, '--', ...files]);
   if (out == null) return null;
   const changed = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return changed.length ? { from, to, files: changed } : null;

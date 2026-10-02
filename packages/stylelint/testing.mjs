@@ -4,10 +4,10 @@ import { starciStylelintConfig } from "./index.mjs"
 
 /** Where a file sits decides which kind of stylesheet it is. */
 export const FILES = {
-  brand: "D:/repo/apps/web/src/modules/brand/brand.css",
-  globals: "D:/repo/apps/web/src/app/globals.css",
-  module: "D:/repo/apps/web/src/components/Card/Card.module.css",
-  css: "D:/repo/apps/web/src/components/Card/card.css",
+  brand: "apps/web/src/modules/brand/brand.css",
+  globals: "apps/web/src/app/globals.css",
+  module: "apps/web/src/components/Card/Card.module.css",
+  css: "apps/web/src/components/Card/card.css",
 }
 
 /** Every warning of one lint run. */

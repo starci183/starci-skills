@@ -190,7 +190,7 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
   const succeededOps = new Set(db.prepare("SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='succeeded' AND op_id IS NOT NULL")
     .all(workflowId).map((row) => row.op_id));
   const businessLegs = legOps.filter((op) => op !== HANDOVER_OP);
-  // alsoSettled: legs autopilot deferred to the final review (scripts/kernel/autopilot.mjs) - the handover lists them.
+  // alsoSettled: legs autopilot deferred to the final review (scripts/kernel/autopilot-run.mjs) - the handover lists them.
   const settledOps = new Set([...succeededOps, ...alsoSettled]);
   const legsSettled = businessLegs.length > 0 && businessLegs.every((op) => settledOps.has(op));
   // An owner answer to another op's ask that no later enqueue acted on is the
@@ -266,7 +266,7 @@ export function deliveriesOf(db, workflowId) {
       reportFile: result.report ?? null,
       ...(report ? {
         outcome: report.outcome ?? null, summary: report.summary ?? null, files: report.files ?? [],
-        head: report.head ?? null, branch: report.branch ?? null, credentialPending: report.credentialPending ?? [],
+        head: report.head ?? null, credentialPending: report.credentialPending ?? [],
         open: report.open ?? [], blocker: report.blocker ?? null,
         checks: (report.checks ?? []).map((check) => ({ name: check?.name ?? null, command: check?.command ?? null, exitCode: check?.exitCode ?? null })),
       } : { reportFiled: false }),

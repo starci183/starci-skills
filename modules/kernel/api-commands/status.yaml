@@ -11,7 +11,7 @@ status:
     Status can resolve met typed waits, sweep autopilot asks and gates, renew
     leases of live workers, and record provider outages observed on worker
     screens. Unless the workflow finished, it drains the workflow's Orca Runs
-    into the ledger first (the same drain as api questions, scripts/kernel/verbs/shared/messages.mjs:
+    into the ledger first (the same drain as api questions, scripts/kernel/verbs/shared/worker-messages.mjs:
     orchestration check, one ledger transaction, then --ack). Its projection
     reflects those transitions in the same call.
   returns:
@@ -82,7 +82,7 @@ status:
       deferred[{jobId, opId, reason, incidentId?, since}], deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
       credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars}, stubPath, owed, record?,
       reason?}], supervisorGates[{incidentId, opId, holds[], since}], budget{used, caps, exceeded[]}, checklist?{due, jobId,
-      items}, sweep?} (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
+      items}, sweep?} (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
       runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api autopilot --sweep). Under
       autopilot: legs[].color adds green-provisional (label "self-accepted provisionally": green resting on a provisional acceptance) and
       deferred; queued[].queuedBecause adds supervisor-gate, deferred and deferred-to-handover (a live proof waiting for
@@ -140,9 +140,9 @@ status:
       settle, worker, peer message, handover move, re-serve or owner wait comes first and every open
       operation is a queued job or a deferred settle (frontier.heldSettleJobs) a wait holds (none open is the common case: the next approved
       leg is not enqueued yet). It stands after awaiting-owner and before handover-due and
-      orphaned-frontier; before it existed mia-mia work-and-stacks (inc-0aebf976e625) sat at
-      orphaned-frontier/actionable with zero open operations while brand.decide waited on a peer's
-      Grammar install, and the watchdog re-woke the Kernel for nothing. A peer message from the
+      orphaned-frontier; before it existed a brand.decide job waiting on a peer's Grammar install
+      sat at orphaned-frontier/actionable with zero open operations, and the watchdog re-woke the
+      Kernel for nothing. A peer message from the
       awaited peer wakes the Kernel (api notify, peerWait) and the frontier reads peer-message.
       reason names each wait, its peer and what it holds
     'frontier.peerWaitsDead': >-
@@ -154,9 +154,8 @@ status:
       held). The job is done - its report consumed - and only the wait holds the settle, so the
       watchdog runs `api reconcile --job <id> --release-worker` for each under --repair (the Kernel
       may run it first): the agent quits, the terminal closes, the path lease is released, the job
-      stays unsettled, and its later settle needs no live worker. Never actionable on its own (nivo
-      op-integration.verify-25532858e7 sat with its terminal open through peer-wait
-      inc-8cce1cf1b330).
+      stays unsettled, and its later settle needs no live worker. Never actionable on its own (an
+      integration.verify job once sat with its terminal open through a peer-wait).
     'frontier.heldSettleJobs': >-
       [{jobId, opId, attempt, heldBecause:owner-gate|peer-wait, blockedBy:{incident}|{incident, peer},
       detail, worker:held|released|none, terminalHandle?}] — settles deferred behind a recorded wait: a running/answering job whose report was
@@ -164,11 +163,9 @@ status:
       without --holds, as its --op). Owner-gate is checked first, as for queued jobs. Such a job is
       NOT in settleReadyJobs and does not make the frontier settle-ready or actionable; it counts
       like a held queued job, so with nothing else to move the state reads `awaiting-owner` (owner
-      gate) or `peer-wait`, and reason says the settle is deferred behind the wait. Before it nivo
-      wf-nivo-app-auth-mudqjob3 deferred the cut-closing settle of op-backend.implement-86ff31372a
-      until a peer commit landed (peer-wait inc-9f2e1e7ff1f6) while status read settle-ready
-      ACTIONABLE, the watchdog woke the Kernel every tick for nothing and the supervisor alerted
-      STALLED. Resolving the wait (api incident --resolve, or the peer's message for an
+      gate) or `peer-wait`, and reason says the settle is deferred behind the wait. Before it a
+      cut-closing settle deferred behind a peer's commit still read settle-ready ACTIONABLE, the
+      watchdog woke the Kernel every tick for nothing and the supervisor alerted STALLED. Resolving the wait (api incident --resolve, or the peer's message for an
       --until-message wait) makes the job settle-ready again: actionable, and the watchdog wakes the
       Kernel to check and settle it. api settle itself is never refused for a held job
     handover: >-
@@ -220,9 +217,9 @@ status:
       recorded wait holds (queued owner-gate or peer-wait, or its settle deferred - heldSettleJobs) also
       carries parkedBehind {heldBecause, incident, peer?, via, settle?} and a detail clause
       (scripts/kernel/frontier-parked.mjs): behind a peer-wait or a deferred settle it is the wait's to
-      release like the held job and never makes the frontier `engaged` (starci-next inc-56d621d6359e: ord-6
-      --after a peer-wait-held ord-3 read engaged and the stall check alerted); behind an owner-gate-held
-      job it counts as open, like that job. Cut seams (scripts/kernel/cut-seam.mjs): a queued seam
+      release like the held job and never makes the frontier `engaged` (an ord-6
+      --after a peer-wait-held ord-3 once read engaged and the stall check alerted); behind an owner-gate-held
+      job it counts as open, like that job. Cut seams (scripts/kernel/seam-policy.mjs): a queued seam
       (ordinal 1 of a cut of more than one) carries seam {cutId, siblings} and ranks right after the
       foundation legs; a sibling ordinal its seam no longer holds carries seamStub {mode, seamJobId,
       seamStatus, reason} (mode interface|released|seam-failed|seam-slipped|timeout) and reads by its
@@ -299,20 +296,19 @@ status:
       [{messageId, type, jobId, opId, attempt, question, options[], askedAt}] — pending
       `question` and `escalation` messages a running worker sent its coordinator (Orca's preamble
       tells it to ask), read from the ledger rows the drain wrote. Any entry makes the frontier
-      `worker-question` (actionable): the worker is blocked until `api reply` answers
-      (inc-b944cbaef24b, inc-20449a260df8). workerQuestionsError names a Run whose orchestration
-      check failed
+      `worker-question` (actionable): the worker is blocked until `api reply` answers.
+      workerQuestionsError names a Run whose orchestration check failed
     cutSets: >-
       [{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?, closingJob?,
       closingCheck?}] — every cut set of the workflow with an ordinal whose latest job has not settled
       succeeded. With exactly one open ordinal it names that ordinal as the closing pass: its settle
       requires `full-regression-final` besides the slice checks (settle.cutSet), so the Kernel runs the
       unchanged full gates over the whole set before that settle. Ordinals settle out of order, so the
-      closing ordinal is whichever is left, not the highest (inc-751dd1ac4492). seam? {jobId, status,
+      closing ordinal is whichever is left, not the highest. seam? {jobId, status,
       passed, failures, interface?:{files[{path,sha256,bytes}], publishedBy, at}, released?:{reason, at},
       siblingsHeld?[], siblingsOnStub?[{jobId, mode}], reconcile?:{seamPassed, seamJobId, pending[],
       owed[], green[], red[]}, recutPlan?:{cutId, op, seamJobId, failures, featureRoot, seam[], wire[],
-      steps[]}} is the seam's contract-first state (scripts/kernel/cut-seam.mjs): each owed reconcile
+      steps[]}} is the seam's contract-first state (scripts/kernel/seam-policy.mjs): each owed reconcile
       is a nextActions impact-check (seamDuty reconcile), each red one a retry of that ordinal
       (reconcile-red), a recutPlan a retry of the seam (recut) - all make the frontier actionable and
       are listed in frontier.seamDuties [{duty, jobId, cutId}]. A queued seam's dispatch action carries
@@ -340,7 +336,7 @@ status:
       (scripts/kernel/dependency-graph.mjs, light: no work-graph or foreign-file reads;
       modules/supervisor/bridging.yaml). Read-only: a finding is the Supervisor's to act on
     reports: '[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op reports; consumed_at NULL means awaiting kernel integration'
-    workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown|starting|released|launching|launch-abandoned,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,launchGrace?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it; an unknown output time (a restarted Orca re-attaches its panes with an empty lastOutputAt) is never an age - lastOutputAt and outputAgeMs read null (terminal-liveness.mjs outputAgeOf) and the active frame is aged by its dispatch heartbeat instead, never stale without one (inc-5e126e55cef4, inc-32adb2f77bf5); a worker whose Orca dispatch heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads active instead (livenessReason heartbeat, heartbeatAgeMs): its terminal stopped rendering, its turn did not (inc-f1b576fb6006). A nudge whose send Orca refuses terminal_not_writable records event op-worker-unwritable; until the terminal prints or the dispatch heartbeats again the worker reads writable false, liveness disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable), and reconcile --dead-worker closes its terminal without typing a quit. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active (inc-06aeecf432f1). A staged-input worker is nudge-ready. A managed worker whose latest op-dispatched event is younger than runtimes.yaml allocation.liveness.launchGraceMs, with no nudge since, reads `starting` (livenessReason launch-grace, launchGrace {dispatchedAt,ageMs,graceMs}) while its screen still shows an idle prompt: worker-start returned before Orca injected the Task, so it is never nudge-ready (inc-bc0b90a7ec70, inc-9ae771781252); a staged-input paste stays nudge-ready through the grace, and a command-terminal dispatch carries none (its prompt''s submission was already proven). `wedged` is a worker whose turn ran past terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output: not nudgeable, not a dead-liveness state - it recovers only through reconcile --dead-worker --settle-failed (inc-2c1ac4ff3e48). A command whose tool block carries its own bound (a "Timeout: 4m40s" row, a "Read shell" poll of a background shell, a Codex background terminal) is a tool still running and reads active however long the turn: the spinner minutes are the turn''s, not the command''s (inc-d8f08b77ca8b). Provider frame shapes come from the cards (modules/models/agents/<agent>.yaml liveness: busyPatterns - spinner, elapsed-timer or interrupt-hint rows that make the frame active whatever its input row shows; chromePatterns - rows between the spinner and the input row that are not an answer): a wrapped Devin spinner block and Claude''s "◐ medium · /effort" row read active (inc-1b82f657a6a8, inc-266976b75b25, inc-fcd1c1c10d8a). A leased job with no worker bound reads `launching` until its lease deadline (jobs.deadline, dispatchLeaseTtlMs after the lease) and `launch-abandoned` after it (leaseDeadline): a dispatch killed mid-spawn left it, it is a dead worker, and reconcile --dead-worker requeues or settles it (nivo inc-c1d5bdbea173). `released` is a worker released while its settle is held (reconcile --release-worker on a frontier.heldWorkerJobs job): no host read, never nudge-ready or dead, its lease never renewed'
+    workers: '[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-idle|live-idle|interactive-gate|failed|disconnected|gone|unknown|starting|released|launching|launch-abandoned,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,launchGrace?,errorCode?,observedAt}] — gone is a running Orca''s typed refusal of the handle (errorCode terminal_handle_stale: it names no terminal, as every handle after a host reboot); an unreachable Orca reads unknown and never proves a worker dead. connected/writable proves terminal availability; current frame proves turn activity; report/output age alone never proves a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason stale-active (screenState stays active), so the nudge frontier reaches it; an unknown output time (a restarted Orca re-attaches its panes with an empty lastOutputAt) is never an age - lastOutputAt and outputAgeMs read null (terminal-liveness.mjs outputAgeOf) and the active frame is aged by its dispatch heartbeat instead, never stale without one; a worker whose Orca dispatch heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads active instead (livenessReason heartbeat, heartbeatAgeMs): its terminal stopped rendering, its turn did not. A nudge whose send Orca refuses terminal_not_writable records event op-worker-unwritable; until the terminal prints or the dispatch heartbeats again the worker reads writable false, liveness disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable), and reconcile --dead-worker closes its terminal without typing a quit. `staged-input` is an unsubmitted paste in the input row: the classifier finds the input region by the text dispatch delivered (contracts.context_json.delivery.text + the contract markdown) and the card''s submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract''s own "Running"/"Working"/"esc to interrupt" words never make it active. A staged-input worker is nudge-ready. A managed worker whose latest op-dispatched event is younger than runtimes.yaml allocation.liveness.launchGraceMs, with no nudge since, reads `starting` (livenessReason launch-grace, launchGrace {dispatchedAt,ageMs,graceMs}) while its screen still shows an idle prompt: worker-start returned before Orca injected the Task, so it is never nudge-ready; a staged-input paste stays nudge-ready through the grace, and a command-terminal dispatch carries none (its prompt''s submission was already proven). `wedged` is a worker whose turn ran past terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output: not nudgeable, not a dead-liveness state - it recovers only through reconcile --dead-worker --settle-failed. A command whose tool block carries its own bound (a "Timeout: 4m40s" row, a "Read shell" poll of a background shell, a Codex background terminal) is a tool still running and reads active however long the turn: the spinner minutes are the turn''s, not the command''s. Provider frame shapes come from the cards (modules/models/agents/<agent>.yaml liveness: busyPatterns - spinner, elapsed-timer or interrupt-hint rows that make the frame active whatever its input row shows; chromePatterns - rows between the spinner and the input row that are not an answer): a wrapped Devin spinner block and Claude''s "◐ medium · /effort" row read active. A leased job with no worker bound reads `launching` until its lease deadline (jobs.deadline, dispatchLeaseTtlMs after the lease) and `launch-abandoned` after it (leaseDeadline): a dispatch killed mid-spawn left it, it is a dead worker, and reconcile --dead-worker requeues or settles it. `released` is a worker released while its settle is held (reconcile --release-worker on a frontier.heldWorkerJobs job): no host read, never nudge-ready or dead, its lease never renewed'
   refuses:
     - workflow-unknown
   usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'

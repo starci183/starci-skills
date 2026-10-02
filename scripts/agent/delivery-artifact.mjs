@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 // Remove a file-reference delivery artifact. Transient artifacts take their
@@ -9,7 +9,7 @@ export function cleanupDeliveryArtifact(artifact) {
   if (!artifact?.file) return { ok: true, removed: false };
   try { fs.rmSync(artifact.file, { force: true }); } catch { /* best-effort */ }
   if (artifact.transient && artifact.dir) {
-    try { safeRemoveTree(artifact.dir, { hold: artifactHoldReason }); } catch { /* best-effort */ }
+    try { safeRemove(artifact.dir, { hold: artifactHoldReason }); } catch { /* best-effort */ }
   }
   return { ok: true, removed: true };
 }

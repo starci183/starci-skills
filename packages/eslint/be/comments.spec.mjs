@@ -34,7 +34,7 @@ const tester = new RuleTester({
 const SRC = at("src/modules/domain/user/user.service.ts")
 const MESSAGES = at("src/modules/domain/user/messages/user.messages.ts")
 const PLATFORM_MESSAGES = at("src/modules/platform/errors/messages/errors.messages.ts")
-const FEATURE_MESSAGES = at("src/features/plan/messages/plan.messages.ts")
+const FEATURE_MESSAGES = at("src/features/api/plan/messages/plan.messages.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -117,7 +117,7 @@ const VI_TEXT = "kh\u00E1ch v\u1EEBa chuy\u1EC3n kho\u1EA3n"
 const I18N_FIXTURE = at("src/tests/fixtures/i18n/customer.rows.ts")
 
 test("COMMENT-4: a spec or fixture gets no exemption: Vietnamese is refused wherever it is not a message catalog", () => {
-  const SPEC = at("src/features/plan/application/place-order.handler.spec.ts")
+  const SPEC = at("src/features/api/plan/application/place-order.handler.spec.ts")
   const FIXTURE = at("src/tests/fixtures/database.ts")
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [],

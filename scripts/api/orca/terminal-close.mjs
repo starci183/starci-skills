@@ -7,7 +7,9 @@
 // answers the close with `runtime_error: tab_not_found`. That refusal is
 // re-checked with terminal show, and the close counts only when show proves
 // the exact terminal is disconnected (verifiedBy: 'terminal-show').
-import { orcaCall, arg, flag, sleepSync } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg, flag } from '../../lib/cli-arg.mjs';
+import { sleepSync } from '../../lib/sleep-sync.mjs';
 import { terminalShow } from './terminal-show.mjs';
 
 const CLOSE_VERIFY_MS = 5000;

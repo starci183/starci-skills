@@ -1,6 +1,0 @@
-export { shareEntities, shareMigrations } from "./persistence/connection"
-export { AccessService } from "./access.service"
-export { SHARE_ERROR_KINDS, ShareError, ShareErrorCode } from "./errors/share.error"
-export { InvitationService } from "./invitation.service"
-export { SHARE_MESSAGES } from "./messages/share.messages"
-export { ShareModule } from "./share.module"

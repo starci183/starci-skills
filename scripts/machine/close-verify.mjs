@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// close-verify.mjs — close an Orca terminal the runtime owns AND prove it is gone (owner, 2026-09-28: "sao supervisor
-// không xóa worker, và op đầy rác thế!!! phải có dọn rác chứ").
+// close-verify.mjs — close an Orca terminal the runtime owns AND prove it is gone (owner, 2026-09-28: "why does the
+// supervisor not delete its workers, and the ops are full of leftovers!!! there has to be a cleanup").
 //
 // Root cause of the leftovers: every owner of a terminal asked Orca to close it and never read the answer back. A
 // close refused with tab_not_found, a close that stopped the PTY but left the tab in Orca's persisted layout (the
@@ -31,15 +31,17 @@
 // lingers outside Orca after it (orcaAgents / reapOrphaned: a lingering tree is killed and read back).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { listHostProcesses } from '../api/process/process-list.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
+import { processList } from '../api/process/process-list.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const VERIFY_MS = 6000;
@@ -117,7 +119,7 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
 /** The host's process table: [{pid, ppid, name, exe, cmd, created}] or null when unreadable (not Windows, CIM failed). */
 export function processTable({ run, platform = process.platform } = {}) {
   if (platform !== 'win32') return null;
-  return listHostProcesses({ cmdMax: 300, run, platform });
+  return processList({ cmdMax: 300, run, platform });
 }
 
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
@@ -143,7 +145,7 @@ export function orcaAgents(table) {
  * was in a closed terminal and lingers: its tree is killed (taskkill /T /F) and the table read again.
  * {checked, lingering, killed, remaining} - remaining 0 is the proof.
  */
-export function reapOrphaned(before, { table = processTable, kill = (pid) => killProcessTree(pid).ok, sleep = sleepSync } = {}) {
+export function reapOrphaned(before, { table = processTable, kill = (pid) => killTree(pid).ok, sleep = sleepSync } = {}) {
   if (!before) return { checked: false };
   const lingeringOf = (t) => {
     const now = orcaAgents(t);
@@ -206,7 +208,7 @@ export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = pro
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   if (value('dispatch')) {

@@ -21,9 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const JUDGEMENT_KIND = 'supervisor-judgement';
 export const DIGEST_SENT_KIND = 'notifier-digest-sent';
 export const URGENT_SENT_KIND = 'notifier-urgent-sent';
@@ -53,18 +54,16 @@ export function planUrgent(items, sent = {}, { now, perKeyMs = URGENT_KEY_MS } =
   return { due, skipped };
 }
 
-const T = {
-  vi: { judge: 'Nhận định của Supervisor', viol: 'Vi phạm bất biến đang mở', lands: 'AUTO land hôm nay', owner: 'Chờ thầy', none: 'không có', slow: 'Vì sao chậm' },
-  en: { judge: 'Supervisor judgement', viol: 'Open invariant violations', lands: 'AUTO lands today', owner: 'Waiting on the owner', none: 'none', slow: 'Why slow' },
-};
+const T = (tr) => ({ judge: tr('Supervisor judgement'), viol: tr('Open invariant violations'), lands: tr('AUTO lands today'), owner: tr('Waiting on the owner'), none: tr('none'), slow: tr('Why slow') });
 
 /** One progress line per workflow (starci/progress@1 + rca.why). Pure. */
 export function progressLines(rows, language = 'vi') {
-  const t = T[language] ?? T.en;
+  const tr = translator(language);
+  const t = T(tr);
   return rows.map((r) => {
     const p = r.progress;
     const eta = p.eta ? `ETA ${String(p.eta).slice(0, 16).replace('T', ' ')}Z` : 'ETA ?';
-    const head = `- ${r.name ?? r.workflowId}: ${p.unitsDone}/${p.unitsTotal} ${language === 'vi' ? 'đơn vị' : 'units'}, ${p.unitsPerHour}/h, ${eta}${p.stall?.stalled ? ` - STALL ${p.stall.sinceMin}m` : ''}`;
+    const head = `- ${r.name ?? r.workflowId}: ${p.unitsDone}/${p.unitsTotal} ${tr('units')}, ${p.unitsPerHour}/h, ${eta}${p.stall?.stalled ? ` - STALL ${p.stall.sinceMin}m` : ''}`;
     return r.why && (p.stall?.stalled || (p.minUnitsPerHour > 0 && p.unitsPerHour < p.minUnitsPerHour)) ? `${head}\n  ${t.slow}: ${String(r.why).replace(/^Why slow: /, '')}` : head;
   });
 }
@@ -74,7 +73,7 @@ export function progressLines(rows, language = 'vi') {
  * `violations` [{code}], `lands` [{kind, id, at}], `judgements` [{text, at}], `ownerWaits` [text].
  */
 export function composeDigest({ digestText, progress = [], actions = [], owed = null, gc = null, trend = null, violations = [], lands = [], judgements = [], ownerWaits = [], language = 'vi', now }) {
-  const t = T[language] ?? T.en;
+  const t = T(translator(language));
   const base = digestText({ actions, owed: { ...(owed ?? {}), items: owed?.items ?? [], ownerWaits }, gc, trend, progress: progressLines(progress, language), language, now });
   const lines = [base];
   const byCode = {};
@@ -131,24 +130,16 @@ async function languageOf() {
 
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
 export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
-  const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { readMachine }, { workflowView }, { listDecisions }] = await Promise.all([
-    import('../machine/home.mjs'), import('../../engine/db/ledger.mjs'), import('../../engine/db/machine.mjs'), import('../kernel/progress-rca.mjs'), import('../machine/decisions.mjs')]);
+  const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { workflowView }, { listDecisions }] = await Promise.all([
+    import('../machine/home.mjs'), import('../../engine/db/ledger.mjs'), import('../kernel/progress-rca.mjs'), import('../machine/decisions.mjs')]);
   const progress = [], ownerWaits = [];
   if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
   for (const repo of repos) {
     let db;
     try {
-      // Decision Q1: a repo's runtime ledger is the file machine.ledgers names for it (ledgerFileFor) —
-      // %LOCALAPPDATA%/StarCi/projects/<ledger id>/runtime.sqlite — never the pre-Q1 in-repo
-      // .starciwork/runtime.sqlite. That legacy store is opened only when the registry names NO ledger for the
-      // repo at all (a checkout the Q1 registration never reached: the file is its only record); a repo with a
-      // registered ledger never has its stale in-repo file opened (LEDGER_LEGACY_WORK_SQLITE).
+      // A repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it).
       const resolved = ledgerFileFor(repo, { env });
       if (fs.existsSync(resolved)) db = openLedgerReader(resolved);
-      else if (!readMachine((m) => m.resolveLedger({ repoRoot: repo }), null, { env })) {
-        const legacy = path.join(repo, '.starciwork', 'runtime.sqlite');
-        if (fs.existsSync(legacy)) db = openLedgerReader(legacy);
-      }
     } catch { continue; }
     if (!db) continue;
     try {
@@ -194,14 +185,15 @@ export async function digest({ send = false, force = false, env = process.env, n
 }
 
 /** Send urgent items through the key dedupe. {ok, sent: [key], skipped}. */
-export async function urgent(items, { send = false, env = process.env, now = Date.now(), push = null, state = null } = {}) {
+export async function urgent(items, { send = false, env = process.env, now = Date.now(), push = null, state = null, language = null } = {}) {
   const st = state ?? await notifierState({ env, now });
   const plan = planUrgent(items, st.urgentSent, { now });
   if (!send) return { ok: true, sent: [], due: plan.due.map((i) => i.key), skipped: plan.skipped };
   const pusher = push ?? (await import('../connectors/telegram.mjs')).ownerPush;
+  const tr = translator(language ?? await languageOf());
   const sent = [];
   for (const i of plan.due) {
-    const r = await pusher(`[khẩn] ${i.text}`, { env });
+    const r = await pusher(tr('[urgent] {text}', { text: i.text }), { env });
     if (r?.ok && !r.skipped) { sent.push(i.key); if (!state) await record(URGENT_SENT_KIND, i.key, { class: i.class, text: clipLine(i.text, 300) }, { env, now }); else st.urgentSent[i.key] = now; }
   }
   return { ok: true, sent, skipped: plan.skipped };
@@ -209,7 +201,7 @@ export async function urgent(items, { send = false, env = process.env, now = Dat
 
 /* ------------------------------------------------------------ CLI */
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const flag = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const json = argv.includes('--json');

@@ -5,7 +5,7 @@
 // Contract: modules/kernel/api.yaml commands.enqueue / commands.settle landed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { readModuleJson, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
@@ -167,7 +167,7 @@ export function enqueueRepository({ op, repository, ownedPaths, repo }) {
 }
 
 const gitCommonDir = (dir, timeout) => {
-  const r = runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], { dir, timeout });
+  const r = revParseQuery(['--path-format=absolute', '--git-common-dir'], { dir, timeout });
   return !r.error && r.status === 0 && r.stdout.trim() ? key(r.stdout.trim()) : null;
 };
 
@@ -185,7 +185,7 @@ export function ownedPathPlacements({ op, payload, ownedPaths, repo, worktree, t
   if (binding) {
     const wtCommon = worktree && isDir(worktree) ? gitCommonDir(worktree, timeoutMs) : null;
     const top = wtCommon && wtCommon === gitCommonDir(binding.appRoot, timeoutMs)
-      ? runGit(['rev-parse', '--show-toplevel'], { dir: worktree, timeout: timeoutMs }) : null;
+      ? revParseQuery(['--show-toplevel'], { dir: worktree, timeout: timeoutMs }) : null;
     const checkout = top && !top.error && top.status === 0 && top.stdout.trim() ? path.resolve(top.stdout.trim()) : binding.appRoot;
     return ownedPaths.map((owned) => {
       if (appRelativeProblem(binding, owned)) return { owned, unresolved: true, repository: 'not-app-relative', via: 'not-app-relative' };

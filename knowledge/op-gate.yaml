@@ -41,8 +41,8 @@ digest:
 # The example app whose files show each slot done right, per side. A slot's example files are the files of the example side
 # that its `hfs explain` pattern matches.
 examples:
-  be: examples/todo-app/be
-  fe: examples/todo-app/fe
+  be: examples/ecommerce-app/be
+  fe: examples/ecommerce-app/fe
 # File kind -> pattern files. A touched file's kind is the slot `hfs explain` names; its family is the slot id's first
 # segment. It owes the family's `always` files plus those of the longest dotted slot prefix listed under `slots`.
 # Paths are relative to knowledge/patterns/.
@@ -52,9 +52,10 @@ kinds:
     slots:
       be.app: [be/architecture-check.yaml, be/config.yaml, be/injection.yaml, be/services.yaml]
       be.app.worker: [be/architecture-check.yaml, be/config.yaml, be/background.yaml, be/services.yaml]
-      be.feature: [be/architecture-check.yaml, be/injection.yaml]
-      be.feature.application: [be/cqrs.yaml, be/error.yaml, be/injection.yaml]
-      be.feature.transport: [be/transport.yaml, be/api-auth.yaml]
+      be.app.cli: [be/cli.yaml, be/architecture-check.yaml, be/config.yaml]
+      be.feature: [be/api.yaml, be/architecture-check.yaml, be/injection.yaml]
+      be.feature.application: [be/api.yaml, be/error.yaml, be/injection.yaml]
+      be.cli: [be/cli.yaml, be/test.yaml]
       be.transport: [be/transport.yaml, be/api-auth.yaml]
       be.transport.message: [be/transport.yaml, be/event-bus.yaml, be/background.yaml, be/idempotency.yaml, be/services.yaml]
       be.feature.jobs: [be/jobs.yaml, be/queues.yaml, be/background.yaml]

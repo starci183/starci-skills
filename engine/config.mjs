@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
-import {invalid} from './invalid-config.mjs';
+import {invalid,validateRoots} from './invalid-config.mjs';
 import {validateOrca} from './orca-config.mjs';
 
 export const configRoot=skillRoot;
@@ -275,16 +275,13 @@ function validateAllocationBalance(allocation,runtimes){
     }
   }
 }
-/** The one provider the runtime no longer carries: a config naming it is refused with the owner's wording, not a generic unknown-id error. */
-function refuseRetiredProvider(value,where){
-  if(typeof value==='string'&&/^qwen(?:-agent)?$/i.test(value.trim()))throw Error(`Invalid config.yaml: ${where} names qwen. Qwen đã bị gỡ; dùng claude, codex hoặc devin.`);
-}
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca','roots'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
   if(config?.orca!==undefined)validateOrca(config.orca);
+  if(config?.roots!==undefined)validateRoots(config.roots);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
@@ -300,9 +297,6 @@ export function validateConfig(config){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
       throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
-    refuseRetiredProvider(preferred,'allocation.preferredProvider');
-    for(const pool of Object.keys(plain(allocation.shares)?allocation.shares:{}))refuseRetiredProvider(pool,'allocation.shares');
-    for(const text of Array.isArray(allocation.grants)?allocation.grants:[])refuseRetiredProvider(parseAllocationGrant(text)?.pool,'allocation.grants');
     if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     validateAllocationBalance(allocation,runtimes);
   }
@@ -312,7 +306,6 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: kernel group must be {group: [{agent, model?}, ...], effort?} with at least one member.');
     if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error('Invalid config.yaml: kernel.group names each agent once — availability is per provider.');
     for(const {agent,model} of group){
-      refuseRetiredProvider(agent,'kernel.group agent');
       if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: kernel.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
       if(typeof model==='string'&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
         throw Error(`Invalid config.yaml: kernel.group model ${model} is not declared by a ${agent} runtime.`);
@@ -323,7 +316,6 @@ export function validateConfig(config){
     const kernel=config.kernel;
     if(!plain(kernel)||Object.keys(kernel).some(key=>!['agent','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
       throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.');
-    refuseRetiredProvider(kernel.agent,'kernel.agent');
     if(typeof kernel.agent==='string'&&!knownProviders.has(kernel.agent))
       throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))
@@ -350,7 +342,6 @@ export function validateConfig(config){
     const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
     if(!(seat===undefined||seat===null||(plain(seat)&&Object.keys(seat).every(key=>['agent','model','effort'].includes(key)&&(seat[key]===null||typeof seat[key]==='string')))))
       throw Error('Invalid config.yaml: supervisor.kernel must be {agent?, model?, effort?} strings, or null.');
-    refuseRetiredProvider(seat?.agent,'supervisor.kernel.agent');
     if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
       throw Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
     if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))
@@ -472,15 +463,10 @@ export function claudeDebugSettings(config=loadConfig()){
   validateClaudeDebug(block);
   return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
 }
-export function loadConfig(root=configRoot,{initialize=false}={}){
-  const yaml=path.join(root,'config.yaml');
-  if(initialize&&!fs.existsSync(yaml)){
-    const exampleFile=path.join(root,'config.example.yaml');
-    if(fs.existsSync(exampleFile)){try{fs.copyFileSync(exampleFile,yaml);}catch{/* best effort */}}
-  }
+/** The owner config of `root` (config.yaml), else the shipped example. The installer seeds config.yaml (scripts/install/install.mjs seedConfig); this reader never writes. */
+export function loadConfig(root=configRoot){
   return readOwnerConfig(root)??readExample(root);
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{process.stdout.write(JSON.stringify(loadConfig(configRoot,{initialize:true}))+'\n');}catch(error){process.stderr.write(error.message+'\n');process.exitCode=1;}}
 
 /** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
 export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}

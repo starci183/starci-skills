@@ -60,4 +60,3 @@ export function clusterOwed(items) {
   return clusters.sort((a, b) => b.size - a.size || b.oldestMin - a.oldestMin);
 }
 
-export const clusterLine = (c) => `CLUSTER ${c.id} size=${c.size} oldest=${c.oldestMin}m ${c.fixedBy ? `fixed-by ${c.fixedBy.slice(0, 9)}?` : 'open'} wf=${c.workflows.join(',')} inc=${c.incidents.join(',') || '-'}${c.patterns.length ? ` patterns=${c.patterns.length}` : ''}: ${String(c.summary).replace(/\s+/g, ' ').slice(0, 160)}`;

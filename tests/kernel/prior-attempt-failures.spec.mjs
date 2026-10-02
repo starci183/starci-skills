@@ -7,11 +7,10 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,changeWorkflowPhase,recordCheckRun,recordJobResult,setJobStatus,startAttempt,updateAttempt} from '../../engine/db/ledger.mjs';
 import {priorAttemptFailures} from '../../scripts/kernel/prior-failures.mjs';
 
-// Incidents inc-eafe6e1c3bc3, inc-49885f42c608, inc-2fa6209de98d (nivo-backend): dispatch read the
+// Dispatch read the
 // prompt's prior_attempt_failures from the newest checks row of the op with attempt < job.attempt. Cut
 // ordinals share the op's durable attempt counter, so with interleaved ordinals a retry inherited a
-// SIBLING ordinal's checks (green or red) and never saw its own red ones
-// (op-backend.implement-27899a6088, cut collab-be-identity-r2 ordinal 5, attempt 11, re-filed partial).
+// SIBLING ordinal's checks (green or red) and never saw its own red ones.
 // The row now comes from the job's own retry lineage: jobs.retry_of, the previous FAILED try of the same
 // work unit (prior-failures.mjs:17-24 - a unit is one cut ordinal, units.mjs admitUnit), and the checks are
 // the predecessor attempt's check_runs (api-lib/check-evidence.mjs independentChecksOf), never an op-wide row.

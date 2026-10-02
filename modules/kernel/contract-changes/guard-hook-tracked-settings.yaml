@@ -1,0 +1,16 @@
+id: guard-hook-tracked-settings
+effectiveAt: '2026-10-02T08:00:00+07:00'
+summary: >-
+  THE COMMAND GUARD IS REGISTERED IN THE TRACKED .claude/settings.json (lane GUARDS under C0, 3.6, owner-approved). The
+  PreToolUse hook scripts/guards/command-guard.mjs is now registered for Bash and PowerShell next to the seat-tools entry,
+  through the guard's own entry point and the same matcher and timeout trust.mjs writes for workers (TOOL_GUARD_MATCHER,
+  TOOL_GUARD_TIMEOUT_S), by the root-relative $CLAUDE_PROJECT_DIR path, so there is one hook script. A session with no Orca
+  guard bound (the owner, a lane) still meets one rule only, an install through a linked node_modules; every other rule
+  needs a guard file. A kill whose PID variable was set in an earlier call is not judged: a tool call is a fresh shell, the
+  guard keeps no state, and refusing every non-literal target would refuse a recorded PID file; only a process query
+  visible in the same call feeds the PROCESS_KILL_BY_NAME verdict.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/guard-hook-tracked-settings.yaml
+  - scripts/agent/trust.mjs
+  - scripts/guards/process-kill-verdict.mjs

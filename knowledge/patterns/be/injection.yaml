@@ -31,7 +31,7 @@ rules:
       `Inject<Thing>()` decorator. Class injection without a decorator is allowed only for a type declared in
       `be/src/modules/domain/**` (a domain service) and in the same owner. The parameter name is the camelCase of the port
       (`clock`, `logger`, `cache`, `commandBus`); an EntityManager is `entityManager`, or `<conn>EntityManager` when one class
-      injects two connections. The rule reads the parameter's type and where it is declared, never the variable name.
+      injects two connections. The rule that finds the infrastructure reads the parameter's type and where it is declared, never the variable name; the names above are the table `ruleParams.be.paramNames` of `slots.yaml`, and `injected-param-name` holds a parameter that injects one of those ports to its name.
     rationale: |-
       A raw token at every call site lets `@Inject(CLOCK) private readonly x: Cache` compile, and class injection of a
       platform class couples every consumer to its implementation.

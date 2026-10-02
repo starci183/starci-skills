@@ -157,7 +157,7 @@ apps/
     app.module.ts                         # composition/configuration only
 src/
   features/
-    cart/
+    api/cart/                             # features are grouped by trigger kind (api, cli); no kind imports another
       index.ts                            # public feature entry
       cart.module.ts
       transport/
@@ -183,8 +183,12 @@ src/
 
 - Apps own boot/configuration/composition. They do not own handlers, services, controllers, or business
   rules.
-- A feature owns its transport adapters and its application handlers. A resolver/controller/message consumer
-  validates/adapts the protocol and dispatches one typed command or query.
+- An api feature owns its transport adapters and its application handlers. A resolver/controller/message consumer
+  validates/adapts the protocol and dispatches one typed command or query. A one-off action (migrate, seed, an
+  operator command) is a command of the cli feature root `features/cli/`, composed only by the one cli app; it is an
+  action runner with its own unit spec, not a transport.
+- Inside one bounded context the handler calls that context's domain service in one transaction, with no event.
+  An event crosses contexts or carries async work only; a feature never reads another context's state directly.
 - A reusable module under `modules/{domain,platform,integrations}/<capability>` owns one cohesive domain,
   platform, or provider capability. It never imports a feature
   or app. Named databases, provider instances, and tenant/workspace instances remain with their actual
@@ -198,8 +202,9 @@ src/
 - Transport DTOs belong to their adapter. Application input/results remain framework-neutral. Persistence
   entities stay behind the database adapter and are mapped before crossing the feature contract.
 
-The existing Academy backend is transport-first under `src/features/api/core/graphql/...`. That is a source
-mapping to assess, not a portable requirement and not permission to copy every wrapper. Refactoring an
+The existing Academy backend is transport-first under `src/features/api/core/graphql/...` (one feature named `core`
+holding protocol folders). That is a source mapping to assess, not the `features/api/<feature>/` shape above and not
+permission to copy every wrapper. Refactoring an
 existing product still follows its accepted SDS and bounded transition plan.
 
 ## Single source and monorepo profiles
@@ -254,38 +259,39 @@ Static checks cannot prove:
 These require focused behavior, boot, contract, concurrency, and accessibility tests plus review of the
 accepted SRS/SDS. A green architecture check is structural evidence only.
 
-## Academy reference critique
+## Reference critique
 
-Reference revision: `starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8`.
-The two pre-existing dirty style files (`packages/grammar/src/core/styles.css` and `src/app/globals.css`) were
-excluded from this trace; observations use the pinned commit.
+Reference: the `examples/todo-app` and `examples/ecommerce-app` trees of this repository.
 
 ### Keep as reference
 
-- `src/app/[lang]/authentication/page.tsx` is a thin route adapter that mounts one page owner.
-- `src/app/[lang]/layout.tsx` is a valid server layout for locale validation, messages, metadata, and shell
-  composition; `src/app/providers.tsx` is a narrow client provider boundary.
-- `src/modules/api/graphql/clients/create-apollo-client.ts` is a cohesive technical capability and records
-  that SWR, rather than Apollo cache, owns product data caching.
-- `packages/grammar/package.json` exposes explicit family exports, and product code imports the public
-  `@starci/grammar/common` entry.
-- `AuthenticationPanel/component.tsx` legitimately owns intrinsic form refs, hydration protection, focus,
-  and draft interaction. Its local state is not evidence of a missing pure twin.
+- `examples/todo-app/fe/apps/web/src/app/[locale]/sign-in/page.tsx` is a thin route adapter that mounts one
+  page owner.
+- `examples/todo-app/fe/apps/web/src/app/[locale]/layout.tsx` is a valid server layout for locale
+  validation, metadata and shell composition; its sibling `providers.tsx` is a narrow client provider
+  boundary.
+- `examples/ecommerce-app/fe/apps/shop/src/app/[locale]/page.tsx` mounting `ShopRootRedirect` is a valid
+  zero-visual-owner adapter.
+- `examples/todo-app/fe/apps/web/src/modules/api/client.ts` is a cohesive technical capability, and hooks
+  such as `src/hooks/task/useTasks.ts` show SWR owning product data caching.
+- Product code imports the public `@starci/grammar/common` entry; the installed package's declared exports
+  are the API.
+- `examples/todo-app/fe/apps/web/src/components/blocks/sign-in-screen/index.tsx` legitimately owns the
+  sign-in form's draft state beside its connected role. An unsaved form draft is intrinsic state, not
+  product-world lifecycle, and is not evidence of a missing responsibility boundary.
 
 ### Treat as debt, not precedent
 
-- `src/hooks/auth/useAuthPanel.ts` combines a product journey, browser persistence/history, OAuth redirect,
-  GraphQL operations, Apollo error mapping, session token storage, and UI transition state. The coherent
-  owner is the authentication feature, with browser/transport mapping at its data boundary.
-- `src/hooks/index.ts` is described as one public door, while authentication and other units deep-import
-  hook paths. The inconsistency shows that a global hook barrel is not a useful ownership boundary.
-- `AuthenticationPage/component.tsx` type-imports `AuthMode` from the scenario hook, and
-  `AuthenticationPanel/component.tsx` runtime-imports `KeycloakIdentityProvider` from handwritten GraphQL
-  transport types. Presentation should depend on feature/view contracts, with wire enums mapped at data.
-- `src/modules/api/graphql/mutations/types/auth.ts` records live-schema introspection in handwritten types,
-  while operation documents use manually paired generic response/variable types. This can drift because the
-  document is not a typed generated contract.
-- Several connected blocks independently fetch below a page. That is valid only for independently reusable
+- A product journey, browser persistence, transport operations and UI transition state combined in one
+  hook would not be one owner: the coherent owner is the feature, with browser/transport mapping at its
+  data boundary.
+- A global hook barrel described as one public door while units deep-import hook paths is inconsistent;
+  it is not a useful ownership boundary.
+- Presentation should depend on feature/view contracts, with wire enums mapped at data: a presentational
+  component importing handwritten transport types couples render to the wire.
+- Wire types handwritten from a live schema drift; where no usable generator is installed they must name
+  the schema revision and be checked for drift.
+- Connected blocks fetching independently below a page are valid only for independently reusable
   capabilities; coordinated loading, identity, failure, or request state belongs to the feature/page owner.
 - Client-only page markers on adapters that merely mount a client owner enlarge the client graph without
   owning browser behavior. Keep the boundary at the connected owner when the route itself needs none.

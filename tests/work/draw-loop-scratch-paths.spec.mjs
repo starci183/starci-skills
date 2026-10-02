@@ -1,8 +1,7 @@
-// A finished draw loop installs Work files the product commits (kernel-proposal kprop-425639c6c3 part 2,
-// wf-nivo-auth-mum8xr9a, op-interface.draw-9c669023e0 attempt 3): the draw-render record <part>.json and the ui-proof
+// A finished draw loop installs Work files the product commits: the draw-render record <part>.json and the ui-proof
 // score <part>.score.json used to be copied verbatim from the loop round, so they cited the op's STARCI_JOB_SCRATCH
 // (<temp>/starci-job-scratch/<64-hex>/draw-loop/...) and the deleted render harness (file:///<temp>/starci-draw-loop-*).
-// The product's pre-commit secrets guard (nivo-backend scripts/secrets-guard.mjs, step 4 "long hex blob") read the
+// The product's pre-commit secrets guard (a product repo's scripts/secrets-guard.mjs, step 4 "long hex blob") read the
 // scratch dir's 64-hex name as a secret and refused the commit. finishLoop now rewrites every scratch path it installs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +27,7 @@ const typedSha256 = (line, hex) => hex.length === 64 && (line.includes(`sha256:$
 const guardHits = (text) => text.split(/\r?\n/).flatMap((line) => [...line.matchAll(HEX_BLOB)].map((m) => m[0]).filter((hex) => !typedSha256(line, hex)));
 
 const DRAW = `import { Text } from "@starci/grammar/core"
-export const SignInBase = () => <Text>Đăng nhập</Text>
+export const SignInBase = () => <Text>\u0110\u0103ng nh\u1eadp</Text>
 `;
 
 test('a finished draw loop installs JSON that cites no scratch path and passes the product secrets guard', async (t) => {
@@ -40,7 +39,7 @@ test('a finished draw loop installs JSON that cites no scratch path and passes t
   const dir = path.join(repo, '.starciwork', 'features', 'login', 'ui', 'authentication', 'assets', 'directions');
   const source = write(dir, 'SignInBase.draw.tsx', DRAW);
   const fixture = write(dir, 'SignInBase.fixture.json', JSON.stringify({ state: 'sign-in-ready', props: { title: 'Nivo' } }));
-  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Sẵn sàng</span></section></div></body></html>';
+  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">S\u1eb5n s\u00e0ng</span></section></div></body></html>';
   const why = withRationale(DOM);
   const whyFile = write(dir, 'SignInBase.rationale.json', JSON.stringify(why.entries));
   const grammar = { ok: true, pick: { source: 'product', version: '0.5.0', root: path.join(repo, 'node_modules') }, grammarSource: 'product@0.5.0', attempts: [{ source: 'product', ok: true, errors: [] }] };

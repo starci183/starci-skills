@@ -3,7 +3,7 @@ import test from "node:test"
 import { projectFixture } from "./fixtures/project/tester.mjs"
 import { rules } from "./project-graph.mjs"
 
-// Bounded contexts (R154 BE_CONTEXT_OWNER, R155 BE_CONTEXT_COUPLING, R156 BE_CONTEXT_TRANSACTION, R158 BE_CONTEXT_PLATFORM_TABLES, and the
+// Bounded contexts (R174 BE_CONTEXT_OWNER, R175 BE_CONTEXT_COUPLING, R176 BE_CONTEXT_TRANSACTION, R178 BE_CONTEXT_PLATFORM_TABLES, and the
 // per-connection carve-out of BE_SCHEMA_OWNER). One repository of three contexts: identity, order (with the cart capability) and billing.
 // A connection is a context; a capability belongs to the connection its persistence arrays are registered on.
 const DATABASE = "src/modules/platform/database"

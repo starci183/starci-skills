@@ -5,6 +5,21 @@ const FILE_SUFFIX = "_FILE"
 const DURATION_UNITS: Readonly<Record<string, number>> = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }
 const DURATION_PATTERN = /^(\d+)(ms|s|m|h)?$/
 
+/** A secret value (password, token, connection string with credentials): never logged, serialized as a mask. */
+export class Secret {
+    constructor(private readonly value: string) {}
+
+    /** The plain value; call it only where the secret is handed to the library that needs it. */
+    reveal(): string {
+        return this.value
+    }
+
+    /** Masks the value when the object is serialized. */
+    toJSON(): string {
+        return "[secret]"
+    }
+}
+
 /**
  * The only reader of the process environment. Typed readers name the missing or malformed key in the error; a key
  * `<KEY>_FILE` supplies `<KEY>` from a file, so secrets can be mounted instead of exported.
@@ -84,5 +99,10 @@ export class EnvSource {
         if (!match?.[1] || unit === undefined)
             throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
         return Number(match[1]) * unit
+    }
+
+    /** A required secret. */
+    secret(key: string): Secret {
+        return new Secret(this.string(key))
     }
 }

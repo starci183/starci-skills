@@ -11,7 +11,7 @@ surface:
     shape: "query buyerStatus -> {personId, hasOrders}"
     transport: >-
       The buyerStatus GraphQL query of the order service (POST /graphql on orderApi, the port
-      .starcistacks/dev/infra/metadata.json resolves; served by features/checkout/transport/graphql/buyer-status.resolver.ts).
+      .starcistacks/dev/infra/metadata.json resolves; served by features/api/checkout/transport/graphql/buyer-status.resolver.ts).
       The consumer is the identity service's account view, through
       modules/integrations/order-api/order-api.client.ts: it forwards the caller's own bearer token, so the answer is
       about the person that token authenticates and no person id travels in the request. There is no shared table and

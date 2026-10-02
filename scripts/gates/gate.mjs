@@ -43,12 +43,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { runGit } from '../api/git/lib.mjs';
+import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
-import { setPriority } from '../api/process/set-priority.mjs';
+import { setPriority } from '../api/process/set-priority.mjs'; import { runNode } from '../api/node/run-node.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -92,8 +92,8 @@ export function parseGateArgs(argv) {
   return opts;
 }
 
-const git = (root, args, options = {}) => runGit(['-c', 'core.quotepath=off', ...args], { cwd: root, maxBuffer: 256 * 1024 * 1024, ...options });
-const gitText = (root, args) => { const r = git(root, args); return !r.error && r.status === 0 ? r.stdout : null; };
+const git = (call, root, args, options = {}) => call(args, { cwd: root, config: { 'core.quotepath': 'off' }, maxBuffer: 256 * 1024 * 1024, ...options });
+const gitText = (call, root, args) => { const r = git(call, root, args); return !r.error && r.status === 0 ? r.stdout : null; };
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 
 /**
@@ -103,14 +103,14 @@ const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
  */
 export function resolveGateBase(root, base = null, { workflowBase = (dir) => gateBaseAt({ env: process.env }, dir) } = {}) {
   if (base) {
-    const sha = gitText(root, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])?.trim();
+    const sha = gitText(revParseQuery, root, ['--verify', '--quiet', `${base}^{commit}`])?.trim();
     if (!sha) throw Object.assign(new Error(`--base ${base} is not a commit of ${root}`), { code: 'GATE_BASE_UNKNOWN' });
     return sha;
   }
   const checkpoint = workflowBase(root);
   if (checkpoint) return checkpoint;
   for (const ref of ['@{upstream}', 'main', 'master', 'origin/HEAD']) {
-    const sha = gitText(root, ['merge-base', 'HEAD', ref])?.trim();
+    const sha = mergeBaseOf(root, 'HEAD', ref);
     if (sha) return sha;
   }
   throw Object.assign(new Error(`no base: ${root} has no upstream, main or master to measure against; pass --base`), { code: 'GATE_BASE_UNKNOWN' });
@@ -122,7 +122,7 @@ export function resolveGateBase(root, base = null, { workflowBase = (dir) => gat
  * blob, so the findings a move carries stay preexisting; untracked files are additions.
  */
 export function gateDelta(root, base) {
-  const status = lines(gitText(root, ['diff', '--name-status', '--find-renames', '--relative', base]));
+  const status = lines(gitText(gitDiff, root, ['--name-status', '--find-renames', '--relative', base]));
   const added = new Set(), deleted = new Set(), changed = new Set(), renamed = new Map();
   for (const row of status) {
     const [kind, file, to] = row.split('\t');
@@ -131,7 +131,7 @@ export function gateDelta(root, base) {
     else if (kind === 'D') deleted.add(rel);
     else { changed.add(rel); if (kind === 'A') added.add(rel); }
   }
-  for (const file of lines(gitText(root, ['ls-files', '--others', '--exclude-standard']))) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
+  for (const file of lines(gitText(lsFiles, root, ['--others', '--exclude-standard']))) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
   return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(), added, deleted, renamed };
 }
 /** The base path a head path is measured against: its rename source, itself, or null when the base has no such file. */
@@ -139,11 +139,11 @@ const basePathOf = (delta, rel) => (delta.added.has(rel) ? null : delta.renamed.
 
 /** The base blob of a root-relative path, or null when the base has no such file. */
 function baseBlobReader(root, base) {
-  const prefix = (gitText(root, ['rev-parse', '--show-prefix']) ?? '').trim();
+  const prefix = (gitText(revParseQuery, root, ['--show-prefix']) ?? '').trim();
   const memo = new Map();
   return (rel) => {
     if (!memo.has(rel)) {
-      const r = git(root, ['show', `${base}:${prefix}${rel}`], { encoding: 'buffer' });
+      const r = git(gitShow, root, [`${base}:${prefix}${rel}`], { encoding: 'buffer' });
       memo.set(rel, !r.error && r.status === 0 ? r.stdout.toString('utf8') : null);
     }
     return memo.get(rel);
@@ -152,8 +152,8 @@ function baseBlobReader(root, base) {
 
 /** The cache directory of this worktree (its git dir, never the checkout) and the shared one of the repository. */
 function cacheDirs(root) {
-  const own = gitText(root, ['rev-parse', '--absolute-git-dir'])?.trim();
-  const common = gitText(root, ['rev-parse', '--git-common-dir'])?.trim();
+  const own = gitText(revParseQuery, root, ['--absolute-git-dir'])?.trim();
+  const common = gitText(revParseQuery, root, ['--git-common-dir'])?.trim();
   if (!own || !common) throw Object.assign(new Error(`${root} is not inside a git repository`), { code: 'GATE_NOT_GIT' });
   const worktree = path.join(own, 'starci-gate');
   const shared = path.join(path.resolve(root, common), 'starci-gate');
@@ -183,7 +183,7 @@ function runHfsLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
     const chunk = files.slice(i, i + LINT_CHUNK);
-    const run = spawnSync(process.execPath, [hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true });
+    const run = runNode([hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
     if (report?.schema !== LINT_SCHEMA) { errors.push(`hfs lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
@@ -272,8 +272,8 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
   // on a file's base path, or on no file, is the base's. A content finding on a changed file does not reproduce there.
   const headPathOf = new Map(head.filter((f) => f.engine === 'hfs' && f.path && basePathOf(delta, f.path)).map((f) => [basePathOf(delta, f.path), f.path]));
   if (headPathOf.size || head.some((f) => f.engine === 'hfs' && !f.path)) {
-    const listing = lines(gitText(root, ['ls-tree', '-r', '--name-only', '--full-tree', base])).map(posixPath);
-    const prefix = (gitText(root, ['rev-parse', '--show-prefix']) ?? '').trim();
+    const listing = lines(gitText(lsTree, root, ['-r', '--name-only', '--full-tree', base])).map(posixPath);
+    const prefix = (gitText(revParseQuery, root, ['--show-prefix']) ?? '').trim();
     const files = listing.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
     const { checkRepo } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'hfs', 'check.mjs')).href);
     const result = checkRepo({ repoRoot: root, files, only: [...headPathOf.keys()], tree: false });
@@ -287,10 +287,10 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
 
 /* ------------------------------------------------------------------------------------ codegen + build */
 
-const npm = (cwd, script) => spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', script], { cwd, encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+const npm = (cwd, script) => runNpm(['run', script], { cwd, maxBuffer: 256 * 1024 * 1024 });
 const readManifest = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; } };
 /** A stamp of what `paths` hold in this worktree: their index entries plus their uncommitted state. */
-const inputStamp = (root, paths) => sha256(`${gitText(root, ['ls-files', '-s', '--', ...paths]) ?? ''}\0${gitText(root, ['status', '--porcelain', '--', ...paths]) ?? ''}`);
+const inputStamp = (root, paths) => sha256(`${gitText(lsFiles, root, ['-s', '--', ...paths]) ?? ''}\0${gitText(gitStatus, root, ['--porcelain', '--', ...paths]) ?? ''}`);
 const exposesDist = (manifest) => /(^|\/)dist\//.test(JSON.stringify([manifest?.exports ?? null, manifest?.main ?? null, manifest?.types ?? null, manifest?.module ?? null]));
 
 /** The workspace package directories of the root manifest (`dir/*` globs and plain paths). */
@@ -500,7 +500,7 @@ function runTests(root, pattern, cache) {
   const outputFile = path.join(cache.worktree, 'jest.json');
   fs.rmSync(outputFile, { force: true });
   const started = Date.now();
-  const run = spawnSync(process.execPath, [bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const run = runNode([bin, '--maxWorkers=2', '--ci', '--json', `--outputFile=${outputFile}`, pattern], { cwd, maxBuffer: 256 * 1024 * 1024 });
   const result = readCache(outputFile);
   if (!result) return { step: { pattern, exit: run.status }, findings: [], error: `jest produced no json result (exit ${run.status}): ${String(run.stderr || run.error?.message || '').trim().split('\n').slice(-1)[0]}` };
   const findings = [];
@@ -551,7 +551,7 @@ const GUARD_CHUNK = 200;
 function blobsAt(root, commit, paths) {
   const out = new Map();
   for (let i = 0; i < paths.length; i += GUARD_CHUNK) {
-    const text = gitText(root, ['ls-tree', '-r', '-z', '--full-tree', commit, '--', ...paths.slice(i, i + GUARD_CHUNK)]) ?? '';
+    const text = gitText(lsTree, root, ['-r', '-z', '--full-tree', commit, '--', ...paths.slice(i, i + GUARD_CHUNK)]) ?? '';
     for (const row of text.split('\0').filter(Boolean)) { const [meta, file] = row.split('\t'); out.set(posixPath(file), meta.split(' ')[2]); }
   }
   return out;
@@ -566,12 +566,12 @@ function blobsAt(root, commit, paths) {
  * dropped: [{path, conflicted, main: blob|null, lane: blob|null}]}; throws when the commits cannot be read.
  */
 export function droppedMainChanges(root, { merge, mainParent, laneParent }) {
-  const mergeBase = gitText(root, ['merge-base', laneParent, mainParent])?.trim();
+  const mergeBase = mergeBaseOf(root, laneParent, mainParent);
   if (!mergeBase) throw Object.assign(new Error(`merge ${merge}: its parents ${laneParent} and ${mainParent} have no merge-base`), { code: 'GATE_MERGE_UNREADABLE' });
-  const remerge = git(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', laneParent, mainParent]);
+  const remerge = git(mergeTree, root, ['--write-tree', '--name-only', '--no-messages', laneParent, mainParent]);
   if (remerge.error || ![0, 1].includes(remerge.status)) throw Object.assign(new Error(`merge ${merge}: git merge-tree could not recompute it: ${String(remerge.stderr ?? remerge.error?.message ?? '').trim().split('\n')[0]}`), { code: 'GATE_MERGE_UNREADABLE' });
   const conflicted = lines(remerge.stdout).slice(1).map(posixPath);
-  const touched = lines(gitText(root, ['diff', '--no-renames', '--name-only', mergeBase, mainParent])).map(posixPath);
+  const touched = lines(gitText(gitDiff, root, ['--no-renames', '--name-only', mergeBase, mainParent])).map(posixPath);
   const main = blobsAt(root, mainParent, touched), lane = blobsAt(root, laneParent, touched), recorded = blobsAt(root, merge, touched);
   const conflicts = new Set(conflicted);
   const dropped = touched.filter((file) => (main.get(file) ?? null) !== (lane.get(file) ?? null) && (recorded.get(file) ?? null) === (lane.get(file) ?? null))
@@ -581,7 +581,7 @@ export function droppedMainChanges(root, { merge, mainParent, laneParent }) {
 
 /** The main line a merge is judged against: `main`, else `master`, else null (then no merge has a main side). */
 export function mainTipOf(root, ref = null) {
-  for (const name of ref ? [ref] : ['main', 'master']) { const sha = gitText(root, ['rev-parse', '--verify', '--quiet', `${name}^{commit}`])?.trim(); if (sha) return sha; }
+  for (const name of ref ? [ref] : ['main', 'master']) { const sha = gitText(revParseQuery, root, ['--verify', '--quiet', `${name}^{commit}`])?.trim(); if (sha) return sha; }
   return null;
 }
 
@@ -594,10 +594,10 @@ export function mainTipOf(root, ref = null) {
 export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root) }) {
   const out = { checked: [], findings: [], errors: [] };
   if (!mainTip) return out;
-  const merges = lines(gitText(root, ['rev-list', '--merges', '--parents', head, `^${base}`]));
+  const merges = lines(gitText(revList, root, ['--merges', '--parents', head, `^${base}`]));
   for (const row of merges) {
     const [merge, ...parents] = row.split(' ');
-    const onMain = parents.filter((p) => git(root, ['merge-base', '--is-ancestor', p, mainTip]).status === 0);
+    const onMain = parents.filter((p) => isAncestor(root, p, mainTip));
     if (onMain.length !== 1 || parents.length !== 2) continue;
     const mainParent = onMain[0], laneParent = parents.find((p) => p !== mainParent);
     try {
@@ -676,8 +676,8 @@ export async function runGate({ root, base = null, changed = null, tests = null,
   try {
     root = path.resolve(root);
     report.base = resolveGateBase(root, base);
-    report.head = gitText(root, ['rev-parse', 'HEAD'])?.trim() ?? null;
-    report.dirty = Boolean((gitText(root, ['status', '--porcelain']) ?? '').trim());
+    report.head = gitText(revParseQuery, root, ['HEAD'])?.trim() ?? null;
+    report.dirty = Boolean((gitText(gitStatus, root, ['--porcelain']) ?? '').trim());
     cache = cacheDirs(root);
     delta = gateDelta(root, report.base);
   } catch (error) { return fail(error); }
@@ -770,9 +770,9 @@ function refusalLines(output) {
  * The document profile: each docChecks script run from the runtime root (`tree` ones with --tree when given). Exit 1 of a check
  * is its findings, any other exit (or a spawn error) a tool that could not run. The same starci/gate@1 envelope, profile docs.
  */
-export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChecksOf(runtime), spawn = spawnSync } = {}) {
+export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChecksOf(runtime), spawn = runNode } = {}) {
   const report = { schema: GATE_SCHEMA, profile: DOC_PROFILE, at: new Date().toISOString(), root: posixPath(path.resolve(runtime)), tree: tree ? posixPath(path.resolve(tree)) : null,
-    base: null, head: gitText(runtime, ['rev-parse', 'HEAD'])?.trim() ?? null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
+    base: null, head: gitText(revParseQuery, runtime, ['HEAD'])?.trim() ?? null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
     steps: { docs: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
   if (tree && !fs.existsSync(path.resolve(tree))) { report.errors.push(`--tree ${tree} does not exist`); return finish(report); }
   if (!checks.length) { report.errors.push('knowledge/op-gate.yaml names no docChecks'); return finish(report); }
@@ -780,7 +780,7 @@ export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChe
   for (const check of checks) {
     const args = [path.join(runtime, check.script), ...(check.tree && tree ? ['--tree', path.resolve(tree)] : [])];
     const started = Date.now();
-    const run = spawn(process.execPath, args, { cwd: runtime, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+    const run = spawn(args, { cwd: runtime, maxBuffer: 256 * 1024 * 1024 });
     report.steps.docs.push({ id: check.id, command: `node ${check.script}${check.tree && tree ? ' --tree <tree>' : ''}`, exit: run.status ?? null, ms: Date.now() - started });
     // An uncaught exception also exits 1: a stack trace on stderr is a check that could not run, never its findings.
     const crashed = run.status === 1 && /^\s+at .+[:(]\d+:\d+\)?$/m.test(String(run.stderr ?? ''));

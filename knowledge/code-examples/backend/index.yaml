@@ -1,7 +1,8 @@
 schema: starci/code-example-catalog@1
 title: Backend code examples
 purpose: |
-  Multi-file interaction examples extracted from starci-academy-backend shapes.
+  Multi-file interaction examples extracted from the example backends' shapes
+  (examples/todo-app/be).
   They teach ownership and wiring; they are not product requirements or runnable apps.
 examples:
   - id: named-exception
@@ -25,9 +26,6 @@ examples:
   - id: api
     path: api
     title: An api feature - a resolver, its command and handler, and the e2e flow
-  - id: cli
-    path: cli
-    title: An operator command - one cli entry that dispatches one command
   - id: domain
     path: domain
     title: A domain capability - a service that owns its rules and publishes inside its transaction

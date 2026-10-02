@@ -40,7 +40,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         worker: { module: WorkerApp, listen: false, options: (w) => ({ /* ... */ }) },
         shop: { module: ShopApp, rawBody: true, options: (w) => ({ /* ... */ }) },   // rawBody: created with Nest's rawBody, as a main.ts that verifies signed webhooks over the exact body
     },
-    migrate: { module: migrateMain, options: (w) => ({ connections: [/* from w.db */] }) },   // apps/migrate: `bootstrap` export, a function, or an AppModule
+    migrate: { module: runMigrations, options: (w) => ({ connections: [/* from w.db */] }) },   // the migrate step over the connection list `cli migrate run` reads: a function or a module exporting `bootstrap`
     identity: { register: "keycloak", signIn: (world, { email, password }) => /* the public door */ },
     modules: { base: (w) => [/* clock, logging, database module over w.db */] },              // base of { modules } specs
     sandbox: { base: () => [HttpModule.register({ isGlobal: true })] },                        // contract specs

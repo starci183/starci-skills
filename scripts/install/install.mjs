@@ -16,8 +16,9 @@ import {sha256} from '../../engine/digest.mjs';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
@@ -433,7 +434,7 @@ export function doctor(opts, log = console.log) {
     const environment = { ...process.env };
     // Doctor starts independent test runners even when invoked by an installer test.
     delete environment.NODE_TEST_CONTEXT;
-    const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(testsDir, testFile)], { cwd: target, encoding: 'utf8', windowsHide: true, env: environment });
+    const result = runNode(['--test', '--test-reporter=tap', path.join(testsDir, testFile)], { cwd: target, env: environment });
     const output = (result.stdout ?? '') + (result.stderr ?? '');
     const count = Number(output.match(/^# tests (\d+)$/m)?.[1] ?? 0);
     const passed = Number(output.match(/^# pass (\d+)$/m)?.[1] ?? 0);
@@ -473,7 +474,7 @@ entry   one AGENTS.md prompt-entry: define-goal / start-kernel lifecycle skills.
         hand or pass --no-bootstrap. Existing ledgers are retained.
 `;
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   try {
     const opts = parseArgs(process.argv.slice(2));
     if (opts.command === 'init') init(opts);

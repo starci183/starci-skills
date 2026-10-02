@@ -1,7 +1,7 @@
 // Owner rulings 2026-09-27 on nivo wf-nivo-modules-agentos-mujek7lg op-interface.draw-2815deda22: the module-ledger
 // draw passed with ten whole-page renders of ONE layout that differ only in a status banner (installed-empty, retrying,
 // operation-pending, access-unverified, no-runtime, last-known, evidence-limited ...), no controls for the FR's
-// commands, internal ids and jargon in the copy ("Nguồn: hệ thống lõi", installation-1), and an untoned "installed"
+// commands, internal ids and jargon in the copy ("Source: core system", installation-1), and an untoned "installed"
 // badge - green on checks alone. scripts/work/draw/draw-quality.mjs refuses each; draw-render names the content-only part.
 import test from 'node:test';
 import { putBundle } from '../../engine/db/blob.mjs';
@@ -50,11 +50,11 @@ test('the data-status vocabulary covers the status variants the owner ruled are 
 });
 
 test('controls, copy and badges are read from the render source', () => {
-  const html = '<main><h1>Mô-đun</h1><p>Nguồn: hệ thống lõi</p><p>installation-1</p><span class="badge">Đã cài đặt</span>'
-    + '<span class="chip" data-tone="warning">Installed</span><span class="badge text-success">Đã cài đặt</span><button>Mở</button><a href="#">Cấu hình</a></main>';
+  const html = '<main><h1>M\u00f4-\u0111un</h1><p>Ngu\u1ed3n: h\u1ec7 th\u1ed1ng l\u00f5i</p><p>installation-1</p><span class="badge">\u0110\u00e3 c\u00e0i \u0111\u1eb7t</span>'
+    + '<span class="chip" data-tone="warning">Installed</span><span class="badge text-success">\u0110\u00e3 c\u00e0i \u0111\u1eb7t</span><button>M\u1edf</button><a href="#">C\u1ea5u h\u00ecnh</a></main>';
   assert.equal(controlCountOf(html), 2);
   assert.deepEqual(internalCopyOf(visibleTextOf(html)).map((l) => l.id).sort(), ['internal-vocabulary', 'kebab-id', 'record-id', 'source-label']);
-  assert.deepEqual(badgesOf(html).map((b) => [b.text, b.tone]), [['Đã cài đặt', null], ['Installed', 'warning'], ['Đã cài đặt', 'success']]);
+  assert.deepEqual(badgesOf(html).map((b) => [b.text, b.tone]), [['\u0110\u00e3 c\u00e0i \u0111\u1eb7t', null], ['Installed', 'warning'], ['\u0110\u00e3 c\u00e0i \u0111\u1eb7t', 'success']]);
   const record = { ui: { flow: { transitions: [
     { id: 'open-module', from: ['installed-current'], to: 'external-module-route', trigger: 'owner activates exact installed sibling' },
     { id: 'retry-facet', from: ['installed-current', 'evidence-limited'], to: 'retrying', trigger: 'owner activates retry by pointer or keyboard' },
@@ -90,9 +90,9 @@ function drawRecord(dir, { right = false } = {}) {
     }
   };
   // Drawn right: every element a DNA component (draw-dna.mjs), and the parts installed by the draw loop.
-  const goodWhy = withRationale('<body><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">Mô-đun đã cài</h1><ul data-grammar-component="SurfaceListCard"><li data-grammar-part="surface-fact">Chatbot <span class="badge" data-grammar-component="Badge" data-tone="success">Đã cài đặt</span> <button data-grammar-component="Button">Mở</button> <button data-grammar-component="Button">Thử lại</button></li></ul></main></body>');
+  const goodWhy = withRationale('<body><main data-grammar-component="PageContainer"><h1 data-grammar-component="Heading">M\u00f4-\u0111un \u0111\u00e3 c\u00e0i</h1><ul data-grammar-component="SurfaceListCard"><li data-grammar-part="surface-fact">Chatbot <span class="badge" data-grammar-component="Badge" data-tone="success">\u0110\u00e3 c\u00e0i \u0111\u1eb7t</span> <button data-grammar-component="Button">M\u1edf</button> <button data-grammar-component="Button">Th\u1eed l\u1ea1i</button></li></ul></main></body>');
   const good = goodWhy.html;
-  const bad = '<main><h1>Mô-đun</h1><p>Nguồn: hệ thống lõi</p><p>installation-1</p><span class="badge">Đã cài đặt</span></main>';
+  const bad = '<main><h1>M\u00f4-\u0111un</h1><p>Ngu\u1ed3n: h\u1ec7 th\u1ed1ng l\u00f5i</p><p>installation-1</p><span class="badge">\u0110\u00e3 c\u00e0i \u0111\u1eb7t</span></main>';
   part('installed-current', ledger(), right ? good : bad);
   if (!right) part('operation-confirmed', ledger({ banner: true }), bad);
   else part('module-tabs', ledger({ tabs: true }), good);

@@ -119,9 +119,9 @@ test('a retired path is valid history in a contract-change entry or owner ruling
 
 test('a moved path is valid history and dead in live text, named with where it went (moved[])', () => {
   const root = fixtureTree({
-    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
+    'modules/kernel/retired-paths.yaml': 'schema: starci/retired-paths@2\nretired: []\nmoved:\n  - {from: scripts/old/gate.mjs, to: scripts/gates/gate.mjs, movedIn: C4, quiesced: false}\n  - {from: scripts/kernel/api-verbs/, to: scripts/kernel/verbs/, movedIn: C6, quiesced: false}\n',
     'modules/kernel/contract-changes/old.yaml': 'id: old\nsummary: "`scripts/old/gate.mjs` ran the gate"\n',
-    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/verbs/settle.mjs` settled"\n',
+    'modules/kernel/contract-changes/verb.yaml': 'id: verb\nsummary: "`scripts/kernel/api-verbs/settle.mjs` settled"\n',
     'modules/kernel/contract-changes/copy.yaml': 'id: copy\nsummary: "`packages/hfs/runtime/scripts/old/gate.mjs` was bundled"\n',
     'knowledge/hfs/runtime-slots.yaml': 'ruleParams:\n  runtime:\n    generated:\n      - {root: packages/hfs/runtime, generatedBy: x.mjs}\n',
     'packages/hfs/runtime/.keep': '',

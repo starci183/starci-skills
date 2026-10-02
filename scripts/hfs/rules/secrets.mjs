@@ -6,7 +6,7 @@
 //   - a line of any other tracked text file that matches a secret pattern.
 // A finding names the file, the line and the pattern, never the value.
 import { FORBIDDEN_FILES, secretHits } from '../../lib/secret-patterns.mjs';
-import { isSopsEnvelope } from '../../lib/test-secrets.mjs';
+import { isSopsEnvelope } from '../../lib/sops-envelope.mjs';
 import { found, readText } from './read.mjs';
 
 export const PLAINTEXT_SECRET = 'HFS_PLAINTEXT_SECRET';

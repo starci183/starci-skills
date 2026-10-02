@@ -13,7 +13,7 @@
 //   round  --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir>
 //          [--css <product global css>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>]
 //          --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui ...] [--out ...] [...]
-//          the real-component drawing (owner ruling 2026-09-27, "chốt"): the shape is a React XBase composing only
+//          the real-component drawing (owner ruling 2026-09-27, "locked"): the shape is a React XBase composing only
 //          @starci/grammar (scripts/work/draw/draw-source.mjs). The round first runs the SOURCE gate - the grammar the
 //          draw type-checks against (scripts/work/draw-grammar.mjs: the product's install, else claude-dist with the
 //          product upgrade owed), DRAW_TYPECHECK_FAILED, the AST gate (DRAW_OFF_GRAMMAR_COMPONENT, DRAW_RAW_STYLED_HTML,
@@ -58,7 +58,7 @@ import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './w
 import { readJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
 import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
@@ -71,7 +71,7 @@ import { criticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
-import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs';
+import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw/draw-rationale.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
@@ -307,7 +307,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
       records.push(...await captureHtml({ html: built.html, out, viewports: vps, theme: 'light', fullPage, name, source: built.source, playwright, rationale }));
       if (harnessDir && !fs.existsSync(path.join(harnessDir, 'index.html'))) { fs.mkdirSync(harnessDir, { recursive: true }); fs.cpSync(workDir, harnessDir, { recursive: true }); }
     } finally {
-      safeRemoveTree(workDir, { hold: artifactHoldReason });
+      safeRemove(workDir, { hold: artifactHoldReason });
     }
   }
   return records;
@@ -730,7 +730,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir, { hold: artifactHoldReason });
+      safeRemove(dir, { hold: artifactHoldReason });
     }
   }
   for (const { html, parts: group } of byHtml.values()) {
@@ -752,7 +752,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(html)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir, { hold: artifactHoldReason });
+      safeRemove(dir, { hold: artifactHoldReason });
     }
   }
   return { findings, parts };
@@ -817,6 +817,6 @@ export async function drawLoopMain(argv) {
   return { code: 2, text: USAGE };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   drawLoopMain(process.argv.slice(2)).then((r) => { process.stdout.write(r.text); process.exitCode = r.code; }, (error) => { process.stderr.write(`draw-loop: ${error?.message ?? error}\n`); process.exitCode = 2; });
 }

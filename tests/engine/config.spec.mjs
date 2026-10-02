@@ -6,14 +6,14 @@ import path from 'node:path';
 import {configuredAllocationPolicy,DEFAULT_MODEL_POOLS,defaultParallelGear,effectiveNonOperationModels,loadConfig,nonOperationModels,parallelGear,slicingGears,validateConfig} from '../../engine/config.mjs';
 import {parseYaml,stringifyYaml} from '../../engine/yaml.mjs';
 // config.example.yaml is the shipped default — the installer seeds config.yaml from it verbatim, so it
-// is what loadConfig({initialize:true}) must produce. The spec reads it rather than keeping a copy.
+// is what the seeded config.yaml (the installer copies the example) must produce. The spec reads it rather than keeping a copy.
 const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).models.nonOperation};
 // connectors is its own closed block (tests/connectors/connectors.spec.mjs); here it only has to round-trip.
 const EXAMPLE_CONNECTORS=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).connectors;
 // reconciler is its own closed block too (controller shadow modes are reconciler specs' contract); read it shipped.
 const EXAMPLE_RECONCILER=parseYaml(fs.readFileSync(new URL('../../config.example.yaml',import.meta.url),'utf8')).reconciler;
 const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{mode:'adaptive',preferredProvider:null,policy:'balanced',shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,grants:['devin-agent=10@implement+verify+write']},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}},connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},orca:{maxWorkerDepth:4},claudeDebug:{interval:"10m",worktreeLimit:40},reconciler:structuredClone(EXAMPLE_RECONCILER)});
-test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual(loadConfig(root,{initialize:true}),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'sol-opus',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='sol-opus';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['sol-opus']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/sol-opus/);const reordered=expected();reordered.models.pools['sol-opus']=['codex-agent','claude-agent'];assert.deepEqual(effectiveNonOperationModels(reordered).validator.runtimes,['codex-agent','claude-agent'],'member order is the owner route order');const duplicate=expected();duplicate.models.pools['sol-opus']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual((fs.copyFileSync(path.join(root,'config.example.yaml'),path.join(root,'config.yaml')),loadConfig(root)),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'sol-opus',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='sol-opus';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['sol-opus']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/sol-opus/);const reordered=expected();reordered.models.pools['sol-opus']=['codex-agent','claude-agent'];assert.deepEqual(effectiveNonOperationModels(reordered).validator.runtimes,['codex-agent','claude-agent'],'member order is the owner route order');const duplicate=expected();duplicate.models.pools['sol-opus']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('six-role nonOperation drafts are refused by the closed schema',()=>{const draft=expected();draft.models.nonOperation={goalAssessment:['claude-agent','codex-agent'],operationPlanner:['claude-agent','codex-agent'],kernelManager:['claude-agent','codex-agent'],technicalDecision:['claude-agent','codex-agent'],goalCritic:['claude-agent','codex-agent'],validator:['claude-agent','codex-agent']};assert.throws(()=>validateConfig(draft),/Invalid config/);});
 test('a lone config.json is not honored — config.yaml is the only owner file',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-json-'));try{fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}}}));assert.throws(()=>loadConfig(root),/Missing config\.example\.yaml/,'config.json must not be read; with no example file the loader fails closed');}finally{fs.rmSync(root,{recursive:true,force:true});}});
@@ -29,7 +29,7 @@ test('parallel.gear accepts a declared gear, defaults to the first one and fails
     const gears=slicingGears();
     assert.deepEqual(gears,[1,2],'the declared gear vocabulary is data in runtimes.yaml');
     assert.equal(defaultParallelGear(),1);
-    const base=loadConfig(root,{initialize:true});
+    const base=(fs.copyFileSync(path.join(root,'config.example.yaml'),path.join(root,'config.yaml')),loadConfig(root));
     assert.deepEqual(base.parallel,{gear:1},'the shipped example ships the owner knob at gear 1');
     assert.equal(parallelGear(base),1);
     for(const gear of gears){
@@ -54,7 +54,7 @@ test('adaptive capacity is the default and the owner may prefer one declared pro
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-providers-'));
   try{
     fs.copyFileSync(new URL('../../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
-    const base=loadConfig(root,{initialize:true});
+    const base=(fs.copyFileSync(path.join(root,'config.example.yaml'),path.join(root,'config.yaml')),loadConfig(root));
     assert.deepEqual(configuredAllocationPolicy(base),{mode:'adaptive',preferredProvider:null,policy:'balanced',
       shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,
       grants:{'devin-agent':{slots:10,roles:['implement','verify','write']}},source:'allocation'},'the shipped default balances three pools, Devin at 35, Opus 20, Codex 10, and grants Devin');
@@ -84,9 +84,9 @@ test('supervisor.repos names the ledgers resume-all resumes: a list of repositor
   const fs = await import('node:fs');
   const base = parseYaml(fs.readFileSync(new URL('../../config.example.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(base.supervisor.repos, [], 'the example resumes no ledger until the owner lists one');
-  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../nivo-backend', 'D:/Repositories/starci-next'] } }));
+  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../todo-app-be', process.cwd()] } }));
   assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { repos: null } }));
-  assert.throws(() => validateConfig({ ...base, supervisor: { repos: '../nivo-backend' } }), /supervisor\.repos/);
+  assert.throws(() => validateConfig({ ...base, supervisor: { repos: '../todo-app-be' } }), /supervisor\.repos/);
   assert.throws(() => validateConfig({ ...base, supervisor: { repos: ['  '] } }), /supervisor\.repos/);
 });
 
@@ -160,15 +160,10 @@ test('supervisor.frozenMinutes is accepted, malformed shapes are refused, and th
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
-test('a config that still names the removed Qwen provider is refused with the owner wording',()=>{
+test('a config naming a provider no runtime declares is refused by the provider whitelist',()=>{
   const ok=expected();
-  const gone=/Qwen đã bị gỡ; dùng claude, codex hoặc devin/;
-  assert.throws(()=>validateConfig({...ok,kernel:{agent:'qwen'}}),gone);
-  assert.throws(()=>validateConfig({...ok,kernel:{group:[{agent:'qwen'},{agent:'codex'}],effort:'high'}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',preferredProvider:'qwen'}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',policy:'balanced',shares:{'qwen-agent':35,'devin-agent':35}}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',grants:['qwen-agent=2@implement']}}),gone);
-  assert.throws(()=>validateConfig({...ok,supervisor:{pollIntervalMs:null,repos:[],kernel:{agent:'qwen'}}}),gone);
+  assert.throws(()=>validateConfig({...ok,kernel:{agent:'no-such-provider'}}),/Invalid config\.yaml/);
+  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',preferredProvider:'no-such-provider'}}),/not declared by a runtime/);
 });
 
 test('root specs is a map of family switches {harness, unit, e2e}, each at its default (harness off, unit on, e2e off)',async()=>{

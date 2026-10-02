@@ -9,6 +9,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HFS_MANIFEST_FILE, HfsSlotsError, RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration, ruleParams } from '../../scripts/hfs/slots.mjs';
+/** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
+const old = (...segments) => segments.join('/');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(import.meta.url)('ajv/dist/2020.js'); return loaded.default ?? loaded; })();
@@ -20,6 +22,8 @@ const RUNTIME_TEXT = fs.readFileSync(path.join(ROOT, RUNTIME_MANIFEST_FILE), 'ut
 const runtimeManifest = () => loadSlotManifest({ root: ROOT, file: path.join(ROOT, RUNTIME_MANIFEST_FILE) });
 const refused = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code);
 const edited = (edit) => { const doc = parseYaml(RUNTIME_TEXT); edit(doc); return JSON.stringify(doc); };
+/** A well-formed pending entry: the real allowlist is empty once every cut landed, so the refusals edit this one. */
+const PENDING = { path: 'scripts/a.mjs', rule: 'RT_API_SHAPE', lane: 'C2a', since: '2026-10-01', reason: 'a fixture entry the refusal cases break' };
 
 test('the runtime manifest loads as kind runtime and its schema accepts it; the product manifest is still kind app', () => {
   const m = runtimeManifest();
@@ -38,11 +42,12 @@ test('a runtime manifest with sides, a product slot id, an unknown tier or a pen
     ['sides', (d) => { d.sides = { be: { reads: [] }, fe: { reads: [] } }; }],
     ['product slot id', (d) => { d.slots[0].id = 'app.declaration'; }],
     ['unknown tier', (d) => { d.slots.find((s) => s.id === 'runtime.lib').tier = 'feature'; }],
-    ['pending lane', (d) => { d.pending[0].lane = 'LAYER-2'; }],
-    ['pending date', (d) => { delete d.pending[0].since; }],
+    ['pending lane', (d) => { d.pending = [{ ...PENDING, lane: 'LAYER-2' }]; }],
+    ['pending date', (d) => { const { since, ...rest } = PENDING; d.pending = [rest]; }],
     ['generated without generator', (d) => { delete d.slots.find((s) => s.tracked === 'generated').generatedBy; }],
     ['schema major', (d) => { d.version = '2.0.0'; }],
   ]) {
+    assert.equal(validateManifest(JSON.parse(edited((d) => { d.pending = [PENDING]; }))), true, 'the fixture pending entry is well formed');
     const text = edited(edit);
     refused(() => loadSlotManifest({ text }), 'HFS_MANIFEST_INVALID');
     if (name !== 'schema major' && name !== 'unknown tier') assert.equal(validateManifest(JSON.parse(text)), false, `the schema accepted: ${name}`);
@@ -68,10 +73,19 @@ test('the runtime resolver: slots, tiers, owners, the forbidden current paths an
   assert.equal(r.classifyPath('scripts/api/orca/worker-start.mjs').bindings.system, 'orca');
   assert.equal(r.tierOf('scripts/kernel/verbs/settle.mjs'), 'kernel', 'a verb inherits the kernel owner');
   assert.equal(r.tierOf('scripts/lib/clip.mjs'), 'base');
-  assert.equal(r.classifyPath('scripts/housekeeping/hk-claude.mjs').status, 'forbidden', 'a retired lib name is spelled out, so it beats <name>.mjs');
-  assert.equal(r.classifyPath('scripts/kernel/settle/job-settle.mjs').status, 'forbidden');
+  assert.equal(r.classifyPath(old('scripts', 'lib', 'hk-claude.mjs')).status, 'forbidden', 'a retired lib name is spelled out, so it beats <name>.mjs');
+  assert.equal(r.classifyPath(old('scripts', 'reconcile', 'job-settle.mjs')).status, 'forbidden');
   assert.equal(r.classifyPath('packages/hfs/runtime/scripts/lib/glob.mjs').tracking, 'generated');
   assert.equal(r.classifyPath('stray/file.txt').status, 'no-slot');
   assert.deepEqual(r.importAllowed('scripts/kernel/a.mjs', 'scripts/agent/lib.mjs'), { allowed: true, reason: 'allowed', fromTier: 'kernel', toTier: 'domain' });
   assert.equal(r.importAllowed('scripts/lib/a.mjs', 'scripts/kernel/b.mjs').reason, 'tierDirection');
+});
+
+test('state directories and local junk named in the review log are forbidden in the tree, not only untracked', () => {
+  const m = runtimeManifest();
+  const r = createSlotResolver(m, resolveRepoDeclaration(m, { hfs: 1, kind: 'runtime', project: 'starci' }));
+  for (const forbidden of ['runtime/x.json', 'mcp/server.json', 'worktrees/a/b.txt', '.starciwork/runtime.sqlite', '.experiments/note.md', 'config.yaml.bak-20261001065612', 'nul', 'nul.txt', 'lp-specs.txt', '3-jobs', 'LEAD.md']) {
+    assert.equal(r.classifyPath(forbidden).status, 'forbidden', `${forbidden} must be forbidden`);
+  }
+  assert.notEqual(r.classifyPath('docs/goal.md').status, 'forbidden');
 });

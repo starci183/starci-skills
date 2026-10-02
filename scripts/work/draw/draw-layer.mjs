@@ -17,15 +17,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
-import { safeRemoveTree } from '../../api/fs/safe-remove.mjs';
+import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
-export const DRAW_LAYER_CODES = Object.freeze([DRAW_NESTED_VARIANT, DRAW_MEASURE_UNCAPPED]);
 
 /** W-3xl of the Width scale (measure.yaml guidance width-scale): no form region renders wider. */
 export const FORM_MEASURE_CAP_PX = 768;
@@ -232,7 +231,7 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
       results.push({ part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings });
     }
   } finally {
-    if (scratch) safeRemoveTree(scratch, { hold: artifactHoldReason });
+    if (scratch) safeRemove(scratch, { hold: artifactHoldReason });
   }
   return results;
 }
@@ -262,6 +261,6 @@ async function main(argv) {
   return red.length ? 1 : 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((c) => { process.exitCode = c; }, (e) => { process.stderr.write(`draw-layer: ${e?.stack ?? e}\n`); process.exitCode = 2; });
 }

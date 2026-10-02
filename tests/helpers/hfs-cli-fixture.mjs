@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
-import { renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../../scripts/hfs/rules/monorepo.mjs';
 import { loadSonarGate } from '../../scripts/gates/sonar-gate.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -46,17 +46,20 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
     if (!fs.existsSync(target)) fs.writeFileSync(target, text);
   };
   const write = (relative, text) => { const target = path.join(dir, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
-  // The one package.json of the app, the monorepo root (R127): the fe workspaces, npm as the package manager, turbo pinned.
+  // The one package.json of the app, the monorepo root (R143): the fe workspaces, npm as the package manager, turbo pinned.
   put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, packageManager: PACKAGE_MANAGER, workspaces: [...WORKSPACES], devDependencies: { turbo: PINS.turbo.version } })}\n`);
-  // Each fe app is a workspace (R128) that declares its own next-intl stack (R59, R130).
+  // Each fe app is a workspace (R144) that declares its own next-intl stack (R59, R146).
   for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/package.json`, `${JSON.stringify({ name: feAppPackageName(declaration.project, app.name), private: true, scripts: FE_APP_SCRIPTS, dependencies: { 'next-intl': PINS['next-intl'].version } }, null, 2)}\n`);
-  // The Nest monorepo of the declared be apps (R129), the default project the first api app.
+  // The Nest monorepo of the declared be apps (R145), the default project the first api app.
   const beApps = declaration.sides.be.apps;
   const defaultApp = beApps.find((app) => app.kind === 'api') ?? beApps[0];
   put('be/nest-cli.json', `${JSON.stringify({ $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${defaultApp.name}`, sourceRoot: `apps/${defaultApp.name}/src`, projects: Object.fromEntries(beApps.map((app) => [app.name, { type: 'application', root: `apps/${app.name}`, entryFile: 'main', sourceRoot: `apps/${app.name}/src` }])) }, null, 2)}\n`);
   writeTargets(dir, renderTargets(declaration, PRESETS));
   // The file a rule reads the content of that the render does not write: the be side's stack declaration.
   put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
+  // One Dockerfile per declared app (R187-R191), the template output, and the standalone output every Next image ships.
+  for (const file of imageFiles(resolveRepoDeclaration(manifest, declaration))) put(file.path, file.content);
+  for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/next.config.ts`, 'export default { output: "standalone" };\n');
   const required = resolver.requiredPaths().paths.map((entry) => entry.path);
   for (const p of required) if (!p.endsWith('/')) put(p, p === 'hfs.json' ? '' : p.endsWith('.json') ? '{}\n' : /^be\/apps\/[^/]+\/src\/app\.module\.ts$/.test(p) ? 'export class AppModule {}\n' : 'export {};\n');
   for (const app of declaration.sides.fe.apps) {
@@ -72,11 +75,11 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
     }
     put(`${base}/src/app/health/live/route.ts`, `${entries.map((p) => `import '../../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\nexport const app_${app.name.replace(/-/g, '_')} = 1;\n`);
   }
-  put('be/src/features/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
-  put('be/src/features/orders/orders.module.ts', 'export {};\n');
-  put('be/src/features/orders/application/place-order.handler.ts', 'export {};\n');
+  put('be/src/features/api/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
+  put('be/src/features/api/orders/orders.module.ts', 'export {};\n');
+  put('be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n');
   // The machine judges reachability: the app composes the feature and every required module, so a clean app is clean to it too.
-  const owners = ['src/features/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
+  const owners = ['src/features/api/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
   // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
   write('be/src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
   write('be/src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');

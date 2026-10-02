@@ -51,7 +51,7 @@ test('subkind rules: name conventions, op ids and paths; unknown stays null', ()
   assert.equal(sk('image', '.starciwork/features/f/impl/fe/view/assets/a.png', 'interface.implement'), null, 'an unproven asset stays null');
   assert.equal(sk('image', '.starciwork/brand/assets/mascot/a.png', 'brand.decide'), null);
   assert.equal(sk('video', '.starciwork/features/login/uat/pw/runs/run-1/videos/a.webm', 'uat.verify'), 'uat-video');
-  assert.equal(sk('video', '.starciwork/kernel-evidence/w/jobs/j/files/ab-video.webm', 'e2e.verify', 'C:/tmp/starci-uat-recordings/j/playwright-x/video.webm'), 'e2e-video');
+  assert.equal(sk('video', '.starciwork/kernel-evidence/w/jobs/j/files/ab-video.webm', 'e2e.verify', path.join(os.tmpdir(), 'starci-uat-recordings', 'j', 'playwright-x', 'video.webm')), 'e2e-video');
   assert.equal(sk('video', '.starciwork/x/a.webm', 'backend.implement'), null);
   assert.equal(sk('report', '.starciwork/kernel-evidence/w/jobs/j/report-3.json'), 'report');
   assert.equal(sk('log', '.starciwork/kernel-evidence/w/jobs/j/log.jsonl'), 'log');
@@ -186,7 +186,7 @@ const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, 
 test('the typed-log rules reach every new dispatch and every kernel boot', async () => {
   const { buildOpPrompt } = await import('../../scripts/kernel/op-prompt.mjs');
   const packet = { op: 'backend.implement', brief: 'modules/ops/ops/backend.implement.yaml', context: { records: [], owned_paths: [], attempt: 1, workflow: { id: 'wf-p' } }, constraints: { model: 'm' } };
-  const prompt = buildOpPrompt({ skillRoot: ROOT, packet, jobId: 'op-p-1', repo: 'D:/r/p' });
+  const prompt = buildOpPrompt({ skillRoot: ROOT, packet, jobId: 'op-p-1', repo: 'repo/p' });
   assert.match(prompt, /^logging: the owner reads your work as TYPED LOG ROWS/m);
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);

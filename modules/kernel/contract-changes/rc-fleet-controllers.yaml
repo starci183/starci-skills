@@ -1,7 +1,7 @@
 id: rc-fleet-controllers
 effectiveAt: '2026-09-28T19:30:00+07:00'
 summary: >-
-  Reconciler lane G, controller part (D:/starci-tmp/reconciler-design/LANES.md "Lane G", DESIGN.md §8.6, §8.7, §10.2,
+  Reconciler lane G, controller part (<tmp>/reconciler-design/LANES.md "Lane G", DESIGN.md §8.6, §8.7, §10.2,
   §17.2, §19), landed in SHADOW (config.yaml reconciler.controllers.fleet|learning.mode; nothing acts until set
   active). The Fleet controller scripts/reconciler/controllers/fleet.mjs (concerns fleet.owed, fleet.push, fleet.deps,
   notify.owner; keys fleet:deps|owed|land|push|notify, numbers modules/reconciler/fleet.yaml) turns the wait-for graph

@@ -1,6 +1,6 @@
 /**
- * Twin tests for the fenced-job laws (R137 `BE_JOB_WRITE_OUTSIDE_OWNER`, R138 `BE_JOB_FENCE_REQUIRED`, R139 `BE_JOB_RUN_KEY`,
- * R140 `BE_JOB_SHAPE`).
+ * Twin tests for the fenced-job laws (R157 `BE_JOB_WRITE_OUTSIDE_OWNER`, R158 `BE_JOB_FENCE_REQUIRED`, R159 `BE_JOB_RUN_KEY`,
+ * R160 `BE_JOB_SHAPE`).
  *
  *   node --test jobs.spec.mjs
  *

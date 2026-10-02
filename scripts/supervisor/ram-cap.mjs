@@ -16,8 +16,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hostThrottle, setPriority, throttleLine, readThrottleState, priorityTable } from '../machine/ram-throttle.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 
 function main(argv) {
   const [verb] = argv;
@@ -50,4 +50,4 @@ function main(argv) {
   return 2;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) process.exit(main(process.argv.slice(2)));
+if (isMain(import.meta.url)) process.exit(main(process.argv.slice(2)));

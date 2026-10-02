@@ -17,16 +17,16 @@
 // its top-level scalar keys become the child's environment. Nothing is written to a file, a log or the parent shell, and
 // a value is never printed except by `--get`, which writes exactly that one value to stdout for the calling process.
 // The age identity is SOPS_AGE_KEY_FILE, default ~/.starci/master.identity. The decryption is scripts/api/sops/exec-env.mjs
-// execEnv, the child process scripts/api/process/run-shell.mjs runShellInherit.
+// execEnv, the child process scripts/api/process/run-shell.mjs runShell.
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/is-main.mjs';
 import { execEnv } from '../api/sops/exec-env.mjs';
-import { runShellInherit } from '../api/process/run-shell.mjs';
+import { runShell } from '../api/process/run-shell.mjs';
 
 /** Runs `command` with the custody keys added to its environment; returns the child's exit status. */
 export function execWithCustody(file, command, options = {}) {
   const values = execEnv(file, options);
-  return runShellInherit(command, values);
+  return runShell(command, values);
 }
 
 function main(argv) {
@@ -48,7 +48,7 @@ function main(argv) {
   return execWithCustody(file, command.join(' '), { inputType });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
   catch (error) { process.stderr.write(`custody-exec: ${error.message}\n`); process.exitCode = 1; }
 }

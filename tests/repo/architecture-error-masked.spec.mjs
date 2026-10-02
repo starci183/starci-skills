@@ -66,3 +66,21 @@ test('BE: a GraphQL registration without formatError, or with another one, is re
   }));
   assert.deepEqual(hits(worker), []);
 });
+
+test('BE: an APP_FILTER built by a helper outside the app root file is followed: counted once, and judged by its class', t => {
+  const helper = use => `import { APP_FILTER } from '@nestjs/core';
+import { AllExceptionsFilter } from '../../../src/modules/platform/errors';
+class LocalFilter { catch(): void {} }
+export const filterProvider = () => ({ provide: APP_FILTER, useClass: ${use} });
+`;
+  const root = `import { Module } from '@nestjs/common';
+import { filterProvider } from './filter-provider';
+@Module({ providers: [filterProvider()] })
+export class AppModule {}
+`;
+  const ok = runArch(archFixture(t, { files: { ...errorsFiles, 'apps/core/src/filter-provider.ts': helper('AllExceptionsFilter'), 'apps/core/src/app.module.ts': root } }));
+  assert.deepEqual(hits(ok), []);
+  const local = runArch(archFixture(t, { files: { ...errorsFiles, 'apps/core/src/filter-provider.ts': helper('LocalFilter'), 'apps/core/src/app.module.ts': root } }));
+  assert.equal(hits(local).length, 1);
+  assert.match(hits(local)[0].message, /must be `useClass` of the filter declared in platform\/errors/);
+});

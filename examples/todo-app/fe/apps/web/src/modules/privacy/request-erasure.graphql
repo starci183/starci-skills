@@ -1,6 +1,0 @@
-mutation RequestErasure {
-    requestErasure {
-        requestId
-        state
-    }
-}

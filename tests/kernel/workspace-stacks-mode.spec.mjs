@@ -39,7 +39,7 @@ test('the stacks mode is a kernel-set param: the kernel may select it, a goal le
 
 test('spec-foundation names the stacks mode as a hard leg in the plan', () => {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'route', 'route-plan.mjs'),
-    '--text', 'viết SDS và khai báo .starcistacks cho mọi feature', '--json'], { cwd: ROOT, encoding: 'utf8' });
+    '--text', 'vi\u1ebft SDS v\u00e0 khai b\u00e1o .starcistacks cho m\u1ecdi feature', '--json'], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const plan = JSON.parse(r.stdout);
   const leg = plan.legs.find(l => l.op === 'workspace.manage' && l.instance === 'stacks');
@@ -48,7 +48,7 @@ test('spec-foundation names the stacks mode as a hard leg in the plan', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-stacks-plan-'));
   try {
     const d = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs'), '--repo', tmp,
-      '--text', 'viết SDS và khai báo .starcistacks cho mọi feature', '--plan', '--json'], { cwd: ROOT, encoding: 'utf8' });
+      '--text', 'vi\u1ebft SDS v\u00e0 khai b\u00e1o .starcistacks cho m\u1ecdi feature', '--plan', '--json'], { cwd: ROOT, encoding: 'utf8' });
     assert.equal(d.status, 0, d.stderr);
     const out = JSON.parse(d.stdout);
     assert.equal(out.legs.find(l => l.op === 'workspace.manage#stacks')?.tier, 'hard');

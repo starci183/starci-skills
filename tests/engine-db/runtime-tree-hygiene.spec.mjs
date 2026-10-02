@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import fs from 'node:fs'; import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
@@ -15,7 +15,7 @@ import {fileURLToPath} from 'node:url';
  * source: a fixture goes in the OS temp directory, and `t.after` removes it whether or not anything threw.
  */
 const runtimeRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..', '..');
-const SPEC=/\.spec\.mjs$/;
+const SPEC=/\.spec\.mjs$/, DRIVE=path.parse(os.tmpdir()).root.replace(/\\/g,'/');
 
 test('no spec builds its fixture inside the runtime tree',()=>{
   const offenders=[];
@@ -39,7 +39,7 @@ test('the runtime tree carries no fixture leftovers',()=>{
 /**
  * A ledger opened on a hard-coded absolute path registers that path in the host's machine arbiter
  * (machine.sqlite `ledgers`), and the registration outlives the spec. engine-lifecycle.spec once enrolled
- * `C:/fixture/.starciwork/runtime.sqlite`: the directory was created outside every temp root, the ledger was
+ * `<drive>/fixture/.starciwork/runtime.sqlite`: the directory was created outside every temp root, the ledger was
  * registered on the live host, and the allocation balance (scripts/agent/balance.mjs) counted it as a product
  * ledger long after the spec was deleted. A spec's ledger lives under a temp directory it made (withLedger,
  * mkdtempSync) or is handed an injected registry - never a real path literal.
@@ -50,11 +50,11 @@ test('no spec names a real-path ledger: fixtures use temp dirs or an injected re
   // inspectLedger, ledgerFileFor or registerLedger. A path a spec merely classifies is data, not a sink.
   const LITERAL=/(?:\b(?:file|ledgerFile|journalFile|machineFile)\s*:\s*|\b(?:openLedger|openMachine|inspectLedger|ledgerFileFor|registerLedger)\(\s*)(['"`])(?:[A-Za-z]:(?=[\\/])|(?=\/(?![/*])))[^'"`\n]*?(?:\.sqlite|[\\/]\.starciwork|[\\/]fixtures?\b)[^'"`\n]*\1/g;
   // The rule itself, on the literal that caused it.
-  assert.equal([..."enrollEngine(store,state,{ledgerFile:'C:/fixture/.starciwork/runtime.sqlite'})".matchAll(LITERAL)].length,1);
+  assert.equal([...`enrollEngine(store,state,{ledgerFile:'${DRIVE}fixture/.starciwork/runtime.sqlite'})`.matchAll(LITERAL)].length,1);
   assert.equal([..."openLedger({file:'/fixture/.starciwork/runtime.sqlite'})".matchAll(LITERAL)].length,1);
-  assert.equal([..."ledgerFileFor('C:/fixture')".matchAll(LITERAL)].length,1);
+  assert.equal([...`ledgerFileFor('${DRIVE}fixture')`.matchAll(LITERAL)].length,1);
   assert.equal([..."openLedger({file:path.join(root,'.starciwork','runtime.sqlite')})".matchAll(LITERAL)].length,0);
-  assert.equal([..."isFixtureLedgerPath('C:/fixture/.starciwork/runtime.sqlite')".matchAll(LITERAL)].length,0,'data, not a sink');
+  assert.equal([...`isFixtureLedgerPath('${DRIVE}fixture/.starciwork/runtime.sqlite')`.matchAll(LITERAL)].length,0,'data, not a sink');
   const self=path.resolve(fileURLToPath(import.meta.url));
   const walk=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()
     ?walk(path.join(dir,entry.name)):/\.m?js$/.test(entry.name)?[path.join(dir,entry.name)]:[]);

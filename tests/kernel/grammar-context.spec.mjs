@@ -57,13 +57,12 @@ test('interface.implement and interface.audit declare grammarContext: required',
 test('the family CSS resolves from brand.sources and the installed grammar family export; knowledge and captures ride along',t=>{
   const p=product(t,{family:'starci',captures:true,
     sources:[{repository:'fe',path:'src/family.css',kind:'tokens'},{path:'src/app/globals.css',kind:'css'},
-      {path:'D:/legacy/globals.css',kind:'reference'},{repository:'fe',path:'src/Brand.tsx',kind:'component'}],
+      {path:path.join(os.tmpdir(),'legacy','globals.css'),kind:'reference'},{repository:'fe',path:'src/Brand.tsx',kind:'component'}],
     grammarExports:{'./core.css':'./dist/core/styles.css','./offset-pop.css':'./dist/offset-pop/styles.css'}});
   write(p.fe,'src/family.css',':root{}');
   write(p.fe,'src/app/globals.css',':root{}');
   const g=resolveGrammarContext({skillRoot:ROOT,repo:p.app,binding:p.binding});
-  assert.deepEqual(g.missing,[]);
-  assert.equal(g.family,'starci');
+  assert.deepEqual(g.missing,[]); assert.equal(g.family,'starci');
   const css=g.sources.filter(s=>s.role==='family-css').map(s=>path.relative(p.fe,s.path).replace(/\\/g,'/'));
   assert.deepEqual(css,['src/family.css','src/app/globals.css','node_modules/@starci/grammar/dist/core/styles.css'],
     'declared .css sources (a reference is not one; a repository-less path is found in the bound fe) plus the starci family export (core)');
@@ -96,12 +95,13 @@ test('a declared CSS source not on disk, or no brand record, is a missing source
 });
 
 test('buildOpPrompt renders packet context.grammar and nothing when the packet has none',()=>{
-  const packet={op:'interface.draw',brief:'modules/ops/ops/interface.draw.yaml',
-    context:{records:['.starciwork/shell'],owned_paths:[],attempt:1},constraints:{model:'m'}};
+  const packet={op:'interface.draw',brief:'modules/ops/ops/interface.draw.yaml',context:{records:['.starciwork/shell'],owned_paths:[],attempt:1},constraints:{model:'m'}};
   assert.doesNotMatch(buildOpPrompt({skillRoot:ROOT,packet}),/grammar_context/);
-  const grammar={family:'nivo',sources:[{role:'family-css',path:'D:/p/nivo.css'}]};
+  const cssPath=slash(path.join(os.tmpdir(),'p','nivo.css'));
+  const grammar={family:'nivo',sources:[{role:'family-css',path:cssPath}]};
   const prompt=buildOpPrompt({skillRoot:ROOT,packet:{...packet,context:{...packet.context,grammar}}});
-  assert.match(prompt,/records: \.starciwork\/shell\ngrammar_context \(family nivo\)[^\n]*\n  family-css: D:\/p\/nivo\.css\n/);
+  const esc=(s)=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  assert.match(prompt,new RegExp(`records: \\.starciwork\\/shell\\ngrammar_context \\(family nivo\\)[^\\n]*\\n  family-css: ${esc(cssPath)}\\n`));
 });
 
 test('api dispatch attaches context.grammar and refuses grammar-context-missing before any Orca call',t=>{

@@ -5,11 +5,12 @@ import { motion } from 'motion/react';
 import { DURATION, EASE } from '../motion';
 import { toneVar, type Tone } from '../status';
 import { FeedbackState } from '../feedback-state';
+import { t } from '../../i18n/t';
 
 export type LegendItem = { tone?: Tone; label: string; hollow?: boolean; neutral?: boolean };
 
 export function Legend({ items }: { items: LegendItem[] }) {
-  return <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Chú giải">
+  return <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={t('Legend')}>
     {items.map(item => <li key={item.label} className="inline-flex items-center gap-2">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
         {item.hollow

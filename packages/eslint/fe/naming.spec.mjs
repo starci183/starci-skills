@@ -77,7 +77,7 @@ test("NAMING-3: a path names its file in the one language every reader shares", 
     invalid: [
       // Diacritics survive in a folder name even though a URL segment drops them.
       {
-        filename: at("apps/web/src/app/cấp-phát/page.tsx"),
+        filename: at("apps/web/src/app/c\u1ea5p-ph\u00e1t/page.tsx"),
         code: "export const x = 1",
         errors: [{ messageId: "path" }],
       },
@@ -109,7 +109,7 @@ test("machine-only: a const introduces a value instead of renaming one identifie
       "const Apollo = await ApolloClient",
       "const { ApolloClient: Apollo } = clients",
       "let Apollo = ApolloClient",
-      // Next reserves these names in a route segment file: the alias IS the contract (live: starci-next-fe subscriptions/checkout/page.tsx).
+      // Next reserves these names in a route segment file: the alias IS the contract (live example: a subscriptions/checkout/page.tsx).
       { filename: PAGE, code: "export const generateMetadata = subscriptionCheckoutMetadata" },
       { filename: PAGE, code: "export const dynamic = forceDynamic" },
       { filename: LAYOUT, code: "export const viewport = appViewport" },

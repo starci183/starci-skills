@@ -9,7 +9,7 @@
 //   Kernel/Supervisor   machine.sqlite seat_transcript_snapshots, same cadence, for every live seat whose record
 //                       names its Dispatch (seats.detail_json value.dispatch).
 //
-// The source is Orca's `worker-read --source auto` (scripts/api/orca/worker-read.mjs workerOutput, paged by its
+// The source is Orca's `worker-read --source auto` (scripts/machine/worker-output.mjs workerOutput, paged by its
 // cursor; deep map T1): the exact hook-reported transcript when the provider has one, else labelled terminal output.
 // Orca's archive is unredacted and on Orca's retention, so the sink stays ours: every output passes
 // scripts/lib/redact.mjs before the put (blobs.redaction='v1'). The first line of every stored text is a header
@@ -19,10 +19,11 @@
 //   node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]
 //     one pass over the repo ledger's open attempts; a periodic caller (the reconciler) runs it every minute.
 import path from 'node:path';
-import { workerOutput } from '../api/orca/worker-read.mjs';
+import { workerOutput } from '../machine/worker-output.mjs';
 import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from '../machine/evidence-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { operationDispatchOf } from './verbs/shared/rows.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 /** The header line that keeps Orca's completeness verdict with the stored output. */
 export const outputHeader = (out) => `[worker-read dispatch=${out.dispatch} source=${out.source}${out.fallbackReason ? ` fallback=${out.fallbackReason}` : ''}`
@@ -109,7 +110,7 @@ export function snapshotSeats(machine, { now = Date.now(), everyMs = TRANSCRIPT_
   return out;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const arg = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   const [cmd] = argv;

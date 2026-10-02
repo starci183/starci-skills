@@ -13,7 +13,7 @@
 // Exit 0: every example is clean. Exit 1: an example has findings or its check could not run. Exit 2: bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -32,7 +32,7 @@ export function exampleDirs(examplesDir, only) {
  * report, or a tool of the lint could not run - a lint that did not run is never clean).
  */
 export function checkExample(examplesDir, name, { bin = HFS_BIN } = {}) {
-  const run = spawnSync(process.execPath, [bin, 'lint', '--repo', path.join(examplesDir, name), '--format', 'json'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const run = runNode([bin, 'lint', '--repo', path.join(examplesDir, name), '--format', 'json'], { maxBuffer: 256 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(run.stdout); } catch { report = null; }
   if (!report?.counts || !Array.isArray(report.findings)) return { name, status: 'unrunnable', errors: 1, byCode: {}, detail: (run.stderr || run.stdout || `exit ${run.status}`).trim().split('\n')[0] };

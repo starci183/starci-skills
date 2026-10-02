@@ -25,7 +25,7 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
@@ -36,10 +36,9 @@ import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
-import { probeOrcaAsync, runChild, serviceRegistry, servicePorts, startService } from './services.mjs';
-import { sleep } from '../lib/sleep.mjs';
+import { probeOrcaAsync, serviceRegistry, servicePorts, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
+import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 export const MIN_SQLITE = '3.51.3';
 export const PROFILE = 'operational';
 /** Services `start` never launches itself: Orca is a GUI app (the owner opens it); the scheduled task is the owner's. */
@@ -153,9 +152,9 @@ export function uiBuildState({ uiDir = path.join(SKILL_ROOT, 'ui'), fsImpl = fs 
   return { stale: false, reason: 'ui/dist is newer than every ui source', srcMs, distMs };
 }
 
-/** `npm run build` in ui/: {ok, output}. Seam: run. */
-export function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), run = spawnSync } = {}) {
-  const r = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'], { cwd: uiDir, encoding: 'utf8', windowsHide: true, timeout: 900_000, shell: process.platform === 'win32' });
+/** `npm run build` in ui/: {ok, output}. Seam: npm(args, options). */
+export function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), npm = runNpm } = {}) {
+  const r = npm(['run', 'build'], { cwd: uiDir, timeout: 900_000 });
   return { ok: r.status === 0, output: String(r.stdout ?? '').concat(String(r.stderr ?? '')).trim().split(/\r?\n/).slice(-6).join(' | ').slice(0, 500) };
 }
 
@@ -290,11 +289,11 @@ export function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
 
 function safeRun(fn, fallback) { try { return fn(); } catch { return fallback; } }
 
-async function json(cmd, args, { timeoutMs = 120_000, run = runChild } = {}) {
-  const r = await run(cmd, args, { timeoutMs });
-  const lines = String(r.stdout ?? '').trim().split(/\r?\n/).reverse();
+async function json(args, { timeoutMs = 120_000 } = {}) {
+  const { error, stdout } = await execNode(args, { cwd: SKILL_ROOT, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
+  const lines = String(stdout ?? '').trim().split(/\r?\n/).reverse();
   for (const line of lines) { try { const v = JSON.parse(line); if (v && typeof v === 'object') return v; } catch { /* next */ } }
-  return r.timedOut ? { ok: false, error: 'timeout' } : null;
+  return error?.killed || error?.code === 'ETIMEDOUT' ? { ok: false, error: 'timeout' } : null;
 }
 
 /**
@@ -309,11 +308,11 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from D:/starci-archive/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from <archive root>/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from D:/starci-archive/ledger-backups, owner-approved)')
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from <archive root>/ledger-backups, owner-approved)')
     : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
@@ -340,7 +339,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   // seats
   const mode = safeRun(() => (env.STARCI_SUPERVISOR_MODE || config?.supervisor?.mode || 'chat'), 'chat');
   if (mode === 'kernel' && seats && orcaProbe.ok) {
-    const st = await json(process.execPath, [path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
+    const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
     push(supervisorItem({ mode, statusJson: st }));
   } else push(mode === 'kernel' ? red('seats', 'supervisor', 'Supervisor seat', orca ? 'Orca is not reachable' : 'not checked', 'open Orca, then run start again') : supervisorItem({ mode }));
   push(orcaProbe.ok === false ? red('preflight', 'orca', 'Orca reachable', `${orcaProbe.verdict}${orcaProbe.error ? `: ${orcaProbe.error}` : ''}`, 'open Orca yourself, then run start again') : orcaProbe.ok ? green('preflight', 'orca', 'Orca reachable', `${orcaProbe.terminals ?? 0} terminal(s)`) : []);
@@ -382,7 +381,7 @@ export async function kernelSeatItems({ orcaOk = true, config = null, repair = f
     const ledger = path.basename(repo);
     if (!orcaOk) { out.push(red('seats', `seat:kernel:${ledger}:${workflowId}`, `Kernel seat ${workflowId}`, 'Orca is not reachable', 'open Orca, then run start again')); continue; }
     const args = [path.join(SKILL_ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs'), '--repo', repo, '--workflow', workflowId, '--once', '--json', ...(repair ? ['--repair'] : [])];
-    const answer = await json(process.execPath, args, { timeoutMs: 300_000 });
+    const answer = await json(args, { timeoutMs: 300_000 });
     out.push(kernelSeatItem({ ledger, workflowId, answer, seatState: answer?.action ? seatStateOf(answer.action) : null }));
   }
   return out;
@@ -472,7 +471,7 @@ async function up(opts) {
   const config = safeRun(() => loadConfig(), null);
   if (orcaUp) {
     if ((env.STARCI_SUPERVISOR_MODE || config?.supervisor?.mode || 'chat') === 'kernel') {
-      const r = await json(process.execPath, [path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
+      const r = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
       applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : ''}`);
     }
     const seats = await kernelSeatItems({ orcaOk: true, config, repair: true });
@@ -505,4 +504,4 @@ export async function main(argv = process.argv.slice(2)) {
   process.exitCode = summary.ok ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) await main();
+if (isMain(import.meta.url)) await main();

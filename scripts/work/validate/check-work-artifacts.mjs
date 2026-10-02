@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../record-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {resolveBlob} from '../../../engine/db/blob.mjs';
+import {resolveBlob} from '../../../engine/db/blob.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
  * The gate verifies declarations, not bytes. check-example-work.mjs asks whether a done uat-flow has a
@@ -618,7 +618,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
   return {...counts, records: records.size, evidence: evidenceByDir.size};
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);
   const treeArg = args.includes('--tree') ? args[args.indexOf('--tree') + 1] : null;
   const trees = treeArg ? [path.resolve(treeArg)]

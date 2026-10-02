@@ -5,7 +5,7 @@
 //   node scripts/work/brand/brand-palette.mjs --check <png> --brand <work-root> [--json]
 //   node scripts/work/brand/brand-palette.mjs --scan <work-root> [--json]     every part, composite and capture, read-only
 //
-// Owner, 2026-09-24 ("sao lúc đỏ lúc xanh??"): one nivo drawing painted its primary button, links and selection in
+// Owner, 2026-09-24 ("why is it red one time and green the next??"): one nivo drawing painted its primary button, links and selection in
 // the image model's default blue while the brand has ONE accent, Unicorn red. scripts/work/ui/render.mjs already read
 // pixels against the brand (`palette-off-brand`, `primary-absent`), but only the example render proof ran it, so
 // nothing on the draw, brand or implement path ever looked at a colour. This module is the drawn-image form of those
@@ -52,7 +52,7 @@
 import fs from 'node:fs';
 import { capturesOf } from '../impl-captures.mjs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../../lib/is-main.mjs';
 import { deltaEOk, oklabToOklch, oklabToRgb, formatHex, readBrandRecord, rgbToOklab } from './brand.mjs';
 import { brandColours } from '../ui/render.mjs';
 import { decodePng, keyRect } from '../png.mjs';
@@ -374,7 +374,7 @@ export function brandOf(workRoot) {
 
 // ---------------------------------------------------------------------------------------------------------
 // Read-only scan of a whole Work tree: every ui record's parts and composites, every layout capture, every
-// implementation capture. What the supervisor ran over nivo, starci-next and mia-mia on 2026-09-24.
+// implementation capture. What the supervisor ran over the product repositories on 2026-09-24.
 // ---------------------------------------------------------------------------------------------------------
 
 const walkFiles = (dir, keep, skip = new Set(['node_modules', 'kernel-evidence', 'kernel-strays', 'runs', '_derived'])) => {
@@ -469,7 +469,7 @@ async function main(argv) {
   return { exitCode: 2, text: 'Usage: node scripts/work/brand/brand-palette.mjs --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = await main(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

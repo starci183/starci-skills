@@ -30,13 +30,14 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
+import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
 import { defaultPushRepos, pushMains, describePush } from './push-mains.mjs';
 import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
-const selfFile = fileURLToPath(import.meta.url);
 const canonical = (p) => { const r = path.resolve(p); try { return fs.realpathSync.native(r); } catch { return r; } };
 const key = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
 const samePath = (a, b) => key(a) === key(b);
@@ -170,8 +171,8 @@ export function runStep(step, { cwd, timeoutMs, tag = 'repo' } = {}) {
   try {
     const env = { ...process.env, CI: process.env.CI ?? '1', STARCI_PUSH_GIT: '1' };
     r = step.cmd === 'npm'
-      ? spawnSync(`npm ${step.args.join(' ')}`, { cwd, shell: true, stdio: ['ignore', fd, fd], timeout: timeoutMs, env })
-      : spawnSync(process.execPath, step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env });
+      ? runNpm(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env })
+      : runNode(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env });
   } finally { fs.closeSync(fd); }
   const timedOut = r.error?.code === 'ETIMEDOUT' || (r.status == null && r.signal === 'SIGTERM');
   const text = readTail(log);
@@ -266,7 +267,7 @@ export function describeRun(run) {
   return out.join('\n');
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const bad = argv.filter((a, i) => a.startsWith('--') && !['--repo', '--check', '--json'].includes(a) && !(argv[i - 1] === '--repo'));
   if (bad.length) { console.error(`unknown option ${bad.join(' ')}; use: push-git.mjs [--repo <path>]... [--check] [--json]`); process.exit(2); }

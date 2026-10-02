@@ -5,11 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sweepTmp } from '../../scripts/housekeeping/hk-tmp.mjs';
-import { forbiddenRoot, safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { forbiddenRoot } from '../../scripts/api/fs/forbidden-root.mjs';
+import { safeRemove } from '../../scripts/api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 
 // STORAGE-PROMPT item 1.tmp: top-level %TEMP% entries matching a declared prefix and older than
-// tmpMaxAgeMs go through safeRemoveTree; links, ${TEMP}/claude and live-process dirs are skipped. Every
+// tmpMaxAgeMs go through safeRemove; links, ${TEMP}/claude and live-process dirs are skipped. Every
 // case runs against its own fixture dir through the injected `env` seam — the real TEMP is never read.
 const DAY = 24 * 60 * 60 * 1000;
 const ALLOCATION = { tmpPrefixes: ['starci', 'evidence-'], tmpMaxAgeMs: 2 * DAY };
@@ -17,7 +18,7 @@ const NOW = Date.parse('2026-09-26T12:00:00Z');
 
 function sandbox(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hk-tmp-spec-')));
-  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
+  t.after(() => { safeRemove(root, { hold: artifactHoldReason }); });
   return { root, env: { TEMP: root } };
 }
 /** A temp entry (dir with a payload file, or a plain file) aged to `mtimeMs`. */
@@ -161,7 +162,7 @@ function checkoutFixture(root, name, mtimeMs, gitMs = mtimeMs) {
   return p;
 }
 
-test('sweepTmp removes an old prefix-matched fixture that is a git checkout (.git directory) through safeRemoveTree', async (t) => {
+test('sweepTmp removes an old prefix-matched fixture that is a git checkout (.git directory) through safeRemove', async (t) => {
   const { root, env } = sandbox(t);
   const fixture = checkoutFixture(root, 'starci-work-v3-cli-old', NOW - 10 * DAY);
   const out = await sweepTmp({ apply: true, now: NOW, env, allocation: ALLOCATION });
@@ -184,12 +185,12 @@ test('sweepTmp skips a temp checkout whose git metadata changed within tmpMaxAge
 test('the temp-root allowance never reaches a checkout outside the temp root or one reached through a link', (t) => {
   const { root } = sandbox(t);
   const outside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hk-outside-checkout-')));
-  t.after(() => { safeRemoveTree(outside, { hold: artifactHoldReason, checkoutsUnder: path.dirname(outside) }); });
+  t.after(() => { safeRemove(outside, { hold: artifactHoldReason, checkoutsUnder: path.dirname(outside) }); });
   fs.mkdirSync(path.join(outside, '.git'));
   fs.writeFileSync(path.join(outside, 'live.txt'), 'do-not-lose\n');
   const temp = path.join(root, 'temp-root');
   fs.mkdirSync(temp);
-  const refused = safeRemoveTree(outside, { hold: artifactHoldReason, checkoutsUnder: temp });
+  const refused = safeRemove(outside, { hold: artifactHoldReason, checkoutsUnder: temp });
   assert.equal(refused.ok, false);
   assert.match(refused.errors[0].message, /refusing to remove a git checkout/);
   const link = path.join(temp, 'starci-linked-checkout');

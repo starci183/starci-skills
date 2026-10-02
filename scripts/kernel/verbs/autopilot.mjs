@@ -1,7 +1,7 @@
 // api autopilot: workflow autonomy controls.
 import { createHash } from 'node:crypto';
 import { csvList, getWorkflow } from './shared/rows.mjs';
-import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot.mjs';
+import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 
 export default {
@@ -33,7 +33,7 @@ export default {
       emit(out, `autopilot sweep ${workflowId}: answered ${out.answered.length}, deferred ${out.deferred.length}, rerouted ${out.rerouted.length}, timed out ${out.timedOut.length}, supplied ${out.supplied.length}${out.errors.length ? `, errors ${out.errors.length}` : ''}`, args.json);
       return;
     }
-    if (args.bundle) { const out = { ok: true, ...autopilotBundle(db, workflowId) }; emit(out, `sổ chờ thầy xem lại ${workflowId}: ${JSON.stringify(out.counts)}`, args.json); return; }
+    if (args.bundle) { const out = { ok: true, ...autopilotBundle(db, workflowId) }; emit(out, `${out.title} ${workflowId}: ${JSON.stringify(out.counts)}`, args.json); return; }
     if (args.checklist) { const out = { ok: true, workflowId, ...credentialChecklist(db, workflowId, { lang: args.lang ?? 'vi' }) }; emit(out, out.question.text, args.json); return; }
     if (args['defer-to-handover']) {
       const cls = String(args.class ?? '').trim();

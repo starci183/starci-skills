@@ -32,6 +32,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -342,5 +343,5 @@ function main() {
   if (args.out) console.log(`packet written: ${args.out}`);
 }
 
-const invokedAsScript = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const invokedAsScript = isMain(import.meta.url);
 if (invokedAsScript) main();

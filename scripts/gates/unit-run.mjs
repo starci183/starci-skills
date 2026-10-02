@@ -4,26 +4,29 @@
 //
 //   node scripts/gates/unit-run.mjs --root <app> [--out <file>]
 //
-// The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): only services are unit-tested, one
-// <name>.service.spec.ts beside each be/src/**/*.service.ts, the subject built by Test.createTestingModule over exactly its
+// The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): only the unit-tested roles of the slot manifest
+// (ruleParams.be.unitRoles: every be/src/**/*.service.ts, every cli command be/src/features/cli/**/*.cli.ts) are unit-tested, one
+// <name>.<role>.spec.ts beside each, the subject built by Test.createTestingModule over exactly its
 // constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock,
 // recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock) and the Outcome matchers, and each service at 100 on lines, branches, functions and
 // statements on its own. Over the app at --root it records:
 //   run       the managed `npm test` (the unit project with --coverage) with jest's --json report and a json-summary coverage
 //             report into a private temp directory: exit, totals, failures;
-//   services  per *.service.ts: its coverage (the four pcts), its spec beside it, and the kit judgment of that spec
+//   services  per unit-tested subject (its role in `role`): its coverage (the four pcts), its spec beside it, and the kit judgment of that spec
 //             (op-gate.yaml unitKit: Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a
 //             `new <Service>(` of the subject forbidden).
 // `api settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 import { reduceJest } from './test-world-run.mjs';
+import { loadSlotManifest } from '../hfs/slots.mjs';
+import { unitRolesOf } from '../hfs/manifest-shape.mjs';
 
 export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
 export const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
@@ -37,13 +40,21 @@ export function unitKitRules(runtime = runtimeRoot) {
   return { required: doc?.unitKit?.required ?? [], forbidden: doc?.unitKit?.forbidden ?? [] };
 }
 
-/** The services of the app: be/src/**\/*.service.ts outside be/src/tests (app-relative POSIX paths). */
-export function servicesOf(root) {
+/** The folder a role's coverage glob roots at, app-relative (`src/**\/*.service.ts` -> be/src/, `src/features/cli/**\/*.cli.ts` -> be/src/features/cli/). */
+const roleRoot = (role) => `be/${role.coverage.slice(0, role.coverage.indexOf('**'))}`;
+
+/** The unit-tested role of an app-relative file, or null: its name ends in .<role>.ts below the role's coverage root. */
+export function unitRoleOf(rel, roles = unitRolesOf(loadSlotManifest())) {
+  return roles.find((role) => rel.endsWith(`.${role.role}.ts`) && rel.startsWith(roleRoot(role))) ?? null;
+}
+
+/** The unit-tested subjects of the app (ruleParams.be.unitRoles) outside be/src/tests, app-relative POSIX paths. */
+export function servicesOf(root, roles = unitRolesOf(loadSlotManifest())) {
   const dir = path.join(root, SERVICE_ROOT);
   if (!fs.existsSync(dir)) return [];
   return walkFiles(dir, { sorted: true, exclude: (name, full, entry) => entry.isDirectory() && ['node_modules', 'dist', 'coverage', 'tests'].includes(name) })
     .map((file) => posixPath(path.relative(root, file)))
-    .filter((rel) => rel.endsWith('.service.ts'));
+    .filter((rel) => unitRoleOf(rel, roles) !== null);
 }
 
 /** The kit judgment of one service spec: the forbidden needles it uses, the required ones it lacks, a `new Subject(`. */
@@ -62,13 +73,15 @@ export function judgeServices(root, coverage, rules = unitKitRules()) {
     const rel = posixPath(path.isAbsolute(file) ? path.relative(root, file) : file);
     byRel.set(rel, metrics);
   }
-  return servicesOf(root).map((rel) => {
+  const roles = unitRolesOf(loadSlotManifest());
+  return servicesOf(root, roles).map((rel) => {
     const metrics = byRel.get(rel) ?? null;
     const pct = Object.fromEntries(COVERAGE_METRICS.map((m) => [m, metrics?.[m]?.pct ?? null]));
-    const specRel = rel.replace(/\.service\.ts$/, '.service.spec.ts');
+    const role = unitRoleOf(rel, roles);
+    const specRel = `${rel.slice(0, -`.${role.role}.ts`.length)}.${role.spec}.ts`;
     const spec = fs.existsSync(path.join(root, specRel)) ? specRel : null;
     const kit = spec ? judgeServiceSpec(fs.readFileSync(path.join(root, specRel), 'utf8'), fs.readFileSync(path.join(root, rel), 'utf8'), rules) : null;
-    return { path: rel, coverage: pct, spec, kit };
+    return { path: rel, role: role.role, coverage: pct, spec, kit };
   });
 }
 
@@ -77,8 +90,8 @@ export function unitFindings(summary) {
   const out = [];
   for (const s of summary.services ?? []) {
     const below = COVERAGE_METRICS.filter((m) => s.coverage?.[m] !== 100);
-    if (below.length) out.push({ rule: 'coverage-below', path: s.path, message: `${below.map((m) => `${m} ${s.coverage?.[m] ?? 'not measured'}`).join(', ')} (every service owes 100 on each metric)` });
-    if (!s.spec) { out.push({ rule: 'spec-missing', path: s.path, message: 'no <name>.service.spec.ts beside the service' }); continue; }
+    if (below.length) out.push({ rule: 'coverage-below', path: s.path, message: `${below.map((m) => `${m} ${s.coverage?.[m] ?? 'not measured'}`).join(', ')} (every unit-tested subject owes 100 on each metric)` });
+    if (!s.spec) { out.push({ rule: 'spec-missing', path: s.path, message: `no <name>.${s.role ?? 'service'}.spec.ts beside it` }); continue; }
     for (const needle of s.kit?.missing ?? []) out.push({ rule: 'kit', path: s.spec, message: `the spec never uses ${needle}` });
     for (const needle of s.kit?.forbidden ?? []) out.push({ rule: 'kit', path: s.spec, message: `the spec uses ${needle}` });
     if (s.kit?.constructsSubject) out.push({ rule: 'kit', path: s.spec, message: `the spec constructs ${s.kit.subject} with new: build it through Test.createTestingModule` });
@@ -87,12 +100,12 @@ export function unitFindings(summary) {
 }
 
 /** Run the managed `npm test` with jest's JSON report and a json-summary coverage report: {command, exit, ...totals, coverage, error}. */
-export function runUnit(root, { spawn = spawnSync } = {}) {
+export function runUnit(root, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-unit-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const covDir = path.join(outDir, 'coverage');
   const args = ['test', '--', '--json', `--outputFile=${outFile}`, '--coverageReporters=json-summary', '--coverageReporters=text-summary', `--coverageDirectory=${covDir}`];
-  const run = spawn('npm', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, windowsHide: true, shell: process.platform === 'win32' });
+  const run = npm(args, { cwd: root, maxBuffer: 512 * 1024 * 1024 });
   let report = null, coverage = null;
   try { report = JSON.parse(fs.readFileSync(outFile, 'utf8')); } catch { report = null; }
   try { coverage = JSON.parse(fs.readFileSync(path.join(covDir, 'coverage-summary.json'), 'utf8')); } catch { coverage = null; }
@@ -103,9 +116,9 @@ export function runUnit(root, { spawn = spawnSync } = {}) {
     error: report ? null : `jest wrote no --json report (exit ${run.status ?? run.error?.message}): ${String(run.stderr || run.stdout || '').trim().split(/\r?\n/).slice(-1)[0] ?? ''}` };
 }
 
-export function buildUnitRun({ root, rules = unitKitRules(), spawn = spawnSync }) {
+export function buildUnitRun({ root, rules = unitKitRules(), npm = runNpm }) {
   const abs = path.resolve(root);
-  const { coverage, ...run } = runUnit(abs, { spawn });
+  const { coverage, ...run } = runUnit(abs, { npm });
   const summary = { schema: UNIT_RUN_SCHEMA, at: new Date().toISOString(), root: posixPath(abs), run, services: judgeServices(abs, coverage, rules), findings: [], exit: 2 };
   summary.findings = unitFindings(summary);
   const red = run.error || run.exit !== 0 || run.failed > 0 || run.total === 0;

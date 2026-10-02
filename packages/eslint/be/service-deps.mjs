@@ -21,9 +21,9 @@
  * slot view. A name is read only for the fixed vocabulary of the double markers, as whole words.
  */
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isSpecFile, normalizePath } from "./lib/path.mjs"
-import { implementsMigration, inMigrateApp, inTestBootstrap, isMigrationFile, mayHoldEntityManager } from "./lib/persistence.mjs"
+import { implementsMigration, inCli, isMigrationFile, mayHoldEntityManager } from "./lib/persistence.mjs"
 import { typed, typeOrigins } from "./lib/types.mjs"
 
 // -- provider-param-token --------------------------------------------------------------------------
@@ -144,7 +144,7 @@ export const noRepositoryClass = {
         schema: [],
         messages: {
             statements:
-                "`{{name}}` is exported and takes an `EntityManager` as its first parameter: a statement module is a repository without a class. Put the SQL text in `<name>.sql.ts` and run it with `this.entityManager.query(...)` from the capability `*.service.ts` or the application `*.handler.ts`; only `platform/database`, `apps/migrate` and `src/tests` take a manager in a free function.",
+                "`{{name}}` is exported and takes an `EntityManager` as its first parameter: a statement module is a repository without a class. Put the SQL text in `<name>.sql.ts` and run it with `this.entityManager.query(...)` from the capability `*.service.ts` or the application `*.handler.ts`; only `platform/database`, the cli (`apps/cli`, `src/features/cli`) and `src/tests` take a manager in a free function.",
             repository:
                 "`{{name}}` takes or holds a `{{type}}` in `{{member}}` but is not an application handler, a domain service or a platform persistence capability. A class wrapping the manager per entity is a repository whatever it is called: it hides which connection and transaction a call runs in and cannot be unit-tested with a token double. Move the queries into the handler or the domain service that owns the use, and call the injected EntityManager directly.",
         },
@@ -153,7 +153,7 @@ export const noRepositoryClass = {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
         const file = normalizePath(filename)
-        if (mayHoldEntityManager(hfs, file) || inMigrateApp(hfs, file) || inTestBootstrap(hfs, file) || isMigrationFile(hfs, file) || (hfs.slotOf(file) ?? "").startsWith("be.tests.")) return {}
+        if (mayHoldEntityManager(hfs, file) || inCli(hfs, file) || inTestWorld(hfs, file) || isMigrationFile(hfs, file) || (hfs.slotOf(file) ?? "").startsWith("be.tests.")) return {}
         const check = (node) => {
             if (implementsMigration(context, node)) return
             const found = persistenceMember(context, node)

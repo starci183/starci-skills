@@ -19,34 +19,16 @@
 // Per-job cap: past perJobCap a job's own rows (not derived ev: rows) are dropped and ONE log.truncated row says so.
 // A row whose workflow the ledger does not hold is refused (the FK), counted as `rejected`, never thrown.
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { appendLog, beginImmediate, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/db/ledger.mjs';
 import { isBusyError } from '../../engine/db/machine.mjs';
+import { guardWrites } from '../../engine/db/authorizer.mjs';
 
-const require = createRequire(import.meta.url);
 export const LOG_FLUSH_MS = 250;
 export const LOG_FLUSH_ROWS = 200;
 export const LOG_WRITABLE_TABLES = Object.freeze(['logs', 'log_cursors', 'sqlite_sequence', 'logs_fts', 'logs_fts_data', 'logs_fts_idx', 'logs_fts_docsize', 'logs_fts_config']);
 const TRUNCATED = 'log.truncated';
 const writers = new Map();
 const keyOf = (file) => { const p = path.resolve(file); return process.platform === 'win32' ? p.toLowerCase() : p; };
-
-/** Refuse, at prepare time, every write outside the log tables (node:sqlite setAuthorizer; absent on old nodes). */
-function guardWrites(db) {
-  if (typeof db.setAuthorizer !== 'function') return false;
-  const { constants } = require('node:sqlite');
-  const { SQLITE_OK, SQLITE_DENY, SQLITE_INSERT, SQLITE_UPDATE, SQLITE_DELETE, SQLITE_CREATE_TABLE, SQLITE_CREATE_INDEX, SQLITE_CREATE_TRIGGER, SQLITE_CREATE_VIEW } = constants;
-  const writes = new Set([SQLITE_INSERT, SQLITE_UPDATE, SQLITE_DELETE]);
-  const creates = new Set([SQLITE_CREATE_TABLE, SQLITE_CREATE_INDEX, SQLITE_CREATE_TRIGGER, SQLITE_CREATE_VIEW]);
-  db.setAuthorizer((action, table) => {
-    if (creates.has(action)) return SQLITE_DENY;
-    // FTS5 maintains its shadow tables (logs_fts_*) with deletes of its own; a logs row itself is never deleted here.
-    if (action === SQLITE_DELETE) return String(table).startsWith('logs_fts') ? SQLITE_OK : SQLITE_DENY;
-    if (writes.has(action)) return LOG_WRITABLE_TABLES.includes(String(table)) ? SQLITE_OK : SQLITE_DENY;
-    return SQLITE_OK;
-  });
-  return true;
-}
 
 function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS } = {}) {
   let db = null, stmts = null, timer = null, refs = 0, closed = false;
@@ -59,7 +41,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
     // Its own connection (wal_autocheckpoint=0: the reconciler engine is the one checkpointer); rows go through the
     // ledger writer's appendLog/setLogCursor, never a statement of this module's own.
     const conn = openLedgerConnection(file);
-    guardWrites(conn);
+    guardWrites(conn, { writable: LOG_WRITABLE_TABLES, deletable: (table) => table.startsWith('logs_fts') });
     db = conn;
     stmts = {
       bySrc: db.prepare('SELECT 1 FROM logs WHERE src=?'),
@@ -114,7 +96,7 @@ function createWriter(file, { flushMs = LOG_FLUSH_MS, maxRows = LOG_FLUSH_ROWS }
         if (d.act === 'drop') {
           out.dropped += 1; out.seqs.push(null);
           if (d.truncate) appendLog(db, { at: d.truncate.now, workflowId: d.truncate.row.workflowId, jobId: d.truncate.row.jobId, attemptId: d.truncate.row.attemptId ?? null,
-            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `Nhật ký job đã chạm trần ${d.truncate.perJobCap} dòng; các dòng sau bị bỏ`, data: { cap: d.truncate.perJobCap }, refs: [] });
+            actor: 'runtime', level: 'warn', kind: TRUNCATED, msg: `the job log hit its ${d.truncate.perJobCap}-line cap; later lines are dropped`, data: { cap: d.truncate.perJobCap }, refs: [] });
           continue;
         }
         const { row } = d;

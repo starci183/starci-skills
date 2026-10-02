@@ -24,7 +24,7 @@ const IN_PLAN = at("src/modules/domain/plan/plan.service.ts")
 const IN_PLAN_NESTED = at("src/modules/domain/plan/balancer/use-api.service.ts")
 const IN_PLAN_INDEX = at("src/modules/domain/plan/index.ts")
 const IN_LOGGING = at("src/modules/platform/logging/json-logger.service.ts")
-const IN_FEATURE = at("src/features/checkout/application/place.handler.ts")
+const IN_FEATURE = at("src/features/api/checkout/application/place.handler.ts")
 const IN_APP_ROOT = at("apps/api/src/app.module.ts")
 
 test("every rule this law declares is exported under its published name, and the old name is gone", () => {
@@ -42,7 +42,7 @@ test("R30: another owner is imported through its public entry, never through a p
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain/ai'" },
       { filename: IN_FEATURE, code: "import { X } from '@modules/platform/logging'" },
       { filename: IN_FEATURE, code: "import { X } from '@modules/integrations/sepay'" },
-      { filename: IN_APP_ROOT, code: "import { PlanModule } from '@features/plan'" },
+      { filename: IN_APP_ROOT, code: "import { PlanModule } from '@features/api/plan'" },
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain/ai/index'" },
       { filename: IN_FEATURE, code: "import type { PlanSummary } from '@modules/domain/plan'" },
       // a test helper alias names a file under the test tree: not an owner
@@ -60,12 +60,12 @@ test("R30: another owner is imported through its public entry, never through a p
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain'", errors: [{ messageId: "barrel" }] },
       { filename: IN_FEATURE, code: "import { X } from '@modules/platform'", errors: [{ messageId: "barrel" }] },
       { filename: IN_FEATURE, code: "import { X } from '@modules/integrations'", errors: [{ messageId: "barrel" }] },
-      { filename: IN_FEATURE, code: "export { X } from '@features/'", errors: [{ messageId: "barrel" }] },
+      { filename: IN_FEATURE, code: "export { X } from '@features/api/'", errors: [{ messageId: "barrel" }] },
       // a file of another owner is not its public surface
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain/plan/plan.service'", errors: [{ messageId: "deep" }] },
       { filename: IN_FEATURE, code: "import { X } from '@modules/platform/logging/logging.port'", errors: [{ messageId: "deep" }] },
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain/plan/persistence/entities/plan.entity'", errors: [{ messageId: "deep" }] },
-      { filename: IN_APP_ROOT, code: "import { X } from '@features/plan/application/create-plan.handler'", errors: [{ messageId: "deep" }] },
+      { filename: IN_APP_ROOT, code: "import { X } from '@features/api/plan/application/create-plan.handler'", errors: [{ messageId: "deep" }] },
       { filename: IN_FEATURE, code: "export { X } from '@modules/integrations/sepay/sepay.client'", errors: [{ messageId: "deep" }] },
       // a same-owner import never goes through the owner's own index
       { filename: IN_PLAN, code: "import { X } from './index'", errors: [{ messageId: "ownIndex" }] },
@@ -90,7 +90,7 @@ test("R30: an owner does not reach itself through its own alias", () => {
       { filename: IN_PLAN, code: "import { X } from '@modules/domain/plan/plan-entitlement.service'", errors: [{ messageId: "self" }] },
       { filename: IN_PLAN_NESTED, code: "import { X } from '@modules/domain/plan'", errors: [{ messageId: "self" }] },
       { filename: IN_LOGGING, code: "import { X } from '@modules/platform/logging'", errors: [{ messageId: "self" }] },
-      { filename: IN_FEATURE, code: "import { X } from '@features/checkout'", errors: [{ messageId: "self" }] },
+      { filename: IN_FEATURE, code: "import { X } from '@features/api/checkout'", errors: [{ messageId: "self" }] },
     ],
   })
 })
@@ -106,7 +106,7 @@ test("R30: no folder re-export, no nested index, and an owner's index holds only
       { filename: IN_PLAN, code: "import { X } from '../databases/x.service'" },
       // an explicit public API is named re-exports, value and type, at the owner root
       { filename: IN_PLAN_INDEX, code: "export { PlanService } from './plan.service'\nexport type { PlanSummary } from './plan.contracts'" },
-      { filename: at("src/features/checkout/index.ts"), code: "export { CheckoutModule } from './checkout.module'" },
+      { filename: at("src/features/api/checkout/index.ts"), code: "export { CheckoutModule } from './checkout.module'" },
       // pure re-exports, but the file is not named index.* -- a deliberate bridging file, not a barrel
       { filename: IN_PLAN, code: "export { X } from './x.service'\nexport { Y } from './y.service'" },
       // the budget is inclusive
@@ -133,7 +133,7 @@ test("R30: no folder re-export, no nested index, and an owner's index holds only
       { filename: IN_PLAN_INDEX, code: `${namesFrom(40)}\nexport { M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19, M20, M21 } from './more'`, errors: [{ messageId: "tooWide" }] },
       // a nested index is a second surface, wherever it sits below the owner root
       { filename: at("src/modules/domain/plan/persistence/index.ts"), code: "export { A } from './a'", errors: [{ messageId: "nestedIndex" }] },
-      { filename: at("src/features/checkout/application/index.ts"), code: "export { A } from './a'", errors: [{ messageId: "nestedIndex" }] },
+      { filename: at("src/features/api/checkout/application/index.ts"), code: "export { A } from './a'", errors: [{ messageId: "nestedIndex" }] },
       { filename: at("src/modules/platform/logging/adapters/index.ts"), code: "export { A } from './a'", errors: [{ messageId: "nestedIndex" }] },
     ],
   })

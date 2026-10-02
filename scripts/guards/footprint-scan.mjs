@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// footprint-scan.mjs — the worktree/link footprint watch, independent of every guard hook (nivo-fe inc-c8fbf76aa499).
+// footprint-scan.mjs — the worktree/link footprint watch, independent of every guard hook.
 //
 // A worker's command may slip past the command guard (a script, a tool that is not a shell), `git worktree remove` cannot be
 // hooked, and a link can be made by any tool. So the runtime also LOOKS: under the repositories root (the parent of
-// the source host repository, D:/Repositories on this host) it lists
+// the source host repository) it lists
 //   - every linked git worktree of a repository there that lives under the root (kernel and supervisor scratch lives
 //     under the user's .starci home or the temp directory, never there), and
 //   - every link (symlink, junction, other reparse point) to depth --depth whose target is in ANOTHER top-level
@@ -18,13 +18,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { foldCase } from '../lib/path-key.mjs';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { isMain } from '../lib/is-main.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(here, '..', '..');
 export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
 export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
@@ -59,13 +59,13 @@ export function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
 }
 
 /** Linked worktrees (not the main checkout) of every repository directly under root, that live under root. */
-export function worktreesUnderRoot(root, { git = (cwd, args) => gitSpawn('git', args, { cwd, timeout: 20_000 }) } = {}) {
+export function worktreesUnderRoot(root, { git = (cwd, args) => worktreeListQuery(args, { cwd, timeout: 20_000 }) } = {}) {
   const found = [];
   let names; try { names = fs.readdirSync(root); } catch { return found; }
   for (const name of names) {
     const repo = path.join(root, name);
     try { if (!fs.statSync(path.join(repo, '.git')).isDirectory()) continue; } catch { continue; }
-    const listed = git(repo, ['worktree', 'list', '--porcelain']);
+    const listed = git(repo, ['--porcelain']);
     if (listed.status !== 0) continue;
     const trees = String(listed.stdout).split(/\r?\n/).filter((line) => line.startsWith('worktree ')).map((line) => path.resolve(line.slice('worktree '.length)));
     for (const tree of trees.slice(1)) if (topOf(root, tree) !== null) found.push({ repo, worktree: tree });
@@ -103,7 +103,7 @@ export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultR
   }, { env });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (name) => { const index = argv.indexOf(`--${name}`); return index >= 0 ? argv[index + 1] : null; };
   const result = await runFootprintScan({ ...(value('root') ? { root: value('root') } : {}), ...(value('depth') ? { depth: Number(value('depth')) } : {}) });

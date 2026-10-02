@@ -19,20 +19,22 @@
 //   --until-commit <repo>:<ref-or-path>        <ref> resolves to a commit, or <path> is committed at HEAD
 //   --until-incident <incidentId>[:resolved]   that incident is no longer open
 //   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
-//                                              --land; scripts/kernel/foundations.mjs)
+//                                              --land; scripts/kernel/foundation-registry.mjs)
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it
 //                                              landed there at its finish (workflow-landed: a workflow lands
 //                                              into main once, at api finish, workflow-checkpoint.mjs) (a
-//                                              cross-workflow hold on a restructure, e.g. nivo FE legs held until
-//                                              wf-nivo-fe-canon lands into nivo-fe)
+//                                              cross-workflow hold on a restructure, e.g. a product's frontend
+//                                              legs held until its canon workflow lands into the frontend repo)
 //
 // Owner-only conditions (an ask answered, a consent given) have no typed form: the owner drives them.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { lsTree } from '../api/git/ls-tree.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeFoundationName, readFoundation } from './foundations.mjs';
+import { normalizeFoundationName, readFoundation } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { resolveIncident } from '../../engine/db/ledger.mjs';
@@ -156,7 +158,7 @@ export function parseCondition(type, raw) {
   }
   if (type === 'landed') {
     const at = spec.lastIndexOf('@');
-    if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like nivo-fe, or its path)`);
+    if (at <= 0 || at === spec.length - 1) throw invalid(`--until-landed ${spec}: the form is <workflowId>@<repository> (a repository name like my-app, or its path)`);
     return { type, workflowId: spec.slice(0, at).trim(), repository: spec.slice(at + 1).trim() };
   }
   throw invalid(`unknown condition type ${type}`);
@@ -210,8 +212,8 @@ export const conditionLabel = (cond) => {
   }
 };
 
-const git = (repo, args) => {
-  const r = runGit(args, { dir: repo, timeout: GIT_TIMEOUT_MS });
+const git = (call, repo, args) => {
+  const r = call(args, { dir: repo, timeout: GIT_TIMEOUT_MS });
   return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? r.error?.message ?? '').trim() };
 };
 /**
@@ -220,8 +222,8 @@ const git = (repo, args) => {
  * entry's `change.rev` (every work record: ui-screen, contract, feature, ...). A nested object's `rev`
  * is a BINDING to another record, never this record's revision - ui-screen `brand.rev` / `shell.rev` /
  * `shell.layouts[].rev`, layout-tree `nodes[].rev`, contract `blockedBy[].rev` / `conflictsWith[].rev`
- * - so nothing below the top level is read except `change` (starci-next wf-sn-subscription
- * inc-13eb86851909: app-layout at change rev 6 never met `>=6`, its evidence read rev=-).
+ * - so nothing below the top level is read except `change` (an app-layout record at
+ * change rev 6 never met `>=6`, its evidence read rev=-).
  * Returns {rev, source} with rev null when the record states no revision of its own.
  */
 const positiveRev = (value) => {
@@ -294,11 +296,11 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
     if (cond.type === 'commit') {
       const repoAbs = path.isAbsolute(cond.repo) ? cond.repo : path.join(repo, cond.repo);
       if (!fs.existsSync(repoAbs)) return { met: false, evidence: `${cond.repo} absent` };
-      const ref = git(repoAbs, ['rev-parse', '--verify', '--quiet', `${cond.target}^{commit}`]);
+      const ref = git(revParseQuery, repoAbs, ['--verify', '--quiet', `${cond.target}^{commit}`]);
       if (ref.ok && ref.out) return { met: true, evidence: `${cond.repo} ${cond.target} = ${ref.out.slice(0, 12)}` };
-      const tree = git(repoAbs, ['ls-tree', '--name-only', 'HEAD', '--', cond.target]);
+      const tree = git(lsTree, repoAbs, ['--name-only', 'HEAD', '--', cond.target]);
       if (tree.ok && tree.out) {
-        const head = git(repoAbs, ['log', '-1', '--format=%H', 'HEAD', '--', cond.target]);
+        const head = git(gitLog, repoAbs, ['-1', '--format=%H', 'HEAD', '--', cond.target]);
         return { met: true, evidence: `${cond.repo}:${cond.target} committed at HEAD (last touched ${head.out.slice(0, 12) || '?'})` };
       }
       return { met: false, evidence: `${cond.repo}: ${cond.target} is neither a commit nor committed at HEAD` };
@@ -340,8 +342,8 @@ const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
  * blocker text names plus `ownerJobs` (routing adds the open jobs of `to` owning a file the introducing
  * commit changed); each is taken at its lineage head, and a head that had already succeeded before the
  * blocker was raised (`since`) is the introducer, not the repair. With no such job the release is the
- * introducer's reply (the follow-up asks it to notify the reporter). nivo academy-debt inc-9474fe9ff445
- * was routed to module-studio, named its queued owner op-backend.implement-853af99286, and still sat
+ * introducer's reply (the follow-up asks it to notify the reporter). One blocker
+ * was routed to its peer workflow, named that peer's queued owner job, and still sat
  * untyped on the supervisor as OWED.
  */
 export function sharedBlockerUntil(db, { to, text = '', since = 0, ownerJobs = [] }) {

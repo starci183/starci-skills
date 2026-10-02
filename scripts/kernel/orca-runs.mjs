@@ -1,12 +1,13 @@
 // orca-runs.mjs — keep a workflow's Orca Run bound to the Kernel terminal that
-// runs it now, and find the operation Tasks nothing holds any more.
+// runs it now. (An op's Task is never closed by the runtime: the op's own worker_done
+// settles it with its Dispatch, orca-deep-map REPLACE #9.)
 //
 // A workflow has one Orca Run, created by its first operation with the Kernel
 // terminal as coordinator (cli.mjs ensureWorkflowRun). A Kernel restart
 // replaces the terminal but not the Run: the Run id is durable on the kernel
 // job, and Orca's coordinator_handle still names the old terminal. Orca then
-// refuses every task-create/task-update the new Kernel issues. After the
-// 2026-09-24 reboot all eight Kernels were rejected at task-create with an
+// refuses every Task the new Kernel files or updates. After the
+// 2026-09-24 reboot all eight Kernels were rejected at the Task's creation with an
 // empty error (inc-5c0ff394e676): the Run existed, its coordinator was the
 // pre-reboot terminal. bindWorkflowRun reads run-show and, when the coordinator
 // is not the current Kernel terminal, re-binds it with one run-use; a Run Orca
@@ -15,7 +16,6 @@
 // and nothing is issued again (a repeated run-use invalidates live Dispatches).
 import { runShow } from '../api/orca/run-show.mjs';
 import { runUse } from '../api/orca/run-use.mjs';
-import { allocationMs } from '../../engine/config.mjs';
 
 /**
  * Make `runId` coordinated by `kernelHandle`. Returns
@@ -42,44 +42,4 @@ export function bindWorkflowRun({ runId, kernelHandle }, { show = runShow, use =
       error: `run-use ${runId} --from ${kernelHandle}: ${used?.error || 'refused'}` };
   }
   return { ok: true, runId, action: 'rebound', previousCoordinator };
-}
-
-// Orca Task statuses that are closed; everything else (pending, ready,
-// dispatched, blocked) is an open row in the sidebar.
-export const CLOSED_TASK_STATUSES = new Set(['completed', 'failed']);
-// A Task StarCi created: an operation Task is titled `<op> #<attempt>` and
-// displayed `[Op] <op>` (cli.mjs createOperationTask).
-const STARCI_TASK_TITLE = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9.-]*\s+#\d+$/i;
-export const isStarciTask = (task) => /^\[Op\]\s/.test(String(task?.display_name ?? task?.displayName ?? ''))
-  || STARCI_TASK_TITLE.test(String(task?.task_title ?? task?.taskTitle ?? ''));
-
-/**
- * Which open Tasks of one workflow Run to close: every open StarCi Task whose id
- * no live job holds (`heldTaskIds`: the tasks of running/answering/leased jobs).
- * Returns {close: [task], keep: [{task, reason}]}. A Task StarCi did not create is kept.
- */
-// A Task younger than this may belong to a dispatch still in flight: api
-// dispatch creates the Task first and writes its id onto the job only once the
-// worker is attested, so no ledger row holds it yet. The window is
-// modules/models/runtimes.yaml allocation.orcaRuns.staleTaskMinAgeMs.
-export const STALE_TASK_MIN_AGE_MS = allocationMs('orcaRuns.staleTaskMinAgeMs');
-// Orca writes created_at as 'YYYY-MM-DD HH:MM:SS' (UTC) or ISO.
-const taskCreatedMs = (task) => {
-  const raw = task?.created_at ?? task?.createdAt ?? null;
-  if (raw == null) return null;
-  const ms = typeof raw === 'number' ? raw : Date.parse(/Z|[+-]\d\d:?\d\d$/.test(String(raw)) ? String(raw) : `${String(raw).replace(' ', 'T')}Z`);
-  return Number.isFinite(ms) ? ms : null;
-};
-
-export function staleTasks(tasks, { heldTaskIds = new Set(), now = Date.now(), minAgeMs = STALE_TASK_MIN_AGE_MS } = {}) {
-  const close = [], keep = [];
-  for (const task of tasks ?? []) {
-    if (CLOSED_TASK_STATUSES.has(task?.status)) continue;
-    const created = taskCreatedMs(task);
-    if (heldTaskIds.has(task?.id)) keep.push({ task, reason: 'held-by-live-job' });
-    else if (!isStarciTask(task)) keep.push({ task, reason: 'not-starci' });
-    else if (created == null || now - created < minAgeMs) keep.push({ task, reason: 'recent' });
-    else close.push(task);
-  }
-  return { close, keep };
 }

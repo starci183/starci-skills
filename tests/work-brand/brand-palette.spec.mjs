@@ -12,7 +12,7 @@ import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { NIVO_BRAND, drawnPart, redAccentPart, bluePrimaryPart } from '../fixtures/brand-palette.mjs';
 import { drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
 
-// Owner, 2026-09-24 ("sao lúc đỏ lúc xanh??"): nivo's brand is ONE accent, Unicorn red, and one drawn part
+// Owner, 2026-09-24 ("why red one moment, blue the next??"): nivo's brand is ONE accent, Unicorn red, and one drawn part
 // painted its primary button, links and selection in the image model's default blue. The palette rule already
 // existed in scripts/work/ui/render.mjs but no gate ran it; scripts/work/brand/brand-palette.mjs is its drawn-image
 // form and scripts/work/ui/shell-conformance.mjs runs it for every part, composite and capture.

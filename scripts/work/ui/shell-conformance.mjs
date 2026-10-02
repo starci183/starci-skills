@@ -44,7 +44,7 @@
 import fs from 'node:fs';
 import { capturesOf } from '../impl-captures.mjs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runNode } from '../../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import {
   DRAWER_DIRECTIONS, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
@@ -57,7 +57,7 @@ import { advisoryCodesFor, loadContractChanges } from '../../machine/contract-ve
 import { brandOf, brandPalette, paletteFindings } from '../brand/brand-palette.mjs';
 import { isPartName } from '../direction-part.mjs';
 import { generatedDrawingsOf } from './ui-shapes.mjs';
-import { assetsOf, indexFilesUnder, list, parseUiRef, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work-io.mjs';
+import { assetsOf, indexFilesUnder, list, parseUiRef, readYamlOrNull as readRecord, sha256File, slash, workRootOf as enclosingWorkRoot } from '../work-io.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
@@ -333,7 +333,7 @@ const GEOMETRY_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 
  * Every html direction of a ui record measured against the product's grammar geometry (grammar-geometry.mjs
  * --check), at the breakpoint the asset names or at every breakpoint of the layout tree.
  */
-export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = spawnSync } = {}) {
+export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = runNode } = {}) {
   const htmls = assetsOf(record).filter((a) => /\.html?$/i.test(a.path));
   if (!htmls.length) return [];
   const at = shown(workRoot, uiFile);
@@ -349,7 +349,7 @@ export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = spawn
     const named = a.viewport?.width && a.viewport?.height ? [{ name: 'asset', width: a.viewport.width, height: a.viewport.height }] : breakpoints.filter((b) => b.name === (a.composite?.breakpoint ?? a.breakpoint));
     const views = named.length ? named : breakpoints.length ? breakpoints : [{ name: 'default', width: 390, height: 844 }];
     for (const view of views) {
-      const r = run(process.execPath, [GEOMETRY_SCRIPT, '--check', file, '--repo', repo, '--viewport', `${view.width}x${view.height}`, '--json'], { encoding: 'utf8', timeout: 240000, maxBuffer: 32 * 1024 * 1024 });
+      const r = run([GEOMETRY_SCRIPT, '--check', file, '--repo', repo, '--viewport', `${view.width}x${view.height}`, '--json'], { timeout: 240000, maxBuffer: 32 * 1024 * 1024 });
       let parsed = null;
       try { parsed = JSON.parse(r.stdout ?? ''); } catch { parsed = null; }
       if (r.status === 0 && parsed?.ok) continue;
@@ -654,7 +654,7 @@ export function shellConformanceMain(argv = []) {
   return { exitCode: result.ok ? 0 : 1, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${result.ok ? 'OK' : 'FAIL'}: shell conformance (${result.mode}) - ${result.refused.length} refused, ${result.suspect.length} suspect.\n` };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const result = shellConformanceMain(process.argv.slice(2));
   process.stdout.write(result.text);
   process.exitCode = result.exitCode;

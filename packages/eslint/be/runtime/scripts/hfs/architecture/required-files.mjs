@@ -1,35 +1,35 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../../api/git/lib.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs';
+import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
+import { gitOutputOf } from '../../lib/git.mjs';
 
 /**
  * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
  * `requiredInstances`, `minInstances`, required app kinds) must exist in the repository tree. Everything is read through the
  * resolver of scripts/hfs/slots.mjs; nothing here names a path.
  *
- *   BE_REQUIRED_MODULE_MISSING   a backend app, feature, domain, integrations or platform instance lacks a required file or
- *                                directory, or a required platform instance (config, logging, errors, primitives) is absent
  *   FE_ERROR_BOUNDARY_MISSING    a fe.app.next app lacks global-error, error, not-found or loading under src/app
- *   HFS_REQUIRED_FILE_MISSING    any other required file or directory (packages, fe modules, i18n, api ...), and a minimum
- *                                (no api app, no feature, no next app) which is reported once at hfs.json
+ *   HFS_REQUIRED_FILE_MISSING    any other required file or directory of any slot (backend app, feature, domain, integrations and
+ *                                platform instances, a required platform instance such as config or logging, packages, fe modules,
+ *                                i18n, api ...), and a minimum (no api app, no feature, no next app) which is reported once at hfs.json
  *
  * Slots of tier none (README, root config, .starciwork, .starcistacks) belong to the slot check; fe.app.next is the one
  * tier-none slot judged here. The tree is the tracked one (`git ls-files` from the repository root, minus files deleted
  * on disk), else the filesystem without node_modules, .git, dist and .next.
  */
-export const REQUIRED_FILE_RULE_IDS = ['BE_REQUIRED_MODULE_MISSING', 'FE_ERROR_BOUNDARY_MISSING', 'HFS_REQUIRED_FILE_MISSING'];
+export const REQUIRED_FILE_RULE_IDS = ['FE_ERROR_BOUNDARY_MISSING', 'HFS_REQUIRED_FILE_MISSING'];
 
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next']);
 const ERROR_BOUNDARY_FILE = /^(?:global-error|error|not-found|loading)\.tsx$/u;
-const BACKEND_MODULE_SLOT = /^be\.(?:app|feature|transport|domain|integrations|platform)(?:\.|$)/u;
 const ALSO_JUDGED_TIER_NONE = new Set(['fe.app.next']);
 
 function gitFiles(root) {
   try {
-    const run = args => gitOutput(args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
-    run(['rev-parse', '--is-inside-work-tree']);
-    const deleted = new Set(run(['ls-files', '--deleted', '-z', '--', '.']).split('\0').filter(Boolean));
-    return run(['ls-files', '--cached', '-z', '--', '.']).split('\0').filter(file => file && !deleted.has(file));
+    const run = (call, args) => gitOutputOf(call(args, { cwd: root, maxBuffer: 256 * 1024 * 1024 }));
+    run(revParseQuery, ['--is-inside-work-tree']);
+    const deleted = new Set(run(lsFiles, ['--deleted', '-z', '--', '.']).split('\0').filter(Boolean));
+    return run(lsFiles, ['--cached', '-z', '--', '.']).split('\0').filter(file => file && !deleted.has(file));
   } catch {
     return null;
   }
@@ -65,7 +65,7 @@ const rootOfTarget = target => (target.endsWith('/') ? strip(target) : (path.pos
 
 function ruleFor(slotId, target, rootExists) {
   if (slotId === 'fe.app.next' && rootExists && ERROR_BOUNDARY_FILE.test(path.posix.basename(strip(target)))) return 'FE_ERROR_BOUNDARY_MISSING';
-  return BACKEND_MODULE_SLOT.test(slotId) ? 'BE_REQUIRED_MODULE_MISSING' : 'HFS_REQUIRED_FILE_MISSING';
+  return 'HFS_REQUIRED_FILE_MISSING';
 }
 
 export function checkRequiredFiles({ config, graph }) {

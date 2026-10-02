@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { mergeBase } from '../api/git/merge-base.mjs';
+import { diffNames } from '../api/git/diff-names.mjs';
 import { revParse as gitRevParse } from '../api/git/rev-parse.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 
@@ -74,4 +75,31 @@ export function gateBaseOf(ctx, workflowId) {
   const base = mergeBase(rec.path, `refs/heads/${mainOf(ctx)}`, 'HEAD') ?? '';
   if (!SHA.test(base)) throw fail({ code: 'workflow-gate-base-unknown' }, `workflow ${workflowId} has no checkpoint and ${rec.branch} has no merge-base with ${mainOf(ctx)}`);
   return base;
+}
+
+const CHAIN_WALK_MAX = 64;
+/**
+ * The bases an op's gate may have measured against, newest first (per side, WFWT2 2.2): the current checkpoint, then each
+ * older checkpoint of the chain while the checkpoint stepped over changed none of `owned` (the op's owned paths, the
+ * leases checkpointOp commits), stopping at the chain's start (the merge-base with main). A be checkpoint committed while
+ * an fe op ran therefore never forces the fe op to re-run its gate: what differs between the bases is the other side's
+ * committed, gated work, and the finish gates the whole branch again. An op that owns no path or owns '.' gets the current
+ * checkpoint only.
+ */
+export function gateBasesOf(ctx, workflowId, { owned = [] } = {}) {
+  const current = gateBaseOf(ctx, workflowId);
+  const paths = owned.map(String).filter(Boolean);
+  if (!paths.length || paths.some((p) => p === '.' || p === './')) return [current];
+  const rec = presentRecordOf(ctx, workflowId);
+  const root = mergeBase(rec.path, `refs/heads/${mainOf(ctx)}`, current);
+  const bases = [current];
+  for (let at = current; at !== root && bases.length < CHAIN_WALK_MAX;) {
+    const parent = revParse(rec.path, `${at}^`);
+    if (!parent) break;
+    const touched = diffNames(rec.path, parent, at, { paths: paths.map((p) => `:(literal)${p}`) });
+    if (touched === null || touched.length) break;
+    bases.push(parent);
+    at = parent;
+  }
+  return bases;
 }

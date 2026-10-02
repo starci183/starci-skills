@@ -40,7 +40,7 @@ export const STARCI_PACKAGES = Object.freeze({
 export const LINT_DEPENDENCIES = Object.freeze([
   'eslint', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals', 'typescript',
   'prettier', 'stylelint', 'postcss-value-parser',
-  '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/testing', '@types/express', '@types/jest', '@types/node',
+  '@nestjs/common', '@nestjs/core', '@nestjs/cqrs', '@nestjs/testing', '@nestjs/typeorm', 'typeorm', 'nest-commander', '@types/express', '@types/jest', '@types/node',
   'next', 'next-intl', 'react', 'react-dom', '@types/react', '@starci/grammar', '@heroui/react', '@heroui/styles',
   'tailwindcss', '@tailwindcss/postcss',
 ]);
@@ -62,13 +62,31 @@ function packagesOf(install) {
   return names;
 }
 
+/** The npm workspaces of the app (its root package.json `workspaces`, `<dir>/*` patterns): [{ name, dir }] of each folder with a package.json. */
+function workspacesOf(app) {
+  let patterns = [];
+  try { patterns = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).workspaces ?? []; } catch { return []; }
+  return patterns.flatMap((pattern) => {
+    const base = path.join(app, ...pattern.replace(/\/\*$/, '').split('/'));
+    if (!fs.existsSync(base)) return [];
+    return fs.readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory() && fs.existsSync(path.join(base, entry.name, 'package.json')))
+      .map((entry) => ({ name: JSON.parse(fs.readFileSync(path.join(base, entry.name, 'package.json'), 'utf8')).name, dir: path.join(base, entry.name) }));
+  });
+}
+
 /**
- * Links the packages of `installs` and copies the runtime's @starci packages into `<app>/node_modules`. Returns the links made, for
- * `uninstall`.
+ * Links the app's own workspaces by their package names (as npm install does: @<project>/ui is fe/packages/<project>-ui), links the
+ * packages of `installs` and copies the runtime's @starci packages into `<app>/node_modules`. Returns the links made, for `uninstall`.
  */
 export function installInto(app, installs) {
   const modules = path.join(app, 'node_modules');
   const links = [];
+  for (const { name, dir } of workspacesOf(app)) {
+    const link = path.join(modules, ...name.split('/'));
+    fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.symlinkSync(dir, link, 'junction');
+    links.push(link);
+  }
   for (const [name, folder] of Object.entries(STARCI_PACKAGES)) {
     const source = path.join(RUNTIME, 'packages', ...folder.split('/'));
     fs.cpSync(source, path.join(modules, ...name.split('/')), { recursive: true, filter: (file) => !/[\\/](node_modules|fixtures)([\\/]|$)|\.test\.mjs$/.test(path.relative(source, file)) });

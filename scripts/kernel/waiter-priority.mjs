@@ -157,7 +157,7 @@ export function orderQueuedByBlocking(queued, blocking) {
   }
   const indexed = queued.map((item, index) => ({ item, index }));
   // Foundation legs (api enqueue --foundation) keep leading the list; a queued cut seam (api status
-  // queued[].seam, scripts/kernel/cut-seam.mjs) comes next - its siblings build on it; blocking weight orders sameOrUnder.
+  // queued[].seam, scripts/kernel/seam-policy.mjs) comes next - its siblings build on it; blocking weight orders sameOrUnder.
   const foundationOf = (item) => Number(Boolean(item.foundation));
   const seamOf = (item) => Number(Boolean(item.seam));
   indexed.sort((a, b) => foundationOf(b.item) - foundationOf(a.item) || seamOf(b.item) - seamOf(a.item) || weightOf(b.item) - weightOf(a.item) || a.index - b.index);

@@ -10,9 +10,9 @@ const reach = report => report.coverage.hfsMachine.reachability;
 test('BE: a feature the app module imports at runtime is composed', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import { FooModule } from '../../../src/features/foo';\nexport const AppModule = [FooModule];\n",
-      'src/features/foo/index.ts': "export { FooModule } from './foo.module';\n",
-      'src/features/foo/foo.module.ts': 'export class FooModule {}\n',
+      'apps/core/src/app.module.ts': "import { FooModule } from '../../../src/features/api/foo';\nexport const AppModule = [FooModule];\n",
+      'src/features/api/foo/index.ts': "export { FooModule } from './foo.module';\n",
+      'src/features/api/foo/foo.module.ts': 'export class FooModule {}\n',
     },
   });
   const report = runArch(root);
@@ -27,15 +27,15 @@ test('BE: a feature the app module imports at runtime is composed', t => {
 test('BE: a feature no app root imports is reported with the roots examined', t => {
   const root = archFixture(t, {
     files: {
-      'src/features/orphan/index.ts': "export { OrphanModule } from './orphan.module';\n",
-      'src/features/orphan/orphan.module.ts': 'export class OrphanModule {}\n',
+      'src/features/api/orphan/index.ts': "export { OrphanModule } from './orphan.module';\n",
+      'src/features/api/orphan/orphan.module.ts': 'export class OrphanModule {}\n',
     },
   });
   const report = runArch(root);
   const hits = findings(report, 'BE_FEATURE_NOT_COMPOSED');
   assert.equal(hits.length, 1, JSON.stringify(hits));
-  assert.equal(hits[0].path, 'src/features/orphan/index.ts');
-  assert.equal(hits[0].owner, 'src/features/orphan');
+  assert.equal(hits[0].path, 'src/features/api/orphan/index.ts');
+  assert.equal(hits[0].owner, 'src/features/api/orphan');
   assert.deepEqual(hits[0].appRoots, ['apps/core/src']);
   assert.match(hits[0].message, /orphan/);
   assert.equal(reach(report).notComposed, 1);
@@ -44,22 +44,22 @@ test('BE: a feature no app root imports is reported with the roots examined', t 
 test('BE: a type-only import from the app module does not compose a feature', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import type { FooModule } from '../../../src/features/foo';\nexport const AppModule: FooModule | null = null;\n",
-      'src/features/foo/index.ts': "export { FooModule } from './foo.module';\n",
-      'src/features/foo/foo.module.ts': 'export class FooModule {}\n',
+      'apps/core/src/app.module.ts': "import type { FooModule } from '../../../src/features/api/foo';\nexport const AppModule: FooModule | null = null;\n",
+      'src/features/api/foo/index.ts': "export { FooModule } from './foo.module';\n",
+      'src/features/api/foo/foo.module.ts': 'export class FooModule {}\n',
     },
   });
   const hits = findings(runArch(root), 'BE_FEATURE_NOT_COMPOSED');
   assert.equal(hits.length, 1, JSON.stringify(hits));
-  assert.equal(hits[0].owner, 'src/features/foo');
+  assert.equal(hits[0].owner, 'src/features/api/foo');
 });
 
 test('BE: a capability module reached through a composed feature is composed; an unreached one is BE_FEATURE_NOT_COMPOSED', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import { FooModule } from '../../../src/features/foo';\nexport const AppModule = [FooModule];\n",
-      'src/features/foo/index.ts': "export { FooModule } from './foo.module';\n",
-      'src/features/foo/foo.module.ts': "import { BillingModule } from '../../modules/domain/billing';\nexport class FooModule { static imports = [BillingModule]; }\n",
+      'apps/core/src/app.module.ts': "import { FooModule } from '../../../src/features/api/foo';\nexport const AppModule = [FooModule];\n",
+      'src/features/api/foo/index.ts': "export { FooModule } from './foo.module';\n",
+      'src/features/api/foo/foo.module.ts': "import { BillingModule } from '../../../modules/domain/billing';\nexport class FooModule { static imports = [BillingModule]; }\n",
       'src/modules/domain/billing/index.ts': "export { BillingModule } from './billing.module';\n",
       'src/modules/domain/billing/billing.module.ts': "import { mail } from '../../integrations/mail';\nexport class BillingModule { static mail = mail; }\n",
       'src/modules/integrations/mail/index.ts': 'export const mail = 1;\n',

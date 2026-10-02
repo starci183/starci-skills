@@ -4,7 +4,8 @@
 //   node scripts/api/orca/worktree-rm.mjs --worktree <sel> [--force]
 // Removes the worktree from Orca and git. Called only by scripts/machine/worktree-orca.mjs removeOrcaWorktree, after every link
 // in the tree was removed as a link. Returns {ok, removed, error}.
-import { orcaCall, arg, flag } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg, flag } from '../../lib/cli-arg.mjs';
 
 export function worktreeRm({ worktree, force = false }) {
   const r = orcaCall('worktree-rm', { worktree, force });

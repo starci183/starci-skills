@@ -1,7 +1,7 @@
 // retired.mjs - two laws over modules/kernel/retired-paths.yaml (knowledge/hfs/rules.yaml, gate runtime).
 //   RT_RETIRED_PRESENT    no path of retired[] and no `from` of moved[] is tracked again, and no symbol of retiredSymbols[] is
-//                         declared in runtime production code: what was replaced (the Orca built-in replacements included)
-//                         stays replaced
+//                         declared in runtime production code or named in a migration comment: what was replaced (the Orca
+//                         built-in replacements included) stays replaced
 //   RT_PINNED_PATH_MOVED  a pinned path (ruleParams.runtime.pinned: persisted outside git in hooks, settings, the scheduled
 //                         task, prompts) exists, or it moved through a moved[] entry marked `quiesced: true` (landed with the
 //                         fleet stopped); a moved[] entry from a pinned path without `quiesced: true` is refused
@@ -52,6 +52,14 @@ export function retiredFindings(ctx) {
         const s = symbols.get(name);
         if (s) found.push({ code: CODES.retired, level: 'error', path: file, line, message: `${file}:${line} declares ${name}, a retired symbol (${RETIRED_PATHS_FILE} retiredSymbols: replaced by ${s.replacedBy}): use the replacement, do not write it again` });
       }
+    }
+    // A migration's comments document the code that runs it: a retired symbol named there is a stale cite.
+    for (const file of ctx.files.filter((f) => /^engine\/db\/migrations\/.+\.sql$/.test(f))) {
+      String(ctx.read(file) ?? '').split(/\r?\n/).forEach((text, i) => {
+        const at = text.indexOf('--');
+        if (at < 0) return;
+        for (const [name, s] of symbols) if (new RegExp(`\\b${name}\\b`).test(text.slice(at))) found.push({ code: CODES.retired, level: 'error', path: file, line: i + 1, message: `${file}:${i + 1} names ${name} in a comment, a retired symbol (${RETIRED_PATHS_FILE} retiredSymbols: replaced by ${s.replacedBy}): cite the replacement` });
+      });
     }
   }
   return found;

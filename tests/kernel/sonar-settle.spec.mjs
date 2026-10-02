@@ -26,7 +26,7 @@ const put=(repo,rel,body)=>{const abs=path.join(repo,rel);fs.mkdirSync(path.dirn
 const scan=(over={})=>({schema:'starci/sonar-local-scan@3',at:'2026-09-29T10:00:00.000Z',scope:'slice',outcome:'pass',gate:thresholdsOf(gate),slice:{verdict:'pass',failures:[]},...over});
 
 test('the gate is one file: the thresholds, the enforced ops and the server conditions come from it', () => {
-  assert.equal(gate.gate.name,'starci-new-code');
+  assert.equal(gate.gate.name,'starci-quality');
   assert.deepEqual([...gate.enforcedOps].sort(),['backend.implement','code.refactor','interface.implement']);
   assert.deepEqual(serverConditions(gate),[
     {metric:'new_coverage',op:'LT',error:'100'},
@@ -40,7 +40,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
     {metric:'duplicated_lines_density',op:'GT',error:'3'},
   ]);
   assert.deepEqual(gate.overall.issues.engines,['starci-hfs','eslint','stylelint']);
-  assert.deepEqual(thresholdsOf(gate),{name:'starci-new-code',ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0,coverageMinPercent:100});
+  assert.deepEqual(thresholdsOf(gate),{name:'starci-quality',ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0,coverageMinPercent:100});
   for(const op of gate.enforcedOps){
     const manifest=fs.readFileSync(path.join(ROOT,'modules','ops','ops',`${op}.yaml`),'utf8');
     assert.match(manifest,/sonar-local\.mjs scan/,`${op} tells its worker to run sonar-local`);
@@ -51,7 +51,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
 
 test('the gate judges coverage per service: one service below 100 fails, a non-service file is not part of the measure', () => {
   // The scope is the one the managed sonar-project.properties renders (hfs sync: the complement of the preset's COVERAGE_SOURCES).
-  const scope=coverageScopeOf(readProperties(path.join(ROOT,'examples','todo-app','sonar-project.properties')));
+  const scope=coverageScopeOf(readProperties(path.join(ROOT,'examples','ecommerce-app','sonar-project.properties')));
   assert.ok(scope.exclusions.includes('fe/**')&&scope.exclusions.includes('be/**/*.resolver.ts'));
   const minPercent=thresholdsOf(gate).coverageMinPercent;
   const files=[
@@ -159,7 +159,7 @@ test('a red judgment is a failed runtime check whose why speaks Vietnamese; a la
   const why=buildWhy({attempt:{attempt_id:attemptId,workflow_id:'wf-sonar',op_id:'backend.implement',try_no:1,verdict:'fail',report_outcome:'done',end_state:'settled',settled_at:1,reported_at:1},
     checks:[facts],report:{report_id:1,report_json:json({outcome:'done',summary:'xong'})},settle:{claimOverruled:true},unit:null,catalog});
   assert.ok(why.codes.includes('sonar-gate-red'));
-  assert.match(`${why.headline} ${why.cause}`,/Cổng chất lượng Sonar đỏ/);
+  assert.match(`${why.headline} ${why.cause}`,/C\u1ed5ng ch\u1ea5t l\u01b0\u1ee3ng Sonar \u0111\u1ecf/);
   const green=record(ledger,attemptId,scan(),2000);
   assert.equal(green.green,true);
   assert.equal(independentChecksOf(ledger.db,{attemptId}).checks[0].exitCode,0,'the latest run decides');
@@ -211,7 +211,7 @@ const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement
     ledger.transaction(db=>{
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
-        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD'),branch:'main'}});
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD')}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
         recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
     });

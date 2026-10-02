@@ -1,6 +1,6 @@
 // Phrase matching per archetypes.yaml signalMatching: NFC + lower-case +
 // collapsed whitespace on both sides, diacritics kept, Unicode word
-// boundaries (JS \b is ASCII-only and never fires beside "đ" or "ệ").
+// boundaries (JS \b is ASCII-only and never fires beside a Vietnamese letter).
 export const normalizeText = s => String(s ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
 const WORD_CHAR = /[\p{L}\p{M}\p{N}_]/u;
 const isWordChar = ch => !!ch && WORD_CHAR.test(ch);

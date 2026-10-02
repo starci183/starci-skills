@@ -12,7 +12,7 @@ surface:
     transport: >-
       The verifySession GraphQL query of the identity service (POST /graphql on identityApi, the port
       .starcistacks/dev/infra/metadata.json resolves; served by
-      features/identity/transport/graphql/verify-session.resolver.ts). The token to verify travels as the input's
+      features/api/identity/transport/graphql/verify-session.resolver.ts). The token to verify travels as the input's
       sessionToken; an internal hop carries no user session of its own. The order service's session guard calls it
       through modules/integrations/identity-api/identity-api.client.ts on every person-scoped GraphQL door, and the
       shop frontend's session door calls it while rendering an account page.
@@ -27,7 +27,7 @@ surface:
     shape: "mutation revokeSession(input: {sessionToken}) -> {revoked: true}"
     transport: >-
       The revokeSession GraphQL mutation on the same identity door
-      (features/identity/transport/graphql/revoke-session.resolver.ts); the token to retire arrives as the input's
+      (features/api/identity/transport/graphql/revoke-session.resolver.ts); the token to retire arrives as the input's
       sessionToken. The shop's session door calls it on sign-out; there the call is best-effort, because the cookie is
       cleared regardless of the answer.
     guarantee: >-

@@ -3,7 +3,8 @@
 // repo-add.mjs — the calls.yaml `repo-add` call as a callable function.
 //   node scripts/api/orca/repo-add.mjs --path <repo>
 // Registers a git repository with Orca (idempotent). Returns {ok, repoId, error}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function repoAdd({ path }) {
   const r = orcaCall('repo-add', { path });

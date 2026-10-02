@@ -32,7 +32,7 @@ rules:
       Every api app registers, in this order, the `APP_GUARD` throttler, the CSRF origin guard and `AuthGuard`. `PublicReason`
       is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`; a new reason is a `.claude` change. An
       operation is open only when it carries `@Public({ reason })`; any other operation requires the authenticated principal.
-      `@UseGuards` is not used for authentication or authorization. A worker, migrate or cli app exposes no route.
+      `@UseGuards` is not used for authentication or authorization. A worker or cli app exposes no route.
     rationale: |-
       With allow-by-default a forgotten decorator publishes an operation unnoticed. With default deny it fails closed and the
       exception carries a reason a reviewer can read.

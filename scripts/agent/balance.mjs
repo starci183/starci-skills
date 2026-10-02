@@ -9,7 +9,7 @@
 // (machine.sqlite `ledgers`) registered. A registered ledger counts only while its
 // file exists and it is not a fixture: under the OS temp directory, or under a
 // directory named `fixture`/`fixtures` (a spec that once enrolled
-// C:/fixture/.starciwork/runtime.sqlite left a real-path fixture registered for
+// <drive>/fixture/.starciwork/runtime.sqlite left a real-path fixture registered for
 // good). Each ledger is opened read-only and closed.
 // Every read is best effort — an unreadable ledger contributes nothing, and the
 // result names the ledgers it counted.

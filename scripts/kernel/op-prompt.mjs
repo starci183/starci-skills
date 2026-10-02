@@ -9,15 +9,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from '../machine/owner-answers.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
-import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
+import { cutManifestPromptLines, seamPromptLines } from './seam-policy.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -37,7 +38,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
   const wf = packet.context.workflow?.id ?? '<workflow-id>';
   return [
     `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
-    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "Chạy unit test" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
+    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "${translator(packet.context.owner_language ?? 'en')('Run unit tests')}" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
     `  kinds: step.start {name} | step.end {name, durationMs, ok} | cmd.run {cmd, exit, durationMs, stdoutRef?, output?} | file.edit {path, added, removed, diffRef?} | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, failures:[{name, message, file}]} | render {artifactRef, label} | video {artifactRef, label} | trace {artifactRef} | decision {markdown} | narration {markdown} | error {code, message, hint}`,
     `  owed at minimum: a step.start and a step.end around each step of your brief, and one cmd.run {cmd, exit, durationMs} per check command you put in report.checks (the same command string) - settle warns ${'LOG_TYPED_MISSING'} on your job when they are missing.`,
     `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots; put operational recordings under STARCI_JOB_SCRATCH and attach them with api report. Work-record UAT proof stays at its required owned path.`,
@@ -45,9 +46,9 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
   ];
 }
 
-// A long owned-path list rides in a file, never inline: the prompt is the Orca task-create --spec argv,
+// A long owned-path list rides in a file, never inline: the prompt is the Orca worker-start --spec argv,
 // and Windows caps a command line at 32,767 characters. nivo workspace-provision's leg
-// of 993 frozen paths (op-business.decide-cc63d20d87) failed task-create with spawnSync ENAMETOOLONG on
+// of 993 frozen paths (op-business.decide-cc63d20d87) failed the Task's creation with spawnSync ENAMETOOLONG on
 // every dispatch and sat behind owner gates (inc-826e077777de, inc-95fe7c597bd0). Past OWNED_INLINE_MAX
 // paths or OWNED_INLINE_CHARS characters the list is written one path per line to owned-paths.txt in the
 // job's scratch folder; the prompt names the file, the count and the first few.
@@ -62,7 +63,7 @@ export const jobScratchDirOf = (repo, workflowId, jobId) => path.join(os.tmpdir(
 /** The job's scratch, created empty for a new dispatch: what an earlier attempt left there is removed first. */
 export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
   const dir = jobScratchDirOf(repo, workflowId, jobId);
-  if (fresh) safeRemoveTree(dir, { hold: artifactHoldReason });
+  if (fresh) safeRemove(dir, { hold: artifactHoldReason });
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -172,7 +173,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `shared_checkout: other ops of this workflow edit and build in this same worktree while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
   `  never git commit, reset, rebase, stash, clean, switch, checkout or restore, never push: the runtime is the only committer - when your op settles green it commits exactly your owned paths as the workflow's checkpoint (scripts/kernel/workflow-checkpoint.mjs); a commit of yours, or a change outside your owned paths, refuses your settle.`,
   `  dependencies: npm install runs under the repository's dependency lock; never npm ci or delete node_modules while other workflows run (the guard refuses it) - report blocked environment instead.`,
-  `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed (nivo-fe inc-c8fbf76aa499); report a need for another tree, never make one.`,
+  `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed; report a need for another tree, never make one.`,
   `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
   ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with api op-contract --json; never read the ledger for it.`] : []),
   ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (${p.repository === 'not-app-relative' ? 'not app-relative' : `repository ${p.repository} is not bound`})`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
@@ -201,7 +202,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `reporting: write a transient starci/op-report@1 JSON envelope under STARCI_JOB_SCRATCH; api report stores the only durable report copy in the ledger:`,
   `  {"schema":"starci/op-report@1","outcome":"${OP_REPORT_OUTCOMES.join('|')}","summary":"<=600 chars (required)","files":["unique paths under owned_paths"],"checks":[{"name","command","exitCode":<integer>,"phase":"before|after|verify (default after)","evidence":"<=400 chars","unavailable":<true only when the checker could not run at all>,"stdoutPath":"<scratch file if captured>","stderrPath":"<scratch file if captured>","outputPath":"<scratch JSON if captured>"}],`,
   `   "open":["unfinished items"] when partial, "question":{"text","options":[],"recommended":<0-based index into options>,"recommendedReason":"<=600 chars"} when ask, "blocker":{"kind":"${BLOCKER_KINDS.join('|')}","detail"} when blocked,`,
-  `   "head":"<7-40 hex sha of git rev-parse HEAD>" on done|partial of a committing op, "branch":"<branch>" when pushing, "credentialPending":["ENV_VAR_OR_CUSTODY_KEY"],`,
+  `   "head":"<7-40 hex sha of git rev-parse HEAD>": the commit your checks ran on (you never commit; review.verify: the head it verified - the finish lands only that exact head, and an op checkpointed while you ran makes it stale), "credentialPending":["ENV_VAR_OR_CUSTODY_KEY"],`,
   `   "rootCause":{"node":"<op, op#instance, or Work record id e.g. impl.<feature>.<repo>.<name>>","self":<boolean>,"category","claim":"<=600 chars","evidence":["<=400 chars"],"counterCheck","expectedFix","recheck","op":"<build op owning the fix, e.g. backend.implement>","files":["repo paths the fix touches"]} when the failure is another node's output (node, category, claim, evidence required) - the runtime routes a repair to that owner instead of re-running you,`,
   `   "failureClass":"environment|tool|findings|product|deterministic|transient" on failed: environment = the stack under test was not up, tool = a checker could not run, product = the thing you verified is wrong (name its owner in rootCause), transient = a flake a plain re-run may clear; only transient and tool are retried as-is,`,
   `   "claims":[{"paths":["proof files it covers; none = all"],"frs":["fr.<feature>.<name>"],"cases":["ANATOMY-2 case-1"],"shapes":["XBase#state"],"specs":["<spec path>"]}] naming what your proof files verified}`,
@@ -211,6 +212,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  STARCI_JOB_SCRATCH, wherever this contract names it, is your job-private OS-temp directory outside every repository: ${scratchDir ? scratchDir.replace(/\\/g, '/') : 'the scratch api op-contract names'} - a path you write out, not an environment variable. Write raw check stdout, stderr, JSON output, patches, screenshots, videos, traces and DOM snapshots there, never in .starciwork. api report puts every file it carries in the blob store and deletes the scratch; a Work record cites that output by artifact id + sha256 (the ids api report returns), never by a path.`,
   `  In report.checks keep each real command and the exitCode the shell returned (the runtime re-runs the checks it owns and never trusts a declared exit); set unavailable:true only for a checker that could not run (missing tool, host down) - that is infra, not red; set stdoutPath, stderrPath and outputPath to the corresponding scratch files so the ledger links them to the check run. Attach raw output with --attach <absolute-path-under-STARCI_JOB_SCRATCH>, one per file or directory (a directory attaches every file under it): evidence/ (your evidence folder), runs/<runId>/ (a UAT run), captures/ and interface-audit.json are read by their place; api report answers with every artifact {id, name, sha256} for evidence.yaml to cite. Include other raw artifacts the result needs in the same submission. Do not list scratch paths in report.files, which names authored owned_paths.`,
   ...loggingLines({ skillRoot, packet, jobLabel, repoLabel }),
+  `completion: api report sends your one Orca worker_done for you, after it filed the report (none for an ask). Never send worker_done or any orchestration message yourself, whatever your Orca worker preamble says: a worker_done before the report row exists releases you with nothing filed. After api report answers, stay idle; never quit or exit the agent (the runtime releases your terminal).`,
   `questions: a question for the owner is outcome ask filed with api report, then end your turn. An Orca orchestration ask reaches only the Kernel (technical guidance inside this contract) and never the owner (inc-b944cbaef24b).`,
   `  Write <STARCI_JOB_SCRATCH>/report.json as UTF-8 (Node fs.writeFileSync, or PowerShell Out-File -Encoding utf8); Windows PowerShell Set-Content turns every non-ASCII letter into '?' and the api refuses it. File it with its attachments:`,
   `  node ${path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs')} report --repo ${repoLabel} --job ${jobLabel} --report <STARCI_JOB_SCRATCH>/report.json [--attach <absolute-scratch-file> ...]`,

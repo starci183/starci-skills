@@ -28,7 +28,7 @@ test('a processor composed by a worker app and a background method reachable fro
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
   const coverage = report.coverage.hfsMachine.backgroundUnowned;
   assert.equal(coverage.status, 'checked');
-  assert.equal(coverage.workers, 1);
+  assert.equal(coverage.workers, 2, 'the api app and the worker app both compose background transports');
   assert.equal(coverage.composed, 1);
   assert.equal(coverage.backgroundMethods, 1);
   assert.ok(report.coverage.checkedRuleIds.includes('BE_BACKGROUND_UNOWNED'));
@@ -37,11 +37,11 @@ test('a processor composed by a worker app and a background method reachable fro
 test('a processor and a consumer no worker or api app composes, or with no worker app declared, are BE_BACKGROUND_UNOWNED', t => {
   const orphan = run(t, {
     'apps/jobs/src/app.module.ts': "import { Module } from '@nestjs/common';\n@Module({})\nexport class AppModule {}\n",
-    'src/features/b/index.ts': 'export const b = 1;\n',
-    'src/features/b/transport/message/paid.consumer.ts': 'export class PaidConsumer {}\n',
+    'src/features/api/b/index.ts': 'export const b = 1;\n',
+    'src/features/api/b/transport/message/paid.consumer.ts': 'export class PaidConsumer {}\n',
   });
   assert.deepEqual(hits(orphan).filter(item => item.role).map(item => `${item.role}:${item.path}`).sort(),
-    ['consumer:src/features/b/transport/message/paid.consumer.ts', 'processor:src/features/jobs/sweep/sweep.processor.ts']);
+    ['consumer:src/features/api/b/transport/message/paid.consumer.ts', 'processor:src/features/jobs/sweep/sweep.processor.ts']);
   const noWorker = run(t, { 'apps/jobs/src/app.module.ts': null, 'apps/jobs/src/main.ts': null }, [{ name: 'core', kind: 'api' }]);
   assert.ok(hits(noWorker).some(item => item.role === 'processor' && /declares no worker app/.test(item.message)));
 });

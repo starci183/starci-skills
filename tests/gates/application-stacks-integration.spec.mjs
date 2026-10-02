@@ -25,15 +25,14 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
   }
   for(const file of ['scripts/gates/stacks-gate.mjs','modules/schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['.starcistacks/vps/infra/compose/nginx.conf','.gitignore',
-      '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
-      '.starcistacks/vps/README.md','.starcistacks/vps/infra/compose/stack.yaml','.sops.yaml']
-      .map(name=>'examples/todo-app/'+name)])assert.ok(files.has(file),file);
+    ...['.gitignore',
+      '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml','.sops.yaml']
+      .map(name=>'examples/ecommerce-app/'+name)])assert.ok(files.has(file),file);
   // the stack kit sits at the app root: nothing of it ships from a side folder
   assert.equal([...files.keys()].some(file=>/^examples\/[^/]+\/(be|fe)\/(\.starcistacks\/|\.sops\.yaml$)/.test(file)),false);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/ecommerce-app/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&file.endsWith('.mjs')),false);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/ecommerce-app/')&&file.endsWith('.mjs')),false);
 });
 
 test('stacks check refuses missing or malformed evidence without echoing file contents or mutation',t=>{
@@ -56,7 +55,7 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-package-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-package-'));fs.rmSync(directory,{recursive:true,force:true});});
   // Minimal stack-kit fixture: only the authored compose input plus planted materialized/secret files.
-  const base='examples/todo-app/.starcistacks/dev/';
+  const base='examples/ecommerce-app/.starcistacks/dev/';
   for(const suffix of ['infra/compose/compose.yaml','secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');
