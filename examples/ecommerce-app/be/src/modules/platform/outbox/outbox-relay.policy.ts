@@ -10,7 +10,7 @@ import { OutboxLogEvent } from "./outbox.log-events"
  * which the receiver absorbs. The loop runs from the start of the app to its shutdown and pauses only when the outbox is empty.
  * A concrete relay says how a batch is read, delivered and marked, which outbox it is and how it waits.
  */
-export abstract class OutboxRelayService<Row extends { readonly id: string }>
+export abstract class OutboxRelayPolicy<Row extends { readonly id: string }>
     implements OnApplicationBootstrap, OnApplicationShutdown
 {
     private running = false
