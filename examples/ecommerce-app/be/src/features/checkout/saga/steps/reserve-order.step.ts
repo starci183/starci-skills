@@ -6,7 +6,7 @@ import type { PlaceOrderRequest, PlaceOrderResult } from "../../application/plac
 import { ReserveOrderCommand } from "../../application/reserve-order.command"
 
 @Injectable()
-/** The first step of the place-order saga: takes the stock, writes the order, captures the payment and clears the cart, and announces `order.placed`. */
+/** The first step of the place-order saga: takes the stock, writes the order and clears the cart, and announces `order.placed`. */
 export class ReserveOrderStep {
     /** The name the compensation of this step carries. */
     readonly name = "reserve-order"

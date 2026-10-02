@@ -1,7 +1,7 @@
 import { Field, ID, Int, ObjectType } from "@nestjs/graphql"
 
 @ObjectType()
-/** The confirmation of placeOrder: the order id, the total, the payment id and whether this answer replays an earlier confirmation. */
+/** The confirmation of placeOrder: the order id, its pending status, the total and whether this answer replays an earlier confirmation. */
 export class PlaceOrderType {
     /** The order id. */
     @Field(() => ID)
@@ -18,10 +18,6 @@ export class PlaceOrderType {
     /** The currency. */
     @Field()
     currency!: string
-
-    /** The captured payment. */
-    @Field(() => ID)
-    paymentId!: string
 
     /** True when the answer replays an earlier confirmation with the same key. */
     @Field()

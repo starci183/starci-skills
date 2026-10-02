@@ -9,18 +9,13 @@ import type {
     ReceiptDocumentView,
 } from "../../fixtures/e2e-views.contracts"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import {
-    ORDER_SUMMARY,
-    ORDER_LINE_COUNT,
-    CART_ITEM_COUNT,
-    PAYMENTS_OF_PERSON,
-} from "../../fixtures/persistence/e2e-verification.sql"
+import { ORDER_SUMMARY, ORDER_LINE_COUNT, CART_ITEM_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The happy path of the checkout end to end: a visitor registers on identity, signs in, browses the catalog through the
- * order cart query, fills the cart, confirms with an idempotency key (a replay answers the same order, never a second
- * payment), and the confirmation transaction leaves a captured payment, decremented stock and an empty cart. The buyer then
+ * order cart query, fills the cart, places the order with an idempotency key (a replay answers the same order, never a second
+ * one), and the placement transaction leaves a pending order, decremented stock and an empty cart. The buyer then
  * downloads the order's receipt from the private archive through a link that expires; another buyer is refused it. The
  * Postgres reads are out-of-band verification only: every step of the journey travels over the public doors.
  *
@@ -35,7 +30,7 @@ describe("checkout journey", () => {
         await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
-    it("register, browse the catalog, add to the cart, place the order, pay, and end with an empty cart", async () => {
+    it("register, browse the catalog, add to the cart, place the order, and end with an empty cart", async () => {
         const session = await world.signedInPerson("checkout")
         personId = session.personId
         const buyer = world.apps.order.api.bearing(session.sessionToken)
@@ -79,29 +74,25 @@ describe("checkout journey", () => {
         expect(placed.errorCode).toBeNull()
         const order = present(placed.data, "placeOrder data").placeOrder
         expect(order).toMatchObject({
-            status: "confirmed",
+            status: "pending",
             totalMinorUnits: expectedTotal,
             currency: "USD",
             replayed: false,
         })
 
-        // Replay with the same key: the first answer again, not a second order or a second capture.
+        // Replay with the same key: the first answer again, not a second order.
         const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
         expect(replayed.errorCode).toBeNull()
         expect(replayed.data?.placeOrder).toMatchObject({
             orderId: order.orderId,
-            paymentId: order.paymentId,
             replayed: true,
         })
 
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
         expect(await readRows(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([
-            { status: "confirmed", total_minor_units: expectedTotal },
+            { status: "pending", total_minor_units: expectedTotal },
         ])
         expect(await readCount(world.db.order, ORDER_LINE_COUNT, order.orderId)).toBe(2)
-        expect(await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
-            expect.objectContaining({ status: "captured", amount_minor_units: expectedTotal }),
-        ])
         expect(await readCount(world.db.order, CART_ITEM_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-mug")).toBe(mug.stock - 2)
 
@@ -117,7 +108,6 @@ describe("checkout journey", () => {
             orderId: order.orderId,
             personId,
             totalMinorUnits: expectedTotal,
-            paymentId: order.paymentId,
             lines: [
                 { productId: "sku-mug", quantity: 2, unitPriceMinorUnits: mug.priceMinorUnits },
                 { productId: "sku-notebook", quantity: 1, unitPriceMinorUnits: notebook.priceMinorUnits },

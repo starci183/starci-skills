@@ -1,6 +1,6 @@
 // Imports of the host (resolve them to its aliases): ../../application/cancel-order.command, @modules/platform/cqrs, @nestjs/common, @nestjs/cqrs.
 @Injectable()
-/** The compensation of the reserve-order step: cancels the order, releases the stock of its lines and refunds its payment. */
+/** The compensation of the reserve-order step: cancels the order and releases the stock of its lines. */
 export class ReserveOrderCompensation {
     /** The step this compensation undoes. */
     readonly step = "reserve-order"

@@ -11,14 +11,12 @@ export const toOrderConfirmation = (data: unknown): OrderConfirmation | null =>
     typeof data.status === "string" &&
     typeof data.totalMinorUnits === "number" &&
     typeof data.currency === "string" &&
-    typeof data.paymentId === "string" &&
     typeof data.replayed === "boolean"
         ? {
               orderId: data.orderId,
               status: data.status,
               totalMinorUnits: data.totalMinorUnits,
               currency: data.currency,
-              paymentId: data.paymentId,
               replayed: data.replayed,
           }
         : null

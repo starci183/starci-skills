@@ -58,9 +58,9 @@ describe("order lifecycle: identity to order boundary", () => {
             variables: { input: { idempotencyKey: `${session.personId}-resume` } },
         })
         expect(placed.errorCode).toBeNull()
-        expect(placed.data?.placeOrder.status).toBe("confirmed")
+        expect(placed.data?.placeOrder.status).toBe("pending")
         expect(await readRows(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([
-            expect.objectContaining({ status: "confirmed" }),
+            expect.objectContaining({ status: "pending" }),
         ])
         const account = await world.apps.identity.api.bearing(resumed.sessionToken).read<AccountData>("account")
         expect(account.data?.account.hasOrders).toBe(true)

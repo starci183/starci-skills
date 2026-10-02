@@ -52,7 +52,11 @@ export class EventBusService implements EventBus, EventConsumerRegistry {
     /** The events of the class that ran out of attempts. */
     async deadLetters(event: EventClass<BaseEvent>): Promise<ReadonlyArray<EventDeadLetter>> {
         const letters = await this.messages.deadLetters(queueOf(event))
-        return letters.map((letter) => ({ ...letter, id: `${event.eventName}${ID_SEPARATOR}${letter.id}`, eventName: event.eventName }))
+        return letters.map((letter) => ({
+            ...letter,
+            id: `${event.eventName}${ID_SEPARATOR}${letter.id}`,
+            eventName: event.eventName,
+        }))
     }
 
     /** Puts a dead letter back to be delivered again: its id names the event and the job. */

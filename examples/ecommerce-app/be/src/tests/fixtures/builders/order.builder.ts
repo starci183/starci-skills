@@ -7,7 +7,7 @@ export interface OrderRow {
     /** The buyer. */
     personId: string
     /** The lifecycle state. */
-    status: "confirmed" | "pending" | "paid" | "expired" | "cancelled"
+    status: "pending" | "paid" | "expired" | "cancelled"
     /** The order total in minor units. */
     totalMinorUnits: number
     /** The ISO currency code. */
@@ -26,7 +26,7 @@ export interface OrderRow {
 export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     id: "o-1",
     personId: "p-1",
-    status: "confirmed",
+    status: "pending",
     totalMinorUnits: 1250,
     currency: "USD",
     idempotencyKey: null,
@@ -63,10 +63,9 @@ export const orderLineRow = (overrides: Partial<OrderLineRow> = {}): OrderLineRo
 /** The confirmed order the doors answer, with valid defaults. */
 export const placedOrder = (overrides: Partial<PlacedOrder> = {}): PlacedOrder => ({
     orderId: "o-1",
-    status: "confirmed",
+    status: "pending",
     totalMinorUnits: 1250,
     currency: "USD",
-    paymentId: "pay-1",
     replayed: false,
     ...overrides,
 })

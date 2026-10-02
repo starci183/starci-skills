@@ -14,6 +14,5 @@ export const toPlaceOrderType = (order: PlacedOrder): PlaceOrderType => ({
     status: order.status,
     totalMinorUnits: order.totalMinorUnits,
     currency: order.currency,
-    paymentId: order.paymentId,
     replayed: order.replayed,
 })

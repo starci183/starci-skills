@@ -22,18 +22,16 @@ export interface CheckoutPlan {
     readonly currency: "USD"
 }
 
-/** A confirmed order as the doors answer it. */
+/** A placed order as the doors answer it. */
 export interface PlacedOrder {
     /** The order id. */
     readonly orderId: string
     /** The lifecycle state: an order that confirmed and was later cancelled keeps answering as a replay with `cancelled`. */
-    readonly status: "confirmed" | "cancelled"
+    readonly status: "pending" | "paid" | "cancelled"
     /** The order total in minor units. */
     readonly totalMinorUnits: number
     /** The currency. */
     readonly currency: "USD"
-    /** The captured payment. */
-    readonly paymentId: string
     /** True when this answer replays an earlier confirmation with the same key. */
     readonly replayed: boolean
 }
@@ -48,7 +46,7 @@ export interface ReceiptLine {
     readonly unitPriceMinorUnits: number
 }
 
-/** The receipt document an order archives: what was bought, for how much, paid by which payment, and when. */
+/** The receipt document an order archives: what was bought, for how much, and when. */
 export interface ReceiptDocument {
     /** The order. */
     readonly orderId: string
@@ -60,8 +58,6 @@ export interface ReceiptDocument {
     readonly totalMinorUnits: number
     /** The currency. */
     readonly currency: string
-    /** The captured payment. */
-    readonly paymentId: string
     /** When the order was placed, ISO 8601. */
     readonly placedAt: string
 }

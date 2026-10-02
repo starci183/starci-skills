@@ -9,7 +9,7 @@ export class CreateOrders1789800003000 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     person_id uuid NOT NULL,
-    status varchar(16) NOT NULL CHECK (status IN ('confirmed')),
+    status varchar(16) NOT NULL CHECK (status IN ('pending')),
     total_minor_units int NOT NULL CHECK (total_minor_units >= 0),
     currency varchar(3) NOT NULL,
     idempotency_key text,

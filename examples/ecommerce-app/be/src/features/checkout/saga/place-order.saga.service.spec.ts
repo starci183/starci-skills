@@ -11,10 +11,9 @@ const placed = {
     kind: "ok",
     value: {
         orderId: "o-1",
-        status: "confirmed",
+        status: "pending",
         totalMinorUnits: 1250,
         currency: "USD",
-        paymentId: "pay-1",
         replayed: false,
     },
 } as const

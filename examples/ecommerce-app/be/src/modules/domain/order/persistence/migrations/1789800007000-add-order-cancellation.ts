@@ -8,7 +8,7 @@ export class AddOrderCancellation1789800007000 implements MigrationInterface {
     async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
         await queryRunner.query(
-            `ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('confirmed', 'cancelled'))`,
+            `ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'cancelled'))`,
         )
         await queryRunner.query(`ALTER TABLE payments DROP CONSTRAINT payments_status_check`)
         await queryRunner.query(
@@ -23,6 +23,6 @@ export class AddOrderCancellation1789800007000 implements MigrationInterface {
             `ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('captured'))`,
         )
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
-        await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('confirmed'))`)
+        await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending'))`)
     }
 }
