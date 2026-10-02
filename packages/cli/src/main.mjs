@@ -56,45 +56,52 @@ const guardFastPath = async (argv, io) => {
   }
 };
 
-const retiredMatch = (argv, retired) => {
-  const input = ['starci', ...argv];
+// `starci <old>` spellings match from the program name; the retired `hfs` and `starci-test-stack` bins also match behind it.
+const RETIRED_BINS = new Set(['hfs', 'starci-test-stack']);
+const retiredMatch = (words, retired) => {
+  const input = ['starci', ...words];
   const candidates = retired
-    .filter((entry) => entry.spelling.startsWith('starci '))
-    .map((entry) => ({ ...entry, tokens: entry.spelling.split(/\s+/) }))
-    .filter((entry) => entry.tokens.every((token, index) => input[index] === token))
+    .map((entry) => {
+      const tokens = entry.spelling.split(/\s+/);
+      if (tokens[0] === 'starci') return { ...entry, tokens, offset: 0 };
+      return RETIRED_BINS.has(tokens[0]) ? { ...entry, tokens, offset: 1 } : null;
+    })
+    .filter((entry) => entry && entry.tokens.every((token, index) => input[index + entry.offset] === token))
     .sort((a, b) => b.tokens.length - a.tokens.length);
   const match = candidates[0];
   if (!match) return null;
-  const suffix = input.slice(match.tokens.length);
+  const suffix = input.slice(match.offset + match.tokens.length);
   return {
-    spelling: [...match.tokens, ...suffix].join(' '),
+    spelling: [...input.slice(0, match.offset), ...match.tokens, ...suffix].join(' '),
     use: [...match.use.split(/\s+/), ...suffix].join(' '),
   };
 };
 
-const handlerArgs = (validated, command, { includeQuiet = true } = {}) => {
-  const args = [...validated.localArgs];
-  if (validated.global.json === true && command.json !== 'always') args.push('--json');
-  if (validated.global.edition !== undefined) args.push('--edition', validated.global.edition);
-  if (includeQuiet && validated.global.quiet === true) args.push('--quiet');
-  return args;
+const handlerArgs = (validated, command, withFlagsBeforeDashes, { includeQuiet = true } = {}) => {
+  const extra = [];
+  if (validated.global.json === true && command.json !== 'always') extra.push('--json');
+  if (validated.global.edition !== undefined) extra.push('--edition', validated.global.edition);
+  if (includeQuiet && validated.global.quiet === true) extra.push('--quiet');
+  return withFlagsBeforeDashes(validated.localArgs, extra);
 };
 
 /** The published CLI entry, with I/O and process seams for deterministic specs. */
 export async function main(argv = process.argv.slice(2), io = {}) {
   const guarded = await guardFastPath(argv, io);
   if (guarded !== null) return guarded;
-  const [catalogModule, completionModule, helpModule, installModule, argsModule] = await Promise.all([
+  const [catalogModule, completionModule, helpModule, installModule, linkModule, argsModule] = await Promise.all([
     import('./catalog.generated.mjs'),
     import('./completion.mjs'),
     import('./help.mjs'),
     import('./runtime-install.mjs'),
+    import('./runtime-link.mjs'),
     import('./validate-args.mjs'),
   ]);
   const { CATALOG, RETIRED } = catalogModule;
   const { completionFor, completionShells } = completionModule;
   const { groupHelp, topHelp, verbHelp } = helpModule;
   const { installRuntime } = installModule;
+  const { linkRuntime } = linkModule;
   const { splitCommand, validateArgs } = argsModule;
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
@@ -161,6 +168,19 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       hosts: validated.values.hosts ?? null,
       noBootstrap: validated.values['no-bootstrap'] === true,
     }, io.runtimeInstallDeps ?? {});
+  }
+
+  if (split.group === 'runtime' && split.verb === 'link') {
+    const link = io.linkRuntime ?? linkRuntime;
+    return await link({
+      cwd,
+      ...(home ? { home } : {}),
+      root: validated.values.root ?? null,
+      json: validated.global.json === true,
+      quiet: validated.global.quiet === true,
+      stdout,
+      stderr,
+    }, io.runtimeLinkDeps ?? {});
   }
 
   if (group.owner === '@starci/hfs') {
