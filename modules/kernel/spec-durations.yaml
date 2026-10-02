@@ -1,0 +1,27 @@
+# Source: the TAP/spec-reporter output of the exact-head land run used for the test-speed audit.
+# The land workflow refreshes this record after the slow specs have been repaired.
+schema: starci/spec-durations@1
+limitSeconds: 60
+rows:
+  - {spec: tests/engine-db/kernel-api.spec.mjs, seconds: 274}
+  - {spec: tests/gates/sonar-local.spec.mjs, seconds: 68}
+  - {spec: tests/hfs/architecture.spec.mjs, seconds: 105}
+  - {spec: tests/hfs/hfs-docker-rules.spec.mjs, seconds: 80}
+  - {spec: tests/hfs/hfs-scaffold-app.e2e.spec.mjs, seconds: 243}
+  - {spec: tests/kernel/cut-seam-stub.spec.mjs, seconds: 81}
+  - {spec: tests/kernel/gate-conditions.spec.mjs, seconds: 85}
+  - {spec: tests/kernel/handover.spec.mjs, seconds: 88}
+  - {spec: tests/kernel/kernel-wake-delivery-proof.spec.mjs, seconds: 78}
+  - {spec: tests/kernel/launch-smoke.spec.mjs, seconds: 74}
+  - {spec: tests/kernel/stale-input.spec.mjs, seconds: 75}
+  - {spec: tests/kernel-verbs-shared/managed-dispatch.spec.mjs, seconds: 121}
+  - {spec: tests/kernel-verbs-shared/op-ipc.spec.mjs, seconds: 88}
+  - {spec: tests/packages-hfs/hfs-cli.spec.mjs, seconds: 176}
+  - {spec: tests/packages-hfs/hfs-scaffold-app.spec.mjs, seconds: 944}
+  - {spec: tests/repo/architecture-default-deny.spec.mjs, seconds: 187}
+  - {spec: tests/repo/architecture-error-masked.spec.mjs, seconds: 99}
+  - {spec: tests/repo/architecture-hfs-dead-exports.spec.mjs, seconds: 124}
+  - {spec: tests/repo/architecture-hfs-redundancy.spec.mjs, seconds: 111}
+  - {spec: tests/repo/architecture-hfs-required-files.spec.mjs, seconds: 72}
+  - {spec: tests/supervisor/peer-wait.spec.mjs, seconds: 67}
+  - {spec: tests/supervisor/supervisor-kernel.spec.mjs, seconds: 189}
