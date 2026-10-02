@@ -81,6 +81,7 @@ import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productR
 import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
+import { evictOverCap, spareInfo } from './lane-cap.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -117,12 +118,8 @@ export function gcSettings(allocation = allocationSettings()) {
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
     // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
     laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
-    // One pass judges lanes for at most laneBudgetMs, then records where it stopped; the next pass resumes there (a
-    // backlog of hundreds of lane worktrees timed the sweep child out every pass, 2026-10-01).
-    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs),
-    // The most lane worktrees that stay registered under the lanes root: past it the oldest clean idle lanes go even when their
-    // commits are not in main (the branch keeps them), so the worktree list never piles up (allocation.gc.laneCap).
-    laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
+    // One pass judges lanes for at most laneBudgetMs, then resumes there; laneCap: most lanes that stay registered (lane-cap.mjs).
+    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
 }
 
 
@@ -524,11 +521,9 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
   const branchOf = (ref) => String(ref ?? '').replace(/^refs\/heads\//, '');
   const dirty = (p) => { const s = run(['status', '--porcelain', '--untracked-files=normal'], { cwd: p }); return s.ok ? s.stdout.trim().split(/\r?\n/).filter(Boolean).length : null; };
   let fatal = null;
-  let removedLanes = 0;
-  const spare = [];
   const removeTree = (w, branch, { why = 'landed in main, clean, idle' }) => {
     const bytes = treeBytes(w.path);
-    if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; removedLanes += 1; return; }
+    if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; return; }
     // safeRemoveWorktree: every link removed as a link (found without following one), zero links asserted, then git
     // worktree remove, and the main checkout asserted untouched (a violation stops the collector).
     const r = safeRemoveWorktree(w.path, { repo: root, git });
@@ -537,7 +532,6 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     markRemoved(w.path, { env });
     item('collect', w.path, `removed (${why})`, { bytes, branch, branchDeleted: false, ok: true, worktree: true });
     freedBytes += bytes;
-    removedLanes += 1;
   };
   const lanes = worktrees.filter((w) => { const k = pathKey(w.path); return k !== mainKey && k !== selfKey && k.startsWith(baseKey); })
     .sort((a, b) => (pathKey(a.path) < pathKey(b.path) ? -1 : pathKey(a.path) > pathKey(b.path) ? 1 : 0));
@@ -575,10 +569,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
       const ledger = landedCommitsForLane(branch, env);
       const ledgerLanded = commits.length > 0 && commits.every((sha) => ledger.has(sha));
       if (!ledgerLanded && !laneContentLanded(commits, branch, root, run)) {
-        const unlanded = laneActivity({ worktree: w.path, branch: w.branch, root, run });
-        const idleFor = unlanded.lastActiveMs == null ? null : now - unlanded.lastActiveMs;
-        if (idleFor != null && idleFor >= (settings.laneIdleMs ?? settings.laneGraceMs) && !laneOwnerOf({ lanePath: w.path, branch, workers, sup })) spare.push({ w, branch, idleFor, ahead });
-        item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true }); continue;
+        item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true, ...spareInfo({ w, branch, ahead, now, idleMs: settings.laneIdleMs ?? settings.laneGraceMs, root, run, workers, sup }) }); continue;
       }
     }
     const act = laneActivity({ worktree: w.path, branch: w.branch, root, run });
@@ -589,17 +580,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
-  // The cap: a complete pass that leaves more lanes than allocation.gc.laneCap evicts the longest idle clean lanes whose commits
-  // are not in main. The branch stays (it holds every commit), so nothing committed is lost; a dirty or live-owned lane is never one.
-  const cap = settings.laneCap ?? DEFAULTS.laneCap;
-  if (!fatal && progress.complete) {
-    spare.sort((a, b) => b.idleFor - a.idleFor);
-    for (const c of spare) {
-      if (lanes.length - removedLanes <= cap || fatal) break;
-      removeTree(c.w, c.branch, { why: `over the lane cap of ${cap}; branch kept with ${c.ahead} unlanded commit(s)` });
-    }
-    if (lanes.length - removedLanes > cap) item('keep', base, `${lanes.length - removedLanes} lanes stay registered, over the cap of ${cap}: the rest are dirty, live or not idle`, { overCap: true });
-  }
+  if (!fatal && progress.complete) evictOverCap({ items, total: lanes.length, cap: settings.laneCap ?? DEFAULTS.laneCap, lanesByPath: new Map(lanes.map((w) => [w.path, w])), removeTree, item, base, stopped: () => fatal });
   if (fatal) return { items, freedBytes, errors, progress, fatal };
   if (apply) run(['worktree', 'prune'], { cwd: root });
   // Leftover empty directories of removed land scratch checkouts whose registration is gone.
