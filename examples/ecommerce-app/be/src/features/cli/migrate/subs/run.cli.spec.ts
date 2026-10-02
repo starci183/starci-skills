@@ -1,14 +1,11 @@
 import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
-import { DataSource, Migration } from "typeorm"
 import { Secret } from "@modules/platform/config"
-import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import { CONNECTION_SOURCE, DATABASE_OPTIONS } from "@modules/platform/database"
+import type { ConnectionSource, DatabaseConnectionOptions, OpenConnection } from "@modules/platform/database"
 import { LOGGER, LoggingLogEvent } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { OPEN_CONNECTION } from "../migrate.decorators"
-import { MODULE_OPTIONS_TOKEN } from "../migrate.module-definition"
-import type { OpenConnection } from "../migrate.options"
-import { RunCli, migrateConnections, openConnection } from "./run.cli"
+import { RunCli, migrateConnections } from "./run.cli"
 
 const connection = (name: string): DatabaseConnectionOptions => ({
     name,
@@ -17,37 +14,30 @@ const connection = (name: string): DatabaseConnectionOptions => ({
     migrations: [],
 })
 
-/** A data source double that answers `ran` from runMigrations, or rejects with `failure`. */
-const dataSource = (ran: ReadonlyArray<string>, failure?: Error) =>
-    mock<DataSource>({
-        initialize: jest.fn(async () => mock<DataSource>()),
-        runMigrations: jest.fn(async () => {
-            if (failure) throw failure
-            return ran.map((name) => new Migration(1, 1, name))
-        }),
-        destroy: jest.fn(async () => undefined),
-    })
+/** A connection source double whose runMigrations answers `ran`. */
+const source = (ran: ReadonlyArray<string>) => {
+    const double = mock<ConnectionSource>()
+    double.runMigrations.mockResolvedValue(ran.map((name) => ({ name })))
+    return double
+}
 
 describe("RunCli", () => {
     it("migrates every connection in order and logs the applied names by connection", async () => {
-        const identity = dataSource(["Accounts1"])
-        const order = dataSource(["Orders1", "Carts1"])
+        const identity = source(["Accounts1"])
+        const order = source(["Orders1", "Carts1"])
         const sources = new Map([
             ["identity", identity],
             ["order", order],
         ])
         const open: OpenConnection = jest.fn(
-            (target: DatabaseConnectionOptions) => sources.get(target.name) ?? dataSource([]),
+            (target: DatabaseConnectionOptions) => sources.get(target.name) ?? source([]),
         )
         const logger = mock<Logger>()
         const moduleRef = await Test.createTestingModule({
             providers: [
                 RunCli,
-                {
-                    provide: MODULE_OPTIONS_TOKEN,
-                    useValue: { connections: [connection("identity"), connection("order")] },
-                },
-                { provide: OPEN_CONNECTION, useValue: open },
+                { provide: DATABASE_OPTIONS, useValue: { connections: [connection("identity"), connection("order")] } },
+                { provide: CONNECTION_SOURCE, useValue: open },
                 { provide: LOGGER, useValue: logger },
             ],
         }).compile()
@@ -63,25 +53,15 @@ describe("RunCli", () => {
 })
 
 describe("migrateConnections", () => {
-    it("destroys the data source of a connection whose migrations fail, and fails", async () => {
-        const failing = dataSource([], new Error("relation exists"))
-
-        await expect(migrateConnections([connection("order")], () => failing)).rejects.toThrow("relation exists")
-        expect(failing.destroy).toHaveBeenCalledTimes(1)
+    it("answers no applied name when there is no connection", async () => {
+        await expect(migrateConnections([], () => source([]))).resolves.toEqual({})
     })
-})
 
-describe("openConnection", () => {
-    it("opens an uninitialized postgres data source with the connection's own ledger table and no synchronize", () => {
-        const opened = openConnection(connection("order"))
+    it("destroys the data source of a connection whose migrations fail, and fails", async () => {
+        const failing = source([])
+        failing.runMigrations.mockRejectedValue(new TypeError("relation exists"))
 
-        expect(opened).toBeInstanceOf(DataSource)
-        expect(opened.isInitialized).toBe(false)
-        expect(opened.options).toMatchObject({
-            type: "postgres",
-            url: "postgres://localhost:5432/order",
-            migrationsTableName: "order_migrations",
-            synchronize: false,
-        })
+        await expect(migrateConnections([connection("identity")], () => failing)).rejects.toThrow("relation exists")
+        expect(failing.destroy).toHaveBeenCalledTimes(1)
     })
 })

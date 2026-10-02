@@ -449,7 +449,8 @@ test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/,
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.owner, true);
   assert.equal(slot.tests, 'unit-beside');
-  assert.deepEqual(slot.requires, ['index.ts', 'cli.module.ts', 'cli.module-definition.ts']);
+  assert.deepEqual(slot.requires, ['index.ts', 'cli.module.ts']);
+  for (const gone of ['cli.module-definition.ts', '<group>/<group>.module-definition.ts', '<group>/<group>.options.ts', '<group>/<group>.decorators.ts']) assert.equal(slot.allows.includes(gone), false, `${gone}: the cli feature root is static`);
   assert.ok(manifest.appKinds.be.includes('cli'), 'the cli app kind exists');
   assert.equal(manifest.appKinds.be.includes('migrate'), false, 'the migrate kind is gone: the cli migrate command migrates');
   assert.equal(manifest.slots.some((s) => s.id === 'be.feature.transport.cli'), false, 'no feature transport is a command line');

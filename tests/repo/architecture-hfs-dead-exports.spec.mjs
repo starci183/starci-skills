@@ -145,3 +145,15 @@ test('HFS_UNUSED_EXPORT: a spec of another kind does not count as a consumer', t
   const files = { ...CONSUMER_FILES, 'src/features/api/a/a.handler.spec.ts': "import { nobody } from '../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n" };
   assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['nobody', 'onlyE2e']);
 });
+
+// Every unit role counts (ruleParams.be.unitRoles: the cli spec beside its command), and so does the test world, which opens and
+// migrates the real databases of the e2e run.
+test('HFS_UNUSED_EXPORT: an export used only by a cli unit spec or a test world file passes; an e2e spec still does not count', t => {
+  const files = {
+    ...CONSUMER_FILES,
+    [X]: 'export const TOKEN = 1;\nexport type Params = { a: number };\nexport const nobody = 2;\nexport const onlyE2e = 3;\nexport const SOURCE = 4;\nexport const openSource = () => 5;\n',
+    'src/features/cli/migrate/subs/run.cli.spec.ts': "import { SOURCE } from '../../../../modules/domain/x';\nit('uses', () => { expect(SOURCE).toBe(4); });\n",
+    'src/tests/world/test-world.config.ts': "import { openSource } from '../../modules/domain/x';\nexport const open = openSource;\n",
+  };
+  assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['nobody', 'onlyE2e']);
+});

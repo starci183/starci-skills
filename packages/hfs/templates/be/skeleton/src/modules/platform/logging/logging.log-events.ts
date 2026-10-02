@@ -8,4 +8,6 @@ export enum LoggingLogEvent {
     WorkerStarted = "worker.started",
     /** The migrate app finished; the names of the applied migrations ride in the fields. */
     MigrationsApplied = "migrations.applied",
+    /** The seed command finished; the seed files it ran ride in the fields, by connection. */
+    SeedsApplied = "seeds.applied",
 }

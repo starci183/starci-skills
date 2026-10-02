@@ -1,39 +1,32 @@
 import { CommandRunner, SubCommand } from "nest-commander"
-import { DataSource } from "typeorm"
-import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import { InjectConnectionSource, InjectDatabaseOptions } from "@modules/platform/database"
+import type { DatabaseConnectionOptions, DatabaseOptions, OpenConnection } from "@modules/platform/database"
 import { InjectLogger, LoggingLogEvent } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { InjectMigrateOptions, InjectOpenConnection } from "../migrate.decorators"
-import type { MigrateOptions, OpenConnection } from "../migrate.options"
 
-/** Opens the data source of one connection, uninitialized: its own migration ledger table, the schema never synchronized. */
-export const openConnection: OpenConnection = (connection: DatabaseConnectionOptions) =>
-    new DataSource({
-        type: "postgres",
-        url: connection.url.reveal(),
-        entities: [...connection.entities],
-        migrations: [...connection.migrations],
-        migrationsTableName: `${connection.name}_migrations`,
-        synchronize: false,
-    })
+/** What a migrate run applied: the migration names it ran, by connection. */
+export interface AppliedMigrations {
+    /** The names of the migrations run on the connection, in the order they ran. */
+    readonly [connection: string]: ReadonlyArray<string>
+}
 
 /**
  * Applies the pending migrations of every connection in turn and answers the names it ran, by connection. The one runner of the
- * schema: this command runs it, and the test world runs it once per run over the same connections.
+ * schema: this command runs it, and a test world runs it over the same connections.
  */
 export async function migrateConnections(
     connections: ReadonlyArray<DatabaseConnectionOptions>,
     open: OpenConnection,
-): Promise<Readonly<Record<string, ReadonlyArray<string>>>> {
+): Promise<AppliedMigrations> {
     const applied: Record<string, ReadonlyArray<string>> = {}
     for (const connection of connections) {
-        const dataSource = open(connection)
-        await dataSource.initialize()
+        const source = open(connection)
+        await source.initialize()
         try {
-            const ran = await dataSource.runMigrations()
+            const ran = await source.runMigrations()
             applied[connection.name] = ran.map((migration) => migration.name)
         } finally {
-            await dataSource.destroy()
+            await source.destroy()
         }
     }
     return applied
@@ -43,8 +36,8 @@ export async function migrateConnections(
 /** `cli migrate run`: migrates every connection of the back end, in order, and logs what it applied. */
 export class RunCli extends CommandRunner {
     constructor(
-        @InjectMigrateOptions() private readonly options: MigrateOptions,
-        @InjectOpenConnection() private readonly open: OpenConnection,
+        @InjectDatabaseOptions() private readonly database: DatabaseOptions,
+        @InjectConnectionSource() private readonly open: OpenConnection,
         @InjectLogger() private readonly logger: Logger,
     ) {
         super()
@@ -52,7 +45,7 @@ export class RunCli extends CommandRunner {
 
     /** Runs the migrations of every connection and logs the applied names. */
     async run(): Promise<void> {
-        const applied = await migrateConnections(this.options.connections, this.open)
+        const applied = await migrateConnections(this.database.connections, this.open)
         this.logger.info(LoggingLogEvent.MigrationsApplied, { applied })
     }
 }

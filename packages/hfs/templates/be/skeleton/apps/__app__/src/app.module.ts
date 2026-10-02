@@ -4,9 +4,11 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { SystemHealthHttpModule } from "@features/api/system-health"
 import { AuthGuard, IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, IdentityModule } from "@modules/domain/identity"
 import { LivenessModule } from "@modules/domain/liveness"
+import { NOTE_ERROR_KINDS, NoteModule, noteEntities, noteMigrations } from "@modules/domain/note"
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
+import { DATABASE_ERROR_KINDS, DatabaseModule } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import {
     HTTP_SECURITY_ERROR_KINDS,
@@ -35,12 +37,23 @@ export class AppModule {
                 }),
                 ErrorsModule.register({
                     isGlobal: true,
-                    kinds: [CONFIG_ERROR_KINDS, HTTP_SECURITY_ERROR_KINDS, IDENTITY_ERROR_KINDS],
+                    kinds: [
+                        CONFIG_ERROR_KINDS,
+                        DATABASE_ERROR_KINDS,
+                        HTTP_SECURITY_ERROR_KINDS,
+                        IDENTITY_ERROR_KINDS,
+                        NOTE_ERROR_KINDS,
+                    ],
                 }),
                 CqrsModule.register({ isGlobal: true }),
                 HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
+                DatabaseModule.register({
+                    isGlobal: true,
+                    connections: [{ ...options.database, entities: noteEntities, migrations: noteMigrations }],
+                }),
                 IdentityModule.register({ isGlobal: true }),
                 LivenessModule.register({ isGlobal: true }),
+                NoteModule.register({ isGlobal: true }),
                 SystemHealthHttpModule,
             ],
             providers: [

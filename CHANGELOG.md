@@ -17,6 +17,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
   - The cli app boots with `CommandFactory.run`. Commands live in `src/features/cli/<group>/subs/<name>.cli.ts`, each with its `<name>.cli.spec.ts`, and they are measured like services.
   - Migrations run as `cli migrate run`. The app kind `migrate` and the slot `be.feature.transport.cli` are deleted.
   - New rules R132 `BE_CLI_REQUIRED`, R133 `BE_CLI_BOOTSTRAP`, R134 `BE_CLI_COMMAND_SHAPE` and R135 `BE_CLI_OWNER` (eslint-be `cli.mjs`).
+  - New rules R132 `BE_CLI_REQUIRED`, R133 `BE_CLI_BOOTSTRAP`, R134 `BE_CLI_COMMAND_SHAPE` and R135 `BE_CLI_OWNER` (eslint-be `cli.mjs`; ids provisional).
   - Api features live in `src/features/api/<feature>/`.
   - The schedule and message transports are composed by the api app that owns them or by a worker app (R46).
   - `ruleParams.be.unitRoles` is the one list of unit-tested roles.

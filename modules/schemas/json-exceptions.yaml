@@ -191,9 +191,12 @@ exceptions:
   - path: packages/hfs/templates/be/tool-config/tsconfig.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
-  - path: packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/i18n/messages/vi.json
+  - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/vi.json
     reason: >
-      next-intl message catalogue template for a scaffolded FE app; next-intl requires JSON.
+      next-intl message catalogue template for the scaffolded product app (fe/apps/app); next-intl requires JSON.
+  - path: packages/hfs/templates/fe/skeleton/apps/landing/src/modules/i18n/messages/vi.json
+    reason: >
+      next-intl message catalogue template for the scaffolded landing app (fe/apps/landing); next-intl requires JSON.
   - path: packages/hfs/templates/fe/tool-config/tsconfig.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
