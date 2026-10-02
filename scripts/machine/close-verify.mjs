@@ -32,6 +32,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { terminalWait } from '../api/orca/terminal-wait.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -87,7 +88,7 @@ export function closeOnce(handle, { list = terminalList, close = terminalClose, 
  * Close `handle` and prove it is gone. Seams: show, close, list, sleep, verifyMs. See the header for the result.
  */
 export function closeAndVerify(handle, { show = terminalShow, close = terminalClose, list = terminalList, sleep = sleepSync,
-  verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, tree = false, table = processTable, reap = reapOrphaned } = {}) {
+  verifyMs = VERIFY_MS, intervalMs = VERIFY_INTERVAL_MS, wait = terminalWait, tree = false, table = processTable, reap = reapOrphaned } = {}) {
   if (!handle) return null;
   const before = terminalState(handle, { show });
   if (before === 'gone') return { handle, ok: true, proof: 'gone', attempts: 0 };
@@ -100,9 +101,14 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
     out.attempts += 1;
     if (r.tab) out.tab = r.tab;
     if (r.error) out.error = r.error;
-    for (let waited = 0; waited <= verifyMs; waited += intervalMs) {
+    // Orca proves the exit (terminal wait --for exit: an exited or closed handle answers at once); only an answer it cannot give
+    // (host down, the verb refused) falls back to polling terminal show.
+    let proven = null;
+    try { proven = wait({ terminal: handle, for: 'exit', timeoutMs: verifyMs }); } catch { proven = null; }
+    const viaWait = proven?.ok === true && !proven.hostUnavailable;
+    for (let waited = 0; waited <= (viaWait ? 0 : verifyMs); waited += intervalMs) {
       if (waited > 0) sleep(intervalMs);
-      const state = terminalState(handle, { show });
+      const state = viaWait ? (proven.satisfied ? 'disconnected' : 'connected') : terminalState(handle, { show });
       if (state === 'gone' || state === 'disconnected') {
         delete out.error;
         // The process tree must be gone too (owner 2026-09-28): an agent that ran in it and lingers is killed.

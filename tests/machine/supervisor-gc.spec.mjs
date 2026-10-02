@@ -83,16 +83,32 @@ test('idle shells: only prompts, no agent, old enough', () => {
 test('closeAndVerify proves the close; closeSelfSafe detaches from its own terminal', () => {
   let state = 'connected';
   const show = () => (state === 'gone' ? { ok: false, errorCode: 'terminal_handle_stale' } : { ok: true, terminal: {}, connected: state === 'connected' });
-  const closed = closeAndVerify('term_x', { show, list: () => ({ terminals: [{ handle: 'term_x', tabId: 't1' }] }), close: () => { state = 'disconnected'; return { ok: true }; }, sleep: () => {} });
+  const closed = closeAndVerify('term_x', { show, list: () => ({ terminals: [{ handle: 'term_x', tabId: 't1' }] }), close: () => { state = 'disconnected'; return { ok: true }; }, sleep: () => {}, wait: () => ({ ok: false, hostUnavailable: true }) });
   assert.deepEqual([closed.ok, closed.proof, closed.tab], [true, 'disconnected', 't1']);
   state = 'connected';
-  const stuck = closeAndVerify('term_x', { show, list: () => ({ terminals: [] }), close: () => ({ ok: true }), sleep: () => {}, verifyMs: 0 });
+  const stuck = closeAndVerify('term_x', { show, list: () => ({ terminals: [] }), close: () => ({ ok: true }), sleep: () => {}, verifyMs: 0, wait: () => ({ ok: false, hostUnavailable: true }) });
   assert.equal(stuck.ok, false);
   assert.equal(stuck.reason, 'still-connected');
   let spawned = null;
   const self = closeSelfSafe('term_me', { env: { ORCA_TERMINAL_HANDLE: 'term_me' }, spawnFn: (_, args) => { spawned = args; return { pid: 7, unref() {} }; } });
   assert.equal(self.detached, true);
   assert.ok(spawned.includes('--terminal') && spawned.includes('term_me'));
+});
+
+test('closeAndVerify takes the proof from terminal wait --for exit; polling terminal show is only the fallback (alpha5 1.2)', () => {
+  const shows = [], waits = [];
+  const show = () => { shows.push(1); return { ok: true, terminal: {}, connected: true }; };
+  const list = () => ({ terminals: [{ handle: 'term_w', tabId: 't9' }] });
+  const proven = closeAndVerify('term_w', { show, list, close: () => ({ ok: true }), sleep: () => {}, verifyMs: 4000,
+    wait: (a) => { waits.push(a); return { ok: true, satisfied: true, status: 'exited' }; } });
+  assert.deepEqual([proven.ok, proven.proof, proven.attempts], [true, 'disconnected', 1]);
+  assert.deepEqual(waits.map((a) => [a.terminal, a.for, a.timeoutMs]), [['term_w', 'exit', 4000]]);
+  assert.equal(shows.length, 1, 'only the initial state read: no polling of terminal show after the close');
+  // a live terminal: the wait times out, the pane is closed once more, and it is never claimed gone
+  let closes = 0;
+  const stuck = closeAndVerify('term_w', { show, list, close: () => { closes += 1; return { ok: true }; }, sleep: () => {}, verifyMs: 4000,
+    wait: () => ({ ok: true, satisfied: false, timedOut: true }) });
+  assert.deepEqual([stuck.ok, stuck.reason, closes], [false, 'still-connected', 2]);
 });
 
 test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the Claude desktop app', async () => {
