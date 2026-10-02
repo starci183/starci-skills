@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { settleCheckpoint } from '../../scripts/kernel/workflow-checkpoint.mjs';
+import { settleCheckpoint } from '../../scripts/kernel/workflow-settle.mjs';
 import { workflowCommittedReader } from '../../scripts/kernel/work-ownership.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

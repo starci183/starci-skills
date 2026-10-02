@@ -5,7 +5,7 @@ summary: >-
   runtime, on the workflow branch of its owner workflow (scripts/kernel/work-ownership.mjs ownerOf): the op that writes it
   commits nothing and its green checkpoint carries it. settle refuses a green op that changed a .starciwork record another
   live workflow definitely owns (any ownership rule but the repo-owner fallback): workflow-work-record-not-owner
-  (scripts/kernel/workflow-checkpoint.mjs requireWorkOwner, called by settleCheckpoint before the checkpoint). The owner
+  (scripts/kernel/workflow-settle.mjs requireWorkOwner, called by settleCheckpoint before the checkpoint). The owner
   reads its own records at its workflow branch (workflowCommittedReader, used by input-digests inputDrift), so its later
   settles see them before it lands; every other workflow reads main, so a peer sees a record when its owner lands. api
   record-change reads and judges the owner's records in its workflow worktree; record-change-uncommitted now says the
@@ -14,6 +14,7 @@ reach: new-legs
 paths:
   - modules/kernel/contract-changes/workflow-work-record-owner.yaml
   - scripts/kernel/workflow-checkpoint.mjs
+  - scripts/kernel/workflow-settle.mjs
   - scripts/kernel/work-ownership.mjs
   - scripts/kernel/input-digests.mjs
   - scripts/kernel/verbs/record-change.mjs

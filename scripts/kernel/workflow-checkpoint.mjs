@@ -15,8 +15,8 @@
 //   preserveAndReset  an op failed or was blocked: its owned paths' work (and any foreign change) is kept as
 //                     preserved/<workflowId>/<op> (a snapshot commit) and put back on the last checkpoint.
 //   rebaseWorkflow    the workflow branch rebased onto main's tip (a milestone when main moved, and the finish); the checkpoint follows.
-//   milestoneRebase   after a green checkpoint (api settle): scripts/lib/rebase-milestone.mjs decides whether main moved
-//                     enough; a conflict is preserved to preserved/<wf>/rebase-<onto12> and escalated as a rebase-conflict DI.
+//   (api settle runs these through scripts/kernel/workflow-settle.mjs: settleCheckpoint, the Work-record owner rule and
+//                     the milestone rebase.)
 //   finishWorkflow    main is touched only here, in this order: the full gate of the whole branch against its merge-base
 //                     with main, the merge guard, review.verify of the exact head that lands, the rebase (a rebase that
 //                     moves the head forces a re-review), the fast-forward of main and its push, then the worktree is
@@ -53,10 +53,7 @@ import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
 import { remote as gitRemote } from '../api/git/remote.mjs';
 import { push as gitPush } from '../api/git/push.mjs';
 import { mainRootOf } from '../machine/worktree-git.mjs';
-import { TERMINAL_JOB_STATUSES, worktreeSettings } from '../machine/worktree-registry.mjs';
-import { openDecisionRow } from '../machine/decisions.mjs';
-import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
-import { createOwnership } from './work-ownership.mjs';
+import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { claimManager } from '../connectors/lib.mjs';
@@ -103,7 +100,7 @@ const mainOf = (ctx) => ctx?.main ?? 'main';
 const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending, TERMINAL_JOB_STATUSES, ...(ctx?.worktree ?? {}) });
 
 /** The registry row of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
-function recordOf(ctx, workflowId) {
+export function recordOf(ctx, workflowId) {
   const rec = wt(ctx).workflowWorktreeOf(ctx, workflowId);
   if (!rec) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no workflow worktree in the registry`);
   if (!rec.path || !fs.existsSync(rec.path)) throw fail({ code: 'workflow-worktree-missing' }, `the worktree of workflow ${workflowId} (${rec.path ?? '-'}) is gone`);
@@ -146,7 +143,7 @@ function changedFiles(dir) {
   return [...new Set([...zlist(tracked.stdout), ...zlist(untracked.stdout)])].sort();
 }
 /** The changed files an op answers for: `mine` under its owned paths, `stray` under no live op's leases at all. */
-function splitChanges(dir, { own, others }) {
+export function splitChanges(dir, { own, others }) {
   const files = changedFiles(dir);
   return { mine: files.filter((f) => under(f, own)), stray: files.filter((f) => !under(f, own) && !under(f, others)) };
 }
@@ -293,90 +290,6 @@ export function rebaseWorkflow(ctx, { workflowId }) {
   const head = revParse(rec.path, 'HEAD');
   wt(ctx).setCheckpoint(ctx, workflowId, head);
   return { ok: true, onto, head };
-}
-
-/** The preserved ref of a milestone rebase that conflicted with main at `onto`: the branch head it could not move. */
-export const milestoneRefOf = (workflowId, onto) => `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/rebase-${String(onto).slice(0, 12)}`;
-
-/** The live ops of the workflow other than `opId` (part A's TERMINAL_JOB_STATUSES); [] without a ledger. */
-function liveSiblingsOf(ctx, { workflowId, opId }) {
-  if (!ctx?.db?.prepare) return [];
-  const statuses = wt(ctx).TERMINAL_JOB_STATUSES;
-  return ctx.db.prepare(`SELECT job_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${statuses.map(() => '?').join(',')})`).all(workflowId, opId, ...statuses).map((r) => r.job_id);
-}
-
-/** A milestone rebase that conflicted, escalated through the Decision Item ladder (scripts/machine/decisions.mjs). */
-function escalateRebaseConflict(ctx, { workflowId, onto, head, files, preservedRef }) {
-  if (ctx?.escalate) return ctx.escalate({ workflowId, onto, head, files, preservedRef });
-  if (!ctx?.ledger) return { ok: false, detail: 'no ledger to open the decision in' };
-  const { di, created } = openDecisionRow(ctx.ledger, {
-    kind: 'rebase-conflict', decider: 'kernel', workflowId, entity: { type: 'workflow', id: workflowId },
-    idempotencyKey: `rebase-conflict:workflow:${workflowId}:${String(onto).slice(0, 12)}`, supersedeEntity: true, code: 'workflow-rebase-conflict',
-    summary: `the workflow branch conflicts with main ${String(onto).slice(0, 12)} on ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` (+${files.length - 3})` : ''}: the branch stays at ${String(head).slice(0, 12)}, preserved as ${preservedRef}; route an op that resolves it before the finish`,
-    evidence: [`onto ${onto}`, `head ${head}`, `preserved ${preservedRef}`, ...files.slice(0, 20).map((f) => `conflict ${f}`)],
-    by: 'runtime:milestone-rebase',
-  });
-  return { ok: true, decisionId: di.id, created };
-}
-
-/**
- * The mid-workflow rebase (WFWT2 2.1), called by api settle right after a green checkpoint: the facts are read here and
- * scripts/lib/rebase-milestone.mjs decides. Due: rebaseWorkflow (the checkpoint follows the new head). A conflict leaves
- * the branch where it was, keeps its head as preserved/<wf>/rebase-<onto12> (the same main tip is never tried twice) and
- * opens one rebase-conflict Decision Item. Never throws: the op is green either way, and the finish's rebase stays the
- * hard stop. {due, why, rebased?, onto?, head?, conflict?, error?}
- */
-export function milestoneRebase(ctx, { workflowId, opId }) {
-  try {
-    const rec = recordOf(ctx, workflowId);
-    const onto = revParse(rec.path, `refs/heads/${mainOf(ctx)}`);
-    const head = revParse(rec.path, 'HEAD');
-    if (!onto || !head) return { due: false, why: 'up-to-date', error: `${mainOf(ctx)} or HEAD does not resolve in ${rec.path}` };
-    const base = git(rec.path, ['merge-base', onto, head]).stdout;
-    const behind = Number(git(rec.path, ['rev-list', '--count', `${base}..${onto}`]).stdout) || 0;
-    const names = (from, to) => new Set(lines(git(rec.path, ['diff', '--name-only', '--no-renames', `${from}..${to}`]).stdout));
-    const ours = behind > 0 ? names(base, head) : new Set();
-    const overlap = behind > 0 ? [...names(base, onto)].filter((f) => ours.has(f)).length : 0;
-    const conflictedOnto = revParse(rec.path, milestoneRefOf(workflowId, onto)) ? onto : null;
-    const idle = liveSiblingsOf(ctx, { workflowId, opId }).length === 0;
-    const policy = rebaseMilestone({ idle, behind, overlap, onto, conflictedOnto, behindLimit: ctx?.behindLimit ?? worktreeSettings().rebaseMilestoneBehind });
-    if (!policy.due) return { ...policy, onto, behind, overlap };
-    const r = rebaseWorkflow(ctx, { workflowId });
-    if (r.ok) return { ...policy, rebased: !r.already, onto: r.onto, head: r.head, behind, overlap };
-    if (r.code !== 'workflow-rebase-conflict') return { ...policy, rebased: false, onto, error: r.code, detail: r.detail ?? null, files: r.files ?? [] };
-    const preservedRef = milestoneRefOf(workflowId, onto);
-    const kept = git(rec.path, ['update-ref', preservedRef, head]);
-    const escalation = escalateRebaseConflict(ctx, { workflowId, onto, head, files: r.files, preservedRef });
-    return { ...policy, rebased: false, onto, head, conflict: { files: r.files, preservedRef: kept.ok ? preservedRef : null, escalation } };
-  } catch (error) {
-    return { due: false, why: 'quiet', error: error?.code ?? 'workflow-rebase-failed', detail: String(error?.message ?? error).slice(0, 300) };
-  }
-}
-
-/**
- * The one rule for Work records (WFWT2 2.8): a record is committed only by the runtime, on the workflow branch of its owner
- * workflow (work-ownership.mjs ownerOf). A green op that changed a .starciwork record another live workflow definitely
- * owns (any rule but the repo-owner fallback) is refused workflow-work-record-not-owner: the owner changes it, peers see
- * it when the owner lands. ctx.ownerOf replaces the ledger's ownership in a spec.
- */
-export function requireWorkOwner(ctx, { workflowId, opId }) {
-  const rec = recordOf(ctx, workflowId);
-  const records = splitChanges(rec.path, leasesOf(ctx, { workflowId, opId })).mine.filter((f) => f.startsWith('.starciwork/'));
-  if (!records.length) return;
-  const ownerOf = ctx?.ownerOf ?? createOwnership(ctx.db, { repo: ctx.repo });
-  const foreign = records.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId && o.workflowId !== workflowId && o.by !== 'repo-owner');
-  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ')}): only the owner's workflow commits a record - ask it (api notify --kind request)`), { files: foreign.slice(0, 40) });
-}
-
-/**
- * What api settle does in a workflow worktree, as the ledger event it records: a green op is a checkpoint followed by the
- * milestone rebase; a failed or blocked op is preserved and reset. Throws the typed refusal of checkpointOp/preserveAndReset.
- */
-export function settleCheckpoint(ctx, { workflowId, opId, pass }) {
-  if (!pass) return { kind: CHECKPOINT_EVENTS.preserved, ...preserveAndReset(ctx, { workflowId, opId }) };
-  requireWorkOwner(ctx, { workflowId, opId });
-  const checkpoint = { kind: CHECKPOINT_EVENTS.checkpoint, ...checkpointOp(ctx, { workflowId, opId }) };
-  return { ...checkpoint, milestone: milestoneRebase(ctx, { workflowId, opId }) };
 }
 
 /** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */

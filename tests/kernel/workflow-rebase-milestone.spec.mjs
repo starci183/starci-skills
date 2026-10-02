@@ -11,7 +11,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { rebaseMilestone } from '../../scripts/lib/rebase-milestone.mjs';
-import { milestoneRebase, milestoneRefOf, settleCheckpoint } from '../../scripts/kernel/workflow-checkpoint.mjs';
+import { milestoneRebase, milestoneRefOf, settleCheckpoint } from '../../scripts/kernel/workflow-settle.mjs';
 import { DI_KINDS } from '../../scripts/machine/decisions.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateJob } from '../../../engine/db/ledger.mjs';
 import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../engine/admission.mjs';
-import { settleCheckpoint } from '../workflow-checkpoint.mjs';
+import { settleCheckpoint } from '../workflow-settle.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -151,7 +151,7 @@ export default {
   }
 
   let checkpoint = null;
-  // The workflow worktree (WFWT, scripts/kernel/workflow-checkpoint.mjs), LAST: every settle refusal above passed. A green
+  // The workflow worktree (WFWT, scripts/kernel/workflow-settle.mjs), LAST: every settle refusal above passed. A green
   // op's side is committed on the workflow branch as the workflow's checkpoint; a failed or blocked op's side is preserved to
   // preserved/<wf>/<op> and reset to the last checkpoint; then the milestone rebase. main moves only at api finish.
   {
