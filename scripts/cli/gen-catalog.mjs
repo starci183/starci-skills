@@ -249,7 +249,7 @@ ${psLocalValues}
             $candidates = @($flags["$group $verb"])
         }
     }
-    $candidates | Where-Object { $_.StartsWith($wordToComplete, [System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+    $candidates | Where-Object { $null -ne $_ -and $_.StartsWith($wordToComplete, [System.StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
 }
 `;
   return { 'starci.bash': bash, '_starci': zsh, 'starci.fish': fish, 'starci.ps1': ps };

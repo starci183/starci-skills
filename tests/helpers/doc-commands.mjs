@@ -94,7 +94,7 @@ function tokenise(text, optional = false) {
       continue;
     }
     if (atom.length > 1 && /^(['"]).*\1$/.test(atom)) atom = atom.slice(1, -1);
-    const tail = /^\.{1,2}$/.test(atom) ? null : TRAILING.exec(atom);
+    const tail = /^\.{1,3}$/.test(atom) ? null : TRAILING.exec(atom);
     const bare = tail && !PLACEHOLDER.test(atom) ? atom.slice(0, tail.index) : atom;
     if (bare) tokens.push({ text: bare, optional });
     if (tail && !PLACEHOLDER.test(atom) && /[^\]]/.test(tail[0])) break;
@@ -149,7 +149,7 @@ export function extractCommands(text, { kind = 'text' } = {}) {
       let code = line;
       while (/\\\s*$/.test(code) && index + 1 < lines.length && !/^\s*```/.test(lines[index + 1])) {
         index += 1;
-        code = `${code.replace(/\\\s*$/, ' ')}${lines[index]}`;
+        code = `${code.replace(/\\\s*$/, ' ')}${lines[index].trimStart()}`;
       }
       // a fenced line is a command where starci stands in command position; elsewhere it is a diagram or a sentence
       for (const m of code.replace(/\s+#\s.*$/, '').matchAll(STARCI_AT)) {
@@ -159,6 +159,8 @@ export function extractCommands(text, { kind = 'text' } = {}) {
       }
       continue;
     }
+    // a comment in a script is never printed to anyone
+    if (kind === 'script' && /^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
     const segments = kind === 'script'
       // a literal in a `spelling:` field is a retired command kept so the dispatcher can refuse it
       ? [...line.matchAll(/(['"`])((?:\\.|(?!\1).)*)\1/g)].filter((m) => !/\bspelling:\s*$/.test(line.slice(0, m.index))).map((m) => m[2])

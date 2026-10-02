@@ -14,7 +14,8 @@ function runtimeStatus({ runtimeRoot = root, exists = existsSync, read = readFil
   const manifestFile = path.join(runtimeRoot, '.starci-skills.json');
   const version = exists(packageFile) ? JSON.parse(read(packageFile, 'utf8')).version ?? null : null;
   if (!exists(manifestFile)) {
-    return { ok: false, version, root: runtimeRoot, doctor: { manifest: 'missing', changed: [] } };
+    // A source checkout (the live runtime of a host) has no install manifest: there is nothing to drift from, so it is a healthy tree.
+    return { ok: true, version, root: runtimeRoot, doctor: { manifest: 'missing', changed: [] } };
   }
   try {
     const manifest = JSON.parse(read(manifestFile, 'utf8'));

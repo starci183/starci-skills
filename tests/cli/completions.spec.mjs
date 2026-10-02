@@ -117,6 +117,7 @@ function Complete([string]$line) { @((TabExpansion2 $line $line.Length).Completi
 [ordered]@{
   top = @(Complete 'starci ')
   gate = @(Complete 'starci gate ')
+  surveyBare = @(Complete 'starci kernel survey --')
   survey = @(Complete 'starci kernel survey -- ')
   surveyPrefix = @(Complete 'starci kernel survey --j')
   only = @(Complete 'starci runtime check --only ')
@@ -126,6 +127,7 @@ function Complete([string]$line) { @((TabExpansion2 $line $line.Length).Completi
   const completed = JSON.parse(result.stdout.trim());
   assert.deepEqual(sorted(completed.top), sorted([...commandGroups, 'help', 'completion']));
   assert.deepEqual(sorted(completed.gate), sorted(Object.keys(CATALOG.groups.gate.verbs)));
+  assert.ok(Array.isArray(completed.surveyBare), 'bare -- completion must not crash');
   assert.deepEqual(sorted(completed.survey), sorted(commandFlags('kernel', 'survey')));
   assert.deepEqual(completed.surveyPrefix, ['--json']);
   assert.ok(Array.isArray(completed.only), 'value completion must return a result array without crashing');

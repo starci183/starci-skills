@@ -231,6 +231,6 @@ if (isMain(import.meta.url)) {
     else { process.stderr.write('Usage: work-hygiene.mjs staged|files --repo <root> [--json] [<file>...]\n'); process.exit(2); }
   } catch (error) { process.stderr.write(`work-hygiene: ${error.message}\n`); process.exit(2); }
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else if (!result.ok) process.stderr.write(`starci work guard: refused - ${result.findings.length} finding(s) in the staged Work files (${fileURLToPath(import.meta.url).split(/[\\/]/).slice(-3).join('/')}); fix them and commit again\n${formatFindings(result)}\n`);
+  else if (!result.ok) process.stderr.write(`starci work hygiene: refused - ${result.findings.length} finding(s) in the staged Work files (${fileURLToPath(import.meta.url).split(/[\\/]/).slice(-3).join('/')}); fix them and commit again\n${formatFindings(result)}\n`);
   process.exit(result.ok ? 0 : 1);
 }
