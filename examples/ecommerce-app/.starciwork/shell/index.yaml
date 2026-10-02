@@ -80,8 +80,8 @@ apps:
           state: todo
           rev: 1
   - name: shop
-    root: fe/apps/shop
-    appDir: fe/apps/shop/src/app
+    root: fe/apps/app
+    appDir: fe/apps/app/src/app
     framework: next-app-router
     localeParam: locale
     source:
@@ -91,10 +91,10 @@ apps:
     i18n:
       catalogs:
         - locale: en
-          path: fe/apps/shop/src/modules/i18n/messages/en.json
+          path: fe/apps/app/src/modules/i18n/messages/en.json
           sha256: 3d9fb2a4d2b7890288db472d66d236f9277f23dba53ad227f49866dfacfb169c
         - locale: vi
-          path: fe/apps/shop/src/modules/i18n/messages/vi.json
+          path: fe/apps/app/src/modules/i18n/messages/vi.json
           sha256: 01bbf029668ad8fb44bd7a778069884a9c65d7d4bb9fda3b2cabed81a8a5896c
       used:
         keys: []
@@ -118,19 +118,19 @@ apps:
         origin: repository
         files:
           layout:
-            path: fe/apps/shop/src/app/[locale]/layout.tsx
+            path: fe/apps/app/src/app/[locale]/layout.tsx
             sha256: 553d9610ba1ff3f2e63a11c11ce0703ae456f579a7aced95e211f66887a402c3
           page:
-            path: fe/apps/shop/src/app/[locale]/page.tsx
+            path: fe/apps/app/src/app/[locale]/page.tsx
             sha256: f5dd1c3289f1177624c2500b6fd4632b3a67806703ba552ea101d8d1cd47907a
           loading:
-            path: fe/apps/shop/src/app/[locale]/loading.tsx
+            path: fe/apps/app/src/app/[locale]/loading.tsx
             sha256: 879cd4fe3a22027ba27feab44a470af767f9e4be91fdbb7ae7ccb567b6fd92b7
           error:
-            path: fe/apps/shop/src/app/[locale]/error.tsx
+            path: fe/apps/app/src/app/[locale]/error.tsx
             sha256: 9e88dcb94266729ab995f4ddba392529b3b7396cf060fba50c0ca29bd51ccc69
           not-found:
-            path: fe/apps/shop/src/app/[locale]/not-found.tsx
+            path: fe/apps/app/src/app/[locale]/not-found.tsx
             sha256: 00bfcbde2a1c363e2b71bafff158abc9c7d26126bc9494e02c3f28016558f21a
         layout:
           component: LocaleShell
@@ -145,7 +145,7 @@ apps:
         origin: repository
         files:
           page:
-            path: fe/apps/shop/src/app/[locale]/account/page.tsx
+            path: fe/apps/app/src/app/[locale]/account/page.tsx
             sha256: bb666a4d734e3bf28085f7b717d0005b2d7d8a8938ac89f03bca997ece90314e
       - id: /[locale]/browse
         parent: /[locale]
@@ -155,7 +155,7 @@ apps:
         origin: repository
         files:
           page:
-            path: fe/apps/shop/src/app/[locale]/browse/page.tsx
+            path: fe/apps/app/src/app/[locale]/browse/page.tsx
             sha256: cea1394502eb7da108c85d12b858a8010b235f50cafafdd18e083597a957e10d
       - id: /[locale]/cart
         parent: /[locale]
@@ -165,7 +165,7 @@ apps:
         origin: repository
         files:
           page:
-            path: fe/apps/shop/src/app/[locale]/cart/page.tsx
+            path: fe/apps/app/src/app/[locale]/cart/page.tsx
             sha256: a5e2513dad9c9be96a51433a6531ccafaa37b4115898e5b4213482b96039417d
       - id: /[locale]/checkout
         parent: /[locale]
@@ -175,7 +175,7 @@ apps:
         origin: repository
         files:
           page:
-            path: fe/apps/shop/src/app/[locale]/checkout/page.tsx
+            path: fe/apps/app/src/app/[locale]/checkout/page.tsx
             sha256: 5f6a56710f7c33028d365caed9e21a9cd43a1ec676a28f25fa5bcbd3ea0db93a
       - id: /api
         parent: /
@@ -191,7 +191,7 @@ apps:
         origin: repository
         files:
           route:
-            path: fe/apps/shop/src/app/api/cart/route.ts
+            path: fe/apps/app/src/app/api/cart/route.ts
             sha256: 5c2a2541539488e0b5dd03f66066e7afb6b9a092d051db7b4a2dcbc4419b0a62
       - id: /api/cart/items
         parent: /api/cart
@@ -201,7 +201,7 @@ apps:
         origin: repository
         files:
           route:
-            path: fe/apps/shop/src/app/api/cart/items/route.ts
+            path: fe/apps/app/src/app/api/cart/items/route.ts
             sha256: d1080d12fc69c52a9af3eee7b3a3ef314ba21e2c95780ab52b22b5466b0836ed
       - id: /api/orders
         parent: /api
@@ -211,7 +211,7 @@ apps:
         origin: repository
         files:
           route:
-            path: fe/apps/shop/src/app/api/orders/route.ts
+            path: fe/apps/app/src/app/api/orders/route.ts
             sha256: 779f1aeb77c410885993bfab37a648496bca11850d12d0ecb82c32ba0ae8481f
       - id: /api/session
         parent: /api
@@ -221,7 +221,7 @@ apps:
         origin: repository
         files:
           route:
-            path: fe/apps/shop/src/app/api/session/route.ts
+            path: fe/apps/app/src/app/api/session/route.ts
             sha256: 3da50fdfb6986ab5158ffa0d636a7f15cf5aef693922645bd37a74c20d3835a4
 change:
   rev: 1

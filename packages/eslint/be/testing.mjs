@@ -26,7 +26,7 @@ import { statSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins } from "./lib/types.mjs"
-import { isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit-spec.mjs"
+import { isUnitSpecFile, unitRoleOfSpec, unitRoleOfSubject } from "./lib/unit-spec.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
 const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
@@ -131,13 +131,13 @@ const BANNED_TEST_FILE = /(?:\.test|\.int-spec|\.harness-spec)\.[cm]?[jt]sx?$/
 export const unitTestColocated = {
   meta: {
     type: "problem",
-    docs: { description: "Only a `<name>.service.ts` is unit-tested: it has its `<name>.service.spec.ts` beside it, any other unit spec is a finding, and there are only the spec kinds `spec`, `e2e-spec`, `integration-spec` and `contract-spec`." },
+    docs: { description: "Only the unit-tested roles (`ruleParams.be.unitRoles`: a `<name>.service.ts`, a cli command `<name>.cli.ts` of `src/features/cli`) are unit-tested: each has its `<name>.<role>.spec.ts` beside it, any other unit spec is a finding, and there are only the spec kinds `spec`, `e2e-spec`, `integration-spec` and `contract-spec`." },
     schema: [],
     messages: {
       suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.service.spec.ts` unit beside its service or a `*.e2e-spec.ts` flow under `src/tests/e2e/`; there is no `.test.ts`, `int-spec` or `harness-spec`.",
-      notService: "`{{name}}` is a unit spec of something that is not a service. Only `<name>.service.ts` is unit-tested; a handler, resolver, controller, consumer, mapper, entity, guard, module, policy, helper or composition is covered through the service tests and the e2e flows. Delete this spec and move any business rule it checks into a service.",
-      orphan: "`{{name}}` has no service beside it. A unit spec is `<name>.service.spec.ts` next to `<name>.service.ts` and tests that one service; move it beside its service, or rename it after the service it tests.",
-      missing: "This service has no spec. Add `{{spec}}` beside it: it builds the service with `Test.createTestingModule`, provides only its constructor dependencies as typed doubles and asserts results or state.",
+      notService: "`{{name}}` is a unit spec of something that is not a service. Only a unit-tested role (a `<name>.service.ts`, a cli command of `src/features/cli`) is unit-tested; a handler, resolver, controller, consumer, mapper, entity, guard, module, policy, helper or composition is covered through the service tests and the e2e flows. Delete this spec and move any business rule it checks into a service.",
+      orphan: "`{{name}}` has nothing beside it to test. A unit spec is `<name>.<role>.spec.ts` next to the `<name>.<role>.ts` it tests (a service, or a cli command of `src/features/cli`; the roles are `ruleParams.be.unitRoles`); move it beside its subject, or rename it after the subject it tests.",
+      missing: "This unit-tested subject has no spec. Add `{{spec}}` beside it: it builds the subject with `Test.createTestingModule`, provides only its constructor dependencies as typed doubles and asserts results or state.",
     },
   },
   create(context) {
@@ -149,17 +149,18 @@ export const unitTestColocated = {
       return { Program(node) { context.report({ node, messageId: "suffix", data: { name } }) } }
     }
     if (isUnitSpecFile(hfs, filename)) {
-      if (!isServiceSpecFile(hfs, filename)) return { Program(node) { context.report({ node, messageId: "notService", data: { name } }) } }
-      if (exists(join(dirname(filename), `${serviceNameOfSpec(filename)}.service.ts`))) return {}
+      const role = unitRoleOfSpec(hfs, filename)
+      if (!role) return { Program(node) { context.report({ node, messageId: "notService", data: { name } }) } }
+      const subject = `${name.slice(0, -`.${role.spec}.ts`.length)}.${role.role}.ts`
+      if (exists(join(dirname(filename), subject))) return {}
       return { Program(node) { context.report({ node, messageId: "orphan", data: { name } }) } }
     }
-    if (!name.endsWith(".service.ts")) return {}
-    // a service outside the test tree; the slot manifest says where the tests live
-    const slot = hfs.slotOf(filename)
-    if (!slot || slot.startsWith("be.tests.")) return {}
-    const stem = join(dirname(filename), name.slice(0, -".ts".length))
-    if (exists(`${stem}.spec.ts`)) return {}
-    return { Program(node) { context.report({ node, messageId: "missing", data: { spec: `${name.slice(0, -".ts".length)}.spec.ts` } }) } }
+    // a unit-tested subject outside the test tree (ruleParams.be.unitRoles): its spec sits beside it
+    const role = unitRoleOfSubject(hfs, filename)
+    if (!role) return {}
+    const spec = `${name.slice(0, -`.${role.role}.ts`.length)}.${role.spec}.ts`
+    if (exists(join(dirname(filename), spec))) return {}
+    return { Program(node) { context.report({ node, messageId: "missing", data: { spec } }) } }
   },
 }
 

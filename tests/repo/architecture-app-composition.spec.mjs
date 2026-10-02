@@ -7,7 +7,7 @@ import { archFixture, findings, runArch } from '../helpers/hfs-arch-fixture.mjs'
 const APP = {
   'apps/core/src/main.ts': "import { AppModule } from './app.module';\nexport const boot = AppModule;\n",
   'apps/core/src/app.module.ts': 'export class AppModule {}\n',
-  'src/features/a/index.ts': 'export const a = 1;\n',
+  'src/features/api/a/index.ts': 'export const a = 1;\n',
 };
 
 test('an app that holds only its composition files has no BE_APP_COMPOSITION_ONLY finding', (t) => {

@@ -56,10 +56,10 @@ test('BE_SPEC_PLACEMENT: a spec in a be app, the app scripts/, be/tools/, beside
     put(dir, 'scripts/x.spec.mjs');
     put(dir, 'scripts/probe.test.cjs');
     put(dir, 'be/tools/seed.spec.ts');
-    put(dir, 'be/src/features/orders/application/place-order.spec.ts');
+    put(dir, 'be/src/features/api/orders/application/place-order.spec.ts');
     put(dir, 'be/src/tests/misc/other.e2e-spec.ts');
   }) });
-  assert.deepEqual(pathsOf(result, 'BE_SPEC_PLACEMENT'), ['be/apps/core/src/core.composition.spec.ts', 'be/src/features/orders/application/place-order.spec.ts', 'be/src/tests/misc/other.e2e-spec.ts', 'be/tools/seed.spec.ts', 'scripts/probe.test.cjs', 'scripts/x.spec.mjs']);
+  assert.deepEqual(pathsOf(result, 'BE_SPEC_PLACEMENT'), ['be/apps/core/src/core.composition.spec.ts', 'be/src/features/api/orders/application/place-order.spec.ts', 'be/src/tests/misc/other.e2e-spec.ts', 'be/tools/seed.spec.ts', 'scripts/probe.test.cjs', 'scripts/x.spec.mjs']);
 });
 
 test('BE_SPEC_PLACEMENT: a service spec beside its service and the integration, e2e and contract layers are clean', () => {

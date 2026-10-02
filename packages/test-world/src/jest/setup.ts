@@ -6,7 +6,7 @@
  *     k3d cluster with its registry, with this repository's databases, realm, redis db, bucket/collection/topic prefixes and
  *     namespace prefix provisioned;
  *  4. start the sibling services (our own images from other repositories);
- *  5. run `apps/migrate` once against the run's databases, then the seed files, and remember which tables the migrate/seed step filled
+ *  5. run the migrate step (the cli migrate command's runner) once against the run's databases, then the seed files, and remember which tables the migrate/seed step filled
  *     (the per-spec reset keeps them);
  *  6. publish the coordinates to the spec workers through the state file.
  * A failure removes whatever was started before it is rethrown: jest does not call the teardown after a failed setup.
@@ -83,10 +83,10 @@ const runMigrate = async (config: AnyTestWorldConfig, context: RunContext): Prom
         else if (typeof entry === "object" && entry !== null && "register" in entry) {
             const app = await NestFactory.createApplicationContext((entry as { register: (o: never) => never }).register(options), { logger: ["error"] })
             await app.close()
-        } else throw worldError(TestWorldErrorCode.ConfigInvalid, "migrate.module must be the apps/migrate module (exports bootstrap), a bootstrap function, or an AppModule with register")
+        } else throw worldError(TestWorldErrorCode.ConfigInvalid, "migrate.module must be a module that exports bootstrap, a bootstrap function, or an AppModule with register")
     } catch (cause) {
         if (cause instanceof Error && cause.name === "TestWorldError") throw cause
-        throw worldError(TestWorldErrorCode.MigrateFailed, `apps/migrate failed: ${cause instanceof Error ? cause.message : String(cause)}`, cause)
+        throw worldError(TestWorldErrorCode.MigrateFailed, `the migrate step failed: ${cause instanceof Error ? cause.message : String(cause)}`, cause)
     }
 }
 

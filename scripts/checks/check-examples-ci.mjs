@@ -13,7 +13,7 @@
 //
 //   node scripts/checks/check-examples-ci.mjs            check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app","todo-app"]) for $GITHUB_OUTPUT
+//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
 //   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml from the render
 import fs from 'node:fs';
 import path from 'node:path';

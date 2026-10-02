@@ -157,7 +157,7 @@ apps/
     app.module.ts                         # composition/configuration only
 src/
   features/
-    cart/
+    api/cart/                             # features are grouped by trigger kind (api, cli); no kind imports another
       index.ts                            # public feature entry
       cart.module.ts
       transport/
@@ -183,8 +183,12 @@ src/
 
 - Apps own boot/configuration/composition. They do not own handlers, services, controllers, or business
   rules.
-- A feature owns its transport adapters and its application handlers. A resolver/controller/message consumer
-  validates/adapts the protocol and dispatches one typed command or query.
+- An api feature owns its transport adapters and its application handlers. A resolver/controller/message consumer
+  validates/adapts the protocol and dispatches one typed command or query. A one-off action (migrate, seed, an
+  operator command) is a command of the cli feature root `features/cli/`, composed only by the one cli app; it is an
+  action runner with its own unit spec, not a transport.
+- Inside one bounded context the handler calls that context's domain service in one transaction, with no event.
+  An event crosses contexts or carries async work only; a feature never reads another context's state directly.
 - A reusable module under `modules/{domain,platform,integrations}/<capability>` owns one cohesive domain,
   platform, or provider capability. It never imports a feature
   or app. Named databases, provider instances, and tenant/workspace instances remain with their actual
@@ -198,8 +202,9 @@ src/
 - Transport DTOs belong to their adapter. Application input/results remain framework-neutral. Persistence
   entities stay behind the database adapter and are mapped before crossing the feature contract.
 
-The existing Academy backend is transport-first under `src/features/api/core/graphql/...`. That is a source
-mapping to assess, not a portable requirement and not permission to copy every wrapper. Refactoring an
+The existing Academy backend is transport-first under `src/features/api/core/graphql/...` (one feature named `core`
+holding protocol folders). That is a source mapping to assess, not the `features/api/<feature>/` shape above and not
+permission to copy every wrapper. Refactoring an
 existing product still follows its accepted SDS and bounded transition plan.
 
 ## Single source and monorepo profiles

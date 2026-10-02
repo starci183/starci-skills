@@ -1,6 +1,0 @@
-mutation ReopenTask($id: ID!) {
-    reopenTask(input: { id: $id }) {
-        taskId
-        complete
-    }
-}

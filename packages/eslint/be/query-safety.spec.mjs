@@ -13,8 +13,8 @@ import { at, typedTester } from "./fixtures/typed/tester.mjs"
 
 const tester = typedTester()
 
-const HANDLER = at("src/features/checkout/application/place.handler.ts")
-const HANDLER_SPEC = at("src/features/checkout/application/place.handler.spec.ts")
+const HANDLER = at("src/features/api/checkout/application/place.handler.ts")
+const HANDLER_SPEC = at("src/features/api/checkout/application/place.handler.spec.ts")
 const SQL_FILE = at("src/modules/domain/order/persistence/order.sql.ts")
 const ROWS_FILE = at("src/modules/domain/order/persistence/order.rows.ts")
 const REPOSITORY_FILE = at("src/modules/domain/order/persistence/order.repository.ts")

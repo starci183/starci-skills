@@ -39,7 +39,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         todo: { module: TodoApp, operations: TODO_OPERATIONS, options: (w) => ({ port: w.apps.todo.port, database: { name: "primary", url: new Secret(w.db.primary.url) }, /* every URL comes from w */ }) },
         worker: { module: WorkerApp, listen: false, options: (w) => ({ /* ... */ }) },
     },
-    migrate: { module: migrateMain, options: (w) => ({ connections: [/* from w.db */] }) },   // apps/migrate: `bootstrap` export, a function, or an AppModule
+    migrate: { module: runMigrations, options: (w) => ({ connections: [/* from w.db */] }) },   // the migrate step over the connection list `cli migrate run` reads: a function or a module exporting `bootstrap`
     identity: { register: "keycloak", signIn: (world, { email, password }) => /* the public door */ },
     modules: { base: (w) => [/* clock, logging, database module over w.db */] },              // base of { modules } specs
     sandbox: { base: () => [HttpModule.register({ isGlobal: true })] },                        // contract specs

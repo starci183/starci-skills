@@ -1,5 +1,0 @@
-export { outboxEntities, outboxMigrations } from "./persistence/connection"
-export type { OutboxMessage, OutboxRecord } from "./outbox.contracts"
-export { InjectOutbox, OUTBOX } from "./outbox.decorators"
-export { OutboxModule } from "./outbox.module"
-export type { Outbox } from "./outbox.port"

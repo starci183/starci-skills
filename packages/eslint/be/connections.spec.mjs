@@ -18,10 +18,10 @@ const CONNECTION = at("src/modules/platform/database/primary.connection.ts")
 const CONFIG = at("src/modules/platform/database/primary.config.ts")
 const DATABASE_MODULE = at("src/modules/platform/database/database.module.ts")
 const DATABASE_INDEX = at("src/modules/platform/database/index.ts")
-const HANDLER = at("src/features/checkout/application/place.handler.ts")
-const RESOLVER = at("src/features/checkout/transport/graphql/place.resolver.ts")
+const HANDLER = at("src/features/api/checkout/application/place.handler.ts")
+const RESOLVER = at("src/features/api/checkout/transport/graphql/place.resolver.ts")
 const SERVICE = at("src/modules/domain/order/order.service.ts")
-const MIGRATE = at("apps/migrate/src/main.ts")
+const MIGRATE = at("apps/cli/src/main.ts")
 const DATABASE_FIXTURE = at("src/tests/fixtures/database.ts")
 const OTHER = at("src/modules/domain/order/order.helper.ts")
 const E2E_WORLD = at("src/tests/world/use-test-world.ts")
@@ -44,7 +44,7 @@ test("R84: an EntityManager injector is the one injector of a declared connectio
             { filename: OTHER, code: `${COMPOSITION}declare class Clock {}\nexport const InjectClock = (): TypedParameterDecorator<Clock> => injector(CLOCK)` },
             // re-exporting the declared injector under its own name is the owner's public surface
             { filename: DATABASE_INDEX, code: 'export { InjectPrimaryEntityManager } from "./primary.injector"' },
-            // the migrate app and the test database fixture may build the token
+            // the cli and the test database fixture may build the token
             { filename: MIGRATE, code: 'import { getEntityManagerToken } from "@nestjs/typeorm"\nconst token = getEntityManagerToken(PRIMARY_CONNECTION)' },
             { filename: DATABASE_FIXTURE, code: 'import { getEntityManagerToken } from "@nestjs/typeorm"\nexport const token = getEntityManagerToken(PRIMARY_CONNECTION)' },
         ],
@@ -105,7 +105,7 @@ test("R84: an EntityManager injector is the one injector of a declared connectio
     })
 })
 
-test("R84: a connection is registered once, in the platform database capability or the migrate app", () => {
+test("R84: a connection is registered once, in the platform database capability or the cli", () => {
     tester.run("one-connection-per-database", oneConnectionPerDatabase, {
         valid: [
             { filename: DATABASE_MODULE, code: 'import { TypeOrmModule } from "@nestjs/typeorm"\nconst m = TypeOrmModule.forRootAsync({ name: PRIMARY_CONNECTION })' },
@@ -180,11 +180,11 @@ test("R88: an EntityManager is injected only in application handlers, domain ser
         ],
         invalid: [
             { filename: RESOLVER, code: injected, errors: [{ messageId: "slot" }] },
-            { filename: at("src/features/checkout/transport/http/place.controller.ts"), code: injected, errors: [{ messageId: "slot" }] },
+            { filename: at("src/features/api/checkout/transport/http/place.controller.ts"), code: injected, errors: [{ messageId: "slot" }] },
             { filename: at("src/modules/integrations/stripe/stripe.service.ts"), code: injected, errors: [{ messageId: "slot" }] },
             { filename: at("apps/api/src/app.module.ts"), code: injected, errors: [{ messageId: "slot" }] },
             // a handler's own folder is not enough: only `*.handler.ts`, and a spec beside it is not one
-            { filename: at("src/features/checkout/application/place.command.ts"), code: injected, errors: [{ messageId: "slot" }] },
+            { filename: at("src/features/api/checkout/application/place.command.ts"), code: injected, errors: [{ messageId: "slot" }] },
             { filename: OTHER, code: injected, errors: [{ messageId: "slot" }] },
             // property injection of the manager is refused in the same places
             { filename: RESOLVER, code: `${manager}class R { @InjectPrimaryEntityManager() private readonly entityManager: EntityManager }`, errors: [{ messageId: "slot" }] },

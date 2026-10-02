@@ -42,7 +42,7 @@ rules:
         write: '@Public({ reason: PublicReason.SignedWebhook }) async handle(@Body() body: PayosWebhookRequest): Promise<void> { if (!(await this.inbox.claim(PAYOS_SOURCE, body.eventId))) return; await this.commandBus.execute(new SettlePaymentCommand({ request: toSettleRequest(body) })) }'
       - id: case-2
         when: A consumer
-        write: 'be/src/features/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
+        write: 'be/src/features/api/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
     verification:
       automated:
         - BE_INBOX_DEDUPE_MISSING

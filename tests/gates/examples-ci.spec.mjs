@@ -17,7 +17,7 @@ const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
-  assert.ok(apps.includes('todo-app') && apps.includes('ecommerce-app'));
+  assert.deepEqual(apps, ['ecommerce-app']);
   for (const app of apps) assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', app, 'hfs.json'), 'utf8')).kind, 'app');
   assert.ok(!apps.includes('shape-slot') && !apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
@@ -60,7 +60,9 @@ test('every executable be file of each example is a service or matched by a Sona
     // The runtime's own scope (what Sonar measures) is exactly the services Codecov judges.
     const target = coverageTargetOf(coverageScopeOf(props));
     assert.deepEqual(files.filter(target), files.filter((file) => services.some((glob) => glob.test(file))), `${app}: Sonar's coverage set = Codecov's`);
-    assert.ok(files.filter(target).every((file) => file.endsWith('.service.ts')));
+    // Only the unit-tested roles are measured: the services, and the cli commands of the cli feature root.
+    assert.ok(files.filter(target).every((file) => file.endsWith('.service.ts') || (file.startsWith('be/src/features/cli/') && file.endsWith('.cli.ts'))));
+    assert.ok(files.filter(target).some((file) => file.endsWith('.cli.ts')), `${app}: its cli commands are measured`);
     assert.ok(excluded.some((glob) => glob.test('fe/apps/web/src/app/page.tsx')), `${app}: fe/ is outside coverage`);
   }
 });

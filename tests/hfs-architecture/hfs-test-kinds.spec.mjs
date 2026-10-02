@@ -78,5 +78,5 @@ test('integration, e2e and contract stay out of hooks, default typecheck, covera
 });
 
 test('a worktree and its main checkout are one repository name', () => {
-  assert.equal(repositoryName(path.resolve('examples', 'todo-app')), 'todo-app');
+  assert.equal(repositoryName(path.resolve('examples', 'ecommerce-app')), 'ecommerce-app');
 });

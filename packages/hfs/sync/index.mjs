@@ -174,16 +174,16 @@ export function coverageExclusions(presets, manifest = loadSlotManifest()) {
  * script runs from be/ (`cd be && ...`, the folder its tsconfig and jest configuration are relative to) or runs the built app; an
  * fe script runs the fe app's workspace (@<project>/<app>): through turbo for dev (so the packages it imports are built first) and
  * through npm `-w` for start. be: `dev:be` runs the one api app from source and restarts it on change (`dev:be:<app>` each, with
- * several), `start:<app>` runs a built api, worker or cli app, `migrate` the migrate app (`migrate:<app>` with several). fe:
- * `dev:fe` runs the one Next app in development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
+ * several), `start:<app>` runs a built api or worker app, `cli` the built cli app (`npm run cli -- <group> <command>`) and, when the
+ * back end declares a connection, `migrate` its migrate command (`cli migrate run`). fe: `dev:fe` runs the one Next app in
+ * development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
  */
 export function appScripts(app) {
   const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
   const be = app.sides.be.apps;
   const fe = app.sides.fe.apps;
   const apis = be.filter(entry => entry.kind === 'api');
-  const migrates = be.filter(entry => entry.kind === 'migrate');
-  const migrateName = entry => (migrates.length === 1 ? 'migrate' : `migrate:${entry.name}`);
+  const connections = app.sides.be.connections ?? [];
   const watch = entry => `cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/${entry.name}/src/main.ts`;
   const built = entry => `node be/dist/apps/${entry.name}/src/main.js`;
   const workspace = entry => feAppPackageName(app.project, entry.name);
@@ -191,10 +191,16 @@ export function appScripts(app) {
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
     ...(fe.length === 1 ? [line('dev:fe', dev(fe[0]))] : fe.map(entry => line(`dev:fe:${entry.name}`, dev(entry)))),
-    ...be.map(entry => line(entry.kind === 'migrate' ? migrateName(entry) : `start:${entry.name}`, built(entry))),
+    ...be.flatMap(entry => {
+      if (entry.kind !== 'cli') return [line(`start:${entry.name}`, built(entry))];
+      return [line('cli', built(entry)), ...(connections.length ? [line('migrate', `${built(entry)} ${MIGRATE_COMMAND}`)] : [])];
+    }),
     ...fe.map(entry => line(`start:${entry.name}`, `npm run start -w ${workspace(entry)}`)),
   ].join('\n    ');
 }
+
+/** The cli command that migrates every connection (src/features/cli/migrate/subs/run.cli.ts). */
+export const MIGRATE_COMMAND = 'migrate run';
 
 /** True when the fe side opts into a workspace package (repo.packages or any fe.package.* slot): the sources then include fe/packages/. */
 export const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo.packages' || String(id).startsWith('fe.package.'));

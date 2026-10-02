@@ -45,15 +45,15 @@ test('an owning capability with entity, migration, connection and index exports 
 
 test('an entity or a migration outside a capability persistence folder is BE_SCHEMA_OWNER', t => {
   const report = run(t, {
-    'src/features/a/index.ts': 'export const a = 1;\n',
-    'src/features/a/application/order.entity.ts': ENTITY('OrderEntity', 'orders'),
-    'src/features/a/migrations/1789800000001-orders.ts': MIGRATION('Orders1789800000001'),
+    'src/features/api/a/index.ts': 'export const a = 1;\n',
+    'src/features/api/a/application/order.entity.ts': ENTITY('OrderEntity', 'orders'),
+    'src/features/api/a/migrations/1789800000001-orders.ts': MIGRATION('Orders1789800000001'),
     'src/modules/integrations/payos/index.ts': 'export const p = 1;\n',
     'src/modules/integrations/payos/persistence/entities/token.entity.ts': ENTITY('TokenEntity', 'tokens'),
   });
   const paths = hits(report).map(item => item.path);
-  assert.ok(paths.includes('src/features/a/application/order.entity.ts'), paths.join());
-  assert.ok(paths.includes('src/features/a/migrations/1789800000001-orders.ts'), paths.join());
+  assert.ok(paths.includes('src/features/api/a/application/order.entity.ts'), paths.join());
+  assert.ok(paths.includes('src/features/api/a/migrations/1789800000001-orders.ts'), paths.join());
   assert.ok(paths.includes('src/modules/integrations/payos/persistence/entities/token.entity.ts'), paths.join());
 });
 
@@ -83,9 +83,9 @@ test('the arrays of one capability registered on two connections are BE_SCHEMA_O
   assert.equal(split.length, 1, JSON.stringify(split));
   assert.equal(split[0].connection, 'agentos');
   assert.match(split[0].message, /agentos and primary.*exactly one connection/);
-  const acrossApps = hits(run(t, { 'apps/core/src/app.module.ts': REGISTER(PRIMARY_ENTRY), 'apps/migrate/src/main.ts': REGISTER(PRIMARY_ENTRY) }));
+  const acrossApps = hits(run(t, { 'apps/core/src/app.module.ts': REGISTER(PRIMARY_ENTRY), 'apps/cli/src/app.module.ts': REGISTER(PRIMARY_ENTRY) }));
   assert.deepEqual(acrossApps, [], JSON.stringify(acrossApps));
-  const splitAcrossApps = hits(run(t, { 'apps/migrate/src/main.ts': REGISTER('{ name: AGENTOS_CONNECTION, entities: billingEntities, migrations: billingMigrations }') }));
+  const splitAcrossApps = hits(run(t, { 'apps/cli/src/app.module.ts': REGISTER('{ name: AGENTOS_CONNECTION, entities: billingEntities, migrations: billingMigrations }') }));
   assert.equal(splitAcrossApps.length, 1, JSON.stringify(splitAcrossApps));
 });
 

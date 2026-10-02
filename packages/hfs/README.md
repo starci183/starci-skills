@@ -69,6 +69,7 @@ Its own checks (`scripts/hfs/check.mjs`, `scripts/hfs/rules/`; the rendered-file
 | `HFS_MONO_FE_WORKSPACE` | error | an fe app `package.json` not named `@<project>/<app>`, not private, or without exactly the workspace scripts; an fe package without `build`, `typecheck` and the workspace `lint` (R128) |
 | `HFS_MONO_NEST_PROJECTS` | error | `be/nest-cli.json` not `monorepo: true`, its default project not an api app, or its `projects` not exactly the declared be apps (R129) |
 | `HFS_MONO_WORKSPACE_DEP` | error | an fe workspace imports a package its own `package.json` does not declare, or the root `package.json` declares a workspace package (R130) |
+| `BE_CLI_REQUIRED` | error | a back end with a connection or a command under `src/features/cli/` and no cli app `be/apps/cli`, a cli app of another name, or no `be/apps/cli/Dockerfile` (R131) |
 | `HFS_PEER_INTEGRATION_MISSING` | error | the app root `package.json` depends on a driver integration (a pair of `knowledge/hfs/peer-integrations.yaml`) without its runtime peer, e.g. `@nestjs/apollo` on `@nestjs/platform-express` 11 without `@as-integrations/express5` (R111) |
 | `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
@@ -139,7 +140,7 @@ derived from the machine's rule id lists). After changing any of those files, `k
 `tests/packages-hfs/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
 The examples gate `node scripts/checks/check-example-architecture.mjs` runs `hfs lint` of this CLI at the root of every `examples/*`
-app with an `hfs.json` (`examples/todo-app`, `examples/ecommerce-app`) and fails on any finding or any tool that could not run;
+app with an `hfs.json` (`examples/ecommerce-app`) and fails on any finding or any tool that could not run;
 `hfs check` alone would miss the machine's source rules, which the canons judge. It is heavy: run it once, by hand, after `npm ci`
 in each app.
 

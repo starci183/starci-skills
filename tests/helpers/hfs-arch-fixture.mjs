@@ -75,6 +75,8 @@ export function archFixture(t, { profile = 'be', files = {}, declaration = {}, a
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1;\n',
     } : {
       [`apps/${app}/src/app/.keep`]: '',
+      // every fe app is an npm workspace with its own manifest (HFS_MONO_FE_WORKSPACE)
+      ...Object.fromEntries(apps.map((entry) => [`apps/${entry.name}/package.json`, JSON.stringify({ name: `@fixture/${entry.name}`, private: true })])),
     }),
   };
   fs.mkdirSync(root, { recursive: true });

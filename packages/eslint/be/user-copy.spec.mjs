@@ -5,8 +5,8 @@ import { userCopyThroughCatalog } from "./user-copy.mjs"
 const tester = typedTester()
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
-const CONTROLLER = at("src/features/checkout/transport/http/order.controller.ts")
-const RESOLVER = at("src/features/checkout/transport/graphql/order.resolver.ts")
+const CONTROLLER = at("src/features/api/checkout/transport/http/order.controller.ts")
+const RESOLVER = at("src/features/api/checkout/transport/graphql/order.resolver.ts")
 const PRELUDE = [
     'import type { MailerClient } from "@modules/integrations/mailer/mailer.client"',
     'import type { MessagePublisher } from "@modules/platform/messaging/message-publisher.port"',

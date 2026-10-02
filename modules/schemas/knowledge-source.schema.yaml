@@ -108,6 +108,56 @@ properties:
     type: array
     items:
       $ref: starci/knowledge-rule@1
+  files:
+    type: object
+    additionalProperties: false
+    required:
+      - root
+      - tree
+      - entries
+    properties:
+      root:
+        type: string
+        minLength: 1
+      tree:
+        type: string
+        minLength: 1
+      entries:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - path
+            - slot
+            - role
+            - rules
+            - spec
+            - why
+          properties:
+            path:
+              type: string
+              minLength: 1
+            slot:
+              type: string
+              minLength: 1
+            role:
+              type: string
+              minLength: 1
+            rules:
+              type: array
+              items:
+                type: string
+                pattern: ^R[0-9]+$
+            spec:
+              type: string
+              enum:
+                - required
+                - none
+            why:
+              type: string
+              minLength: 1
   topics:
     type: array
     items:

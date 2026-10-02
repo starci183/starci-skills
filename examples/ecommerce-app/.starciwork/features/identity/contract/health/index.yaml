@@ -11,7 +11,7 @@ surface:
     shape: GET /health -> {status, service, checks}
     transport: >-
       Plain HTTP/JSON on the port .starcistacks/dev/infra/metadata.json resolves (identityApi). The door is a probe
-      door served by features/identity/transport/http/health.controller.ts - but it is not only
+      door served by features/api/identity/transport/http/health.controller.ts - but it is not only
       a host's probe: the order service's own /health aggregation calls it for real through
       modules/integrations/identity/identity.client.ts (isHealthy), so this door has a feature
       consumer and belongs in a contract. Order's own /health door, which no in-repo feature

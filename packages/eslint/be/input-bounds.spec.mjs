@@ -11,11 +11,11 @@ import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { authDoorStrictRateTier, inputBounded, noOffsetPagination, rules } from "./input-bounds.mjs"
 
 const tester = typedTester()
-const REQUEST = at("src/features/plan/transport/http/dto/create-plan.request.ts")
-const INPUT = at("src/features/plan/transport/graphql/dto/create-plan.input.ts")
-const ARGS = at("src/features/plan/transport/graphql/dto/list-plans.args.ts")
+const REQUEST = at("src/features/api/plan/transport/http/dto/create-plan.request.ts")
+const INPUT = at("src/features/api/plan/transport/graphql/dto/create-plan.input.ts")
+const ARGS = at("src/features/api/plan/transport/graphql/dto/list-plans.args.ts")
 const SERVICE = at("src/modules/domain/plan/plan.service.ts")
-const SPEC = at("src/features/plan/transport/http/dto/create-plan.request.spec.ts")
+const SPEC = at("src/features/api/plan/transport/http/dto/create-plan.request.spec.ts")
 
 const IMPORTS =
     "import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator'\nimport { Type } from 'class-transformer'\nenum Tier { Free = 'free', Paid = 'paid' }\ninterface Address { street: string }\n"
@@ -45,7 +45,7 @@ test("R42: every property of an input class is validated and bounded by its type
             // a class decorated as an input, in any file
             { filename: SERVICE, code: `${IMPORTS}@InputType()\nexport class PlanInput { @Field() @IsUUID() @MaxLength(36) planId!: string }` },
             // a response type is not input
-            { filename: at("src/features/plan/transport/http/dto/plan.response.ts"), code: "export class PlanResponse { name!: string }" },
+            { filename: at("src/features/api/plan/transport/http/dto/plan.response.ts"), code: "export class PlanResponse { name!: string }" },
             { filename: SERVICE, code: "@ObjectType()\nexport class PlanType { @Field() name!: string }" },
             // an ordinary class is not input
             { filename: SERVICE, code: "export class PlanService { private name!: string }" },
@@ -116,8 +116,8 @@ const DOORS = [
     "declare const Throttle: (tier: Tier) => MethodDecorator",
     "",
 ].join("\n")
-const RESOLVER = at("src/features/identity/transport/graphql/sign-in.resolver.ts")
-const WEBHOOK = at("src/features/payment/transport/http/payos-webhook.controller.ts")
+const RESOLVER = at("src/features/api/identity/transport/graphql/sign-in.resolver.ts")
+const WEBHOOK = at("src/features/api/payment/transport/http/payos-webhook.controller.ts")
 
 test("R42: a handshake or webhook door is on the strict rate-limit tier", () => {
     tester.run("auth-door-strict-rate-tier", authDoorStrictRateTier, {

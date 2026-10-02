@@ -450,7 +450,7 @@ export function checkHfs(config) {
       continue;
     }
     if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
-    // A back-end app must hold exactly what the slot of its kind requires (be.app.migrate has no app.module.ts).
+    // A back-end app must hold exactly what the slot of its kind requires (each kind's slot names its own requires).
     if (backend) for (const required of resolver.requiredFiles(`apps/${app}/src/main.ts`)) {
       const directory = required.endsWith('/');
       if (!(directory ? tree.hasDir(required.slice(0, -1)) : tree.hasFile(required))) missing.push(required.slice(`apps/${app}/`.length));

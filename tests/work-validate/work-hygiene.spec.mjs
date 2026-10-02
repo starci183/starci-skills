@@ -24,7 +24,7 @@ for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const FLOW = '.starciwork/features/login/uat/sign-in';
-const CLEAN_ACCOUNTS = 'schema: work/disposable-accounts@1\ndisposable: true\naccounts:\n  - {role: person, identity: identity.todo-app.demo}\n';
+const CLEAN_ACCOUNTS = 'schema: work/disposable-accounts@1\ndisposable: true\naccounts:\n  - {role: person, identity: identity.ecommerce-app.demo}\n';
 const BROKEN_YAML = 'schema: work/disposable-accounts@1\nsummary: Fix the sign-in bug: it breaks the page\n';
 const LITERAL_ACCOUNTS = 'schema: work/disposable-accounts@1\ndisposable: true\naccounts:\n  - {role: person, username: qa.tester@acme-mail.io, password: Zx9-qLm2-vT7pRw4}\n';
 

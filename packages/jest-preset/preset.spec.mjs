@@ -157,15 +157,33 @@ test('each test kind is its own project, matched by folder and suffix together; 
   assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });
 
-test('coverage is measured on *.service.ts only, with a per-file threshold of 100', () => {
+test('coverage is measured on the services and the cli commands only, with a per-file threshold of 100', () => {
   const globs = preset.collectCoverageFrom();
-  assert.deepEqual(globs.filter((g) => !g.startsWith('!')), ['src/**/*.service.ts']);
+  assert.deepEqual(globs.filter((g) => !g.startsWith('!')), ['src/**/*.service.ts', 'src/features/cli/**/*.cli.ts']);
   for (const excluded of ['src/tests/**', '**/dist/**', '**/coverage/**']) {
     assert.ok(globs.includes(`!${excluded}`), `${excluded} is outside the denominator`);
   }
   const { coverageThreshold } = preset.starciJestConfig();
-  assert.deepEqual(Object.keys(coverageThreshold), ['./src/**/*.service.ts']);
-  assert.deepEqual(coverageThreshold['./src/**/*.service.ts'], { lines: 100, branches: 100, functions: 100, statements: 100 });
+  assert.ok(Object.keys(coverageThreshold).every((key) => preset.COVERAGE_SOURCES.map((glob) => `./${glob}`).includes(key)));
+  for (const glob of Object.keys(coverageThreshold)) assert.deepEqual(coverageThreshold[glob], { lines: 100, branches: 100, functions: 100, statements: 100 });
+});
+
+test('a coverage source with no file in the repository gets no threshold key (jest refuses a key that matches nothing); one with files gets it', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-roles-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'modules', 'domain', 'a'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'modules', 'domain', 'a', 'a.service.ts'), 'export {};\n');
+    assert.equal(preset.hasCoverageSubjects(root, 'src/**/*.service.ts'), true);
+    assert.equal(preset.hasCoverageSubjects(root, 'src/features/cli/**/*.cli.ts'), false, 'no cli command yet');
+    fs.mkdirSync(path.join(root, 'src', 'features', 'cli', 'migrate', 'subs'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'features', 'cli', 'migrate', 'subs', 'run.cli.ts'), 'export {};\n');
+    assert.equal(preset.hasCoverageSubjects(root, 'src/features/cli/**/*.cli.ts'), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the unit run writes the lcov Sonar imports, keeps the text summary, and renders no coverage exclusion', () => {
@@ -175,8 +193,8 @@ test('the unit run writes the lcov Sonar imports, keeps the text summary, and re
   assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
   assert.ok(config.coverageReporters.includes('text-summary'));
   assert.equal(config.coverageDirectory, 'coverage');
-  // The Sonar scope is rendered from COVERAGE_SOURCES (hfs sync prefixes the be side), so it is services only, like jest's.
-  assert.deepEqual(preset.COVERAGE_SOURCES, ['src/**/*.service.ts']);
+  // The Sonar scope is rendered from COVERAGE_SOURCES (hfs sync prefixes the be side): the services and the cli commands, like jest's.
+  assert.deepEqual(preset.COVERAGE_SOURCES, ['src/**/*.service.ts', 'src/features/cli/**/*.cli.ts']);
 });
 
 test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assignable to T, wrong stubs rejected', async () => {

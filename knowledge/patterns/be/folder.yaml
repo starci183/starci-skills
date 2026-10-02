@@ -26,7 +26,7 @@ rules:
     hfsRules: [R01, R02, R29, R89]
     requirement: |-
       The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app. Apps own process composition only.
-      `be/src/features/<feature>` owns the application layer and the transport adapters. `be/src/modules/<tier>/<capability>` owns
+      `be/src/features/<kind>/` owns what triggers the application, grouped by trigger kind (BE-FOLDER-2). `be/src/modules/<tier>/<capability>` owns
       cohesive reusable capabilities where `<tier>` is exactly `domain` (business rules), `platform` (technical runtime) or
       `integrations` (third-party provider or protocol). `be/src/tests/{e2e,fixtures}` holds non-unit tests and shared test data.
       Nothing else exists at `be/src/` level, and no teaching, mock or sandbox code lives under `be/src/`. No folder named `types`,
@@ -59,34 +59,33 @@ rules:
         - Verify the actual owner and public API, not only folder names.
     relatedExamples: []
   - id: BE-FOLDER-2
-    title: One feature, one explicit protocol boundary
+    title: Features are grouped by trigger kind
     kind: mandatory
-    hfsRules: [R29, R87]
+    hfsRules: [R29, R87, R131, R133]
     requirement: |-
-      A feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
-      `messages/`, and nothing else. `application/` holds the CQRS files of cqrs.yaml and no folder named after a protocol. A
-      protocol lives in `transport/graphql`, `transport/http`, `transport/websocket`, `transport/schedule`,
-      `transport/message` or `transport/cli`, each with exactly one Nest module `<feature>-<protocol>.module.ts`, its
-      resolvers, controllers, gateways, jobs, consumers or cli files, and `dto/` where the protocol has DTOs.
+      `be/src/features/` holds one folder per trigger kind and nothing else: `features/api/<feature>/` for a feature a request
+      or a background transport triggers (api.yaml) and `features/cli/` for the one-off actions an operator runs (cli.yaml);
+      every further kind is its own root under `features/`. A kind never imports another kind, every kind imports only downward
+      into `src/modules/*`, and only `be/apps/*` composes a feature.
     rationale: |-
-      Several entry protocols share one operation without importing transport DTOs into the application layer, and an app can
-      compose only the transports it serves.
+      The trigger decides which app composes the code, so grouping by trigger keeps each app's composition one folder and
+      makes a cross-kind import visible from the path alone.
     cases:
       - id: case-1
-        when: An operation reachable over HTTP and GraphQL
-        write: application/place-order.command.ts and its handler once; transport/http/place-order.controller.ts and transport/graphql/place-order.resolver.ts each dispatch it.
+        when: A new GraphQL operation of the checkout feature
+        write: be/src/features/api/checkout/ (its shape is api.yaml BE-API-1).
       - id: case-2
-        when: A conversion has substance
-        write: transport/graphql/place-order.mapper.ts with toPlaceOrderType and toPlaceOrderRequest.
+        when: A new seed or migrate command
+        write: be/src/features/cli/<group>/subs/<name>.cli.ts (its shape is cli.yaml BE-CLI-2).
       - id: case-3
-        when: A feature grows past 250 source files
-        write: Split it by product capability into features, moving shared behavior into a domain capability.
+        when: A cli command needs the checkout scenario
+        write: It calls the domain service under src/modules/domain, never a file of features/api.
     verification:
       automated:
         - BE_FEATURE_SHAPE
-        - BE_CQRS_SHAPE
-      manual:
-        - Review application contracts for request-context, ORM entity and protocol DTO leaks.
+        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_CLI_COMMAND_SHAPE
+      manual: []
     relatedExamples: []
   - id: BE-FOLDER-3
     title: Registration is executable composition
@@ -94,9 +93,9 @@ rules:
     hfsRules: [R31, R32, R45]
     requirement: |-
       An app registers the capability modules once and the transport modules it serves (architecture-check.yaml
-      BE-ARCHITECTURE-3). Feature modules are static: `<feature>.module.ts` (the handlers) and one
-      `<feature>-<protocol>.module.ts` per transport folder; there is no module per operation and no module-definition in a
-      feature. An e2e run boots the real `AppModule.register(options)` through `useTestWorld({ apps })`, so a transport that is not
+      BE-ARCHITECTURE-3). Api feature modules are static: `<feature>.module.ts` (the handlers) and one
+      `<feature>-<protocol>.module.ts` per transport folder; there is no module per operation and no module-definition in an
+      api feature (the cli feature root uses the module-definition pattern, cli.yaml). An e2e run boots the real `AppModule.register(options)` through `useTestWorld({ apps })`, so a transport that is not
       composed fails there.
     rationale: |-
       Import syntax and a unit spec do not establish a working DI container; only the real app booted in the world does.
@@ -193,7 +192,8 @@ rules:
     kind: mandatory
     hfsRules: [R47, R48]
     requirement: |-
-      Unit specs are `<name>.service.spec.ts` beside their `<name>.service.ts` and nothing else has a unit spec. Integration specs are
+      Unit specs exist only for the unit-tested roles (test.yaml BE-TEST-1): `<name>.service.spec.ts` beside its
+      `<name>.service.ts` and `<name>.cli.spec.ts` beside its `<name>.cli.ts`; nothing else has a unit spec. Integration specs are
       `be/src/tests/integration/<capability>/*.integration-spec.ts`, e2e specs `be/src/tests/e2e/<area>/*.e2e-spec.ts` and provider
       contract specs `be/src/tests/contract/<provider>/*.contract-spec.ts`; the folder and the suffix agree. Test infrastructure
       (containers, boot of the real apps, network-edge fakes) lives only in `be/src/tests/world/` and typed doubles and builders in

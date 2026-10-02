@@ -3,7 +3,9 @@ id: be.background
 title: Backend background work
 purpose: |-
   Given work that runs without a request (cron, sweep, outbox relay, queue consumption, retry), where does it live and which
-  process runs it? Background work is a transport that dispatches one command, run only by an app of kind worker.
+  process runs it? Background work is a transport of an api feature that dispatches one command, composed by the api app
+  that owns it or by a worker app scaled apart. A one-off action an operator runs is not background work: it is a cli
+  command (cli.yaml).
 appliesTo:
   - backend
 family: be
@@ -17,7 +19,7 @@ provenance:
     - docs/backend-source-pattern.md
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
-    Static checks prove that a background method has a runner and that a worker composes it. They do not prove lease
+    Static checks prove that a background method has a runner and that an app composes it. They do not prove lease
     correctness, fencing at the remote resource or crash recovery; those need failure-injection tests against the actual
     authority.
 rules:
@@ -32,8 +34,8 @@ rules:
       `transport/message/<event>.consumer.ts` registered through `<feature>-message.module.ts` into `platform/messaging` (an
       adapter over `@nestjs/bullmq` for queues and a Kafka adapter for cross-system streams). A job or consumer dispatches one
       command exactly as a resolver does and holds no business decision. `@Cron`, `@Interval`, `@Timeout`, `setInterval`,
-      `new Worker(`, `@Processor` and `WorkerHost` appear only inside `platform/{scheduling,messaging}`. A CLI command is
-      `transport/cli/<name>.cli.ts` registered through `platform/cli`.
+      `new Worker(`, `@Processor` and `WorkerHost` appear only inside `platform/{scheduling,messaging}`. A one-off action is
+      a cli command, never a job (cli.yaml).
     rationale: |-
       One shape for every entry protocol keeps handlers reusable and lets the app choose which protocols it serves.
     cases:
@@ -51,18 +53,24 @@ rules:
       manual: []
     relatedExamples: []
   - id: BE-BACKGROUND-2
-    title: Only a worker app runs it
+    title: The owning api app runs it; a worker app only scales it apart
     kind: mandatory
     hfsRules: [R46, R31]
     requirement: |-
-      An app of kind `worker` composes the schedule and message modules; an api app never runs cron or consumes a queue,
-      because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app that
-      composes it, and an e2e run boots the worker's real AppModule.
+      Every schedule or message transport is composed by exactly the app that runs it: the api app of the service that owns
+      the feature, by default, or a worker app (kind `worker`, opt-in) when the background load must scale apart from the
+      requests. The lease of `platform/scheduling` makes one replica run a tick, so a job in a replicated api app does not
+      run once per replica. A worker app composes schedule and message modules only, never a resolver or a controller, and an
+      e2e run boots the real AppModule of the app that composes the job.
     rationale: |-
-      A job that no process composes never runs, and a job inside a replicated api runs many times.
+      A job that no process composes never runs; a separate worker app is a scaling decision, not a requirement of every
+      background job.
     cases:
       - id: case-1
-        when: A worker app
+        when: An outbox relay of the order service
+        write: 'be/apps/order/src/app.module.ts registers OrderScheduleModule beside OrderGraphqlModule; no worker app is declared.'
+      - id: case-2
+        when: Billing consumption that must scale apart
         write: 'be/apps/worker/src/app.module.ts registers BillingScheduleModule and BillingMessageModule and no controller or resolver.'
     verification:
       automated:
@@ -77,14 +85,14 @@ rules:
     hfsRules: [R46]
     requirement: |-
       A method named `sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` must be reachable from a job or consumer that a
-      worker app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing
+      app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing
       invokes does not recover anything.
     rationale: |-
       A built and unit-tested outbox, sweep or reconcile that nothing schedules gives the false impression of durable recovery.
     cases:
       - id: case-1
         when: A new sweep
-        write: 'add a SweepUnsettledPaymentsJob in transport/schedule that dispatches the sweep command, and compose it in the worker in the same change.'
+        write: 'add a SweepUnsettledPaymentsJob in transport/schedule that dispatches the sweep command, and compose it in the owning api app (or the worker app) in the same change.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED

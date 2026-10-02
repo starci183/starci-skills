@@ -1,6 +1,0 @@
-mutation CompleteTask($id: ID!) {
-    completeTask(input: { id: $id }) {
-        taskId
-        complete
-    }
-}

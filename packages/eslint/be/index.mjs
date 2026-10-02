@@ -41,6 +41,7 @@ import { recommended as operationsRecommended, rules as operationsRules } from "
 import { recommended as querySafetyRecommended, rules as querySafetyRules } from "./query-safety.mjs"
 import { recommended as resilienceRecommended, rules as resilienceRules } from "./resilience.mjs"
 import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
+import { recommended as cliRecommended, rules as cliRules } from "./cli.mjs"
 import { recommended as serviceDepsRecommended, rules as serviceDepsRules } from "./service-deps.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
 import { recommended as specNoSkipRecommended, rules as specNoSkipRules } from "./spec-no-skip.mjs"
@@ -61,6 +62,7 @@ const CONTRIBUTIONS = [
     { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "builders", rules: buildersRules, recommended: buildersRecommended },
+    { law: "cli", rules: cliRules, recommended: cliRecommended },
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
     { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
     { law: "connections", rules: connectionsRules, recommended: connectionsRecommended },

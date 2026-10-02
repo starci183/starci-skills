@@ -7,7 +7,7 @@ const SERVICE = at("src/modules/domain/order/order.service.ts")
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
 const MIGRATION = at("src/modules/domain/order/persistence/migrations/1770000000000-create-order.ts")
 const EM = 'import type { EntityManager } from "typeorm"\n'
-const MIGRATE_APP = at("apps/migrate/src/migrate.ts")
+const MIGRATE_APP = at("src/features/cli/migrate/subs/run.cli.ts")
 const WORLD_SETUP = at("src/tests/world/global-setup.ts")
 const PERSISTED = at("src/modules/domain/order/persistence/order.sql.ts")
 const TYPEORM = 'import { DataSource } from "typeorm"\nimport type { DataSourceOptions } from "typeorm"\nimport { TypeOrmModule } from "@nestjs/typeorm"\ndeclare const options: DataSourceOptions\ndeclare const dataSource: DataSource\n'
@@ -24,13 +24,13 @@ test("the schema is decided by migrations, never by the running process", () => 
 const ds = mock<DataSource>({ manager: undefined, synchronize: undefined, dropDatabase: undefined })` },
             { filename: SERVICE, code: `${TYPEORM}declare function mock<T>(overrides?: Partial<T>): T
 const ds = mock<DataSource>({ manager: undefined })` },
-            // migrations run in apps/migrate and in the test world that runs its bootstrap
+            // migrations run in the cli (its migrate command) and in the test world
             { filename: MIGRATE_APP, code: `${TYPEORM}await dataSource.runMigrations()` },
             { filename: WORLD_SETUP, code: `${TYPEORM}await dataSource.runMigrations()` },
             // entity options without the switch, dropSchema stated false, a schema read
             { filename: SERVICE, code: `import { Entity } from "typeorm"\n@Entity({ name: "plan" })\nexport class PlanEntity {}\n@Entity("plan_item")\nexport class PlanItemEntity {}` },
             { filename: SERVICE, code: `${TYPEORM}const ds = new DataSource({ type: "postgres", synchronize: false, dropSchema: false })` },
-            // a lifecycle hook that only reads, and one that writes inside apps/migrate (the seeding home)
+            // a lifecycle hook that only reads, and one that writes inside the cli (a seed command)
             { filename: SERVICE, code: `${TYPEORM}${EM}export class Probe { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.query("SELECT 1"); await this.manager.find(class A {}) } }` },
             { filename: MIGRATE_APP, code: `${TYPEORM}${EM}export class Seeder { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.save({}) } }` },
             // a write outside a lifecycle hook is a handler's business, and a save on a value that is not typeorm's manager is not a row write
@@ -60,7 +60,7 @@ const ds = mock<DataSource>({ manager: undefined })` },
             // a typed options object stays refused when it turns synchronize on, and a DataSource double is only exempt by its contextual type
             { filename: SERVICE, code: `${TYPEORM}declare const options: DataSourceOptions
 const o: DataSourceOptions = { type: "postgres", synchronize: true }`, errors: [{ messageId: "synchronize" }] },
-            // migrations run in apps/migrate only
+            // migrations run in the cli only
             { filename: SERVICE, code: `${TYPEORM}await dataSource.runMigrations()`, errors: [{ messageId: "runMigrations" }] },
             { filename: SERVICE, code: `${TYPEORM}await dataSource.undoLastMigration()`, errors: [{ messageId: "runMigrations" }] },
             { filename: SPEC, code: `${TYPEORM}await dataSource.runMigrations()`, errors: [{ messageId: "runMigrations" }] },
@@ -106,11 +106,11 @@ const o: DataSourceOptions = { type: "postgres", synchronize: true }`, errors: [
 })
 
 const ENTITY = 'import { OrderEntity } from "@modules/domain/order/persistence/entities/order.entity"\nimport type { OrderSummary } from "@modules/domain/order/order.contracts"\n'
-const RESOLVER = at("src/features/checkout/transport/graphql/get-order.resolver.ts")
-const RESPONSE = at("src/features/checkout/transport/http/dto/get-order.response.ts")
+const RESOLVER = at("src/features/api/checkout/transport/graphql/get-order.resolver.ts")
+const RESPONSE = at("src/features/api/checkout/transport/http/dto/get-order.response.ts")
 const CONTRACTS = at("src/modules/domain/invoice/invoice.contracts.ts")
-const HANDLER = at("src/features/checkout/application/place.handler.ts")
-const COMMAND = at("src/features/checkout/application/place.command.ts")
+const HANDLER = at("src/features/api/checkout/application/place.handler.ts")
+const COMMAND = at("src/features/api/checkout/application/place.command.ts")
 const ENTITY_FILE = at("src/modules/domain/invoice/persistence/entities/invoice.entity.ts")
 
 test("an ORM entity never appears in a boundary type", () => {
@@ -148,7 +148,7 @@ test("an ORM entity never appears in a boundary type", () => {
             { filename: ENTITY_FILE, code: 'import { Field } from "@nestjs/graphql"\nexport class Row {}', errors: [{ messageId: "entityImport" }] },
             { filename: ENTITY_FILE, code: 'import { IsString } from "class-validator"\nexport class Row {}', errors: [{ messageId: "entityImport" }] },
             // specs are not exempt
-            { filename: at("src/features/checkout/transport/graphql/get-order.resolver.spec.ts"), code: `${ENTITY}class R { get(): Promise<OrderEntity> { return Promise.resolve(new OrderEntity()) } }`, errors: [{ messageId: "entity" }] },
+            { filename: at("src/features/api/checkout/transport/graphql/get-order.resolver.spec.ts"), code: `${ENTITY}class R { get(): Promise<OrderEntity> { return Promise.resolve(new OrderEntity()) } }`, errors: [{ messageId: "entity" }] },
         ],
     })
 })

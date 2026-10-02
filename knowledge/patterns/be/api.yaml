@@ -1,0 +1,281 @@
+schema: starci/knowledge-source@1
+id: be.api
+title: Backend api feature
+purpose: |-
+  Given a scenario a request or a background transport triggers, where does it live and how is it written? It is an api
+  feature, `be/src/features/api/<feature>/`, the trigger kind the api apps compose. Its application layer is CQRS: one
+  typed command or query per operation and one handler that owns the scenario, dispatched by a transport directly on the
+  bus. There is no use-case class and no forwarder service. Inside one bounded context the work is synchronous; an event
+  only crosses contexts or carries async work.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
+    - owner decision 2026-10-02 (features grouped by trigger kind; synchronous inside a context)
+    - https://docs.nestjs.com/recipes/cqrs
+  limitations: |-
+    Static checks prove the shape of a feature, a message, its handler and the dispatch, and that SQL touches only tables its
+    owner may reach. They do not prove that a handler decides the right thing, that a transaction boundary is right, that a
+    context boundary is drawn where the business draws it or that a refusal is chosen over an exception correctly; the
+    service spec of the service the handler calls and the e2e run prove behavior, and design review proves the boundary.
+rules:
+  - id: BE-CQRS-1
+    title: The application folder holds messages, handlers, contracts and support only
+    kind: mandatory
+    hfsRules: [R87, R29]
+    requirement: |-
+      `be/src/features/api/<feature>/application/` holds `<action>.command.ts` or `<action>.query.ts`, `<action>.handler.ts`,
+      `<action>.contracts.ts` and the opt-in `support/` folder of helpers local to the feature. A
+      `*.use-case.ts` file, a forwarder `<op>.service.ts` and a folder named after a protocol do not exist. A read is a
+      query and a write is a command; a handler never serves both.
+    rationale: |-
+      One shape for every operation gives one interception point and one message object, so a reader finds the scenario
+      in the handler and never in a wrapper around it.
+    cases:
+      - id: case-1
+        when: A new write operation
+        write: 'application/start-checkout.command.ts, start-checkout.handler.ts, start-checkout.contracts.ts (the handler has no spec: its service does).'
+      - id: case-2
+        when: A new read operation
+        write: 'application/get-cart.query.ts, get-cart.handler.ts, get-cart.contracts.ts (the handler has no spec: its service does).'
+    verification:
+      automated:
+        - BE_CQRS_SHAPE
+        - BE_FEATURE_SHAPE
+      manual:
+        - Confirm each operation is a command or a query and no handler mixes both.
+    relatedExamples: []
+  - id: BE-CQRS-2
+    title: A message is a typed Command or Query carrying one params field
+    kind: mandatory
+    hfsRules: [R87, R37]
+    requirement: |-
+      `export class <Action>Command extends Command<<Action>Result> { constructor(readonly params: ExecuteParams<<Action>Request>) { super() } }`
+      (`Query<R>` for reads). One `readonly params` field, no methods, no defaults. `ExecuteParams<T> = { request: T; principal: Principal }`
+      for an authenticated operation and `PublicExecuteParams<T> = { request: T }` for a `@Public` one, so the type states
+      whether the door is public and the principal is never optional. `Principal = { id: string; roles: ReadonlyArray<Role> }`
+      is owned by `platform/cqrs`. An entity never travels in params.
+    rationale: |-
+      `@nestjs/cqrs` 11 types `execute` with the message's result type, so the compiler proves what the transport gets
+      back, and a principal that cannot be absent removes a class of authorization bugs.
+    cases:
+      - id: case-1
+        when: An authenticated command
+        write: 'export class StartCheckoutCommand extends Command<StartCheckoutResult> { constructor(readonly params: ExecuteParams<StartCheckoutRequest>) { super() } }'
+      - id: case-2
+        when: A public query
+        write: 'export class CheckHealthQuery extends Query<CheckHealthResult> { constructor(readonly params: PublicExecuteParams<CheckHealthRequest>) { super() } }'
+    verification:
+      automated:
+        - BE_CQRS_SHAPE
+        - BE_ENTITY_IN_CONTRACT
+      manual:
+        - Review that the request carries what the operation needs and nothing of the transport.
+    relatedExamples: []
+  - id: BE-CQRS-3
+    title: A handler overrides process and returns its declared result
+    kind: mandatory
+    hfsRules: [R87, R75]
+    requirement: |-
+      `@CommandHandler(X)` or `@QueryHandler(X)` on a class that `extends ICQRSHandler<X, XResult>` and implements
+      `protected override async process(message)`; it never overrides `execute`. `ICQRSHandler.execute` is load-bearing: it
+      logs `OperationFailed` with the operation name and the error and rethrows, and counts refused outcomes. `<Action>Result`
+      is a plain projection type or an `Outcome<Value, Code>` and the return type of `process` is declared. The handler opens
+      the transaction (`this.entityManager.transaction(async (manager) => ...)`), stamps `this.clock.now()` once and passes
+      it down. The handler is thin (BE-TEST-7): its `process` maps the message, calls exactly one method of an injected `*.service` and
+      returns the result, so it has no unit spec; the decisions (persisted state, the `where` that holds ownership, nothing
+      written on a refusal) live in the service and its `<name>.service.spec.ts` asserts them.
+    rationale: |-
+      A single template gives every operation the same failure log and metric, and the service spec pins the decision the
+      handler delegates.
+    cases:
+      - id: case-1
+        when: A handler
+        write: |-
+          @CommandHandler(StartCheckoutCommand)
+          /** Opens a checkout, or refuses with a purchase code. */
+          export class StartCheckoutHandler extends ICQRSHandler<StartCheckoutCommand, StartCheckoutResult> {
+              constructor(
+                  @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+                  @InjectClock() private readonly clock: Clock,
+                  private readonly purchaseService: PurchaseService,
+              ) { super() }
+
+              protected override async process(command: StartCheckoutCommand): Promise<StartCheckoutResult> {
+                  const at = this.clock.now()
+                  return this.entityManager.transaction(async (manager) => this.purchaseService.open({ manager, learnerId: command.params.principal.id, offerId: command.params.request.offerId, at }))
+              }
+          }
+    verification:
+      automated:
+        - BE_CQRS_SHAPE
+        - BE_RETURN_TYPE
+        - BE_SPEC_QUALITY
+      manual:
+        - Confirm the service spec the handler calls asserts refusal paths and ownership, not only that a mock was called.
+    relatedExamples: []
+  - id: BE-CQRS-4
+    title: The bus is the only way into a handler; nothing forwards
+    kind: mandatory
+    hfsRules: [R87, R88]
+    requirement: |-
+      A handler is reached only through `commandBus.execute` or `queryBus.execute` from a transport (the transport side is
+      transport.yaml BE-TRANSPORT-2). No `<op>.service.ts` sits between a transport and a handler. No in-process event
+      exists: `EventBus`, `@EventsHandler`, `EventEmitter2`, `@OnEvent` and NATS bridges are not used. A side effect that must
+      happen anyway, in another context or later, is an outbox message written in the handler's transaction and consumed in
+      `transport/message/` (background.yaml, BE-API-2).
+    rationale: |-
+      A forwarder is pure indirection where logic creeps in, and an in-process event does not survive a crash between the
+      commit and the delivery.
+    cases:
+      - id: case-1
+        when: A resolver needs an operation
+        write: '`constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}` then `this.commandBus.execute(new StartCheckoutCommand({ request, principal }))`.'
+      - id: case-2
+        when: A follow-up effect in another context after a write
+        write: 'the handler calls `this.outbox.enqueue(manager, message)` inside its transaction; a consumer in transport/message runs the follow-up.'
+    verification:
+      automated:
+        - BE_CQRS_SHAPE
+        - BE_TRANSPORT_SHAPE
+        - BE_INFRA_OWNER
+      manual: []
+    relatedExamples: []
+  - id: BE-API-1
+    title: An api feature has one fixed shape and is composed only by apps
+    kind: mandatory
+    hfsRules: [R29, R28, R30, R31, R45]
+    requirement: |-
+      An api feature is `be/src/features/api/<feature>/` (slot `be.feature`) and holds `index.ts`, `<feature>.module.ts`,
+      `application/` (`be.feature.application`, with the opt-in `support/`, `be.feature.application.support`),
+      `transport/<protocol>/` and, when it has copy, `messages/` (`be.feature.messages`), and nothing else. A protocol lives
+      in `transport/graphql`, `transport/http`, `transport/websocket` (`be.transport.{graphql,http,websocket}`, composed by
+      an api app) or `transport/schedule`, `transport/message` (`be.transport.{schedule,message}`, composed by the api app
+      that owns it or by a worker app), each with exactly one Nest module `<feature>-<protocol>.module.ts`, its resolvers,
+      controllers, gateways, jobs or consumers, their `<action>.mapper.ts` and `dto/` where the protocol has DTOs (shapes in
+      transport.yaml). The feature imports only downward into `src/modules/*`, never another api feature and never another
+      trigger kind such as `features/cli`; only `be/apps/*` composes it (folder.yaml BE-FOLDER-2).
+    rationale: |-
+      Several entry protocols share one operation without importing transport DTOs into the application layer, and an app can
+      compose only the transports it serves.
+    cases:
+      - id: case-1
+        when: An operation reachable over HTTP and GraphQL
+        write: application/place-order.command.ts and its handler once; transport/http/place-order.controller.ts and transport/graphql/place-order.resolver.ts each dispatch it.
+      - id: case-2
+        when: A conversion has substance
+        write: transport/graphql/place-order.mapper.ts with toPlaceOrderType and toPlaceOrderRequest.
+      - id: case-3
+        when: A feature grows past 250 source files
+        write: Split it by product capability into api features, moving shared behavior into a domain capability.
+      - id: case-4
+        when: An api feature imports features/cli/seed/subs/demo.cli.ts to reuse its rows
+        write: 'Refused (BE_FEATURE_IMPORTS_FEATURE): both kinds import the domain capability that owns the rows instead.'
+    verification:
+      automated:
+        - BE_FEATURE_SHAPE
+        - BE_FEATURE_IMPORTS_FEATURE
+        - BE_PUBLIC_SURFACE
+        - BE_FEATURE_NOT_COMPOSED
+        - BE_MODULE_SHAPE
+      manual:
+        - Review application contracts for request-context, ORM entity and protocol DTO leaks.
+    relatedExamples: []
+  - id: BE-API-2
+    title: Inside one context the work is synchronous; events only cross contexts or carry async work
+    kind: mandatory
+    hfsRules: [R87, R26, R86, R82]
+    requirement: |-
+      A context is one bounded context: one domain capability set under `src/modules/domain/`, which may own one Postgres
+      schema. Work inside one context is synchronous: the handler calls that context's domain service directly, in one
+      transaction it opens, and emits no event to reach code of the same context. An event (an outbox message consumed in
+      `transport/message/`) exists only to cross into another context or to carry work that runs later. A feature never reads
+      or writes another context's tables or state directly; it receives that context's facts through an event or reads a
+      projection its own context owns.
+    rationale: |-
+      An event inside one context turns one atomic decision into a chain that can half-fail, while a direct read of another
+      context's state couples two owners through their storage and bypasses the owner's rules.
+    cases:
+      - id: case-1
+        when: add-cart-item (passing)
+        write: 'AddCartItemHandler opens one transaction and calls `this.cartService.addItem({ manager, buyerId, productId, quantity, at })`; the cart rows and the quantity check commit together, with no event.'
+      - id: case-2
+        when: The order feature needs the payment state (violating)
+        write: 'Refused: PlaceOrderHandler querying the payment tables or calling PaymentService to read whether a payment settled. The payment context publishes PaymentSettled through its outbox, and an order consumer in transport/message records it in an order-owned projection the order handler reads.'
+      - id: case-3
+        when: A confirmation mail after the order commits (async)
+        write: 'The order handler enqueues OrderPlaced in its transaction; the mail runs later from a consumer, never inside the order transaction.'
+    verification:
+      automated:
+        - BE_CQRS_SHAPE
+        - BE_SQL_TABLE_OWNER
+        - BE_TIER_DIRECTION
+        - BE_TRANSACTION_EXTERNAL_CALL
+      manual:
+        - Confirm each event crosses a context boundary or carries deferred work, and that no handler waits on an event of its own context.
+    relatedExamples: []
+files:
+  root: be/src/features/api/checkout/
+  tree: |-
+    be/src/features/api/checkout/
+    |-- index.ts
+    |-- checkout.module.ts
+    |-- application/
+    |   |-- add-cart-item.command.ts
+    |   |-- add-cart-item.contracts.ts
+    |   |-- add-cart-item.handler.ts
+    |   |-- get-cart.query.ts
+    |   |-- get-cart.contracts.ts
+    |   |-- get-cart.handler.ts
+    |   `-- support/
+    |       `-- cart-line.mapper.ts
+    |-- transport/
+    |   |-- graphql/
+    |   |   |-- checkout-graphql.module.ts
+    |   |   |-- add-cart-item.resolver.ts
+    |   |   |-- add-cart-item.mapper.ts
+    |   |   `-- dto/
+    |   |       |-- add-cart-item.input.ts
+    |   |       `-- add-cart-item.type.ts
+    |   |-- http/
+    |   |   |-- checkout-http.module.ts
+    |   |   |-- payment-webhook.controller.ts
+    |   |   `-- dto/
+    |   |       `-- payment-webhook.request.ts
+    |   |-- message/
+    |   |   |-- checkout-message.module.ts
+    |   |   `-- payment-settled.consumer.ts
+    |   `-- schedule/
+    |       |-- checkout-schedule.module.ts
+    |       `-- expire-carts.job.ts
+    `-- messages/
+        `-- checkout.messages.ts
+  entries:
+    - {path: index.ts, slot: be.feature, role: entry, rules: [R30], spec: none, why: 'the one public entry of the feature; exports what an app composes'}
+    - {path: checkout.module.ts, slot: be.feature, role: module, rules: [R29, R45], spec: none, why: 'registers the handlers once; static, no module-definition'}
+    - {path: application/add-cart-item.command.ts, slot: be.feature.application, role: command, rules: [R87, R37], spec: none, why: 'the typed write message with one readonly params field'}
+    - {path: application/add-cart-item.contracts.ts, slot: be.feature.application, role: contracts, rules: [R87, R37], spec: none, why: 'the plain request and result types; no entity, no transport type'}
+    - {path: application/add-cart-item.handler.ts, slot: be.feature.application, role: handler, rules: [R87, R75], spec: none, why: 'opens one transaction and calls CartService.addItem; thin, proved through the service spec'}
+    - {path: application/get-cart.query.ts, slot: be.feature.application, role: query, rules: [R87, R37], spec: none, why: 'the typed read message'}
+    - {path: application/get-cart.contracts.ts, slot: be.feature.application, role: contracts, rules: [R87, R37], spec: none, why: 'the plain request and projection types of the read'}
+    - {path: application/get-cart.handler.ts, slot: be.feature.application, role: handler, rules: [R87, R75], spec: none, why: 'calls one service method and returns its projection'}
+    - {path: application/support/cart-line.mapper.ts, slot: be.feature.application.support, role: mapper, rules: [R28, R29], spec: none, why: 'a helper local to this feature; covered through the service spec of its caller'}
+    - {path: transport/graphql/checkout-graphql.module.ts, slot: be.transport.graphql, role: module, rules: [R45, R31], spec: none, why: 'the one GraphQL module of the feature, composed by an api app'}
+    - {path: transport/graphql/add-cart-item.resolver.ts, slot: be.transport.graphql, role: resolver, rules: [R88, R41], spec: none, why: 'maps the input, dispatches AddCartItemCommand on the bus, maps the result'}
+    - {path: transport/graphql/add-cart-item.mapper.ts, slot: be.transport.graphql, role: mapper, rules: [R88], spec: none, why: 'pure toAddCartItemRequest and toAddCartItemType'}
+    - {path: transport/graphql/dto/add-cart-item.input.ts, slot: be.transport.graphql, role: input, rules: [R42], spec: none, why: 'the bounded, validated GraphQL input'}
+    - {path: transport/graphql/dto/add-cart-item.type.ts, slot: be.transport.graphql, role: type, rules: [R88], spec: none, why: 'the GraphQL output type'}
+    - {path: transport/http/checkout-http.module.ts, slot: be.transport.http, role: module, rules: [R45, R31], spec: none, why: 'the one HTTP module, for the signed webhook only'}
+    - {path: transport/http/payment-webhook.controller.ts, slot: be.transport.http, role: controller, rules: [R88, R41, R80], spec: none, why: 'a signed webhook door that dispatches one command whose service claims the event'}
+    - {path: transport/http/dto/payment-webhook.request.ts, slot: be.transport.http, role: request, rules: [R42], spec: none, why: 'the validated webhook body'}
+    - {path: transport/message/checkout-message.module.ts, slot: be.transport.message, role: module, rules: [R46, R45], spec: none, why: 'composed by the owning api app or a worker app'}
+    - {path: transport/message/payment-settled.consumer.ts, slot: be.transport.message, role: consumer, rules: [R88, R80], spec: none, why: 'receives the payment context''s event and dispatches one command; the only way payment facts reach checkout'}
+    - {path: transport/schedule/checkout-schedule.module.ts, slot: be.transport.schedule, role: module, rules: [R46, R45], spec: none, why: 'composed by the owning api app or a worker app'}
+    - {path: transport/schedule/expire-carts.job.ts, slot: be.transport.schedule, role: job, rules: [R46, R88], spec: none, why: 'a sweep with a runner; dispatches one command per tick'}
+    - {path: messages/checkout.messages.ts, slot: be.feature.messages, role: messages, rules: [R78], spec: none, why: 'the vi and en copy of the feature'}

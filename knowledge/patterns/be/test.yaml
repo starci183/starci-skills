@@ -3,8 +3,9 @@ id: be.test
 title: Test
 purpose: |-
   Given a backend unit, where does its spec live, how is the subject built, what does it assert and what does it leave
-  alone? Four test kinds exist by folder. Only services have unit specs, and they run automatically at per-file 100
-  coverage. Integration, e2e and contract run by hand.
+  alone? Four test kinds exist by folder. Only the unit-tested roles have unit specs (services and cli commands, the
+  `unitRoles` of the slot manifest), and they run automatically at per-file 100 coverage. Integration, e2e and contract run
+  by hand.
 appliesTo:
   - backend
 family: be
@@ -34,7 +35,10 @@ rules:
     kind: mandatory
     hfsRules: [R12, R47, R48]
     requirement: |-
-      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `be/src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
+      Four test kinds exist and the folder and the file suffix always agree. Unit covers exactly the unit-tested roles that
+      `ruleParams.be.unitRoles` of knowledge/hfs/slots.yaml lists: `<name>.service.spec.ts` beside its `<name>.service.ts`, and
+      `<name>.cli.spec.ts` beside its `<name>.cli.ts` under `src/features/cli/` (a cli command is an action runner, cli.yaml).
+      No other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `be/src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
       Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (capability modules on the real infrastructure,
       no HTTP door of ours, through `useTestWorld({ modules })`; real peer apps the client calls join as `apps`; every integration
       of `src/modules/integrations/<provider>/` has one, R112). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
@@ -59,7 +63,7 @@ rules:
     cases:
       - id: case-1
         when: Unit
-        write: 'commission.service.spec.ts beside commission.service.ts, the only unit spec kind'
+        write: 'commission.service.spec.ts beside commission.service.ts; run.cli.spec.ts beside features/cli/migrate/subs/run.cli.ts'
       - id: case-2
         when: Integration
         write: be/src/tests/integration/inbox/claim-once.integration-spec.ts calling useTestWorld({ modules }) and asserting rows through world.db
@@ -347,11 +351,12 @@ rules:
       manual: []
     relatedExamples: []
   - id: BE-TEST-7
-    title: Transport is thin, so only services need unit specs
+    title: Transport is thin, so only services and cli commands need unit specs
     kind: mandatory
-    hfsRules: [R87, R88, R48]
+    hfsRules: [R87, R88, R48, R133]
     requirement: |-
-      "Only services are unit-tested" is safe because everything else is thin. A handler, a resolver, a controller and a message
+      "Only services and cli commands are unit-tested" is safe because everything else is thin. A cli command is not a thin
+      transport: it is an action runner with its own spec (cli.yaml), and R88 does not apply to it. A handler, a resolver, a controller and a message
       consumer maps its input, calls exactly one method of an injected `*.service` (a transport handler dispatches exactly one
       command or query through the injected bus) and returns its result. Its method body has no branching, no loop, no
       EntityManager and no other injected infrastructure. All business logic lives in `*.service.ts`. There is no unit spec for a
@@ -490,7 +495,7 @@ rules:
       the real apps through `useTestWorld({ apps })` against the app's own stack running real (Postgres, Redis, Keycloak
       with its realm imported, a mail host, k3s through k3d with a local registry when the app drives Kubernetes; `global-setup.ts`
       attaches to a warm stack that answers and otherwise starts its own, and `global-teardown.ts` stops only what it started),
-      runs the real migrations through the `be/apps/migrate` runner function once in `global-setup.ts`, fakes only external SaaS the
+      runs the real migrations once in `global-setup.ts` over the same connection list the cli migrate command reads (cli.yaml), fakes only external SaaS the
       team does not operate at the network edge (`world.fake.<provider>`), fails a real service on purpose through
       `world.infra.<service>.latency(ms)`, `.cut()` and `.restore()` (toxiproxy), overrides no provider or DI token and never a
       guard, authenticates through an identity fixture that issues real tokens, asserts persisted state and waits with `waitFor`
@@ -525,18 +530,18 @@ rules:
         - Confirm an e2e fails when a module or provider of the app is missing.
     relatedExamples: []
   - id: BE-TEST-13
-    title: Coverage is per-file 100 of services only
+    title: Coverage is per-file 100 of the unit-tested roles only
     kind: mandatory
     hfsRules: [R11, R47]
     requirement: |-
       ts-jest runs with `diagnostics: false` in every project (`isolatedModules: true` comes from `@starci/tsconfig`); types are checked once, by `typecheck`
-      and `typecheck:tests`. The unit project collects coverage from `be/src/**/*.service.ts` ONLY (`be/src/tests`, `dist` and `coverage` excluded), with a per-file threshold of 100 for lines, branches, functions and statements. `test` runs the unit project
+      and `typecheck:tests`. The unit project collects coverage from the `coverage` globs of the unit-tested roles ONLY, `be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts` (`be/src/tests`, `dist` and `coverage` excluded), with a per-file threshold of 100 for lines, branches, functions and statements. `test` runs the unit project
       with `--coverage` and fails below the threshold. The unit project overlays `isolatedModules: false` and `importHelpers: true`
       on `be/tsconfig.json` and the app root `package.json` lists `tslib` in its devDependencies, so neither the `design:paramtypes`
       guards TypeScript emits under isolated modules nor inlined decorator helpers add branches: counts measure only source. The managed jest config and preset render all of this; an app
       never edits the coverage settings, and no file carries an inline coverage ignore.
     rationale: |-
-      Services are the only place decisions live (BE-TEST-7), so a per-file 100 on exactly those files is a meaningful bar. A
+      Services and cli commands are the only places decisions live (BE-TEST-7), so a per-file 100 on exactly those files is a meaningful bar. A
       denominator of the whole source tree rewards trivial files and hides an untested branch behind an average.
     cases:
       - id: case-1
@@ -544,41 +549,41 @@ rules:
         write: 'transform: { "^.+\\.ts$": ["ts-jest", { diagnostics: false }] } supplied by @starci/jest-preset'
       - id: case-2
         when: Coverage denominator and threshold
-        write: 'coverageProvider: "v8", collectCoverageFrom: ["src/**/*.service.ts", "!src/tests/**", "!**/dist/**", "!**/coverage/**"], coverageThreshold: { "./src/**/*.service.ts": { lines: 100, branches: 100, functions: 100, statements: 100 } } (a glob key is applied to each file on its own), supplied by @starci/jest-preset'
+        write: 'coverageProvider: "v8", collectCoverageFrom: ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts", "!src/tests/**", "!**/dist/**", "!**/coverage/**"], coverageThreshold: { "./src/**/*.service.ts": { lines: 100, branches: 100, functions: 100, statements: 100 }, "./src/features/cli/**/*.cli.ts": { lines: 100, branches: 100, functions: 100, statements: 100 } } (a glob key is applied to each file on its own), supplied by @starci/jest-preset'
       - id: case-3
         when: The gate
-        write: '"test": "jest --selectProjects unit --coverage" fails when any *.service.ts is below 100 in any metric'
+        write: '"test": "jest --selectProjects unit --coverage" fails when any *.service.ts or *.cli.ts is below 100 in any metric'
     verification:
       automated:
         - BE_TEST_TOPOLOGY
       manual:
-        - Confirm a new service ships its spec in the same change and the unit project stays at 100.
+        - Confirm a new service or cli command ships its spec in the same change and the unit project stays at 100.
     relatedExamples: []
   - id: BE-TEST-14
-    title: Sonar and Codecov judge the services' coverage, from the one scope
+    title: Sonar and Codecov judge the unit-tested roles' coverage, from the one scope
     kind: mandatory
     hfsRules: [R11]
     requirement: |-
       The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
-      it with ONE scope, the services: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
-      `sonar.coverage.exclusions` listing every executable file that is not a service (SonarQube has no coverage inclusions: hfs sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
+      it with ONE scope, the unit-tested roles: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
+      `sonar.coverage.exclusions` listing every executable file that is not of a unit-tested role (SonarQube has no coverage inclusions: hfs sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
       100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. hfs sync
       renders the scope into both files from the jest preset's `COVERAGE_SOURCES`, so it can never drift. The Sonar gate
       (`knowledge/sonar-gate.yaml`) holds coverage at 100 overall and on new code, and the runtime judges it per file: one service
-      below 100 fails. Handlers, resolvers, controllers, modules, config and tests are not coverage targets; fe/ has no tests.
+      or cli command below 100 fails. Handlers, resolvers, controllers, modules, config and tests are not coverage targets; fe/ has no tests.
     rationale: |-
-      One denominator everywhere: the unit project's per-file 100 on services (BE-TEST-13), the Sonar dashboard and Codecov show
-      the same number for the same files, so a gap in any one service is visible and blocking wherever it is read.
+      One denominator everywhere: the unit project's per-file 100 on the unit-tested roles (BE-TEST-13), the Sonar dashboard and Codecov show
+      the same number for the same files, so a gap in any one service or command is visible and blocking wherever it is read.
     cases:
       - id: case-1
         when: sonar-project.properties
-        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every non-service file (fe/** included), no coverage exclusion; hfs sync renders the file'
+        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every file of no unit-tested role (fe/** included), no coverage exclusion; hfs sync renders the file'
       - id: case-2
         when: CI
         write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action and the CODECOV_TOKEN secret'
       - id: case-3
         when: codecov.yml
-        write: 'project and patch status target 100% on paths be/src/**/*.service.ts, fe/** ignored; hfs sync renders the file from the same scope as Sonar'
+        write: 'project and patch status target 100% on paths be/src/**/*.service.ts and be/src/features/cli/**/*.cli.ts, fe/** ignored; hfs sync renders the file from the same scope as Sonar'
     verification:
       automated:
         - HFS_SONAR_CONFIG

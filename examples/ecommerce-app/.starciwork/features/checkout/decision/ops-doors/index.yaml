@@ -5,9 +5,9 @@ state: done
 outcome: decided
 question: >-
   Both services serve GET /health - order at
-  features/checkout/transport/http/health.controller.ts (answering only when Postgres answers
+  features/api/checkout/transport/http/health.controller.ts (answering only when Postgres answers
   and identity's own /health does), identity at
-  features/identity/transport/http/health.controller.ts (Postgres and Redis). The surface
+  features/api/identity/transport/http/health.controller.ts (Postgres and Redis). The surface
   checks flag a served route no record names. Does each /health door need a contract of its
   own?
 options:
@@ -35,7 +35,7 @@ recommendationReason: >-
   Split the pair honestly: identity's /health is consumed by order's health aggregation, so it
   is declared by contract.identity.health like any other wire. Order's own /health answers
   only for the host's sake - the code already has an owner
-  (impl.checkout.be.order-checkout owns the whole src/features/checkout root,
+  (impl.checkout.be.order-checkout owns the whole src/features/api/checkout root,
   transport/http included) and scripts/check-work-surfaces.mjs already classifies /health as
   an ops/probe door ("real, but no contract could ever own it"). This record makes the
   probe-only half a written decision rather than a silence.

@@ -23,8 +23,8 @@ import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
-/** The one coverage scope of an app: the services of the be side, nothing else. */
-const COVERAGE_SCOPE = ['be/src/**/*.service.ts'];
+/** The one coverage scope of an app: the unit-tested roles of ruleParams.be.unitRoles (the services and the cli commands), from the preset. */
+const COVERAGE_SCOPE = jestPreset.COVERAGE_SOURCES.map((glob) => `be/${glob}`);
 const LCOV = 'be/coverage/lcov.info';
 const installs = runtimeInstalls();
 const missing = missingFrom(installs);
@@ -146,7 +146,7 @@ function assertCoverageContract(app) {
   assert.ok(sonar['sonar.coverage.exclusions'].split(',').includes('fe/**') && !/\.service\.ts/.test(sonar['sonar.coverage.exclusions']), 'fe/ is out, the services are in');
   const codecov = parseYaml(fs.readFileSync(path.join(app, 'codecov.yml'), 'utf8'));
   for (const kind of ['project', 'patch']) {
-    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the services at 100`);
+    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the unit-tested roles at 100`);
   }
   assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
@@ -254,13 +254,13 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
 
   // One violation per side: a public door with no closed-list reason (BE canon), a raw heading (FE canon), and an alias of a
   // declaration whose message names its file.
-  edit(app, 'be/src/features/system-health/transport/http/live.controller.ts', '@Public({ reason: PublicReason.Health })', '@Public({ reason: "health" })');
+  edit(app, 'be/src/features/api/system-health/transport/http/live.controller.ts', '@Public({ reason: PublicReason.Health })', '@Public({ reason: "health" })');
   edit(app, 'fe/apps/web/src/features/pages/HomePage/component.tsx', '<Heading level={1}>{props.props.title}</Heading>', '<h1>{props.props.title}</h1>');
   fs.writeFileSync(path.join(app, 'fe', 'apps', 'web', 'src', 'modules', 'config', 'alias.ts'), 'import { siteUrl } from "./index"\n\nexport const origin = siteUrl\n');
   const planted = await lint(app);
   assert.equal(planted.code, 1);
   const eslint = planted.report.findings.filter((f) => f.engine === 'eslint');
-  assert.ok(eslint.some((f) => f.rule === 'starci-be/public-needs-reason' && f.path === 'be/src/features/system-health/transport/http/live.controller.ts'), 'the BE canon judged be/');
+  assert.ok(eslint.some((f) => f.rule === 'starci-be/public-needs-reason' && f.path === 'be/src/features/api/system-health/transport/http/live.controller.ts'), 'the BE canon judged be/');
   assert.ok(eslint.some((f) => f.rule.startsWith('starci-fe/') && f.path === 'fe/apps/web/src/features/pages/HomePage/component.tsx'), 'the FE canon judged fe/');
   const alias = eslint.find((f) => f.rule === 'starci-fe/alias-reexport' && f.path === 'fe/apps/web/src/modules/config/alias.ts');
   assert.ok(alias, 'the alias is reported on its app-relative path');

@@ -30,7 +30,7 @@ rules:
       Text a user reads never sits in source as a literal: a `subject`, `title`, `body`, `text` or `message` property of a
       `notify`, `send` or `publish` call, and a `message`, `description` or `title` property of a transport response, all come
       from `messages/<owner>.messages.ts` of the owner (`be/src/modules/{domain,platform,integrations}/<c>/messages/` or
-      `be/src/features/<f>/messages/`): one keyed entry per message, `vi` and `en` maps with the same keys, named `{{param}}`
+      `be/src/features/api/<f>/messages/`): one keyed entry per message, `vi` and `en` maps with the same keys, named `{{param}}`
       interpolation for anything a literal built with `+` or a template. A class reads the catalog through
       `@InjectMessageCatalog() private readonly messages: MessageCatalog`, never by importing a catalog file. An error's display
       text is the entry `errors.<code>` resolved by the filter (error.yaml), so an error constructor never takes prose. A short

@@ -7,6 +7,20 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane MONO: `examples/todo-app` is deleted with its CI flag, its Sonar analysis token, its json-exception entries and its standard doc.
+  `examples/ecommerce-app` is the only example app; the root `codecov.yml` and the `examples.yml` matrix derive from it alone, and the specs that read an example read it.
+  The deleted paths are in `modules/kernel/retired-paths.yaml`.
+- Lane MONO U2: every one-off action of a back end is a command of ONE app, `be/apps/cli`, on nest-commander, and back-end features are grouped by trigger kind.
+  - The cli app boots with `CommandFactory.run`. Commands live in `src/features/cli/<group>/subs/<name>.cli.ts`, each with its `<name>.cli.spec.ts`, and they are measured like services.
+  - Migrations run as `cli migrate run`. The app kind `migrate` and the slot `be.feature.transport.cli` are deleted.
+  - New rules R131 `BE_CLI_REQUIRED`, R132 `BE_CLI_BOOTSTRAP`, R133 `BE_CLI_COMMAND_SHAPE` and R134 `BE_CLI_OWNER` (eslint-be `cli.mjs`; ids provisional).
+  - Api features live in `src/features/api/<feature>/`.
+  - The schedule and message transports are composed by the api app that owns them or by a worker app (R46).
+  - `ruleParams.be.unitRoles` is the one list of unit-tested roles.
+  - The knowledge is updated: `api.yaml` (merged from `cqrs.yaml`) and `cli.yaml` with `files:` trees.
+  - A dead-cite spec refuses a deleted slot named in knowledge text.
+  - ecommerce has shop renamed to app, features moved to features/api, fe workspaces, turbo, and migrate turned into cli.
+
 - Lane MONO U1: every app is a monorepo, even a single one.
   - The app root `package.json` declares the npm workspaces `fe/apps/*` and `fe/packages/*`, `packageManager` npm and turbo (pin 2.11.6).
   - The root holds the managed `turbo.json` (slot `app.task-graph`). `fe/turbo.json` is gone.

@@ -1,9 +1,0 @@
-include:
-  - postgres.yaml
-  - keycloak.yaml
-  - redis.yaml
-  - minio.yaml
-  - prometheus.yaml
-  - api.yaml
-  - web.yaml
-

@@ -43,7 +43,10 @@ rules:
         write: 'place-order.resolver.ts, place-order.controller.ts, place-order.mapper.ts, dto/place-order.input.ts, dto/place-order.type.ts, dto/place-order.request.ts, dto/place-order.response.ts, checkout-graphql.module.ts, checkout-http.module.ts'
       - id: case-3
         when: Background transport
-        write: 'settle-payments.job.ts in transport/schedule, payment-settled.consumer.ts in transport/message, backup.cli.ts in transport/cli, billing-schedule.module.ts, billing-message.module.ts'
+        write: 'settle-payments.job.ts in transport/schedule, payment-settled.consumer.ts in transport/message, billing-schedule.module.ts, billing-message.module.ts'
+      - id: case-3b
+        when: Cli command
+        write: 'features/cli/db/db.cli.ts (the group), features/cli/db/subs/backup.cli.ts and backup.cli.spec.ts beside it; `.cli.ts` because `.command.ts` is the CQRS message (cli.yaml)'
       - id: case-4
         when: Capability
         write: 'purchase.module.ts, purchase.module-definition.ts, purchase.config.ts, purchase.options.ts, purchase.decorators.ts, purchase.log-events.ts, purchase.service.ts, purchase.contracts.ts, credit-limit.policy.ts'

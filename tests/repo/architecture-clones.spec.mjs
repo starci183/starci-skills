@@ -123,18 +123,18 @@ test('the main.ts of two api apps and thin resolvers of two features are uniform
   const entries = runArch(archFixture(t, { apps: API_APPS, files: {
     'apps/core/src/main.ts': helper('boot', 26),
     'apps/other/src/main.ts': helper('start', 26, { variable: 'item' }),
-    'src/features/a/transport/graphql/a.resolver.ts': helper('resolveA', 26),
-    'src/features/b/transport/graphql/b.resolver.ts': helper('resolveB', 26, { variable: 'item' }),
+    'src/features/api/a/transport/graphql/a.resolver.ts': helper('resolveA', 26),
+    'src/features/api/b/transport/graphql/b.resolver.ts': helper('resolveB', 26, { variable: 'item' }),
   } }));
   assert.deepEqual(findings(entries, 'HFS_DUPLICATE_CODE'), []);
   assert.equal(entries.coverage.hfsMachine.clones.cloneBlocks, 0);
   const shared = runArch(archFixture(t, { apps: API_APPS, files: {
     'apps/core/src/app.module.ts': helper('composeCore', 26),
     'apps/other/src/app.module.ts': helper('composeOther', 26, { variable: 'item' }),
-    'src/features/a/transport/graphql/a.mapper.ts': helper('mapA', 26),
-    'src/features/b/transport/graphql/b.mapper.ts': helper('mapB', 26, { variable: 'item' }),
+    'src/features/api/a/transport/graphql/a.mapper.ts': helper('mapA', 26),
+    'src/features/api/b/transport/graphql/b.mapper.ts': helper('mapB', 26, { variable: 'item' }),
   } }));
   const paths = findings(shared, 'HFS_DUPLICATE_CODE').flatMap((hit) => [hit.path, hit.twin.path]);
   assert.ok(paths.includes('apps/core/src/app.module.ts'), paths.join(', '));
-  assert.ok(paths.includes('src/features/a/transport/graphql/a.mapper.ts'), paths.join(', '));
+  assert.ok(paths.includes('src/features/api/a/transport/graphql/a.mapper.ts'), paths.join(', '));
 });

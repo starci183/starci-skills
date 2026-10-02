@@ -29,7 +29,7 @@ const REDIS = at("src/modules/integrations/redis/redis.client.ts")
 const CONFIG = at("src/modules/platform/config/config.service.ts")
 const DOMAIN = at("src/modules/domain/order/order.service.ts")
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
-const FEATURE = at("src/features/plan/application/place-order.handler.ts")
+const FEATURE = at("src/features/api/plan/application/place-order.handler.ts")
 const INTEGRATION = at("src/modules/integrations/payos/payos.client.ts")
 const E2E = at("src/tests/world/use-test-world.ts")
 
@@ -148,7 +148,7 @@ test("R90: the HttpClient port of platform/http is called only by an integration
             { filename: at("src/modules/domain/order/order.service.ts"), code: `${PORT}const door = http\nexport const read = () => door.get("x")`, errors: [{ messageId: "foreign" }] },
             // another platform capability and a feature are not integrations
             { filename: at("src/modules/platform/cache/cache.service.ts"), code: `${PORT}export const warm = () => http.get("x")`, errors: [{ messageId: "foreign" }] },
-            { filename: at("src/features/plan/application/plan.handler.ts"), code: `${PORT}export const read = () => http.get("x")`, errors: [{ messageId: "foreign" }] },
+            { filename: at("src/features/api/plan/application/plan.handler.ts"), code: `${PORT}export const read = () => http.get("x")`, errors: [{ messageId: "foreign" }] },
         ],
     })
 })

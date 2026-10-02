@@ -8,7 +8,7 @@ import { feNoTestsFindings, isFeTestPath } from '../../scripts/hfs/rules/fe-no-t
 
 // FE_NO_TESTS (R97): the front end (the fe side of an app) has no tests by standard, and no exception. feNoTestsFindings judges
 // side-relative paths; hfs check runs it over the fe side of the app and reports app-relative paths.
-const APP = { hfs: 2, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
+const APP = { hfs: 2, kind: 'app', project: 'demo', sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } };
 
 const tree = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-fe-no-tests-'));
@@ -68,6 +68,6 @@ test('hfs check of an app reports a test file of the fe side once, as FE_NO_TEST
 test('hfs check of an fe side without a test file has no FE_NO_TESTS finding, and the be side and the root are not judged by it', (t) => {
   const clean = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files: ['fe/apps/web/src/app/[locale]/page.tsx', 'scripts/check-quality.mjs'], tree: false });
   assert.equal(clean.findings.some((finding) => finding.code === 'FE_NO_TESTS'), false);
-  const be = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files: ['be/src/features/orders/application/place-order.service.spec.ts', 'be/jest.config.js', 'package.json'], tree: false });
+  const be = checkRepo({ repoRoot: tree(t, {}), declaration: APP, files: ['be/src/features/api/orders/application/place-order.service.spec.ts', 'be/jest.config.js', 'package.json'], tree: false });
   assert.equal(be.findings.some((finding) => finding.code === 'FE_NO_TESTS'), false);
 });

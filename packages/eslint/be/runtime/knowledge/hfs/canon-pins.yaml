@@ -9,7 +9,7 @@ purpose: >-
   dependency both sides declared at different versions takes one: its pin where it has one, otherwise the higher of the
   two, pinned here with a why (2026-10-01, from nivo-backend/nivo-fe, starci-next/starci-next-fe and
   mia-mia-backend/miamia-fe: every such conflict but graphql was already pinned). The runtime's example apps merged the
-  same way on 2026-10-01 (examples/todo-app from todo-app-backend/todo-app-frontend, examples/ecommerce-app from
+  same way on 2026-10-01 (examples/ecommerce-app from
   ecommerce-app-be/ecommerce-app-fe): no dependency outside this file was declared at two versions across their sides, so
   every choice is a pin (each side's older @starci pins and graphql moved to the version here). `side` names the side whose code uses
   the dependency; the app root package.json carries the pins of both.
@@ -151,6 +151,11 @@ pins:
     version: 19.2.3
     group: framework
     side: fe
+  nest-commander:
+    version: 3.21.0
+    group: framework
+    side: be
+    why: 'the one command-line framework of a back end (R132-R134): apps/cli boots with CommandFactory.run and every one-off action is a nest-commander command of src/features/cli; 3.21.0 is the newest on 2026-10-02 and takes @nestjs 11 as its peer.'
   '@nestjs/core':
     version: 11.2.5
     group: framework
@@ -182,7 +187,7 @@ pins:
     version: 16.14.2
     group: framework
     side: both
-    why: 'one app package.json for both sides (hfs 4): nivo-backend declares ^16.14.1 and nivo-fe ^16.14.2, the higher wins; all four product installs resolve 16.14.2. The example apps: todo-app-backend declared ^16.14.2 (devDependencies) and ecommerce-app-be ^16.14.2 (dependencies and devDependencies); each app root now has one dependencies entry at the pin.'
+    why: 'one app package.json for both sides (hfs 4): nivo-backend declares ^16.14.1 and nivo-fe ^16.14.2, the higher wins; all four product installs resolve 16.14.2. The example app: ecommerce-app-be declared ^16.14.2 (dependencies and devDependencies); the app root now has one dependencies entry at the pin.'
   supertest:
     version: 7.3.0
     group: tooling

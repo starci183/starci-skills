@@ -24,7 +24,7 @@ properties:
     type: string
     pattern: ^(?:environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
     description: "The resource's stable id, prefixed by its kind: <kind>.<workspace>.<name>; example
-      environment.todo-app.dev. The prefix is part of the id so that a uat-flow's `environment` field
+      environment.ecommerce-app.dev. The prefix is part of the id so that a uat-flow's `environment` field
       pointing at a fixture is a malformed reference on sight rather than a type error discovered at run
       time."
   kind:

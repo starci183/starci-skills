@@ -340,7 +340,7 @@ frontier:
     title: Download the receipt of an order
   - id: gap.checkout.second-example-gates
     feature: checkout
-    title: No host port-registry entry exists for this second example yet
+    title: No host port-registry entry exists for this example yet
   - id: integration.checkout.minio
     feature: checkout
     title: MinIO archives the receipts of placed orders

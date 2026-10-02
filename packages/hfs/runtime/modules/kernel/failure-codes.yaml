@@ -262,6 +262,16 @@ BE_BACKGROUND_UNOWNED:
   owner: op-retry
   kind: check-finding
 
+BE_CLI_REQUIRED:
+  title: "The back end has no cli app, or no cli image"
+  title_vi: "Back end thiếu app cli hoặc image của nó"
+  meaning_vi: "Mọi hành động chạy một lần của back end (migrate, seed, sync, backup, lệnh vận hành) nằm trong MỘT app `be/apps/cli` (kind cli, tên cli) chạy trên nest-commander. Back end có connection (migration chạy bằng `cli migrate run`) hoặc có lệnh dưới `src/features/cli/` thì phải khai báo đúng app đó và có `be/apps/cli/Dockerfile`."
+  causes_vi:
+    - "Vi phạm luật R131: không có app cli thì migration và các hành động một lần không có chỗ chạy chuẩn; thiếu Dockerfile thì không có image `cli` để chạy `cli <group> <command>`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai báo { \"name\": \"cli\", \"kind\": \"cli\" } trong `sides.be.apps` của `hfs.json`, dựng `be/apps/cli` với `CommandFactory.run` và thêm `be/apps/cli/Dockerfile`; đổi tên app cli khác thành `cli`."
+  owner: op-retry
+  kind: check-finding
+
 BE_CONNECTION_DUPLICATE:
   title: "One database reached through more than one connection or injector"
   title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
@@ -306,7 +316,7 @@ BE_ENTRYPOINT_ONLY_IN_APPS:
   title_vi: "Entrypoint nằm ngoài apps"
   meaning_vi: "`<file>` là một entrypoint tiến trình nằm ngoài `apps/`."
   causes_vi:
-    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là `apps/migrate`."
+    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là lệnh `cli migrate run` của `apps/cli`."
     - "NestFactory.create* hoặc lời gọi bootstrap() cấp cao nhất nằm ngoài apps/<app>/src/main.ts"
     - "Chỉ `src/tests/world/` (gốc ghép của test, slot be.tests.world) được gọi NestFactory ngoài main.ts; một spec (integration, contract, e2e) không được ghép: nó chỉ gọi useTestWorld(...)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

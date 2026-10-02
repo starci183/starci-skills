@@ -104,11 +104,11 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       mode: generate-with-anatomy-references
     provenance:
       stage: initial
@@ -135,12 +135,12 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/landing-home.initial.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/landing-home.initial.png
       mode: edit-with-anatomy-references
     provenance:
@@ -157,10 +157,10 @@ ui:
       sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
       rev: 1
     anatomyReferences:
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
       sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
       role: actual-installed-grammar-render; read-only reuse
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
       role: actual-installed-grammar-render; read-only reuse
     grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not

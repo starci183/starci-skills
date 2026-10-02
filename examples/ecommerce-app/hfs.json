@@ -7,7 +7,7 @@
       "apps": [
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },
-        { "name": "migrate", "kind": "migrate" }
+        { "name": "cli", "kind": "cli" }
       ],
       "connections": [
         { "name": "identity", "envPrefix": "IDENTITY_DB" },
@@ -18,7 +18,7 @@
     "fe": {
       "apps": [
         { "name": "landing", "kind": "next" },
-        { "name": "shop", "kind": "next" }
+        { "name": "app", "kind": "next" }
       ],
       "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"]
     }

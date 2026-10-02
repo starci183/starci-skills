@@ -20,7 +20,7 @@ const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, EntityManagerToken> = new Map<s
 @Module({})
 /**
  * The database capability: opens one named TypeORM connection per entry of the options and probes them for health.
- * Schema changes never happen here (`synchronize` is false, migrations run only in apps/migrate).
+ * Schema changes never happen here (`synchronize` is false, migrations run only in the cli migrate command).
  */
 export class DatabaseModule extends ConfigurableModuleClass {
     /** Registers the capability once per app with the connections it opens. */

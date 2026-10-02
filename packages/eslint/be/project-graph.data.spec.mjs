@@ -242,7 +242,7 @@ test("connection-map: one connection file set per declared connection, one regis
     const f = projectFixture({
         files: CONNECTION_FILES,
         declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY" }, { name: "agentos", envPrefix: "AGENTOS" }, { name: "billing", envPrefix: "BILLING" }] },
-        apps: [{ name: "core", kind: "api" }, { name: "worker", kind: "worker" }, { name: "migrate", kind: "migrate" }],
+        apps: [{ name: "core", kind: "api" }, { name: "worker", kind: "worker" }, { name: "cli", kind: "cli" }],
     })
     t.after(f.cleanup)
     f.tester.run("connection-map", rules["connection-map"], {

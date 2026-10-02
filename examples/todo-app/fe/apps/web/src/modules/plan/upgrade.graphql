@@ -1,8 +1,0 @@
-mutation UpgradePlan {
-    upgradePlan {
-        subscriptionId
-        paymentIntentId
-        checkoutUrl
-        status
-    }
-}

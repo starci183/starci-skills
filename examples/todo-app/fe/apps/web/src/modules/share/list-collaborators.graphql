@@ -1,8 +1,0 @@
-query Collaborators($taskId: ID!) {
-    collaborators(input: { taskId: $taskId }) {
-        invitationId
-        email
-        role
-        status
-    }
-}

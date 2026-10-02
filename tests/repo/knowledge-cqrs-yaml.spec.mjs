@@ -12,7 +12,7 @@ test('backend pattern files with comma-separated TypeScript names parse without 
     assert.deepEqual(doc.errors,[],name);
     assert.deepEqual(doc.warnings,[],name);
   }
-  const doc=YAML.parseDocument(patternSource('cqrs'),{version:'1.2',schema:'core',uniqueKeys:true,strict:true});
+  const doc=YAML.parseDocument(patternSource('api'),{version:'1.2',schema:'core',uniqueKeys:true,strict:true});
   assert.deepEqual(doc.errors,[]);
   assert.deepEqual(doc.warnings,[]);
   const cases=doc.toJS({maxAliasCount:0}).rules[0].cases;

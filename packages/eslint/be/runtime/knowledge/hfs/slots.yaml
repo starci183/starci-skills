@@ -65,7 +65,7 @@ sides:
   fe: {reads: [be/contracts/]}     # the back end's committed contract snapshots, the input of the front end's codegen
 
 appKinds:
-  be: [api, worker, migrate, cli]
+  be: [api, worker, cli]
   fe: [next]
 
 # ---------------------------------------------------------------------------------------------------------
@@ -159,6 +159,15 @@ ruleParams:
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
+    # THE list of unit-tested roles of a back end (the ONE source every consumer reads: the eslint unit-test rules, hfs
+    # spec-placement and the cli spec check, the architecture machine's unit-spec checks, the unit-run gate, the jest preset's
+    # coverage sources, held equal by spec, and the Sonar and Codecov coverage scope rendered from them). A role's subject is
+    # `<name>.<role>.ts` (inside `slot` when one is named), its unit spec `<name>.<spec>.ts` beside it, and `coverage` the be-relative
+    # glob the unit run measures at 100 per file. `thin` lists the thin-door rules the role is exempt from: a cli command is an
+    # action runner, not a thin transport (R133). A lane that adds a unit-tested role adds its entry here and nowhere else.
+    unitRoles:
+      - {role: service, spec: service.spec, coverage: "src/**/*.service.ts"}
+      - {role: cli, spec: cli.spec, slot: be.cli, coverage: "src/features/cli/**/*.cli.ts", exempt: [BE_TRANSPORT_SHAPE]}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -606,7 +615,7 @@ slots:
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
-    appKind: worker               # composes transport/schedule and transport/message modules only
+    appKind: worker               # composes transport/schedule and transport/message modules only (an api app may compose them too: a worker app is for separate scaling)
     presence: opt-in
     tracked: tracked
     tier: app
@@ -615,21 +624,13 @@ slots:
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
-  - id: be.app.migrate
-    profiles: [be]
-    path: "apps/<app>/src/"
-    appKind: migrate              # the ONLY process that runs migrations (one run per connection, before api/worker start)
-    presence: required
-    requiredWhen: connections     # required as soon as hfs.json declares a connection
-    tracked: tracked
-    tier: app
-    owner: true
-    requires: [main.ts]
-    allows: [main.ts, "<app>.options.ts"]
-    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
-    rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
   - id: be.app.cli
     profiles: [be]
+    # The ONE app of every one-off action (migrate, seed, sync, backup, any operator command): be/apps/cli, on nest-commander.
+    # main.ts boots with CommandFactory.run (BE_CLI_BOOTSTRAP); app.module.ts composes the platform and the cli feature root
+    # (src/features/cli/cli.module.ts); cli.options.ts carries what it needs from the environment, the connections it migrates
+    # among them (the test world migrates through the same list). It is required as soon as the back end declares a connection
+    # or tracks a command, with its image apps/cli/Dockerfile (BE_CLI_REQUIRED): one image, run as `cli <group> <command>`.
     path: "apps/<app>/src/"
     appKind: cli
     presence: opt-in
@@ -639,11 +640,15 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    rules: [BE_CLI_REQUIRED, BE_CLI_BOOTSTRAP, BE_CLI_OWNER, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: features ------------------------------------------------------------------------------------
+  # src/features/ is grouped by TRIGGER KIND (owner decision 2026-10-02): features/api/<feature>/ (a request: application/ and
+  # transport/<protocol>/, composed by the api apps), features/cli/ (a one-off action: the cli feature root, compiled only into
+  # apps/cli). Every kind imports only downward into modules/*; no kind imports another.
   - id: be.feature
     profiles: [be]
-    path: "src/features/<feature>/"
+    path: "src/features/api/<feature>/"
     presence: required
     tracked: tracked
     tier: feature
@@ -656,7 +661,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/<feature>/application/"
+    path: "src/features/api/<feature>/application/"
     presence: required
     tracked: tracked
     tier: feature
@@ -666,7 +671,7 @@ slots:
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/<feature>/application/support/"
+    path: "src/features/api/<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -677,7 +682,7 @@ slots:
     since: 1.0.0
   - id: be.transport.http
     profiles: [be]
-    path: "src/features/<feature>/transport/http/"
+    path: "src/features/api/<feature>/transport/http/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -688,7 +693,7 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
     profiles: [be]
-    path: "src/features/<feature>/transport/graphql/"
+    path: "src/features/api/<feature>/transport/graphql/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -699,29 +704,29 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
-    path: "src/features/<feature>/transport/message/"
-    presence: opt-in              # queue worker: consumed only by a worker app
+    path: "src/features/api/<feature>/transport/message/"
+    presence: opt-in              # queue consumer: composed by the service that owns it (an api app) or by a worker app scaled apart
     tracked: tracked
     tier: feature
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.schedule
     profiles: [be]
-    path: "src/features/<feature>/transport/schedule/"
-    presence: opt-in              # cron job, sweep or outbox publisher: consumed only by a worker app
+    path: "src/features/api/<feature>/transport/schedule/"
+    presence: opt-in              # cron job, sweep or outbox publisher: composed by the service that owns it (an api app) or by a worker app scaled apart
     tracked: tracked
     tier: feature
     requires: ["<feature>-schedule.module.ts"]
     allows: ["<job>.job.ts"]
     tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.websocket
     profiles: [be]
-    path: "src/features/<feature>/transport/websocket/"
+    path: "src/features/api/<feature>/transport/websocket/"
     presence: opt-in
     tracked: tracked
     tier: feature
@@ -730,18 +735,22 @@ slots:
     tests: none
     composedBy: [api]
     since: 1.0.0
-  - id: be.feature.transport.cli
+  - id: be.cli
     profiles: [be]
-    path: "src/features/<feature>/transport/cli/"
-    presence: opt-in              # a command line entry: dispatches one command or query, composed by an app of kind cli
+    # The cli feature root: every one-off action of the back end, compiled only into apps/cli. A group is a nest-commander
+    # @Command (<group>/<group>.cli.ts) whose sub-commands are @SubCommand classes extending CommandRunner
+    # (<group>/subs/<name>.cli.ts), each with its unit spec beside it (<name>.cli.spec.ts): a command is an action runner, not a
+    # thin transport (BE_CLI_COMMAND_SHAPE). `.cli.ts` because `.command.ts` is the CQRS message (HFS delta 3). The feature root
+    # module (cli.module.ts, module-definition pattern) imports each group module.
+    path: "src/features/cli/"
+    presence: optional
     tracked: tracked
     tier: feature
-    requires: ["<feature>-cli.module.ts"]
-    allows: ["<name>.cli.ts", "dto/*.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
-    tests: none
-    composedBy: [cli]
-    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
-    since: 1.0.0
+    owner: true
+    requires: [index.ts, cli.module.ts, cli.module-definition.ts]
+    allows: [index.ts, cli.module.ts, cli.module-definition.ts, "<group>/<group>.cli.ts", "<group>/<group>.cli.spec.ts", "<group>/<group>.module.ts", "<group>/<group>.module-definition.ts", "<group>/<group>.options.ts", "<group>/<group>.decorators.ts", "<group>/subs/<name>.cli.ts", "<group>/subs/<name>.cli.spec.ts"]
+    tests: unit-beside
+    rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain
@@ -778,7 +787,7 @@ slots:
     since: 1.0.0
   - id: be.feature.messages
     profiles: [be]
-    path: "src/features/<feature>/messages/"
+    path: "src/features/api/<feature>/messages/"
     presence: optional
     tracked: tracked
     tier: feature
@@ -850,7 +859,7 @@ slots:
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
-      infrastructure (containers) and runs apps/migrate's exported bootstrap once; use-test-world.ts exports
+      infrastructure (containers) and runs the migrations once over the cli app's connections; use-test-world.ts exports
       useTestWorld({ apps: { <name>: { module, listen? } } } | { modules: [...] }) -> world.apps.<name>.api,
       world.db.<connection> (the shared EntityManager), world.infra.<service> (latency/cut/restore on a REAL service of the repository's
       own stack, the app root's `.starcistacks/<env>`, each behind toxiproxy), world.fake.<provider> (a network-edge fake of an external SaaS started by the world, with

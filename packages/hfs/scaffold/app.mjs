@@ -61,7 +61,7 @@ export const STARTER_SIDES = Object.freeze({
 
 /**
  * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. A name with a
- * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference apps (examples/todo-app)
+ * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference app (examples/ecommerce-app)
  * declare. The root package.json holds the back end's runtime and every tool; each fe app workspace declares the packages its
  * own source imports (HFS_MONO_WORKSPACE_DEP), FE_APP_DEPENDENCIES.
  */

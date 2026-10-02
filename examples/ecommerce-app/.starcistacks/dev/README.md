@@ -25,4 +25,4 @@ that mentions dev+vps is reported as a finding, not answered with a fake).
 The dev Postgres runs with trust authentication (DEMO-ONLY: a local container whose published
 ports bind loopback, holding the demo seeds - nothing worth a password). Keycloak's two secrets (its bootstrap admin
 password and the `identity-admin` client secret) are sealed in `secrets/keycloak-env.enc`, MinIO's root password in
-`secrets/minio-env.enc`, with the SOPS+age custody the todo-app example demonstrates; `runtime/env/KEYS.md` lists them.
+`secrets/minio-env.enc`, with SOPS+age custody; `runtime/env/KEYS.md` lists them.

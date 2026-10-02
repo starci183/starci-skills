@@ -26,21 +26,16 @@ function scoped(report) {
 }
 
 /**
- * The files of a side written in the app shape: `package.json` is the app's one manifest at the app root, its workspaces the
- * side's packages (`packages/*` becomes `<side>/packages/*`; the apps are no workspaces and have no package.json), and the
- * dependencies an app package.json of the test declared move into it.
+ * The files of a side written in the app shape: `package.json` is the app's one manifest at the app root and its workspaces the
+ * side's apps and packages (`apps/*` becomes `<side>/apps/*`, `packages/*` becomes `<side>/packages/*`); each app keeps its own
+ * package.json (an npm workspace, HFS_MONO_FE_WORKSPACE).
  */
 function appShaped(side, files) {
   const out = { ...files };
   const manifest = JSON.parse(out['package.json'] ?? '{"private":true}');
   delete out['package.json'];
-  for (const key of Object.keys(out).filter(key => /^apps\/[^/]+\/package\.json$/.test(key))) {
-    const appManifest = JSON.parse(out[key]);
-    for (const section of ['dependencies', 'devDependencies']) if (appManifest[section]) manifest[section] = { ...manifest[section], ...appManifest[section] };
-    delete out[key];
-  }
   if (Array.isArray(manifest.workspaces)) {
-    manifest.workspaces = manifest.workspaces.filter(pattern => !pattern.startsWith('apps/')).map(pattern => `${side}/${pattern}`);
+    manifest.workspaces = manifest.workspaces.map(pattern => `${side}/${pattern}`);
     if (!manifest.workspaces.length) delete manifest.workspaces;
   }
   out['../package.json'] = JSON.stringify(manifest);
@@ -101,6 +96,8 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
       [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
       [`apps/${app}/tsconfig.json`]: JSON.stringify({ extends: '../../tsconfig.json', include: ['src/**/*'] }),
       [`apps/${app}/src/.keep`]: '',
+      // every fe app is an npm workspace with its own manifest (HFS_MONO_FE_WORKSPACE)
+      ...Object.fromEntries(apps.map((entry) => [`apps/${entry.name}/package.json`, JSON.stringify({ name: `@fixture/${entry.name}`, private: true })])),
     }),
   };
   // A null entry removes a baseline file (a test that needs the tree without it).
@@ -166,9 +163,9 @@ function monorepoFixture(t, files = {}) {
 test('backend accepts inward composition and narrow bootstrap configuration', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/catalog/value.ts': 'export const value = 1\n',
-    'src/features/http/feature.ts': 'import { value } from "@modules/catalog/value"; export const feature = value\n',
+    'src/features/api/http/feature.ts': 'import { value } from "@modules/catalog/value"; export const feature = value\n',
     'apps/core/src/core.options.ts': 'export const runtime = { port: 3000 }\n',
-    'apps/core/src/app.module.ts': 'import { feature } from "@features/http/feature"; export const AppModule = feature\n',
+    'apps/core/src/app.module.ts': 'import { feature } from "@features/api/http/feature"; export const AppModule = feature\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
   });
   const result = check(root);
@@ -178,7 +175,7 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
     'apps/core/src/app.module.ts',
     'apps/core/src/core.options.ts',
     'apps/core/src/main.ts',
-    'src/features/http/feature.ts',
+    'src/features/api/http/feature.ts',
     'src/modules/domain/catalog/value.ts',
   ]);
   assert.ok(result.coverage.checkedRuleIds.includes('BE_TIER_DIRECTION'));
@@ -188,10 +185,10 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
 
 test('backend resolves aliases, relative imports, and re-export barrels before enforcing direction', t => {
   const root = fixture(t, 'backend', {
-    'src/features/http/feature.ts': 'export const feature = 1\n',
-    'src/modules/domain/shared/barrel.ts': 'export * from "../../../features/http/feature"\n',
+    'src/features/api/http/feature.ts': 'export const feature = 1\n',
+    'src/modules/domain/shared/barrel.ts': 'export * from "../../../features/api/http/feature"\n',
     'src/modules/domain/shared/consumer.ts': 'import { feature } from "@modules/shared/barrel"; export const value = feature\n',
-    'src/features/http/app-link.ts': 'export * from "../../../apps/core/src/app.module"\n',
+    'src/features/api/http/app-link.ts': 'export * from "../../../../apps/core/src/app.module"\n',
     'apps/core/src/app.module.ts': 'export const AppModule = 1\n',
     'apps/core/src/main.ts': 'void 0\n',
     'apps/core/src/orders.controller.ts': 'export class OrdersController {}\n',
@@ -303,13 +300,13 @@ test('frontend world owners cannot draw inline, capture owner state, choose a co
 
 test('unresolved internal aliases fail clearly instead of returning a false green result', t => {
   const root = fixture(t, 'backend', {
-    'src/modules/domain/broken.ts': 'import { missing } from "@features/missing"; export const value=missing\n',
-    'src/features/present.ts': 'export const present=1\n',
+    'src/modules/domain/broken.ts': 'import { missing } from "@features/api/missing"; export const value=missing\n',
+    'src/features/api/present.ts': 'export const present=1\n',
   });
   const result = check(root);
   assert.equal(result.ok, false);
   const unresolved = result.errors.find(item => item.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED');
-  assert.equal(unresolved.specifier, '@features/missing');
+  assert.equal(unresolved.specifier, '@features/api/missing');
   assert.equal(unresolved.path, 'src/modules/domain/broken.ts');
   assert.ok(unresolved.line > 0 && unresolved.column > 0);
 });
@@ -317,7 +314,7 @@ test('unresolved internal aliases fail clearly instead of returning a false gree
 test('production loader reports missing target TypeScript without borrowing StarCi test TypeScript', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'export const feature=1\n',
+    'src/features/api/feature.ts': 'export const feature=1\n',
   });
   const result = checkArchitecture({ repositoryRoot: root });
   assert.equal(result.ok, false);
@@ -328,7 +325,7 @@ test('production loader reports missing target TypeScript without borrowing Star
 test('check emits one actionable JSON record and uses target-local TypeScript', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'import { value } from "@modules/value"; export const feature=value\n',
+    'src/features/api/feature.ts': 'import { value } from "@modules/value"; export const feature=value\n',
   });
   const targetModules = path.join(root, '..', 'node_modules');
   fs.mkdirSync(targetModules);
@@ -359,14 +356,14 @@ test('owner coverage is derived from slot owners; the Grammar contract is unavai
   const backend = fixture(t, 'backend', {
     'apps/core/src/app.module.ts': null,
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'export const feature=1\n',
+    'src/features/api/feature.ts': 'export const feature=1\n',
   });
   const backendResult = check(backend);
   assert.deepEqual(ownerIds(backend), []);
   assert.deepEqual(backendResult.coverage.ownerPublicApi, { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' });
   assert.deepEqual(backendResult.coverage.grammarContract, { status: 'not-applicable' });
   assert.deepEqual(backendResult.coverage.sourceFiles, [
-    'apps/core/src/main.ts', 'src/features/feature.ts', 'src/modules/domain/value.ts',
+    'apps/core/src/main.ts', 'src/features/api/feature.ts', 'src/modules/domain/value.ts',
   ]);
   assert.equal(backendResult.coverage.checkedRuleIds.includes('ARCH_OWNER_EXPORT_BYPASS'), false);
   const frontend = fixture(t, 'frontend', {
@@ -449,9 +446,9 @@ test('declared package export key must resolve to its declared target rather tha
 
 test('single-application composition root excludes nested feature/module roots from app containment', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/value.ts': 'export const value = 1\n',
-    'src/modules/domain/catalog/consumer.ts': 'import { value } from "@features/orders/value"; export const consumer = value\n',
-    'apps/core/src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
+    'src/features/api/orders/value.ts': 'export const value = 1\n',
+    'src/modules/domain/catalog/consumer.ts': 'import { value } from "@features/api/orders/value"; export const consumer = value\n',
+    'apps/core/src/app.module.ts': 'import { value } from "@features/api/orders/value"; export const AppModule = value\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
   });
   const result = checkAll(root);
@@ -461,7 +458,7 @@ test('single-application composition root excludes nested feature/module roots f
 
 test('single-application composition root still refuses a business-role file placed directly at its root', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/value.ts': 'export const value = 1\n',
+    'src/features/api/orders/value.ts': 'export const value = 1\n',
     'src/modules/domain/catalog/value.ts': 'export const catalogValue = 1\n',
     'apps/core/src/app.module.ts': 'export const AppModule = 1\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
@@ -473,9 +470,9 @@ test('single-application composition root still refuses a business-role file pla
 
 test('single-application layout derives its composition root from apps/<app>/src', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/value.ts': 'export const value = 1\n',
+    'src/features/api/orders/value.ts': 'export const value = 1\n',
     'src/modules/domain/catalog/value.ts': 'export const catalogValue = 1\n',
-    'apps/core/src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
+    'apps/core/src/app.module.ts': 'import { value } from "@features/api/orders/value"; export const AppModule = value\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
     'apps/core/src/leaky.service.ts': 'export class LeakyService { run(){return 1} }\n',
   });
@@ -503,8 +500,8 @@ test('backend workspace packages cannot reach executable app packages through ty
 
 test('backend direction traverses multi-hop type-only imports and barrels', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/contract.ts': 'export type FeatureContract = string\n',
-    'src/modules/platform/shared/barrel.ts': 'export type { FeatureContract } from "../../../features/orders/contract"\n',
+    'src/features/api/orders/contract.ts': 'export type FeatureContract = string\n',
+    'src/modules/platform/shared/barrel.ts': 'export type { FeatureContract } from "../../../features/api/orders/contract"\n',
     'src/modules/domain/catalog/types.ts': 'import type { FeatureContract } from "../../platform/shared/barrel"; export type CatalogContract = FeatureContract\n',
   });
   const result = checkAll(root), violation = result.violations.find(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('barrel.ts'));
@@ -514,8 +511,8 @@ test('backend direction traverses multi-hop type-only imports and barrels', t =>
 
 test('backend direction includes static dynamic imports that use import attributes', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/contract.ts': 'export const feature = 1\n',
-    'src/modules/domain/catalog/load.ts': 'export const load = () => import("@features/orders/contract", { with: { type: "json" } })\n',
+    'src/features/api/orders/contract.ts': 'export const feature = 1\n',
+    'src/modules/domain/catalog/load.ts': 'export const load = () => import("@features/api/orders/contract", { with: { type: "json" } })\n',
   });
   const result = checkAll(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION'), JSON.stringify(result, null, 2));
@@ -523,9 +520,9 @@ test('backend direction includes static dynamic imports that use import attribut
 
 test('TypeScript import types join the dependency graph and direct dynamic module names fail coverage', t => {
   const root = fixture(t, 'backend', {
-    'src/features/private.ts': 'export interface Private { value:string }\n',
-    'src/modules/domain/import-type.ts': 'export type Hidden = import("@features/private").Private\n',
-    'src/modules/domain/dynamic.ts': 'const selected="@features/private"; export const load=()=>import(selected); export const loadCjs=()=>require(selected)\n',
+    'src/features/api/private.ts': 'export interface Private { value:string }\n',
+    'src/modules/domain/import-type.ts': 'export type Hidden = import("@features/api/private").Private\n',
+    'src/modules/domain/dynamic.ts': 'const selected="@features/api/private"; export const load=()=>import(selected); export const loadCjs=()=>require(selected)\n',
     'src/modules/domain/shadow.ts': 'const require=(value:string)=>value; const selected="local"; export const local=require(selected)\n',
   });
   const result = checkAll(root);
@@ -540,21 +537,21 @@ test('TypeScript import types join the dependency graph and direct dynamic modul
 test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',
-    'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; interface ValidParams {name:string} interface ValidResult {name:string} @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:ValidParams):ValidResult { return this.orders.create(input) } }\n',
-    'src/features/orders/application/valid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
-    'src/features/orders/application/valid-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidRequireUseCase {}\n',
-    'src/features/orders/application/valid-shadow-es.use-case.ts': 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-    'src/features/orders/application/valid-shadow-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowCjsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-    'src/features/orders/application/valid-shadow-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowRequireUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-    'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
-    'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
-    'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
-    'src/features/orders/application/invalid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
-    'src/features/orders/application/invalid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); export class InvalidCjsUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
-    'src/features/orders/application/invalid-require.use-case.ts': 'const Nest = require("@nestjs/common"); export class InvalidRequireUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
-    'src/features/orders/application/invalid-require-destructured.use-case.ts': 'const { Body } = require("@nestjs/common"); export class InvalidRequireDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
-    'src/features/orders/application/invalid-direct-require.use-case.ts': 'const DirectBody = require("@nestjs/common").Body; export class InvalidDirectRequireUseCase { execute(@DirectBody() input:unknown){ return input } }\n',
-    'src/features/orders/application/invalid-destructured.use-case.ts': 'import * as Nest from "@nestjs/common"; const { Body } = Nest; export class InvalidDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
+    'src/features/api/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; interface ValidParams {name:string} interface ValidResult {name:string} @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:ValidParams):ValidResult { return this.orders.create(input) } }\n',
+    'src/features/api/orders/application/valid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
+    'src/features/api/orders/application/valid-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidRequireUseCase {}\n',
+    'src/features/api/orders/application/valid-shadow-es.use-case.ts': 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/api/orders/application/valid-shadow-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowCjsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/api/orders/application/valid-shadow-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowRequireUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/api/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
+    'src/features/api/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
+    'src/features/api/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
+    'src/features/api/orders/application/invalid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
+    'src/features/api/orders/application/invalid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); export class InvalidCjsUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
+    'src/features/api/orders/application/invalid-require.use-case.ts': 'const Nest = require("@nestjs/common"); export class InvalidRequireUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
+    'src/features/api/orders/application/invalid-require-destructured.use-case.ts': 'const { Body } = require("@nestjs/common"); export class InvalidRequireDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
+    'src/features/api/orders/application/invalid-direct-require.use-case.ts': 'const DirectBody = require("@nestjs/common").Body; export class InvalidDirectRequireUseCase { execute(@DirectBody() input:unknown){ return input } }\n',
+    'src/features/api/orders/application/invalid-destructured.use-case.ts': 'import * as Nest from "@nestjs/common"; const { Body } = Nest; export class InvalidDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
   });
   const result = check(root), rules = result.violations.map(item => item.ruleId);
   assert.ok(rules.includes('BE_APPLICATION_IMPORTS_TRANSPORT'), JSON.stringify(result, null, 2));
@@ -569,10 +566,10 @@ test('feature application use cases may use Nest injection but cannot reach tran
 
 test('feature application cannot import a protocol decorator re-exported by an internal barrel', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/shared/protocol.ts': 'export { Body } from "@nestjs/common"; export { ArgsType as Input } from "@nestjs/graphql"\n',
-    'src/features/orders/shared/capability.ts': 'export const execute = (value: unknown) => value\n',
-    'src/features/orders/application/valid.use-case.ts': 'import { execute } from "../shared/capability"; export class ValidUseCase { execute(value:unknown){ return execute(value) } }\n',
-    'src/features/orders/application/invalid.use-case.ts': 'import { Body, Input } from "../shared/protocol"; @Input() export class InvalidUseCase { execute(@Body() input:unknown){ return input } }\n',
+    'src/features/api/orders/shared/protocol.ts': 'export { Body } from "@nestjs/common"; export { ArgsType as Input } from "@nestjs/graphql"\n',
+    'src/features/api/orders/shared/capability.ts': 'export const execute = (value: unknown) => value\n',
+    'src/features/api/orders/application/valid.use-case.ts': 'import { execute } from "../shared/capability"; export class ValidUseCase { execute(value:unknown){ return execute(value) } }\n',
+    'src/features/api/orders/application/invalid.use-case.ts': 'import { Body, Input } from "../shared/protocol"; @Input() export class InvalidUseCase { execute(@Body() input:unknown){ return input } }\n',
   });
   const result = check(root);
   const violations = result.violations.filter(item => item.ruleId === 'BE_APPLICATION_TRANSPORT_FRAMEWORK');
@@ -582,20 +579,20 @@ test('feature application cannot import a protocol decorator re-exported by an i
 
 test('same-source owners are derived from slots and require named public entries without export-star barrels', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/index.ts': 'export * from "./public"\n',
-    'src/features/orders/public.ts': 'export const publicOrder = 1\n',
-    'src/features/orders/private.ts': 'export const secretOrder = 2\n',
-    'src/features/orders/internal.ts': 'import { secretOrder } from "./private"; export const internal = secretOrder\n',
-    'src/features/catalog/valid.ts': 'import { publicOrder } from "../orders"; export const valid = publicOrder\n',
-    'src/features/catalog/invalid.ts': 'import { secretOrder } from "../orders/private"; export const invalid = secretOrder\n',
-    'src/modules/platform/orders/barrel.ts': 'export { secretOrder } from "../../../features/orders/private"\n',
-    'src/features/catalog/indirect.ts': 'import { secretOrder } from "../../modules/platform/orders/barrel"; export const indirect = secretOrder\n',
+    'src/features/api/orders/index.ts': 'export * from "./public"\n',
+    'src/features/api/orders/public.ts': 'export const publicOrder = 1\n',
+    'src/features/api/orders/private.ts': 'export const secretOrder = 2\n',
+    'src/features/api/orders/internal.ts': 'import { secretOrder } from "./private"; export const internal = secretOrder\n',
+    'src/features/api/catalog/valid.ts': 'import { publicOrder } from "../orders"; export const valid = publicOrder\n',
+    'src/features/api/catalog/invalid.ts': 'import { secretOrder } from "../orders/private"; export const invalid = secretOrder\n',
+    'src/modules/platform/orders/barrel.ts': 'export { secretOrder } from "../../../features/api/orders/private"\n',
+    'src/features/api/catalog/indirect.ts': 'import { secretOrder } from "../../../modules/platform/orders/barrel"; export const indirect = secretOrder\n',
   });
   const result = check(root);
   const owners = ownerIds(root);
-  assert.ok(owners.includes('be.feature:src/features/orders'), JSON.stringify(owners));
+  assert.ok(owners.includes('be.feature:src/features/api/orders'), JSON.stringify(owners));
   assert.deepEqual(result.coverage.ownerPublicApi, { status: 'checked', declarations: owners.length });
-  assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_STAR' && item.path === 'src/features/orders/index.ts'), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_STAR' && item.path === 'src/features/api/orders/index.ts'), JSON.stringify(result, null, 2));
   const bypasses = result.violations.filter(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS');
   assert.ok(bypasses.some(item => item.path.endsWith('/invalid.ts')));
   assert.ok(bypasses.some(item => item.path.endsWith('/indirect.ts') && item.dependencyChain.some(part => part.endsWith('/platform/orders/barrel.ts'))));
@@ -622,9 +619,9 @@ test('Nest registration derives exported class-token ownership and selected CQRS
     'src/modules/platform/framework/index.ts': 'export { Module as NestModule } from "@nestjs/common"; export { CommandHandler as HandlesCommand } from "@nestjs/cqrs";\n',
     'src/modules/domain/catalog/catalog.service.ts': 'export class CatalogService {}\n',
     'src/modules/domain/catalog/catalog.module.ts': 'import { NestModule } from "../../platform/framework"; import { CatalogService } from "./catalog.service"; const StaticModule=NestModule; @StaticModule({providers:[CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
-    'src/features/orders/application/create.command.ts': 'export class CreateOrderCommand {}\n',
-    'src/features/orders/application/create.handler.ts': 'import { HandlesCommand } from "../../../modules/platform/framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
-    'src/features/orders/orders.module.ts': 'import { NestModule } from "../../modules/platform/framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
+    'src/features/api/orders/application/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/api/orders/application/create.handler.ts': 'import { HandlesCommand } from "../../../../modules/platform/framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/api/orders/orders.module.ts': 'import { NestModule } from "../../../modules/platform/framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
   });
   installNestTypes(root);
   const result = check(root);
@@ -639,9 +636,9 @@ test('Nest registration rejects same class-token provider duplication and missin
   const root = fixture(t, 'backend', {
     'src/modules/domain/catalog/catalog.service.ts': 'export class CatalogService {}\n',
     'src/modules/domain/catalog/catalog.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "./catalog.service"; @Module({providers:[CatalogService,CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
-    'src/features/orders/create.command.ts': 'export class CreateOrderCommand {}\n',
-    'src/features/orders/create.handler.ts': 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
-    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
+    'src/features/api/orders/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/api/orders/create.handler.ts': 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/api/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
   });
   installNestTypes(root);
   const result = check(root);
@@ -667,11 +664,11 @@ test('Nest registration does not force CQRS when no recognized handler exists', 
 
 test('Nest registration becomes unavailable for hidden or dynamic module metadata', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/find.query.ts': 'export class FindOrderQuery {}\n',
-    'src/features/orders/find.handler.ts': 'import { QueryHandler } from "@nestjs/cqrs"; import { FindOrderQuery } from "./find.query"; @QueryHandler(FindOrderQuery) export class FindOrderHandler {}\n',
-    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { FindOrderHandler } from "./find.handler"; const providers=[FindOrderHandler]; @Module({providers}) export class OrdersModule {}\n',
-    'src/features/orders/legacy.module.ts': 'const {Module}=require("@nestjs/common"); @Module({}) export class LegacyModule {}\n',
-    'src/features/orders/mutable.module.ts': 'import { Module } from "@nestjs/common"; let MutableModule=Module; @MutableModule({}) export class MutableIdentityModule {}\n',
+    'src/features/api/orders/find.query.ts': 'export class FindOrderQuery {}\n',
+    'src/features/api/orders/find.handler.ts': 'import { QueryHandler } from "@nestjs/cqrs"; import { FindOrderQuery } from "./find.query"; @QueryHandler(FindOrderQuery) export class FindOrderHandler {}\n',
+    'src/features/api/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { FindOrderHandler } from "./find.handler"; const providers=[FindOrderHandler]; @Module({providers}) export class OrdersModule {}\n',
+    'src/features/api/orders/legacy.module.ts': 'const {Module}=require("@nestjs/common"); @Module({}) export class LegacyModule {}\n',
+    'src/features/api/orders/mutable.module.ts': 'import { Module } from "@nestjs/common"; let MutableModule=Module; @MutableModule({}) export class MutableIdentityModule {}\n',
   });
   installNestTypes(root);
   const result = check(root);
@@ -685,12 +682,12 @@ test('Nest registration becomes unavailable for hidden or dynamic module metadat
 test('backend source shape accepts adopted application, transport, persistence, enum, and GraphQL naming forms', t => {
   const root = fixture(t, 'backend', {
     'src/modules/platform/framework/index.ts': 'export { Args as GqlArgs, InputType as GqlInput, Mutation as GqlMutation, Query as GqlQuery, registerEnumType as registerGraphQlEnum } from "@nestjs/graphql"; export { Entity as DatabaseEntity } from "typeorm";\n',
-    'src/features/orders/index.ts': 'export { CreateOrderHandler } from "./application/create-order.handler";\n',
-    'src/features/orders/orders.module.ts': 'export class OrdersModule {}\n',
-    'src/features/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
-    'src/features/orders/application/create-order.handler.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
-    'src/features/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../modules/platform/framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
-    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
+    'src/features/api/orders/index.ts': 'export { CreateOrderHandler } from "./application/create-order.handler";\n',
+    'src/features/api/orders/orders.module.ts': 'export class OrdersModule {}\n',
+    'src/features/api/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
+    'src/features/api/orders/application/create-order.handler.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
+    'src/features/api/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../../modules/platform/framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
+    'src/features/api/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
     'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
     'src/modules/domain/catalog/enums/order-status.ts': 'import { registerGraphQlEnum } from "../../../platform/framework"; export enum OrderStatus { Pending="pending", Complete="complete" } registerGraphQlEnum(OrderStatus,{name:"OrderStatus"});\n',
     'src/modules/domain/catalog/errors/challenge-not-found.ts': 'export class ChallengeNotFoundException extends Error {}\n',
@@ -707,19 +704,19 @@ test('backend source shape accepts adopted application, transport, persistence, 
 
 test('backend source shape locates layer, class, enum, contract, and GraphQL naming violations', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/application/create-order.request.ts': 'export class CreateOrderRequest {}\n',
-    'src/features/orders/application/create-order.contracts.ts': 'interface CreateOrderData { readonly itemId:string } type WrappedWrong=Readonly<{readonly value:string}>; type Shape={readonly x:string}; type AliasWrong=Shape; type Pick<T,K extends keyof T>=string; type Scalar=Pick<{readonly ignored:string},"ignored">; export {CreateOrderData,WrappedWrong,AliasWrong,Scalar};\n',
+    'src/features/api/orders/application/create-order.request.ts': 'export class CreateOrderRequest {}\n',
+    'src/features/api/orders/application/create-order.contracts.ts': 'interface CreateOrderData { readonly itemId:string } type WrappedWrong=Readonly<{readonly value:string}>; type Shape={readonly x:string}; type AliasWrong=Shape; type Pick<T,K extends keyof T>=string; type Scalar=Pick<{readonly ignored:string},"ignored">; export {CreateOrderData,WrappedWrong,AliasWrong,Scalar};\n',
     'src/modules/domain/catalog/bad_Name.service.ts': 'export class WrongName {}\n',
     'src/modules/domain/catalog/export-list.service.ts': 'class ExportListWrong {} export {ExportListWrong};\n',
     'src/modules/domain/catalog/class-expression.service.ts': 'export const Wrong=class {};\n',
     'src/modules/domain/catalog/named-expression.service.ts': 'const Value=class InnerWrong {}; export {Value};\n',
-    'src/features/orders/transport/http/run.handler.ts': 'export class RunHandler {}\n',
-    'src/features/orders/transport/graphql/dto/order.entity.ts': 'import { Entity } from "typeorm"; @Entity() export class OrderEntity {}\n',
-    'src/features/orders/migrations/1790000000000-CreateOrders.ts': 'export class CreateOrders { up(){} down(){} }\n',
-    'src/features/orders/transport/graphql/order-view.mapper.ts': 'import { ViewEntity } from "typeorm"; @ViewEntity() export class OrderViewMapper {}\n',
-    'src/features/orders/application/order-schema.handler.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
-    'src/features/orders/transport/graphql/create-order.input.ts': 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderInput {}\n',
-    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("itemId") itemId:string){return itemId} }\n',
+    'src/features/api/orders/transport/http/run.handler.ts': 'export class RunHandler {}\n',
+    'src/features/api/orders/transport/graphql/dto/order.entity.ts': 'import { Entity } from "typeorm"; @Entity() export class OrderEntity {}\n',
+    'src/features/api/orders/migrations/1790000000000-CreateOrders.ts': 'export class CreateOrders { up(){} down(){} }\n',
+    'src/features/api/orders/transport/graphql/order-view.mapper.ts': 'import { ViewEntity } from "typeorm"; @ViewEntity() export class OrderViewMapper {}\n',
+    'src/features/api/orders/application/order-schema.handler.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
+    'src/features/api/orders/transport/graphql/create-order.input.ts': 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderInput {}\n',
+    'src/features/api/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("itemId") itemId:string){return itemId} }\n',
     'src/modules/domain/catalog/enums/order-status.ts': 'export const enum orderStatus { pending=1 }\n',
   });
   installSourceShapeTypes(root);
@@ -774,10 +771,10 @@ test('backend source shape: domain values and port implementations pass, transpo
 
 test('backend source shape exposes dynamic naming as unavailable coverage', t => {
   const root = fixture(t, 'backend', {
-    'src/features/orders/application/run.workflow.ts': 'export const run=()=>"ok";\n',
-    'src/features/orders/transport/graphql/order.resolver.ts': 'import { Query } from "@nestjs/graphql"; const FIELD="order"; export class OrderResolver { @Query(()=>String,{name:FIELD}) order(){return "order"} }\n',
-    'src/features/orders/transport/graphql/wrapped.resolver.ts': 'import { Query } from "@nestjs/graphql"; const make=()=>Query; const Wrapped=make(); export class WrappedResolver { @Wrapped(()=>String,{name:"wrapped"}) wrapped(){return "wrapped"} }\n',
-    'src/features/orders/transport/graphql/deep.resolver.ts': 'import { Query } from "@nestjs/graphql"; const q0=()=>Query; const q1=()=>q0(); const q2=()=>q1(); const q3=()=>q2(); const q4=()=>q3(); const q5=()=>q4(); const q6=()=>q5(); const q7=()=>q6(); const q8=()=>q7(); const q9=()=>q8(); const q10=()=>q9(); const q11=()=>q10(); const q12=()=>q11(); const Deep=q12(); export class DeepResolver { @Deep(()=>String,{name:"deep"}) deep(){return "deep"} }\n',
+    'src/features/api/orders/application/run.workflow.ts': 'export const run=()=>"ok";\n',
+    'src/features/api/orders/transport/graphql/order.resolver.ts': 'import { Query } from "@nestjs/graphql"; const FIELD="order"; export class OrderResolver { @Query(()=>String,{name:FIELD}) order(){return "order"} }\n',
+    'src/features/api/orders/transport/graphql/wrapped.resolver.ts': 'import { Query } from "@nestjs/graphql"; const make=()=>Query; const Wrapped=make(); export class WrappedResolver { @Wrapped(()=>String,{name:"wrapped"}) wrapped(){return "wrapped"} }\n',
+    'src/features/api/orders/transport/graphql/deep.resolver.ts': 'import { Query } from "@nestjs/graphql"; const q0=()=>Query; const q1=()=>q0(); const q2=()=>q1(); const q3=()=>q2(); const q4=()=>q3(); const q5=()=>q4(); const q6=()=>q5(); const q7=()=>q6(); const q8=()=>q7(); const q9=()=>q8(); const q10=()=>q9(); const q11=()=>q10(); const q12=()=>q11(); const Deep=q12(); export class DeepResolver { @Deep(()=>String,{name:"deep"}) deep(){return "deep"} }\n',
     'src/modules/domain/catalog/engine.workflow.ts': 'export class EngineWorkflow {}\n',
     'src/modules/domain/catalog/graphql-enum.adapter.ts': 'export const createEnumType=(value:unknown)=>value; createEnumType({ Pending:"pending" });\n',
     'src/modules/domain/catalog/index.ts': 'export const catalog=true;\n',
@@ -878,7 +875,7 @@ test('internal aliases and relative imports cannot resolve outside the checked r
   const root = fixture(t, 'backend', {
     'src/modules/domain/alias.ts': 'import { outside } from "@outside/value"; export const alias=outside\n',
     'src/modules/domain/relative.ts': '',
-    'src/features/present.ts': 'export const present=1\n',
+    'src/features/api/present.ts': 'export const present=1\n',
   });
   const outside = `${path.dirname(root)}-outside`;
   t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
@@ -948,7 +945,7 @@ test('frontend rejects a visual branch that selects a page versus no composition
 test('backend rejects decorator and declaration roles hidden in config-shaped app files', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'export const feature=1\n',
+    'src/features/api/feature.ts': 'export const feature=1\n',
     'apps/core/src/main.ts': 'void 0\n',
     'apps/core/src/app.module.ts': 'export const AppModule=1\n',
     'apps/core/src/core.options.ts': 'function Injectable(){return ()=>{}}; @Injectable() export class PaymentProvider {}\n',
@@ -960,14 +957,14 @@ test('backend rejects decorator and declaration roles hidden in config-shaped ap
 test('backend composition roots support app source layouts without swallowing modules or features', t => {
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'export const feature=1\n',
+    'src/features/api/feature.ts': 'export const feature=1\n',
     'apps/core/src/main.ts': 'void 0\n',
     'apps/core/src/app.module.ts': 'export const AppModule=1\n',
     'apps/core/src/orders.controller.ts': 'export class OrdersController {}\n',
   });
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path === 'apps/core/src/orders.controller.ts'), JSON.stringify(result, null, 2));
-  assert.equal(result.violations.some(item => item.path === 'src/modules/domain/value.ts' || item.path === 'src/features/feature.ts'), false, JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.path === 'src/modules/domain/value.ts' || item.path === 'src/features/api/feature.ts'), false, JSON.stringify(result, null, 2));
 });
 
 test('an empty project program fails closed', t => {

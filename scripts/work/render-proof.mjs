@@ -8,7 +8,7 @@ import {readWorkspace, loadRecords} from './record-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
 
 /**
- * Grit item 55 (docs/examples/todo-app-grit.md): scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
+ * Grit item 55: scripts/work/ui/render.mjs and scripts/work/brand/brand.mjs are real - a
  * capture's PNG bytes plus its kept markup are checked against the brand record, palette and component
  * anatomy both - but nothing ever ran them against this example tree, so a frontend work/implementation@1
  * record could reach `done` with no capture at all. This module is the mechanical wiring: for every done

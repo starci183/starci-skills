@@ -2,8 +2,8 @@ schema: starci/hfs-peer-integrations@1
 purpose: >-
   The runtime peers a driver integration needs and npm does not install for it: "if the app depends on every package of
   `when` (at the named major, when one is named), it must declare `requires` in its dependencies". A missing peer is
-  invisible to the type checker and the unit specs and only fails when the api boots (todo-app and ecommerce-app,
-  2026-10-01: neither old backend declared @as-integrations/express5, so the Apollo GraphQL api could not boot under
+  invisible to the type checker and the unit specs and only fails when the api boots (ecommerce-app,
+  2026-10-01: the old backend did not declare @as-integrations/express5, so the Apollo GraphQL api could not boot under
   Express 5 and nothing noticed before e2e). R111 HFS_PEER_INTEGRATION_MISSING judges the app root package.json, the one
   manifest of both sides, with this catalog; an entry is added the day a boot failure of the same kind is found.
 pairs:

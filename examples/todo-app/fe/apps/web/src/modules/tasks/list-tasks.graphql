@@ -1,7 +1,0 @@
-query ListTasks {
-    tasks {
-        taskId
-        title
-        complete
-    }
-}

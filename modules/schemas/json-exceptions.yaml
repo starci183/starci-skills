@@ -59,6 +59,21 @@ exceptions:
   - path: examples/ecommerce-app/be/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
+  - path: examples/ecommerce-app/fe/apps/app/package.json
+    reason: >
+      npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
+  - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/en.json
+    reason: >
+      i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+  - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/vi.json
+    reason: >
+      i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+  - path: examples/ecommerce-app/fe/apps/app/tsconfig.json
+    reason: >
+      TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
+  - path: examples/ecommerce-app/fe/apps/landing/package.json
+    reason: >
+      npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
   - path: examples/ecommerce-app/fe/apps/landing/src/modules/i18n/messages/en.json
     reason: >
       i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
@@ -66,15 +81,6 @@ exceptions:
     reason: >
       i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
   - path: examples/ecommerce-app/fe/apps/landing/tsconfig.json
-    reason: >
-      TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
-  - path: examples/ecommerce-app/fe/apps/shop/src/modules/i18n/messages/en.json
-    reason: >
-      i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-  - path: examples/ecommerce-app/fe/apps/shop/src/modules/i18n/messages/vi.json
-    reason: >
-      i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
-  - path: examples/ecommerce-app/fe/apps/shop/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
   - path: examples/ecommerce-app/fe/tsconfig.json
@@ -89,6 +95,9 @@ exceptions:
   - path: examples/ecommerce-app/package.json
     reason: >
       npm package manifest of the ecommerce-app root; the npm toolchain requires JSON.
+  - path: examples/ecommerce-app/turbo.json
+    reason: >
+      The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
   - path: examples/shape-slot/apps/shape-slot/package.json
     reason: npm package manifest for the shape-slot example app; the npm toolchain requires JSON.
   - path: examples/shape-slot/apps/shape-slot/src/modules/i18n/messages/vi.json
@@ -104,49 +113,6 @@ exceptions:
     reason: npm package manifest for the shape-slot example; the npm toolchain requires JSON.
   - path: examples/shape-slot/tsconfig.json
     reason: TypeScript config for the shape-slot example; tsc requires JSON.
-  - path: examples/todo-app/.starcistacks/dev/environment.json
-    reason: >
-      Rendered dev environment for the todo-app application stack (be side);
-      starci/rendered-environment output of application-stacks.yaml, JSON by
-      the rendering contract.
-  - path: examples/todo-app/.starcistacks/dev/infra/compose/realm-todo.json
-    reason: >
-      Keycloak realm import for the dev Compose stack of the todo-app back end; the
-      Keycloak container's realm-import feature requires a JSON realm file.
-  - path: examples/todo-app/.starcistacks/vps/environment.json
-    reason: >
-      Rendered vps environment for the todo-app application stack (be side);
-      starci/rendered-environment output of application-stacks.yaml, JSON by
-      the rendering contract.
-  - path: examples/todo-app/.starciwork/features/task/ui/list/assets/grammar-reference-review.json
-    reason: >
-      Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
-  - path: examples/todo-app/be/nest-cli.json
-    reason: Nest CLI configuration for the todo-app example (be side); the nest toolchain reads JSON.
-  - path: examples/todo-app/be/src/tests/tsconfig.json
-    reason: >
-      TypeScript config for the todo-app back-end test tree (src/tests); tsc reads JSON (with comments).
-  - path: examples/todo-app/be/tsconfig.build.json
-    reason: TypeScript build project config for the todo-app example (be side); tsc expects a JSON tsconfig file.
-  - path: examples/todo-app/be/tsconfig.json
-    reason: TypeScript project config for the todo-app example (be side); tsc expects a JSON tsconfig file.
-  - path: examples/todo-app/fe/apps/web/src/modules/i18n/messages/en.json
-    reason: >
-      i18n message catalog inside the todo-app front-end source; the app i18n loader consumes JSON.
-  - path: examples/todo-app/fe/apps/web/src/modules/i18n/messages/vi.json
-    reason: >
-      i18n message catalog inside the todo-app front-end source; the app i18n loader consumes JSON.
-  - path: examples/todo-app/fe/apps/web/tsconfig.json
-    reason: TypeScript project config for the todo frontend app; tsc expects a JSON tsconfig file.
-  - path: examples/todo-app/fe/tsconfig.json
-    reason: TypeScript project config of the todo-app front end; tsc expects a JSON tsconfig file.
-  - path: examples/todo-app/hfs.json
-    reason: >
-      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app example; the architecture machine reads hfs.json as JSON.
-  - path: examples/todo-app/package-lock.json
-    reason: npm lockfile for the todo-app example ; package managers require JSON filename and syntax.
-  - path: examples/todo-app/package.json
-    reason: npm package manifest for the todo-app example ; Node/npm require JSON filename and syntax.
   - path: hfs.json
     reason: >
       HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader

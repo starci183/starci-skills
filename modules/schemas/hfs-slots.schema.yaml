@@ -64,7 +64,7 @@ $defs:
           be:
             type: object
             additionalProperties: false
-            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape]
+            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape, unitRoles]
             properties:
               fileLines: {$ref: '#/$defs/fileLines'}
               duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -103,6 +103,20 @@ $defs:
                       forms: {$ref: '#/$defs/doubleForms'}
               suffixes: {$ref: '#/$defs/roleSuffixes'}
               bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
+              unitRoles:
+                type: array
+                minItems: 1
+                description: The unit-tested roles of a back end, the one list every unit-test consumer reads.
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [role, spec, coverage]
+                  properties:
+                    role: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    spec: {type: string}
+                    slot: {type: string}
+                    coverage: {type: string}
+                    exempt: {type: array, items: {type: string, pattern: '^[A-Z][A-Z0-9_]+$'}}
               contractShape:
                 type: object
                 additionalProperties: false

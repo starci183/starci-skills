@@ -678,7 +678,7 @@ BE_READONLY_BOUNDARY:
 BE_SCHEMA_AUTHORITY:
   title: "Schema defined at runtime"
   title_vi: "Schema được định nghĩa lúc chạy"
-  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize() hoặc dropDatabase(), có khóa migrationsRun (cấm dưới mọi dạng), gọi runMigrations() ngoài apps/migrate và test world, dropSchema khác false, dựng schema bằng createSchemaBuilder()/build(), khóa synchronize trong tùy chọn của @Entity, hook onModuleInit/onApplicationBootstrap ghi dữ liệu qua EntityManager hoặc DataSource (seed chỉ chạy trong apps/migrate), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE, SCHEMA, EXTENSION, TRIGGER, FUNCTION, ADD/DROP CONSTRAINT...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
+  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize() hoặc dropDatabase(), có khóa migrationsRun (cấm dưới mọi dạng), gọi runMigrations() ngoài cli (lệnh migrate của apps/cli) và test world, dropSchema khác false, dựng schema bằng createSchemaBuilder()/build(), khóa synchronize trong tùy chọn của @Entity, hook onModuleInit/onApplicationBootstrap ghi dữ liệu qua EntityManager hoặc DataSource (seed chỉ chạy bằng một lệnh cli), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE, SCHEMA, EXTENSION, TRIGGER, FUNCTION, ADD/DROP CONSTRAINT...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do lệnh cli migrate chạy."
   causes_vi:
     - "new DataSource({ type: 'postgres' }) không ghi synchronize: false"
     - "synchronize: true, hoặc đọc từ biến môi trường"
@@ -686,7 +686,7 @@ BE_SCHEMA_AUTHORITY:
     - "dropSchema: true, hoặc dataSource.createSchemaBuilder().build() lúc chạy"
     - "@Entity({ synchronize: false }): công tắc riêng cho từng entity"
     - "onModuleInit ghi dữ liệu bằng entityManager.save/insert/query INSERT: seed lúc khởi động ở mọi tiến trình"
-    - "dataSource.runMigrations() gọi ngoài apps/migrate"
+    - "dataSource.runMigrations() gọi ngoài cli (lệnh migrate của apps/cli)"
     - "entities hoặc migrations khai bằng đường dẫn có ký tự *"
   nextStep_vi: "Viết một migration trong persistence/migrations/ của capability sở hữu bảng và liệt kê entity, migration tường minh; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
@@ -11534,7 +11534,7 @@ BE_ENTRYPOINT_ONLY_IN_APPS:
   title_vi: "Entrypoint nằm ngoài apps"
   meaning_vi: "`<file>` là một entrypoint tiến trình nằm ngoài `apps/`."
   causes_vi:
-    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là `apps/migrate`."
+    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là lệnh `cli migrate run` của `apps/cli`."
     - "NestFactory.create* hoặc lời gọi bootstrap() cấp cao nhất nằm ngoài apps/<app>/src/main.ts"
     - "Chỉ `src/tests/world/` (gốc ghép của test, slot be.tests.world) được gọi NestFactory ngoài main.ts; một spec (integration, contract, e2e) không được ghép: nó chỉ gọi useTestWorld(...)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -12864,7 +12864,7 @@ BE_TRANSPORT_SHAPE:
 BE_UNNAMED_DATA_ACCESS:
   title: "Database reached without the named shared EntityManager"
   title_vi: "Truy cập cơ sở dữ liệu không qua EntityManager dùng chung có tên"
-  meaning_vi: "Tham số hoặc thuộc tính kiểu EntityManager không mang bộ tiêm Inject<Kết nối>EntityManager của một kết nối đã khai báo trong hfs.json (tên na ná cũng không đạt), hoặc tiêm bằng thuộc tính, hoặc gọi .getRepository(...), hoặc dùng @InjectRepository / Repository<T> / TypeOrmModule.forFeature, hoặc tiêm DataSource / QueryRunner ngoài platform/database, apps/migrate và test world (kể cả viết kiểu DataSource làm kiểu trả về, giá trị await, token provide: hay lớp bọc trả ra kết nối); lớp nào ngoài handler ứng dụng, domain service và năng lực persistence của platform mà nhận, giữ hoặc trả EntityManager, Repository, DataSource hay QueryRunner đều là repository dù đặt tên gì (Store, Dao, Gateway, Persistence, hoặc module hàm export nhận EntityManager làm tham số đầu như authoring.statements.ts); ứng dụng đăng ký nhiều kết nối nên cách viết này trỏ vào kết nối mặc định hoặc gắn một handle vào đúng một entity, và giao dịch không đi qua được sang bảng thứ hai."
+  meaning_vi: "Tham số hoặc thuộc tính kiểu EntityManager không mang bộ tiêm Inject<Kết nối>EntityManager của một kết nối đã khai báo trong hfs.json (tên na ná cũng không đạt), hoặc tiêm bằng thuộc tính, hoặc gọi .getRepository(...), hoặc dùng @InjectRepository / Repository<T> / TypeOrmModule.forFeature, hoặc tiêm DataSource / QueryRunner ngoài platform/database, cli (apps/cli, src/features/cli) và test world (kể cả viết kiểu DataSource làm kiểu trả về, giá trị await, token provide: hay lớp bọc trả ra kết nối); lớp nào ngoài handler ứng dụng, domain service và năng lực persistence của platform mà nhận, giữ hoặc trả EntityManager, Repository, DataSource hay QueryRunner đều là repository dù đặt tên gì (Store, Dao, Gateway, Persistence, hoặc module hàm export nhận EntityManager làm tham số đầu như authoring.statements.ts); ứng dụng đăng ký nhiều kết nối nên cách viết này trỏ vào kết nối mặc định hoặc gắn một handle vào đúng một entity, và giao dịch không đi qua được sang bảng thứ hai."
   causes_vi:
     - "constructor(@InjectFooEntityManager() private readonly manager: EntityManager) {} với Foo không phải kết nối khai báo"
     - "@InjectPrimaryEntityManager() private readonly manager: EntityManager (tiêm bằng thuộc tính)"
@@ -13177,5 +13177,45 @@ HFS_MONO_WORKSPACE_DEP:
   causes_vi:
     - "Vi phạm luật R130: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
+  owner: op-retry
+  kind: check-finding
+
+BE_CLI_REQUIRED:
+  title: "The back end has no cli app, or no cli image"
+  title_vi: "Back end thiếu app cli hoặc image của nó"
+  meaning_vi: "Mọi hành động chạy một lần của back end (migrate, seed, sync, backup, lệnh vận hành) nằm trong MỘT app `be/apps/cli` (kind cli, tên cli) chạy trên nest-commander. Back end có connection (migration chạy bằng `cli migrate run`) hoặc có lệnh dưới `src/features/cli/` thì phải khai báo đúng app đó và có `be/apps/cli/Dockerfile`."
+  causes_vi:
+    - "Vi phạm luật R131: không có app cli thì migration và các hành động một lần không có chỗ chạy chuẩn; thiếu Dockerfile thì không có image `cli` để chạy `cli <group> <command>`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai báo { \"name\": \"cli\", \"kind\": \"cli\" } trong `sides.be.apps` của `hfs.json`, dựng `be/apps/cli` với `CommandFactory.run` và thêm `be/apps/cli/Dockerfile`; đổi tên app cli khác thành `cli`."
+  owner: op-retry
+  kind: check-finding
+
+BE_CLI_BOOTSTRAP:
+  title: "The cli app does not boot with CommandFactory.run, or serves"
+  title_vi: "App cli không khởi động bằng CommandFactory.run hoặc lại chạy như server"
+  meaning_vi: "`main.ts` của app cli khởi động bằng `CommandFactory.run(...)` của nest-commander và không bao giờ phục vụ HTTP hay microservice: `NestFactory.create*`, `.listen()`, adapter `@nestjs/platform-*` hay `@nestjs/microservices` trong app cli đều bị từ chối."
+  causes_vi:
+    - "Vi phạm luật R132: app cli chạy một lệnh rồi thoát; một server trong app cli là một app api đội lốt."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết `main.ts` của app cli là `CommandFactory.run(AppModule, logger)` và bỏ mọi phần tạo server khỏi app cli."
+  owner: op-retry
+  kind: check-finding
+
+BE_CLI_COMMAND_SHAPE:
+  title: "A cli command is misplaced or has no spec"
+  title_vi: "Lệnh cli đặt sai chỗ hoặc thiếu spec"
+  meaning_vi: "Lệnh nest-commander (`@Command` hoặc `@SubCommand`) chỉ được khai báo trong `src/features/cli/`: nhóm `@Command` ở `<group>/<group>.cli.ts`, `@SubCommand` kế thừa `CommandRunner` ở `<group>/subs/<name>.cli.ts`, mỗi tệp một lệnh, và mỗi lệnh con có unit spec `<name>.cli.spec.ts` bên cạnh."
+  causes_vi:
+    - "Vi phạm luật R133: lệnh cli là nơi chạy hành động (không phải transport mỏng), nên phải nằm đúng chỗ và được chứng minh bằng spec như một service."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển lệnh về `src/features/cli/<group>/subs/<name>.cli.ts` (nhóm về `<group>/<group>.cli.ts`), cho lệnh con kế thừa `CommandRunner` và viết `<name>.cli.spec.ts` bên cạnh."
+  owner: op-retry
+  kind: check-finding
+
+BE_CLI_OWNER:
+  title: "A command line outside the cli"
+  title_vi: "Có dòng lệnh nằm ngoài cli"
+  meaning_vi: "`nest-commander` chỉ được import trong app cli và gốc feature cli; không mã back end nào tự đọc `process.argv` hay import commander, yargs, minimist."
+  causes_vi:
+    - "Vi phạm luật R134: một cửa hành động một lần ở app khác (ví dụ cờ `migrate` trong api) lách khỏi app cli, image cli và spec của lệnh."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết hành động thành một lệnh `src/features/cli/<group>/subs/<name>.cli.ts` do app cli chạy và bỏ việc đọc tham số dòng lệnh ở nơi khác."
   owner: op-retry
   kind: check-finding

@@ -1,6 +1,0 @@
-mutation CompleteErasure($requestId: ID!) {
-    completeErasure(input: { requestId: $requestId }) {
-        requestId
-        state
-    }
-}

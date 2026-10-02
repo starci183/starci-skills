@@ -39,7 +39,7 @@ test("@Global() is refused everywhere, specs included", () => {
         invalid: [
             { filename: MODULE, code: "@Global() @Module({}) class PlanModule {}", errors: [{ messageId: "global" }] },
             { filename: at("src/modules/platform/config/config.module.ts"), code: "@Global() @Module({}) class ConfigModule {}", errors: [{ messageId: "global" }] },
-            { filename: at("src/features/plan/plan.module.ts"), code: "@Global @Module({}) class PlanModule {}", errors: [{ messageId: "global" }] },
+            { filename: at("src/features/api/plan/plan.module.ts"), code: "@Global @Module({}) class PlanModule {}", errors: [{ messageId: "global" }] },
             { filename: at("src/modules/domain/plan/plan.module.spec.ts"), code: "@Global() @Module({}) class Probe {}", errors: [{ messageId: "global" }] },
             { filename: MODULE, code: 'import { Global as G } from "@nestjs/common"\n@G() class PlanModule {}', errors: [{ messageId: "global" }] },
             { filename: MODULE, code: 'import * as common from "@nestjs/common"\n@common.Global() class PlanModule {}', errors: [{ messageId: "global" }] },
@@ -61,7 +61,7 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
         ],
         invalid: [
             { filename: MODULE, code: "const m = CatalogModule.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
-            { filename: at("src/features/plan/plan.module.ts"), code: "@Module({ imports: [X.register({ isGlobal: true })] }) class M {}", errors: [{ messageId: "isGlobal" }] },
+            { filename: at("src/features/api/plan/plan.module.ts"), code: "@Module({ imports: [X.register({ isGlobal: true })] }) class M {}", errors: [{ messageId: "isGlobal" }] },
             { filename: at("apps/api/src/main.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("apps/api/src/api.options.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("src/modules/domain/plan/plan.module.spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
@@ -79,7 +79,7 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
 })
 
 const CROSS = at("src/modules/domain/plan/plan.module.ts")
-const TRANSPORT = at("src/features/checkout/transport/graphql/checkout-graphql.module.ts")
+const TRANSPORT = at("src/features/api/checkout/transport/graphql/checkout-graphql.module.ts")
 
 test("a module never imports another owner's module", () => {
     tester.run("no-cross-owner-module-import", noCrossOwnerModuleImport, {
@@ -194,8 +194,8 @@ test("a capability's representative module extends its module definition; sub-mo
             { filename: at("src/modules/platform/cache/cache.module.ts"), code: 'import { ConfigurableModuleClass } from "./cache.module-definition"\n@Module({}) export class CacheModule extends ConfigurableModuleClass {}' },
             // a sub-module and a feature module are plain
             { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: "@Module({ providers: [] }) export class PlanItemsModule {}" },
-            { filename: at("src/features/checkout/application/checkout.module.ts"), code: "@Module({ providers: [] }) export class CheckoutModule {}" },
-            { filename: at("src/features/checkout/transport/graphql/checkout-graphql.module.ts"), code: "@Module({ providers: [] }) export class CheckoutGraphqlModule {}" },
+            { filename: at("src/features/api/checkout/application/checkout.module.ts"), code: "@Module({ providers: [] }) export class CheckoutModule {}" },
+            { filename: at("src/features/api/checkout/transport/graphql/checkout-graphql.module.ts"), code: "@Module({ providers: [] }) export class CheckoutGraphqlModule {}" },
             // the app module composes: it has its own register(options: AppOptions)
             { filename: APP, code: "@Module({}) export class AppModule { static register(options: AppOptions) { return {} } }" },
             // the definition
@@ -217,10 +217,10 @@ test("a capability's representative module extends its module definition; sub-mo
             // sub-modules and feature modules are not configurable
             { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: 'import { ConfigurableModuleClass } from "./plan.module-definition"\n@Module({}) export class PlanItemsModule extends ConfigurableModuleClass {}', errors: [{ messageId: "plain" }] },
             { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: "@Module({}) export class PlanItemsModule { static register() { return {} } }", errors: [{ messageId: "plain" }] },
-            { filename: at("src/features/checkout/application/checkout.module.ts"), code: "@Module({}) export class CheckoutModule extends Base {}", errors: [{ messageId: "plain" }] },
-            { filename: at("src/features/checkout/checkout.module.ts"), code: "@Module({}) export class CheckoutModule { static register() { return {} } }", errors: [{ messageId: "plain" }] },
+            { filename: at("src/features/api/checkout/application/checkout.module.ts"), code: "@Module({}) export class CheckoutModule extends Base {}", errors: [{ messageId: "plain" }] },
+            { filename: at("src/features/api/checkout/checkout.module.ts"), code: "@Module({}) export class CheckoutModule { static register() { return {} } }", errors: [{ messageId: "plain" }] },
             // a feature has no module definition
-            { filename: at("src/features/checkout/checkout.module-definition.ts"), code: CHAIN, errors: [{ messageId: "featureDefinition" }] },
+            { filename: at("src/features/api/checkout/checkout.module-definition.ts"), code: CHAIN, errors: [{ messageId: "featureDefinition" }] },
             // the definition chain
             { filename: DEFINITION, code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<PlanOptions>().build()", errors: [{ messageId: "chain" }] },
             { filename: DEFINITION, code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<PlanOptions>().setExtras({ isGlobal: true }, (d, e) => d).build()", errors: [{ messageId: "chain" }] },

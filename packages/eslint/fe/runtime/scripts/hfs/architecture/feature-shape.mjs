@@ -5,7 +5,7 @@ import { allowsFile } from '../allows.mjs';
 /**
  * R29 `feature-shape` (BE_FEATURE_SHAPE). A feature root holds `index.ts`, `<feature>.module.ts`, `application/`,
  * `transport/<protocol>/` and `messages/` only, and each of those folders holds only what its slot `allows` (knowledge/hfs/
- * slots.yaml: be.feature, be.feature.application, be.feature.application.support, be.transport.*, be.feature.transport.cli,
+ * slots.yaml: be.feature, be.feature.application, be.feature.application.support, be.transport.*,
  * be.feature.messages). Every tracked file below a feature root is classified by the slot resolver and matched against
  * the `requires` and `allows` entries of the slot that owns it; a directory that no slot owns (an unknown protocol under
  * `transport/`, a `graphql/` folder under `application/`) is refused because its files fall back to the feature root slot.
@@ -31,7 +31,10 @@ export function checkFeatureShape({ config, graph }) {
     const feature = path.posix.basename(owner.root);
     const where = `${verdict.slot} (${verdict.root})`;
     if (verdict.slot === owner.slot) {
-      // The feature root slot owns only the files at the root; anything deeper sits in a directory no slot claims.
+      // A file the feature root slot itself allows is in place (the cli feature root allows its <group>/ folders); any other file
+      // deeper than the root sits in a directory no slot claims.
+      // A directory entry (`transport/`, `application/`) is held by its own slots: below it, only those slots admit a file.
+      if (verdict.allowed && !String(verdict.entry ?? '').endsWith('/')) continue;
       if (verdict.relative.includes('/')) {
         const folder = verdict.relative.split('/')[0];
         report(file, `${file} sits in ${owner.root}/${folder}/, which no slot owns; a feature root holds only ${verdict.allows.join(', ')}, and transport/ holds one folder per protocol a slot names. Move it to application/ or a transport/<protocol>/ folder, or delete it.`,

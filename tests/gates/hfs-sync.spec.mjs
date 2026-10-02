@@ -26,7 +26,7 @@ const jestPreset = require('../../packages/jest-preset/index.cjs');
 const Ajv2020 = (() => { const loaded = require('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
-const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
+const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
 const rendered = (hfs = APP) => Object.fromEntries(renderTargets(hfs, PRESETS).map(target => [target.path, target.content]));
@@ -70,8 +70,8 @@ describe('hfs.json validation', () => {
   });
   it('refuses a declaration the canons would refuse, so a pin bump never leaves eslint unable to start', () => {
     // the pre-2.0 connections shape (names only) is what broke eslint in a product repo after a pin bump
-    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: ['primary', 'agentos'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
-    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] } })));
+    assert.throws(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: ['primary', 'agentos'] } })), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
+    assert.doesNotThrow(() => validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] } })));
   });
 });
 
@@ -400,11 +400,14 @@ describe('the be side tool configuration', () => {
 });
 
 describe('the package.json scripts of the app', () => {
-  it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start and migrate per app', () => {
+  it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start per app and the cli', () => {
     const scripts = scriptsOf();
-    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'format', 'format:check', 'lint', 'lint:fix', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
-    assert.equal(scripts.migrate, 'node be/dist/apps/migrate/src/main.js');
+    assert.equal(scripts.cli, 'node be/dist/apps/cli/src/main.js', 'the cli app runs a command: npm run cli -- <group> <command>');
+    assert.equal(scripts.migrate, undefined, 'no connection, nothing to migrate');
+    const withDb = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }));
+    assert.equal(withDb.migrate, 'node be/dist/apps/cli/src/main.js migrate run', 'a back end with a connection migrates through the cli migrate command');
     assert.equal(scripts['dev:be'], 'cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/core/src/main.ts');
     assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && turbo run dev --filter=@nivo/app', 'turbo runs the workspace @<project>/<app> after the packages it imports');
     assert.equal(scripts['start:app'], 'npm run start -w @nivo/app');
@@ -426,12 +429,12 @@ describe('the package.json scripts of the app', () => {
     assert.deepEqual(graph.tasks.build.dependsOn, ['^build']);
     assert.deepEqual(Object.keys(graph.tasks).sort(), ['build', 'dev', 'lint', 'typecheck']);
   });
-  it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
+  it('one api app and one Next app take the unsuffixed dev scripts; every api and worker app gets a start script, the cli app the cli script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
     assert.equal(one['dev:fe'], 'npm run codegen --silent && turbo run dev --filter=@nivo/web');
-    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] } }));
-    assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:admin', 'start:app', 'start:core', 'start:jobs']);
-    assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"start:x": "node be\/dist\/apps\/x\/src\/main\.js",/);
+    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'order', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }));
+    assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate|cli)/.test(name)).sort(), ['cli', 'migrate', 'start:admin', 'start:app', 'start:core', 'start:jobs', 'start:order']);
+    assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"cli": "node be\/dist\/apps\/x\/src\/main\.js",/);
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t);
@@ -589,10 +592,10 @@ describe('hfs scaffold app: the first tree', () => {
     assert.deepEqual(sources.filter(file => /process\.env/.test(read(root, file))), ['be/src/modules/platform/config/env-source.config.ts'], 'process.env is read only by platform/config');
     assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron|new Date\(\)|Date\.now/.test(read(root, file)) || file === 'be/src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
     assert.match(read(root, 'be/src/modules/platform/logging/logging.log-events.ts'), /export enum LoggingLogEvent/);
-    const door = read(root, 'be/src/features/system-health/transport/http/live.controller.ts');
+    const door = read(root, 'be/src/features/api/system-health/transport/http/live.controller.ts');
     assert.match(door, /@Get\("live"\)\s*@Public\(\{ reason: PublicReason\.Health \}\)[\s\S]*this\.queryBus\.execute\(new CheckLivenessQuery/);
     assert.doesNotMatch(door, /EntityManager|HealthCheckService|\bif \(/, 'a door injects the bus only and branches never');
-    assert.match(read(root, 'be/src/features/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
+    assert.match(read(root, 'be/src/features/api/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
     const module = read(root, 'be/apps/api/src/app.module.ts');
     assert.match(module, /static register\(options: ApiOptions\): DynamicModule/);
     assert.match(module, /APP_FILTER, useClass: ErrorsFilter[\s\S]*APP_GUARD, useClass: RateLimitGuard[\s\S]*APP_GUARD, useClass: OriginGuard[\s\S]*APP_GUARD, useClass: AuthGuard/, 'throttler, then the CSRF origin guard, then AuthGuard');

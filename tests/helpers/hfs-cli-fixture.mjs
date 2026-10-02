@@ -72,11 +72,11 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
     }
     put(`${base}/src/app/health/live/route.ts`, `${entries.map((p) => `import '../../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\nexport const app_${app.name.replace(/-/g, '_')} = 1;\n`);
   }
-  put('be/src/features/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
-  put('be/src/features/orders/orders.module.ts', 'export {};\n');
-  put('be/src/features/orders/application/place-order.handler.ts', 'export {};\n');
+  put('be/src/features/api/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
+  put('be/src/features/api/orders/orders.module.ts', 'export {};\n');
+  put('be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n');
   // The machine judges reachability: the app composes the feature and every required module, so a clean app is clean to it too.
-  const owners = ['src/features/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
+  const owners = ['src/features/api/orders/index.ts', ...required.filter((p) => /^be\/src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p)).map((p) => p.slice('be/'.length))];
   // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
   write('be/src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
   write('be/src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');

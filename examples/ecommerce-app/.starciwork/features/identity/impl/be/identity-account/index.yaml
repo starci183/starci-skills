@@ -9,7 +9,7 @@ owners:
   - {role: module, path: be/src/modules/integrations/order-api}
   - {role: module, path: be/src/modules/integrations/keycloak}
   - {role: module, path: be/src/modules/integrations/keycloak-admin}
-  - {role: feature, path: be/src/features/identity}
+  - {role: feature, path: be/src/features/api/identity}
 proves: [br.identity.sign-in, fr.identity.sign-in, contract.identity.internal.sessions, contract.identity.health]
 
 change:

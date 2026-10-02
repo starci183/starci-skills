@@ -21,7 +21,7 @@ function writeFiles(root, files) {
   }
 }
 
-// Owners are derived: src/features/orders is an owner exactly when it has an index.ts entry. `owners: false` leaves the entry out.
+// Owners are derived: src/features/api/orders is an owner exactly when it has an index.ts entry. `owners: false` leaves the entry out.
 function fixture(t, files, { owners = true } = {}) {
   const root = tempSide(t, 'starci-architecture-contracts-');
   writeFiles(root, {
@@ -36,7 +36,7 @@ function fixture(t, files, { owners = true } = {}) {
     'node_modules/@nestjs/graphql/package.json': '{"name":"@nestjs/graphql","types":"index.d.ts"}',
     'node_modules/@nestjs/graphql/index.d.ts': 'export declare function Resolver():ClassDecorator;',
     ...files,
-    ...(owners ? {} : { 'src/features/orders/index.ts': null }),
+    ...(owners ? {} : { 'src/features/api/orders/index.ts': null }),
   });
   return root;
 }
@@ -50,7 +50,7 @@ function check(root) {
 
 test('accepts named callable contracts, inherited execute contracts, readonly injection, and readonly messages', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { CreateOrderCommand } from './application/create-order.command';
 export { CreateOrderHandler } from './application/create-order.handler';
 export { CreateOrderUseCase } from './application/create-order.use-case';
@@ -58,14 +58,14 @@ export { FindOrdersUseCase } from './application/find-orders.use-case';
 export type { OrderPort } from './application/order.port';
 export { createOrdersModule } from './orders.module-definition';
 `,
-    'src/features/orders/application/contracts.ts': `
+    'src/features/api/orders/application/contracts.ts': `
 export interface CreateOrderParams { readonly sku:string }
 export interface CreateOrderResult { readonly id:string }
 export interface FindOrdersParams { readonly accountId:string }
 export interface FindOrdersResult { readonly ids:ReadonlyArray<string> }
 `,
-    'src/features/orders/application/repository.ts': 'export interface OrderRepository { save(params:import("./contracts").CreateOrderParams):Promise<import("./contracts").CreateOrderResult> }',
-    'src/features/orders/application/create-order.use-case.ts': `
+    'src/features/api/orders/application/repository.ts': 'export interface OrderRepository { save(params:import("./contracts").CreateOrderParams):Promise<import("./contracts").CreateOrderResult> }',
+    'src/features/api/orders/application/create-order.use-case.ts': `
 import { Injectable } from '@nestjs/common';
 import type { CreateOrderParams,CreateOrderResult } from './contracts';
 import type { OrderRepository } from './repository';
@@ -75,19 +75,19 @@ import type { OrderRepository } from './repository';
   execute(params:CreateOrderParams):Promise<CreateOrderResult>{return this.repository.save(params)}
 }
 `,
-    'src/features/orders/application/find-orders.use-case.ts': `
+    'src/features/api/orders/application/find-orders.use-case.ts': `
 import type { FindOrdersParams,FindOrdersResult } from './contracts';
 class BaseUseCase<P,R>{ execute(_params:P):Promise<R>{throw new Error('abstract behavior')} }
 export class FindOrdersUseCase extends BaseUseCase<FindOrdersParams,FindOrdersResult>{}
 `,
-    'src/features/orders/application/order.port.ts': `
+    'src/features/api/orders/application/order.port.ts': `
 import type { FindOrdersParams,FindOrdersResult } from './contracts';
 export interface OrderPort { find(params:FindOrdersParams):Promise<FindOrdersResult> }
 `,
-    'src/features/orders/application/create-order.command.ts': `
+    'src/features/api/orders/application/create-order.command.ts': `
 export class CreateOrderCommand { constructor(public readonly sku:string){} }
 `,
-    'src/features/orders/application/create-order.handler.ts': `
+    'src/features/api/orders/application/create-order.handler.ts': `
 import { CommandHandler } from '@nestjs/cqrs';
 import { CreateOrderCommand } from './create-order.command';
 import { CreateOrderUseCase } from './create-order.use-case';
@@ -97,7 +97,7 @@ import type { CreateOrderResult } from './contracts';
   execute(command:CreateOrderCommand):Promise<CreateOrderResult>{return this.useCase.execute(command)}
 }
 `,
-    'src/features/orders/orders.module-definition.ts': `
+    'src/features/api/orders/orders.module-definition.ts': `
 export const createOrdersModule=(options:{endpoint:string})=>({module:'orders',options});
 `,
   });
@@ -114,7 +114,7 @@ export const createOrdersModule=(options:{endpoint:string})=>({module:'orders',o
 
 test('rejects inline or inferred public contracts and mutable dependency or message fields without treating DTOs as messages', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { BadCapability } from './application/bad.service';
 export { InlineInheritedUseCase } from './application/inline-inherited.use-case';
 export { MutableAssignedService, ValidAssignedService } from './application/injection.service';
@@ -122,31 +122,31 @@ export { ChangeOrderCommand } from './application/change-order.command';
 export { ChangeOrderHandler } from './application/change-order.handler';
 export { MutableInput } from './transport/http/mutable.input';
 `,
-    'src/features/orders/application/bad.service.ts': `
+    'src/features/api/orders/application/bad.service.ts': `
 export class BadCapability {
   run(input:{readonly value:string}) { return {value:input.value} }
   static build(input:{readonly value:string}) {return input}
   get transform(){return (input:{readonly value:string})=>({value:input.value})}
 }
 `,
-    'src/features/orders/application/inline-inherited.use-case.ts': `
+    'src/features/api/orders/application/inline-inherited.use-case.ts': `
 class BaseUseCase<P,R>{ execute(_params:P):Promise<R>{throw new Error('base')} }
 export class InlineInheritedUseCase extends BaseUseCase<{readonly id:string},{readonly ok:boolean}>{}
 `,
-    'src/features/orders/application/injection.service.ts': `
+    'src/features/api/orders/application/injection.service.ts': `
 import { Injectable } from '@nestjs/common';
 class Repository{}
 @Injectable() export class MutableAssignedService { private repository:Repository; constructor(repository:Repository){this.repository=repository} }
 @Injectable() export class ValidAssignedService { private readonly repository:Repository; constructor(repository:Repository){this.repository=repository} }
 `,
-    'src/features/orders/application/change-order.command.ts': `
+    'src/features/api/orders/application/change-order.command.ts': `
 export class ChangeOrderCommand { constructor(public id:string){} }
 `,
-    'src/features/orders/application/change-order.handler.ts': `
+    'src/features/api/orders/application/change-order.handler.ts': `
 import { CommandHandler } from '@nestjs/cqrs'; import { ChangeOrderCommand } from './change-order.command';
 @CommandHandler(ChangeOrderCommand) export class ChangeOrderHandler { execute(command:ChangeOrderCommand):Promise<void>{void command;return Promise.resolve()} }
 `,
-    'src/features/orders/transport/http/mutable.input.ts': 'export class MutableInput { value!:string }',
+    'src/features/api/orders/transport/http/mutable.input.ts': 'export class MutableInput { value!:string }',
   });
   const result = check(root);
   const contracts = result.violations.filter(item => item.ruleId === PUBLIC_CONTRACT_RULE_ID);
@@ -165,14 +165,14 @@ import { CommandHandler } from '@nestjs/cqrs'; import { ChangeOrderCommand } fro
 
 test('fails coverage closed for undeclared owners and constructed or dynamically stored dependency/message identity', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': 'export { HiddenService } from "./application/hidden.service";',
-    'src/features/orders/application/hidden.service.ts': `
+    'src/features/api/orders/index.ts': 'export { HiddenService } from "./application/hidden.service";',
+    'src/features/api/orders/application/hidden.service.ts': `
 import { Injectable } from '@nestjs/common';
 const make=()=>Injectable; const Wrapped=make(); class Repository{}
 @Wrapped() export class HiddenService { constructor(repository:Repository){Object.assign(this,{repository})} }
 @Injectable() export class StoredService { constructor(repository:Repository){Object.assign(this,{repository})} }
 `,
-    'src/features/orders/application/object-wrapped.service.ts': `
+    'src/features/api/orders/application/object-wrapped.service.ts': `
 import { Injectable } from '@nestjs/common'; const Nest={Injectable}; class Repository{}
 @Nest.Injectable() export class ObjectWrappedService { constructor(private repository:Repository){} }
 `,
@@ -187,8 +187,8 @@ import { Injectable } from '@nestjs/common'; const Nest={Injectable}; class Repo
 
 test('does not certify public contracts when an applicable backend source is outside declared owner roots', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': 'export { OrdersCapability } from "./application/orders.service";',
-    'src/features/orders/application/orders.service.ts': 'export class OrdersCapability { count():number{return 0} }',
+    'src/features/api/orders/index.ts': 'export { OrdersCapability } from "./application/orders.service";',
+    'src/features/api/orders/application/orders.service.ts': 'export class OrdersCapability { count():number{return 0} }',
     'src/modules/catalog/catalog.service.ts': 'export class CatalogCapability { find(id:string):string{return id} }',
   });
   const result = check(root);
@@ -200,14 +200,14 @@ test('does not certify public contracts when an applicable backend source is out
 
 test('handles optional contracts while failing closed on unknown types, dynamic storage, aliases, and class expressions', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { AnyCapability, OptionalCapability } from './application/contracts.service';
 export { AliasStorage, DynamicStorage, MutableAliasStorage } from './application/storage.service';
 export { CoalescedStorage, DefinePropertyStorage, DestructureStorage, IdentityStorage, PrimitiveProjection, ObjectAssignAlias, ReflectStorage } from './application/derived-storage.service';
 export { ExpressionService } from './application/expression.service';
 export { UpdateOrderCommand, UpdateOrderHandler } from './application/update-order.handler';
 `,
-    'src/features/orders/application/contracts.service.ts': `
+    'src/features/api/orders/application/contracts.service.ts': `
 export interface NamedParams {readonly id:string} export interface OtherParams {readonly key:string}
 export class AnyCapability { run(input:any):unknown{return input} }
 export class OptionalCapability {
@@ -216,13 +216,13 @@ export class OptionalCapability {
   bad(input?:NamedParams|OtherParams):number{return input?1:0}
 }
 `,
-    'src/features/orders/application/storage.service.ts': `
+    'src/features/api/orders/application/storage.service.ts': `
 import { Injectable } from '@nestjs/common'; class Repository{}
 @Injectable() export class AliasStorage {private readonly repository:Repository;constructor(repository:Repository){const self=this;self.repository=repository}}
 @Injectable() export class DynamicStorage {constructor(repository:Repository){const key='repository';this[key]=repository}}
 @Injectable() export class MutableAliasStorage {constructor(repository:Repository){let self=this;self.repository=repository}}
 `,
-    'src/features/orders/application/derived-storage.service.ts': `
+    'src/features/api/orders/application/derived-storage.service.ts': `
 import { Injectable } from '@nestjs/common';
 class Repository { readonly timeoutMs=100 }
 const identity=<T>(value:T):T=>value;
@@ -234,11 +234,11 @@ const identity=<T>(value:T):T=>value;
 @Injectable() export class DefinePropertyStorage {private repository!:Repository;constructor(repository:Repository){Object.defineProperty(this,'repository',{value:repository})}}
 @Injectable() export class DestructureStorage {private repository!:Repository;constructor(repository:Repository){({repository:this.repository}={repository})}}
 `,
-    'src/features/orders/application/expression.service.ts': `
+    'src/features/api/orders/application/expression.service.ts': `
 import { Injectable } from '@nestjs/common'; import type { NamedParams } from './contracts.service'; class Repository{}
 export const ExpressionService=@Injectable() class {constructor(private repository:Repository){} run(input:NamedParams):number{return input.id.length}}
 `,
-    'src/features/orders/application/update-order.handler.ts': `
+    'src/features/api/orders/application/update-order.handler.ts': `
 import { CommandHandler } from '@nestjs/cqrs';
 export class UpdateOrderCommand {constructor(input:{id:string}){const self=this;Object.assign(self,input)}}
 @CommandHandler(UpdateOrderCommand) export class UpdateOrderHandler {execute(_command:UpdateOrderCommand):void{}}
@@ -285,23 +285,23 @@ declare global {
 }
 export {};
 `,
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { NotOwnerException } from './application/not-owner.exception';
 export { LeakyException } from './application/leaky.exception';
 `,
-    'src/features/orders/application/abstract.exception.ts': `
+    'src/features/api/orders/application/abstract.exception.ts': `
 export abstract class AbstractException extends Error {
   constructor(message:string){super(message)}
 }
 `,
-    'src/features/orders/application/not-owner.exception.ts': `
+    'src/features/api/orders/application/not-owner.exception.ts': `
 import { AbstractException } from './abstract.exception';
 export class NotOwnerException extends AbstractException {
   constructor(){super('not owner')}
   reason():string{return 'not-owner'}
 }
 `,
-    'src/features/orders/application/leaky.exception.ts': `
+    'src/features/api/orders/application/leaky.exception.ts': `
 import { AbstractException } from './abstract.exception';
 export class LeakyException extends AbstractException {
   constructor(){super('leaky')}
@@ -320,10 +320,10 @@ export class LeakyException extends AbstractException {
 
 test('classifies a boolean return as a primitive rather than an inline union', t => {
   const root = fixture(t, {
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { PingCapability } from './application/ping.service';
 `,
-    'src/features/orders/application/ping.service.ts': `
+    'src/features/api/orders/application/ping.service.ts': `
 export class PingCapability {
   ping():boolean{return true}
   isReady(flag:boolean):boolean{return flag}
@@ -339,10 +339,10 @@ test('an owner export whose target the compiler cannot resolve (no declaration) 
   // `export { Missing }` of a module that has no such export resolves to the compiler's unknown symbol, which has no
   // declarations; the public contract walk once read `.filter` of that undefined list and stopped every project-graph rule.
   const root = fixture(t, {
-    'src/features/orders/index.ts': `
+    'src/features/api/orders/index.ts': `
 export { PingCapability, Missing } from './application/ping.service';
 `,
-    'src/features/orders/application/ping.service.ts': `
+    'src/features/api/orders/application/ping.service.ts': `
 export class PingCapability {
   ping():boolean{return true}
 }

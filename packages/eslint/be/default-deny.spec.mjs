@@ -3,8 +3,8 @@ import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { noUntypedBody, publicNeedsReason } from "./default-deny.mjs"
 
 const tester = typedTester()
-const CONTROLLER = at("src/features/plan/transport/http/create-plan.controller.ts")
-const RESOLVER = at("src/features/plan/transport/graphql/create-plan.resolver.ts")
+const CONTROLLER = at("src/features/api/plan/transport/http/create-plan.controller.ts")
+const RESOLVER = at("src/features/api/plan/transport/graphql/create-plan.resolver.ts")
 
 test("a body or argument is typed, never unknown, any or GraphQLJSON", () => {
     tester.run("no-untyped-body", noUntypedBody, {
@@ -53,7 +53,7 @@ test("an open door states why it is open, with a PublicReason member of domain/i
             { filename: CONTROLLER, code: "enum PublicReason { Health = 'h' }\nclass C { @Public({ reason: PublicReason.Health }) hook() {} }", errors: [{ messageId: "reason" }] },
             { filename: CONTROLLER, code: "enum Other { Health = 'h' }\nclass C { @Public({ reason: Other.Health }) hook() {} }", errors: [{ messageId: "reason" }] },
             // a spec is not exempt
-            { filename: at("src/features/plan/transport/http/create-plan.controller.spec.ts"), code: "class C { @Public() hook() {} }", errors: [{ messageId: "reason" }] },
+            { filename: at("src/features/api/plan/transport/http/create-plan.controller.spec.ts"), code: "class C { @Public() hook() {} }", errors: [{ messageId: "reason" }] },
         ],
     })
 })

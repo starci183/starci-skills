@@ -13,7 +13,7 @@ The front end, shaped like `nivo-fe`, serves one deployable Next.js app per `fe/
 | app               | what it is                                          |
 | ----------------- | --------------------------------------------------- |
 | `fe/apps/landing` | Public marketing site + catalogue teaser            |
-| `fe/apps/shop`    | Authenticated shop: browse, cart, checkout, account |
+| `fe/apps/app`     | Authenticated shop: browse, cart, checkout, account |
 
 The apps are real, runnable Next.js builds on `@starci/grammar` primitives (the same Common family the todo app
 consumes): grammar's `GrammarRoot` boundary wraps each app's client shell, and every surface maps to a real grammar
@@ -42,7 +42,7 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
   i18n, logging, clock, primitives (Outcome), probes.
 - `be/src/modules/integrations`: cache (Redis), identity-api and order-api (each service calls the other over GraphQL).
 - Unit specs exist only as `<name>.service.spec.ts` beside each `<name>.service.ts`. `be/src/tests`: `fixtures/builders/<area>.builder.ts` (test data), `e2e/` and `integration/` (the real world), `world/` (test infrastructure).
-- `fe/apps/landing/src`: the public marketing app; `fe/apps/shop/src`: the authenticated shop app. The front end has no tests.
+- `fe/apps/landing/src`: the public marketing app; `fe/apps/app/src`: the authenticated shop app. The front end has no tests.
 - `fe/packages/ecommerce-api`: the wire client, the `Outcome` union and the back-end projection reader.
 - `fe/packages/ecommerce-i18n`: locales, routing, navigation and the server glue (request config, proxy, locale segment).
 - `fe/packages/ecommerce-ui`: the shared composites and leaves both apps draw (shells, notices, tiles, display controls).
@@ -77,11 +77,11 @@ evidence retains its recorded revisions; the derived index reports stale proof w
 
 Every runtime value of the back end comes from the process environment through `EnvSource`;
 `.starcistacks/dev/runtime/env/KEYS.md` lists the keys. The product's resolved runtime projection is
-**`.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.shop`, `ports.identityApi`, `ports.orderApi`), the
+**`.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.app`, `ports.identityApi`, `ports.orderApi`), the
 port map the front end reads. No port literal exists in the front end:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
-  `node scripts/serve.mjs <landing|shop> <dev|start>`.
+  `node scripts/serve.mjs <landing|app> <dev|start>`.
 - `fe/packages/ecommerce-api/src/projection.ts` resolves the file for both apps' service base URLs; each app's
   `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_METADATA` names the file outright, else the

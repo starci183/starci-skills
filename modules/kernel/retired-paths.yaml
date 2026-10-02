@@ -159,9 +159,11 @@ retired:
   - {path: packages/hfs/sync/skeleton.mjs, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/scaffold/app.mjs: the app scaffold writes the skeleton (the per-app Next tsconfig from code)'}
   - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/ci.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
   - {path: packages/hfs/templates/be/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-10-01, removedIn: c0-apphfs, replacedBy: 'packages/hfs/templates/app: one app CI at the app root'}
-  - {path: examples/todo-app-backend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/README.md (the todo app examples merged into one hfs 4 app: be/ and fe/ under one root)'}
-  - {path: examples/todo-app-backend/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/be/docs/guides/testing.md'}
-  - {path: examples/todo-app-frontend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/todo-app/README.md (the todo app examples merged into one hfs 4 app: be/ and fe/ under one root)'}
+  - {path: examples/todo-app-backend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'the example app was deleted; examples/ecommerce-app is the only example app'}
+  - {path: examples/todo-app-backend/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'the example app was deleted; examples/ecommerce-app is the only example app'}
+  - {path: examples/todo-app-frontend/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'the example app was deleted; examples/ecommerce-app is the only example app'}
+  - {path: examples/todo-app/README.md, retiredAt: 2026-10-02, removedIn: c0-mono, replacedBy: 'the example app was deleted; examples/ecommerce-app is the only example app'}
+  - {path: examples/todo-app/be/docs/guides/testing.md, retiredAt: 2026-10-02, removedIn: c0-mono, replacedBy: 'the example app was deleted; examples/ecommerce-app/be/docs/guides/testing.md'}
   - {path: examples/ecommerce-app-be/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}
   - {path: examples/ecommerce-app-be/docs/guides/testing.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/be/docs/guides/testing.md'}
   - {path: examples/ecommerce-app-fe/README.md, retiredAt: 2026-10-01, removedIn: c0-ex, replacedBy: 'examples/ecommerce-app/README.md (the ecommerce examples merged into one hfs 4 app: be/ and fe/ under one root)'}
@@ -935,6 +937,7 @@ moved:
   - {from: scripts/example/example-ownership.mjs, to: scripts/work/record-ownership.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/example/example-render-proof.mjs, to: scripts/work/render-proof.mjs, movedIn: C4, quiesced: false}
   - {from: scripts/kernel/status/view.mjs, to: scripts/kernel/verbs/shared/status-view.mjs, movedIn: C6, quiesced: false}
+  - {from: knowledge/patterns/be/cqrs.yaml, to: knowledge/patterns/be/api.yaml, movedIn: MONO, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
 # staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
 # deletes the symbol.

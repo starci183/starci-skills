@@ -142,7 +142,7 @@ guidance:
   - id: STACK-EVIDENCE
     requirement: |
       Read docs/application-stacks.md, docs/application-stacks-vps.md and the synthetic kit
-      examples/todo-app/.starcistacks. Author .starcistacks/application-stacks.yaml against
+      examples/ecommerce-app/.starcistacks. Author .starcistacks/application-stacks.yaml against
       modules/schemas/application-stacks.schema.yaml. Declare dev docker-compose and VPS docker-swarm.
       Render the actual deployment model with docker compose config or docker stack config and run the
       `starci-stacks-check` machine — `checkApplicationStacks({repoRoot, environment, deploymentModelFile})`

@@ -2,9 +2,10 @@ schema: starci/knowledge-source@1
 id: be.transport
 title: Backend transport
 purpose: |-
-  Given a door into the application (GraphQL, HTTP, WebSocket, schedule, message, CLI), how is it written? A transport
-  maps its input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else,
-  returns no envelope and takes no `GraphQLJSON`.
+  Given a door into an api feature (GraphQL, HTTP, WebSocket, schedule, message), how is it written? A transport maps its
+  input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else, returns no
+  envelope and takes no `GraphQLJSON`. The transport folders live under `src/features/api/<feature>/transport/<protocol>/`
+  (api.yaml). A cli command is not a transport: it is an action runner (cli.yaml).
 appliesTo:
   - backend
 family: be
@@ -61,7 +62,7 @@ rules:
       A transport file may import its feature's `application/` messages and contracts, `platform/*`, the public decorators of
       `domain/identity` and its own `dto/`. It injects only `InjectCommandBus` / `InjectQueryBus` (and `InjectRequestLocale`
       for REST content negotiation): no EntityManager, no domain service, no logic beyond mapping. Every transport handler
-      (resolver method, controller action, gateway handler, consumer, job, cli) dispatches exactly one command or query. A
+      (resolver method, controller action, gateway handler, consumer, job) dispatches exactly one command or query. A
       refusal in the result becomes a throw only here, with `unwrapOutcome(outcome, <C>Error)`.
     rationale: |-
       A transport that reaches the database or a service can bypass the handler's authorization and its transaction, and a
@@ -98,7 +99,7 @@ rules:
       manual: []
     relatedExamples: []
   - id: BE-TRANSPORT-4
-    title: REST, WebSocket, schedule, message and CLI have one shape each
+    title: REST, WebSocket, schedule and message have one shape each
     kind: mandatory
     hfsRules: [R88, R89, R46, R90]
     requirement: |-
@@ -107,14 +108,14 @@ rules:
       passthrough except a byte stream. WebSocket: `transport/websocket/<channel>.gateway.ts`, the handshake authenticated by
       `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Schedule:
       `transport/schedule/<job>.job.ts` (background.yaml). Message: `transport/message/<event>.consumer.ts`
-      (background.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
-      kind `cli`.
+      (background.yaml). An http, graphql or websocket module is composed only by an api app; a schedule or message module by
+      the api app that owns it or by a worker app (R46).
     rationale: |-
       Each protocol has one place and one shape, so an app composes exactly the transports it serves.
     cases:
       - id: case-1
         when: A health probe
-        write: 'features/health/transport/http/health.controller.ts is `@Public({ reason: PublicReason.Health })` and dispatches CheckHealthQuery.'
+        write: 'features/api/health/transport/http/health.controller.ts is `@Public({ reason: PublicReason.Health })` and dispatches CheckHealthQuery.'
     verification:
       automated:
         - BE_TRANSPORT_SHAPE
@@ -152,7 +153,7 @@ rules:
               "sales.policy@1": query<SalesPolicyAsk, SalesPolicyView, "DENIED" | "INVALID">(),
               "sales.close@1": mutation<SalesCloseAsk, SalesOpportunityView>(),
           })
-          // features/sales/transport/http/operations.controller.ts
+          // features/api/sales/transport/http/operations.controller.ts
           @Post("operations")
           async invoke(@Body() request: OperationRequest<typeof OPERATIONS>): Promise<OperationReply<typeof OPERATIONS>> { ... }
     verification:
