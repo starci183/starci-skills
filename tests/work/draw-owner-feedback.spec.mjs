@@ -25,7 +25,14 @@ import { checkDirection } from '../../scripts/work/brand/brand.mjs';
 import { autoAcceptDecision } from '../../scripts/machine/ask-recommendation.mjs';
 import { answerDrawReviewByReply, autoAcceptAsk, drawReplyDecision } from '../../scripts/kernel/ask-server.mjs';
 import { loadWorkSchemaValidators } from '../../scripts/work/validate/check-work-schemas.mjs';
-import { translator } from '../../scripts/lib/i18n.mjs';
+import { translate, translator } from '../../scripts/lib/i18n.mjs';
+
+/** One block of the notice in `language`, rendered from the same catalog production reads; it must differ from the English source. */
+const ownerBlock = (en, vars, language) => {
+  const text = translate(en, vars, { language });
+  assert.notEqual(text, translate(en, vars, { language: 'en' }), `the catalog translates the block into ${language}`);
+  return text;
+};
 
 const trv = translator('vi');
 
@@ -197,7 +204,8 @@ test('a redraw that does not address an owner note fails DRAW_FEEDBACK_UNADDRESS
   assert.match(again.text, /Round 2; this redraw addresses your notes/);
   const againVi = drawReviewQuestion(p.dir, { lang: 'vi' });
   assert.deepEqual([againVi.review.round, againVi.review.addresses], [2, ids]);
-  assert.match(againVi.text, /Vòng 2; bản vẽ lại này xử lý các ghi chú/, 'the round-2 block is present in the owner language too');
+  const roundVi = ownerBlock(' Round {n}; this redraw addresses your notes: {notes}.', { n: 2, notes: '@@' }, 'vi').split('@@')[0];
+  assert.ok(againVi.text.includes(roundVi), 'the round-2 block is present in the owner language too');
 });
 
 test('the owner accept promotes the drawing into brand.direction.golden with its receipt; an automatic answer never does', async (t) => {
@@ -260,7 +268,8 @@ test('a product-direction note persists into brand.direction.learned as proposed
   const dq = directionReviewQuestion(p.work, { archetype: 'list', lang: 'en' });
   assert.deepEqual(dq.review.learned, [learned[0].id]);
   assert.match(dq.text, /Rulings learned from your draw feedback/);
-  assert.match(directionReviewQuestion(p.work, { archetype: 'list', lang: 'vi' }).text, /Quy tắc rút ra từ góp ý vẽ của chủ dự án/, 'the learned block is present in the owner language too');
+  const learnedPrefix = ownerBlock(' Rulings learned from your draw feedback (accepted with this answer): {list}.', { list: '@@' }, 'vi').split('@@')[0];
+  assert.ok(directionReviewQuestion(p.work, { archetype: 'list', lang: 'vi' }).text.includes(learnedPrefix), 'the learned block is present in the owner language too');
   const dirReceipt = path.join(p.work, 'kernel-evidence', WF, 'serve-ask', 'answer-direction.json');
   fs.writeFileSync(dirReceipt, JSON.stringify({ schema: 'starci/ask-answer@1', workflowId: WF, dispatchId: 'ctx_dir', opId: 'brand.decide', optionIndex: 0, answeredBy: 'owner', at: '2026-09-27T13:00:00.000Z', review: dq.review }));
   applyDirectionReview(p.work, dirReceipt, { write: true });
