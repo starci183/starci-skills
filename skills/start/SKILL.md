@@ -37,7 +37,7 @@ Executable: `.claude/scripts/reconciler/start.mjs` (also `starci reconciler up`)
 2. What an apply run does, in order: preflight (Node bundles SQLite >= 3.51.3; machine.sqlite and every registered ledger quick_check; temp/test, missing-repo or
    missing-file registered ledgers; legacy in-repo `.starciwork/runtime.sqlite`; kernel/supervisor pins whose model the agent
    card cannot attest; Orca reachable) -> (with `--set-profile` only: writes the profile to config.yaml; operational = job, host, workflow,
-   resource active; gc, fleet, learning shadow) -> rebuilds `ui/dist`
+   resource active; gc, workers, learning shadow) -> rebuilds `ui/dist`
    when a ui source is newer -> starts the reconciler engine (restarts it out of `--safe` when no real crash loop is on
    record) -> starts every service that is down -> the Supervisor seat (`supervisor.mode: kernel` only) and every running
    workflow's Kernel seat.

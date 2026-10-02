@@ -3,7 +3,7 @@
 // push-scan-test-secrets-encrypted, 2026-09-28: they work exactly like the stack custody and a plaintext password is never pushed).
 // There is no store of the runtime's own: a test credential lives at `<repo>/.starcistacks/<stack>/secrets/test/<name>`,
 // its plaintext git-ignored by the repo's `.starcistacks/**` rules and only the sops-encrypted twin `<name>.enc`
-// committed. It is written with the repository's existing command (`node scripts/stack-secret.mjs set
+// committed. It is written with the repository's existing command (`node <repo>/scripts/stack-secret.mjs set
 // <stack>/secrets/test/<name>`, npm run secret:set), which encrypts against the recipients `.sops.yaml` names and
 // removes the plaintext; this module only READS: the local plaintext when present, else the `.enc` decrypted by sops
 // with the shared age identity (SOPS_AGE_KEY_FILE, default ~/.starci/master.identity) into memory.

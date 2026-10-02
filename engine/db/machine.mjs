@@ -50,7 +50,7 @@ const MACHINE_BUSY_TIMEOUT_MS = 15000;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
-export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning']);
+export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'workers', 'learning']);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Paths
@@ -606,8 +606,8 @@ function forEachLedger(m, fn, { state = 'active' } = {}) {
   return out;
 }
 /** Manual queries only: ATTACH up to 9 ledgers read-only to this handle as l0..l8. Returns the attached names. */
-function attachFleet(m, ledgers = listLedgers(m)) {
-  need(ledgers.length <= 9, 'attachFleet: at most 9 ledgers per batch');
+function attachLedgers(m, ledgers = listLedgers(m)) {
+  need(ledgers.length <= 9, 'attachLedgers: at most 9 ledgers per batch');
   return ledgers.map((l, i) => { m.db.exec(`ATTACH DATABASE ${JSON.stringify(pathToFileURL(l.file).href + '?mode=ro')} AS l${i}`); return { alias: `l${i}`, ...l }; });
 }
 
@@ -1445,7 +1445,7 @@ function snake(obj) {
 const API = {
   insert: (m, table, row, opts) => insertRow(m.db, table, row, opts), upsert: (m, table, row, keys) => upsertRow(m.db, table, row, keys), update: (m, table, set, where) => updateRow(m.db, table, set, where),
   putMachineBlob, jsonOrBlob, meta, checkpoint,
-  registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet,
+  registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachLedgers,
   supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases,
   startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport,
   openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed,
@@ -1469,7 +1469,7 @@ const API = {
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
-export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics, recordArchive };
+export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachLedgers, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics, recordArchive };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;
 

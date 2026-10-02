@@ -9,6 +9,9 @@ appliesTo:
   - backend
   - frontend
 family: repo
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [app.starciwork]
 provenance:
   reviewedAt: 2026-09-29
   sources:
@@ -23,7 +26,7 @@ rules:
   - id: REPO-WORK-1
     title: Product records only
     kind: mandatory
-    hfsRules: [R07, R01]
+    hfsRules: [R07, R01, R105]
     requirement: |
       The app root's `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
@@ -56,6 +59,7 @@ rules:
         - HFS_MODULE_TIER_INVALID
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
+        - HFS_PROOF_COMMAND_FILE_MISSING
       manual:
         - starci runtime validate <app>/.starciwork passes.
     relatedExamples: []

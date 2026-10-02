@@ -3,7 +3,7 @@ id: be.function
 title: Backend function
 purpose: |-
   Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS responsibility pattern. Read
-  docs/backend-source-pattern.md for the coherent layout, code forms and verification limits, and api.yaml for the message
+  docs/architecture.md for the coherent layout, code forms and verification limits, and api.yaml for the message
   and handler shapes.
 appliesTo:
   - backend
@@ -13,7 +13,7 @@ provenance:
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/fundamentals/dynamic-modules
     - https://docs.nestjs.com/techniques/validation

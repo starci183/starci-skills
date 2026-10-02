@@ -143,14 +143,14 @@ The upload authenticates with GitHub's OIDC token: the managed `ci.yml` job has 
 ## Maintaining the bundle
 
 `runtime/` is a byte copy of the slot loader files, the pins, and the import closure of `scripts/hfs/check.mjs` and
-`scripts/hfs/architecture.mjs` (computed by `scripts/sync-runtime.mjs`, so a new import of the machine is bundled without
+`scripts/hfs/architecture.mjs` (computed by `scripts/hfs/sync-runtime.mjs`, so a new import of the machine is bundled without
 editing a list), plus the catalog slice of every code `starci app check` can emit: its own and the machine's (`ARCHITECTURE_RULE_IDS`,
 derived from the machine's rule id lists). After changing any of those files, `knowledge/hfs/slots.yaml`,
 `knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `starci release sync-runtime`;
 `tests/packages-hfs/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
 The examples gate `starci runtime check --only example-architecture` runs `starci app lint` of this CLI at the root of every `examples/*`
-app with an `hfs.json` (`examples/ecommerce-app`) and fails on any finding or any tool that could not run;
+app with an `hfs.json` (each `examples/<app>` root) and fails on any finding or any tool that could not run;
 `starci app check` alone would miss the machine's source rules, which the canons judge. It is heavy: run it once, by hand, after `npm ci`
 in each app.
 

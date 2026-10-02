@@ -265,19 +265,19 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   assert.equal(because(second,statusOf()).queuedBecause,'ready','a released fence and a settled sibling clear it');
 
   // pool-full: the persisted route decision names a pool whose declared
-  // maxParallel is already committed fleet-wide, across every workflow.
-  const pool='claude-agent',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','runtimes.yaml'),'utf8')).runtimes[pool].maxParallel;
+  // maxParallel is already committed worker-wide, across every workflow.
+  const pool='claude-agent',maxParallel=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','registry.yaml'),'utf8')).pools[pool].maxParallel;
   seed(repo,ledger=>{
     const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(second).payload_json);
     ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
     const at=Date.now();
-    ledger.ensureWorkflow({workflowId:'wf-other',title:'another workflow on the same fleet'});
+    ledger.ensureWorkflow({workflowId:'wf-other',title:'another workflow on the same host'});
     for(let n=1;n<=maxParallel;n++)seedOp(ledger,'wf-other',{jobId:`occupant-${n}`,opId:'docs.author',status:'running',
       payload:{opId:'docs.author',model:pool},createdAt:at+n});
   });
   const full=because(second,statusOf());
   assert.equal(full.queuedBecause,'pool-full');
-  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from runtimes.yaml');
+  assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from registry.yaml');
 
   // circuit-open outranks pool-full: a dead provider credential is not a wait.
   const machine=openMachine({file:process.env[TEST_REGISTRY_ENV]});
@@ -802,7 +802,7 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
   seed(repo,ledger=>moveJob(ledger,jobA,'succeeded'));
   assert.equal(runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
     'a settled sibling releases the slot');
-  // With no owner budget the fleet ceiling (runtimes.yaml maxParallelOps) admits alone.
+  // With no owner budget the worker ceiling (runtimes.yaml maxParallelOps) admits alone.
   const unbounded=ownerConfig(t,{budgets:{maxOps:null}});
   const third=runApiAsOwner(unbounded,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/c','--json');
   assert.equal(third.status,0,third.stderr);

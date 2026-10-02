@@ -45,7 +45,7 @@ const fixture=t=>{
     // Login: a queued phone job and a leased (in-flight) auth job - the current leg.
     workflow(LOGIN,'nivo-app-auth','running',[repo],[
       ['job-login-phone','interface.implement',['src/auth/phone'],'queued'],
-      ['job-login-auth','code.refactor',['src/auth','todo-app-fe/apps/login'],'leased',at+1000],
+      ['job-login-auth','code.refactor',['src/auth','shop-fe/apps/login'],'leased',at+1000],
       ['job-login-old','docs.author',['src/auth'],'succeeded'],
     ]);
     // Collab: one in-flight job, so its frontier is engaged and not actionable on its own.
@@ -85,7 +85,7 @@ test('peers lists every running workflow sharing a source root, with its current
   assert.equal(login.phase,'running');
   assert.deepEqual(login.currentLeg,{jobId:'job-login-auth',op:'code.refactor',status:'leased',attempt:1},'the in-flight job is the current leg');
   assert.deepEqual(login.ownedPaths.map(j=>[j.jobId,j.paths]).sort(),[
-    ['job-login-auth',['src/auth','todo-app-fe/apps/login']],['job-login-phone',['src/auth/phone']]],'settled jobs own nothing');
+    ['job-login-auth',['src/auth','shop-fe/apps/login']],['job-login-phone',['src/auth/phone']]],'settled jobs own nothing');
   assert.deepEqual(login.pending,{toPeer:[],fromPeer:[]});
 
   const sent=fx.ok(['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','phone verification','--body','Collab needs it']);

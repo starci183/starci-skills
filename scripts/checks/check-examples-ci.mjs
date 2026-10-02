@@ -14,7 +14,7 @@
 //
 //   starci runtime check --only examples-ci              check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   starci runtime check --only examples-ci -- --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
+//   starci runtime check --only examples-ci -- --matrix   the matrix as JSON (["<app>"]) for $GITHUB_OUTPUT
 //   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
 //   starci runtime check --only examples-ci -- --write    rewrite codecov.yml and each example's own codecov.yml, sonar-project.properties and be/jest.config.js from the render
 //

@@ -18,7 +18,7 @@ params:
     default: ''
     setBy: owner
     doc:
-      en: "Comma-separated canon-scan families (a canon law such as shape-slot, architecture, or a lint
+      en: "Comma-separated canon-scan families (a canon law such as drawing, architecture, or a lint
         plugin prefix) this slice drives to zero inside its owned paths; `all` names every family
         canon-scan reports and an empty value means the slice is no canon-conformance slice."
   canonWire:
@@ -47,7 +47,7 @@ sideEffects:
   - the declared regression and architecture checks run before and after in their declared sandbox
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done-or-exact-workspace-canonicalization-proposal-with-regression
   dispatch: never
 reads:
@@ -94,7 +94,7 @@ reads:
         topics for the selected repository.
   - id: machines
     path: scripts/gates/gate.mjs + scripts/hfs/architecture/*.mjs + modules/models/code-patterns.yaml +
-      docs/architecture-check.md
+      docs/architecture.md
     purpose:
       en: When the slice lives in a checked app (`be/` or `fe/`), read the sealed architecture and
         code-pattern machines' supported arguments, report schema, exit codes and coverage limits.
@@ -109,16 +109,13 @@ reads:
         repository's own lint config against this runtime's canon source plus the architecture check,
         the reference tree each family converges to and the law that publishes each rule.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
 writes:
   - id: node
@@ -164,16 +161,14 @@ writes:
         statement with the observed outputs, and any behavior difference found - which is a failure,
         not a refactor outcome."
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
 steps:
   - reads: [op-loop]
@@ -438,10 +433,10 @@ blockers:
         predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
   manifest-paths: Manifest and script files defining the declared regression check
-  write-ceiling: Explicit owned source paths
+  write-ceiling: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:

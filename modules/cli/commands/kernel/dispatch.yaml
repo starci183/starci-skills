@@ -207,7 +207,7 @@ refuses:
   - job-live-worker: queued row still has a connected+writable exact worker; starci kernel reconcile must reattach
       it before any new dispatch
   - job-no-op: the job row carries no op identity to dispatch
-  - model-unknown: no model profile at modules/models/profiles/<target>.yaml
+  - model-unknown: no pool or launch target named <target> in modules/models/registry.yaml (pools, targets)
   - "model-outside-order (field `reason`): the launch pool (--model, the persisted route or the
     unrouted default devin-agent) is outside the kind's order at its floor-raised tier
     (scripts/agent/models.mjs kindOrder; a cut slice walks the fan-out order); a profile target

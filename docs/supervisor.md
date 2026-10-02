@@ -1,9 +1,10 @@
+Owner: modules/supervisor/
 # Supervisor
 
 One Supervisor decision seat, `[Worker]` fix agents spawned on demand, and one land gate.
 `modules/supervisor/supervise.yaml` defines the seat and its authority. The single
 long-running host loop is `scripts/reconciler/engine.mjs`: its Job, Workflow,
-Resource, Host, GC, Fleet and Learning controllers perform deterministic duties
+Resource, Host, GC, Workers and Learning controllers perform deterministic duties
 and open Decision Items for the Supervisor when judgment is required.
 `modules/reconciler/reconciler.yaml` is the controller contract.
 
@@ -19,7 +20,7 @@ and open Decision Items for the Supervisor when judgment is required.
   started in this mode (`start-supervisor.mjs` answers `chat-mode`).
 - **kernel** (optional): `[Supervisor] main` is one long-lived Orca terminal.
   The reconciler Host controller keeps its seat alive by running
-  `scripts/supervisor/supervisor-watchdog.mjs --once`; the Fleet controller opens its owed
+  `scripts/supervisor/supervisor-watchdog.mjs --once`; the Workers controller opens its owed
   Decision Items. There is no Supervisor watchdog loop.
 
 Either way: the Supervisor never dispatches ops, never writes a product ledger and never answers an owner ask;
@@ -33,7 +34,7 @@ define-goal and a kernel start run only in the owner's chat, on the owner's own 
 | `[Worker] <cluster>` | Works on one fix cluster in an ephemeral staging checkout with file leases and one report. |
 | Reconciler Host controller | Maintains the Supervisor seat and runs `scripts/supervisor/supervisor-watchdog.mjs --once` in kernel mode. |
 | Reconciler Job controller | Verifies and closes reported `[Worker]` terminals through `sweepWorkers`. |
-| Reconciler Fleet controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
+| Reconciler Workers controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
 | Telegram bridge | Files owner messages in channel `main` and relays replies. |
 
 State lives in `machine.sqlite`, written only through `engine/db/machine.mjs` ([storage](ledger-db.md) §4):
@@ -93,7 +94,7 @@ then `/start` relaunches every seat on the new binary.
 periodically. The one engine runs all seven controllers: Host maintains services,
 Orca and seats; Job settles eligible reports and manages workers; Workflow watches
 progress and stalls; Resource manages capacity; GC sweeps and runs housekeeping;
-Fleet handles owed work, land and owner notification; Learning measures outcomes.
+The Workers controller handles owed work, land and owner notification; Learning measures outcomes.
 Controllers use the existing API for product-ledger writes and open durable
 Decision Items for the Kernel or Supervisor. The Supervisor reads its items with
 `starci machine decisions supervisor --list`; its read-only digest is
@@ -111,7 +112,7 @@ the table; `--trend` the recorded snapshots.
 What is stuck and who must move it is a query, not a verb: `v_blocking` and `v_settle_overdue` in each
 ledger, `v_sla_open` (open `sla_episodes`, including `SETTLE_OVERDUE`, `SEAT_DEAF` and `TRANSCRIPT_MISSING`)
 and `v_open_sup_decisions` in machine ([debugging](debugging.md)). The Workflow controller writes progress and RCA
-snapshots to `metrics_snapshots` and opens and escalates stall Decision Items; the Fleet controller turns owed
+snapshots to `metrics_snapshots` and opens and escalates stall Decision Items; the Workers controller turns owed
 clusters into Supervisor Decision Items and includes owner waits in its digest. `op-metrics.mjs` stays a
 read-only measurement command. The harness reads these rows; it never runs `starci kernel status`.
 

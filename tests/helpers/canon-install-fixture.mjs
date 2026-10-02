@@ -6,6 +6,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { packedFiles } from '../../scripts/gates/canon-digest.mjs';
 import { loadPins, PROFILES_FILE } from '../../scripts/gates/canon-pins.mjs';
+import { ensureRuntimeCopies } from './runtime-copies.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 let published;
@@ -13,6 +14,9 @@ let published;
 /** [{package, side, source, files}] of every profile's canon, its pack list read once per process. */
 export function publishedCanons() {
   if (published) return published;
+  // npm pack's list includes the git-ignored runtime/ copies: regenerate them so a bare `node --test` in a fresh
+  // checkout packs the same files the publish flow would.
+  ensureRuntimeCopies();
   const pins = loadPins(ROOT).pins;
   const profiles = parseYaml(fs.readFileSync(path.join(ROOT, PROFILES_FILE), 'utf8')).profiles;
   published = Object.values(profiles).map(({ canon }) => {

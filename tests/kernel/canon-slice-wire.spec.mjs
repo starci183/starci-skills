@@ -32,7 +32,7 @@ const scan = ({ seamOwnsFeatures = false } = {}) => ({
     { ordinal: 3, wave: 'surfaces', paths: [`${SRC}/components/blocks/sales`] },
   ],
   findings: [
-    { machine: 'eslint', ruleId: 'starci-fe/shape-slot', family: 'shape-slot', file: `${SRC}/modules/slot/index.ts`, line: 1 },
+    { machine: 'eslint', ruleId: 'starci-fe/drawing', family: 'drawing', file: `${SRC}/modules/slot/index.ts`, line: 1 },
     { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/Sidebar/component.tsx`, line: 1 },
     { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/ConsoleTopBar/component.tsx`, line: 1 },
     { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/ConsoleLayout/index.tsx`, line: 3 },

@@ -231,7 +231,7 @@ export const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = 
   const peers = peerWorkflowsOf(db, self);
   if (!peers.length) return { overlap, messages };
   // Compared in the lease form (scripts/kernel/lease-canon.mjs): a bare and a repository-prefixed
-  // spelling of one file are one path here too (nivo inc-52a4a5ee5b12).
+  // spelling of one file are one path here too (inc-52a4a5ee5b12).
   const canon = repo ? leaseCanonOf(db, repo) : null;
   const formOf = (owned, context) => { try { return leaseCompareForm(canon ? canon.canonical(owned, context) : owned); } catch { return null; } };
   const ownForms = ownedPaths.map((own) => ({ own, form: formOf(own, { op, payload }) }));

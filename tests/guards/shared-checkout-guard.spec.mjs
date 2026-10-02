@@ -113,7 +113,7 @@ test('history-rewriting git is refused; append-only git passes', () => {
 
 test('discarding, staging and committing are scoped to the op owned paths', () => {
   const cwd = path.resolve(os.tmpdir(), 'repo');
-  const owned = [path.join(cwd, 'src/features/collab/tasks'), path.join(cwd, '.starciwork/features/collab/impl/todo-app-be/tasks')];
+  const owned = [path.join(cwd, 'src/features/collab/tasks'), path.join(cwd, '.starciwork/features/collab/impl/shop-be/tasks')];
   const ctx = { cwd, owned, top: cwd };
   assert.equal(classifyGit(['checkout', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
   assert.equal(classifyGit(['checkout', '--', 'src/features/workspace-provision/x.ts'], ctx).code, 'PATH_NOT_OWNED');
@@ -122,7 +122,7 @@ test('discarding, staging and committing are scoped to the op owned paths', () =
   assert.equal(classifyGit(['restore', '--', 'src/features/collab/tasks'], ctx).allow, true);
   assert.equal(classifyGit(['reset', '-q', '--', 'src/features/collab/tasks/a.ts'], ctx).allow, true);
   assert.equal(classifyGit(['reset', 'HEAD', '--', 'src/other'], ctx).code, 'PATH_NOT_OWNED');
-  assert.equal(classifyGit(['add', '--', 'src/features/collab/tasks', '.starciwork/features/collab/impl/todo-app-be/tasks/index.yaml'], ctx).allow, true);
+  assert.equal(classifyGit(['add', '--', 'src/features/collab/tasks', '.starciwork/features/collab/impl/shop-be/tasks/index.yaml'], ctx).allow, true);
   assert.equal(classifyGit(['add', '.'], ctx).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks', '.starcistacks/dev/stack.yaml.enc'], ctx).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['commit', '-m', 'x', '--', 'src/features/collab/tasks/*.ts'], ctx).allow, true);

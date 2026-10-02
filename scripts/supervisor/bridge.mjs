@@ -18,7 +18,7 @@
 //   rewire   --repo <r> --bridge <id> [--no-notify]     finish the re-typing of a bridge that was not running yet
 //   transfer --repo <r> (--foundation <name> [--merge-into <name> | --to <wf>] | --record <path> --to <wf>) --reason <text>
 //            (b) ownership of a shared foundation or record moves to another workflow; --merge-into folds one
-//            foundation spelled two ways (nivo.brand -> brand) into the other and re-types the waits on it
+//            foundation spelled two ways (<product>.brand -> brand) into the other and re-types the waits on it
 //   revise   --repo <r> --workflow <wf> --text <goal text> --reason <text> [--request-only]
 //            (c) merge/split/park a workflow's legs when two workflows duplicate work: define-goal --revise,
 //            applied provisionally (--approved-by supervisor) under autopilot, else filed as a request

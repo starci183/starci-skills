@@ -1,0 +1,27 @@
+id: workers-controller-rename
+effectiveAt: '2026-10-02T00:00:00+07:00'
+summary: >-
+  The reconciler "fleet" is renamed to what it supervises: the workers. The Fleet controller is the
+  Workers controller (scripts/reconciler/controllers/workers.mjs, modules/reconciler/workers.yaml,
+  reconciler id `workers`, duty keys workers:deps|owed|land|push|metrics|direct|notify, concerns
+  workers.owed|workers.push|workers.deps|notify.owner, lane rc-workers); the Fleet Notifier is the
+  Owner Notifier (scripts/reconciler/notifier.mjs); the throttle reason fleet-max-ops is
+  workers-max-ops; engine/db/machine.mjs attachFleet is attachLedgers and the machine.sqlite baseline
+  controller CHECKs carry 'workers'; the UI's /api/fleet route, 'fleet' topic and Fleet*/fleet* types
+  are /api/workers, 'workers' and Workers*/workers*. The word "fleet" survives only in this registry,
+  modules/kernel/retired-paths.yaml and changelogs (history).
+reach: new-legs
+paths:
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/owner-rulings.yaml
+  - modules/reconciler/
+  - modules/supervisor/
+  - modules/models/
+  - modules/schemas/index.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/
+  - modules/kernel/contract-changes/workers-controller-rename.yaml

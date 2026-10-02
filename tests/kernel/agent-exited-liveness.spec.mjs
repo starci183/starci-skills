@@ -22,7 +22,7 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
 process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=path.parse(os.tmpdir()).root,BE=path.join(os.tmpdir(),'todo-app-be'),APPDIR=path.join(os.tmpdir(),'ecommerce-app');
+const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=path.parse(os.tmpdir()).root,BE=path.join(os.tmpdir(),'shop-be'),APPDIR=path.join(os.tmpdir(),'ecommerce-app');
 
 // A captured Codex op whose agent exited mid-turn. The
 // spinner residue ("Working", "Running hook") is still on screen; the last row is the shell prompt.
@@ -173,15 +173,15 @@ const APP_AFTER=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`),'At line:1
 // The frame before the wake, the two ways it could have looked: PowerShell's prompt over the footer row,
 // bare or followed by what was left of the footer it did not clear.
 const APP_EXITED_BARE=[...APP_TRANSCRIPT,APP_PS].join('\n');
-const APP_EXITED_RESIDUE=[...APP_TRANSCRIPT,`${APP_PS} % left · ~\\todo-app-be`].join('\n');
+const APP_EXITED_RESIDUE=[...APP_TRANSCRIPT,`${APP_PS} % left · ~\\shop-be`].join('\n');
 // A frozen Codex still drawing its footer: nothing on screen says the process is gone.
-const APP_FROZEN=[...APP_TRANSCRIPT,'  gpt-6-sol high · 58% left · ~\\todo-app-be'].join('\n');
+const APP_FROZEN=[...APP_TRANSCRIPT,'  gpt-6-sol high · 58% left · ~\\shop-be'].join('\n');
 // The shell mid-echo: the wake typed after the prompt, not yet run.
 const APP_TYPING=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`)].join('\n');
 
 test('a Codex frame frozen at Working with a shell prompt under its input row is agent-exited',()=>{
   assert.equal(exitedAgentPromptRow(APP_EXITED_BARE),APP_PS);
-  assert.equal(exitedAgentPromptRow(APP_EXITED_RESIDUE),`${APP_PS} % left · ~\\todo-app-be`,'a prompt over an uncleared footer row');
+  assert.equal(exitedAgentPromptRow(APP_EXITED_RESIDUE),`${APP_PS} % left · ~\\shop-be`,'a prompt over an uncleared footer row');
   assert.equal(exitedAgentPromptRow(APP_AFTER),APP_PS);
   assert.equal(exitedAgentPromptRow(APP_TYPING),null,'mid-echo the last row is the wrapped wake, not a prompt');
   assert.equal(exitedAgentPromptRow(APP_FROZEN),null,'a frozen frame that still draws its footer proves nothing');

@@ -13,7 +13,6 @@ import {
 } from '../../scripts/work/draw/draw-rationale.mjs';
 import { DRAW_QUALITY_CODES } from '../../scripts/work/draw/draw-quality.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rationale-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
@@ -87,7 +86,7 @@ test('fake rule id: a rules[] entry that resolves to no knowledge id, DNA name, 
   assert.deepEqual(kinds(f), ['unresolvable rule id']);
   assert.equal(f[0].count, 4);
   const resolve = ruleResolver({});
-  for (const ok of ['GAP-4', 'GAP-4 case-2', 'ui.presentation.gap', 'dna:Button', 'Button.variant=secondary', 'owner:draw-devin-brand-claude', 'owner:draw-loop-dna']) assert.ok(resolve(ok).ok, ok);
+  for (const ok of ['GAP-4', 'GAP-4 case-2', 'ui.presentation.gap', 'dna:Button', 'Button.variant=secondary', 'owner:draw-devin-brand-claude', 'owner:work-hygiene-gate']) assert.ok(resolve(ok).ok, ok);
   for (const bad of ['padding.yaml page-inset', '07-DIRECTION §3.2', 'direction:P2', 'rubric:H3']) assert.equal(resolve(bad).ok, false, bad);
 });
 
@@ -137,7 +136,7 @@ test('the rationale file: beside the source, validated field by field; redline l
   assert.deepEqual([...statedValues('pad 1.5rem, gap 16px; 2×2').nums].sort((a, b) => a - b), [2, 16, 24]);
 });
 
-test('the draw loop metric and draw-quality carry DRAW_RATIONALE_MISSING; the contract change registers it with a follow-up', async (t) => {
+test('the draw loop metric and draw-quality carry DRAW_RATIONALE_MISSING', async (t) => {
   const dir = tmp(t);
   const html = path.join(dir, 'screen.html');
   fs.writeFileSync(html, GOOD_HTML);
@@ -150,10 +149,6 @@ test('the draw loop metric and draw-quality carry DRAW_RATIONALE_MISSING; the co
   fs.writeFileSync(path.join(dir, 'screen.rationale.json'), JSON.stringify(GOOD_RATIONALE));
   assert.deepEqual((await run()).findings, []);
   assert.ok(DRAW_QUALITY_CODES.includes(DRAW_RATIONALE_MISSING), 'draw-quality (so draw-acceptance at starci kernel settle) refuses it');
-  const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'draw-devin-rationale');
-  assert.deepEqual(change.adds.codes, [DRAW_RATIONALE_MISSING]);
-  assert.equal(change.reach, 'follow-up');
-  assert.equal(change.followUp.op, 'interface.draw');
 });
 
 test('a real render: draw-render measures the values and captures the redline (skipped without Playwright)', async (t) => {

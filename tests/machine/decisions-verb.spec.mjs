@@ -74,7 +74,7 @@ test('claim: a second claimer is refused until the TTL; the Supervisor claims a 
   assert.equal(getDecision(ledger.db, di.id, { now: later }).status, 'open', 'an expired claim reads open again');
   assert.equal(claimDecision(ledger, di.id, { by: 'kernel:other', now: later }).claim.by, 'kernel:other');
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='decision-expired'").get().n, 1);
-  const cross = openDecisionRow(ledger, { workflowId: WF, kind: 'cross-workflow', entity: { type: 'workflow', id: WF }, summary: 'two workflows share a seam', by: 'reconciler/fleet' }, { now: 0 });
+  const cross = openDecisionRow(ledger, { workflowId: WF, kind: 'cross-workflow', entity: { type: 'workflow', id: WF }, summary: 'two workflows share a seam', by: 'reconciler/workers' }, { now: 0 });
   assert.equal(claimDecision(ledger, cross.di.id, { by: 'supervisor', now: 5 }).claim.by, 'supervisor', 'cross-workflow: the Supervisor may claim');
 });
 

@@ -54,7 +54,7 @@ test('a description of what the runtime does or what happened is not a finding',
     '3. land.mjs fast-forwards live main by compare-and-swap (git update-ref main <new> <base>) and updates the working tree.',
     '`scripts/api/git/worktree-add.mjs` is the only place the runtime runs `git worktree add` (`check-worktree-add.mjs`).',
     'createWorktree is the only `git worktree add` in the runtime scripts.',
-    'A worker\'s private worktree beside todo-app-fe was removed with `git worktree remove --force`, which followed the junctions and deleted 674 live files.',
+    'A worker\'s private worktree beside shop-fe was removed with `git worktree remove --force`, which followed the junctions and deleted 674 live files.',
     'A `git worktree remove` ran through a node_modules junction.',
   ];
   for (const text of descriptions) assert.deepEqual(await textFindings(text), [], text);

@@ -13,7 +13,7 @@ sideEffects:
   - direct provider/resource cleanup for exact run-owned IDs
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
@@ -25,26 +25,17 @@ reads:
         target is a scope/graph gap: report it and propose a separately selected scope op; do not
         create a target or invent its acceptance/graph here."
   - id: business
-    path: .starciwork/features/<feature>/{fr,nfr,br,decision,data,journey}/**/index.yaml
+    path: shared
     purpose:
-      en: Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant
-        inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a
-        replacement. Do not invent a mandatory BA predecessor for a scope that does not require one;
-        a needed missing input is a reported graph/scope gap, not a new dependency silently added
-        here.
+      en: shared
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-        state; read applicable instructions, manifests, owning code, callers and relevant tests.
-        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
-        request; no invented repository or fact citation. Source implementation still needs an
-        actual selected writable repository.
+      en: shared
   - id: environment
     path: .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
-      en: Read exact target/origins, owner, configuration revision, declared probes and allowed effects;
-        validate live observations without inferring identity from hostname alone.
+      en: shared
   - id: flows
     path: request flows[] + selected .starciwork/features/<feature>/uat/<flow>/index.yaml
     purpose:
@@ -87,18 +78,13 @@ reads:
         spending or an invitation to retry forever. Discover deletion and post-delete verification
         capability before creating billable resources.
   - id: workflow
-    path: selected workflow request + modules/kernel/verdict-contract.yaml + this op authority.json
+    path: shared
     purpose:
-      en: When selected inside the named workflow, read the exact request, strict response contract and
-        primary/secondary authority JSON. Standalone op execution does not invent a workflow
-        request.
+      en: shared
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
 writes:
   - id: node
     path: .starciwork/features/<feature>/uat/<flow>/index.yaml
@@ -398,13 +384,13 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
-  feature: Selected feature slug
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
-  environment: Resolved environment label
-  identity: Selected actor label
-  fixture: Selected fixture path
+  feature: shared
+  app: shared
+  bound-paths: shared
+  write-ceiling: shared
+  environment: shared
+  identity: shared
+  fixture: shared
   flow: Selected UAT journey slug
   runId: Stable id of this UAT run, one folder under the flow node
 layoutPolicy:

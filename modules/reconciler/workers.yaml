@@ -1,0 +1,33 @@
+# Workers controller (scripts/reconciler/controllers/workers.mjs; DESIGN §8.6, §10.2, §17.2; lane rc-workers).
+# Cross-workflow work no single workflow owns, as Supervisor Decision Items; the owner Notifier
+# (scripts/reconciler/notifier.mjs) is the only owner-bound sender once this controller owns notify.owner.
+# The digest cadence stays in modules/models/runtimes.yaml allocation.supervisorTick.ownerDigestMs; the SLA of each clock
+# this controller holds is in modules/reconciler/sla.yaml (LAND_QUEUE_STALL, LAND_FAILED_UNOWNED, DERIVED_STALE) and is
+# repeated here only as the clock's slaMs.
+name: workers
+concerns: [workers.owed, workers.push, workers.deps, notify.owner]
+# How often the engine re-lists the keys workers:deps, workers:owed, workers:land, workers:push, workers:metrics, workers:direct, workers:notify; each key below
+# decides for itself whether it is due (workers:land runs every pass and on every land-* event).
+resyncMs: 60000
+concurrency: 1
+# workers:deps - the wait-for graph of every product ledger: a cycle is one deadlock DI, a hub-blocker / unowned-need one
+# cross-workflow DI.
+depsEveryMs: 300000
+# workers:owed - owed.mjs -> cluster.mjs -> one Supervisor DI per open cluster.
+owedEveryMs: 300000
+# workers:push - push-mains.mjs; a refused repo is one push-refused DI.
+pushEveryMs: 1800000
+# workers:metrics - the op-health snapshot (op-metrics.mjs) the digest's trend line compares (the deleted tick's cadence).
+metricsEveryMs: 1800000
+# workers:direct - the direct-commit audit of .claude main (exclusive land-gate mode only).
+directEveryMs: 900000
+# workers:notify - how often the controller asks the Notifier; the Notifier itself sends a digest at most every ownerDigestMs.
+notifyEveryMs: 300000
+# The dueAt of the DIs this controller opens.
+decisionDueMs: 3600000
+# The clocks (their slaMs; sla.yaml is the catalogue).
+landStallMs: 1800000
+landFailedMs: 3600000
+derivedMs: 300000
+# A Supervisor DI escalated this many times and past due goes to the owner on the urgent channel (DESIGN §19).
+urgentOverdueEscalations: 3

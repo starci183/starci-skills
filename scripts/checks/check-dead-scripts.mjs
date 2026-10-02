@@ -9,8 +9,8 @@
 //     an executable position (run, check, script, executable, entry, command, exec, cmd, handler) holding the script path;
 //     `starci runtime check --only <name>` names scripts/checks/check-<name>.mjs through the runtime check dispatcher;
 //   - a directory the runtime loads by listing it (DYNAMIC_ROOTS: verbs, status views, reconciler controllers);
-//   - an entry of scripts/checks/dead-scripts.entries: a CLI nothing imports (owner or agent tool), declared once with the
-//     reason it has no code reader.
+//   - an entry of the dead-script-entries section of modules/kernel/allowlist.yaml: a CLI nothing imports (owner or agent
+//     tool), declared once with the reason it has no code reader.
 // A mention in a doc, a README, retired-paths.yaml, a contract-change, a benchmark finding or YAML prose is NOT a reader:
 // that is how a one-off script (why-backfill, migrate-ui-shapes, repair-rejected-attempts) survived its own removal.
 // A script only tests read is dead code with a test attached: both go (RT_DEAD_SCRIPT). An entry whose script is gone, or
@@ -20,12 +20,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { printFindings } from '../lib/check-scan.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from '../lib/git.mjs';
+import { ALLOWLIST_FILE, allowlistSection } from '../lib/allowlist.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
-export const ENTRIES_FILE = 'scripts/checks/dead-scripts.entries';
 /**
  * Directories the runtime loads by listing them, never by naming a file. The loader is named so a removed loader makes the
  * directory dead again (the spec asserts each loader still lists its directory).
@@ -48,7 +50,7 @@ const runtimeCheckNames = (text) => new Set([...String(text).matchAll(/\b(?:(?:n
 
 /** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
 function executableText(rel, text) {
-  if (CODE.test(rel) || HOOK.test(rel) || rel === 'package.json' || rel === '.claude/settings.json') {
+  if (CODE.test(rel) || HOOK.test(rel) || path.posix.basename(rel) === 'package.json' || rel === '.claude/settings.json') {
     return CODE.test(rel) || HOOK.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
   }
   const skill = /^skills\/.*SKILL\.md$/.test(rel);
@@ -60,14 +62,12 @@ function executableText(rel, text) {
   return '';
 }
 
-/** The declared entries: `path<TAB>reason` lines of ENTRIES_FILE (`#` lines and blanks skipped). */
+/** The declared entries: the {path, reason} maps of the dead-script-entries section of the one allowlist. */
 function parseEntries(text) {
   const entries = new Map();
-  for (const raw of String(text ?? '').split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const [entry, ...reason] = line.split('\t');
-    entries.set(entry.trim(), reason.join('\t').trim());
+  if (!String(text ?? '').trim()) return entries;
+  for (const entry of allowlistSection(parseYaml(text), 'dead-script-entries')) {
+    entries.set(entry.path, entry.reason);
   }
   return entries;
 }
@@ -78,7 +78,7 @@ function parseEntries(text) {
  */
 export function deadScriptFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel));
-  const entries = parseEntries(tracked.includes(ENTRIES_FILE) ? read(ENTRIES_FILE) : '');
+  const entries = parseEntries(tracked.includes(ALLOWLIST_FILE) ? read(ALLOWLIST_FILE) : '');
   const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !HISTORY.test(rel));
   const texts = new Map();
   for (const rel of readers) {
@@ -99,13 +99,13 @@ export function deadScriptFindings({ tracked, read }) {
     if (Object.keys(DYNAMIC_ROOTS).some((root) => rel.startsWith(root))) continue;
     const reader = readBy(rel);
     if (entries.has(rel)) {
-      if (reader && CODE.test(reader)) findings.push({ code: 'RT_DEAD_ENTRY', path: rel, message: `${ENTRIES_FILE} lists ${rel}, but ${reader} reads it: delete the entry` });
+      if (reader && CODE.test(reader)) findings.push({ code: 'RT_DEAD_ENTRY', path: rel, message: `${ALLOWLIST_FILE} dead-script-entries lists ${rel}, but ${reader} reads it: delete the entry` });
       continue;
     }
-    if (!reader) findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is read by no code, package script, hook or agent command (a doc or YAML prose mention is not a reader): delete it with its tests, wire it where it is used, or declare a CLI in ${ENTRIES_FILE}` });
+    if (!reader) findings.push({ code: 'RT_DEAD_SCRIPT', path: rel, message: `${rel} is read by no code, package script, hook or agent command (a doc or YAML prose mention is not a reader): delete it with its tests, wire it where it is used, or declare a CLI in the dead-script-entries section of ${ALLOWLIST_FILE}` });
   }
   for (const [entry] of entries) {
-    if (!scripts.includes(entry)) findings.push({ code: 'RT_DEAD_ENTRY', path: entry, message: `${ENTRIES_FILE} lists ${entry}, which is not a tracked runtime script: delete the entry` });
+    if (!scripts.includes(entry)) findings.push({ code: 'RT_DEAD_ENTRY', path: entry, message: `${ALLOWLIST_FILE} dead-script-entries lists ${entry}, which is not a tracked runtime script: delete the entry` });
   }
   return findings;
 }
@@ -116,12 +116,4 @@ export function checkDeadScripts(root = skillRoot) {
   return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
 }
 
-if (isMain(import.meta.url)) {
-  const findings = checkDeadScripts();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.message}`);
-    if (!findings.length) console.log('OK: every runtime script has an executable reader or a declared entry.');
-  }
-  process.exit(findings.length ? 1 : 0);
-}
+if (isMain(import.meta.url)) process.exit(printFindings(checkDeadScripts(), "OK: every runtime script has an executable reader or a declared entry."));

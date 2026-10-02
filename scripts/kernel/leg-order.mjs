@@ -10,7 +10,7 @@
 //                 cycle nothing can break - the same override afterChainReaches gives a declared
 //                 --after edge (inc-df38ecef1927).
 //
-// nivo wf-nivo-workspace-provision-mujek7cb (2026-09-27): a deferred settle, inc-a158db5dc9b7 on
+// A workspace-provision workflow (2026-09-27): a deferred settle, inc-a158db5dc9b7 on
 // op-business.decide-660a4d3e9a, waited until-job op-interface.draw-9f387aad28 succeeded, while that
 // draw read `dependency` behind the very business.decide job the gate held, a hold that could never release it.
 

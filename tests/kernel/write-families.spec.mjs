@@ -31,7 +31,7 @@ test('the measured misroutes are refused; the op\'s own families, evidence and t
     '.starciwork/features/commerce/journey/buy', '.starciwork/evidence/wf-x.scope/work-graph.json']), []);
   const architecture = familyGuardOf(brief('architecture.decide'));
   assert.deepEqual(familyViolations(architecture, ['.starciwork/features/collab/journey/first-open']).map((v) => v.family), ['journey']);
-  assert.deepEqual(familyViolations(architecture, [path.join(path.dirname(OPS), 'todo-app-be', '.starciwork/features/collab/sds/room'), '.starciwork/features/collab/index.yaml']).map((v) => v.family), ['overview']);
+  assert.deepEqual(familyViolations(architecture, [path.join(path.dirname(OPS), 'shop-be', '.starciwork/features/collab/sds/room'), '.starciwork/features/collab/index.yaml']).map((v) => v.family), ['overview']);
 });
 
 test('the refusal names who writes each family', () => {

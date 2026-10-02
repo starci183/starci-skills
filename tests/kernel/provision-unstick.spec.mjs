@@ -37,7 +37,7 @@ test('taskSpecOf: a packet over the argv budget is written verbatim to the job d
   assert.deepEqual(taskSpecOf({prompt:small,file:path.join(dir,'p.md'),op:'x',jobId:'j'}),{spec:small,spilled:false});
   assert.equal(fs.existsSync(path.join(dir,'p.md')),false,'a packet that fits writes nothing');
 
-  const owned=Array.from({length:993},(_,i)=>`.starciwork/features/workspace-provision/impl/todo-app-be/n${i}/report.json`);
+  const owned=Array.from({length:993},(_,i)=>`.starciwork/features/workspace-provision/impl/shop-be/n${i}/report.json`);
   const big=`[Op] business.decide\nowned_paths: ${owned.join(', ')}\n  cut: ...`;
   assert.ok(big.length>TASK_SPEC_MAX_CHARS);
   const file=packetFileOf(path.join(dir,'jobs','op-business.decide-cc63d20d87'),2);

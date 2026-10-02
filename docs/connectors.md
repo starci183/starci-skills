@@ -1,3 +1,4 @@
+Owner: modules/kernel/api.yaml
 # Connectors: public owner asks over Cloudflare + Telegram
 
 An owner ask is a `serve-ask` form (`scripts/kernel/ask-server.mjs`) on a random loopback port
@@ -174,12 +175,12 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   Item per actionable stall or stale wait, and escalates overdue items to the
   Supervisor. `scripts/machine/decisions.mjs` supplies the doorbell; a busy
   Kernel keeps the item in its queue. See `modules/reconciler/workflow.yaml`.
-- **Owner notification.** The Fleet controller is the owner-bound sender. It
+- **Owner notification.** The Workers controller is the owner-bound sender. It
   invokes `scripts/reconciler/notifier.mjs` for the periodic digest and urgent
   invariant alerts; `scripts/connectors/telegram.mjs` sends the message. Owner
   asks retain their immediate notice and `/asks` or `/creds` handling above.
   Digest and urgent dedupe are `notifications` rows in machine.sqlite, as defined by
-  `modules/reconciler/fleet.yaml` and `scripts/reconciler/notifier.mjs`.
+  `modules/reconciler/workers.yaml` and `scripts/reconciler/notifier.mjs`.
 
 ```
 starci supervisor channel register --id <id> --label <text> [--repos <csv>]

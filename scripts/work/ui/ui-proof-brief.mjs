@@ -2,7 +2,7 @@
 // ui-proof-brief.mjs — every knowledge/ui case a surface's elements bring into play, with the numbers the
 // product's CSS resolves them to, and a scorer that marks each case on a render.
 //
-//   starci work ui-proof-brief --surface <ui record path> --repo <repo> [--family starci|nivo]
+//   starci work ui-proof-brief --surface <ui record path> --repo <repo> [--family <name>]
 //        [--elements field,card,...] [--json]
 //   starci work ui-proof-brief --surface <ui record path> --repo <repo> --score <html>
 //        [--viewport 390x844] [--json]
@@ -839,7 +839,7 @@ function scoreText(s) {
 // ---------------------------------------------------------------------------------------------------------
 
 const USAGE = `Usage:
-  starci work ui-proof-brief --surface <ui record path> --repo <repo> [--family starci|nivo] [--elements a,b] [--json]
+  starci work ui-proof-brief --surface <ui record path> --repo <repo> [--family <name>] [--elements a,b] [--json]
   starci work ui-proof-brief --surface <ui record path> --repo <repo> --score <html> [--viewport 390x844] [--json]
 Element kinds: ${KIND_IDS.join(', ')}
 `;

@@ -57,7 +57,7 @@ test('the group skips a dead or circuit-open Claude and orders a limited one las
   const limited=f.plan({STARCI_FAKE_ORCA_LIMITED:'claude'});
   assert.equal(limited.r.status,0,limited.r.stderr);
   assert.deepEqual(limited.body.group.map(m=>[m.agent,m.availability]),[['codex','available'],['claude','limited']]);
-  // Provider health is fleet-wide machine state now (the ledger's signals table no longer carries it).
+  // Provider health is worker-wide machine state now (the ledger's signals table no longer carries it).
   const machine=openMachine({file:f.machineFile});
   try{
     writeProviderCircuit('claude',{machine,expiresAt:Date.now()+3600000,

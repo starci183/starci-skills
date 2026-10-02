@@ -31,7 +31,7 @@ const FILES = [
 const PEER = ['src/app/l/page.tsx', 'src/app/(auth)/sign-in/page.tsx'];
 
 test('App Router segments in owned paths are literal names to the guard, as to admission', () => {
-  const cwd = path.resolve(os.tmpdir(), 'todo-app-fe');
+  const cwd = path.resolve(os.tmpdir(), 'shop-fe');
   for (const grant of GRANTS) assert.equal(normalizeOwnedPath(grant), grant, `admission admits ${grant} literally`);
   const owned = GRANTS.map((g) => path.join(cwd, g));
   const ctx = { cwd, owned, top: cwd };

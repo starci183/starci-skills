@@ -24,7 +24,7 @@ const git = (cwd, ...args) => {
 };
 const write = (root, files) => { for (const [f, c] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), c); } };
 
-// main: tests/red.spec.mjs has one stale test red on main and one test of scripts/a.mjs that is green on main.
+// main: <fixture>/tests/red.spec.mjs has one stale test red on main and one test of <fixture>/scripts/a.mjs that is green on main.
 const RED_SPEC = [
   "import test from 'node:test';",
   "import assert from 'node:assert/strict';",

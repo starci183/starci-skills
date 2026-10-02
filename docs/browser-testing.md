@@ -1,3 +1,4 @@
+Task: set up browser testing prerequisites
 # Browser testing prerequisites
 
 StarCi owns the browser-testing instructions; project tests own their scenarios.

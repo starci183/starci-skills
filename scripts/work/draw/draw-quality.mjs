@@ -1,4 +1,4 @@
-// draw-quality.mjs — owner ruling 2026-09-27 (nivo wf-nivo-modules-agentos-mujek7lg op-interface.draw-2815deda22): a
+// draw-quality.mjs — owner ruling 2026-09-27 (a product's wf-<product>-modules-agentos-mujek7lg op-interface.draw-2815deda22): a
 // draw with correct tokens is not a draw that passes. The owner judged the module-ledger drawing ugly - ten whole-page
 // renders of one layout that differ only in a status banner, no controls for the FR's commands, internal ids and
 // jargon in the copy, badges bound to no tone - and it had gone green on checks alone. What an interface.draw pass
@@ -14,8 +14,9 @@
 //                            actor activating, selecting, opening, submitting ...) renders fewer controls (button,
 //                            link, select, submit, role=button/link/tab/menuitem) in its render source than it has
 //                            such commands - every FR command of the surface is a control;
-//   DRAW_COPY_INTERNAL       the visible copy of a render source leaks internal ids or jargon (`Nguồn:`/`Source:`
-//                            labels, "nguồn hiện tại", `installation-1`, kebab ids with a digit, uuids and hashes);
+//   DRAW_COPY_INTERNAL       the visible copy of a render source leaks internal ids or jargon (a `source:` label in
+//                            either language - source-phrases.yaml drawCopy -, `installation-1`, kebab ids with a
+//                            digit, uuids and hashes);
 //   DRAW_BADGE_UNTONED       a badge / chip / status pill binds no tone token (data-tone, color=, a tone class, a
 //                            var(--<tone>)), or a success word (installed, active, ready, confirmed) binds a tone
 //                            other than success;
@@ -45,6 +46,7 @@ import { DRAW_TASTE_CODES, accentBudgetOf, drawLoopSettings, htmlTasteFindings }
 import { assetRequestIdsFor } from '../asset-slot.mjs';
 import { DRAW_LOOP_MISSING, loopCoverageFindings } from './draw-loop-coverage.mjs';
 import { DRAW_RATIONALE_MISSING, loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleResolver } from './draw-rationale.mjs';
+import { altOf } from '../../lib/source-phrases.mjs';
 
 export { SHAPE_DUPLICATE };
 export const DRAW_SCOPE_FULL_PAGE = 'DRAW_SCOPE_FULL_PAGE';
@@ -93,10 +95,11 @@ export function visibleTextOf(html) {
     .split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
-/** Internal-copy patterns: each {id, rx, why}. Owner ruling 2026-09-27 names `Nguồn:`, `source:`, installation ids, kebab ids. */
+/** Internal-copy patterns: each {id, rx, why}. Owner ruling 2026-09-27 names the `source:` label (and its Vietnamese
+ * form, lexicon drawCopy.sourceLabel), installation ids, kebab ids. */
 const INTERNAL_COPY = Object.freeze([
-  { id: 'source-label', rx: /(^|\s)(nguồn|source)\s*:/giu, why: 'a source label is provenance jargon, not product copy' },
-  { id: 'internal-vocabulary', rx: /nguồn hiện tại|current source|hệ thống lõi|core system/giu, why: 'internal system vocabulary' },
+  { id: 'source-label', rx: new RegExp(`(^|\\s)(${altOf('drawCopy.sourceLabel')}|source)\\s*:`, 'giu'), why: 'a source label is provenance jargon, not product copy' },
+  { id: 'internal-vocabulary', rx: new RegExp(`${altOf('drawCopy.internalVocabulary')}|current source|core system`, 'giu'), why: 'internal system vocabulary' },
   { id: 'record-id', rx: /\b(?:installation|instance|inst|ws|wf|op|job|ctx|req|evt)-[a-z0-9]+(?:-[a-z0-9]+)*\b/gi, why: 'a raw record id' },
   { id: 'kebab-id', rx: /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g, why: 'a kebab-case identifier', test: (m) => /\d/.test(m) || m.split('-').length >= 3 },
   { id: 'uuid-hash', rx: /\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{12,})\b/gi, why: 'a uuid or hash' },
@@ -121,7 +124,7 @@ const CONTROL_RX = /<(button)\b|<a\b[^>]*\bhref=|<select\b|<input\b[^>]*\btype=[
 export const controlCountOf = (html) => (String(html).match(CONTROL_RX) ?? []).length;
 
 const COMMAND_RX = /\b(activates?|selects?|clicks?|press(?:es)?|opens?|chooses?|submits?|taps?|confirms?|cancels?|retries|installs?|uninstalls?|configures?|toggles?|enters?|types?)\b/i;
-const ACTOR_RX = /^\s*(the\s+)?(owner|user|member|admin|administrator|actor|viewer|operator|person|customer|visitor|người dùng|chủ)\b/i;
+const ACTOR_RX = new RegExp(`^\\s*(the\\s+)?(owner|user|member|admin|administrator|actor|viewer|operator|person|customer|visitor|${altOf('drawCopy.actor')})\\b`, 'i');
 /** The commands a person leaves `state` by: ui.flow transitions from it whose trigger is an actor's command. */
 export function commandsFrom(record, state) {
   return list(record?.ui?.flow?.transitions).filter((t) => {
@@ -136,7 +139,7 @@ export function commandsFrom(record, state) {
 const BADGE_RX = /<([a-z][a-z0-9-]*)\b([^>]*\b(?:class|data-slot|data-component)=["'][^"']*\b(?:badge|chip|status-pill|pill|tag)(?![\w-])[^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
 const TONES = ['success', 'warning', 'danger', 'error', 'info', 'accent', 'primary', 'secondary', 'neutral', 'default', 'muted'];
 const TONE_RX = new RegExp(`\\b(?:data-tone|tone|color|variant)=["'](${TONES.join('|')})["']|\\b(?:text|bg|border|badge|chip|tag|tone)--?(${TONES.join('|')})\\b|var\\(--[\\w-]*(${TONES.join('|')})[\\w-]*\\)`, 'i');
-const SUCCESS_WORDS = /\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\b|đã cài|đang hoạt động|sẵn sàng|đã xác nhận|thành công/i;
+const SUCCESS_WORDS = new RegExp(`\\b(installed|active|ready|confirmed|enabled|connected|healthy|succeeded|success)\\b|${altOf('drawCopy.success')}`, 'i');
 /** Badges a render source draws: [{text, tone|null}]. */
 export function badgesOf(html) {
   const out = [];

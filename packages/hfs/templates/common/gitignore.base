@@ -26,7 +26,7 @@ lt.json
 nul
 .artifacts/
 .tmp-*
-# Worktrees live under D:/starci-lanes, never inside the repository.
+# Worktrees live outside the repository, never inside it.
 .worktrees/
 # StarCi runtime state of the repository (ledger), never tracked.
 .starci/

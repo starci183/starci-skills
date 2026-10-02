@@ -92,6 +92,12 @@ properties:
   family:
     type: string
     minLength: 1
+  slots:
+    type: array
+    items:
+      type: string
+      minLength: 1
+    description: The slot ids this topic teaches (knowledge/hfs/slots.yaml). scripts/gates/read-digest.mjs inverts these into the READ-step slot -> pattern-topic map; there is no second list.
   provenance:
     type: object
     additionalProperties: true

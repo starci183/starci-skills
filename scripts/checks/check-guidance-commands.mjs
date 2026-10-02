@@ -12,8 +12,9 @@
 // fenced code line, or the text after an imperative "run". Each is evaluated by commandVerdict with static deps: no git,
 // no lock recovery, a cwd outside every repository, so only the command text decides.
 // A refused command is NOT a finding when its sentence:
-//   - forbids it: a negation (never, do not, don't, not, no, nor, without, instead of, rather than, avoid, không, đừng,
-//     cấm, tránh) before the command, or a refusal verb (refuses, is refused, is blocked, bị chặn) after it;
+//   - forbids it: a negation (never, do not, don't, not, no, nor, without, instead of, rather than, avoid, plus the
+//     Vietnamese negations of the source-phrases lexicon) before the command, or a refusal verb (refuses, is refused,
+//     is blocked, and the lexicon's refused forms) after it;
 //   - describes what happened or what the runtime itself does, not what the agent should do: a past-tense narrative
 //     (was, were, ran, had in the command's own clause; ran, followed, deleted, emptied, restarted right after it), or
 //     the runtime as the actor of the command's own clause (the runtime, a *.mjs script or a camelCase API name, then a
@@ -32,6 +33,7 @@ import * as depsGuard from '../guards/deps-guard.mjs';
 import { CATALOG_FILE } from './check-failure-codes.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
 const HISTORY_DIR = 'modules/kernel/contract-changes/';
@@ -83,8 +85,9 @@ export function commandSpans(sentence, { prose = true } = {}) {
   return out;
 }
 
-const NEGATION = /\b(?:never|not|no|nor|without|avoid|instead of|rather than|don't|do not|must not|cannot|không|đừng|cấm|tránh)\b/i;
-const REFUSED_AFTER = /^[^.;]*?\b(?:refuses?|is refused|are refused|is blocked|are blocked|bị chặn|bị từ chối)\b/i;
+// The Vietnamese alternatives are matcher data, not source: modules/goal/source-phrases.yaml (source-phrases.mjs).
+const NEGATION = new RegExp(`\\b(?:never|not|no|nor|without|avoid|instead of|rather than|don't|do not|must not|cannot|${altOf('guidance.negation')})\\b`, 'i');
+const REFUSED_AFTER = new RegExp(`^[^.;]*?\\b(?:refuses?|is refused|are refused|is blocked|are blocked|${altOf('guidance.refused')})\\b`, 'i');
 const PAST_BEFORE = /\b(?:was|were|ran|had)\b[^,;:]*$/i;
 const PAST_AFTER = /^\W{0,3}(?:,?\s*which\s+)?(?:ran|followed|deleted|emptied|restarted|wiped)\b/i;
 const RUNTIME_ACTOR = /(?:\bthe runtime\b|\bruntime's\b|[\w/.-]+\.mjs\b|\b[a-z]+[A-Z]\w*\b)(?:\s+\w+){0,3}?\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;

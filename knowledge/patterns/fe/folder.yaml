@@ -23,7 +23,7 @@ rules:
   - id: FE-FOLDER-1
     title: Responsibility directories
     kind: mandatory
-    hfsRules: [R01, R02, R59, R64, R26, R54, R56, R91]
+    hfsRules: [R01, R02, R59, R64, R26, R54, R56, R91, R94]
     requirement: |
       The front end of every app (`fe/`) is an fe/apps/<app>/ monorepo even with one app — each app declared in
       `hfs.json` `sides.fe.apps` with kind `next` (slot `fe.app.next`; the scaffold writes `landing` and `app`) — and all
@@ -153,6 +153,7 @@ rules:
         - FE_COMPONENT_DEEP_HOOK_IMPORT
         - FE_SOURCE_FORM
         - FE_SOURCE_LAYOUT_INVALID
+        - FE_SLOT_FILE_ROLE
       manual:
         - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.
     relatedExamples:

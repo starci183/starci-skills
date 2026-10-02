@@ -9,7 +9,6 @@ import {
 } from '../../scripts/work/draw/draw-layer.mjs';
 import { parseHtml, walkElements } from '../../scripts/work/draw/draw-dna.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
-import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 // Owner, 2026-09-28, StarCi Next SignInBase#signed-out round 2 (<tmp>/starci-draw10/loop/SignInBase/round-2):
 // the sign-in card stretched the whole 1184px content region, and on that Surface the "Remember me" Checkbox kept
@@ -90,15 +89,6 @@ test('the draw loop carries a `layer` metric: round 2 is red on both codes, the 
   assert.equal(green.ok, true, JSON.stringify(green.findings));
   const unread = (await machineMetrics({ html, domHtml: fixedCheckbox(SIGN_IN_DOM), captures: [{ ...capture(0), record: { ok: true, layer: { error: 'boom' } } }], repo: dir, probes })).doc.metrics.find((m) => m.id === 'layer');
   assert.equal(unread.findings[0].code, 'DRAW_METRICS_UNVERIFIED', 'a measure that could not run fails, never passes');
-});
-
-test('the contract change registers both codes with a follow-up interface.draw', () => {
-  const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'draw-layer-measure');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml draw-layer-measure');
-  assert.deepEqual([...change.adds.codes].sort(), [DRAW_MEASURE_UNCAPPED, DRAW_NESTED_VARIANT]);
-  assert.equal(change.reach, 'follow-up');
-  assert.equal(change.followUp.op, 'interface.draw');
-  for (const p of ['knowledge/ui/presentation/measure.yaml', 'knowledge/ui/proof/anatomy-source.yaml', 'knowledge/grammars/starci/DNA.yaml']) assert.ok(change.paths.includes(p), p);
 });
 
 test('a real render measures the form region (skipped without Playwright)', async (t) => {

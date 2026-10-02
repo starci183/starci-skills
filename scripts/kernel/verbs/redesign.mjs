@@ -37,7 +37,7 @@ export default {
     if (!r.ok || !r.json?.job_id) throw refuse(`enqueue ${args.op} refused: ${r.json?.reason ?? ''} ${r.json?.detail ?? r.json?.error ?? r.err ?? r.out}`.trim(), r.json?.reason ?? 'enqueue-refused');
     const jobId = r.json.job_id;
     const job = jobRow(db, jobId);
-    const payload = { ...job.payload, redesign: { rca: brief.id, routeAs: cfg.routeAs ?? 'implementation.plan', minDifficulty: cfg.minDifficulty ?? 'hard', effort: cfg.effort ?? 'high', decision: decision.id, brief },
+    const payload = { ...job.payload, redesign: { rca: brief.id, routeAs: cfg.routeAs ?? 'implementation.plan', minDifficulty: cfg.minDifficulty ?? 'hard', effort: cfg.effort, decision: decision.id, brief },
       difficulty: ['hard', 'insane'].includes(job.payload.difficulty) ? job.payload.difficulty : (cfg.minDifficulty ?? 'hard'),
       kernelOverride: { ...(job.payload.kernelOverride ?? {}), notes: [...(job.payload.kernelOverride?.notes ?? []), `Redesign from the Kernel's RCA ${brief.id ?? ''}: read packet context.kernel_override.redesign.brief (progress, failure clusters with examples) before you change anything; fix the cause that blocks the most units.`] } };
     setPayload(ledger, job, payload);

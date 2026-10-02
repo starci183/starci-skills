@@ -18,15 +18,14 @@ completionProfile: operations
 sideEffects: []
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: request
-    path: current user request, supplied files/references and existing task authorization
+    path: shared
     purpose:
-      en: Start without presumed business, architecture or product context. Identify the intended result,
-        concrete inputs, permitted effects and observable completion criteria from the request.
+      en: shared
   - id: repo
     path: <app>/<bound-paths> when source is relevant
     purpose:
@@ -45,9 +44,9 @@ reads:
       en: Resolve the working Codex/Claude profile against actual available tools. Do not switch
         providers, invent tools or dispatch agents solely from a profile.
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
 writes:
   - id: evidence
@@ -73,16 +72,14 @@ writes:
         actual artifacts. Existing Work may receive normal completion only through its proper
         validated profile; this op never fabricates graph nodes or marks unrelated work done.
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
 steps:
   - reads: [op-loop]
@@ -192,7 +189,7 @@ blockers:
     condition:
       en: A necessary effect exceeds current authorization or conflicts with retained user work.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
+  app: shared
   bound-paths: Inspected relevant source read set
 layoutPolicy:
   checks: [starci-validate]

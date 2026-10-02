@@ -41,6 +41,7 @@ import { INFRASTRUCTURE_CODES } from '../hfs/infrastructure-codes.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../hfs/slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from '../hfs/architecture/index.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { hasSecondLanguage } from '../lib/language.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
@@ -48,7 +49,7 @@ const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
   hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
-  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-retired-cli.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-retired-names.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-retired-cli.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -127,9 +128,6 @@ export function readKnowledgeFiles(root) {
   };
   return KNOWLEDGE_CODE_ROOTS.flatMap(walk);
 }
-
-/** A Vietnamese text carries at least one letter no other language of this repository uses. */
-const VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
 
 /**
  * The rules of the stylelint canon, read from the package's source text: its peer dependencies (stylelint, postcss) are
@@ -231,7 +229,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) {
         const value = entry[field];
         if (typeof value !== 'string' || !value.trim()) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has no ${field}`);
-        else if (!VIETNAMESE.test(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
+        else if (!hasSecondLanguage(value)) add('HFS_RULE_CODE_UNCATALOGUED', rule.id, `${failureCode} (${rule.id}) has a ${field} that is not Vietnamese`);
       }
     }
   }

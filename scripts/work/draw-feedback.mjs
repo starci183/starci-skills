@@ -38,10 +38,10 @@ import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf
 import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from './brand/brand.mjs';
-import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { text } from '../lib/stack-declaration.mjs'; import { isMain } from '../lib/is-main.mjs'; import { altOf } from '../lib/source-phrases.mjs';
 
 const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
-/** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes.yaml). */
+/** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes/). */
 export const DRAW_FEEDBACK_CHANGE = 'owner-draw-feedback-golden';
 export const DRAW_FEEDBACK_UNADDRESSED = 'DRAW_FEEDBACK_UNADDRESSED';
 /** Ledger events (payloads are names, ids and digests; the note text is the owner's own words). */
@@ -56,12 +56,12 @@ const LEARNED_KINDS = Object.freeze(['antiPattern', 'vocabulary', 'rubric']);
 /** Rubric check groups the critic gets from the owner. */
 const OWNER_NOTE_GROUP = 'owner-note';
 const OWNER_LEARNED_GROUP = 'owner-learned';
-/** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). */
-const GOLDEN_WORDS = /\bgolden\b|mẫu chuẩn|ảnh chuẩn|hình chuẩn/i;
+/** The owner marks an accepted drawing golden in the note (or the form's golden box: receipt.golden). The Vietnamese alternatives of every word class below are lexicon data (modules/goal/source-phrases.yaml drawNote). */
+const GOLDEN_WORDS = new RegExp(`\\bgolden\\b|${altOf('drawNote.golden')}`, 'i');
 const RULE_ID = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+\b/;
-const PRODUCT_WORDS = /\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\b|luôn|không bao giờ|mọi|tất cả|từ nay|màu|thương hiệu|phông|chữ|khoảng cách|bo góc|đổ bóng|biểu tượng/i;
-const GRAMMAR_WORDS = /\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\b|thành phần mới|biến thể|thiếu thành phần|không có thành phần/i;
-const KNOWLEDGE_WORDS = /\bknowledge\b|\bguideline\b|kiến thức|quy tắc chung|nguyên tắc chung/i;
+const PRODUCT_WORDS = new RegExp(`\\b(always|never|every|everywhere|all (pages|screens|cards)|from now on|brand|colou?rs?|palette|accent|tones?|fonts?|typography|style|spacing|density|radius|shadow|icons?)\\b|${altOf('drawNote.product')}`, 'i');
+const GRAMMAR_WORDS = new RegExp(`\\b(grammar|DNA|variant|new component|missing component|anatomy|slot)\\b|${altOf('drawNote.grammar')}`, 'i');
+const KNOWLEDGE_WORDS = new RegExp(`\\bknowledge\\b|\\bguideline\\b|${altOf('drawNote.knowledge')}`, 'i');
 const OWNER = 'owner';
 
 

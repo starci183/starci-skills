@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // `starci harness start` runs the development API and Vite UI.
-// `starci harness start --tunnel` runs the named Cloudflare tunnel to 127.0.0.1:4547.
-import fs from 'node:fs';
+// `starci harness start --tunnel` runs the named Cloudflare tunnel (starci-harness, %USERPROFILE%/.cloudflared/harness.yml)
+//                          to the served UI on 127.0.0.1:<statusApp.port of modules/models/runtimes.yaml>;
+//                          the tunnel credential file authenticates it, never a token.
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';

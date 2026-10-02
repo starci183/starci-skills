@@ -1,3 +1,4 @@
+Owner: knowledge/patterns/be/architecture-check.yaml
 # Nest callable contract and readonly boundary check
 
 `starci runtime architecture <repository>` reports two independent Nest contract rules:

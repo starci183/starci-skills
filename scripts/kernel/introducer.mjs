@@ -1,7 +1,7 @@
 // introducer.mjs — which workflow introduced the code behind a shared blocker.
 //
 // A blocker that stops several workflows at once — the served-app boot failing
-// on ModuleRecoveryClientService's DI (nivo WSPV inc-be78a39b6b50, Modules
+// on ModuleRecoveryClientService's DI (a WSPV inc-be78a39b6b50, Modules
 // inc-b6f66a0d29ce) — was raised by each victim and owned by nobody: each
 // said "not ours" and waited for the owner to assign one. The rule
 // (modules/kernel/api.yaml commands.incident sharedBlocker): a Kernel raising
@@ -99,7 +99,7 @@ export function resolveIntroducer(db, { commits = [], roots = [], explicit = nul
 
 /**
  * The open jobs of `workflowId` that own a file one of `commits` changed: the introducer's legs that
- * will repair it (nivo inc-9474fe9ff445: 9caa2d5c changed pod-registration.controller.ts, owned by the
+ * will repair it (inc-9474fe9ff445: 9caa2d5c changed pod-registration.controller.ts, owned by the
  * queued op-backend.implement-853af99286). Ledger and git reads only; [] when nothing resolves.
  */
 export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {

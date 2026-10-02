@@ -1,9 +1,0 @@
-id: schema-catalog-reconciler-supervisor
-effectiveAt: '2026-09-28T16:01:51+07:00'
-summary: >-
-  The schema catalog now lists the eight existing module-local document stamps for contract
-  freeze, reconciler engine/controllers/SLA, and Supervisor bridging/lessons. No source document
-  kind, runtime reader, validation rule or dispatch behavior changes.
-reach: new-legs
-paths:
-  - modules/schemas/index.yaml

@@ -43,7 +43,7 @@
 //   starci supervisor owed acks [--json]
 //
 // Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
-// poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
+// poll.mjs prints the OWED lines every cycle; the Workers controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
 // fixed used to re-alert every hour: one workflow's brand.decide a1-a8 failed, fixed by
@@ -74,6 +74,7 @@ import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { DECISION_TEXT, CONTRACT_CONFLICT_TEXT, NOTE_KIND, OWNER_ONLY, SUPERVISOR_ADDRESSED, WORKER_DIED_TEXT } from './owed-text.mjs';
 import { shortHash } from '../lib/hash.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -99,16 +100,6 @@ const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]
 
 /* ------------------------------------------------------------ declared types and labels */
 
-/**
- * Kernel note kinds: records of a plan, a cut, a ruling or a decision already taken. They hold
- * nothing (only owner-gate and peer-wait kinds hold jobs), so they are their Kernel's to resolve
- * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.
- */
-const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
-/** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. */
-const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
-/** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
-export const OWNER_ONLY = /\bcredentials?\b|\bcreds\b|\bsecrets?\b|\bpasswords?\b|\bapi[- ]?keys?\b|\boauth\b|\bconsent\b|\bpayments?\b|\bbilling\b|\blegal\b|\bpush(?:ing)? to (?:a |the )?remote\b|\bpublish(?:ing)?\b|\bhandover\b|bàn giao|mật khẩu|thanh toán/i;
 /** Peer-dependency wording on an owner gate (the retired stall-alert.mjs PEER_DEPENDENCY): a misfiled peer-wait. */
 const PEER_DEPENDENCY = /\bpeer(?:[- ]dependen\w*| workflow)\b|\bnot an owner (?:step|decision|gate)\b/i;
 
@@ -117,13 +108,13 @@ const LABEL_RULES = [
   ['addressed-to-supervisor', (k, t) => SUPERVISOR_ADDRESSED.test(t)],
   ['runtime', (k, t) => /runtime|source|liveness|nudge|op-boundary|provider|launch|environment|api-/.test(k) || /\b(?:scripts|engine|modules|knowledge|bin)\/[\w./-]+|\.claude\b|\bSource\b/.test(t)],
   ['liveness', (k, t) => /liveness|nudge|idle/.test(k) || /\bturn-idle\b|\bnudge-ready\b|\bliveness\b/i.test(t)],
-  ['worker-died', (k, t) => /died|exited|no-report|missing-report|without-report|turn-cap/.test(k) || /without (?:filing )?(?:a |an )?(?:api )?report|bare PowerShell prompt|không nộp report/i.test(t)],
+  ['worker-died', (k, t) => /died|exited|no-report|missing-report|without-report|turn-cap/.test(k) || WORKER_DIED_TEXT.test(t)],
   ['checker', (k, t) => /checker|lint|quality-gate/.test(k) || /status[= ]unavailable|gate.mjs|code-patterns-check|\bsonar\b/i.test(t)],
   ['knowledge-churn', (k, t) => /stale|churn|baseline|rollout/.test(k) || /staleOperations|staleInput|knowledge\/[\w.-]+\.ya?ml/i.test(t)],
-  ['contract-conflict', (k, t) => /contradict|conflict|divergence|read-race/.test(k) || /mâu thuẫn|contradict/i.test(t)],
+  ['contract-conflict', (k, t) => /contradict|conflict|divergence|read-race/.test(k) || CONTRACT_CONFLICT_TEXT.test(t)],
   ['cross-workflow', (k, t) => /cross|foreign|shared|history|unowned|env-/.test(k) || /git reset|\brebase\b|\bamend\b|reflog/i.test(t)],
   ['host-tooling', (k, t) => /inbox|orchestration|host|unbridged|release|reap/.test(k) || /\bENOBUFS\b|orca(?:\.exe)? |managedWorker/i.test(t)],
-  ['decision', (k, t) => /decision|delegat|ruling|scope-gap|design-gap|srs-gap|account-gap|owner-gate/.test(k) || /ủy quyền|uỷ quyền|\bdelegat|quyết\b/i.test(t)],
+  ['decision', (k, t) => /decision|delegat|ruling|scope-gap|design-gap|srs-gap|account-gap|owner-gate/.test(k) || DECISION_TEXT.test(t)],
   ['grammar', (k, t) => /grammar/.test(k) || /@starci\/grammar/.test(t)],
 ];
 export const labelsOf = (kind, text) => LABEL_RULES.filter(([, test]) => test(String(kind ?? ''), String(text ?? ''))).map(([name]) => name);
@@ -411,7 +402,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
       // Nor one nobody ever tried to run: settled with no dispatch and no dispatch reject (a stranded --after chain
       // the Kernel settled blocked; a launcher that kept refusing is repeat-reject's, and still counts here).
-      // nivo wf-nivo-collab-group-chat a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
+      // a collab-group-chat workflow's a3 settled so on 2026-09-23; the Kernel's re-run of the same cut ordinal three
       // days later chained to it (--retry-of) and a3 read as the loop's first failure.
       const dispatched = new Set(db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind IN ('op-dispatched','dispatch-rejected')").all(wf).map((r) => r.entity_id));
       for (const r of db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind='op-settled'").all(wf)) if (!dispatched.has(r.entity_id)) notAFailure.add(r.entity_id);

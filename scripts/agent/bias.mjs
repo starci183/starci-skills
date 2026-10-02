@@ -12,10 +12,9 @@
 //                          this regex exists so the same code path still
 //                          works when nobody is there to read intent.
 //
-// Regex markers (floor, not ceiling — agents catch every other phrasing):
-//   prefer: "ưu tiên X", "prefer X", "uu tien X", "u-u tien X" ("<ưu tiên X>" too)
-//   avoid:  "tránh X", "tranh X", "avoid X", "không dùng X", "khong dung X"
-// where X is a pool alias:
+// Regex markers (floor, not ceiling — agents catch every other phrasing): the prefer/avoid marker
+// phrases an owner prompt types, in either language (the Vietnamese ones are lexicon data,
+// modules/goal/source-phrases.yaml bias), each followed by a pool alias:
 //   codex|codex-agent -> codex-agent   claude|claude-agent -> claude-agent
 //   devin|devin-agent -> devin-agent
 //
@@ -23,6 +22,7 @@
 // Args: "<text>" -> extracted JSON; --normalize '<json>' -> normalized JSON.
 import { isMain } from '../lib/is-main.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 const ALIASES = {
   'codex': 'codex-agent', 'codex-agent': 'codex-agent',
@@ -31,8 +31,8 @@ const ALIASES = {
 };
 
 // Longest alias forms first so 'codex-agent' wins over 'codex' inside the token.
-const PREFER_RE = /(?:ưu\s*tiên|uu\s*tien|u-u\s*tien|prefer)\s+([a-z][a-z-]*)/gi;
-const AVOID_RE = /(?:không\s*dùng|khong\s*dung|tránh|tranh|avoid)\s+([a-z][a-z-]*)/gi;
+const PREFER_RE = new RegExp(`(?:${altOf('bias.prefer')})\\s+([a-z][a-z-]*)`, 'gi');
+const AVOID_RE = new RegExp(`(?:${altOf('bias.avoid')})\\s+([a-z][a-z-]*)`, 'gi');
 
 const scan = (text, re) => {
   const out = [];

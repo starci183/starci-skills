@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fail if any authored *.json under the skill root is outside
- * modules/schemas/json-exceptions.yaml. Inventory-only helper.
+ * Fail if any authored *.json under the skill root is outside the json-exceptions
+ * section of modules/kernel/allowlist.yaml (the ONE allowlist of the runtime).
+ * Inventory-only helper.
  *
  * The allowlist names exact files (`exceptions[]`) and exact directories (`directories[]`). A registered
  * directory admits the *.json files directly inside it, for an append-only record kept as one JSON file per
@@ -15,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../engine/yaml.mjs';
+import { ALLOWLIST_FILE, readAllowlistFile } from '../lib/allowlist.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -32,7 +33,7 @@ const SKIP_DIR_NAMES = new Set([
   '.venv',
   'worktrees',
   'coverage',
-  // Fleet scratch (lint reports, perf baselines) under examples/; not authored source.
+  // Scratch files (lint reports, perf baselines) under examples/; not authored source.
   'ex-testing',
   // Gitignored local credentials (ui/.secrets); never authored source and never committed.
   '.secrets',
@@ -117,16 +118,16 @@ function loadAllowlist(allowlistFile) {
   if (!fs.existsSync(allowlistFile)) {
     throw Error(`JSON exceptions allowlist is required: ${path.relative(root, allowlistFile).replaceAll('\\', '/')}`);
   }
-  const doc = parseYaml(fs.readFileSync(allowlistFile, 'utf8'));
-  if (!doc || typeof doc !== 'object' || !Array.isArray(doc.exceptions)) {
-    throw Error('modules/schemas/json-exceptions.yaml must define exceptions[]');
+  const section = readAllowlistFile('json-exceptions', allowlistFile);
+  if (!section || typeof section !== 'object' || !Array.isArray(section.exceptions)) {
+    throw Error(`${ALLOWLIST_FILE} json-exceptions must define exceptions[]`);
   }
-  if (doc.directories !== undefined && !Array.isArray(doc.directories)) {
-    throw Error('modules/schemas/json-exceptions.yaml directories must be a list when present');
+  if (section.directories !== undefined && !Array.isArray(section.directories)) {
+    throw Error(`${ALLOWLIST_FILE} json-exceptions.directories must be a list when present`);
   }
   return {
-    files: sortedUnique(doc.exceptions.map(entry => entryPath(entry, 'exceptions')), 'exceptions'),
-    directories: sortedUnique((doc.directories ?? []).map(entry => entryPath(entry, 'directories')), 'directories'),
+    files: sortedUnique(section.exceptions.map(entry => entryPath(entry, 'exceptions')), 'exceptions'),
+    directories: sortedUnique((section.directories ?? []).map(entry => entryPath(entry, 'directories')), 'directories'),
   };
 }
 
@@ -168,7 +169,7 @@ export function checkJsonExceptions({
   ignoreLockfiles: ignoreLocks = ignoreLockfiles,
 } = {}) {
   const skillRoot = optionRoot ?? skillRootOption ?? root;
-  const listFile = allowlistFile ?? path.join(skillRoot, 'modules', 'schemas', 'json-exceptions.yaml');
+  const listFile = allowlistFile ?? path.join(skillRoot, ...ALLOWLIST_FILE.split('/'));
   const { files: allowlist, directories } = loadAllowlist(listFile);
   const allow = new Set(allowlist);
   const allowDirs = new Set(directories);
@@ -221,7 +222,7 @@ function main() {
   }
   if (result.offenders.length) {
     process.stderr.write(
-      `Authored JSON outside modules/schemas/json-exceptions.yaml (${result.offenders.length}):\n` +
+      `Authored JSON outside ${ALLOWLIST_FILE} (${result.offenders.length}):\n` +
         result.offenders.map(p => `  ${p}`).join('\n') +
         '\n'
     );

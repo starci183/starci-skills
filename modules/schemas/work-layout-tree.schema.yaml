@@ -640,7 +640,7 @@ $defs:
               - locales
             description: The message keys the tree uses - nav labels (i18nKey), layout titles (titleKey) and any
               key a capture names (i18nKeys) - and one digest of their values per locale. A catalog change stales
-              the tree only when a used key's value changed or a used key disappeared (nivo inc-13f6af8494bf). A
+              the tree only when a used key's value changed or a used key disappeared (inc-13f6af8494bf). A
               tree scanned before this field judges its whole-file digests by the keys it uses until the next
               re-scan records it.
             properties:

@@ -17,8 +17,8 @@ asOf:
   date: 2026-09-25
   commit: f17e62112            # the runtime main this file was derived from, plus contract change routing-review-hands (lane routing-review-hands)
   derivedFrom:
-    - modules/models/runtimes.yaml          # runtimes.<pool>.roles/models/maxParallel, allocation.tiers/preference/balanced/overflowByOrder/frontier/hands, roleOfKind
-    - modules/models/registry.yaml          # targets, operators.<op>.chain, costPolicy
+    - modules/models/runtimes.yaml          # allocation.tiers/preference/balanced/overflowByOrder/frontier/hands, roleOfKind
+    - modules/models/registry.yaml          # pools.<pool>.provider/roles/models/maxParallel, targets, operators.<op>.chain, costPolicy
     - modules/models/profiles/*.yaml        # business.whenNeeded / whenNot / failureModes
     - modules/models/agents/*.yaml          # capabilities.hostTools
     - config.example.yaml                   # allocation.policy balanced, allocation.shares, allocation.grants

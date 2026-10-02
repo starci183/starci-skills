@@ -19,6 +19,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 
 const SCHEMA_FILE = 'modules/schemas/op.schema.yaml';
@@ -102,19 +103,25 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     for (const error of validateAgainstSchema(doc, schema)) add(id, 'SCHEMA_INVALID', 'error', error);
     if (doc?.id && doc.id !== id) add(id, 'SCHEMA_INVALID', 'error', `$.id is ${doc.id} but the file is ${file}`);
 
+    // `shared:` markers expand to the _common.yaml fragments — the rules below
+    // judge the effective manifest text, not the stub (scripts/lib/op-shared.mjs).
+    let full;
+    try { full = mergeOpShared(doc, opSharedOf(dir)); }
+    catch (e) { add(id, 'SCHEMA_INVALID', 'error', `shared fragment: ${e.message}`); continue; }
+
     // PARAM_DEFAULT — a param either has a value that stands when nobody sets it, or is required
     // of its setter at enqueue; a JSON schema walker without oneOf cannot say "exactly one".
-    for (const [name, def] of Object.entries(doc?.params && typeof doc.params === 'object' ? doc.params : {})) {
+    for (const [name, def] of Object.entries(full?.params && typeof full.params === 'object' ? full.params : {})) {
       const hasDefault = Object.hasOwn(def ?? {}, 'default'), required = def?.required === true;
       if (hasDefault === required) add(id, 'PARAM_DEFAULT', 'error', `params.${name} ${hasDefault ? 'carries both a default and required: true' : 'carries neither a default nor required: true'} — exactly one`);
     }
 
     // (a) PARAM_RESTATED — a tunable's value spelled out in prose the agent reads as law.
-    const covered = unitsCoveredBy(doc?.params);
+    const covered = unitsCoveredBy(full?.params);
     if (covered.size) {
       const proseFields = [
-        ...(Array.isArray(doc?.steps) ? doc.steps.map((s, i) => ({ at: `steps[${i}].action.en`, text: s?.action?.en })) : []),
-        ...(Array.isArray(doc?.proofs) ? doc.proofs.map((p, i) => ({ at: `proofs[${i}].requirement.en`, text: p?.requirement?.en })) : []),
+        ...(Array.isArray(full?.steps) ? full.steps.map((s, i) => ({ at: `steps[${i}].action.en`, text: s?.action?.en })) : []),
+        ...(Array.isArray(full?.proofs) ? full.proofs.map((p, i) => ({ at: `proofs[${i}].requirement.en`, text: p?.requirement?.en })) : []),
       ];
       for (const { at, text } of proseFields) {
         if (typeof text !== 'string') continue;
@@ -127,7 +134,7 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
 
     // (b) RULE_DUPLICATED — one rule, one place.
     const seen = new Map();
-    for (const { at, text } of proseStrings(doc)) {
+    for (const { at, text } of proseStrings(full)) {
       for (const sentence of sentencesOf(text)) {
         const key = normalize(sentence);
         if (wordCount(key) < 12) continue;
@@ -137,7 +144,7 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     }
 
     // (c) RULE_IN_DATA — reads describe data; the rule belongs to the step.
-    for (const [i, read] of (Array.isArray(doc?.reads) ? doc.reads : []).entries()) {
+    for (const [i, read] of (Array.isArray(full?.reads) ? full.reads : []).entries()) {
       const purpose = read?.purpose?.en;
       if (typeof purpose !== 'string') continue;
       // A hyphenated compound is a name, not a rule: `read-only` access is data.
@@ -146,12 +153,12 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
     }
 
     // (d) PATH_JOINED — one write entry, one path.
-    for (const [i, write] of (Array.isArray(doc?.writes) ? doc.writes : []).entries()) {
+    for (const [i, write] of (Array.isArray(full?.writes) ? full.writes : []).entries()) {
       if (typeof write?.path === 'string' && write.path.includes(' + ')) add(id, 'PATH_JOINED', 'error', `writes[${i}] (${write?.id ?? '?'}).path joins several paths with ' + ' — one path (or one glob) per entry`);
     }
 
     // (e) CHECK_MISSING — a claim that executes.
-    for (const [i, proof] of (Array.isArray(doc?.proofs) ? doc.proofs : []).entries()) {
+    for (const [i, proof] of (Array.isArray(full?.proofs) ? full.proofs : []).entries()) {
       const check = proof?.check;
       if (typeof check !== 'string' || !check.trim()) continue;
       if (!fs.existsSync(path.join(root, check))) add(id, 'CHECK_MISSING', 'error', `proofs[${i}] (${proof?.id ?? '?'}).check names ${check}, which is not on disk`);

@@ -61,8 +61,8 @@ export default {
       const waiting = d.json?.waiting === true;
       results.push({ jobId, dispatched: d.ok && !waiting, waiting: waiting ? (d.json?.reason ?? d.json?.throttle?.reason ?? 'waiting') : null, error: d.ok ? null : (d.json?.reason ?? d.json?.error ?? `exit ${d.status}`) });
       if (d.ok && !waiting) launched += 1;
-      // A host refusal (RAM, disk, fleet cap, a repository at its worktree cap) will refuse the next one too: stop and let the next wake retry.
-      if (waiting && /host-resources|fleet-max|heavy-paused|does-not-fit|priority-reserved|worktree-cap/.test(JSON.stringify(d.json ?? {}))) break;
+      // A host refusal (RAM, disk, workers cap, a repository at its worktree cap) will refuse the next one too: stop and let the next wake retry.
+      if (waiting && /host-resources|workers-max|heavy-paused|does-not-fit|priority-reserved|worktree-cap/.test(JSON.stringify(d.json ?? {}))) break;
     }
     const out = { ok: true, workflowId: wf, pushId, before: { running: p.running, allowed: p.allowedParallel, queuedReady: p.queuedReady }, target: k, launched, results, dryRun: Boolean(args['dry-run']) };
     if (!args['dry-run']) {

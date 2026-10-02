@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { readOpManifest } from '../lib/op-shared.mjs';
 import { ownedRecordPaths } from '../work/record-ownership.mjs';
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
@@ -150,17 +151,14 @@ function resolveOwnedPaths(records, stateDir) {
   return { ownedPaths, missing: missing.length ? missing : undefined };
 }
 
-/** modules/models/profiles/<target>.yaml -> {target, provider, requestedModel, profile}. */
+/** modules/models/registry.yaml -> {target, provider} — the ONE catalog's pools and launch targets. */
 function resolveModel(target, modelsDir) {
   if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
-  const file = path.join(modelsDir, 'profiles', `${target}.yaml`);
-  if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
-  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  return {
-    target, provider: doc?.provider ?? null,
-    requestedModel: doc?.identity?.requestedModel ?? null,
-    profile: path.relative(skillRoot, file),
-  };
+  const file = path.join(modelsDir, 'registry.yaml');
+  const doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null;
+  const entry = doc?.pools?.[target] ?? doc?.targets?.[target];
+  if (!entry) return { error: `no model target '${target}' in modules/models/registry.yaml (pools, targets)` };
+  return { target, provider: entry.provider ?? entry.runtime ?? null, profile: 'modules/models/registry.yaml' };
 }
 
 // The [Op] prompt is one canonical builder (scripts/kernel/op-prompt.mjs OPS-07): this preview
@@ -178,7 +176,7 @@ function main() {
     console.error(`unknown op '${args.op}' — no brief at ${briefRel}`);
     process.exit(1);
   }
-  const opDoc = parseYaml(fs.readFileSync(briefAbs, 'utf8'));
+  const opDoc = readOpManifest(briefAbs);
   const model = resolveModel(args.model ?? defaultOperationTarget(modelsDir), modelsDir); // orchestration.defaultOperationTarget
   if (model.error) { console.error(model.error); process.exit(1); }
 
@@ -226,7 +224,7 @@ function main() {
   const worktree = args.worktree ?? 'active';
 
   // The launch starci kernel dispatch issues for this packet (modules/kernel/dispatch.yaml spawnMechanics).
-  const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel, modelsDir });
+  const launchModel = resolveWorkerLaunchModel({ target: model.target, modelsDir });
   const orcaCommands = [
     { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${args.op} #<attempt>`, '--display-name', title, '--worktree', worktree, '--agent', model.provider ?? '<agent>',
       ...(launchModel.error ? [] : ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])]), '--run', '<workflow-run-id>', '--json'],

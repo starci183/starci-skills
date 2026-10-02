@@ -146,8 +146,8 @@ test("message-carries-params-only: a message is one params and nothing else", ()
         valid: [
             { filename: COMMAND, code: `${head}export class PlaceOrderCommand extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },
             { filename: QUERY, code: `${head}export class ListOrdersQuery extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },
-            // a `.command.ts` of a CLI transport is not an application message
-            { filename: at("src/features/api/plan/transport/cli/seed.command.ts"), code: "export class Seed { run() { return 1 } }" },
+            // a `.command.ts` of a transport is not an application message
+            { filename: at("src/features/api/plan/transport/rest/seed.command.ts"), code: "export class Seed { run() { return 1 } }" },
             // a handler file is not a message file
             { filename: HANDLER, code: "export class H { run() { return 1 } }" },
         ],
@@ -171,7 +171,7 @@ test("message-typed-result: a message extends Command<R> / Query<R> from @nestjs
             // a renamed import is the same class
             { filename: COMMAND, code: `import { Command as Message } from "@nestjs/cqrs"\nimport type { ExecuteParams } from "@modules/platform/cqrs"\nexport class PlaceOrderCommand extends Message<string> { constructor(readonly params: ExecuteParams<string>) { super() } }` },
             // outside the application slot the rule is silent
-            { filename: at("src/features/api/plan/transport/cli/seed.command.ts"), code: "export class Seed {}" },
+            { filename: at("src/features/api/plan/transport/rest/seed.command.ts"), code: "export class Seed {}" },
         ],
         invalid: [
             { filename: COMMAND, code: `${head}export class PlaceOrderCommand { constructor(readonly params: ExecuteParams<string>) {} }`, errors: [{ messageId: "base" }] },

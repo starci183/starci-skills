@@ -3,7 +3,7 @@ id: be.typing
 title: Backend typing
 purpose: |-
   Given a backend contract, value or boundary, which type expresses it? Types express actual contracts and never stand in for
-  runtime validation. Read docs/backend-source-pattern.md for the layout and code forms.
+  runtime validation. Read docs/architecture.md for the layout and code forms.
 appliesTo:
   - backend
 family: be
@@ -12,7 +12,7 @@ provenance:
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/rules.yaml
-    - docs/backend-source-pattern.md
+    - docs/architecture.md
     - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/techniques/validation
     - https://www.typescriptlang.org/tsconfig

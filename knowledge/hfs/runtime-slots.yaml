@@ -3,8 +3,9 @@
 # runtime) and the same machinery: scripts/hfs/runtime-check.mjs runs the tree check (checkRepo) with this manifest, then
 # the runtime rules of knowledge/hfs/rules.yaml (gate runtime) under scripts/hfs/runtime-rules/. Every tracked path of the
 # runtime matches exactly one slot. The slots describe the CURRENT tree and the TARGET tree of the runtime HFS design: a
-# current path the target moves is a forbidden slot whose goesTo names its successor, and its presence is a `pending` entry.
-# The `pending` block at the end is the ONLY allowlist of the runtime check and only shrinks.
+# current path the target moves is a forbidden slot whose goesTo names its successor. The ONE explicit allowlist of the
+# runtime is modules/kernel/allowlist.yaml (scripts/checks/check-one-allowlist.mjs); every exception list lives in one
+# named section of it and only shrinks.
 schema: starci/runtime-slots@1
 kind: runtime
 version: 1.0.0
@@ -105,11 +106,13 @@ ruleParams:
     sourceName: "^[a-z0-9]+(-[a-z0-9]+)*$"
     oneOffNames: ["_*", "tmp-*", "fix-*", "*-backfill", "backfill-*", "migrate-*", "*-old", "*.bak*", "repair-*"]
     sharedBasenames: [lib.mjs, index.mjs]
-    # RT_GENERATED_DRIFT: the generated copies, declared once.
+    # RT_GENERATED_DRIFT and GENERATED_UNTRACKED: the generated copies, declared once. They are git-ignored output of the
+    # declared generatedBy; a checkout regenerates them and no path below them may be tracked.
     generated:
       - {root: packages/hfs/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/be/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
       - {root: packages/eslint/fe/runtime, generatedBy: scripts/hfs/sync-runtime.mjs}
+      - {root: ui/src/i18n/generated, generatedBy: scripts/hfs/sync-runtime.mjs}
     # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
     pinned:
       - {path: packages/cli/bin/starci.mjs, why: the @starci/cli npm bin}
@@ -126,7 +129,10 @@ ruleParams:
       - {id: retired-cli, run: scripts/checks/check-retired-cli.mjs}
       - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
+      - {id: schema-shared, run: scripts/checks/check-schema-shared.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
+      - {id: one-allowlist, run: scripts/checks/check-one-allowlist.mjs}
+      - {id: generated-untracked, run: scripts/checks/check-generated-untracked.mjs}
       - {id: work-deep, run: scripts/work/validate/check-work-deep.mjs}
       - {id: host-boundary, run: scripts/checks/check-host-boundary.mjs}
       - {id: module-yaml, run: scripts/checks/check-module-yaml.mjs}
@@ -137,6 +143,9 @@ ruleParams:
       - {id: i18n-catalog, run: scripts/checks/check-i18n-catalog.mjs}
       - {id: grammar-dist, run: scripts/checks/check-grammar-dist.mjs}
       - {id: canon-pins, run: scripts/checks/check-canon-pins.mjs}
+      - {id: retired-names, run: scripts/checks/check-retired-names.mjs}
+      - {id: example-coupling, run: scripts/checks/check-example-coupling.mjs}
+      - {id: doc-owner, run: scripts/checks/check-doc-owner.mjs}
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
       - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
       - {id: clones, run: scripts/checks/check-clones.mjs}
@@ -146,6 +155,10 @@ ruleParams:
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
+      - {id: port-once, run: scripts/checks/check-port-once.mjs}
+      - {id: default-once, run: scripts/checks/check-default-once.mjs}
+      - {id: version-pin-once, run: scripts/checks/check-version-pin-once.mjs}
+      - {id: slot-id-shape, run: scripts/checks/check-slot-id-shape.mjs}
 
 slots:
 
@@ -260,7 +273,7 @@ slots:
     tier: entry
     owner: true
     requires: [package.json, server.mjs, README.md, CONTRACT.md]
-    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, "api/**", "src/**", "public/**", "fixtures/**"]
+    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
@@ -466,12 +479,12 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
   - id: runtime.checks-retired
     profiles: [runtime]
-    path: "scripts/checks/{architecture.mjs,architecture/,typescript-programs.mjs,common.mjs,gate.mjs,read-digest.mjs,proof.mjs,unit-run.mjs,test-world-run.mjs,release-proof.mjs,release-app-installs.mjs,acceptance.mjs,stacks.mjs,sonar-ext-custody.mjs,sonar-gate.mjs,sonar-local.mjs,canon-scan.mjs,repo-presentation.mjs,package-clean-test.mjs,output.mjs,probe-reference-conventions.mjs,draw-*.mjs,brand*.mjs,grammar-*.mjs,render.mjs,shell-conformance.mjs,ui-*.mjs,work-*.mjs,ledger-*.mjs,owner-claims-audit.mjs,providers.mjs,failure-codes.mjs,examples-ci.mjs,check-db-openers.mjs,check-starcistacks.mjs,check-hfs-sync.mjs,check-work-artifacts.mjs,check-work-consistency.mjs,check-work-deep.mjs,check-work-schemas.mjs,check-work-surfaces.mjs,check-evidence-binding.mjs,host-boundary.allow,failure-codes.not-codes,spec/}"
+    path: "scripts/checks/{architecture.mjs,architecture/,typescript-programs.mjs,common.mjs,gate.mjs,read-digest.mjs,proof.mjs,unit-run.mjs,test-world-run.mjs,release-proof.mjs,release-app-installs.mjs,acceptance.mjs,stacks.mjs,sonar-ext-custody.mjs,sonar-gate.mjs,sonar-local.mjs,canon-scan.mjs,repo-presentation.mjs,package-clean-test.mjs,output.mjs,probe-reference-conventions.mjs,draw-*.mjs,brand*.mjs,grammar-*.mjs,render.mjs,shell-conformance.mjs,ui-*.mjs,work-*.mjs,ledger-*.mjs,owner-claims-audit.mjs,providers.mjs,failure-codes.mjs,examples-ci.mjs,check-db-openers.mjs,check-starcistacks.mjs,check-hfs-sync.mjs,check-work-artifacts.mjs,check-work-consistency.mjs,check-work-deep.mjs,check-work-schemas.mjs,check-work-surfaces.mjs,check-evidence-binding.mjs,host-boundary.allow,failure-codes.not-codes,dead-scripts.entries,spec/}"
     presence: forbidden
     tracked: external
     tier: none
     tests: none
-    goesTo: "scripts/hfs/ (architecture machine, typescript-programs: C1), scripts/lib/{is-main,walk}.mjs (common: C1), scripts/gates/ (gates and proofs: C4), scripts/work/{draw,brand,ui,validate}/ (Work judges and validators: C4), scripts/housekeeping/ (ledger tools: C4), scripts/checks/check-{providers,failure-codes,examples-ci,grammar-dist}.mjs (renamed self-checks: C4); check-db-openers is superseded by RT_EXTERNAL_OWNER (C3); allow files fold into pending (C4)"
+    goesTo: "scripts/hfs/ (architecture machine, typescript-programs: C1), scripts/lib/{is-main,walk}.mjs (common: C1), scripts/gates/ (gates and proofs: C4), scripts/work/{draw,brand,ui,validate}/ (Work judges and validators: C4), scripts/housekeeping/ (ledger tools: C4), scripts/checks/check-{providers,failure-codes,examples-ci,grammar-dist}.mjs (renamed self-checks: C4); check-db-openers is superseded by RT_EXTERNAL_OWNER (C3); the check list files fold into the dead-script-entries section of modules/kernel/allowlist.yaml (H)"
 
   # ----- contracts, knowledge, docs, skills ---------------------------------------------------------------------
   - id: runtime.contracts
@@ -507,15 +520,6 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-  - id: runtime.checks-data
-    profiles: [runtime]
-    # The two shrink-only declaration lists of the runtime checks: the CLIs no code imports (check-dead-scripts.mjs) and the source
-    # files not yet converted to English (check-doc-language.mjs).
-    path: "scripts/checks/{dead-scripts.entries,source-language.pending}"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
   - id: runtime.host-contract
     profiles: [runtime]
     path: "modules/host/<system>/"
@@ -547,7 +551,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING, RT_DOC_NO_OWNER]
   - id: runtime.skill
     profiles: [runtime]
     path: "skills/<skill>/"
@@ -581,7 +585,7 @@ slots:
   # ----- packages, generated copies -----------------------------------------------------------------------------
   - id: runtime.packages-meta
     profiles: [runtime]
-    path: "packages/{README.md,KNOWN-DEFECTS.md,package.json,package-lock.json,eslint/.gitignore,eslint/CHANGELOG.md,eslint/README.md}"
+    path: "packages/{README.md,package.json,package-lock.json,eslint/.gitignore,eslint/CHANGELOG.md,eslint/README.md}"
     presence: optional
     tracked: tracked
     tier: none
@@ -601,14 +605,15 @@ slots:
   - id: runtime.package-runtime-copy
     profiles: [runtime]
     # Byte copies of runtime files a published package needs in a product repository; never edited, never imported by
-    # runtime code. The roots are ruleParams.runtime.generated.
+    # runtime code. The roots are ruleParams.runtime.generated: git-ignored output that pack, tests and the check
+    # regenerate; a tracked path below them is GENERATED_UNTRACKED.
     path: "packages/{hfs,eslint/be,eslint/fe}/runtime/"
-    presence: required
+    presence: optional
     tracked: generated
     generatedBy: scripts/hfs/sync-runtime.mjs
     tier: none
     tests: none
-    rules: [RT_GENERATED_DRIFT]
+    rules: [RT_GENERATED_DRIFT, GENERATED_UNTRACKED]
 
   # ----- dev stacks, examples, benchmark ---------------------------------------------------------------------
   - id: runtime.ext
@@ -643,12 +648,6 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-
-# pending - the ONE explicit allowlist of the runtime check. A finding matching an entry (its path glob and its finding
-# code) reports at level `pending` (printed, never failing). An entry that matches no finding is RT_PENDING_STALE, and an
-# entry that allows a finding the base revision's list did not allow is RT_PENDING_ADDED, so the list only shrinks. Each
-# entry names the chunk of the runtime HFS migration that deletes it.
-pending: []
 
 consumers:
   - scripts/hfs/slots.mjs

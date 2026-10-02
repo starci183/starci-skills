@@ -16,7 +16,7 @@ import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-collab-mum8xsop';
-const LEDGER = 'todo-app-be';
+const LEDGER = 'shop-be';
 const REFUSAL = { ok: false, error: "plan-edges-missing: the plan's 12 leg(s) [request.analyze, scope.define] carry no provable dependency edges (absent, partial, naming an unknown leg or cyclic); a plan without edges is refused", code: 'plan-edges-missing' };
 const refusedSpawn = () => ({ ok: false, code: 1, value: null, stdout: '', stderr: `${JSON.stringify(REFUSAL)}\n`, timedOut: false });
 

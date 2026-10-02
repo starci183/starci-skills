@@ -4,7 +4,7 @@
 //
 // Cross-workflow dependencies surfaced one at a time - a peer-wait, a foundation's dependents, a typed
 // --until-job on a peer's job, a foreign-file incident, a record-change refused because another
-// workflow owns the record - and stalled both sides (nivo module-studio and collab-group-chat both
+// workflow owns the record - and stalled both sides (a product's module-studio and collab-group-chat both
 // peer-waited on workspace-provision's queued repair op-e2e.verify-9fb01b4fe6 while workspace-provision
 // sat behind its own owner-gates). This read-only projection puts them in one graph:
 //
@@ -27,7 +27,7 @@
 //            hub-blocker     one workflow holds >= 2 other live workflows over hard edges
 //            duplicate-work  two live workflows build the same thing: open jobs owning intersecting
 //                            paths, work-graph nodes owning intersecting paths, or two foundations
-//                            that are one foundation under two names (nivo.brand ~ brand)
+//                            that are one foundation under two names (<product>.brand ~ brand)
 //   proposal each finding carries the Supervisor's action (scripts/supervisor/bridge.mjs): bridge,
 //            transfer, revise or designate, with clearCut true only when the evidence leaves no
 //            judgement (the rule is stated on the proposal).
@@ -69,7 +69,7 @@ const pathForm = (p) => normWork(typeof p === 'string' ? p : p?.path).toLowerCas
 const within = pathsOverlap;
 export const shortWorkflow = (wf) => String(wf ?? '').replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '');
 
-/** The alias key of a foundation name: `nivo.brand` and `brand` are one foundation, `shell` is `layout-tree`. */
+/** The alias key of a foundation name: `<product>.brand` and `brand` are one foundation, `shell` is `layout-tree`. */
 export function foundationAliasKey(name) {
   const stripped = String(name ?? '').toLowerCase().replace(/^[a-z0-9-]+\./, '').replace(/^starci-/, '');
   return FOUNDATION_SYNONYMS[stripped] ?? stripped;

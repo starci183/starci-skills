@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // draw-acceptance.mjs — what an interface.draw pass is judged by: EVERY asset its accepted record binds, the files it
-// wrote and the ones it adopted, inherited or found already there alike (nivo wf-nivo-app-auth-mujek72s
+// wrote and the ones it adopted, inherited or found already there alike (a product's wf-<product>-app-auth-mujek72s
 // op-interface.draw-7c2821e002 settled pass by committing 40 image-gen evidence files of three older jobs unchanged).
 //
 // Owner ruling 2026-09-27: interface.draw draws shapes only - one image per XBase#state of the ui record's ui.shapes -
@@ -50,7 +50,7 @@ export const DRAW_ASSET_NOT_TOKEN_RENDERED = 'DRAW_ASSET_NOT_TOKEN_RENDERED';
 export const DRAW_NOT_SHAPES = 'DRAW_NOT_SHAPES';
 export const DRAW_NOT_REDRAWN = 'DRAW_NOT_REDRAWN';
 export { DATA_STATUS_DRAWN };
-/** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes.yaml). */
+/** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes/). */
 export const DRAW_ACCEPTANCE_CHANGE = 'draw-adopt-gate';
 export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
 const IMAGEGEN_ASSERTION = 'imagegen-provenance';
@@ -120,7 +120,7 @@ function judgeRecord(recordDir, repo) {
   const recipe = recipeRenderedOf(record);
   if (recipe) return { record, findings, drawn: false, recipe: true, tokenRendered: new Set() };
   const shapes = list(record?.ui?.shapes);
-  if (!shapes.length) findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} declares no ui.shapes: a drawing is one image per XBase#state of ui.shapes, never a whole screen (scripts/work/migrate-ui-shapes.mjs writes them)` });
+  if (!shapes.length) findings.push({ code: DRAW_NOT_SHAPES, path: rel, detail: `${rel} declares no ui.shapes: a drawing is one image per XBase#state of ui.shapes, never a whole screen` });
   const shapeStates = new Set(shapes.map((s) => String(s?.state)));
   const live = assetsOf(record).filter((a) => !a.retired && a.selected !== false);
   const drawRendered = live.filter((a) => a.generation?.tool === DRAW_TOOL);
@@ -179,7 +179,7 @@ function judgeEvidence(abs, doc, repo) {
  * draws.yaml, rejected composites, baselines) is kept-never-deleted and artifact-indexed, so it stays in the owned
  * directory; it is judged only when the live record still points at it.
  */
-export function boundByRecord(record, recordDir, abs, repo) {
+function boundByRecord(record, recordDir, abs, repo) {
   const target = slash(path.resolve(abs)).toLowerCase();
   const names = (v) => typeof v === 'string' && !/\s/.test(v) && /\.(ya?ml|json|png|jpe?g|webp)$/i.test(v)
     && [recordDir, repo].some((base) => base && slash(path.resolve(base, v)).toLowerCase() === target);

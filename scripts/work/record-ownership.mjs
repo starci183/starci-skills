@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {readYamlFile} from '../lib/read-yaml.mjs';
 import {sha256, sha256File} from '../../engine/digest.mjs';
 
 /**
@@ -25,11 +26,7 @@ export function moduleRootOf(rawPath) {
   return p;
 }
 
-export function readWorkspace(workRoot) {
-  const file = path.join(workRoot, 'workspace.yaml');
-  if (!fs.existsSync(file)) return null;
-  try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; }
-}
+export const readWorkspace = (workRoot) => readYamlFile(path.join(workRoot, 'workspace.yaml'));
 
 /**
  * Whether a yaml file's `schema:` marker names a Work record at all. Every record schema this layout

@@ -180,7 +180,7 @@ export class Engine {
     const modes = {};
     for (const name of new Set([...CONTROLLER_NAMES, ...this.controllers.map((c) => c.name)])) {
       let mode = configuredMode(name, conf);
-      if (!MODES.includes(mode)) mode = 'off';
+      if (!MODES.includes(mode)) mode = MODES[0];
       if ((this.safe || !this.apply) && mode === 'active') mode = 'shadow';
       modes[name] = mode;
     }

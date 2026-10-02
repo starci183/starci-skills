@@ -8,10 +8,13 @@ import { pathToFileURL } from 'node:url';
 
 const skillRoot = path.resolve(import.meta.dirname, '..', '..');
 const checkerFile = path.join(skillRoot, 'scripts', 'checks', 'check-json-exceptions.mjs');
-const allowlistFile = path.join(skillRoot, 'modules', 'schemas', 'json-exceptions.yaml');
+const allowlistFile = path.join(skillRoot, 'modules', 'kernel', 'allowlist.yaml');
 
 assert.equal(fs.existsSync(checkerFile), true, 'scripts/checks/check-json-exceptions.mjs is required');
-assert.equal(fs.existsSync(allowlistFile), true, 'modules/schemas/json-exceptions.yaml is required');
+assert.equal(fs.existsSync(allowlistFile), true, 'modules/kernel/allowlist.yaml is required');
+
+/** A fixture allowlist document carrying only the json-exceptions section text given (already indented one level). */
+const allowlistDoc = (section) => `schema: starci/allowlist@1\njson-exceptions:\n${section}`;
 
 function disposable(t, prefix) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -33,14 +36,14 @@ test('authored JSON outside allowlist fails the exceptions checker', async t => 
   const dir = disposable(t, 'starci-json-ex-');
   // Synthesized offender tree (the legacy/builders copy fixture is gone): one allowlisted manifest,
   // one authored JSON the allowlist does not name.
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
   fs.writeFileSync(
-    path.join(dir, 'schemas', 'json-exceptions.yaml'),
-    `schema: starci/json-exceptions@1
-exceptions:
-  - path: package.json
-    reason: npm package manifest for the disposable offender fixture
-`,
+    allowlist,
+    allowlistDoc(`  exceptions:
+    - path: package.json
+      reason: npm package manifest for the disposable offender fixture
+`),
   );
   fs.writeFileSync(path.join(dir, 'package.json'), '{}\n');
   fs.mkdirSync(path.join(dir, 'workflows'), { recursive: true });
@@ -48,7 +51,7 @@ exceptions:
 
   const result = checkJsonExceptions({
     root: dir,
-    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    allowlistFile: allowlist,
   });
   assert.ok(
     result.offenders.includes('workflows/catalog.json'),
@@ -60,19 +63,19 @@ exceptions:
 test('allowlisted package.json alone does not produce offenders in a disposable tree', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-ok-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
   fs.writeFileSync(
-    path.join(dir, 'schemas', 'json-exceptions.yaml'),
-    `schema: starci/json-exceptions@1
-exceptions:
-  - path: package.json
-    reason: npm package manifest
-`,
+    allowlist,
+    allowlistDoc(`  exceptions:
+    - path: package.json
+      reason: npm package manifest
+`),
   );
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'ok', private: true }));
   const result = checkJsonExceptions({
     root: dir,
-    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    allowlistFile: allowlist,
   });
   assert.deepEqual(result.offenders, [], `unexpected offenders: ${JSON.stringify(result.offenders)}`);
 });
@@ -80,11 +83,9 @@ exceptions:
 test('root-local runtime JSON is excluded without hiding authored JSON or nested lookalikes', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-local-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, 'schemas', 'json-exceptions.yaml'),
-    'schema: starci/json-exceptions@1\nexceptions: []\n',
-  );
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, allowlistDoc('  exceptions: []\n'));
   const localFiles = [
     '.starciwork/kernel-evidence/wf/state.json',
     'runtime/engine/builds/digest/runtime-pin.json',
@@ -104,7 +105,7 @@ test('root-local runtime JSON is excluded without hiding authored JSON or nested
 
   const result = checkJsonExceptions({
     root: dir,
-    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    allowlistFile: allowlist,
   });
   assert.deepEqual(result.offenders, authoredFiles, 'only exact root-local storage is excluded');
   assert.equal(result.ok, false, 'unexpected authored JSON still fails the checker');
@@ -116,18 +117,18 @@ test('root-local runtime JSON is excluded without hiding authored JSON or nested
 test('a missing allowlisted authored source still fails the checker', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-missing-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
   fs.writeFileSync(
-    path.join(dir, 'schemas', 'json-exceptions.yaml'),
-    `schema: starci/json-exceptions@1
-exceptions:
-  - path: package.json
-    reason: npm package manifest
-`,
+    allowlist,
+    allowlistDoc(`  exceptions:
+    - path: package.json
+      reason: npm package manifest
+`),
   );
   const result = checkJsonExceptions({
     root: dir,
-    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    allowlistFile: allowlist,
   });
   assert.equal(result.ok, false);
   assert.deepEqual(result.offenders, []);
@@ -137,16 +138,15 @@ exceptions:
 test('a registered directory admits its direct JSON children, so the next snapshot needs no new line', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-dir-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
-  const allowlist = path.join(dir, 'schemas', 'json-exceptions.yaml');
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
   fs.writeFileSync(
     allowlist,
-    `schema: starci/json-exceptions@1
-directories:
-  - path: benchmark/snapshots
-    reason: append-only snapshots, one file per entry
-exceptions: []
-`,
+    allowlistDoc(`  directories:
+    - path: benchmark/snapshots
+      reason: append-only snapshots, one file per entry
+  exceptions: []
+`),
   );
   const write = relative => {
     const file = path.join(dir, ...relative.split('/'));
@@ -177,14 +177,14 @@ exceptions: []
 test('a registered directory is exact: wildcards, trailing slashes, escapes and missing reasons are refused', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-dir-bad-');
-  const allowlist = path.join(dir, 'json-exceptions.yaml');
+  const allowlist = path.join(dir, 'allowlist.yaml');
   for (const [entry, pattern] of [
-    ['  - path: benchmark/*\n    reason: glob', /Wildcards are not allowed/],
-    ['  - path: benchmark/snapshots/\n    reason: slash', /without a trailing slash/],
-    ['  - path: ../outside\n    reason: escape', /relative skill path/],
-    ['  - path: benchmark/snapshots', /needs reason/],
+    ['    - path: benchmark/*\n      reason: glob', /Wildcards are not allowed/],
+    ['    - path: benchmark/snapshots/\n      reason: slash', /without a trailing slash/],
+    ['    - path: ../outside\n      reason: escape', /relative skill path/],
+    ['    - path: benchmark/snapshots', /needs reason/],
   ]) {
-    fs.writeFileSync(allowlist, `schema: starci/json-exceptions@1\ndirectories:\n${entry}\nexceptions: []\n`);
+    fs.writeFileSync(allowlist, allowlistDoc(`  directories:\n${entry}\n  exceptions: []\n`));
     assert.throws(() => checkJsonExceptions({ root: dir, allowlistFile: allowlist }), pattern, entry);
   }
 });
@@ -203,8 +203,9 @@ test('the shipped allowlist registers benchmark/snapshots as a directory, not fi
 test('only the skill-root tests tree is skipped; a product or template tests directory stays in the inventory', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-tests-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'schemas', 'json-exceptions.yaml'), 'schema: starci/json-exceptions@1\nexceptions: []\n');
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, allowlistDoc('  exceptions: []\n'));
   const nested = [
     'examples/app/src/tests/tsconfig.json',
     'examples/app/src/tests/world/fakes/idp/payloads/token.json',
@@ -215,7 +216,7 @@ test('only the skill-root tests tree is skipped; a product or template tests dir
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, '{}\n');
   }
-  const result = checkJsonExceptions({ root: dir, allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml') });
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
   assert.deepEqual(result.offenders, nested, 'a nested tests directory is authored source, not the spec root');
 });
 
@@ -234,9 +235,9 @@ test('checker CLI succeeds only when the installed authored source is clean', ()
 test('generated runtime mirrors are skipped, so their copies of authored JSON are not wrongly blocked', async t => {
   const checkJsonExceptions = await loadChecker();
   const dir = disposable(t, 'starci-json-mirror-');
-  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
-  const allowlist = path.join(dir, 'schemas', 'json-exceptions.yaml');
-  fs.writeFileSync(allowlist, 'schema: starci/json-exceptions@1\nexceptions: []\n');
+  fs.mkdirSync(path.join(dir, 'modules', 'kernel'), { recursive: true });
+  const allowlist = path.join(dir, 'modules', 'kernel', 'allowlist.yaml');
+  fs.writeFileSync(allowlist, allowlistDoc('  exceptions: []\n'));
   const original = 'packages/hfs/templates/be/package-scripts/package.json';
   const mirrored = [
     `packages/hfs/runtime/${original}`,

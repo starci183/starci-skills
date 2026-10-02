@@ -14,12 +14,22 @@
 //   tempState()          a machine.sqlite in a fresh temp directory: {dir, file, env, m, db (= m), own(x), close()}; env
 //                        names it (STARCI_TEST_MACHINE_FILE); close() closes every own()ed handle first, then removes
 //                        the directory.
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+
+/** The shared controller contract, asserted once per controller spec: the module names itself, owns its
+ *  concerns, routes its declared event to its duty key, and ships a reconcile function. */
+export function controllerContract(controller, { name, concerns, routeKey, routeEvent = {}, duty }) {
+  assert.equal(controller.name, name);
+  assert.deepEqual(controller.concerns, concerns);
+  assert.equal(typeof controller.reconcile, 'function');
+  assert.equal(controller.routes[routeKey](routeEvent), duty);
+}
 
 export function fakeCtx(overrides = {}) {
   const {

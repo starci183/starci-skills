@@ -1,3 +1,4 @@
+Owner: modules/host/
 # Host contract — Orca calls and agent cards
 
 Everything StarCi knows about driving a coding agent on the Orca host is

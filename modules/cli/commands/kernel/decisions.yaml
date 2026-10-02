@@ -136,7 +136,7 @@ rules:
     returns that DI; a new occurrence needs a new key
   decider: --decider defaults by kind - cap-starved, quota-exhausted, runtime-defect, cross-workflow,
     deadlock, seat-unrecoverable, service-quarantined, experiment-revert, hypothesis, push-refused
-    and kernel-proposal are the Supervisor's (resource, host, fleet and learning policy); every
+    and kernel-proposal are the Supervisor's (resource, host, workers and learning policy); every
     other kind is the Kernel's
   supersede: a supervisor-ruling --open supersedes the live Kernel DIs on the same entity (status
     superseded, event decision-superseded)

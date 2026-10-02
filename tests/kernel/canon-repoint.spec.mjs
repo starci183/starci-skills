@@ -93,12 +93,12 @@ test('RCA: a checker failing on an unresolved import is broken-import (not check
   const report = { outcome: 'blocked', blocker: { kind: 'environment', detail: 'gate.mjs exit 2: TS2307 Cannot find module "@/i18n/request"' } };
   assert.deepEqual(causesOf({ status: 'failed', report }), ['broken-import']);
   assert.equal(causesOf({ status: 'failed', report: { outcome: 'blocked', blocker: { kind: 'environment', detail: 'checker is unavailable (exit 3)' } } })[0], 'checker-unavailable');
-  const importsBroken = { count: 26, files: 3, repointQueued: false, brokenFiles: ['todo-app-fe/apps/app/src/a.ts', 'todo-app-fe/apps/app/src/b.ts', 'todo-app-fe/apps/app/src/c.ts'] };
+  const importsBroken = { count: 26, files: 3, repointQueued: false, brokenFiles: ['shop-fe/apps/app/src/a.ts', 'shop-fe/apps/app/src/b.ts', 'shop-fe/apps/app/src/c.ts'] };
   const units = [{ key: 'u1', op: 'code.refactor', state: 'open', open: [], jobs: [{ job_id: 'op-next-1', status: 'queued' }] }];
   const progress = { queuedReady: 1, running: 1, allowedParallel: 3 };
   const acts = actionsOf({ progress, rca: { clusters: [] }, units, workflowId: 'wf-x', repo: 'r', importsBroken });
   assert.equal(acts[0].cause, 'broken-import', 'ranked above dispatching more units into broken imports');
-  assert.ok(acts[0].command.endsWith('graph-edit --repo r --workflow wf-x --edit wire --op code.refactor --paths "todo-app-fe/apps/app/src/a.ts,todo-app-fe/apps/app/src/b.ts,todo-app-fe/apps/app/src/c.ts" --before op-next-1 --decision <id>'), acts[0].command);
+  assert.ok(acts[0].command.endsWith('graph-edit --repo r --workflow wf-x --edit wire --op code.refactor --paths "shop-fe/apps/app/src/a.ts,shop-fe/apps/app/src/b.ts,shop-fe/apps/app/src/c.ts" --before op-next-1 --decision <id>'), acts[0].command);
   assert.ok(!actionsOf({ progress, rca: { clusters: [] }, units, workflowId: 'wf-x', importsBroken: { ...importsBroken, repointQueued: true } }).some((a) => a.cause === 'broken-import'), 'a queued repoint is not asked for twice');
 });
 

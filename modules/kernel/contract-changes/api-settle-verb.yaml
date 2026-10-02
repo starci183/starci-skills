@@ -1,8 +1,0 @@
-id: api-settle-verb
-effectiveAt: '2026-09-28T18:45:00+07:00'
-summary: 'Move settle verdict handling and its command contract into a dedicated file, retaining shared proof helpers.'
-paths:
-  - scripts/kernel/api.mjs
-  - scripts/kernel/api-verbs/settle.mjs
-  - modules/kernel/api.yaml
-  - modules/cli/commands/kernel/settle.yaml

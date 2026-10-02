@@ -17,8 +17,8 @@ const checkout = (name: string, packageName: string | null): string => {
 
 describe("namespaceOf", () => {
     it("slugs the unscoped package name and appends 6 hex of the root hash and the slot", () => {
-        const namespace = namespaceOf(checkout("a", "@starci/Todo-App-Be"), 1)
-        assert.match(namespace.snake, /^todo_app_be_[0-9a-f]{6}_w1$/)
+        const namespace = namespaceOf(checkout("a", "@starci/Shop-Be"), 1)
+        assert.match(namespace.snake, /^shop_be_[0-9a-f]{6}_w1$/)
         assert.equal(namespace.kebab, namespace.snake.replace(/_/g, "-"))
     })
 

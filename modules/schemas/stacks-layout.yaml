@@ -36,7 +36,7 @@ shape:
 
 custody:
   summary: >-
-    What scripts/secrets-guard.mjs (the product repositories' commit-time guard) and each repository's
+    What the managed pre-commit hook's staged-secret judgement (`starci app hygiene`, R06) and each repository's
     .gitignore enforce, stated once so a declaration, a check and a guard read the same rules.
   plaintextMember: .starcistacks/<environment>/runtime/{files,env,config}/<name> - present only on a machine that decrypted it; always ignored
   encryptedTwin: <plaintextMember>.enc - SOPS (age) envelope, the tracked record

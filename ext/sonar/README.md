@@ -13,8 +13,9 @@ Files: `compose.yaml` (SonarQube + its Postgres + the one-shot admin-password bo
 Identity preserved from the legacy `<source>/.stacks` stack, so the already-running container keeps
 working: Compose project `starci`, containers `starci-sonarqube`, `starci-sonarqube-postgres`,
 `starci-sonarqube-bootstrap`, `starci-cloudflared-sonarqube`, named volumes `starci-sonarqube-*`,
-published port `${STARCI_PORT_SONARQUBE}` → container `9000` (this host: `9010`, serving
-`http://localhost:9010`, published as `https://sonar.starci.org`).
+published port `${STARCI_PORT_SONARQUBE}` → container `9000` (this host's published port is the one
+`scripts/gates/sonar-local.mjs` states once as `DEFAULT_HOST`, served locally at that host and published as
+`https://sonar.starci.org`).
 
 ## One-time materialization (owner, per host)
 
@@ -36,7 +37,7 @@ The stack needs two untracked files beside `compose.yaml`; both are gitignored:
 2. Create `.env` next to `compose.yaml`:
 
    ```
-   STARCI_PORT_SONARQUBE=9010          # this host's published SonarQube port (metadata.json port map)
+   STARCI_PORT_SONARQUBE=<the DEFAULT_HOST port of scripts/gates/sonar-local.mjs>   # this host's published SonarQube port (metadata.json port map)
    SONARQUBE_DB_PASSWORD=<contents of secrets/sonarqube-db-password.txt>
    # STARCI_CONTAINER_PREFIX=starci-   # optional; must stay starci- in steady state
    ```
@@ -63,6 +64,6 @@ Every product repository scans here (local ops through `scripts/gates/sonar-loca
 through the public host): starci-academy-backend, starci-academy-fe, nivo-backend, nivo-fe,
 starci-next, starci-next-fe, mia-mia-backend, miamia-fe, tedo-landing — the set is each repository's
 `services.sonar.projects` entry, listed in the host declaration
-(`examples/starcistacks-services/starci-academy-backend.application-stacks.yaml`). A product's own
+(`tests/fixtures/starcistacks-services/starci-academy-backend.application-stacks.yaml`). A product's own
 per-project analysis token stays in **its** custody
 (`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`, written through that repository's stack-secret tool), never in this extension. The example apps under `examples/` are the exception: they belong to this runtime repository, so the tokens they declare (`services.sonar.credentials`, custody path `.claude/ext/sonar/secrets/sonarqube-<key>-token.key`) are sealed in `secrets/`. `sonar-local.mjs ensure-project --with-token` (and a scan whose member the server rejects) mints the token with the admin token and seals it there itself, with `sops --encrypt` to the one recipient the directory's sealed members share, through a 0600 temp file (never argv), writing only the `.enc`; a directory with no such recipient is refused and the minted value revoked.

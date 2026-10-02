@@ -36,8 +36,8 @@ verification:
     BE-ERROR-5/6/7 in knowledge/patterns/be/error.yaml.
 provenance:
   sources:
-    - examples/todo-app/be/src/modules/platform/errors/domain.error.ts
-    - examples/todo-app/be/src/modules/domain/task/errors/task.error.ts
+    - examples/ecommerce-app/be/src/modules/platform/errors/domain.error.ts
+    - examples/ecommerce-app/be/src/modules/domain/order/errors/order.error.ts
   simplifications: |
     Mirrors the base-error/capability-error declaration shape (stable code, one
     init object) without filter/interceptor consumers. Uses a synthetic

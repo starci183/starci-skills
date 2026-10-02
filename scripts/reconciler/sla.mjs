@@ -206,7 +206,7 @@ const typedRow = (ev, { now, cleared = false }) => ({
 // {holds: true} when it still holds, null when it cannot tell (the clock is left to its controller). A clock the check
 // clears gets cleared_at here, and the cleared path of the pass writes ONE runtime-invariant-cleared event and ONE
 // invariant.cleared row when it had been violated. Ledger checks run for every open clock; a host probe (SERVICE_DOWN)
-// only for a clock that is violated or due, so a pass never probes a healthy fleet. A controller that re-sets a clock
+// only for a clock that is violated or due, so a pass never probes a healthy worker set. A controller that re-sets a clock
 // the truth cleared is cleared again on the next pass before it can re-violate.
 
 const SETTLED_JOB = new Set(SETTLED_JOB_LIST);

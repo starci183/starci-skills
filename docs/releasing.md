@@ -1,6 +1,19 @@
+Task: build, pack and release the runtime
 # Build and release StarCi
 
-This is the maintainer workflow, not a requirement for users installing a reviewed archive. Package preparation does not publish to npm or push Git. Runtime consumers receive sources only; the runtime reads them in place. See [runtime distribution](runtime-distribution.md).
+This is the maintainer workflow, not a requirement for users installing a reviewed archive. Package preparation does not publish to npm or push Git. Runtime consumers receive sources only; the runtime reads them in place.
+
+## Distribution: sources only
+
+A published package ships **sources only** — the authored tree is the runtime. Install and update
+copy the declared `package.json` `files[]` payload into `<host>/.claude`, preserve locally changed
+or unowned files on update (unless `--force`), ensure the installed `.claude/.gitignore` carries
+`/config.yaml` and `/config.json`, verify the installed tree (the doctor contract checks), and only
+then record `.starci-skills.json` with the new version and file hashes. A failed copy or verify
+records nothing — no manifest, no version bump. After an interrupted init or update, re-run from
+the same reviewed package and confirm `doctor --quick`; keep the local modifications update
+reported and use `--force` only after backup and review. The operator flow is
+[installation](installation.md).
 
 ## Verify source
 

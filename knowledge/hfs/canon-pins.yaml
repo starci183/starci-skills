@@ -130,6 +130,41 @@ pins:
     group: tooling
     side: both
     why: one front end resolves 20.19.43 and one back end 22.20.0; the package engines are node >=22.
+  '@types/express':
+    version: 4.17.25
+    group: tooling
+    side: be
+    why: the Express types of a back end; the reference app declares ^4.17.21 and resolves 4.17.25.
+  '@types/react':
+    version: 19.3.0
+    group: tooling
+    side: fe
+    why: the React types of a front end; the reference app declares ^19.0.0 and resolves 19.3.0.
+  '@types/react-dom':
+    version: 19.3.0
+    group: tooling
+    side: fe
+    why: the React DOM types of a front end; the reference app declares ^19.0.0 and resolves 19.3.0.
+  husky:
+    version: 9.1.7
+    group: tooling
+    side: both
+    why: the managed git hooks of the app root (pre-commit, pre-push); the reference app declares ^9.1.7 and resolves 9.1.7.
+  ts-node-dev:
+    version: 2.0.0
+    group: tooling
+    side: be
+    why: 'the watch runner of the managed dev:be:<app> script (ts-node-dev --respawn -r tsconfig-paths/register); 2.0.0 is its latest release.'
+  tsc-alias:
+    version: 1.9.7
+    group: tooling
+    side: be
+    why: 'rewrites the path aliases in the compiled output (build:be); the reference app declares ^1.8.10 and resolves 1.9.7.'
+  tsconfig-paths:
+    version: 4.2.0
+    group: tooling
+    side: be
+    why: 'loads the path aliases for the dev runner (dev:be:<app>); the reference app declares ^4.2.0 and resolves 4.2.0.'
   # --- test
   jest:
     version: 29.7.0
@@ -183,6 +218,46 @@ pins:
     group: framework
     side: be
     why: readiness probes with dependency indicators use Terminus (the liveness route of the scaffolded skeleton does not, being a thin door over the liveness service); every measured product back end resolves 11.1.1.
+  '@nestjs/cqrs':
+    version: 11.0.3
+    group: framework
+    side: be
+    why: 'the CQRS module of the application layer (commands, queries, handlers); the reference app declares ^11.0.3 and resolves 11.0.3.'
+  '@nestjs/typeorm':
+    version: 11.0.3
+    group: framework
+    side: be
+    why: 'the Nest bridge of TypeORM; the reference app declares ^11.0.3 and resolves 11.0.3.'
+  typeorm:
+    version: 0.3.31
+    group: framework
+    side: be
+    why: 'the one ORM of a back end; the reference app declares ^0.3.20 and resolves 0.3.31.'
+  pg:
+    version: 8.23.1
+    group: framework
+    side: be
+    why: 'the Postgres driver behind TypeORM; the reference app declares ^8.12.0 and resolves 8.23.1.'
+  reflect-metadata:
+    version: 0.2.2
+    group: framework
+    side: be
+    why: 'the decorator-metadata runtime Nest reads; the reference app declares ^0.2.2 and resolves 0.2.2.'
+  rxjs:
+    version: 7.8.2
+    group: framework
+    side: be
+    why: 'the observable runtime Nest is built on; the reference app declares ^7.8.1 and resolves 7.8.2.'
+  tslib:
+    version: 2.8.1
+    group: framework
+    side: be
+    why: 'the helper runtime the TypeScript emit references (importHelpers); the reference app declares ^2.8.1 and resolves 2.8.1.'
+  server-only:
+    version: 0.0.1
+    group: framework
+    side: fe
+    why: 'the Next.js marker that fails a client bundle that imports it; the i18n workspace of the reference app declares ^0.0.1.'
   next-intl:
     version: 4.13.6
     group: framework
@@ -209,3 +284,13 @@ pins:
     group: ui
     side: fe
     why: one product front end resolves 3.2.4, the others 3.2.6.
+  tailwindcss:
+    version: 4.3.3
+    group: ui
+    side: fe
+    why: 'the styling engine of a front end; the reference app declares ^4 and resolves 4.3.3.'
+  '@tailwindcss/postcss':
+    version: 4.3.3
+    group: ui
+    side: fe
+    why: 'the PostCSS plugin tailwindcss 4 runs through; the reference app declares ^4 and resolves 4.3.3.'

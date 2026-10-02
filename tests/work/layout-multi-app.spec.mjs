@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { checkShellConformance } from '../../scripts/work/ui/shell-conformance.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import {
   appNamesOf, appOfUi, frontendOf, layoutTreeMain, locateApps, nodeById, nodesOf, treeOf,
 } from '../../scripts/work/layout-tree.mjs';
@@ -15,8 +16,8 @@ import { APP_FILES, appDeclarationText, buildProduct, uiSkeleton } from '../fixt
 // app, named by `app`, or derived when the tree holds one app or only one app holds the route.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
-const validateUi = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
+const validateTree = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
+const validateUi = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
 
 const LANDING_FILES = {
   'apps/landing/tsconfig.json': JSON.stringify({ compilerOptions: {} }),

@@ -8,7 +8,7 @@ export const attemptAgent = (row: AttemptRow, live = false): LinkedAgent => ({ .
 
 /** Recent attempts from /api/attempts (shared cache); helpers to look up agents by job and list running ones. */
 export function useAttemptAgents() {
-  const query = useApiQuery<AttemptRow[]>('/api/attempts?limit=200', { topics: ['fleet'], intervalMs: 30_000 });
+  const query = useApiQuery<AttemptRow[]>('/api/attempts?limit=200', { topics: ['workers'], intervalMs: 30_000 });
   const rows = query.data ?? [];
   const byJob = new Map<string, AttemptRow>();
   for (const row of rows) { const key = `${row.project}/${row.job}`; const old = byJob.get(key); if (!old || row.id > old.id) byJob.set(key, row); }

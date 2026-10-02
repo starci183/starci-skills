@@ -1,9 +1,6 @@
-// t.ts - the UI's one text mechanism. Source strings are English; the owner reads them in Vietnamese through the declared
-// catalog files of ui/src/i18n/messages/*.ts (each default-exports a Record from the English source to the Vietnamese text).
-// A string with no catalog entry renders as its English source, never blank. A placeholder is `{name}`.
-const files = import.meta.glob<{ default: Record<string, string> }>('./messages/*.ts', { eager: true });
-
-const catalog: Record<string, string> = Object.assign({}, ...Object.values(files).map((file) => file.default));
+// t.ts - the UI's browser adapter for the one YAML catalog source. Build and dev generate this disposable map through
+// scripts/lib/i18n.mjs; source strings remain English and a missing entry renders as that source, never blank.
+import catalog from './generated/catalog';
 
 /** `text` with each `{name}` replaced by vars[name] (an unknown name is left as written). */
 export const fill = (text: string, vars: Record<string, string | number> = {}): string =>

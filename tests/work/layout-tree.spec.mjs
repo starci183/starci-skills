@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import {
   addCapture, addPlanned, captureFileOf, chainOf, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
   scanAppDir, segmentKindOf, treeOf,
@@ -15,7 +16,8 @@ import { buildProduct, layoutCapture } from '../fixtures/layout-tree.mjs';
 // layouts a drawing is composited into and the routes a build lands at are the ones the product has.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
+const validateTree = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
+
 const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.app });
 
 test('segment kinds follow the App Router file convention', () => {

@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { ROLES, CHILDREN, SMOKE_SCHEMA, noopAgent, noopSpec, runSmoke, runStage, markResult, resolveState, stateParentOf,
   ownedFileOf, ownedTextOf, feAppOf, worktreeParamsOf, mainManifest, manifestDiff } from '../../scripts/kernel/launch-smoke.mjs';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
@@ -13,6 +12,7 @@ import { startWorkerAgent } from '../../scripts/agent/start-worker.mjs';
 import { launchCriticWorker } from '../../scripts/work/draw-critic.mjs';
 import { runGit } from '../../scripts/api/git/lib.mjs';
 import { gitResultOf } from '../../scripts/lib/git.mjs';
+import { buildAppFixture } from '../helpers/app-fixture.mjs';
 
 const gitResult = (args, options) => gitResultOf(runGit(args, options));
 
@@ -31,8 +31,6 @@ const gitResult = (args, options) => gitResultOf(runGit(args, options));
 // last checkpoint; the finish fast-forwards the app's main from the branch and removes the clone.
 
 const titleRole = (title) => Object.entries(ROLES).find(([, r]) => r.title === title)?.[0] ?? (String(title).startsWith('[Critic]') ? 'critic' : null);
-const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
-
 function git(dir, ...args) {
   const r = spawnSync('git', ['-C', dir, '-c', 'user.name=smoke', '-c', 'user.email=smoke@example.invalid', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', windowsHide: true });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
@@ -342,27 +340,19 @@ test('the finish merges to main and leaves the worktree release-pending; the con
   assert.ok(names.lastIndexOf('worker-release') < fake.calls.findLastIndex((c) => c[0] === 'worktree-list'), 'every agent is released before the finish removes the worktree');
 });
 
-test("the smoke's no-op files sit in slots a real app owns: the hfs repository check over the ecommerce example finds nothing new", (t) => {
+test("the smoke's no-op files sit in slots an app owns: the hfs repository check over the frozen fixture finds nothing new", (t) => {
   // The finish gate lints the whole branch; a file in an invented folder (HFS_SLOT_UNDECLARED) would refuse the finish and
-  // hide a real finish failure. Measured on a copy of examples/ecommerce-app (its tracked files, never a node_modules), with the
-  // repository check starci app lint runs (scripts/hfs/check.mjs checkRepository; the preset and formatter passes need an
-  // installed app and are not this question).
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-slots-'));
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const source = path.join(SPEC_DIR, '..', '..', 'examples', 'ecommerce-app');
-  const app = path.join(tmp, 'ecommerce-app');
-  for (const rel of git(source, 'ls-files', '-z', '.').split('\0').filter(Boolean)) {
-    fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
-    fs.copyFileSync(path.join(source, rel), path.join(app, rel));
-  }
-  git(tmp, 'init', '-q', '-b', 'main', app);
+  // hide a real finish failure. The frozen fixture has only the app-tree shape this assertion needs; the repository check
+  // starci app lint runs is the subject (the preset and formatter passes need an installed app and are not this question).
+  const app = buildAppFixture(t);
+  git(path.dirname(app), 'init', '-q', '-b', 'main', app);
   git(app, 'config', 'core.autocrlf', 'false');
   git(app, 'add', '-A');
-  git(app, 'commit', '-q', '-m', 'ecommerce example');
+  git(app, 'commit', '-q', '-m', 'fixture app');
   const codes = () => checkRepository({ repoRoot: app, fast: true }).findings.map((f) => `${f.code} ${f.path}`).sort();
   const base = codes();
   const feApp = feAppOf(app);
-  assert.equal(feApp, 'landing');
+  assert.equal(feApp, 'web');
   const files = ['op', 'opFe', 'opFail'].map((role) => [ownedFileOf(role, 'smoke-t', feApp), ownedTextOf(role, 'smoke-t')]);
   for (const [rel, text] of files) { fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true }); fs.writeFileSync(path.join(app, rel), text); }
   git(app, 'add', '-A');
@@ -470,16 +460,16 @@ test('a stage refuses to start a child from a terminal that is not the one launc
   assert.equal(fake.names().includes('worker-start'), false);
 });
 
-test('the no-op agent is the cheapest priced model a runtimes.yaml pool pins, with that tier effort', () => {
+test('the no-op agent is the cheapest priced model a registry.yaml pool pins, with that tier effort', () => {
   const runtimes = { runtimes: {
     a: { provider: 'claude', models: { easy: 'big', hard: 'big' } },
     b: { provider: 'codex', models: { easy: 'small', hard: 'mid' }, effort: { easy: 'low', hard: 'high' } },
     c: { provider: 'devin', models: { medium: 'unpriced' } } } };
   const prices = { models: { big: { input: 4, output: 20 }, mid: { input: 2, output: 10 }, small: { input: 0.1, output: 0.5 }, unpriced: { input: null, output: null } } };
   assert.deepEqual(noopAgent({ runtimes, prices }), { provider: 'codex', model: 'small', effort: 'low', pool: 'b', tier: 'easy', usdPerMTok: 0.6 });
-  assert.match(noopAgent({ runtimes: { runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no runtimes.yaml pool pins a priced model/);
+  assert.match(noopAgent({ runtimes: { runtimes: { c: runtimes.runtimes.c } }, prices }).error, /no registry\.yaml pool pins a priced model/);
   const live = noopAgent();
-  assert.ok(live.provider && live.model, 'the shipped runtimes.yaml has a priced no-op model');
+  assert.ok(live.provider && live.model, 'the shipped registry.yaml has a priced no-op model');
 });
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {

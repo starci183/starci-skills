@@ -44,7 +44,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
 import { clipLine } from '../lib/clip.mjs'; import { isMain } from '../lib/is-main.mjs';
@@ -440,7 +440,7 @@ const slim = (r) => ({ key: r.key, jobs: r.jobs, succeeded: r.succeeded, failed:
 export const snapshotPayload = (metrics, stuck = []) => ({ schema: 'starci/op-metrics-snapshot@1', windowMs: metrics.windowMs,
   totals: slim(metrics.totals), ops: metrics.ops.map(slim), stuck: stuckCounts(stuck) });
 
-/** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', fleet-wide). Returns snap_id. */
+/** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', worker-wide). Returns snap_id. */
 export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KIND, windowMs: payload?.windowMs ?? null, subject: SNAPSHOT_KIND, data: payload });
 /** The newest `limit` snapshots (machine.sqlite metrics_snapshots over the machine handle `m`), oldest first: [{at, ...payload}]. */
 export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
@@ -455,7 +455,7 @@ const signed = (n, fmt) => (n == null || n === 0 ? '' : ` (${n > 0 ? '+' : '-'}$
  * One short trend line from snapshots (oldest first): the newest against the one closest to `trendMs` before it.
  * null when there is no snapshot. Pure.
  */
-export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
+export function trendLine(snaps, { trendMs, language = ownerLanguage() } = {}) {
   const last = snaps[snaps.length - 1];
   if (!last?.totals) return null;
   const target = last.at - trendMs;
@@ -473,7 +473,7 @@ export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
 }
 
 /** The trend line from machine.sqlite (home.mjs readSupervisor), or null. Never throws. */
-export async function currentTrend({ env = process.env, language = 'en', settings = null } = {}) {
+export async function currentTrend({ env = process.env, language = ownerLanguage(), settings = null } = {}) {
   try {
     const { readSupervisor } = await import('./home.mjs');
     const s = settings ?? telemetrySettings();

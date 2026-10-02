@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { checkShellConformance, productLocaleOf, shellBindingFindings, shellConformanceMain } from '../../scripts/work/ui/shell-conformance.mjs';
 import { checkPrerequisites, resolveReadPath } from '../../scripts/kernel/prerequisites.mjs';
 import { shellFoundationNeed } from '../../scripts/kernel/shell-foundation.mjs';
@@ -12,6 +13,7 @@ import { productLocaleFor } from '../../scripts/kernel/product-locale.mjs';
 import { nodeById } from '../../scripts/work/layout-tree.mjs';
 import { encodePng, blankImage } from '../../scripts/work/png.mjs';
 import { cloneTree, drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
+import { readAppFixtureYaml } from '../helpers/app-fixture.mjs';
 
 // The layout-tree redesign (owner-approved 2026-09-24): design follows the Next.js App Router layout
 // architecture. The shell record is the layout tree scanned from app/, directions are generated slot content
@@ -21,7 +23,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const readYaml = (rel) => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
-const compile = (rel) => new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(readYaml(rel));
+const compile = (rel) => addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(readYaml(rel));
 const codes = (result) => [...new Set(result.findings.filter((f) => f.level === 'refuse').map((f) => f.code))].sort();
 const CONSOLE = '/[locale]/(console)';
 const bound = (p) => ({ ref: 'shell', rev: p.tree.rev, layouts: [{ node: CONSOLE, rev: 1 }] });
@@ -52,9 +54,9 @@ test('work/layout-tree@1 and the ui-screen route/surface/overlay/composite field
   assert.ok(errorsAt({ ...base, route: 'photos' }, 'route').length, 'a route is a layout tree node id');
   assert.ok(errorsAt({ ...base, host: 'photos list' }, 'host').length);
   assert.deepEqual(errorsAt({ ...base, shell: { ref: 'shell', rev: 2, layouts: [{ node: CONSOLE, rev: 1 }] } }, 'shell'), []);
-  const example = readYaml('examples/ecommerce-app/.starciwork/features/checkout/ui/cart/index.yaml');
-  delete example.shell;
-  ui(example);
+  const fixture = readAppFixtureYaml('.starciwork/features/identity/ui/sign-in/index.yaml');
+  delete fixture.shell;
+  ui(fixture);
   assert.deepEqual((ui.errors ?? []).filter((e) => /^\/(route|surface|shell|direction|routed|host)/.test(e.instancePath)), [], 'a historical ui record without the new fields still compiles');
 });
 

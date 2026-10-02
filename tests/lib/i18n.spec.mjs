@@ -16,7 +16,8 @@ const root = (t, files) => {
   for (const [rel, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), text); }
   return dir;
 };
-const catalog = (messages) => `schema: starci/i18n-catalog@1\nmessages:\n${messages.map(([en, vi]) => `  - {en: "${en}", vi: "${vi}"}`).join('\n')}\n`;
+const catalog = (messages, { area = 'a', scope = 'runtime' } = {}) =>
+  `schema: starci/i18n-catalog@1\narea: ${area}\nscope: ${scope}\nmessages:\n${messages.map(([en, vi]) => `  - {en: "${en}", vi: "${vi}"}`).join('\n')}\n`;
 
 test('vi translates through the catalog, any other language and a missing entry return the English source', (t) => {
   const dir = root(t, { 'modules/i18n/messages/a.yaml': catalog([['Open', OPEN], ['Workflow {id} needs you', NEEDS]]) });
@@ -28,6 +29,16 @@ test('vi translates through the catalog, any other language and a missing entry 
   assert.equal(loadCatalog(dir).size, 2);
 });
 
+test('runtime and UI scopes can translate the same English source independently', (t) => {
+  const dir = root(t, {
+    'modules/i18n/messages/a.yaml': catalog([['Open', OPEN]]),
+    'modules/i18n/messages/ui.yaml': catalog([['Open', 'UI']], { area: 'ui', scope: 'ui' }),
+  });
+  assert.equal(loadCatalog(dir).get('Open'), OPEN);
+  assert.equal(loadCatalog(dir, { scope: 'ui' }).get('Open'), 'UI');
+  assert.deepEqual(catalogFindings(dir), []);
+});
+
 test('fill replaces known placeholders only, and placeholdersOf lists them', () => {
   assert.equal(fill('a {x} b {y}', { x: 1 }), 'a 1 b {y}');
   assert.deepEqual(placeholdersOf('{b} and {a} and {b}'), ['a', 'b', 'b']);
@@ -36,11 +47,11 @@ test('fill replaces known placeholders only, and placeholdersOf lists them', () 
 test('a well formed catalog is clean; a bad schema, entry, placeholder or duplicate source is refused', (t) => {
   assert.deepEqual(catalogFindings(root(t, { 'modules/i18n/messages/a.yaml': catalog([['Open', OPEN]]) })), []);
   const codes = (files) => catalogFindings(root(t, files)).map((f) => f.code);
-  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': 'schema: other\nmessages:\n  - {en: "x", vi: "y"}\n' }), ['RT_I18N_SCHEMA']);
-  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': 'schema: starci/i18n-catalog@1\nmessages: []\n' }), ['RT_I18N_EMPTY']);
+  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': 'schema: other\narea: a\nscope: runtime\nmessages:\n  - {en: "x", vi: "y"}\n' }), ['RT_I18N_SCHEMA']);
+  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': 'schema: starci/i18n-catalog@1\narea: a\nscope: runtime\nmessages: []\n' }), ['RT_I18N_EMPTY']);
   assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': catalog([['Hello {name}', OPEN]]) }), ['RT_I18N_PLACEHOLDERS']);
   assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': catalog([[OPEN, OPEN]]) }), ['RT_I18N_EN_NOT_ENGLISH']);
-  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': catalog([['Open', OPEN]]), 'modules/i18n/messages/b.yaml': catalog([['Open', OPEN]]) }), ['RT_I18N_DUPLICATE']);
+  assert.deepEqual(codes({ 'modules/i18n/messages/a.yaml': catalog([['Open', OPEN]]), 'modules/i18n/messages/b.yaml': catalog([['Open', OPEN]], { area: 'b' }) }), ['RT_I18N_DUPLICATE']);
 });
 
 test('the runtime catalog is well formed', () => {

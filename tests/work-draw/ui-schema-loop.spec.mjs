@@ -6,6 +6,7 @@ import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { putBundle } from '../../engine/db/blob.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, loopCoverageFindings } from '../../scripts/work/draw/draw-loop-coverage.mjs';
 
@@ -20,7 +21,7 @@ import { DRAW_LOOP_MISSING, LOOP_SCHEMA, loopCoverageFindings } from '../../scri
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SCHEMA = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'schemas', 'work-ui-screen.schema.yaml'), 'utf8'));
 const EXAMPLE = path.join(ROOT, 'examples', 'ecommerce-app', '.starciwork', 'features', 'identity', 'ui', 'sign-in', 'index.yaml');
-const validate = new Ajv2020({ strict: true, allErrors: true }).compile(SCHEMA);
+const validate = addWorkCommon(new Ajv2020({ strict: true, allErrors: true })).compile(SCHEMA);
 const errorText = () => (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
 
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ui-schema-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };

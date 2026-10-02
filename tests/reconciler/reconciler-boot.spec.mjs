@@ -55,7 +55,7 @@ test('three lands in 30 minutes (self-reload restarts) do not start safe mode; a
 
 test('the operational profile makes job/host/workflow/resource active, an explicit mode overrides it, no profile leaves the explicit set', () => {
   const op = reconcilerConfig({ config: { reconciler: { enabled: true, profile: 'operational', controllers: { gc: { mode: 'active' }, job: { mode: 'shadow' } } } } });
-  assert.deepEqual(['host', 'workflow', 'resource', 'gc', 'job', 'fleet'].map((n) => configuredMode(n, op)), ['active', 'active', 'active', 'active', 'shadow', 'shadow']);
+  assert.deepEqual(['host', 'workflow', 'resource', 'gc', 'job', 'workers'].map((n) => configuredMode(n, op)), ['active', 'active', 'active', 'active', 'shadow', 'shadow']);
   assert.equal(profileItems(op, {})[0].status, 'red', 'an explicit shadow of a needed controller is red');
   const plain = reconcilerConfig({ config: { reconciler: { enabled: true, controllers: { job: { mode: 'shadow' } } } } });
   assert.equal(configuredMode('host', plain), 'off');
@@ -67,7 +67,7 @@ test('the operational profile makes job/host/workflow/resource active, an explic
   assert.equal(PROFILES.observe.job, 'shadow');
 });
 
-test('applyProfileText rewrites the reconciler block, keeps explicit gc/fleet/learning entries and is idempotent', () => {
+test('applyProfileText rewrites the reconciler block, keeps explicit gc/workers/learning entries and is idempotent', () => {
   const text = 'model: x\r\nreconciler:\r\n  enabled: true\r\n  controllers: {job: {mode: shadow}, host: {mode: shadow}, gc: {mode: active}}\r\n# specs\r\nspecs: {unit: true}\r\n';
   const out = applyProfileText(text);
   assert.equal(out.changed, true);
@@ -123,8 +123,8 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the launc
 
 test('the checklist is red when a needed controller is shadow or the engine is safe, and exits green only when every required row is', () => {
   const status = (modes, extra = {}) => ({ leader: { fresh: true, holder: 'h', pid: 1, epoch: 1, ageMs: 1000, safe: false, draining: false, ...extra }, modes, violations: { open: 0, clocks: 0 } });
-  const all = (mode) => Object.fromEntries(['job', 'host', 'gc', 'resource', 'workflow', 'fleet', 'learning'].map((n) => [n, { configured: mode, effective: mode }]));
+  const all = (mode) => Object.fromEntries(['job', 'host', 'gc', 'resource', 'workflow', 'workers', 'learning'].map((n) => [n, { configured: mode, effective: mode }]));
   assert.equal(summarize(engineItems(status(all('shadow')))).ok, false);
-  assert.equal(summarize(engineItems(status({ ...all('active'), gc: { configured: 'shadow', effective: 'shadow' }, fleet: { configured: 'shadow', effective: 'shadow' }, learning: { configured: 'shadow', effective: 'shadow' } }))).ok, true);
+  assert.equal(summarize(engineItems(status({ ...all('active'), gc: { configured: 'shadow', effective: 'shadow' }, workers: { configured: 'shadow', effective: 'shadow' }, learning: { configured: 'shadow', effective: 'shadow' } }))).ok, true);
   assert.equal(summarize(engineItems(status(all('active'), { safe: true }))).ok, false);
 });

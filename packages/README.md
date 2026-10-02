@@ -65,7 +65,5 @@ npm run test:be
 A rule ships with the test that fires it. The test is not a formality: it is how a reader checks that the
 rule refuses the thing the law says it refuses, and not something adjacent.
 
-**A red test stays red.** Four assertions fail, from three different causes — one real defect in the BE
-plugin and two twin tests that read repositories this package no longer sits inside. All four are
-documented in [KNOWN-DEFECTS.md](KNOWN-DEFECTS.md) and none is skipped: skipping to get a green push
-would remove the only evidence each problem exists.
+**A red test stays red.** A failing assertion is never skipped to get a green push: skipping would
+remove the only evidence the problem exists.

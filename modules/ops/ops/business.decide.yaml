@@ -30,11 +30,7 @@ reads:
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-        state; read applicable instructions, manifests, owning code, callers and relevant tests.
-        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
-        request; no invented repository or fact citation. Source implementation still needs an
-        actual selected writable repository.
+      en: shared
   - id: intent
     path: current accepted user intent + supplied domain documents
     purpose:
@@ -47,16 +43,13 @@ reads:
       en: Read the record family contracts and this operator procedure before authoring the .starciwork
         payload.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: standard
-    path: knowledge/op-gate.yaml + knowledge/** + <app>/hfs.json
+    path: shared
     purpose:
-      en: "The standard this op's decisions and records cite: knowledge/op-gate.yaml (proofs.read-knowledge), the knowledge files listed in its READ step and the hfs slot map of every record it writes (starci app explain at the app root). The files are read in place and recorded with their sha256 in the READ digest; nothing here is restated into a record."
+      en: shared
       vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
@@ -296,9 +289,9 @@ blockers:
         Report node/resource IDs and propose a separately selected graph update when needed; never
         run predecessors or weaken dependsOn/refs to proceed.
 placeholders:
-  feature: Selected feature slug
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  feature: shared
+  app: shared
+  bound-paths: shared
 layoutPolicy:
   checks: [starci-validate]
 route:

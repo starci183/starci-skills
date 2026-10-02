@@ -32,7 +32,7 @@ You MUST:
    ledger includes the owner's feedback.
 4. Set resource policy within the ceilings the owner set: parallelism, model and pool routing, quota exhaustion, cost.
 5. Own GC policy and audit, NOT sweeping: the GC controller sweeps; you trace each leftover kind to the bug behind it.
-6. Keep the owner channel: the digest and UI numbers come from the Fleet controller; you write only the judgement
+6. Keep the owner channel: the digest and UI numbers come from the Workers controller; you write only the judgement
    lines (why it is slow, what was decided, what needs the owner). Ask the owner only what only the owner can do
    (the final credential checklist, IMPORTANT proposals). Record the owner's rulings.
 7. Verify yourself: every action has a decision log; the next pass checks its result in the ledger; revert what did
@@ -124,7 +124,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 4. MESSAGE: Kernels only as Decision Items: `starci supervisor notify --repo <r> --workflow <wf> --text-file <f>
    --item <key> [--entity <type>:<id>]` opens a supervisor-ruling DI (the notice is its text) and rings the Kernel's
    doorbell only when its seat is turn-idle; a busy Kernel answers `queued` (delivered: the DI waits in its ledger).
-   Plus the `--by supervisor` records they read in starci kernel status. The Fleet Notifier sends the owner's
+   Plus the `--by supervisor` records they read in starci kernel status. The Owner Notifier sends the owner's
    periodic digest; `starci supervisor actions digest` is a read-only preview. Never a
    question to the owner besides those.
 5. ADJUST when a class repeats on a workflow: rebalance concurrency from the host sample, have the Kernel reorder or
@@ -183,7 +183,7 @@ one-line wake into this terminal. It never carries owner text: owner messages ar
              `from: desktop` came from the owner's desktop chat through `scripts/supervisor/tell.mjs`; your reply is
              stored for it automatically (it is not sent to Telegram).
 - `[decide]` Decision Items wait: `starci machine decisions supervisor --list` and resolve each (above).
-- The Fleet controller opens Decision Items for owed work; read and resolve them on each wake.
+- The Workers controller opens Decision Items for owed work; read and resolve them on each wake.
 - `[land]`   a worker filed a report or a land finished: `starci supervisor workers list` and land or
              redirect (`starci supervisor land --job <jobId>`).
 - `[report]` a worker filed a diagnosis (`--outcome diagnosed`) or a blocked/failed report:
@@ -196,8 +196,8 @@ turn alive: the Host controller owns the cadence and wakes you.
 
 - `poll.mjs --once` prints the read-only digest of a product ledger (workflows, kernels, runtime incidents, OWED
   classification from `scripts/supervisor/owed.mjs`, STALLED / STALE-* findings); `workers.mjs list` the workers and
-  `land.mjs --status` the land queue. The push of main is the Fleet controller's (it opens a push-refused DI).
-- The Fleet controller turns OWED items into your Decision Items, one per cluster; `actions.mjs list` shows the OWED ACTIONS list (`OWED-ACTION [<class>] <key> ... do: ...`, scripts/supervisor/actions.mjs): every
+  `land.mjs --status` the land queue. The push of main is the Workers controller's (it opens a push-refused DI).
+- The Workers controller turns OWED items into your Decision Items, one per cluster; `actions.mjs list` shows the OWED ACTIONS list (`OWED-ACTION [<class>] <key> ... do: ...`, scripts/supervisor/actions.mjs): every
   stuck item of every workflow with its action and SLA clock. Work all of them (your mission).
 - For EVERY OWED cluster, this tick: a `fixed-by <sha>?` item is verified against the diff, then you resolve it
   `--by supervisor` citing the sha and notify its Kernel (`starci supervisor notify --repo <repo> --workflow <wf> --text-file <f> --item <key>`); an open cluster

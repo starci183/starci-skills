@@ -4,7 +4,7 @@
 //
 // A dispatch is an op job whose payload names a routed pool (payload.model, set
 // by `starci kernel route`) created inside the window. Routed-but-queued and running jobs
-// count, so consecutive routes of one fan-out see the fleet filling. The counts
+// count, so consecutive routes of one fan-out see the workers filling. The counts
 // cover this repo's ledger plus every other product ledger the machine arbiter
 // (machine.sqlite `ledgers`) registered. A registered ledger counts only while its
 // file exists and it is not a fixture: under the OS temp directory, or under a

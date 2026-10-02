@@ -32,11 +32,11 @@ const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.y
 
 // The fe-canon attempt-4 checks the kernel recorded, verbatim in shape.
 const CANON_CHECKS=[
-  {name:'canon-scan',command:'starci gate canon-scan --root ../todo-app-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
-  {name:'hfs-lint',command:'npx starci app lint --repo ../todo-app-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
-  {name:'lint-check',command:'npm run lint:check (root ../todo-app-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
+  {name:'canon-scan',command:'starci gate canon-scan --root ../shop-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
+  {name:'hfs-lint',command:'npx starci app lint --repo ../shop-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
+  {name:'lint-check',command:'npm run lint:check (root ../shop-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
 ];
-const UAT_ROOT_CAUSE={node:'impl.login.todo-app-be.session-custody',self:false,category:'contract-gap',
+const UAT_ROOT_CAUSE={node:'impl.login.shop-be.session-custody',self:false,category:'contract-gap',
   claim:'refresh-session.handler re-checks twoFactorEnabled on restore; the FE maps requiresTwoFactor to anonymous',
   evidence:['manifest.yaml step-6/step-7 observed no'],counterCheck:'a served revisit lands without a fresh prompt',
   expectedFix:'refreshSession stops re-demanding the factor for a verified session',recheck:'node --test e2e/login-password-sign-in.spec.mjs'};
@@ -46,10 +46,10 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(workspace){
     const work=path.join(repo,'.starciwork');
-    fs.mkdirSync(path.join(work,'features','login','impl','todo-app-be','session-custody'),{recursive:true});
-    fs.writeFileSync(path.join(work,'workspace.yaml'),'schema: work/workspace@1\nid: t\nrepositories:\n  - {role: be, name: todo-app-be}\n  - {role: fe, name: todo-app-fe}\n');
-    fs.writeFileSync(path.join(work,'features','login','impl','todo-app-be','session-custody','index.yaml'),
-      'schema: work/implementation@1\nid: impl.login.todo-app-be.session-custody\nrepository: todo-app-be\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
+    fs.mkdirSync(path.join(work,'features','login','impl','shop-be','session-custody'),{recursive:true});
+    fs.writeFileSync(path.join(work,'workspace.yaml'),'schema: work/workspace@1\nid: t\nrepositories:\n  - {role: be, name: shop-be}\n  - {role: fe, name: shop-fe}\n');
+    fs.writeFileSync(path.join(work,'features','login','impl','shop-be','session-custody','index.yaml'),
+      'schema: work/implementation@1\nid: impl.login.shop-be.session-custody\nrepository: shop-be\nowners:\n  - {role: refresh-session, path: be/src/auth/refresh-session}\n  - {role: sign-out, path: be/src/auth/sign-out}\n');
   }
   const wf='wf-verify-rel';
   const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
@@ -117,8 +117,8 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(measurementCheckClass(CANON_CHECKS[0]),'findings','canon-scan exit 1 is findings');
   assert.equal(measurementCheckClass({...CANON_CHECKS[0],exitCode:3}),'error','canon-scan exit 3: a machine could not run');
   assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository starci app lint with findings is measured');
-  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../todo-app-fe',exitCode:1}),'findings','gate exit 1: new findings');
-  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../todo-app-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../shop-fe',exitCode:1}),'findings','gate exit 1: new findings');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../shop-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:[{...CANON_CHECKS[0],exitCode:3}]},measurement:true}).class,'tool');
   // app-auth a1: the UAT names its owner as a Work record.
   assert.equal(classifyFailure({op:'uat.verify',report:{outcome:'failed',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test x',exitCode:1}]}}).class,'product');
@@ -140,8 +140,8 @@ test('a Work record id resolves to the build op of its repository role, with the
   const w=world(t);
   const owner=resolveRootOwner({repo:w.repo,rootCause:UAT_ROOT_CAUSE,kinds:KINDS});
   assert.equal(owner.op,'backend.implement');
-  assert.equal(owner.record,'.starciwork/features/login/impl/todo-app-be/session-custody');
-  assert.deepEqual(owner.ownedPaths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/todo-app-be/session-custody']);
+  assert.equal(owner.record,'.starciwork/features/login/impl/shop-be/session-custody');
+  assert.deepEqual(owner.ownedPaths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/shop-be/session-custody']);
   assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,op:'interface.implement',files:['fe/apps/app/src/session.tsx']},kinds:KINDS}).op,'interface.implement','an explicit rootCause.op wins');
   assert.equal(resolveRootOwner({repo:w.repo,rootCause:{...UAT_ROOT_CAUSE,node:'impl.login.nowhere.x'},kinds:KINDS}),null,'an unresolvable record names no owner');
 });
@@ -161,8 +161,8 @@ test('a red UAT naming a backend record repairs that record with a fresh backend
   const repair=w.row(repairId),rerun=w.row(rerunId);
   assert.equal(repair.op_id,'backend.implement');
   assert.equal(repair.status,'queued');
-  assert.deepEqual(repair.payload.owned_paths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/todo-app-be/session-custody']);
-  assert.deepEqual(repair.payload.records,['.starciwork/features/login/impl/todo-app-be/session-custody']);
+  assert.deepEqual(repair.payload.owned_paths,['be/src/auth/refresh-session','be/src/auth/sign-out','.starciwork/features/login/impl/shop-be/session-custody']);
+  assert.deepEqual(repair.payload.records,['.starciwork/features/login/impl/shop-be/session-custody']);
   assert.equal(repair.payload.repository,undefined,'a backend repair is not placed in the fe checkout the UAT ran from');
   assert.equal(repair.payload.repairFor.rootCause.claim,UAT_ROOT_CAUSE.claim);
   assert.equal(rerun.op_id,'uat.verify');

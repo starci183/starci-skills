@@ -129,7 +129,7 @@ test('a justified gate is reported as GATE, never alerted; a young gate is not j
   assert.equal(young.young,true);
 
   // A supervisor hold that waits for a record nobody wrote yet is justified with no ask at all.
-  const hold=judgeGate({db:ledger.db,workflowId:'wf-todo-app-base-repos-mud7kk5c',gate:{...g,text:'Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled.'},repo:repoRoot,now:NOW});
+  const hold=judgeGate({db:ledger.db,workflowId:'wf-shop-base-repos-mud7kk5c',gate:{...g,text:'Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled.'},repo:repoRoot,now:NOW});
   assert.equal(hold.stale,false);
   assert.deepEqual(hold.waits,['.starciwork/brand/index.yaml is absent']);
   assert.deepEqual(namedPaths('record .starciwork/shell/index.yaml. And .starciwork/brand/.'),['.starciwork/shell/index.yaml','.starciwork/brand']);
@@ -255,7 +255,7 @@ test('a peer-dependency gate names no ask, so a closed ask is no evidence, and t
 // record did not exist yet. A gate that names a path is released by that path landing and nothing else;
 // a pending peer message is UNREAD-PEER (the Kernel reads its inbox), never STALE-GATE.
 test('a gate naming a record is not released by a peer heads-up while the record is absent; the pending message is UNREAD-PEER',t=>withLedger(t,({repoRoot,ledger})=>{
-  const BASE='wf-todo-app-base-repos-mud7kk5c',WORK='wf-todo-app-work-and-stacks-mud7kjun';
+  const BASE='wf-shop-base-repos-mud7kk5c',WORK='wf-shop-work-and-stacks-mud7kjun';
   const text=`Supervisor holds interface.scaffold until .starciwork/brand/index.yaml is settled by peer ${WORK} (heads-up when brand lands).`;
   seedWorkflow(ledger,{id:BASE,now:NOW-600*MIN,events:[
     {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
@@ -271,7 +271,7 @@ test('a gate naming a record is not released by a peer heads-up while the record
   assert.match(found.find(f=>f.type==='GATE').line,/justified: waits: \.starciwork\/brand\/index\.yaml is absent/);
   const unread=found.find(f=>f.type==='UNREAD-PEER');
   assert.equal(unread.alert,false);
-  assert.match(unread.line,/^UNREAD-PEER wf-todo-app-base-repos-mud7kk5c pm-a34aec2c6891 from wf-todo-app-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read starci kernel inbox/);
+  assert.match(unread.line,/^UNREAD-PEER wf-shop-base-repos-mud7kk5c pm-a34aec2c6891 from wf-shop-work-and-stacks-mud7kjun \[heads-up\] Brand job admitted after Grammar 0\.5\.0 proof: pending since \d\d:\d\d \(20m\); inc-55060d946270 may concern it and still holds; tell its Kernel to read starci kernel inbox/);
 
   // Acked, the message is no finding at all; the record landing (settled) is what releases the gate.
   ledger.db.prepare("UPDATE inbox SET status='applied',applied_at=? WHERE key='pm-a34aec2c6891'").run(NOW-10*MIN);

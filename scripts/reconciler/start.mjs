@@ -12,7 +12,7 @@
 //      agent takes no --model on worker-start (agent card start.modelArgument false), Orca reachable;
 //   2. config: config.yaml is NEVER rewritten by a plain run; a profile that is not operational is a red row with the one
 //      command that fixes it. `--set-profile operational|observe` writes that one `reconciler` block (backup first) and
-//      then runs as usual (operational: job/host/workflow/resource active; gc/fleet/learning shadow unless configured);
+//      then runs as usual (operational: job/host/workflow/resource active; gc/workers/learning shadow unless configured);
 //   3. ui/dist rebuilt (npm run build in ui/) when any ui source is newer than the build, before harness-ui is started;
 //   4. the reconciler engine: started when down, restarted (planned, never a crash) when it runs --safe without a real
 //      crash loop behind it;
@@ -31,11 +31,11 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { quickCheck } from './ledger-health.mjs';
-import { loadConfig } from '../../engine/config.mjs';
+import { CONNECTOR_DEFAULTS, loadConfig } from '../../engine/config.mjs';
 import { green, red, warn } from './checklist-items.mjs';
 import { depthItems } from './depth-items.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
-import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
+import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs'; import { DEFAULT_SUPERVISOR_MODE, supervisorMode } from '../machine/home.mjs';
 import { probeOrcaAsync, serviceRegistry, servicePorts, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 
@@ -162,7 +162,7 @@ function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), npm = runNpm } = {}) {
 
 /**
  * config.yaml text with `reconciler:` set to a named profile: enabled, the profile, and (operational only) the explicit
- * controller entries the profile does not itself run active (an explicit gc/fleet/learning setting survives; an explicit
+ * controller entries the profile does not itself run active (an explicit gc/workers/learning setting survives; an explicit
  * shadow/off of job/host/workflow/resource is what the profile replaces; observe keeps none). Returns {text, changed}. Pure.
  */
 export function applyProfileText(text, profile = PROFILE) {
@@ -187,7 +187,7 @@ export function profileItems(conf, raw) {
   if (!conf.enabled) return [red('config', 'profile', 'reconciler config', 'reconciler.enabled is not true: no controller runs', fix)];
   if (conf.profile !== PROFILE) {
     const shadow = REQUIRED_ACTIVE.filter((n) => conf.controllers[n]?.mode !== 'active');
-    return [shadow.length ? red('config', 'profile', 'reconciler profile', `${conf.profile ? `profile ${conf.profile}` : 'no reconciler.profile: an unnamed controller is not run (shadow at most)'}: ${shadow.map((n) => `${n}=${conf.controllers[n]?.mode ?? 'off'}`).join(' ')} - start needs them active`, fix)
+    return [shadow.length ? red('config', 'profile', 'reconciler profile', `${conf.profile ? `profile ${conf.profile}` : 'no reconciler.profile: an unnamed controller is not run (shadow at most)'}: ${shadow.map((n) => `${n}=${configuredMode(n, conf)}`).join(' ')} - start needs them active`, fix)
       : green('config', 'profile', 'reconciler profile', `no profile, but ${REQUIRED_ACTIVE.join(', ')} are explicitly active`)];
   }
   const overridden = REQUIRED_ACTIVE.filter((n) => conf.controllers[n]?.mode !== 'active');
@@ -250,7 +250,7 @@ async function probeServices({ registry = serviceRegistry() } = {}) {
 }
 
 /** Whether config.yaml wants a connector service at all (an `off` one is not required). Pure. */
-const serviceWanted = (name, config) => (name === 'ask-tunnel' ? (config?.connectors?.cloudflare?.mode ?? 'off') !== 'off' : name === 'telegram-bridge' ? config?.connectors?.telegram?.enabled === true : true);
+const serviceWanted = (name, config) => (name === 'ask-tunnel' ? (config?.connectors?.cloudflare?.mode ?? CONNECTOR_DEFAULTS.cloudflare.mode) !== 'off' : name === 'telegram-bridge' ? config?.connectors?.telegram?.enabled === true : true);
 
 function serviceItems(probes, { publicUrl = null, config = null } = {}) {
   return probes.map((p) => {
@@ -337,7 +337,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const ui = uiBuildState();
   push(ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason));
   // seats
-  const mode = safeRun(() => (env.STARCI_SUPERVISOR_MODE || config?.supervisor?.mode || 'chat'), 'chat');
+  const mode = safeRun(() => supervisorMode({ env, config }), DEFAULT_SUPERVISOR_MODE);
   if (mode === 'kernel' && seats && orcaProbe.ok) {
     const st = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--status', '--json'], { timeoutMs: 90_000 });
     push(supervisorItem({ mode, statusJson: st }));
@@ -470,7 +470,7 @@ async function up(opts) {
   const orcaUp = (await probeOrcaAsync({ timeoutMs: 30_000 })).ok;
   const config = safeRun(() => loadConfig(), null);
   if (orcaUp) {
-    if ((env.STARCI_SUPERVISOR_MODE || config?.supervisor?.mode || 'chat') === 'kernel') {
+    if (supervisorMode({ env, config }) === 'kernel') {
       const r = await json([path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs'), '--json'], { timeoutMs: 300_000 });
       applied.push(`Supervisor seat: ${r?.action ?? 'no answer'}${r?.ok === false ? ` (${String(r.error ?? r.reason ?? '').slice(0, 120)})` : ''}`);
     }

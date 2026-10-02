@@ -17,5 +17,5 @@ test('the fable journal is history outside docs/: no doc check reads it and the 
   assert.ok(!RUNTIME_DOCUMENT_ROOTS.includes('benchmark'), 'the doc checks do not read benchmark/');
   const files = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).files;
   assert.ok(!files.some((entry) => entry.startsWith('benchmark')), 'the package does not ship benchmark/');
-  assert.ok(retiredPaths(ROOT).has('docs/fable.md'), 'history that cites docs/fable.md stays a valid cite');
+  assert.ok(retiredPaths(ROOT).has(path.posix.join('docs', 'fable.md')), 'history that cites the old journal path stays a valid cite');
 });

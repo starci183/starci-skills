@@ -12,16 +12,18 @@
  * that consumer's copies, so the junctions are what eslint/tsc see and never the
  * copy an app bundle actually links.
  *
- * Usage: node scripts/link-peers.mjs [consumer]
- *   consumer defaults to "ecommerce-app" (any example app root under ../examples; the app root holds the one install).
+ * Usage: node packages/fe-kit/scripts/link-peers.mjs [consumer]
+ *   consumer defaults to the declared reference example app (any example app root under the runtime's
+ *   examples tree; the app root holds the one install).
  */
 import { existsSync, mkdirSync, symlinkSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { EXAMPLES_ROOT, REFERENCE_EXAMPLE_APP } from "../../../scripts/lib/example-refs.mjs"
 
 const KIT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
-const consumer = process.argv[2] ?? "ecommerce-app"
-const consumerNodeModules = resolve(KIT_ROOT, "..", "..", "examples", consumer, "node_modules")
+const consumer = process.argv[2] ?? REFERENCE_EXAMPLE_APP
+const consumerNodeModules = resolve(KIT_ROOT, "..", "..", EXAMPLES_ROOT, consumer, "node_modules")
 
 const PEERS = [
     "react",

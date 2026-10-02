@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkWorkTree, DEFAULT_MIN_ID_SEGMENTS, FAMILIES, MIN_ID_SEGMENTS, placeDepthFinding } from '../../scripts/work/validate/check-example-work.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 
 // Live defect: the place rule derived impl.<feature> for impl/index.yaml and
 // impl.<feature>.<repository> for impl/<repository>/index.yaml, while work/implementation@1 admits only
@@ -61,7 +62,7 @@ test('impl scope records above impl/<repository>/<name>/ are PLACE_TOO_SHALLOW s
 });
 
 test('the place both gates accept: a leaf impl id compiles under its schema and proves a requirement record', (t) => {
-  const validate = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(schemaOf('work-implementation.schema.yaml'));
+  const validate = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(schemaOf('work-implementation.schema.yaml'));
   const leaf = parseYaml(impl('impl.baseline.web.base', 'nfr.baseline.toolchain'));
   assert.equal(validate(leaf), true, JSON.stringify(validate.errors));
   assert.equal(validate({ ...leaf, id: 'impl.baseline.web' }), false, 'the repository-scope id the old place rule accepted');

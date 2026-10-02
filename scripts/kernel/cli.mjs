@@ -456,20 +456,20 @@ const launchGraceOf = (db, job, { now }) => {
 // job has not been dispatched and holds nothing; everything from the lease
 // forward does, including a fenced launch whose effect may exist.
 const SLOT_HOLDING_STATUSES = [...JOB_STATUSES.dispatchable.filter((status) => status !== 'queued'), ...JOB_STATUSES.fenced];
-// modules/models/runtimes.yaml — the pool cards and the fleet ceiling. Every
+// modules/models/runtimes.yaml — the pool cards and the worker ceiling. Every
 // concurrency number this gate reasons with comes from here, through the one
 // cached loader (engine/config.mjs runtimeProfile): a missing or unparsable
 // file throws, never reads as an empty document.
 const poolCardFor = (doc, target) => Object.entries(doc?.runtimes ?? {})
   .find(([poolId, runtime]) => (runtime?.target ?? poolId) === target)?.[1] ?? null;
-const fleetMaxParallelOps = () => {
+const workersMaxParallelOps = () => {
   const value = Number(runtimeProfile()?.maxParallelOps);
   return Number.isInteger(value) && value > 0 ? value : null;
 };
 /**
  * The owner's concurrent-operation budget. A missing, unparsable or schema-short config.yaml must
  * never stop a workflow from routing (the same tolerance start-workflow and route-model keep), so
- * an unreadable owner file leaves `maxOps` unbounded and the fleet ceiling admits alone.
+ * an unreadable owner file leaves `maxOps` unbounded and the worker ceiling admits alone.
  */
 const ownerMaxOps = () => {
   const owner = inspectOwnerConfig(ownerRoot);
@@ -487,7 +487,7 @@ const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
     `SELECT count(*) n FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND job_id<>?
        AND status IN (${SLOT_HOLDING_STATUSES.map(() => '?').join(',')})`
   ).get(workflowId, excludeJobId ?? '', ...SLOT_HOLDING_STATUSES).n;
-  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: fleetMaxParallelOps() });
+  return admitOpSlot({ running, maxOps: ownerMaxOps(), maxParallelOps: workersMaxParallelOps() });
 };
 
 /**
@@ -635,7 +635,7 @@ const workerGateAnswerOf = (db, job, gate) => {
 };
 // One writability judgement for liveness and nudge. Orca's `terminal show` can answer writable:true for a
 // terminal whose writes it refuses terminal_not_writable: Orca 1.4.209 binds a send to the terminal's
-// process incarnation, and every terminal created before the update refuses (nivo inc-f1b576fb6006). A nudge records that
+// process incarnation, and every terminal created before the update refuses (inc-f1b576fb6006). A nudge records that
 // refusal (op-worker-unwritable); a refusal newer than the worker's last output and last heartbeat makes
 // the terminal unwritable here, so status reads it disconnected and reconcile --dead-worker recovers it.
 const TERMINAL_NOT_WRITABLE = 'terminal_not_writable';
@@ -671,7 +671,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
   }
   // A leased job with no worker bound is a launch: in flight until its lease deadline (jobs.deadline,
   // dispatchLeaseTtlMs after the lease), abandoned after it. A dispatch killed mid-spawn (a shell timeout
-  // around starci kernel dispatch, nivo inc-c1d5bdbea173) leaves exactly that row.
+  // around starci kernel dispatch, inc-c1d5bdbea173) leaves exactly that row.
   if (job.status === 'leased' && !terminalHandle) {
     const deadline = Number(job.deadline);
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null,
@@ -787,7 +787,7 @@ const staleInputProjection = (db, wf, repo = null) => {
 };
 const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
 const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
-const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
+const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes/'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
 const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 /* ---------------------------------------------------------------- status */
 /**
@@ -928,12 +928,12 @@ function afterChainReaches(db, row, targetId) {
 /** runtimes.yaml allocation.routeHoldMs: how long a routed-but-queued job keeps its pool slot after its latest route. */
 const routeHoldMsOf = () => allocationMs('routeHoldMs');
 /**
- * Pool load fleet-wide, the one count `starci kernel route` (capacity) and `starci kernel status` (queuedBecause pool-full) both
+ * Pool load worker-wide, the one count `starci kernel route` (capacity) and `starci kernel status` (queuedBecause pool-full) both
  * reason with, so they agree: every non-settled job whose payload.model names a pool holds a slot of it - running,
  * leased and answering jobs always, and a routed-but-QUEUED one only while its latest route decision (payload.routedAt,
  * else its newest route-decided event) is younger than allocation.routeHoldMs. The hold lets sequential route calls of
- * one fan-out see the fleet filling instead of piling every slice onto the first preferred pool; past it, a job parked
- * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (nivo
+ * one fan-out see the workers filling instead of piling every slice onto the first preferred pool; past it, a job parked
+ * behind a gate, a hold, a peer-wait, a dependency or a readiness loop no longer starves the pool for hours (seen live
  * 2026-09-28: devin 10/10 with 5 ops running). Re-routing a queued job refreshes its hold.
  * {byModel: {pool: n}, holders: Set<jobId>, routeHoldMs}; `excludeJobId` (the job being routed) holds nothing.
  */
@@ -1028,7 +1028,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // the Kernel must drop and re-enqueue.
   // A lineage that leads back to this job is its own history, never a wait: a retry whose --after
   // names the attempt it retries (a draw follow-up enqueued --after op-interface.draw-3cd517a152
-  // as that job's retry, nivo wf-nivo-workspace-provision-mujek7cb) otherwise held itself forever.
+  // as that job's retry, wf-<product>-workspace-provision-mujek7cb) otherwise held itself forever.
   const heldByJob = (priorId) => {
     const prior = lineageHeadById(db, priorId)?.row ?? null;
     return prior && prior.status !== 'succeeded' && prior.job_id !== job.job_id ? prior : null;
@@ -1039,7 +1039,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
     ? cutSeamHeadOf(db, { workflowId: job.workflow_id ?? payload.hierarchy?.workflowId, op: opId, cutId: payload.cut.id })?.job_id ?? null
     : null;
   // A released sibling is not held back through the seam's Work record either: a record edge to a job
-  // of its own cut's seam (ordinal 1) is the same wait the release lifted (cut-seam.mjs; nivo collab-impl-be
+  // of its own cut's seam (ordinal 1) is the same wait the release lifted (cut-seam.mjs; a product's collab-impl-be
   // ordinals dependsOn the composition record the seam owns).
   const seamReleased = Boolean(seamHold && !seamHold.hold);
   const ownSeamRow = (id) => {
@@ -1432,7 +1432,7 @@ function seamActionsOf(set) {
   return actions;
 }
 /* ------------------------------------------------------- status git memo */
-// starci kernel status took 26-31 s per workflow under load (8 s idle) on the nivo ledger, nearly all of it in
+// starci kernel status took 26-31 s per workflow under load (8 s idle) on a product ledger, nearly all of it in
 // spawnSync: every git call pays a process start (0.1-2.5 s on a loaded Windows host), and status repeated
 // the same reads - runtime-rev.mjs re-resolved the current rev once per running job and re-diffed the same
 // commit pair on every call, and two typed waits naming the same --until-commit targets ran the same
@@ -1790,7 +1790,7 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
     ...(extra ?? {}),
     ...(opens ? { recover: failureKind === QUOTA_FAILURE_KIND ? providerQuotaProbeCommand(key) : providerRecoverCommand(key) } : {}),
   };
-  // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), fleet-wide.
+  // The circuit is a machine.sqlite provider_health row (scripts/machine/provider-circuit.mjs), worker-wide.
   storeProviderCircuit(key, { value, expiresAt });
   return value.status === 'unavailable' ? { ...value, expiresAt } : null;
 };
@@ -1895,14 +1895,14 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 /* -------------------------------------------------------------- dispatch */
 const resolveModel = (target) => {
   if (!target) return { error: 'no operation target given and modules/models/registry.yaml names no orchestration.defaultOperationTarget' };
-  const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${target}.yaml`);
-  if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
-  const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  return { target, provider: doc?.provider ?? null,
-    requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
+  const file = path.join(skillRoot, 'modules', 'models', 'registry.yaml');
+  const doc = fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null;
+  const entry = doc?.pools?.[target] ?? doc?.targets?.[target];
+  if (!entry) return { error: `no model target '${target}' in modules/models/registry.yaml (pools, targets)` };
+  return { target, provider: entry.provider ?? entry.runtime ?? null, profile: 'modules/models/registry.yaml' };
 };
 
-const ownerLanguage = () => ownerLanguageOf('en');
+const ownerLanguage = () => ownerLanguageOf();
 const ownerDelegation = () => { try { return activeDelegation(); } catch { return null; } };
 
 // Each owned path as the packet carries it. A path the target resolver
@@ -1928,7 +1928,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
     // The owner's goal text of the revision the job is bound to, so an op reads it from
-    // `starci kernel op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
+    // `starci kernel op-contract --json` and never opens the ledger for it (a product's auth, inc-26b260e101e4).
     ...((boundGoal ?? (payload.goal_binding?.revision == null ? goal : null)) ? { goal: goalForPacket(boundGoal ?? goal) } : {}),
     attempt: tryOf(job),
     owner_language: ownerLanguage(),
@@ -2123,12 +2123,12 @@ const DISPATCH_LEASE_TTL_MS = allocationMs('dispatchLeaseTtlMs');
 // resolves paths with, so a request and a held lease can never disagree.
 // In a bound project each request is spelled repository-qualified (scripts/kernel/lease-canon.mjs), and
 // held rows are compared in that form through their holder job, so a bare and a repository-prefixed
-// spelling of one file overlap (nivo inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
+// spelling of one file overlap (inc-52a4a5ee5b12). Without a canonicalizer: the paths as written.
 const opLeaseRequests = (payload, canon = null, op = null) => (canon
   ? canon.requests(payload, op ?? payload?.opId ?? null)
   : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
 
-// A write set another job's LIVE lease still owns is a wait, never a launch failure. A nivo job
+// A write set another job's LIVE lease still owns is a wait, never a launch failure. A job
 // was dispatched twice and rejected at `reserve` both times behind its own workflow's running
 // interface.implement (en.json/vi.json); each refusal was recorded dispatch-rejected and fed
 // repeat-reject OWED. Now route and dispatch answer path-lease and leave the job queued: status
@@ -2198,7 +2198,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
 const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
   `# dispatch contract — [Op] ${op} (job ${jobId})\n\n${prompt}\n\n## packet\n\n\`\`\`json\n${JSON.stringify(packet, null, 2)}\n\`\`\`\n`;
 // context.contract is the contract version the leg is admitted under (scripts/machine/contract-version.mjs):
-// the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes.yaml).
+// the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes/).
 // A frozen family's batched changes not yet released for this workflow are WITHHELD from the leg (contract.withheld,
 // modules/kernel/contract-freeze.yaml): it is judged as if admitted before them, for life.
 const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
@@ -2259,7 +2259,7 @@ function raiseEnvironmentIncident(ledger, job, health) {
 // same worktree.
 // Every Run-scoped call (dispatch, starci kernel reply, a Task close) binds the Run to the workflow's current Kernel
 // terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
-// refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
+// refuses its reply and task-update consumer_fenced until then (inc-e523617a3c31). bindWorkflowRun
 // is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
 
 const bindRunToKernel = ({ db, ledger = null, workflowId, runId, by }, { bind = bindWorkflowRun, kernelJob = latestKernelJobOf(db, workflowId) } = {}) => {
@@ -2857,7 +2857,7 @@ const repairTemplateOf = (db, job, ops) => {
 };
 /**
  * The job that owns the Work record a rootCause.node names when the node is a record id rather than `<op>#...`
- * (a nivo uat.verify named a record id of another repository five times and the
+ * (a uat.verify named a record id of another repository five times and the
  * route re-ran the same UAT, never the owner of that record): the newest settled job of another op of the workflow
  * whose owned .starciwork record directory holds an index.yaml with that id. Null when none does.
  */
@@ -2976,7 +2976,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const routed = { route: route.id, from: job.job_id, firing: base.firing, limit };
     const classNote = failure?.class ? { class: failure.class, classReason: failure.reason } : {};
     // A product defect or measured findings with a named owner: repair THAT build, then this op runs again
-    // behind it - never the same walk again at the same HEAD (nivo app-auth uat.verify a1-a5).
+    // behind it - never the same walk again at the same HEAD (an app-auth uat.verify, a1-a5).
     // A node that names an op with a job in this workflow keeps the read-only root verify below (the
     // op-graph ruling); a Work record id, an explicit rootCause.op/files, or an op with no job here is
     // repaired directly.
@@ -3033,7 +3033,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const targets = routeTargetOps(catalog, route, op);
     // A report that names its root cause outside itself (rootCause.self false) and that this workflow
     // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
-    // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db and another
+    // the same partial (a collab op-backend.implement-bd2609ff17 -> a1dad730db and another
     // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
     // report's own checks pin on a peer's change settles peer-blocked like starci kernel record-checks's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
@@ -3412,7 +3412,7 @@ function reconcileReleaseWorker(ledger, args, job, repo) {
 // still dispatchable (running/queued/leased/answering) whose workflow is
 // finished or archived. Nothing will ever release it — finish settles the
 // kernel job it finds, and a restart after finish (or a finish from an older
-// runtime) left kernel-wf-nivo-ang-stales-refactor-mu9nfaxf 'running' for a
+// runtime) left kernel-wf-<product>-ang-stales-refactor-mu9nfaxf 'running' for a
 // workflow finished days before. Each is settled cancelled with its leases, a
 // finished workflow's kernel signal is released, and one
 // 'orphan-kernel-job-reconciled' event records the row as it was. Its terminal
@@ -3559,7 +3559,7 @@ async function settleOpProofs(db, jobId, repo) {
 }
 // The draw acceptance an interface.draw pass owes (scripts/work/draw/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
-// drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
+// drew something under the current contract (a product's op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
 // Read-only, before anything is written. A leg admitted before the draw-adopt-gate change settles on its old contract.
 function settleDrawAcceptance(db, jobId, repo, reportAbs, reportText) {
   const s = settleJobContext(db, jobId, { changeId: DRAW_ACCEPTANCE_CHANGE, opOnly: 'interface.draw' });
@@ -3728,7 +3728,7 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
 function handoverProofGate(db, job, repo) {
   const admitted = admittedContractOf(db, job);
   const change = changeById(loadContractChanges(skillRoot), PROOF_INTEGRITY_CHANGE);
-  if (!change || admittedBeforeChange(admitted, change)) return;
+  if (admittedBeforeChange(admitted, change)) return;
   let cov;
   try { cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)) }); }
   catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: starci kernel coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
@@ -3753,7 +3753,7 @@ function handoverProofGate(db, job, repo) {
 // class peer marks it peerBlocked {peers[], routes[]}, which summarizeCheckEvidence counts neither
 // passed nor failed. Only the api decides: a caller-supplied peerBlocked or attribution is dropped.
 // A red check with no `failing` list is attributed on the source files its own evidence/output text
-// names (failingFromText), recorded as failing + failingDerived: nivo collab's Kernel re-ran the
+// names (failingFromText), recorded as failing + failingDerived: a product's collab Kernel re-ran the
 // typecheck, wrote the peer's tsc line into the evidence and filed no list, so the peer's red was
 // counted this op's and the same op re-ran for hours.
 function attributeChecks(db, { repo, job, checks }) {

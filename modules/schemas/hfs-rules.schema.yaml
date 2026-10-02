@@ -67,6 +67,7 @@ $defs:
         pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'
         description: The rule's finding code, a key of modules/kernel/failure-codes.yaml.
       law: {type: string, minLength: 1, description: The rule in one English line.}
+      scope: {const: runtime, description: 'Present only on a rule that governs the StarCi runtime repository itself (a RT_* law); a product rule is cited by the hfsRules of at least one knowledge/patterns topic instead (R193 judges both directions).'}
       kinds:
         type: array
         minItems: 1

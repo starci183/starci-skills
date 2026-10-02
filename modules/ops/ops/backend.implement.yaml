@@ -22,20 +22,14 @@ sideEffects:
     no production deployment
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: application-stacks
-    path: knowledge/application-stacks.yaml + docs/application-stacks.md +
-      docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
+    path: shared
     purpose:
-      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
-        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks check
-        when validating a materialized stack; bind its exact inputs and limitations. Acceptance
-        additionally requires the selected real startup, persistence, recovery and application
-        checks. This conditional read grants no extra deployment or source scope.
+      en: shared
   - id: target
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
@@ -61,22 +55,15 @@ reads:
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
-        state; read applicable instructions, manifests, owning code, callers and relevant tests.
-        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
-        request; no invented repository or fact citation. Source implementation still needs an
-        actual selected writable repository.
+      en: shared
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
 writes:
   - id: node
@@ -90,10 +77,8 @@ writes:
         add/remove them to obtain pass.
   - id: source
     path: <app>/<write-ceiling>
-    fields: [source files, tests, migration/assets/config only when selected]
     content:
-      en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
-        changes; record actual diff and commit mapping, not proposed changes as delivered.
+      en: shared
   - id: evidence
     path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
@@ -160,16 +145,14 @@ writes:
         production deploy, API success or runtime readiness is inferred merely from a source commit.
         Standalone source-only work records runtime not requested instead of claiming readiness.
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
 steps:
   - reads: [op-loop]
@@ -342,11 +325,11 @@ blockers:
         update when needed; never run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
-  repository: Implementation repository segment under impl/
-  name: Implementation record folder
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
-  write-ceiling: Explicit owned source paths
+  repository: shared
+  name: shared
+  app: shared
+  bound-paths: shared
+  write-ceiling: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:

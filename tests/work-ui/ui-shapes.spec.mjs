@@ -5,15 +5,17 @@ import os from 'node:os';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings } from '../../scripts/work/ui/ui-shapes.mjs';
 import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
+import { readAppFixtureYaml } from '../helpers/app-fixture.mjs';
 
 // Owner model (examples/shape-slot/README.md): a ui record's state is a SHAPE - one layout, one drawing - and a
 // slot's data status (loading, skeleton, empty, error, 401/403/404) renders by recipe and is never drawn.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const validate = new Ajv2020({ strict: true, allErrors: true }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
+const validate = addWorkCommon(new Ajv2020({ strict: true, allErrors: true })).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
 const errors = () => (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
-const example = () => parseYaml(fs.readFileSync(path.join(ROOT, 'examples/ecommerce-app/.starciwork/features/identity/ui/sign-in/index.yaml'), 'utf8'));
+const example = () => readAppFixtureYaml('.starciwork/features/identity/ui/sign-in/index.yaml');
 const sha = 'a'.repeat(64);
 const codes = (findings) => findings.map((f) => f.code);
 

@@ -32,8 +32,8 @@ const context = (overrides: Partial<RunContext["infra"]> = {}): RunContext => ({
             proxy: "ab12-keycloak",
             image: "quay.io/keycloak/keycloak:26.0",
             container: "starci-ts-keycloak-x",
-            realm: "shop-a1b2c3-todo",
-            clientId: "todo-api",
+            realm: "shop-a1b2c3-shop",
+            clientId: "shop-api",
             adminUser: "admin",
             adminPassword: "admin",
             userIds: {},
@@ -103,12 +103,12 @@ test("kafka wires the slot's topics, consumer groups and client ids under one pr
 
 test("keycloak urls derive from the proxied base and the namespaced realm", () => {
     const { keycloak } = buildWiring(context())
-    assert.equal(keycloak.issuer, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo")
-    assert.equal(keycloak.tokenUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo/protocol/openid-connect/token")
-    assert.equal(keycloak.jwksUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-todo/protocol/openid-connect/certs")
-    assert.equal(keycloak.clientId, "todo-api")
+    assert.equal(keycloak.issuer, "http://127.0.0.1:30101/realms/shop-a1b2c3-shop")
+    assert.equal(keycloak.tokenUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-shop/protocol/openid-connect/token")
+    assert.equal(keycloak.jwksUrl, "http://127.0.0.1:30101/realms/shop-a1b2c3-shop/protocol/openid-connect/certs")
+    assert.equal(keycloak.clientId, "shop-api")
     assert.equal(keycloak.clientSecret("admin-reader"), "generated-secret")
-    assert.throws(() => keycloak.clientSecret("todo-api"), /TEST_WORLD_NOT_DECLARED.*no confidential client todo-api/)
+    assert.throws(() => keycloak.clientSecret("shop-api"), /TEST_WORLD_NOT_DECLARED.*no confidential client shop-api/)
 })
 
 test("a service the declaration does not run throws NotDeclared when read, never undefined", () => {

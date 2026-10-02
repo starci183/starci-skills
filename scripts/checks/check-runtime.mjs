@@ -3,8 +3,7 @@
 // runtime repository. In order:
 //   1. node --check over every .mjs of engine/, scripts/, modules/ and bin/ (scripts/api/node/syntax-check.mjs);
 //   2. the runtime HFS check, scripts/hfs/runtime-check.mjs, with knowledge/hfs/runtime-slots.yaml, and the
-//      RT_CITED_PATH_MISSING findings of scripts/checks/check-contract-cites.mjs over the runtime's live prose, judged
-//      together against the manifest's pending list;
+//      RT_CITED_PATH_MISSING findings of scripts/checks/check-contract-cites.mjs over the runtime's live prose;
 //   3. every retained self-check of ruleParams.runtime.selfChecks, in order (scripts/api/node/run-script.mjs).
 // Every step runs; the exit status is 1 when any failed.
 //   starci runtime check [--json]                       run the complete runtime check
@@ -16,7 +15,7 @@ import { runScript } from '../api/node/run-script.mjs';
 import { syntaxCheck } from '../api/node/syntax-check.mjs';
 import { runtimeCheck } from '../hfs/runtime-check.mjs';
 import { RUNTIME_MANIFEST_FILE, loadSlotManifest, ruleParams } from '../hfs/slots.mjs';
-import { CITED_PATH_MISSING, citedPathFindings } from './check-contract-cites.mjs';
+import { citedPathFindings } from './check-contract-cites.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 /** The folders whose every .mjs must parse. */
@@ -90,13 +89,12 @@ function checkRuntime({ root = skillRoot, json = false } = {}) {
   }
   out(`node --check: ${files.length} files, ${bad.length} failed`);
 
-  const runtime = runtimeCheck({ repoRoot: root, root, extraFindings: citedPathFindings(root), extraCodes: [CITED_PATH_MISSING] });
+  // The cites run lazily: runtimeCheck regenerates the git-ignored runtime copies first, and a live-prose cite of a
+  // path inside them must resolve on disk.
+  const runtime = runtimeCheck({ repoRoot: root, root, extraFindings: () => citedPathFindings(root) });
   for (const f of runtime.findings) err(line(f));
-  const lanes = {};
-  for (const f of runtime.pending) lanes[f.lane] = (lanes[f.lane] ?? 0) + 1;
-  const owed = Object.entries(lanes).sort().map(([lane, n]) => `${lane} ${n}`).join(', ') || 'none';
-  if (runtime.ok) out(`OK: runtime HFS ${runtime.manifest} - ${runtime.tracked} tracked files, ${runtime.sources} sources; ${runtime.pending.length} pending finding(s) owed by chunk (${owed})`);
-  else err(`runtime HFS: ${runtime.findings.length} error finding(s); ${runtime.pending.length} pending (${owed})`);
+  if (runtime.ok) out(`OK: runtime HFS ${runtime.manifest} - ${runtime.tracked} tracked files, ${runtime.sources} sources`);
+  else err(`runtime HFS: ${runtime.findings.length} error finding(s)`);
   if (json) process.stdout.write(`${JSON.stringify(runtime, null, 2)}\n`);
 
   const { selfChecks } = ruleParams(loadSlotManifest({ root, file: path.join(root, RUNTIME_MANIFEST_FILE) }), 'runtime');

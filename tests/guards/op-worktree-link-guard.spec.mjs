@@ -157,28 +157,28 @@ test('the command guard hook refuses the incident\'s worktree and link commands 
 
 test('the footprint watch flags a new worktree or cross-repository link under the root, never a workspace link', (t) => {
   const root = tempDir(t, 'footprint-root-');
-  for (const name of ['todo-app-fe', 'todo-app-fe-wt-r4', 'other']) fs.mkdirSync(path.join(root, name, '.git'), { recursive: true });
+  for (const name of ['shop-fe', 'shop-fe-wt-r4', 'other']) fs.mkdirSync(path.join(root, name, '.git'), { recursive: true });
   const at = (...parts) => path.join(root, ...parts);const foreignBin = `${String.fromCharCode(path.parse(os.tmpdir()).root.charCodeAt(0) ^ 1)}:\\elsewhere\\bin`;
-  let links = [{ link: at('todo-app-fe','node_modules', '@todo-app', 'ui'), target: null, real: at('todo-app-fe', 'packages', 'ui'), mtime: 'x' }];
+  let links = [{ link: at('shop-fe','node_modules', '@shop', 'ui'), target: null, real: at('shop-fe', 'packages', 'ui'), mtime: 'x' }];
   let trees = '';
-  const git = (cwd) => ({ status: 0, stdout: path.basename(cwd) === 'todo-app-fe' ? `worktree ${at('todo-app-fe')}\nHEAD 1\n\n${trees}` : `worktree ${cwd}\n` });
+  const git = (cwd) => ({ status: 0, stdout: path.basename(cwd) === 'shop-fe' ? `worktree ${at('shop-fe')}\nHEAD 1\n\n${trees}` : `worktree ${cwd}\n` });
   const listLinks = () => links;
   const first = scanFootprint({ root, state: null, git, listLinks, now: 't0' });
   assert.deepEqual([first.links, first.worktrees, first.fresh], [[], [], []], 'a workspace link inside its own repository is not a footprint');
-  links = [...links, { link: at('todo-app-fe-wt-r4', 'node_modules'), target: null, real: at('todo-app-fe', 'node_modules'), mtime: 'y' },
+  links = [...links, { link: at('shop-fe-wt-r4', 'node_modules'), target: null, real: at('shop-fe', 'node_modules'), mtime: 'y' },
     { link: at('other', 'bin'), target: foreignBin, real: foreignBin, mtime: 'z' }];
-  trees = `worktree ${at('todo-app-fe-wt-r4')}\nHEAD 2\ndetached\n\nworktree ${path.join(os.tmpdir(), 'kernel-scratch')}\nHEAD 3\n`;
+  trees = `worktree ${at('shop-fe-wt-r4')}\nHEAD 2\ndetached\n\nworktree ${path.join(os.tmpdir(), 'kernel-scratch')}\nHEAD 3\n`;
   const second = scanFootprint({ root, state: first.state, git, listLinks, now: 't1' });
-  assert.deepEqual(second.fresh.map((entry) => [entry.type, entry.link ?? entry.worktree]), [['link', at('todo-app-fe-wt-r4', 'node_modules')], ['worktree', at('todo-app-fe-wt-r4')]],
+  assert.deepEqual(second.fresh.map((entry) => [entry.type, entry.link ?? entry.worktree]), [['link', at('shop-fe-wt-r4', 'node_modules')], ['worktree', at('shop-fe-wt-r4')]],
     'the junction into another repository and the worktree beside it are fresh; a link out of the root and kernel scratch outside it are not');
   const third = scanFootprint({ root, state: second.state, git, listLinks, now: 't2' });
   assert.deepEqual(third.fresh, [], 'a footprint is flagged once');
-  assert.equal(third.state.seen[`link:${process.platform === 'win32' ? at('todo-app-fe-wt-r4', 'node_modules').toLowerCase() : at('todo-app-fe-wt-r4', 'node_modules')}`], 't1');
+  assert.equal(third.state.seen[`link:${process.platform === 'win32' ? at('shop-fe-wt-r4', 'node_modules').toLowerCase() : at('shop-fe-wt-r4', 'node_modules')}`], 't1');
   // The state holds what the last scan saw: a footprint removed is dropped, and one made again later is fresh again.
   const saved = links;
-  links = links.filter((entry) => !entry.link.includes('todo-app-fe-wt-r4'));
+  links = links.filter((entry) => !entry.link.includes('shop-fe-wt-r4'));
   const gone = scanFootprint({ root, state: third.state, git, listLinks, now: 't3' });
-  assert.equal(Object.keys(gone.state.seen).some((key) => key.startsWith('link:') && key.includes('todo-app-fe-wt-r4')), false, 'a removed link leaves the state');
+  assert.equal(Object.keys(gone.state.seen).some((key) => key.startsWith('link:') && key.includes('shop-fe-wt-r4')), false, 'a removed link leaves the state');
   links = saved;
   const back = scanFootprint({ root, state: gone.state, git, listLinks, now: 't4' });
   assert.deepEqual(back.fresh.map((entry) => entry.type), ['link'], 'made again: fresh again');

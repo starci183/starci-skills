@@ -1,3 +1,4 @@
+# owner: the executable code-pattern profile inventory (canon digests included; do not rebind); rule law lives in knowledge/hfs/rules.yaml only.
 schema: starci/code-pattern-profile@1
 profiles:
   nest:
@@ -10,8 +11,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: eee663eca8884eb3435cef225bf475832cc1fcea444abc773ba545dfd1528b40
-        files: 172
+        value: c0c42e00962dbb0985f690f272288ca330bd8b2803ac1e9d8400ca7f0f1886ce
+        files: 175
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -154,7 +155,7 @@ profiles:
             ruleIds: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Confirm that a declared module owns a cohesive capability instead of hiding feature orchestration.
         status: implemented
       - id: NEST-APP-COMPOSITION
@@ -167,7 +168,7 @@ profiles:
             ruleIds: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Inspect callbacks with neutral names for hidden product behavior.
         status: implemented
       - id: NEST-APPLICATION-TRANSPORT-BOUNDARY
@@ -180,7 +181,7 @@ profiles:
             ruleIds: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Verify semantic validation and DTO/result projection at the actual transport boundary.
         status: implemented
       - id: NEST-DOCUMENTED-EXPORTS
@@ -236,7 +237,7 @@ profiles:
             ruleIds: [starci-be/no-runtime-schema, starci-be/sql-text-only, starci-be/no-query-builder, starci-be/no-entity-in-contract]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Verify the baseline migration against the live schema, and that each projection carries what its consumer needs.
         status: implemented
       - id: NEST-HFS-DEFAULT-DENY-CONFIG
@@ -264,7 +265,7 @@ profiles:
             ruleIds: [starci-be/no-global-decorator, starci-be/is-global-only-in-app, starci-be/no-cross-owner-module-import, starci-be/capability-module-shape, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Verify that each capability exposes one application module and one module per transport.
         status: implemented
       - id: NEST-OWNER-ENTRY-LINT
@@ -278,7 +279,7 @@ profiles:
             ruleIds: [starci-be/import-owner-entry, starci-be/no-folder-reexport]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Confirm the exported surface is a stable capability API.
         status: implemented
       - id: NEST-HFS-NO-SUPPRESSION
@@ -306,7 +307,7 @@ profiles:
             ruleIds: [starci-be/file-size-growth]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Split by responsibility, not by line count.
         status: implemented
       - id: NEST-HFS-SPEC-QUALITY
@@ -390,7 +391,7 @@ profiles:
             ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation, starci-be/named-entity-manager-only, starci-be/no-repository-class]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Boot the named connection and test atomicity; AST shape cannot prove the token or database effect.
         status: implemented
       - id: NEST-CONDITIONAL-CQRS-SHAPE
@@ -404,7 +405,7 @@ profiles:
             ruleIds: [starci-be/handler-overrides-process, starci-be/message-carries-params-only]
             expected: { severity: error }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Judge whether each handler owns one operation; this check does not judge handler logic.
         status: implemented
       - id: NEST-AUTHORIZATION-DOOR
@@ -418,7 +419,7 @@ profiles:
             ruleIds: [starci-be/no-auth-use-guards, starci-be/door-lives-in-features, starci-be/rest-door-needs-a-reason]
             expected: { severity: error }
         semantic:
-          guidance: docs/architecture-rules.md
+          guidance: docs/architecture.md
           review: Exercise denied and cross-scope actions; decorator presence does not prove resource authorization.
         status: implemented
       - id: NEST-TEST-STATIC-CONTRACT
@@ -476,7 +477,7 @@ profiles:
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Confirm the exported surface is a stable capability API.
         status: implemented
       - id: NEST-MODULE-REGISTRATION
@@ -486,7 +487,7 @@ profiles:
           requirement: Detect direct re-registration of another module's exported provider and validate selected handler/module registration shape.
           check: { kind: architecture, ruleIds: [BE_MODULE_PROVIDER_REREGISTRATION, BE_MODULE_HANDLER_REGISTRATION] }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Boot-test token, scope, configuration and lifetime; named instances cannot be inferred from syntax alone.
         status: implemented
       - id: NEST-COMMENT-MEMBER-SHAPE
@@ -510,7 +511,7 @@ profiles:
           requirement: Enforce adopted feature/application/transport placement and filename, class, enum, type and GraphQL surface syntax.
           check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_FORM] }
         semantic:
-          guidance: docs/backend-source-pattern.md
+          guidance: docs/architecture.md
           review: Select domain versus persistence ownership before judging placement.
         status: implemented
       - id: NEST-TRANSPORT-ERROR-MAPPING
@@ -572,11 +573,11 @@ profiles:
       - id: NEST-COHESIVE-ORCHESTRATION
         sourceRuleIds: [BE-FUNCTION-3, BE-FUNCTION-7, BE-TYPING-6]
         rationale: Whether a wrapper, helper, port or generic owns a meaningful responsibility depends on scenario and lifecycle meaning.
-        guidance: docs/backend-source-pattern.md
+        guidance: docs/architecture.md
       - id: NEST-CONCURRENCY-DESIGN
         sourceRuleIds: [BE-FUNCTION-6]
         rationale: Atomicity, idempotency and unknown-effect recovery require store/provider design and executable competing/crash tests.
-        guidance: docs/architecture-rules.md
+        guidance: docs/architecture.md
       - id: NEST-IMPORT-ORDER-OBSERVATION
         sourceRuleIds: [BE-IMPORTS-3, BE-IMPORTS-5]
         rationale: Import order is explicitly observational; selected execution form and ownership decide imports.
@@ -715,8 +716,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: e9821a7acfc8cefca09102d003c83e4c89922b0045a2b4d01bbf93792d422d60
-        files: 171
+        value: 054f35445a54d8936283bf25f638cd44a7b327969408e25e1e08a34e9bfaa099
+        files: 174
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:
@@ -796,7 +797,7 @@ profiles:
             ruleIds: [FE_ROUTE_DEFAULT_EXPORT, FE_ROUTE_ONE_PAGE, FE_ROUTE_DRAWING_DECISION, FE_ROUTE_CLIENT_BOUNDARY, FE_ROUTE_CLIENT_HOOK]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Confirm a server loader adapts framework input rather than owning product orchestration.
         status: implemented
       - id: NEXT-DEPENDENCY-DIRECTION
@@ -809,7 +810,7 @@ profiles:
             ruleIds: [FE_TIER_DIRECTION, FE_APP_ISOLATION, ARCH_OWNER_CYCLE, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_TRANSPORT_OWNER, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Classify scenario, reusable capability and intrinsic visual responsibilities before applying a directory edge.
         status: implemented
       - id: NEXT-PURE-BOUNDARY
@@ -822,7 +823,7 @@ profiles:
             ruleIds: [FE_PURE_WORLD_HOOK, FE_PURE_WORLD_IMPORT, FE_PURE_REACHES_DATA]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Intrinsic focus, measurement, disclosure, drag and reduced-motion state remain valid visual ownership.
         status: implemented
       - id: NEXT-COMMENT-SOURCE-HYGIENE
@@ -878,7 +879,7 @@ profiles:
             ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner]
             expected: { severity: error }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Inspect installed Grammar exports/props; a lint name cannot prove an API exists.
         status: implemented
       - id: NEXT-TOKENS-TYPOGRAPHY-COPY
@@ -936,7 +937,7 @@ profiles:
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Confirm the public surface belongs to one cohesive feature/module/package owner.
         status: implemented
       - id: NEXT-GRAMMAR-CONTRACT
@@ -949,7 +950,7 @@ profiles:
             ruleIds: [ARCH_GRAMMAR_EXPORT_BYPASS, ARCH_GRAMMAR_CONTRACT_INVALID]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Typecheck actual component props and render states; static package identity cannot prove behavior.
         status: implemented
       - id: NEXT-CONDITIONAL-RENDER-BOUNDARY
@@ -962,7 +963,7 @@ profiles:
             ruleIds: [FE_WORLD_OWNER_RENDER_BOUNDARY]
             externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
         status: implemented
       - id: NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
@@ -975,7 +976,7 @@ profiles:
             sourceOnly: true
             ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_TIER_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Review cohesion, public API shape and behavior separately; each source root follows the same roles in a single application or monorepo.
         status: implemented
       - id: NEXT-ERROR-STATE-MAPPING
@@ -1086,7 +1087,7 @@ profiles:
             ruleIds: [starci-fe/connected-block-has-presentational-twin]
             expected: { severity: off }
         semantic:
-          guidance: docs/portable-source-architecture.md
+          guidance: docs/architecture.md
           review: Classify product-world ownership before applying NEXT-CONDITIONAL-RENDER-BOUNDARY; intrinsic state does not manufacture a twin.
         status: implemented
     semanticOnly:
@@ -1097,7 +1098,7 @@ profiles:
       - id: NEXT-COHESIVE-UI-OWNERSHIP
         sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-6, FE-FUNCTION-2, FE-FUNCTION-3, FE-FUNCTION-5]
         rationale: Cohesion and usefulness of a separate render/helper contract depend on the product responsibility.
-        guidance: docs/portable-source-architecture.md
+        guidance: docs/architecture.md
       - id: NEXT-IMPORT-ORDER-OBSERVATION
         sourceRuleIds: [FE-IMPORTS-2]
         rationale: The source explicitly records import order as descriptive rather than mandatory.

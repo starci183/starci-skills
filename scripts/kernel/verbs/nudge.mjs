@@ -173,7 +173,7 @@ export default {
   // draft the liveness classification did, not a second read that could have moved on (L-6).
   const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
   // Orca lifts the input box's text out of the frame and answers it as `draft`: text left there that
-  // the runtime did not type is foreign input exactly as a visible input row is (nivo collab Kernel,
+  // the runtime did not type is foreign input exactly as a visible input row is (a collab Kernel,
   // 2026-09-25: a hidden draft took every later send as its tail). The runtime's own - this wake or
   // the contract left staged, or runtime wakes piled up - goes on to the proven wake, which submits
   // or clears it (scripts/kernel/wake-delivery.mjs).

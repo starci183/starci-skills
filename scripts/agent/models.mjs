@@ -1,5 +1,6 @@
 // scripts/agent/models.mjs — pool + launch-model resolution over
-// modules/models/runtimes.yaml (schema starci/runtimes@1).
+// modules/models/runtimes.yaml (operational policy) + modules/models/registry.yaml
+// (`pools`, the ONE model catalog — schema starci/profile-registry@1).
 //
 // Routing model (selection.yaml allocationFacts.poolSelection):
 //   0. runtimes.yaml roleOfKind names the kind's role, work, floor and order;
@@ -32,10 +33,13 @@ import { credentialFingerprintOf, credentialRotated } from './credential-fingerp
 import { parseJsonOr } from '../lib/json.mjs';
 import { readProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
+import { DEFAULT_MODELS_DIR } from './model-registry.mjs';
+
+export { loadModelRegistry, loadRuntimes, defaultOperationTarget } from './model-registry.mjs';
+import { loadModelRegistry, loadRuntimes } from './model-registry.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
 
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'insane'];
 
@@ -112,22 +116,6 @@ function orderOverflowOf(runtimes, orderKey) {
   return Array.isArray(list) ? list : [];
 }
 
-function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
-  const file = path.join(modelsDir, 'runtimes.yaml');
-  if (!fs.existsSync(file)) return null;
-  return parseYaml(fs.readFileSync(file, 'utf8'));
-}
-
-// The unrouted operation target is declared, never a literal: modules/models/registry.yaml
-// orchestration.defaultOperationTarget (GQ-02).
-// A registry that cannot be read or does not declare it fails loudly.
-export function defaultOperationTarget(modelsDir = DEFAULT_MODELS_DIR) {
-  const value = parseYaml(fs.readFileSync(path.join(modelsDir, 'registry.yaml'), 'utf8'))?.orchestration?.defaultOperationTarget;
-  if (typeof value !== 'string' || !value)
-    throw new Error('modules/models/registry.yaml orchestration.defaultOperationTarget must declare the unrouted default target');
-  return value;
-}
-
 // The model a pool launches for one difficulty. A missing pin is a typed
 // error (the pool is ineligible at that difficulty) — never a fallback to a
 // neighbouring tier's model.
@@ -136,23 +124,26 @@ export function resolveLaunchModel(target, difficulty, opts = {}) {
   if (!d) return { error: `unknown difficulty '${difficulty}'` };
   const runtimes = opts.runtimes ?? loadRuntimes(opts.modelsDir);
   const pool = runtimes?.runtimes?.[target];
-  if (!pool) return { error: `no runtimes.yaml pool '${target}'` };
+  if (!pool) return { error: `no registry.yaml pool '${target}'` };
   const modelId = pool.models?.[d];
   if (!modelId) return { error: `pool '${target}' has no ${d} model` };
   return { target: pool.target ?? target, modelId, effort: pool.effort?.[d] ?? null };
 }
 
 // The model + effort a worker launches with (worker-start --model/--effort). Order: the persisted `starci kernel route`
-// decision when it names this target, the pool's difficulty pin, then the profile's own requestedModel for
-// launch-only targets (gpt-6-sol/gpt-6-luna) that runtimes.yaml has no pool for. No model at all is a typed error -
-// a worker is never started on the CLI's own default model, because attestation could not prove it.
-export function resolveWorkerLaunchModel({ target, requestedModel = null, payload = {}, runtimes, modelsDir } = {}) {
+// decision when it names this target, the pool's difficulty pin, then the registry default model — the
+// launch-only targets' `targets.<t>.defaultModel` (gpt-6-sol/gpt-6-luna/cursor-agent hold no pool) and the
+// pool's `pools.<p>.defaultModel` at a difficulty its models map does not pin. No model at all is a typed
+// error - a worker is never started on the CLI's own default model, because attestation could not prove it.
+export function resolveWorkerLaunchModel({ target, payload = {}, runtimes, modelsDir } = {}) {
   if (payload?.modelId && (!payload.model || payload.model === target))
     return { modelId: payload.modelId, effort: payload.effort ?? null, source: 'route' };
-  const pinned = resolveLaunchModel(target, payload?.difficulty ?? 'medium', { runtimes, modelsDir });
+  const rt = runtimes ?? loadRuntimes(modelsDir);
+  const pinned = resolveLaunchModel(target, payload?.difficulty ?? 'medium', { runtimes: rt });
   if (pinned && !pinned.error && pinned.modelId)
     return { modelId: pinned.modelId, effort: pinned.effort ?? null, source: 'runtimes' };
-  if (requestedModel) return { modelId: requestedModel, effort: payload?.effort ?? null, source: 'profile' };
+  const fallback = rt?.runtimes?.[target]?.defaultModel ?? loadModelRegistry(modelsDir)?.targets?.[target]?.defaultModel ?? null;
+  if (fallback) return { modelId: fallback, effort: payload?.effort ?? null, source: 'registry' };
   return { error: pinned?.error ?? `no launch model for ${target}` };
 }
 
@@ -241,7 +232,7 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
 // review, draw, scaffold, sol-think) never widen serving.
 function poolRejectionReasons({ pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir, backoff = {} }) {
   const reasons = [];
-  if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
+  if (!pool) return [`no registry.yaml pool '${target}'`];
   const orderServed = order && order !== role ? ` or order '${order}'` : '';
   if (role && Array.isArray(pool.roles) && pool.roles.length && !pool.roles.includes(role) && !pool.roles.includes(order))
     reasons.push(`pool does not serve role '${role}'${orderServed}`);
@@ -485,7 +476,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
 // from the agent card, which for an Orca-managed provider without an account
 // list stays unresolved and keeps the circuit. Nothing else closes a circuit
 // early but `starci kernel provider-health --recover`.
-// The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one fleet-wide fact per provider;
+// The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one worker-wide fact per provider;
 // `db` (a ledger) is not read and stays in the signature for its callers.
 export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
   const key = normalizeProvider(provider);

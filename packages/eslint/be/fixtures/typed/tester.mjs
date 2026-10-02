@@ -23,23 +23,29 @@ export const BE_DECLARATION = Object.freeze({
 /** The HFS view of the fixture be side (`declaration` is the be side of the app). */
 export const fixtureHfs = (declaration = BE_DECLARATION) => hfsFromDeclaration(appDeclaration("be", declaration), TYPED_ROOT)
 
-/** Globs of every depth a case filename may sit at (the project service refuses a `**` glob). */
-const DEPTHS = ["*.ts", "*/*.ts", "*/*/*.ts", "*/*/*/*.ts", "*/*/*/*/*.ts", "*/*/*/*/*/*.ts", "*/*/*/*/*/*/*.ts", "*/*/*/*/*/*/*/*.ts"]
+/** Globs of every depth a case filename may sit at, per extension (the project service refuses a `**` glob). */
+const depthsOf = (extensions = ["ts"], maxDepth = 8) =>
+    Array.from({ length: maxDepth }, (_, depth) => extensions.map((ext) => `${"*/".repeat(depth)}*.${ext}`)).flat()
 
 /** The absolute filename of a fixture-relative path. */
 export const at = (rel) => join(TYPED_ROOT, rel)
 
-/** A RuleTester with typed linting and the fixture HFS settings. */
-export const typedTester = ({ declaration } = {}) => new RuleTester({
+/** The one typed RuleTester both canons build: the project service on the fixture root's tsconfig, the fixture
+ *  HFS in settings; the front end passes jsx, a .tsx second extension and its own depth and project cap. */
+export const ruleTester = ({ root, hfs, jsx = false, extensions = ["ts"], maxDepth = 8, maxProjects = 500 }) => new RuleTester({
     languageOptions: {
         parser: tsParser,
         ecmaVersion: 2022,
         sourceType: "module",
         parserOptions: {
+            ...(jsx ? { ecmaFeatures: { jsx: true } } : {}),
             // A case's file need not exist: the default project types it with this directory's tsconfig.json.
-            projectService: { allowDefaultProject: DEPTHS, defaultProject: "tsconfig.json", maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 500 },
-            tsconfigRootDir: TYPED_ROOT,
+            projectService: { allowDefaultProject: depthsOf(extensions, maxDepth), defaultProject: "tsconfig.json", maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: maxProjects },
+            tsconfigRootDir: root,
         },
     },
-    settings: { starci: { hfs: fixtureHfs(declaration) } },
+    settings: { starci: { hfs } },
 })
+
+/** A RuleTester with typed linting and the fixture HFS settings. */
+export const typedTester = ({ declaration } = {}) => ruleTester({ root: TYPED_ROOT, hfs: fixtureHfs(declaration) })

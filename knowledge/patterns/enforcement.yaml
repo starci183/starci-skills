@@ -1,3 +1,4 @@
+# owner: the cross-project anti-bypass enforcement requirements; rule law lives in knowledge/hfs/rules.yaml only.
 schema: starci/knowledge-source@1
 id: patterns.enforcement
 title: Cross-project convention enforcement

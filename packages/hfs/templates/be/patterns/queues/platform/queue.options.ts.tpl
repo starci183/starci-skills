@@ -17,6 +17,6 @@ export interface QueueOptions {
     readonly concurrency: number
     /** The tokens of the shared entity managers of the connections that hold a queue outbox of the app: the relay reads each of them. */
     readonly connections: ReadonlyArray<InjectionToken>
-    /** The job schedulers the app registers at boot; BullMQ upserts them by id, so a fleet of replicas fires each one once per interval. */
+    /** The job schedulers the app registers at boot; BullMQ upserts them by id, so a pool of replicas fires each one once per interval. */
     readonly schedulers: ReadonlyArray<QueueSchedulerDefinition>
 }

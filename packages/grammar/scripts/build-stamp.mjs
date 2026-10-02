@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
  *
  * The source digest covers everything that decides what `dist/` contains: every file under `src/`
  * except stories, test helpers, specs and tests (they never ship), `tsconfig.build.json`,
- * `scripts/copy-css.mjs`, and the `exports` and `files` fields of `package.json`. Line endings are
+ * `packages/grammar/scripts/copy-css.mjs`, and the `exports` and `files` fields of `package.json`. Line endings are
  * normalised so a CRLF checkout of the same commit has the same digest.
  */
 

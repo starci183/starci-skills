@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import fs from 'node:fs';
+import { appPort, devPort } from './ports.mjs';
 
 function conceptDeclarations(): Plugin {
   const source = path.resolve(import.meta.dirname, './src');
@@ -28,9 +29,9 @@ function conceptDeclarations(): Plugin {
 export default defineConfig({
   plugins: [conceptDeclarations(), react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
-  preview: { host: '127.0.0.1', port: 4545, strictPort: true },
+  preview: { host: '127.0.0.1', port: devPort, strictPort: true },
   server: {
-    host: '127.0.0.1', port: 4545, strictPort: true,
-    proxy: { '/api': 'http://127.0.0.1:4547' },
+    host: '127.0.0.1', port: devPort, strictPort: true,
+    proxy: { '/api': `http://127.0.0.1:${appPort}` },
   },
 });

@@ -216,7 +216,7 @@ test('the land gate reports gate stability for a frozen family: which lands touc
   assert.deepEqual(gateFamiliesTouched({changed:['scripts/work/draw/draw-dna.mjs','README.md'],freeze}),[{family:'interface.draw',why:['scripts/work/draw/draw-dna.mjs']}]);
   assert.deepEqual(gateFamiliesTouched({changed:['README.md'],freeze}),[]);
   const entry={id:'new-draw-code',ops:['interface.draw'],adds:{codes:['DRAW_X']}};
-  assert.deepEqual(gateFamiliesTouched({changed:['modules/kernel/contract-changes.yaml'],freeze,before:{changes:[]},after:{changes:[entry]}}),[{family:'interface.draw',why:['contract change new-draw-code']}]);
+  assert.deepEqual(gateFamiliesTouched({changed:['modules/kernel/contract-changes/new-draw-code.yaml'],freeze,before:{changes:[]},after:{changes:[entry]}}),[{family:'interface.draw',why:['contract change new-draw-code']}]);
   assert.deepEqual(gateFamiliesTouched({changed:[],freeze,before:{changes:[entry]},after:{changes:[entry]}}),[],'an unchanged entry is not this land');
 
   // Two trees whose gate differs: the candidate newly fails one accepted leg.

@@ -530,13 +530,13 @@ blockers:
     condition:
       en: A prerequisite is not effectively done or a required selected input is absent.
 placeholders:
-  feature: Selected feature slug
+  feature: shared
   audit: Stable selected audit slug
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
+  app: shared
   bound-paths: Inspected product source read set
   environment: Resolved environment resource slug
   identity: Selected actor resource slug
-  playwright-manifest-and-lockfile: Actual package manifest and lockfile that pin Playwright
+  playwright-manifest-and-lockfile: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:

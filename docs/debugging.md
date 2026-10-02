@@ -1,3 +1,4 @@
+Task: debug a stuck unit or workflow
 # Debugging
 
 Every question about a workflow has an answer in SQL. Open the databases read-only, run one query,

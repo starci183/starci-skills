@@ -902,7 +902,7 @@ FROM work_units u LEFT JOIN ui_state_map m ON m.entity='unit' AND m.native=u.sta
 CREATE VIEW IF NOT EXISTS v_checks AS
 SELECT c.*, COALESCE(m.ui,'unknown') AS ui FROM check_runs c LEFT JOIN ui_state_map m ON m.entity='check' AND m.native=c.status;
 
--- An ENDED workflow (phase archived|finished) surfaces no live leftovers: the predicate of scripts/reconciler/decisions.mjs listDecisions,
+-- An ENDED workflow (phase archived|finished) surfaces no live leftovers: the predicate of scripts/machine/decisions.mjs listDecisions,
 -- applied per leg here (a missing workflow row survives; v_decision_rows keeps an ended workflow's resolved rows as history).
 -- Decision items with a time-rule ui: overdue or escalations >= 2 -> bad; under 20% of the window left -> warn.
 CREATE VIEW IF NOT EXISTS v_decision_rows AS
@@ -1046,7 +1046,7 @@ SELECT 'job-'||j.status, j.workflow_id, j.job_id, j.op_id, j.updated_at, j.deadl
    AND (w.phase IS NULL OR w.phase NOT IN ('archived','finished'));
 
 -- H1: a filed report unsettled past SLA (green <= 3 min for settler; non-green <= 15 min for Kernel, then DI escalation).
--- A job in 'reported'/'deciding' past SLA does NOT count as holding a fleet slot (census reads this view to exclude it).
+-- A job in 'reported'/'deciding' past SLA does NOT count as holding a worker slot (census reads this view to exclude it).
 CREATE VIEW IF NOT EXISTS v_settle_overdue AS
 SELECT a.workflow_id, a.attempt_id, a.job_id, a.unit_id, a.op_id, a.report_outcome, j.status AS job_status,
        a.reported_at, (CAST(unixepoch('subsec')*1000 AS INTEGER) - a.reported_at) AS waiting_ms,

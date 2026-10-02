@@ -41,7 +41,7 @@ export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'ch
 const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,
- * host, fleet and learning controllers open these for the Supervisor). `cap-starved` is resource policy (lane
+ * host, workers and learning controllers open these for the Supervisor). `cap-starved` is resource policy (lane
  * rc-gc-resource's Resource controller), next to `quota-exhausted`.
  */
 const SUPERVISOR_KINDS = Object.freeze(['cap-starved', 'quota-exhausted', 'runtime-defect', 'cross-workflow', 'deadlock',

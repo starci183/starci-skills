@@ -1,3 +1,4 @@
+Owner: modules/ops/ops/interface.audit.yaml
 # Interface audit
 
 `interface.audit` is the read-only diagnostic step between frontend implementation and independent acceptance.
@@ -139,7 +140,7 @@ declaration/token provenance.
 ## Layout lens
 
 The audit applies `starci work shell-conformance` in two directions against the layout tree
-(`.starciwork/shell/index.yaml`, see [layout-tree.md](layout-tree.md)).
+(`.starciwork/shell/index.yaml`, see [architecture](architecture.md#the-layout-tree)).
 
 - **Direction side:** each accepted direction must be a reproducible composite in the current layout chain of
   its route, with its route, surface, drawer direction, `routed` and `host` consistent, and a routed overlay drawn

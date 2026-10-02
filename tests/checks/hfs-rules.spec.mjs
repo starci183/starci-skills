@@ -94,7 +94,7 @@ test('schema and loader agree on a broken catalog', () => {
   }
 });
 
-test('the loader also refuses what only semantics can see', () => {
+test('the rule-catalog loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.rules[1].id = 'R01'; }), 'HFS_RULES_INVALID');   // ids only increase: a repeat or a step back is refused
   assert.doesNotThrow(load((d) => { d.rules[0].id = 'R99'; d.rules[1].id = 'R100'; d.rules.length = 2; }));   // ids compare as numbers: R100 follows R99
   refusal(load((d) => { d.rules[0].id = 'R100'; d.rules[1].id = 'R99'; d.rules.length = 2; }), 'HFS_RULES_INVALID');

@@ -36,12 +36,13 @@
 //                  every running-page capture of an implementation record is painted in the brand record's
 //                  colours (scripts/work/brand/brand-palette.mjs): PALETTE_OFF_BRAND names each foreign colour, its
 //                  area share and the nearest brand token; PRIMARY_ABSENT when that colour stands in for the
-//                  brand primary. Owner 2026-09-24: a nivo part drew its primary in blue, the brand is red.
+//                  brand primary. Owner 2026-09-24: a product part drew its primary in blue, the brand is red.
 //
 // Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci runtime validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev) as suspects, never refusals.
 import fs from 'node:fs';
+import { escapeRegExp } from '../../lib/regex.mjs';
 import { capturesOf } from '../impl-captures.mjs';
 import path from 'node:path';
 import { runNode } from '../../api/node/run-node.mjs';
@@ -63,7 +64,6 @@ const UI_SCHEMA = 'work/ui-screen@1';
 const IMPL_SCHEMA = 'work/implementation@1';
 const SOURCE_EXT = ['.tsx', '.ts', '.jsx', '.js', '.mdx'];
 
-const escapeRe = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The Work root enclosing `dir` (work-io.mjs workRootOf), else `dir` itself. */
 const workRootOf = (dir) => enclosingWorkRoot(dir) ?? path.resolve(dir);
@@ -192,7 +192,7 @@ function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = '
         let scan = null;
         try { scan = scanAppDir(appDirOf, { repoRoot: located.repoRoot, name }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `app/ could not be scanned (${error.message})`))); }
         // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
-        // string another workflow adds is not drift (nivo inc-13f6af8494bf).
+        // string another workflow adds is not drift (inc-13f6af8494bf).
         const drift = scan ? sourceDrift(tree, scan) : null;
         if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs starci work layout-tree scan --work <.starciwork> --write and re-captures what moved`));
       }
@@ -457,7 +457,7 @@ function checkPromptLocale(workRoot, uiFile, record, shell) {
     seen.add(promptPath);
     const file = path.join(path.dirname(uiFile), promptPath);
     if (!fs.existsSync(file)) { out.push(finding('refuse', 'SHELL_PROMPT_UNREADABLE', at, `${asset.path}: its prompt ${promptPath} is not on disk`)); continue; }
-    if (!new RegExp(`product[\\s_-]?locale\\s*[:=]\\s*${escapeRe(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
+    if (!new RegExp(`product[\\s_-]?locale\\s*[:=]\\s*${escapeRegExp(locale)}(?![A-Za-z0-9-])`, 'i').test(fs.readFileSync(file, 'utf8'))) out.push(finding('refuse', 'SHELL_LOCALE_DRIFT', at, `${promptPath} does not state "Product locale: ${locale}" - UI copy follows the layout tree's productLocale, not owner_language`));
   }
   return out;
 }
@@ -582,7 +582,7 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
 /**
  * The whole check for one target: a work tree, the shell dir, a ui record dir or an implementation record dir.
  * `advisoryCodes`: finding codes a contract change added after the checked leg was admitted
- * (--admitted-at, modules/kernel/contract-changes.yaml) - suspects for that leg, never refusals.
+ * (--admitted-at, modules/kernel/contract-changes/) - suspects for that leg, never refusals.
  */
 export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
   const resolved = path.resolve(target);

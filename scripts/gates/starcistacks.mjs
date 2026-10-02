@@ -15,7 +15,7 @@
 //   --new          the repository is being created by this leg (interface.scaffold, backend.scaffold,
 //                  package.scaffold): a missing declaration or services block is refused, not a suspect
 //   --admitted-at  the leg's admission (starci kernel op-contract --json admission.admittedAt): finding codes a
-//                  contract change added after it are suspects for that leg (modules/kernel/contract-changes.yaml)
+//                  contract change added after it are suspects for that leg (modules/kernel/contract-changes/)
 //
 // Refusals: an unknown or ambiguous service declaration, custody that is missing where it is declared,
 // an owner action declared for something custody already holds, CI calling a service the declaration
@@ -40,6 +40,8 @@ import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from '
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
 import { readProperties } from '../lib/properties.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
+import { STACK_DECLARATION_TEMPLATE } from '../lib/example-refs.mjs';
 
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
@@ -47,7 +49,7 @@ const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 const DECLARATION_SCHEMA = 'starci/application-stacks@1';
 const CONTRACT_CHANGE = 'starcistacks-services';
 const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
-  detail: 'author the services block of the repository stack declaration (sonar and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
+  detail: `author the services block of the repository stack declaration (sonar and every other delivery/quality service) from ${STACK_DECLARATION_TEMPLATE}` };
 
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
 const SERVICE_CATALOG = {
@@ -78,7 +80,6 @@ const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
 const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
-const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 
 // ---- schema ---------------------------------------------------------------------------------------------
@@ -338,7 +339,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         add('suspect', 'STACKS_CI_UNUSED', `${at}.ci`, 'ci.wiring required, but no workflow calls the service');
       if (['required', 'optional-follow-up'].includes(service.ci.wiring) && ciUses[id].length)
         for (const item of [...service.ci.secrets, ...service.ci.vars])
-          if (item.name && !new RegExp(`\\b${escapeRe(item.name)}\\b`).test(ciText))
+          if (item.name && !new RegExp(`\\b${escapeRegExp(item.name)}\\b`).test(ciText))
             add('suspect', 'STACKS_CI_NAME_UNREFERENCED', `${at}.ci`, `${item.name} is declared for CI but no workflow reads it`);
       if (ciUses[id].length && service.projects.length && !service.projects.some((project) => project.repository === name) && !governing)
         add('refuse', 'STACKS_PROJECT_MISSING', `${at}.projects`, `the workflows call ${id} but no project entry names repository ${name}`);
@@ -380,7 +381,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         const custodyArea = parts.length > 3 && (parts[2] === 'runtime' || parts[2] === 'secrets');
         const base = parts.at(-1);
         // infra/** is tracked source, but a value file inside it (.env*, *.env, *.key, *.pem, *.tfvars)
-        // is plaintext custody (mia inc-5360513a96b3: infra/compose/.env.generated was trackable).
+        // is plaintext custody (inc-5360513a96b3: infra/compose/.env.generated was trackable).
         const infraValue = parts.length > 3 && parts[2] === 'infra' && INFRA_VALUE_FILE.test(base) && !/\.enc$/.test(base) && !/\.example$/.test(base);
         if ((custodyArea && !/\.enc$/.test(base) && !['KEYS.md', '.gitkeep'].includes(base)) || infraValue)
           add('refuse', 'STACKS_PLAINTEXT_TRACKED', file, /\.enc\.(?:ya?ml|json|env)$/u.test(base)
@@ -398,7 +399,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         `${bare.length} plaintext custody member(s) have no .enc twin (${bare.slice(0, 5).join(', ')}${bare.length > 5 ? ', ...' : ''}); encrypt them (stack-secret) so another machine can decrypt them`);
     }
     const ignore = readText(path.join(repo, '.gitignore')) ?? '';
-    if (!new RegExp(`^/?${escapeRe(root)}/\\*\\*\\s*$`, 'm').test(ignore))
+    if (!new RegExp(`^/?${escapeRegExp(root)}/\\*\\*\\s*$`, 'm').test(ignore))
       add('suspect', 'STACKS_GITIGNORE_OPEN', '.gitignore', `no deny-all rule \`${root}/**\`; custody plaintext is only safe when the tree is denied and *.enc, KEYS.md and the declaration are re-included`);
     // The rules must still deny a value file under infra AFTER the infra re-includes
     // (stacks-layout.yaml custody.gitignoreRules). git check-ignore --no-index answers for paths
@@ -427,14 +428,13 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
   const pick = (level) => findings.filter((finding) => finding.level === level).map((finding) => `${finding.file}: ${finding.message} [${finding.code}]${finding.advisory ? ' (added after this leg was admitted)' : ''}`);
   const refused = pick('refuse');
   const needsFollowUp = findings.some((finding) => ['STACKS_DECLARATION_MISSING', 'STACKS_SERVICES_MISSING', 'STACKS_SERVICE_UNDECLARED'].includes(finding.code) && finding.level !== 'refuse');
-  const fixture = path.join(skillRoot, 'examples', 'starcistacks-services', `${name}.services.yaml`);
   return {
     schema: RESULT_SCHEMA, ok: refused.length === 0, repository: name, repoRoot: slash(repo), newRepo,
     declaration: declaration?.file ? slash(declaration.file) : null, root: declaration?.root ?? null,
     governedBy: governing ? slash(governing.repo) : null,
     services: Object.fromEntries(Object.entries(normalized).map(([id, service]) => [id, summary(service)])),
     refused, suspect: pick('suspect'), findings,
-    ...(needsFollowUp ? { followUp: { change: CONTRACT_CHANGE, ...FOLLOW_UP, ...(isFile(fixture) ? { fixture: slash(path.relative(skillRoot, fixture)) } : {}) } } : {}),
+    ...(needsFollowUp ? { followUp: { change: CONTRACT_CHANGE, ...FOLLOW_UP, ...(isFile(path.join(skillRoot, STACK_DECLARATION_TEMPLATE)) ? { fixture: STACK_DECLARATION_TEMPLATE } : {}) } } : {}),
   };
 }
 
@@ -465,9 +465,9 @@ export function ownerAskConflict({ repo, question } = {}) {
     const service = resolveStackService(repo, id);
     if (!service || service.mode === 'disabled' || service.ownerAction !== 'none' || !custodyHeld(service)) continue;
     const names = [...service.credentials.map((credential) => credential.env), ...service.ci.secrets.map((item) => item.name), ...service.ci.vars.map((item) => item.name)].filter(Boolean);
-    const byName = names.find((item) => new RegExp(`\\b${escapeRe(item)}\\b`).test(body));
+    const byName = names.find((item) => new RegExp(`\\b${escapeRegExp(item)}\\b`).test(body));
     const words = [...new Set([id, service.provider, ...SERVICE_CATALOG[id].words].filter(Boolean))];
-    const byWord = words.find((word) => new RegExp(`\\b${escapeRe(word)}\\b`, 'i').test(body));
+    const byWord = words.find((word) => new RegExp(`\\b${escapeRegExp(word)}\\b`, 'i').test(body));
     if (!byName && !(byWord && ASK_WORDS.test(body))) continue;
     const custody = service.credentials.map((credential) => `${credential.custody.repository}/${credential.custody.path}`);
     return { service: id, provider: service.provider, declaration: slash(service.declaration), matched: byName ?? byWord,

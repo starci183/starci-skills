@@ -2,13 +2,13 @@
 // grammar-geometry.mjs — the control geometry a product actually renders, read from its CSS, and the check
 // that a drawn render keeps it.
 //
-//   starci work grammar-geometry --prompt --repo <product repo> [--family starci|nivo] [--json]
+//   starci work grammar-geometry --prompt --repo <product repo> [--family <name>] [--json]
 //   starci work grammar-geometry --check <html file | capture dir> --repo <product repo>
-//        [--family starci|nivo] [--viewport 390x844] [--json]
+//        [--family <name>] [--viewport 390x844] [--json]
 //
 // Every value comes from the cascade of the product's installed CSS: HeroUI v3 (`@heroui/styles`
-// dist/heroui.min.css plus its `@theme inline` tokens), `@starci/grammar` common (+ core for the starci
-// family) and the family sheet (nivo: the repo css that scopes `[data-grammar-family="nivo"]`). The
+// dist/heroui.min.css plus its `@theme inline` tokens), `@starci/grammar` common (+ core for the runtime's
+// own family) and the family sheet (the repo css that scopes `[data-grammar-family="<id>"]`). The
 // cascade honours layers, importance, specificity, custom-property inheritance and media conditions at
 // the viewport asked for. A brand token the family declares but no `var()` and no source file reads is
 // reported as unbound: the CSS wins (owner ruling 2026-09-27), never the declared token.
@@ -22,13 +22,13 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { flag as argOf } from '../work-io.mjs';
-import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../lib/is-main.mjs'; import { GRAMMAR_FAMILIES } from '../../lib/example-refs.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 import { alphaOver } from '../../lib/color.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
-export const FAMILIES = { starci: 'core', nivo: 'nivo' };
+export const FAMILIES = GRAMMAR_FAMILIES;
 export const DEFAULT_VIEWPORT = { width: 390, height: 844 };
 const PROMPT_WIDTHS = [390, 1280];
 const ROOT_FONT_PX = 16;
@@ -504,7 +504,7 @@ export function discoverSources(repo, family = null, { app = null, grammarDist =
     .filter((f) => /@import\s+(url\()?["']@heroui\/styles/.test(readText(f)))
     .filter((f) => !app || path.resolve(f).startsWith(path.resolve(app)))
     .map(graphOf);
-  const fam = family ?? (entries.some((e) => e.files.some((f) => scopesFamily(f, 'nivo'))) || (!entries.length && css.some((f) => scopesFamily(f, 'nivo'))) ? 'nivo' : 'starci');
+  const fam = family ?? Object.keys(FAMILIES).find((k) => FAMILIES[k] !== FAMILIES.starci && (entries.some((e) => e.files.some((f) => scopesFamily(f, FAMILIES[k]))) || (!entries.length && css.some((f) => scopesFamily(f, FAMILIES[k]))))) ?? 'starci';
   const familyId = FAMILIES[fam];
   const reaches = (e) => e.files.some((f) => scopesFamily(f, familyId));
   const ranked = entries.slice().sort((a, b) => Number(reaches(b)) - Number(reaches(a)) || semverDesc({ version: a.grammarVersion }, { version: b.grammarVersion }) || a.entry.localeCompare(b.entry));
@@ -1075,8 +1075,8 @@ export function geometryFindings(snap, g, { file = snap.file } = {}) {
   }
   // Page inset: a page-scoped render (a `<shape>--page--<breakpoint>--<theme>` part) keeps its top-level content -
   // text outside any card or control, and every top-level card - the page inset (--grammar-page-inset, PageContainer;
-  // knowledge/ui/presentation/padding.yaml scale notes, measure.yaml MEASURE-1) from both viewport edges. nivo
-  // module-ledger mobile: a page header flush with the left edge (0px) passed because nothing measured it.
+  // knowledge/ui/presentation/padding.yaml scale notes, measure.yaml MEASURE-1) from both viewport edges. A
+  // module-ledger page on mobile: a page header flush with the left edge (0px) passed because nothing measured it.
   if (/--page--/.test(path.basename(String(file ?? ''))) && g.resolver && g.chains) {
     let inset = null;
     try { inset = g.resolver.memo(`inset-${width}`, [g.chains.html, g.chains.root], width).variable('--grammar-page-inset'); } catch { inset = null; }
@@ -1124,8 +1124,8 @@ export async function checkGeometry(target, { repo, family = null, viewport = DE
 // ---------------------------------------------------------------------------------------------------------
 
 const USAGE = `Usage:
-  starci work grammar-geometry --prompt --repo <product repo> [--family starci|nivo] [--json]
-  starci work grammar-geometry --check <html file | capture dir> --repo <product repo> [--family starci|nivo] [--viewport 390x844] [--json]
+  starci work grammar-geometry --prompt --repo <product repo> [--family <name>] [--json]
+  starci work grammar-geometry --check <html file | capture dir> --repo <product repo> [--family <name>] [--viewport 390x844] [--json]
 `;
 
 export function parseViewport(text) {
@@ -1144,7 +1144,7 @@ export async function grammarGeometryMain(argv = []) {
   const repo = argOf(argv, '--repo');
   const family = argOf(argv, '--family');
   if (argv.includes('--help') || argv.includes('-h')) return { exitCode: 0, text: USAGE };
-  if (family && !FAMILIES[family]) return { exitCode: 2, text: `--family is starci or nivo\n${USAGE}` };
+  if (family && !FAMILIES[family]) return { exitCode: 2, text: `--family is one of ${Object.keys(FAMILIES).join(', ')}\n${USAGE}` };
   if (!repo) return { exitCode: 2, text: `--repo <product repo> is required\n${USAGE}` };
   if (argv.includes('--prompt')) {
     const g = resolveGeometry({ repo, family });

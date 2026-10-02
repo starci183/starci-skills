@@ -8,7 +8,7 @@ import {encrypt} from '../api/sops/encrypt.mjs';
 
 const IS_WINDOWS=process.platform==='win32';
 
-/** PATH lookup with PATHEXT and the winget package tree, the way scripts/stack-secret.mjs finds sops. */
+/** PATH lookup with PATHEXT and the winget package tree, the way scripts/api/sops/lib.mjs resolveSops finds sops. */
 export function resolveCommand(command,env=process.env){
   const dirs=(env.PATH||'').split(IS_WINDOWS?';':':').filter(Boolean);
   if(IS_WINDOWS&&env.LOCALAPPDATA){

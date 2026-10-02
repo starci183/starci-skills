@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadContractChanges, changeById } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = new URL('../..', import.meta.url);
 
@@ -21,10 +19,4 @@ test('the shared op contract separates open items from environment and later-leg
   assert.match(text, /sonar-local\.mjs[\s\S]*401 means run it\s+again/, 'Sonar 401 is a rerun, never an open item');
   assert.match(text, /backend\.implement's scoped unit gate for its selected operations/, "the op's own required proofs stay its own");
   assert.match(text, /`blocked`\s+`environment` with its evidence, never `partial`/);
-});
-
-test('the change is registered for new legs only', () => {
-  const change = changeById(loadContractChanges(fileURLToPath(ROOT)), 'open-items-not-notes');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers open-items-not-notes');
-  assert.equal(change.reach, 'new-legs');
 });

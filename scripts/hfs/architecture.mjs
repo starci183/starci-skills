@@ -1,4 +1,4 @@
-// architecture.mjs — the architecture check (docs/architecture-check.md).
+// architecture.mjs — the architecture check (docs/architecture.md).
 //
 //   starci runtime architecture <repo-root> [--base <commit>]
 //

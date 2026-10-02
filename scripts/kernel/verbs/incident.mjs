@@ -27,7 +27,7 @@ export default {
       const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
       if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
       // Who resolves it, and the owner answer any owner claim rests on (scripts/machine/owner-claim.mjs):
-      // free text saying "Owner confirmed" is no owner answer (nivo inc-2474f6593dfe, inc-f19d118298f1).
+      // free text saying "Owner confirmed" is no owner answer (inc-2474f6593dfe, inc-f19d118298f1).
       const by = typeof args.by === 'string' && args.by.trim() ? args.by.trim() : null;
       if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
       const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });

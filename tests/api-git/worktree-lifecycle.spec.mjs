@@ -33,7 +33,7 @@ import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LINK = process.platform === 'win32' ? 'junction' : 'dir';
-const WF = 'wf-todo-app-fe-lifecycle-k2';
+const WF = 'wf-shop-fe-lifecycle-k2';
 const HOUR = 3_600_000;
 
 const git = (cwd, ...args) => {
@@ -47,7 +47,7 @@ const branches = (repo, pattern) => git(repo, 'branch', '--list', pattern).split
 const trees = (repo) => git(repo, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length;
 
 /** A product repo on main with a bare origin, and a machine registry of its own (no row of another spec is seen). */
-function fixture(t, name = 'todo-app-fe') {
+function fixture(t, name = 'shop-fe') {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-wt-life-')));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(base, name);
@@ -119,37 +119,37 @@ test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unre
   const orca = fakeOrcaWorktrees({ root: path.join(base, 'orca') });
   const now = Date.now() + 2 * HOUR;
   // 1. the workflow worktree of a workflow that finished: preserved, removed through Orca.
-  const ended = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-todo-app-fe-ended-1a', appRepo: repo }).record;
+  const ended = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-shop-fe-ended-1a', appRepo: repo }).record;
   write(ended.path, 'src/wip.ts', 'export const wip = 1;\n');
   // 2. a tree under the worktrees root the registry never knew (made before the registry, or by a crashed run).
   const orphan = path.join(worktreesRootOf(repo), 'legacy', '_wf');
   fs.mkdirSync(path.dirname(orphan), { recursive: true });
   git(repo, 'worktree', 'add', '-q', '-b', 'wf/legacy', orphan, 'main');
-  git(repo, 'config', 'branch.wf/legacy.description', 'wf-todo-app-fe-legacy-9z');
+  git(repo, 'config', 'branch.wf/legacy.description', 'wf-shop-fe-legacy-9z');
   write(orphan, 'src/unlanded.ts', 'export const u = 1;\n');
   git(orphan, 'add', '-A'); git(orphan, 'commit', '-qm', 'unlanded work');
   // 3. a land scratch whose creating process is gone.
   const scratch = path.join(worktreesRootOf(repo), 'scratch-dead');
   assert.ok(createScratchWorktree({ repoRoot: repo, dir: scratch, kind: 'land-scratch', detach: true, base: 'main', ownerPid: 2 ** 22 + 12345, env }).ok);
   // 4. a running workflow keeps its tree.
-  const live = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-todo-app-fe-live-2b', appRepo: repo }).record;
+  const live = ensureWorkflowWorktree({ env, orca }, { workflowId: 'wf-shop-fe-live-2b', appRepo: repo }).record;
   // 5. an Orca slot whose creator died before Orca answered.
   const slot = reserveOrcaSlot({ repoRoot: repo, kind: 'workflow', slotKey: 'wf-crashed', owner: { workflowId: 'wf-crashed' }, env });
   assert.ok(slot.ok);
   withMachine((m) => m.db.prepare('UPDATE worktrees SET created_at=? WHERE path=?').run(1, slot.pending), { env });
-  const phase = { 'wf-todo-app-fe-ended-1a': 'finished', 'wf-todo-app-fe-live-2b': 'running' };
+  const phase = { 'wf-shop-fe-ended-1a': 'finished', 'wf-shop-fe-live-2b': 'running' };
   const lookup = Object.assign(() => null, { workflowPhase: (_, id) => phase[id] ?? null });
   const items = gcWorktrees({ env, now, repos: [repo], jobStatusOf: lookup, ownerAlive: () => false, orca });
   const by = (p) => items.find((i) => i.path && path.resolve(i.path) === path.resolve(p));
   assert.equal(by(ended.path)?.reason, 'owner-settled', JSON.stringify(items));
   assert.equal(by(ended.path)?.home, 'orca');
   assert.equal(by(ended.path)?.ok, true);
-  assert.equal(by(ended.path)?.preserved, 'refs/heads/preserved/wf-todo-app-fe-ended-1a/gc');
+  assert.equal(by(ended.path)?.preserved, 'refs/heads/preserved/wf-shop-fe-ended-1a/gc');
   assert.ok(orca.calls.some(([verb, a]) => verb === 'remove' && a.worktree === `id:${ended.orcaWorktreeId}`), 'Orca removed it');
   assert.equal(by(orphan)?.reason, 'orphan');
   assert.equal(by(orphan)?.ok, true);
-  assert.equal(by(orphan)?.preserved, 'refs/heads/preserved/wf-todo-app-fe-legacy-9z', 'the unlanded commit is preserved');
-  assert.equal(git(repo, 'show', 'preserved/wf-todo-app-fe-legacy-9z:src/unlanded.ts'), 'export const u = 1;');
+  assert.equal(by(orphan)?.preserved, 'refs/heads/preserved/wf-shop-fe-legacy-9z', 'the unlanded commit is preserved');
+  assert.equal(git(repo, 'show', 'preserved/wf-shop-fe-legacy-9z:src/unlanded.ts'), 'export const u = 1;');
   assert.equal(by(scratch)?.reason, 'owner-gone');
   assert.equal(by(scratch)?.home, 'git');
   assert.equal(by(slot.pending)?.reason, 'slot-never-bound');

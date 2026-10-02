@@ -9,17 +9,17 @@ import { baselineVerdict, findingLines } from '../../scripts/supervisor/land.mjs
 
 const CITES = 'scripts/checks/check-contract-cites.mjs';
 const DEAD = [
-  'modules/kernel/contract-changes/e2e-manual-only.yaml:22  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/fe-no-tests.yaml:11  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/grammar-state-recipes-and-shape-slot-patterns.yaml:15  knowledge/patterns/fe/test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/e2e-manual-only.yaml:22  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/fe-no-tests.yaml:11  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/grammar-state-recipes-and-shape-slot-patterns.yaml:15  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
   'modules/kernel/contract-changes/hfs-architecture-machine.yaml:68  scripts/hfs/architecture/size-growth.mjs — no such file (prose path)',
-  'modules/kernel/contract-changes/hfs-patterns.yaml:47  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/hfs-secrets-guard-staged.yaml:4  scripts/secrets-guard.mjs — no such file (prose path)',
-  'modules/kernel/contract-changes/next-spec-describe-module-and-default.yaml:8  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/shape-slot-hfs-app-tree.yaml:19  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/specs-policy-2026-09-29.yaml:29  knowledge/patterns/fe/test.yaml — no such file (prose path)',
-  'modules/kernel/contract-changes/starci-link-removed.yaml:35  packages/hfs/templates/fe/ci-workflows/github/workflows/e2e.yml — no such file (prose path)',
-  'modules/kernel/contract-changes/test-kinds-unit-e2e.yaml:21  knowledge/patterns/fe/test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/hfs-patterns.yaml:47  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/hfs-secrets-guard-staged.yaml:4  scripts/old-secrets-guard.mjs — no such file (prose path)',
+  'modules/kernel/contract-changes/next-spec-describe-module-and-default.yaml:8  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/shape-slot-hfs-app-tree.yaml:19  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/specs-policy-2026-09-29.yaml:29  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
+  'modules/kernel/contract-changes/starci-link-removed.yaml:35  packages/hfs/templates/fe/ci-workflows/github/workflows/e2e-gone.yml — no such file (prose path)',
+  'modules/kernel/contract-changes/test-kinds-unit-e2e.yaml:21  knowledge/patterns/fe/gone-test.yaml — no such file (prose path)',
 ];
 const cites = (dead, checked) => ({ ok: false, full: [`check-contract-cites: ${dead.length} dead cite(s) of ${checked} checked`, ...dead.map((l) => `  ${l}`)].join('\n') + '\n' });
 
@@ -57,16 +57,16 @@ test('a green candidate is ok whatever main said', () => {
 });
 
 test('each tree check has identifiable finding lines and its summary line is dropped', () => {
-  assert.deepEqual(findingLines('scripts/checks/check-module-yaml.mjs', 'UNPARSEABLE knowledge/patterns/be/cqrs.yaml: Invalid or unsupported YAML\n'), ['UNPARSEABLE knowledge/patterns/be/cqrs.yaml: Invalid or unsupported YAML']);
+  assert.deepEqual(findingLines('scripts/checks/check-module-yaml.mjs', 'UNPARSEABLE knowledge/patterns/be/gone-cqrs.yaml: Invalid or unsupported YAML\n'), ['UNPARSEABLE knowledge/patterns/be/gone-cqrs.yaml: Invalid or unsupported YAML']);
   assert.deepEqual(findingLines('scripts/checks/check-cli-parity.mjs', 'check-cli-parity: RT_CLI_VERB_PARITY — 1 parity finding(s)\n  catalog:kernel: verb module scripts/kernel/verbs/c.mjs has no catalog file\n'), ['catalog:kernel: verb module scripts/kernel/verbs/c.mjs has no catalog file']);
-  assert.deepEqual(findingLines('scripts/checks/check-db-openers.mjs', '  packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs\ncheck-db-openers: red\n'), ['packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs']);
+  assert.deepEqual(findingLines('scripts/checks/check-db-gone.mjs', '  packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs\ncheck-db-gone: red\n'), ['packages/hfs/runtime/engine/db/machine.mjs:310  new DatabaseSync outside engine/db/machine.mjs']);
   assert.deepEqual(findingLines(CITES, cites(DEAD, 5368).full), DEAD);
 });
 
 test('a red run printing no finding line falls back to the exact text', () => {
-  const pre = { ok: false, full: 'check-db-openers: red\n' };
-  assert.equal(baselineVerdict('scripts/checks/check-db-openers.mjs', pre, { ok: false, full: 'check-db-openers: red\n' }).ok, true);
-  assert.equal(baselineVerdict('scripts/checks/check-db-openers.mjs', pre, { ok: false, full: 'check-db-openers: red (2)\n' }).ok, false);
+  const pre = { ok: false, full: 'check-db-gone: red\n' };
+  assert.equal(baselineVerdict('scripts/checks/check-db-gone.mjs', pre, { ok: false, full: 'check-db-gone: red\n' }).ok, true);
+  assert.equal(baselineVerdict('scripts/checks/check-db-gone.mjs', pre, { ok: false, full: 'check-db-gone: red (2)\n' }).ok, false);
 });
 
 test('a baseline without full output (older rows) compares its output', () => {

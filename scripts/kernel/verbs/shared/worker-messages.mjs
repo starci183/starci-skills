@@ -12,7 +12,7 @@
 // Routes (nothing in a Delivery is skipped):
 //   question, escalation  inbox row kind worker-question (the Kernel answers it with starci kernel reply)
 //   heartbeat             counted on the Delivery's event only: Orca keeps dispatch.lastHeartbeatAt (worker-show), which
-//                         is what lease renewal reads, and one nivo Run held 2616 of them
+//                         is what lease renewal reads, and one product Run held 2616 of them
 //   every other type      one event kind orchestration-message per message (worker_done included: the Orca-side echo, kept for
 //                         audit; settlement reads the Dispatch state with worker-show, never these rows)
 // The ledger rows are what survives Orca's inbox and what the Kernel reads through api (status, questions, messages).

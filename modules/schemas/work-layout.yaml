@@ -516,8 +516,8 @@ example:
     - br/documents/ac/A/index.yaml
     - sds/data/index.yaml
     - sds/runtime/update/index.yaml
-    - ui/documents/index.yaml
-    - ui/documents/edit/index.yaml
+    - features/knowledge/ui/documents/index.yaml
+    - features/knowledge/ui/documents/edit/index.yaml
     - ui/documents/edit/assets/states/uploading.webp
     - ui/documents/edit/assets/transitions/update.webm
     - ui/documents/edit/assets/states/uploading.prompt.txt

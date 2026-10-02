@@ -6,7 +6,7 @@ import { machineKit } from './machine-ast.mjs';
  *   - an api or worker app passes to the database module registration (or lists in its options) only the connections it owns (a monolith's one
  *     app owns them all);
  *   - an api or worker app imports no domain or projection capability of a context it does not own: it composes only its own contexts;
- *   - the cli app (and the migrate app of a repository not yet moved to it) is the migration runner and composes every declared connection
+ *   - the cli app is the migration runner and composes every declared connection
  *     that holds registered tables (migrations run only through it, once per connection).
  * Which connection an app composes is read from two typed origins in its own files: the connection passed to the database module registration
  * and the connection literal that lists a capability's `<c>Entities` / `<c>Migrations`. Which context a capability belongs to is the connection

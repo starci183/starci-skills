@@ -1,0 +1,53 @@
+schema: starci/i18n-catalog@1
+area: reporting
+scope: runtime
+purpose: Owner-visible supervision, incident and design-review messages, keyed from their English source.
+messages:
+  - {en: "Supervisor judgement", vi: "Nhận định của Supervisor"}
+  - {en: "Open invariant violations", vi: "Vi phạm bất biến đang mở"}
+  - {en: "AUTO lands today", vi: "AUTO land hôm nay"}
+  - {en: "Waiting on the owner", vi: "Chờ thầy"}
+  - {en: "none", vi: "không có"}
+  - {en: "Why slow", vi: "Vì sao chậm"}
+  - {en: "units", vi: "đơn vị"}
+  - {en: "[urgent] {text}", vi: "[khẩn] {text}"}
+  - {en: "URGENT: the StarCi reconciler restarted {count} times in {minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).", vi: "KHẨN: StarCi reconciler khởi động lại {count} lần trong {minutes} phút; chạy safe mode (chỉ đọc). Xem machine_logs actor reconciler (boot.mjs --status)."}
+  - {en: "A circular wait across {count} workflows: {cycle} -> {first}", vi: "Chờ vòng tròn giữa {count} luồng: {cycle} -> {first}"}
+  - {en: "{from} waits on {to}", vi: "{from} chờ {to}"}
+  - {en: " via {via}", vi: " qua {via}"}
+  - {en: "Publish a seam stub so one branch keeps running", vi: "Công bố một seam stub để một nhánh chạy tiếp"}
+  - {en: "Supervisor bridge: transfer or assign the owner of the shared need", vi: "Supervisor bridge: chuyển hoặc chỉ định chủ của nhu cầu chung"}
+  - {en: "Lower the priority of branch {branch}", vi: "Hạ ưu tiên nhánh {branch}"}
+  - {en: "{size} owed items ({id}), oldest {oldestMin} min: {summary}", vi: "{size} việc nợ ({id}), cũ nhất {oldestMin} phút: {summary}"}
+  - {en: "Push to main refused at {repo} ({signature}{repeat}): {why}", vi: "Push main bị từ chối ở {repo} ({signature}{repeat}): {why}"}
+  - {en: ", attempt {n} at the same head", vi: ", lần {n} cùng head"}
+  - {en: "blob:{sha} (the full push/hook output, {bytes} bytes)", vi: "blob:{sha} (toàn bộ output push/hook, {bytes} bytes)"}
+  - {en: "Fix the cause and let the next push run retry it", vi: "Sửa nguyên nhân rồi để lượt push sau chạy lại"}
+  - {en: "Direct commit on main bypassing the land gate: {sha} {subject}", vi: "Commit thẳng lên main không qua cổng land: {sha} {subject}"}
+  - {en: "Revert the commit and re-land through land.mjs (lane + contract change)", vi: "Revert commit rồi land lại qua land.mjs (lane + contract change)"}
+  - {en: "Accept and record the reason (the infrastructure commit was already approved)", vi: "Chấp nhận và ghi lý do (commit hạ tầng đã được duyệt)"}
+  - {en: "Supervisor DI overdue x{count}: {summary}", vi: "Supervisor DI quá hạn x{count}: {summary}"}
+  - {en: "New hypothesis: {signature} repeats ({causeClass}): {symptom}", vi: "Giả thuyết mới: {signature} lặp lại ({causeClass}): {symptom}"}
+  - {en: "Experiment {id} needs a revert: {reason}", vi: "Thử nghiệm {id} cần revert: {reason}"}
+  - {en: "Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}", vi: "Sức khỏe op {window}: đạt {rate}{rateDelta}, chờ trung vị {wait}{waitDelta}, kẹt {stuck} ({critical} nghiêm trọng){stuckDelta}{top}{vs}"}
+  - {en: "; top failure {top}", vi: "; lỗi nhiều nhất {top}"}
+  - {en: " [vs {vs} ago]", vi: " [so với {vs} trước]"}
+  - {en: "Accept this archetype of the direction", vi: "Chấp nhận hướng thiết kế cho loại trang này"}
+  - {en: "Revise - say in the note what to change", vi: "Sửa lại - ghi chú rõ cần đổi gì"}
+  - {en: "owner stated", vi: "chủ dự án đã nêu"}
+  - {en: " Open owner questions (not applied): {list}.", vi: " Câu hỏi còn mở (chưa áp dụng): {list}."}
+  - {en: " Rulings learned from your draw feedback (accepted with this answer): {list}.", vi: " Quy tắc rút ra từ góp ý vẽ của chủ dự án (sẽ được chấp nhận cùng): {list}."}
+  - {en: "Please review the design direction (brand.direction rev {rev}) for the \"{archetype}\" page archetype: region order, grids, emphasis, primary-action placement and the reference renders. Accept it, or ask for a revision and say in the note what to change.{pendingLine}{learnedLine} [{digests}]", vi: "Xin chủ dự án duyệt hướng thiết kế (brand.direction rev {rev}) cho loại trang \"{archetype}\": thứ tự vùng, lưới, điểm nhấn, vị trí hành động chính và các ảnh tham chiếu. Chấp nhận, hoặc yêu cầu sửa và ghi rõ cần đổi gì.{pendingLine}{learnedLine} [{digests}]"}
+  - {en: "Accept the drawn parts", vi: "Chấp nhận các phần đã vẽ"}
+  - {en: "Redraw - say in the note what to change", vi: "Vẽ lại - ghi chú rõ cần đổi gì"}
+  - {en: " Round {n}; this redraw addresses your notes: {notes}.", vi: " Vòng {n}; bản vẽ lại này xử lý các ghi chú: {notes}."}
+  - {en: "(none)", vi: "(không có)"}
+  - {en: " Data-status images ({states}) are retired and not for review.", vi: " Ảnh trạng thái dữ liệu ({states}) đã loại, không cần duyệt."}
+  - {en: "Please review the drawn shapes of \"{title}\" ({id}): desktop and mobile, light theme. They are a proposed design direction, not a running product. Accept them, or ask for a redraw and say in the note what to change.{retiredLine} [{digests}]", vi: "Xin chủ dự án duyệt các hình dạng đã vẽ của \"{title}\" ({id}): máy tính và điện thoại, giao diện sáng. Đây là hướng thiết kế đề xuất, chưa phải ảnh sản phẩm đang chạy. Chấp nhận, hoặc yêu cầu vẽ lại và ghi rõ cần đổi gì trong ghi chú.{retiredLine} [{digests}]"}
+  - {en: "desktop", vi: "máy tính"}
+  - {en: "mobile", vi: "điện thoại"}
+  - {en: " Grammar proposals (yours to decide, never auto-accepted): {names}.", vi: " Đề xuất bổ sung grammar (chờ chủ dự án quyết, không tự chấp nhận): {names}."}
+  - {en: " Evidence for every decision: the redline images (spacing, rule ids) and {list}.", vi: " Bằng chứng cho từng quyết định: hình redline (khoảng cách, mã quy tắc) và {list}."}
+  - {en: "({n} decisions)", vi: "({n} quyết định)"}
+  - {en: "proposal", vi: "đề xuất"}
+  - {en: "part{tail}", vi: "phần{tail}"}

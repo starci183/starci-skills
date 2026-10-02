@@ -1,4 +1,113 @@
 schema: starci/profile-registry@1
+purpose: >-
+  The ONE model catalog of the runtime. Concrete model ids — provider,
+  capability tier and per-token price — live under `models`; the provider
+  quota/capacity pools, their roles, concurrency and per-difficulty model pins
+  live under `pools`; every launch target lives under `targets`, carrying
+  `defaultModel` where it names a single model. No other file in the repo
+  states a model id, tier, price or pool: those cite these keys.
+
+# Canonical naming. Keep these roles distinct
+# in contracts and receipts; an `agent` and a `provider` may carry the same
+# string, but the fields are not interchangeable — `agent` names the execution
+# adapter while model-routing `provider` remains quota authority.
+glossary:
+  launcher: human chat surface invoking entry skills (codex-chat | claude-chat | devin-chat)
+  host: Orca execution environment owning terminals, worktrees and managed operation workers
+  agent: execution adapter / Orca agent id (codex | claude | devin | cursor)
+  provider: credential, billing and quota family used by allocation
+  model: a concrete model id (a `models` key below) that worker-start --model takes
+  target: a StarCi routing/capability target (a `targets` key below)
+  pool: one provider quota/capacity window (a `pools` key below), routed to as a target
+
+# Price table that turns measured token counts (llm_usage, scripts/lib/llm-usage.mjs
+# priceOf/costOfRow) into cost_usd. The runtime never guesses a price: a model absent
+# from `models`, or with a null rate, leaves cost_usd NULL. Nothing reads a provider
+# price feed; the owner declares the rates below from the provider's own price page
+# and dates the edit (pricing.asOf).
+pricing:
+  currency: USD
+  unit: per-million-tokens
+  asOf: '2026-09-29'
+  source: >-
+    Official list prices read 2026-09-29 (WebFetch): claude-* from https://claude.com/pricing (5-minute cache write TTL);
+    gpt-6-* from https://developers.openai.com/api/docs/pricing, Standard processing tier, short context (long context is
+    double, batch/flex half, fast mode double: not applied - the CLI reports no tier). swe-2-max (Devin) has
+    no official per-token price page read, so its rates stay null and cost_usd stays NULL for it. A subscription seat
+    (Claude Max, Codex Pro, Devin plan) bills a flat fee, so cost_usd is the API-equivalent list price.
+  matching: >-
+    priceOf(model): the exact `models` key first, then the longest declared id that is a prefix of the model
+    (a dated snapshot id `claude-opus-5-5-20260901` prices as `claude-opus-5-5`). The four rates are USD per 1M tokens:
+    input = fresh (non-cached) input, cacheRead = cached input read, cacheWrite = cache creation, output = generated
+    tokens including reasoning. A model whose used rate is null gets cost_usd NULL (a partial sum is never written).
+
+# The concrete model ids the runtime may name: provider (quota family), tier (the
+# capability class the catalog assigns it) and the per-token price row costOfRow
+# consumes. A launch-only target's `targets.<t>.defaultModel` and every pool's
+# `pools.<p>.models`/`defaultModel` pin keys of this map — nothing else.
+models:
+  claude-opus-5-5:   {provider: claude, tier: frontier, price: {input: 4,   output: 20,  cacheRead: 0.2,  cacheWrite: 5,     source: official}}
+  claude-sonnet-5-5: {provider: claude, tier: standard, price: {input: 2,   output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}}
+  gpt-6-sol:         {provider: codex,  tier: frontier, price: {input: 2,   output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}}
+  gpt-6-luna:        {provider: codex,  tier: economy,  price: {input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, source: official}}
+  swe-2-max:         {provider: devin,  tier: frontier, price: {input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}}
+
+# The provider quota/capacity pools the allocator serves. `models` pins the launch
+# model per difficulty (easy|medium|hard|insane) — a missing pin is a typed error,
+# never a fallback to a neighbouring tier's model; `defaultModel` is the model a
+# launch takes when no difficulty pin applies. `maxParallel` is the only concurrency
+# authority (registry.yaml executionModel.concurrency).
+pools:
+  # One Codex account window carries both models: Luna is the easy/medium model, Sol the hard and insane one.
+  # Role/tier/tool/quality gates still apply on top of the difficulty pin; an owner allocation changes
+  # capacity, never qualification or effect authority.
+  codex-agent:
+    target: codex-agent
+    provider: codex
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 10
+    defaultModel: gpt-6-luna
+    models:
+      easy: gpt-6-luna
+      medium: gpt-6-luna
+      hard: gpt-6-sol
+      insane: gpt-6-sol
+    effort:
+      easy: low
+      medium: medium
+      hard: high
+      insane: max
+  # One Claude session/week window, all five roles on the same pinned model at every difficulty. The Claude
+  # CLI lists no models, so the dispatch's model attestation is what proves the claude-opus-5-5 id.
+  claude-agent:
+    target: claude-agent
+    provider: claude
+    roles: [implement, verify, write, decide, plan]
+    maxParallel: 6
+    defaultModel: claude-opus-5-5
+    models:
+      easy: claude-opus-5-5
+      medium: claude-opus-5-5
+      hard: claude-opus-5-5
+      insane: claude-opus-5-5
+  # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
+  # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
+  # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
+  # `starci kernel route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed
+  # launch/refusal status are the live capacity signal on top of this cap. swe-2-max is a medium+ agent: no
+  # easy or insane pin, and the easy tier does not list the pool.
+  devin-agent:
+    target: devin-agent
+    provider: devin
+    roles: [implement, verify, write]
+    maxParallel: 10
+    capacityAuthority: explicit-workflow-quota
+    quotaTelemetry: launch-status
+    defaultModel: swe-2-max
+    models:
+      medium: swe-2-max
+      hard: swe-2-max
+
 runtimes:
   - codex
   - claude
@@ -24,7 +133,7 @@ executionModel:
   fanOutWithinOperation: forbidden
   concreteAgentBinding: provider-profile-model
   # Concurrency is one number per pool and it lives in one file.
-  concurrency: modules/models/runtimes.yaml runtimes.<pool>.maxParallel
+  concurrency: modules/models/registry.yaml pools.<pool>.maxParallel
 orchestration:
   runtime: orca
   owner: source-host
@@ -38,38 +147,28 @@ orchestration:
     (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `starci kernel dispatch --spawn`
     launches one isolated agent per ready operation in the workflow's one worktree, using the first eligible target in
     that operation's chain. The kernel never implements, repairs or tests on behalf of an operation agent.
-defaults:
-  codex:
-    working: gpt-6-luna
-    reasoning: gpt-6-sol
-  claude:
-    working: opus
-    reasoning: opus-reviewer
-  devin:
-    working: devin-worker
-    reasoning: devin-reviewer
 targets:
-  # Pool targets are named by the provider-window pool of modules/models/runtimes.yaml; `requestedModel` stays the
-  # implement-role model of the pool's models map for compatibility with consumers that read one model.
+  # Pool targets are named by a `pools` key above, whose `models` map pins the launch model per
+  # difficulty and whose `defaultModel` covers an unpinned difficulty. A pool target names no model itself.
   codex-agent:
     runtime: codex
-    requestedModel: gpt-6-luna
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   # Launch-only targets: an explicit `--model gpt-6-sol` or `--model gpt-6-luna` request reaches that one model
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
+  # `defaultModel` is the launch model resolveWorkerLaunchModel returns for them (they hold no pools entry).
   gpt-6-sol:
     runtime: codex
-    requestedModel: gpt-6-sol
+    defaultModel: gpt-6-sol
     profiles:
       working: gpt-6-sol
       reasoning: gpt-6-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   gpt-6-luna:
     runtime: codex
-    requestedModel: gpt-6-luna
+    defaultModel: gpt-6-luna
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-luna
@@ -77,24 +176,23 @@ targets:
   # Cursor: Orca agent id `cursor` (binary cursor-agent). A launch-only target like gpt-6-sol: off every automatic chain,
   # reached by an explicit `--model auto` (the CLI's default) or any id of the account's `cursor-agent --list-models`.
   # Live proof 2026-10-02: worker-start --agent cursor --model auto reached worker_done and released cleanly. No Cursor
-  # quota probe exists, so no automatic chain routes to it.
+  # quota probe exists, so no automatic chain routes to it. `defaultModel: auto` is the CLI's selector keyword —
+  # Orca's catalog default — not a `models` entry (Cursor publishes no fixed priced catalog).
   cursor-agent:
     runtime: cursor
-    requestedModel: auto
+    defaultModel: auto
     profiles:
       working: auto
       reasoning: auto
     orcaLaunch: {agent: cursor}   # orca orchestration worker-start --agent cursor
   claude-agent:
     runtime: claude
-    requestedModel: claude-opus-5-5
     profiles:
       working: opus
       reasoning: opus-reviewer
     orcaLaunch: {agent: claude}   # orca orchestration worker-start --agent claude
   devin-agent:
     runtime: devin
-    requestedModel: swe-2-max
     executionHosts: [orca]
     profiles:
       working: devin-worker

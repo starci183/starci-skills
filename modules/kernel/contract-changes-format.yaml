@@ -41,6 +41,9 @@
 # The supervisor batches changes and registers each in the same commit that lands it
 # (modules/supervisor/supervise.yaml guardrails contract-rollout); it never tells a Kernel to hold
 # running work for a change unless the change is safetyCritical.
+#
+# Release-line compaction: at each release the entries older than the previous release's base are
+# deleted (git history and the CHANGELOG keep them); no archive copy.
 
 # The documentation file itself is stamped so the schema catalog (modules/schemas/index.yaml) has a file for the kind;
 # every entry file is one map of the fields above and has no schema key.

@@ -110,7 +110,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
-  // Pool load fleet-wide - the same count `starci kernel route` reasons with (poolLoadOf), so status and route agree.
+  // Pool load worker-wide - the same count `starci kernel route` reasons with (poolLoadOf), so status and route agree.
   const poolLoad = poolLoadOf(db, { now });
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);
@@ -176,7 +176,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     const subject = subjectOfJob(row.job_id);
     // Neither subject nor cut: the wait holds until a later job of the same op AND the same unit of
     // work unit exists (scripts/kernel/units.mjs) - an unrelated same-op job enqueued meanwhile
-    // is not its successor (mia inc-2f7968ede59c: two served asks vanished from awaitingOwner).
+    // is not its successor (inc-2f7968ede59c: two served asks vanished from awaitingOwner).
     if (!subject) {
       const own = workflowJobs.find((j) => j.job_id === row.job_id) ?? row;
       // Try numbers count per unit: a later try of the same unit replaces it.
@@ -208,7 +208,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // while the Kernel waits on them: a Modules tax ask sat unanswerable that
   // way. Such an ask is the Kernel's to re-serve, so it is actionable.
   const lastLifecycle = (dispatchId, kind) => db.prepare("SELECT seq FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1").get(workflowId, kind, dispatchId)?.seq ?? null;
-  // A form that died without expiring is dead too: a nivo Modules Kernel
+  // A form that died without expiring is dead too: a product's Modules Kernel
   // served its scope ask as its own Claude Code background shell, Claude Code
   // reaped it under memory pressure, and status kept calling the ask served,
   // so nothing woke the Kernel while the owner's link returned nothing.
@@ -260,8 +260,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   }).map((report) => report.job_id))];
   // A settle the Kernel deliberately defers behind a recorded wait is not work it can do: an open
   // owner-gate or peer-wait whose --holds (else --op) names the job holds its settle the way it
-  // holds a queued job (nivo wf-nivo-app-auth-mudqjob3: op-backend.implement-86ff31372a's cut-closing
-  // settle waited on wf-nivo-workspace-provision-mudqjokb's commit under peer-wait inc-9f2e1e7ff1f6,
+  // holds a queued job (wf-<product>-app-auth-mudqjob3: op-backend.implement-86ff31372a's cut-closing
+  // settle waited on wf-<product>-workspace-provision-mudqjokb's commit under peer-wait inc-9f2e1e7ff1f6,
   // while status read settle-ready ACTIONABLE and the watchdog re-woke the Kernel every tick for
   // nothing). Resolving the wait (starci kernel incident --resolve, or the peer's message for --until-message)
   // makes it settle-ready again, which is actionable and wakes the Kernel.
@@ -280,7 +280,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   }
   // A held settle's worker has nothing left to do: its report is consumed and only the wait holds the
   // job. Its terminal and path lease go back now (reconcile --release-worker; the watchdog runs it under
-  // --repair), the job stays unsettled for the settle the wait releases (nivo op-integration.verify-
+  // --repair), the job stays unsettled for the settle the wait releases (a product's op-integration.verify-
   // 25532858e7 sat leased with its terminal open through the whole peer-wait inc-8cce1cf1b330).
   for (const item of heldSettle) {
     const worker = workers.find((w) => w.jobId === item.jobId) ?? null;

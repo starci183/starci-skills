@@ -1,0 +1,38 @@
+schema: work/ui-screen@1
+id: ui.identity.sign-in
+title: Account entry
+state: todo
+brand: {rev: 1}
+refs: [fr.identity.sign-in]
+ui:
+  status: proposed
+  intent: Let a visitor enter an account.
+  surfaces:
+    - name: sign-in
+      route: /sign-in
+      purpose: Let a visitor enter an account.
+      actors: [visitor]
+  states:
+    - name: filled-welcome
+      trigger: The entry form is ready.
+      behavior: The visitor can submit the form.
+  coverage:
+    scale: bounded
+    representativeScreens: [sign-in]
+    map:
+      - screen: sign-in
+        state: filled-welcome
+        viewport: desktop
+        directionAsset: assets/sign-in.png
+  accessibility: [Every control has a visible label.]
+  responsive: [The form reflows on a narrow viewport.]
+  observations: [The fixture captures one representative state.]
+  gaps: []
+  assets:
+    - path: assets/sign-in.png
+      role: direction
+      sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+assets:
+  - path: assets/sign-in.png
+    role: direction
+    sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

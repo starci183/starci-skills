@@ -54,7 +54,7 @@ test('this spec, and a process it spawns with the inherited env, resolve a regis
 
 test('npm test and the land gate load the per-run registry preload',t=>{
   const pkg=JSON.parse(fs.readFileSync(path.join(runtimeRoot,'package.json'),'utf8'));
-  assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --test /,'the temp-root guard loads first so the per-run registry lands inside it');
+  assert.match(pkg.scripts.test,/--import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --import \.\/tests\/setup\/runtime-copies\.mjs --test /,'the temp-root guard loads first so the per-run registry lands inside it');
   const probeRoot=tempWorld(t),landProbe=path.join(probeRoot,'land-registry.spec.mjs');
   fs.writeFileSync(landProbe,`import assert from 'node:assert/strict';import test from 'node:test';test('land preload',()=>assert.ok(process.env.${TEST_REGISTRY_ENV}?.endsWith('machine.sqlite')));\n`);
   const landed=runSpecFiles({dir:runtimeRoot,files:[landProbe],concurrency:1});

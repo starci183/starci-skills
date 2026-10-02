@@ -4,7 +4,7 @@ A small real shop: one StarCi app, two NestJS services in `be/` and two Next.js 
 
 ## Overview
 
-The back end runs three services (`be/apps/identity`, `be/apps/order`, `be/apps/billing`: billing consumes `order.placed` and invoices the order, the order service consumes `billing.invoice-rejected` and compensates the order) and one migrate app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
+The back end runs three services (`be/apps/identity`, `be/apps/order`, `be/apps/billing`: billing consumes `order.placed` and invoices the order, the order service consumes `billing.invoice-rejected` and compensates the order) and one cli app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
 convention: CQRS handlers, GraphQL doors that only dispatch the bus, one injected `EntityManager` per database, outcomes for
 expected refusals and one error family per capability.
 
@@ -60,8 +60,8 @@ environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `be/doc
 
 The unit suite runs the service specs with coverage and fails when a `*.service.ts` file is below 100 percent lines,
 branches, functions or statements. From the parent `.claude` tree, run
-`node scripts/checks/canon-scan.mjs --root examples/ecommerce-app/be --json` and
-`node scripts/checks/check-starcistacks.mjs examples/ecommerce-app`.
+`starci gate canon-scan --root examples/ecommerce-app/be --json` and
+`starci gate starcistacks examples/ecommerce-app`.
 
 `npm run test:e2e` needs the declared Postgres, Redis, and application processes. The test kinds are unit
 `<name>.service.spec.ts` beside each service, integration `*.integration-spec.ts` under `be/src/tests/integration/` and e2e
@@ -81,8 +81,8 @@ Every runtime value of the back end comes from the process environment through `
 **`.starcistacks/dev/infra/metadata.json`** (`ports.landing`, `ports.app`, `ports.identityApi`, `ports.orderApi`), the
 port map the front end reads. No port literal exists in the front end:
 
-- `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
-  `node scripts/serve.mjs <landing|app> <dev|start>`.
+- `examples/ecommerce-app/scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app:
+  `node examples/ecommerce-app/scripts/serve.mjs <landing|app> <dev|start>`.
 - `fe/packages/ecommerce-api/src/projection.ts` resolves the file for both apps' service base URLs; each app's
   `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_METADATA` names the file outright, else the
@@ -95,7 +95,7 @@ resolved constant, not `process.env`.
 
 With no back end running, `/browse` and `/account` in the shop render their unreachable states and name the service and
 reason rather than showing placeholder data; `/cart` and `/checkout` render their genuine empty states. That is the intended
-honest behavior — `node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the running-page
+honest behavior — `node examples/ecommerce-app/scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the running-page
 pairs (PNG + markup per route and viewport) against the Work tree's ui records.
 
 ## Work

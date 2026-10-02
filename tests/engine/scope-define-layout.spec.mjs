@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const readYaml = rel => parseYaml(fs.readFileSync(path.join(root, rel), 'utf8'));
@@ -43,7 +44,7 @@ test('the scope.define kind carries the feature record, not work/node', () => {
 });
 
 test('work/feature@1 accepts a bounded scope under extensions.work3.scope and still refuses state', () => {
-  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(featureSchema);
+  const validate = addWorkCommon(new Ajv2020({ allErrors: true, strict: false })).compile(featureSchema);
   const feature = {
     schema: 'work/feature@1', id: 'collab', title: 'Collab coordinates people and modules in one conversation.',
     description: 'Synthetic feature record for a layout test.',
@@ -111,17 +112,17 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
   const scope = featureSchema.$defs.scope.properties;
   for (const field of ['nodes', 'deps', 'exclusions', 'openQuestions']) assert.deepEqual(setup[field], scope[field], `${field} drifted from $defs.scope`);
   assert.deepEqual(Object.keys(setup.request.properties), Object.keys(scope.request.properties).filter(k => k !== 'workflow'));
-  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(catalogSchema);
-  const catalog = { schema: 'work/catalog@1', id: 'todo-app', description: 'Synthetic catalog for a layout test.',
+  const validate = addWorkCommon(new Ajv2020({ allErrors: true, strict: false })).compile(catalogSchema);
+  const catalog = { schema: 'work/catalog@1', id: 'shop', description: 'Synthetic catalog for a layout test.',
     features: [{ id: 'repository-foundation', directory: 'features/repository-foundation', description: 'Baseline.' }] };
   const entry = {
     request: { goalIdentity: 'abc123', goalRevision: 0, outcome: 'Canonical Work, SRS, SDS and stacks.' },
     assertions: ['Every declared outcome maps to a required leaf, a deferred decision or a justified exclusion.'],
-    nodes: [{ id: 'todo-app.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
+    nodes: [{ id: 'shop.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
     review: { outcome: 'pass', checks: ['starci runtime validate'] },
   };
   const withSetup = setup => ({ ...catalog, extensions: { work3: { setup } } });
-  assert.ok(validate(withSetup({ 'wf-todo-app-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
+  assert.ok(validate(withSetup({ 'wf-shop-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, state: 'done' } } })), false, 'a catalog entry carries no state');
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, completion: { evidence: ['e'] } } } })), false);
   assert.equal(validate(withSetup({ 'import-cv-seam': { import: entry } })), false, 'entries are keyed by workflow id');

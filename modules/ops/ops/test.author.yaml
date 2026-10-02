@@ -22,7 +22,7 @@ sideEffects:
   - runner collection/listing checks in the declared sandbox
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done-or-exact-direct-predecessor-proposal
   dispatch: never
 reads:
@@ -65,16 +65,13 @@ reads:
       en: Read the adopted test conventions - naming, structure, fixture and assertion shape - for the
         back end; a front end has no tests.
   - id: profile
-    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    path: shared
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
-        active profiles. Use current host model configuration; historical model names are not
-        availability proof. Capabilities are the intersection of actual tools, selected profile
-        policy, op permissions and existing task authority.
+      en: shared
   - id: op-loop
-    path: knowledge/op-gate.yaml
+    path: shared
     purpose:
-      en: "The op loop's data: the file-kind to pattern-file map, the example app per side and the gate and digest schemas that read-digest.mjs and gate.mjs apply."
+      en: shared
       vi: "Dữ liệu của vòng lặp op: bảng loại tệp sang tệp pattern, app ví dụ cho từng phía, và schema của cổng và bản tóm tắt đọc mà read-digest.mjs và gate.mjs dùng."
 writes:
   - id: node
@@ -107,16 +104,14 @@ writes:
         Operator-specific observed result in evidence/result.md: report tests authored and collected - the
         pass/fail judgement of the product is the verify op's, and this evidence never claims it."
   - id: read-digest
-    path: STARCI_JOB_SCRATCH/read-digest.json
-    schema: starci/read-digest@1
+    path: shared
     content:
-      en: "The READ digest: the touched files, their slot map from starci app explain, and every pattern and example file read with its sha256."
+      en: shared
       vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
-    path: STARCI_JOB_SCRATCH/gate.json
-    schema: starci/gate@1
+    path: shared
     content:
-      en: "The last round's gate report: exit, base, head, changed files, new and preexisting counts and every new finding."
+      en: shared
       vi: "Báo cáo cổng của vòng cuối: exit, commit gốc, head, các tệp đã đổi, số lỗi mới và lỗi có sẵn, và từng lỗi mới."
 steps:
   - reads: [op-loop]
@@ -261,8 +256,8 @@ placeholders:
   feature: Feature folder of the intake or migration, inside the operation allowlist
   family: Flat family folder of the selected target record
   name: Record folder inside its family
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
   suite-paths: Existing test harness, fixture and helper paths
   test-ceiling: Explicit owned test paths
 layoutPolicy:

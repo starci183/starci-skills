@@ -70,7 +70,7 @@ test('safeForStart: --safe is inherited by a fresh start only; a self-reload re-
 
 test('start.mjs reads safe mode from the live state: a self-reload run that forces controllers shadow is RED', () => {
   const modes = (eff) => ({ job: { configured: 'active', effective: eff }, host: { configured: 'active', effective: eff }, gc: { configured: 'shadow', effective: 'shadow' },
-    resource: { configured: 'active', effective: eff }, workflow: { configured: 'active', effective: eff }, fleet: { configured: 'shadow', effective: 'shadow' }, learning: { configured: 'shadow', effective: 'shadow' } });
+    resource: { configured: 'active', effective: eff }, workflow: { configured: 'active', effective: eff }, workers: { configured: 'shadow', effective: 'shadow' }, learning: { configured: 'shadow', effective: 'shadow' } });
   const leader = { fresh: true, ageMs: 1000, holder: 'h', pid: 1, epoch: 18, safe: false, startReason: 'self-reload' };
   const s = { leader, modes: modes('shadow'), violations: { open: 0 } };
   assert.deepEqual(safeShadowOf(s), ['job', 'host', 'resource', 'workflow']);

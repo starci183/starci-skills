@@ -63,10 +63,10 @@ test('admission: heavy-paused refuses a heavy op, admits a light one, and never 
   assert.equal(light.class, 'light');
 });
 
-test('admission: the fleet never passes the owner maxParallelOps 20, however much RAM is free', () => {
+test('admission: the workers never pass the owner maxParallelOps 20, however much RAM is free', () => {
   const a = admitOp({ op: 'scope.define', workflowId: 'wf-a', maxParallelOps: 20, host: host(90), mode: 'normal', estimates: EST, thresholds: T, ops: running(20) });
   assert.equal(a.ok, false);
-  assert.equal(a.reason, 'fleet-max-ops');
+  assert.equal(a.reason, 'workers-max-ops');
 });
 
 test('admission: an estimate that does not fit above the hard floor waits, light or heavy', () => {

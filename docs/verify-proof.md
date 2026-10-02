@@ -1,3 +1,4 @@
+Owner: modules/kernel/verdict-contract.yaml
 # Proof by contrast: a green check is not proof
 
 `machineVerify` re-runs the checks an operation declares and refuses a `done` the kernel cannot reproduce.

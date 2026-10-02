@@ -1,3 +1,4 @@
+Owner: modules/ops/
 # Ops — writing an operation contract
 
 An **op** is the unit of work the kernel dispatches to one ephemeral `[Op]`

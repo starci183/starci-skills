@@ -15,7 +15,6 @@ import {sha256} from '../../engine/digest.mjs';
 import {
   DATA_STATUS_DRAWN,DRAW_ACCEPTANCE_CHANGE,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
 } from '../../scripts/work/draw/draw-acceptance.mjs';
-import {loadContractChanges} from '../../scripts/machine/contract-version.mjs';
 import {colorsFromJobs} from '../../scripts/work/work-graph-store.mjs';
 import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
@@ -26,8 +25,7 @@ const json=v=>JSON.stringify(v??null);
 const PNG_A=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000002000154a24f5d0000000049454e44ae426082','hex');
 const PNG_B=Buffer.concat([PNG_A,Buffer.from('b')]);
 const PNG_C=Buffer.concat([PNG_A,Buffer.from('c')]);
-const registry=loadContractChanges(ROOT);
-const effectiveOf=id=>{const c=registry.changes.find(x=>x.id===id);assert.ok(c,`${id} is registered`);return c.effectiveAt;};
+
 const codes=r=>[...new Set(r.findings.map(f=>f.code))].sort();
 const yaml=o=>JSON.stringify(o,null,2); // JSON is YAML
 
@@ -142,22 +140,32 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
   }finally{ledger.close();}
   return jobId;
 };
-const settle=(repo,jobId)=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
+const settle=(repo,jobId,env)=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
 const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;}finally{l.close();}};
 
 test('starci kernel settle refuses an adopting interface.draw pass draw-not-accepted; a leg admitted before the change settles as admitted',t=>{
   const repo=checkout(t);
   const files=adoptedFixture(repo);
-  const at=effectiveOf(DRAW_ACCEPTANCE_CHANGE);
+  // draw-adopt-gate (and draw-loop-dna, whose settle gate the same legs cross) predate the alpha.3 release
+  // base and were deleted by the release-line compaction; a fixture registry keeps them for this boundary.
+  const at=Date.parse('2026-09-27T15:20:00+07:00');
+  const changesDir=path.join(ROOT,'modules','kernel','contract-changes');
+  const changes=fs.readdirSync(changesDir).filter(f=>f.endsWith('.yaml')).map(f=>parseYaml(fs.readFileSync(path.join(changesDir,f),'utf8')));
+  changes.push({id:DRAW_ACCEPTANCE_CHANGE,effectiveAt:'2026-09-27T15:20:00+07:00',reach:'new-legs',ops:['interface.draw'],
+    adds:{codes:[DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_SHAPES,DRAW_NOT_REDRAWN]},summary:'spec fixture for the compacted draw-adopt-gate entry'},
+    {id:'draw-loop-dna',effectiveAt:'2026-09-27T18:20:00+07:00',reach:'follow-up',ops:['interface.draw'],followUp:{op:'interface.draw',ops:['interface.draw']},summary:'spec fixture for the compacted draw-loop-dna entry'});
+  const changesFile=path.join(tmp(t),'contract-changes.yaml');
+  fs.writeFileSync(changesFile,yaml({schema:'starci/contract-changes@1',changes}));
+  const env={...process.env,STARCI_CONTRACT_CHANGES:changesFile};
   const jobId=seedDraw(repo,{jobId:'op-interface.draw-adopt',files,admittedAt:at+1000});
-  const refused=settle(repo,jobId);
+  const refused=settle(repo,jobId,env);
   assert.equal(refused.r.status,1,refused.r.stdout||refused.r.stderr);
   assert.equal(refused.body.reason,'draw-not-accepted');
   assert.ok(refused.body.codes.includes(DRAW_ASSET_NOT_TOKEN_RENDERED));
   assert.ok(refused.body.codes.includes(DRAW_NOT_REDRAWN));
   assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
   const legacy=seedDraw(repo,{jobId:'op-interface.draw-old',wf:'wf-draw-old',files,admittedAt:at-1000});
-  const old=settle(repo,legacy);
+  const old=settle(repo,legacy,env);
   assert.equal(old.r.status,0,old.r.stderr||old.r.stdout);
 });
 

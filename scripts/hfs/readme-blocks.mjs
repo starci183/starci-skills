@@ -53,9 +53,9 @@ function beTiers(manifest) {
   return rows.join('\n');
 }
 
-/** The rule catalog: `| id | code | law |` per rule. */
+/** The rule catalog: `| id | code | law | scope |` per rule (scope `runtime` for a rule that governs this repository itself). */
 function rules(_manifest, catalog) {
-  return ['| Id | Code | Law |', '| --- | --- | --- |', ...catalog.rules.map((rule) => `| ${rule.id} | \`${rule.code}\` | ${cell(rule.law)} |`)].join('\n');
+  return ['| Id | Code | Law | Scope |', '| --- | --- | --- | --- |', ...catalog.rules.map((rule) => `| ${rule.id} | \`${rule.code}\` | ${cell(rule.law)} | ${rule.scope ?? 'product'} |`)].join('\n');
 }
 
 const RENDER = { 'app-map': appMap, 'be-tree': tree('be'), 'be-tiers': beTiers, 'fe-tree': tree('fe'), rules };

@@ -3,7 +3,7 @@
 // uat.assisted.verify, e2e.verify): is the stack under test actually up, and if not, is that the
 // environment's fault or the product's? (lane op-verify, 2026-09-28)
 //
-// Measured before it: nivo app-auth uat.verify ran five times; at dispatch the next-dev on 3067
+// Measured before it: an app-auth uat.verify ran five times; at dispatch the next-dev on 3067
 // accepted TCP but never answered, nothing listened on 3068, and the declared api probe
 // GET /health/live answered 404 on a healthy API - each attempt spent its first half restarting
 // servers by hand and none of that reached the ledger as an environment fact.

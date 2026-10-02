@@ -1,3 +1,4 @@
+Owner: modules/ops/
 # Ops source ownership
 
 The ops contracts are hand-authored YAML under `modules/ops/`. The runtime

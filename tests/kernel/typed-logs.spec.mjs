@@ -123,7 +123,7 @@ test('event-derived rows: dispatch, checks, settle with land, incident, drop - p
   const ev = (seq, kind, entityId, payload, entityType = 'job') => ({ seq, kind, entity_type: entityType, entity_id: entityId, workflow_id: WF, created_at: 5000 + seq, payload_json: JSON.stringify(payload) });
   const ctx = {
     ledgerKey: 'k',
-    jobOf: () => ({ op_id: 'backend.implement', attempt: 2, result_json: JSON.stringify({ landed: { head: 'a'.repeat(40), repo: 'r/todo-app-be', repos: [{ paths: ['src/a.ts'] }] } }) }),
+    jobOf: () => ({ op_id: 'backend.implement', attempt: 2, result_json: JSON.stringify({ landed: { head: 'a'.repeat(40), repo: 'r/shop-be', repos: [{ paths: ['src/a.ts'] }] } }) }),
     checksOf: () => [{ name: 'lint', command: 'npm run lint', exitCode: 0, evidence: 'ok' }, { name: 'unit', command: 'npm test', exitCode: 1, evidence: '2 failed' }],
   };
   const [dispatch] = rowsOfEvent(ev(1, 'op-dispatched', 'op-x-1', { op: 'backend.implement', model: 'codex-agent', modelId: 'gpt', dispatch: 'ctx_1' }), ctx);
