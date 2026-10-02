@@ -4,9 +4,11 @@
 // every path a finding names, in its path and in its message, is app-relative. The scaffold also type-checks with its own root
 // `typecheck` script (after `codegen`), so every import of the skeleton is proven to resolve; an unresolvable import planted on each
 // side is reported. The be api also builds with its own build:be script and boots with start:api (GET /health/live answers 200), then stops.
-// The scaffold resolves its lockfile with npm (network or the npm cache); nothing is installed: the dependencies are linked from existing installs (tests/helpers/hfs-app-install.mjs; STARCI_APP_INSTALLS may add
-// a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
-import { test } from 'node:test';
+// The scaffold resolves its real lockfile with npm (network or the npm cache), the @starci scope from this checkout's own packages
+// (tests/helpers/source-canon-registry.mjs: the canon versions are raised in the source before they are published, so the spec never
+// depends on publish state). Nothing is installed: the dependencies are linked from existing installs (tests/helpers/hfs-app-install.mjs;
+// STARCI_APP_INSTALLS may add a product app's node_modules when the runtime holds no copy of a framework the skeleton imports).
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,6 +21,7 @@ import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { coverageExclusions } from '../../packages/hfs/sync/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
+import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
@@ -40,6 +43,15 @@ function gate(name, reason) {
   return { skip: reason, required: null };
 }
 const lintGate = gate('scaffold lint', skipReason);
+
+/** The checkout's @starci packages as a registry, started once by the first test that scaffolds and stopped after the file. */
+let registry = null;
+after(async () => { if (registry) await (await registry).close(); });
+/** `hfs scaffold app demo --into <into>` with the real lock step, the @starci scope resolved from this checkout. */
+async function scaffold(into) {
+  registry ??= startSourceCanonRegistry();
+  return scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: (await registry).lock });
+}
 
 async function run(argv) {
   let out = '';
@@ -165,8 +177,8 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
   let links = [];
   t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
 
-  const scaffolded = await run(['scaffold', 'app', 'demo', '--into', into]);
-  assert.equal(scaffolded.code, 0, scaffolded.out);
+  const scaffolded = await scaffold(into);
+  assert.equal(scaffolded.root, app);
   const declaration = JSON.parse(fs.readFileSync(path.join(app, 'hfs.json'), 'utf8'));
   assert.equal(declaration.kind, 'app');
   assert.deepEqual(Object.keys(declaration.sides).sort(), ['be', 'fe']);
@@ -260,7 +272,7 @@ test('the scaffolded be api builds with build:be and boots with start:api from t
   let child = null;
   t.after(() => { if (child && child.exitCode === null) child.kill(); uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
 
-  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  assert.equal((await scaffold(into)).root, app);
   // The scaffold declares the runtime peer of every driver integration pair it depends on (R111): nothing to add.
   const { peerIntegrationFindings } = await import('../../scripts/hfs/rules/peer-integrations.mjs');
   assert.deepEqual(peerIntegrationFindings({ repoRoot: app, files: ['package.json'] }), []);
@@ -300,7 +312,7 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   const app = path.join(into, 'demo');
   let links = [];
   t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
-  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  assert.equal((await scaffold(into)).root, app);
   assertCoverageContract(app);
   links = installInto(app, installs);
   // The root `test` script, as npm runs it: `cd be && jest --selectProjects unit --coverage` (plus --ci, like the managed CI).
@@ -334,7 +346,7 @@ test('the scaffolded fe builds with the root build:fe script: next-intl finds it
   const app = path.join(into, 'demo');
   let links = [];
   t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
-  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  assert.equal((await scaffold(into)).root, app);
   links = installInto(app, installs);
   const toRuntime = path.relative(path.join(app, 'fe', 'apps', 'web'), RUNTIME).split(path.sep).join('/');
   edit(app, 'fe/apps/web/next.config.ts', '"..", "..", "..")', `${JSON.stringify(toRuntime)})`);
