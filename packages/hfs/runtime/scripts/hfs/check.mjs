@@ -29,10 +29,8 @@
 //   HFS_PEER_INTEGRATION_MISSING  (R111, hfs-rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
 //   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
 //   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
-//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R136-R140, hfs-rules/services.mjs) the microservice policy of a product with more than one service
-//   HFS_MONO_WORKSPACES, HFS_MONO_FE_WORKSPACE, HFS_MONO_NEST_PROJECTS, HFS_MONO_WORKSPACE_DEP
-//                                 (R127-R130, hfs-rules/monorepo.mjs) every app is a monorepo: root workspaces and turbo, the fe workspace manifests and
-//                                 what they import, the Nest projects of be/apps
+//   HFS_SERVICE_PLACEMENT, HFS_IMAGE_UNPINNED, HFS_SERVICE_STACK_DECLARATION, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING   (R143-R147, hfs-rules/services.mjs) the microservice policy of a product with more than one service
+//   HFS_MONO_WORKSPACES, HFS_MONO_FE_WORKSPACE, HFS_MONO_NEST_PROJECTS, HFS_MONO_WORKSPACE_DEP   (R127-R130, hfs-rules/monorepo.mjs) the monorepo shape
 //   BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING   (R131, R135, hfs-rules/event-bus.mjs) a typed event class that the vendored contract does not list, and a declared pattern whose proof scenarios have no test
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
@@ -64,14 +62,8 @@ import { readTree, treeFacts, untrackedEntries } from './tree.mjs';
 import { contractFindings } from './rules/contract.mjs';
 import { depFindings } from './rules/deps.mjs';
 import { appFrontendFindings, frontendFindings } from './rules/frontend-tree.mjs';
-import { feContractFindings } from './rules/fe-contract-documents.mjs';
-import { sagaFindings } from './rules/saga.mjs';
-import { serviceFindings } from './rules/services.mjs';
-import { integrationSpecFindings } from './rules/integration-specs.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
-import { eventClassContractFindings, patternSpecFindings } from './rules/event-bus.mjs';
-import { monorepoFindings } from './rules/monorepo.mjs';
-import { contractCompatFindings } from './rules/contract-compat.mjs';
+import { repositoryRuleFindings } from './rules/repository-rules.mjs';
 import { peerIntegrationFindings } from './rules/peer-integrations.mjs';
 import { pipelineFindings } from './rules/pipeline.mjs';
 import { proofCommandFindings } from './rules/proof-commands.mjs';
@@ -284,13 +276,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
     findings.push(
       ...depFindings({ repoRoot, files: all }),
       ...peerIntegrationFindings({ repoRoot, files: all }),
-      ...monorepoFindings({ repoRoot, files: all, repo }), ...contractCompatFindings({ repoRoot, files: all }),
-      ...eventClassContractFindings({ repoRoot, files: all, repo }),
-      ...patternSpecFindings({ repoRoot, files: all, repo }),
-      ...integrationSpecFindings({ repoRoot, files: all }),
-      ...feContractFindings({ repoRoot, files: all }),
-      ...serviceFindings({ repoRoot, files: all, repo }),
-      ...sagaFindings({ repoRoot, files: all }),
+      ...repositoryRuleFindings({ repoRoot, files: all, repo }),
       ...pipelineFindings({ repoRoot, files, pins }),
       ...testTopologyFindings({ repoRoot, files }),
       ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),

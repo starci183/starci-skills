@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Changed: `no-repository-class` (R83) accepts `platform/saga` as a platform persistence capability (state of a saga run with its version fence).
-- New: `service-isolation` (R142 `BE_SERVICE_ISOLATION`, new law `service-isolation`): a file of a service app imports no file of a sibling service app. The slot manifest copy gains `be.contract.events` and `events.ts`/`consumes.ts` in the api and worker app slots.
+- New: `service-isolation` (R148 `BE_SERVICE_ISOLATION`, new law `service-isolation`): a file of a service app imports no file of a sibling service app. The slot manifest copy gains `be.contract.events` and `events.ts`/`consumes.ts` in the api and worker app slots.
 
 ## 3.0.7 - 2026-10-01
 

@@ -16,7 +16,7 @@
         { "name": "billing", "envPrefix": "BILLING_DB", "owner": "billing", "isolation": "database" }
       ],
       "optionalSlots": ["repo.docs", "be.contract.graphql", "be.contract.events", "be.transport.message"],
-      "patterns": ["saga", "event-bus", "webhooks", "realtime"]
+      "patterns": ["saga", "event-bus", "webhooks", "realtime", "projection"]
     },
     "fe": {
       "apps": [

@@ -2,7 +2,7 @@
  * The async contract of a service: `contracts/<service>/events.json`, emitted from the typed event classes of the service,
  * `src/modules/events/<service>/<event>.event.ts` (name, version, `compensates`, the payload fields of the interface `create` takes).
  * Nothing is executed: the classes are read as a TypeScript syntax tree with the repository's own `typescript`. The reader and the
- * printer are the runtime's (`scripts/lib/event-contract.mjs`), so `hfs check` (R140 HFS_EVENT_CONTRACT) compares the committed file
+ * printer are the runtime's (`scripts/lib/event-contract.mjs`), so `hfs check` (R146 HFS_EVENT_CONTRACT) compares the committed file
  * with exactly this text.
  */
 import fs from 'node:fs';

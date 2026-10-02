@@ -1,0 +1,41 @@
+schema: starci/code-example@1
+id: projection
+title: A projection kept current by a reactor
+purpose: |
+  Show a read model that replaces a cross-context join: the projection entity and class (only the projection writes its table, the api
+  reads through get*), and the reactor consumer that triggers a recompute when the source event arrives.
+appliesTo: [backend]
+relatedRules:
+  - BE-PROJECTIONS-1
+  - BE-PROJECTIONS-2
+  - BE-PROJECTIONS-3
+  - BE-PROJECTIONS-4
+  - BE-REACTORS-1
+files:
+  - path: order-summary.projection-entity.ts
+    role: The read-model table.
+  - path: order-summary.projection.ts
+    role: recompute and get methods; the only writer.
+  - path: order-summary.reactor-consumer.ts
+    role: The reactor door that triggers a recompute.
+entrypoint: order-summary.projection.ts
+adapt:
+  - The projection sits on the connection of the context that serves the read.
+  - recompute reads source facts through its own context and upserts by a natural key.
+  - The projection index exports the class and contracts, never the entity.
+dependencies:
+  packages: []
+  assumptions: |
+    The platform database, CQRS and event-bus capabilities exist in the host; this folder shows the interaction and is not a runnable app.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Does not show the migration, the module wiring or the command handler; see knowledge/patterns/be/projections.yaml and reactors.yaml.
+provenance:
+  sources:
+    - knowledge/patterns/be/projections.yaml
+  simplifications: |
+    Synthetic order and payment names; the facts query is a named SqlText constant that is omitted.

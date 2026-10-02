@@ -211,11 +211,11 @@ export const oneConnectionPerDatabase = {
 export const emInjectionSlots = {
     meta: {
         type: "problem",
-        docs: { description: "An `EntityManager` is injected only in application handlers, domain services and the platform capabilities that own a `persistence/`." },
+        docs: { description: "An `EntityManager` is injected only in application handlers, domain services, projections and the platform capabilities that own a `persistence/`." },
         schema: [],
         messages: {
             slot:
-                "`EntityManager` is injected in a file of slot `{{slot}}`. Only an application `*.handler.ts`, a domain `*.service.ts` and the platform database, inbox, outbox and lease capabilities reach the database. Transport dispatches a command or query, an integration calls its provider, an app composes: move the data access into a handler or a domain service.",
+                "`EntityManager` is injected in a file of slot `{{slot}}`. Only an application `*.handler.ts`, a domain `*.service.ts`, a projection's `*.projection.ts` and the platform database, inbox, event-bus, queue and jobs capabilities reach the database. Transport dispatches a command or query, an integration calls its provider, an app composes: move the data access into a handler or a domain service.",
         },
     },
     create(context) {

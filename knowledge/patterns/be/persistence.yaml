@@ -55,7 +55,7 @@ rules:
   - id: BE-PERSISTENCE-2
     title: cli migrate is the only migration runner
     kind: mandatory
-    hfsRules: [R33, R34, R148]
+    hfsRules: [R33, R34, R154]
     requirement: |-
       Migrations run only through the `migrate` command of `be/apps/cli` (`cli migrate`), once per connection, before any api
       or worker process starts (a deploy runs it as an init job). `apps/cli` is required as soon as `hfs.json`
@@ -152,13 +152,11 @@ rules:
     kind: mandatory
     hfsRules: [R46, R82]
     requirement: |-
-      When a database change must lead to an external message, the handler calls `outbox.enqueue(manager, message)` on an
-      `InjectOutbox()` parameter inside the same transaction. The `platform/outbox` job relays the row with bounded backoff and
-      an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
-      business result are different facts, and an outbox alone is not exactly-once processing. Outbox and inbox tables and migrations
-      live in the platform capability that owns them (`platform/event-bus/persistence`, `platform/inbox/persistence`) and
-      exist on EVERY connection that publishes or consumes (BE-PERSISTENCE-14): the outbox row is written in the same
-      transaction as the domain change, so it sits in the database of that change.
+      When a database change must lead to an external message, the domain service calls `eventBus.publish(event, tx)` (or a queue producer's `enqueueX(payload, tx)`)
+      inside the same transaction. The relay of `platform/event-bus` (or `platform/queue`) hands the committed row to Kafka (or
+      BullMQ) with bounded backoff and an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
+      business result are different facts, and an outbox alone is not exactly-once processing. Outbox tables and migrations
+      live in the platform capability that owns them.
     rationale: |-
       Publishing straight to a broker inside a request does not prove durable delivery, and an in-process event does not
       survive a crash between commit and delivery.
@@ -325,7 +323,7 @@ rules:
   - id: BE-PERSISTENCE-11
     title: A connection is a bounded context with one owning service
     kind: mandatory
-    hfsRules: [R148]
+    hfsRules: [R154]
     requirement: |-
       Every `hfs.json` `sides.be.connections` entry has an `owner` (an api or worker app declared in the same file) and an
       `isolation` (`database` or `schema`). An app passes to `DatabaseModule.register` only the connections it owns and imports
@@ -349,7 +347,7 @@ rules:
   - id: BE-PERSISTENCE-12
     title: Contexts are coupled only by events
     kind: mandatory
-    hfsRules: [R149, R86]
+    hfsRules: [R155, R86]
     requirement: |-
       No cross-context entity relation (`OneToOne`, `OneToMany`, `ManyToOne`, `ManyToMany` to another context's entity), no
       cross-context foreign key (`REFERENCES` another context's table in a migration), no cross-context SQL (BE-PERSISTENCE-9) and
@@ -377,7 +375,7 @@ rules:
   - id: BE-PERSISTENCE-13
     title: One transaction touches one context's connection
     kind: mandatory
-    hfsRules: [R150]
+    hfsRules: [R156]
     requirement: |-
       Inside `entityManager.transaction(async (manager) => ...)` of the manager of connection C, no entity manager of another
       connection is used and no capability of another context is called. Work that spans contexts is a saga: one transaction per
@@ -398,7 +396,7 @@ rules:
   - id: BE-PERSISTENCE-14
     title: Per-connection platform tables and projection placement
     kind: mandatory
-    hfsRules: [R152]
+    hfsRules: [R158]
     requirement: |-
       Projections keep their tables under their owning context's connection, in `modules/projections/<name>/persistence/{entities,migrations}`.
       The outbox and inbox tables exist per connection that publishes or consumes (`platform/event-bus/persistence`,
@@ -422,7 +420,7 @@ rules:
   - id: BE-PERSISTENCE-15
     title: Event contracts evolve only additively
     kind: mandatory
-    hfsRules: [R151]
+    hfsRules: [R157]
     requirement: |-
       `be/contracts/<service>/events.json` is compared with its pinned previous contract `events.pin.json` (copied over when the
       contract is published). Every pinned event keeps its stream, version, payload fields, types and optionality; a new field is

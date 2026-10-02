@@ -106,9 +106,9 @@ rules:
       `transport/http/<action>.controller.ts`, DTOs `dto/<action>.{request,response}.ts`, versioned routes, no `@Res()`
       passthrough except a byte stream. A provider webhook is not an api door: it is the webhooks feature kind
       (`features/webhooks/<provider>/`, webhooks.yaml). A push channel, a WebSocket gateway or a GraphQL subscription, is the
-      realtime feature kind (`features/realtime/<channel>/`, realtime.yaml); an api feature has no `transport/websocket`. Schedule:
-      `transport/schedule/<job>.job.ts` (background.yaml). Message: `transport/message/<event>.consumer.ts`
-      (background.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
+      realtime feature kind (`features/realtime/<channel>/`, realtime.yaml); an api feature has no `transport/websocket`. Jobs:
+      `features/jobs/<job>/<job>.processor.ts` (jobs.yaml). Message: `transport/message/<event>.consumer.ts`
+      (event-bus.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
       kind `cli`.
     rationale: |-
       Each protocol has one place and one shape, so an app composes exactly the transports it serves.

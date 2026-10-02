@@ -28,8 +28,8 @@ const HTTP_SLOT = "be.transport.http"
 /** The slot of provider webhook doors (the REST doors of the webhook kind). */
 const WEBHOOK_SLOT = "be.feature.webhooks"
 
-/** Slots whose classes are entered through a method the framework calls on a schedule, a queue or a command line. */
-const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.transport.schedule", "be.feature.transport.cli"])
+/** Slots whose classes are entered through a method the framework calls on a queue or a command line. */
+const PLAIN_ENTRY_SLOTS = new Set(["be.transport.message", "be.feature.transport.cli"])
 
 /** True for the decorators that make a method a transport handler (a socket handler belongs to the realtime kind, which has its own laws). */
 const isRouteDecorator = (context, decorator) => {

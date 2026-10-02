@@ -2,7 +2,7 @@ import { contextModelOf, connectionsComposedBy } from './context-map.mjs';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R148 `context-owner` (BE_CONTEXT_OWNER). A connection of hfs.json IS a bounded context, and its `owner` is the one service app that composes it:
+ * R154 `context-owner` (BE_CONTEXT_OWNER). A connection of hfs.json IS a bounded context, and its `owner` is the one service app that composes it:
  *   - an api or worker app passes to the database module registration (or lists in its options) only the connections it owns (a monolith's one
  *     app owns them all);
  *   - an api or worker app imports no domain or projection capability of a context it does not own: it composes only its own contexts;

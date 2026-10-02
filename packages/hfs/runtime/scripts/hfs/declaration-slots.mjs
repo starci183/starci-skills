@@ -18,11 +18,27 @@ export function optionalSlotProblems(manifest, side, s) {
   return bad;
 }
 
-/** The problem of the shape of a side's `patterns` list (a unique list of pattern names), or null. */
-export function patternShapeProblem(s, at, namePattern) {
+/** The problems of the shape of a side's `patterns` list (a unique list of pattern names). */
+export function patternShapeProblems(s, at, namePattern) {
   const list = s.patterns;
-  if (list === undefined) return null;
-  return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? null : `${at}.patterns must be a unique list of pattern names`;
+  if (list === undefined) return [];
+  return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? [] : [`${at}.patterns must be a unique list of pattern names`];
+}
+
+/** The problems of `ruleParams.be.patternScenarios`: a pattern name to a non-empty list of unique kebab-case scenario ids. */
+export function scenarioProblem(scenarios) {
+  const kebab = /^[a-z][a-z0-9-]*$/;
+  const ok = scenarios !== null && typeof scenarios === 'object' && !Array.isArray(scenarios) && Object.entries(scenarios).every(([name, list]) => kebab.test(name) && Array.isArray(list) && list.length > 0 && list.every((id) => kebab.test(String(id))) && new Set(list).size === list.length);
+  return ok ? [] : ['ruleParams.be.patternScenarios must map a pattern name to a non-empty list of unique kebab-case scenario ids'];
+}
+
+/** The problems of the `trigger` of a slot against the manifest's `triggerKinds`: a known kind, on a feature-tier slot only. */
+export function triggerProblems(slot, triggerKinds) {
+  if (slot.trigger === undefined) return [];
+  const bad = [];
+  if (!(triggerKinds ?? []).includes(slot.trigger)) bad.push(`slot ${slot.id}: trigger ${slot.trigger} is not one of triggerKinds`);
+  if (slot.tier !== 'feature') bad.push(`slot ${slot.id}: a trigger belongs to a feature-tier slot`);
+  return bad;
 }
 
 /** Whether an opt-in slot is enabled for the repository: by its app kind, by name in optionalSlots, or by its declared pattern. */

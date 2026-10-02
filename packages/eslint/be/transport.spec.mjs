@@ -28,7 +28,6 @@ const RESOLVER = at(`${T}/graphql/place-order.resolver.ts`)
 const DTO = at(`${T}/graphql/dto/place-order.input.ts`)
 const CONTROLLER = at(`${T}/http/pay.controller.ts`)
 const CONSUMER = at(`${T}/message/paid.consumer.ts`)
-const JOB = at(`${T}/schedule/sweep.job.ts`)
 const CLI = at(`${T}/cli/seed.cli.ts`)
 const DOMAIN = at("src/modules/domain/order/order.service.ts")
 const PLATFORM = at("src/modules/platform/graphql/graphql.module.ts")
@@ -59,7 +58,6 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(@InjectQueryBus() private readonly q: QueryBus, @InjectCommandBus() readonly c: CommandBus) {} @GqlQuery(() => String) async ask() { return this.q.execute(new Ask()) } }` },
             // REST content negotiation
             { filename: CONTROLLER, code: `${BUS}@Controller() export class C { constructor(@InjectCommandBus() private readonly bus: CommandBus, private readonly locale: RequestLocale) {} @Post() async pay() { return this.bus.execute(new Place()) } }` },
-            { filename: JOB, code: `${BUS}export class J { readonly name = "sweep"; constructor(private readonly bus: CommandBus) {} async run(at: Date) { await this.bus.execute(new Place()) } }` },
             { filename: CLI, code: `${BUS}export class S { constructor(private readonly bus: CommandBus) {} async run() { await this.bus.execute(new Place()) } }` },
             // mapping the input and the result with pure mapper functions is mapping
             { filename: RESOLVER, code: `${BUS}import { toCommand, toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place(input: string) { const command = toCommand(input); return toView(await this.commandBus.execute(command)) } }` },
@@ -94,7 +92,6 @@ export class PlanMessageModule { constructor(private readonly registry: Registry
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus, private readonly q: QueryBus) {} @Mutation(() => String) async place() { await this.q.execute(new Ask()); return this.bus.execute(new Place()) } }`, errors: [{ messageId: "many" }] },
             { filename: CONTROLLER, code: `${BUS}@Controller() export class C { constructor(private readonly bus: CommandBus) {} @Get() list() { return 1 } }`, errors: [{ messageId: "none" }] },
             { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly bus: CommandBus) {} async handle() { return 1 } }`, errors: [{ messageId: "none" }] },
-            { filename: JOB, code: `${BUS}export class J { constructor(private readonly bus: CommandBus) {} async run() { await this.bus.execute(new Place()); await this.bus.execute(new Place()) } }`, errors: [{ messageId: "many" }] },
             // a decision, a loop or a throw in a door is logic no unit spec covers
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(flag: boolean) { if (flag) { return "" } return this.bus.execute(new Place()) } }`, errors: [{ messageId: "branch" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(flag: boolean) { return this.bus.execute(flag ? new Place() : new Place()) } }`, errors: [{ messageId: "branch" }] },
