@@ -1,0 +1,30 @@
+group: release
+verb: images
+owner: runtime
+summary: build, run, health-check and tear down the shipped application images
+impl: {module: scripts/supervisor/release-proof-images.mjs, export: releaseProofImages}
+effect: host
+roles: [release, owner]
+conventions:
+  - images are built sequentially from be/apps or fe/apps with the application root as context
+  - proof containers publish no ports and carry the exact starci.project label
+  - healthy containers pass; an image without HEALTHCHECK must remain running for ten seconds
+  - teardown always removes the exact proof container id and never touches nivo-lite or port 3100
+flags:
+  - {name: app, type: string, summary: app root to prove (default is the current directory)}
+  - {name: sides, type: list, summary: "selected sides, each be or fe (default both)"}
+  - {name: only, type: list, summary: selected application names}
+  - {name: wait-seconds, type: number, default: 90, summary: health deadline per container}
+  - {name: remove-images, type: boolean, summary: remove each image after its proof is recorded}
+positional: []
+exit:
+  "0": every selected image built, ran healthy and was torn down
+  "1": a Docker, health, teardown or host-lock step failed
+  "2": usage, app shape or protected Docker policy was refused
+json: starci/release-images@1
+examples:
+  - starci release images --app examples/ecommerce-app
+  - starci release images --app examples/lite-app --sides be --remove-images --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: [bash docker-proof.sh]

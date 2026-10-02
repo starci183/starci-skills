@@ -29,7 +29,7 @@ const verbFailure = (stderr, group, verb, message) => {
 };
 
 const printModuleResult = ({ result, wantsJson, stdout, stderr, group, verb }) => {
-  if (!result || typeof result !== 'object' || ![0, 1, 2].includes(result.code)) {
+  if (!result || typeof result !== 'object' || !Number.isInteger(result.code) || result.code < 0 || result.code > 255) {
     return verbFailure(stderr, group, verb, `returned invalid code ${JSON.stringify(result?.code)}`);
   }
   if (result.stderr !== undefined) writeTo(stderr, String(result.stderr));

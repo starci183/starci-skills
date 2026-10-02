@@ -68,7 +68,7 @@ const fixture = (t) => {
 }\n`);
   put('scripts/fail.mjs', `export function runFail() { return {code: 1, text: 'fixture failed', stderr: 'fixture finding\\n'}; }\n`);
   put('scripts/explode.mjs', `export function explode() { throw new Error('fixture boom'); }\n`);
-  put('scripts/invalid.mjs', `export function invalid() { return {code: 7}; }\n`);
+  put('scripts/invalid.mjs', `export function invalid() { return {code: 300}; }\n`);
 
   const loaded = loadCatalog(root);
   const groups = Object.fromEntries(loaded.groups.map((group) => [group.group, {
@@ -135,7 +135,7 @@ test('module failures preserve codes and thrown errors become verb failures', as
 
   const invalid = capture();
   assert.equal(await runtimeMain(['demo', 'invalid'], { ...invalid, catalog, runtimeRoot: root }), 1);
-  assert.match(invalid.value.err, /returned invalid code 7/);
+  assert.match(invalid.value.err, /returned invalid code 300/);
 });
 
 test('module help and package-level explain expose policy and replacements', async (t) => {

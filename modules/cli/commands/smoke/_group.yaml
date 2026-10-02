@@ -1,0 +1,4 @@
+group: smoke
+summary: prove published StarCi behavior in isolated scratch applications
+owner: runtime
+since: 1.0.0-alpha.4

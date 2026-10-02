@@ -1,7 +1,6 @@
 // release-publish-flow.mjs - extend package publication with final canon rebind, example re-pin/install/sync, and checks.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { porcelainStatus } from '../api/git/porcelain-status.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { runNode } from '../api/node/run-node.mjs';
@@ -12,8 +11,6 @@ import { loadPins } from '../gates/canon-pins.mjs';
 import { releasePublish } from '../gates/release-publish.mjs';
 import { underHostLock } from '../machine/verb-lock.mjs';
 
-const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const cliEntry = path.join(runtimeRoot, 'packages', 'cli', 'bin', 'starci.mjs');
 const ok = (result) => Boolean(result && !result.error && result.status === 0);
 const message = (result) => String(result?.stderr ?? result?.error?.message ?? '').trim().split(/\r?\n/).at(-1) ?? '';
 const exampleNames = (value) => {
@@ -97,9 +94,14 @@ export async function releasePublishFlow(ctx, deps = {}) {
   const operation = async () => {
     const tracked = await (deps.status ?? porcelainStatus)(root, { untracked: 'no' });
     if (!tracked?.ok || String(tracked.stdout ?? '').trim()) return { code: 1, stderr: 'starci release publish: the worktree has tracked changes' };
+    const revParse = deps.revParse ?? revParseQuery;
+    const head = await revParse(['HEAD'], { cwd: root });
+    const branch = await revParse(['--abbrev-ref', 'HEAD'], { cwd: root });
+    if (!ok(head) || !ok(branch)) return { code: 1, stderr: 'starci release publish: Git could not read HEAD and branch' };
+    data.head = String(head.stdout).trim(); data.branch = String(branch.stdout).trim();
+    lines.push(`worktree ${root}, branch ${data.branch}, HEAD ${data.head}, tracked changes 0`);
     if (ctx.args?.['expect-sha']) {
-      const head = await (deps.revParse ?? revParseQuery)(['HEAD'], { cwd: root });
-      if (!head?.ok || String(head.stdout).trim() !== String(ctx.args['expect-sha']).trim()) return { code: 2, stderr: 'starci release publish: --expect-sha is not HEAD' };
+      if (data.head !== String(ctx.args['expect-sha']).trim()) return { code: 2, stderr: 'starci release publish: --expect-sha is not HEAD' };
     }
     let publishCode;
     try {
@@ -116,15 +118,20 @@ export async function releasePublishFlow(ctx, deps = {}) {
     }
     try { data.rebind = rebindCodePatterns(root, ctx.args?.publish === true, deps); }
     catch (error) { return { code: 1, stderr: `starci release publish: code-pattern rebind failed (${error.message})` }; }
+    lines.push(`code-pattern rebind: ${data.rebind.changed} profile(s) ${ctx.args?.publish ? 'written' : 'would change'}`);
     const pins = (deps.loadPins ?? loadPins)(root)?.pins ?? {};
-    for (const name of examples) data.examples.push(repinExample(root, name, pins, ctx.args?.publish === true));
+    for (const name of examples) {
+      const example = repinExample(root, name, pins, ctx.args?.publish === true);
+      data.examples.push(example);
+      lines.push(`example ${name}: ${example.present ? `${example.changed} pin(s) ${ctx.args?.publish ? 'written' : 'would change'}` : 'not present, skipped'}`);
+    }
     if (ctx.args?.publish !== true) return { code: 0 };
     for (const example of data.examples.filter((entry) => entry.present)) {
       const install = await npm(['install', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
       if (!ok(install)) return { code: 1, stderr: `starci release publish: ${example.name} npm install failed (${message(install)})` };
       const ci = await npm(['ci', '--no-audit', '--no-fund'], { cwd: example.directory, timeout: 900_000, env: ctx.env });
       if (!ok(ci)) return { code: 1, stderr: `starci release publish: ${example.name} npm ci failed (${message(ci)})` };
-      const sync = await node([cliEntry, 'app', 'sync', '--write', '--cwd', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
+      const sync = await node([path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'), 'app', 'sync', '--write', '--cwd', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
       if (!ok(sync)) return { code: 1, stderr: `starci release publish: ${example.name} sync failed (${message(sync)})` };
       const checked = await node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs'), '--repo', example.directory], { cwd: root, timeout: 900_000, env: ctx.env });
       if (!ok(checked)) return { code: 1, stderr: `starci release publish: ${example.name} binding check failed (${message(checked)})` };
