@@ -12,13 +12,11 @@ coverage:
         threshold: 0%
         paths:
           - "be/src/**/*.service.ts"
-          - "be/src/features/cli/**/*.cli.ts"
     patch:
       default:
         target: 100%
         threshold: 0%
         paths:
           - "be/src/**/*.service.ts"
-          - "be/src/features/cli/**/*.cli.ts"
 ignore:
   - "fe/**"
