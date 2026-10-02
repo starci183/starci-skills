@@ -39,11 +39,11 @@ test('every op of modules/ops/ops has a vi and an en label, and nothing else is 
 });
 
 test('a derived workflow name is `<Product> · <first clause>`, at most 48 characters, else the slug', () => {
-  assert.equal(productName('todo-app-be'), 'Todo App');
+  assert.equal(productName('shop-app-be'), 'Shop App');
   assert.equal(productName('starci-be'), 'StarCi');
   assert.equal(deriveWorkflowDisplayName({ text: '\u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c cho app. Th\u00eam OAuth sau.', product: 'nivo', fallback: 'nivo-app-auth' }), 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c cho app');
-  const long = deriveWorkflowDisplayName({ text: 'X\u00e2y d\u1ef1ng n\u1ec1n t\u1ea3ng h\u1ecdc tr\u1ef1c tuy\u1ebfn ho\u00e0n ch\u1ec9nh g\u1ed3m \u0111\u0103ng k\u00fd, n\u1ed9i dung v\u00e0 thanh to\u00e1n', product: 'todo-app-be', fallback: 'ta-foundation' });
-  assert.ok(long.startsWith('Todo App · X\u00e2y d\u1ef1ng'), long);
+  const long = deriveWorkflowDisplayName({ text: 'X\u00e2y d\u1ef1ng n\u1ec1n t\u1ea3ng h\u1ecdc tr\u1ef1c tuy\u1ebfn ho\u00e0n ch\u1ec9nh g\u1ed3m \u0111\u0103ng k\u00fd, n\u1ed9i dung v\u00e0 thanh to\u00e1n', product: 'shop-app-be', fallback: 'ta-foundation' });
+  assert.ok(long.startsWith('Shop App · X\u00e2y d\u1ef1ng'), long);
   assert.ok(long.length <= WORKFLOW_NAME_MAX, `${long.length} <= ${WORKFLOW_NAME_MAX}`);
   assert.ok(long.endsWith('…'), 'a clipped name says so');
   assert.equal(deriveWorkflowDisplayName({ text: 'Nivo: module studio for creators', product: 'nivo', fallback: 'x' }), 'Nivo · Module studio for creators', 'the product is not repeated');
@@ -74,7 +74,7 @@ test('what a job works on: explicit, then the work-graph node, the op-prefixed t
   assert.ok(long.length <= JOB_WHAT_MAX, long);
   assert.equal(pathLabel('.starciwork/features/instance-management/ui/owned-shell/module-ledger/evidence/draws.yaml'), 'instance management / module ledger');
   assert.equal(nodeLabel({ id: 'learning-paths.view-roadmap', domain: 'learning-paths' }), 'learning paths / view roadmap');
-  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t', workflowName: 'Nivo · M\u00f4-\u0111un Todo' }), 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Todo');
+  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t', workflowName: 'Nivo · M\u00f4-\u0111un Shop' }), 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Shop');
   assert.equal(jobDisplayName({ op: 'review.verify', what: null, workflowName: 'Nivo · Chu\u1ea9n ho\u00e1 code FE' }), 'Review cu\u1ed1i · Nivo · Chu\u1ea9n ho\u00e1 code FE');
 });
 
@@ -159,7 +159,7 @@ test('the orca-tree check never identifies a kernel by its [Kernel] tab title, d
   // Former false positive: two tabs titled with the workflow's display name read as a duplicate kernel.
   const dup = orcaTreeFindings(ledger.db, [term('t1', '[Kernel] Nivo · C\u00e2y'), term('t2', '[Kernel] Nivo · C\u00e2y')], { owned: new Set() });
   assert.deepEqual(dup.filter((f) => f.code === 'DUPLICATE_KERNEL'), []);
-  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] Todo App · N\u1ec1n t\u1ea3ng')], { owned: new Set() });
+  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] Shop App · N\u1ec1n t\u1ea3ng')], { owned: new Set() });
   assert.deepEqual(foreign.filter((f) => f.terminal === 't9'), [], 'another ledger\'s kernel is not this ledger\'s orphan');
 }));
 
@@ -167,11 +167,11 @@ test('a Telegram ask names the workflow by its display name and the asking job b
   seedWorkflow(ledger, { id: 'wf-ask-named', state: { phase: 'running', job: 'ask-slug' }, jobs: [
     { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', dispatchId: 'ask-1', payload: { opId: 'interface.draw', displayWhat: 'M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t' } },
   ] });
-  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · M\u00f4-\u0111un Todo' WHERE workflow_id='wf-ask-named'").run();
+  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · M\u00f4-\u0111un Shop' WHERE workflow_id='wf-ask-named'").run();
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-interface.draw-1').attempt_id;
   ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
     .run('wf-ask-named', attemptId, 'ask-1', 'op-interface.draw-1', JSON.stringify({ outcome: 'ask', question: { text: 'Duy\u1ec7t?', options: ['ok'] } }), Date.now());
   const view = askState(ledger.db, 'wf-ask-named', 'ask-1');
-  assert.equal(view.title, 'Nivo · M\u00f4-\u0111un Todo');
-  assert.equal(view.jobName, 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Todo');
+  assert.equal(view.title, 'Nivo · M\u00f4-\u0111un Shop');
+  assert.equal(view.jobName, 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Shop');
 }));

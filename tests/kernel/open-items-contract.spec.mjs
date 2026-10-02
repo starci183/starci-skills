@@ -25,6 +25,6 @@ test('the shared op contract separates open items from environment and later-leg
 
 test('the change is registered for new legs only', () => {
   const change = changeById(loadContractChanges(fileURLToPath(ROOT)), 'open-items-not-notes');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers open-items-not-notes');
+  assert.ok(change, 'modules/kernel/contract-changes/ registers open-items-not-notes');
   assert.equal(change.reach, 'new-legs');
 });

@@ -164,7 +164,7 @@ test('the CLI exits 0 on suspects, 1 on refusals, 2 on usage', async (t) => {
 test('the contract change registers every code the check emits', () => {
   const changes = loadContractChanges(root).changes;
   const change = changes.find((item) => item.id === 'starcistacks-services');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers starcistacks-services');
+  assert.ok(change, 'modules/kernel/contract-changes/ registers starcistacks-services');
   const custody = changes.find((item) => item.id === 'starcistacks-infra-value-custody');
   assert.ok(custody?.safetyCritical, 'the infra value custody rule is a safety-critical change');
   const registered = changes.flatMap((item) => item.adds.codes).filter((code) => code.startsWith('STACKS_'));

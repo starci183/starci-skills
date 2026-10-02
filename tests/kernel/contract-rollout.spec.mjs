@@ -44,7 +44,7 @@ test('the registry normalizes changes, refuses malformed ones, and the live regi
   assert.deepEqual(registry.changes.map(c=>c.id),['app-shell-record','layout-tree','part-review-matrix','token-leak-fix','nav-follow-up']);
   assert.deepEqual(registry.changes.at(-1).followUp,{op:'interface.implement',ops:['interface.draw'],detail:'re-derive the nav of drawings admitted before nav routes'});
   const live=loadContractChanges(ROOT);
-  assert.deepEqual(live.problems,[],'modules/kernel/contract-changes.yaml is well-formed');
+  assert.deepEqual(live.problems,[],'modules/kernel/contract-changes/ is well-formed');
   assert.ok(live.changes.some(c=>c.id==='part-review-matrix'&&c.adds.codes.includes('DRAW_MATRIX_INCOMPLETE')));
 
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bad-changes-'));

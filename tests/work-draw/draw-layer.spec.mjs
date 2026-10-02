@@ -94,7 +94,7 @@ test('the draw loop carries a `layer` metric: round 2 is red on both codes, the 
 
 test('the contract change registers both codes with a follow-up interface.draw', () => {
   const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'draw-layer-measure');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml draw-layer-measure');
+  assert.ok(change, 'modules/kernel/contract-changes/ draw-layer-measure');
   assert.deepEqual([...change.adds.codes].sort(), [DRAW_MEASURE_UNCAPPED, DRAW_NESTED_VARIANT]);
   assert.equal(change.reach, 'follow-up');
   assert.equal(change.followUp.op, 'interface.draw');

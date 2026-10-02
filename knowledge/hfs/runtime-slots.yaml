@@ -568,7 +568,7 @@ slots:
   # ----- packages, generated copies -----------------------------------------------------------------------------
   - id: runtime.packages-meta
     profiles: [runtime]
-    path: "packages/{README.md,KNOWN-DEFECTS.md,package.json,package-lock.json,eslint/.gitignore,eslint/CHANGELOG.md,eslint/README.md}"
+    path: "packages/{README.md,package.json,package-lock.json,eslint/.gitignore,eslint/CHANGELOG.md,eslint/README.md}"
     presence: optional
     tracked: tracked
     tier: none

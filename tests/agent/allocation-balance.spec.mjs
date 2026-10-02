@@ -394,7 +394,7 @@ test('a fixture-shaped path is never a product ledger: temp roots and fixture/fi
   assert.equal(isFixtureLedgerPath(`${DRV}work/tests/fixtures/repo/.starciwork/runtime.sqlite`,{env}),true);
   assert.equal(isFixtureLedgerPath(`${T}/w1-x/repo/.starciwork/runtime.sqlite`,{env}),true);
   assert.equal(isFixtureLedgerPath(path.join(os.tmpdir(),'starci-x','.starciwork','runtime.sqlite')),true);
-  assert.equal(isFixtureLedgerPath(`${DRV}Repositories/todo-app-be/.starciwork/runtime.sqlite`,{env}),false);
+  assert.equal(isFixtureLedgerPath(`${DRV}Repositories/shop-be/.starciwork/runtime.sqlite`,{env}),false);
   assert.equal(isFixtureLedgerPath(`${DRV}Repositories/fixture-shop/.starciwork/runtime.sqlite`,{env}),false,'only a whole segment names a fixture');
   assert.equal(isFixtureLedgerPath(null,{env}),false);
 });

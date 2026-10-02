@@ -18,10 +18,10 @@ const plan = (text) => {
 
 test('a canon-conformance phrase in Vietnamese or English routes to the canon-conformance chain: a lint scan, then the refactor slices and the verify leg', () => {
   for (const text of [
-    'd\u1ecdn n\u1ee3 todo-app-fe theo chu\u1ea9n starci',
+    'd\u1ecdn n\u1ee3 shop-fe theo chu\u1ea9n starci',
     'chu\u1ea9n ho\u00e1 source ecommerce-app-fe',
     'D\u1ecdn n\u1ee3 k\u1ef9 thu\u1eadt my-app-fe: s\u1eeda h\u1ebft lint canon',
-    'conform the todo-app-fe frontend to the starci canon, zero lint findings',
+    'conform the shop-fe frontend to the starci canon, zero lint findings',
     'clean up the canon debt in the my-app-fe screens',
   ]) {
     const result = plan(text);

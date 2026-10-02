@@ -84,7 +84,7 @@ test('hfs.json: schema and loader agree', () => {
     'connection as a bare string': app({ be: { ...BE_SIDE, connections: ['primary'] } }),
     'no apps on a side': app({ fe: { apps: [] } }),
     'unknown key': { ...APP, owners: ['x'] },
-    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../todo-app-be' } }),
+    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../shop-be' } }),
     'bad project name': { ...APP, project: 'My App' },
   };
   for (const [name, declaration] of Object.entries(bad)) {

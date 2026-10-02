@@ -112,16 +112,16 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
   for (const field of ['nodes', 'deps', 'exclusions', 'openQuestions']) assert.deepEqual(setup[field], scope[field], `${field} drifted from $defs.scope`);
   assert.deepEqual(Object.keys(setup.request.properties), Object.keys(scope.request.properties).filter(k => k !== 'workflow'));
   const validate = new Ajv2020({ allErrors: true, strict: false }).compile(catalogSchema);
-  const catalog = { schema: 'work/catalog@1', id: 'todo-app', description: 'Synthetic catalog for a layout test.',
+  const catalog = { schema: 'work/catalog@1', id: 'shop', description: 'Synthetic catalog for a layout test.',
     features: [{ id: 'repository-foundation', directory: 'features/repository-foundation', description: 'Baseline.' }] };
   const entry = {
     request: { goalIdentity: 'abc123', goalRevision: 0, outcome: 'Canonical Work, SRS, SDS and stacks.' },
     assertions: ['Every declared outcome maps to a required leaf, a deferred decision or a justified exclusion.'],
-    nodes: [{ id: 'todo-app.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
+    nodes: [{ id: 'shop.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
     review: { outcome: 'pass', checks: ['starci validate'] },
   };
   const withSetup = setup => ({ ...catalog, extensions: { work3: { setup } } });
-  assert.ok(validate(withSetup({ 'wf-todo-app-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
+  assert.ok(validate(withSetup({ 'wf-shop-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, state: 'done' } } })), false, 'a catalog entry carries no state');
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, completion: { evidence: ['e'] } } } })), false);
   assert.equal(validate(withSetup({ 'import-cv-seam': { import: entry } })), false, 'entries are keyed by workflow id');

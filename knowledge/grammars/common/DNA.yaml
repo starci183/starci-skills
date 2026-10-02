@@ -18,7 +18,7 @@ provenance:
   publicEntry: "@starci/grammar/common"
   styleEntrypoint: "@starci/grammar/common/styles.css"
   exportsEntry: "packages/grammar/package.json → ./common (dist/common/index.js), ./common/styles.css"
-  observedSource: "packages/grammar/src/common (host source tree of @starci/grammar@0.5.0)"
+  observedSource: "packages/grammar/src/common (host source tree of @starci/grammar@0.8.2)"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   generatedBy: "scripts/work/ui/grammar-knowledge.mjs --write (tokens[], renderers[], identity.counts, provenance.digests)"
@@ -63,7 +63,7 @@ provenance:
     NavigationFeatureNav: `starci-core-page-container`; ChatWorkspace and WorkspaceShell:
     `starci-core-visually-hidden`) because the class rule above no longer folds nested renderers in.
   limitations: |
-    Snapshot generated 2026-09-23 from @starci/grammar@0.5.0 source at the recorded host commit, read
+    Snapshot generated 2026-09-23 from @starci/grammar@0.8.2 source at the recorded host commit, read
     statically. Before use, inspect the selected repository's manifest/lockfile, exported types,
     renderers and CSS, and record actual source/version in the .starciwork node; if source is
     unavailable, report unverified. Do not infer current APIs or defects from these tables, and do not

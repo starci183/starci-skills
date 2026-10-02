@@ -7,7 +7,7 @@ import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verif
 import { translator } from '../../scripts/lib/i18n.mjs';
 
 const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/'); const RT = `${F}Repositories/x/.claude`;
-const REPO_PATH = `${F}Repositories/todo-app-be`;
+const REPO_PATH = `${F}Repositories/shop-be`;
 const term = (handle, title, extra = {}) => ({ handle, title, connected: true, worktreePath: RT, ...extra });
 const sup = { seat: { handle: 'term_seat', live: true }, jobs: [
   { jobId: 'fix-a-aaaaaa', status: 'failed', cluster: 'a', handle: 'term_old' },
@@ -33,7 +33,7 @@ test('prompts-only screens and plain shell titles', () => {
   assert.equal(onlyPrompts(`${PROMPTS} npm test`), false);
   assert.equal(onlyPrompts(''), false);
   assert.equal(isShellTitle('Terminal 17'), true);
-  assert.equal(isShellTitle('todo-app-be', { worktreeName: 'todo-app-be' }), true);
+  assert.equal(isShellTitle('shop-be', { worktreeName: 'shop-be' }), true);
   for (const title of ['[Worker] fix-x', '[Kernel] Nivo · Live', '[Op] a · Nivo', '[Supervisor] main', '✳ Claude Code']) assert.equal(isShellTitle(title), false, title);
   const titles = tabTitles([{ root: { tabs: [{ title: '[Op] x · Nivo · Live', panes: { type: 'terminal', handle: 'term_z' } }] } }]);
   assert.equal(titles.get('term_z'), '[Op] x · Nivo · Live');

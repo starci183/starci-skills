@@ -46,7 +46,7 @@ test('runtimes.yaml declares the stale window and housekeeping runs the gitlocks
 });
 
 test('a git process holds the repo when it names it or names none; one naming only another repo does not', () => {
-  const repo = path.join(os.tmpdir(), 'ecommerce-app'), fwd = repo.replace(/\\/g, '/'), other = path.join(os.tmpdir(), 'todo-app-be').replace(/\\/g, '/');
+  const repo = path.join(os.tmpdir(), 'ecommerce-app'), fwd = repo.replace(/\\/g, '/'), other = path.join(os.tmpdir(), 'shop-be').replace(/\\/g, '/');
   assert.deepEqual(reposNamed(`"${path.parse(repo).root}Program Files\\Git\\cmd\\git.exe" -C "${repo}" status`), [repo]);
   assert.deepEqual(reposNamed('git --git-dir=/r/.git --work-tree /r log'), ['/r/.git', '/r']);
   assert.equal(processOnRepo(proc(`git.exe -C ${fwd} commit -m x`), repo), 'this');

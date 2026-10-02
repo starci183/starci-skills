@@ -21,7 +21,7 @@ const HERE = fileURLToPath(import.meta.url);
 const NOW = Date.parse('2026-09-28T10:00:00Z');
 const MIN = 60_000;
 // A ledger whose file exists (this spec) and a reader that is never queried: the deps/owed helpers are injected.
-const ledgers = [{ ledgerId: 'todo-app-be', repo: 'todo-app-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
+const ledgers = [{ ledgerId: 'shop-be', repo: 'shop-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
 const ctxOf = (over = {}) => fakeCtx({ controller: 'fleet', now: () => NOW, ledgers, openReader: () => ({ close() {} }), ...over });
 
 test('the controller module follows the shared contract', () => {
@@ -63,7 +63,7 @@ test('the deps cadence: a second pass inside depsEveryMs does nothing', async ()
 });
 
 test('hub-blocker and unowned-need findings are one cross-workflow DI each', () => {
-  const plan = planDeps({ now: NOW, graphs: [{ ledgerId: 'todo-app-be', edges: [], findings: [
+  const plan = planDeps({ now: NOW, graphs: [{ ledgerId: 'shop-be', edges: [], findings: [
     { kind: 'hub-blocker', workflows: ['wf-b', 'wf-a'], summary: 'wf-a blocks 2', proposal: { action: 'bridge', why: 'transfer the need', clearCut: true } },
     { kind: 'duplicate-work', workflows: ['wf-a', 'wf-c'], summary: 'dup' },
   ] }] });
@@ -108,11 +108,11 @@ test('push: shadow only records the run; a refused repo is one push-refused DI',
   const r = await reconcileFleet(KEYS.push, ctx, { settings: DEFAULTS, deps: { force: true } });
   assert.equal(r.shadow, true);
   assert.equal(ctx.calls.run[0].args[0], 'scripts/supervisor/push-mains.mjs');
-  const plan = planPush({ now: NOW, results: [{ repo: 'todo-app-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
-    { repo: 'todo-app-be', pushed: false, error: 'failed', head: '' }, { repo: 'x', pushed: true }] });
+  const plan = planPush({ now: NOW, results: [{ repo: 'shop-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
+    { repo: 'shop-be', pushed: false, error: 'failed', head: '' }, { repo: 'x', pushed: true }] });
   assert.equal(plan.length, 1);
-  assert.match(plan[0].idempotencyKey, /^push-refused:todo-app-fe:[0-9a-f]{10}:abcdef123456$/);
-  assert.deepEqual(plan[0].keyParts, { kind: 'push-refused', repo: 'todo-app-fe', signature: 'secret-scan:aws-key', head: 'abcdef1234567890' });
+  assert.match(plan[0].idempotencyKey, /^push-refused:shop-fe:[0-9a-f]{10}:abcdef123456$/);
+  assert.deepEqual(plan[0].keyParts, { kind: 'push-refused', repo: 'shop-fe', signature: 'secret-scan:aws-key', head: 'abcdef1234567890' });
   assert.equal(plan.incomplete.length, 1, 'a refusal without head or signature opens nothing (MB-07)');
 });
 
@@ -135,7 +135,7 @@ function home(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   return { ...process.env, LOCALAPPDATA: dir, STARCI_CONNECTORS_OFF: '1' };
 }
-const inputs = { progress: [{ workflowId: 'wf-todo-app-fe-canon', name: 'Todo App · Chu\u1ea9n ho\u00e1 code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
+const inputs = { progress: [{ workflowId: 'wf-shop-fe-canon', name: 'Todo App · Chu\u1ea9n ho\u00e1 code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
   ownerWaits: [], violations: [{ code: 'SETTLE_OVERDUE' }, { code: 'SETTLE_OVERDUE' }], gc: 'D\u1ecdn r\u00e1c: 0 agent, 0 terminal, 3 worktree, 0.4 GB', actions: [], owed: null };
 
 test('the notifier sends one digest per window (fake push), then refuses until the window passes', async (t) => {
@@ -188,7 +188,7 @@ test('pure pieces: digestDue, planUrgent, composeDigest', () => {
 test('fleet:metrics records one op-health snapshot per window (telemetry, also in shadow) with the cached stuck waits', async () => {
   const recorded = [];
   const om = await import('../../scripts/machine/op-metrics.mjs');
-  const ctx = ctxOf({ status: { 'todo-app-be:wf-a': { stuck: [{ key: 'k', kind: 'queued-ready', severity: 'critical', ageMs: 1 }] } } });
+  const ctx = ctxOf({ status: { 'shop-be:wf-a': { stuck: [{ key: 'k', kind: 'queued-ready', severity: 'critical', ageMs: 1 }] } } });
   const db = { prepare: (sql) => ({ all: () => (/FROM workflows/.test(sql) ? [{ workflow_id: 'wf-a' }] : []) }), close() {} };
   ctx.openReader = () => db;
   const deps = { opMetrics: { ...om, jobRecords: () => [] }, recordSnapshot: async (p) => recorded.push(p) };

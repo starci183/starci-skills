@@ -209,7 +209,7 @@ ui:
     - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
       role: actual-installed-grammar-render; read-only reuse
-    grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not reinstalled or recaptured
+    grammarVersion: 'the @starci/grammar version recorded by the existing reference provenance; not reinstalled or recaptured
       here.'
     knowledge:
       path: knowledge/ui/proof/anatomy-source.yaml

@@ -33,10 +33,10 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/components/leaves/Menu/index.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/features/overlays/Compose/index.tsx"), code: DIRECTIVE },
       // a workspace package keeps its grammar tiers at src/<tier>, with no components/ folder
-      { filename: at("packages/todo-app-ui/src/leaves/TodoIcon/index.tsx"), code: DIRECTIVE },
-      { filename: at("packages/todo-app-ui/src/leaves/TodoGrammar/index.ts"), code: DIRECTIVE },
-      { filename: at("packages/todo-app-ui/src/branches/Rail/component.tsx"), code: DIRECTIVE },
-      { filename: at("packages/todo-app-ui/src/branches/Rail/index.tsx"), code: DIRECTIVE },
+      { filename: at("packages/shop-ui/src/leaves/TodoIcon/index.tsx"), code: DIRECTIVE },
+      { filename: at("packages/shop-ui/src/leaves/TodoGrammar/index.ts"), code: DIRECTIVE },
+      { filename: at("packages/shop-ui/src/branches/Rail/component.tsx"), code: DIRECTIVE },
+      { filename: at("packages/shop-ui/src/branches/Rail/index.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/global-error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/[locale]/error.tsx"), code: DIRECTIVE },
@@ -64,7 +64,7 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       // a file named like the role outside the route tree is no role
       { filename: at("apps/web/src/modules/theme/providers.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       // the package layout does not widen the app layout, and a package composite is not a boundary
-      { filename: at("packages/todo-app-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("packages/shop-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/leaves/Menu/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/branches/Rail/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/blocks/Feed/component.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },

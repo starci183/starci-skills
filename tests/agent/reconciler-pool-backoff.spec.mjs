@@ -82,7 +82,7 @@ function setup({ events = [], health = [], logs = [] } = {}) {
   const calls = { api: [], log: [] };
   const src = { events, health, logs };
   let now = T;
-  const ctxOf = (mode) => ({ mode, now: () => now, ledgers: [{ ledgerId: 'todo-app-be' }, { ledgerId: 'supervisor' }],
+  const ctxOf = (mode) => ({ mode, now: () => now, ledgers: [{ ledgerId: 'shop-be' }, { ledgerId: 'supervisor' }],
     read: (id, fn) => fn(ledgerDb(src)), api: async (...a) => { calls.api.push(a); return { ok: true }; }, run: async () => ({ ok: true }),
     clock() {}, clear() {}, openDecision: async () => ({ ok: true }), log: (kind, msg, data) => calls.log.push({ kind, msg, data }) });
   const backoff = () => entriesOfRows(readMachine((m) => m.poolBackoff(), [], { env }));
@@ -110,7 +110,7 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   assert.equal(s.backoff()['devin-agent'].cap, 2);
   const opened = s.calls.api.filter((a) => a[1] === 'provider-backoff');
   assert.equal(opened.length, 1, 'one circuit per floor episode, on the one product ledger');
-  assert.deepEqual(opened[0].slice(0, 2), ['todo-app-be', 'provider-backoff']);
+  assert.deepEqual(opened[0].slice(0, 2), ['shop-be', 'provider-backoff']);
   assert.ok(opened[0][2].includes('devin') && opened[0][2].includes('--open-circuit'));
   // Quiet: +1 after 15 minutes.
   s.src.events = [];

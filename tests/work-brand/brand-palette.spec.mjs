@@ -147,7 +147,7 @@ test('a tree without a brand record is told so, never refused', async (t) => {
 test('the contracts wire it: registered for new legs, the draw prompt carries the brand colours, the gates name the codes', () => {
   const changes = loadContractChanges(ROOT);
   const change = changes.changes.find((c) => c.id === 'brand-palette-gate');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers brand-palette-gate');
+  assert.ok(change, 'modules/kernel/contract-changes/ registers brand-palette-gate');
   assert.equal(change.reach ?? 'new-legs', 'new-legs');
   for (const op of ['interface.draw', 'brand.decide', 'interface.implement']) {
     assert.ok(change.ops.includes(op), op);

@@ -128,7 +128,7 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
     '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
   assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
-  const post=[`❯ Read ${F}Repositories/todo-app-be/.orca/orca-dispatch-ctx_3dedd02ae7c5.md completely and follow it exactly.`,
+  const post=[`❯ Read ${F}Repositories/shop-be/.orca/orca-dispatch-ctx_3dedd02ae7c5.md completely and follow it exactly.`,
     '✻ Moseying… (running PostToolUse hook · 3s)',...chrome].join('\n');
   assert.equal(classifyAgentScreen(post).state,'active','PostToolUse hook spinner right after launch');
   assert.equal(classifyAgentScreen(['✳ Moseying… (running SessionStart hook)',...chrome].join('\n')).state,'active','a hook spinner with no timer yet');
@@ -138,10 +138,10 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
   assert.equal(classifyAgentScreen(tool).state,'active','a tool call still executing');
   assert.equal(classifyAgentScreen(['● Bash(node cli.mjs status)','  ⎿  Running PreToolUse hook…',...chrome].join('\n')).state,'active');
   // Captured from a running claude-agent op.
-  const live=['  ⎿  $ cd /d/Repositories/todo-app-be;',
-    '     E=.starciwork/features/workspace-provision/impl/todo-app-be/purchase-orchestrator/E; npx jest --config',
+  const live=['  ⎿  $ cd /d/Repositories/shop-be;',
+    '     E=.starciwork/features/workspace-provision/impl/shop-be/purchase-orchestrator/E; npx jest --config',
     '     src/tests/e2e/jest-e2e.js --runInBand --testMatch',
-    '     "<rootDir>/src/tests/e2e/todo-app-be/workspace-provision/purchase-orchestrator/*.e2e-spec.ts" > $E/r7/e2e-output.txt …',
+    '     "<rootDir>/src/tests/e2e/shop-be/workspace-provision/purchase-orchestrator/*.e2e-spec.ts" > $E/r7/e2e-output.txt …',
     '     (32s · 11 lines)','     (ctrl+b to run in background)',
     '· Newspapering… (5m 7s · ↓ 20.8k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome];

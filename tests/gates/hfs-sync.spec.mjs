@@ -63,8 +63,8 @@ describe('the template renderer', () => {
 describe('hfs.json validation', () => {
   it('accepts an app and refuses everything else, the standalone back-end and front-end kinds included', () => {
     assert.doesNotThrow(() => validateHfs(APP));
-    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Todo App Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
-      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../todo-app-be' }]) {
+    for (const bad of [null, { ...APP, hfs: 1 }, { ...APP, kind: 'be' }, { ...APP, project: 'Shop Be' }, app({ fe: { apps: [] } }), app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }] } }),
+      { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] }, { ...APP, stacks: '../shop-be' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
   });
@@ -589,7 +589,7 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal(validateWorkspace({ ...workspace, repositories: [{ role: 'be', name: 'be', apps: [{ name: 'api' }] }] }), false, 'the schema refuses apps: on a repository (hfs.json declares the apps)');
     assert.equal((await run(['--check'], root)).code, 0, 'a fresh app is in sync by construction');
     assert.throws(() => scaffoldApp({ name: 'nivo', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_EXISTS' });
-    assert.throws(() => scaffoldApp({ name: 'Todo App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
+    assert.throws(() => scaffoldApp({ name: 'Shop App', into: path.dirname(root), presets: PRESETS }), { code: 'HFS_SCAFFOLD_NAME_INVALID' });
   });
   it('a lock step npm cannot complete fails the scaffold with HFS_SCAFFOLD_LOCK_FAILED, names the step and leaves no app behind', t => {
     const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-'));
