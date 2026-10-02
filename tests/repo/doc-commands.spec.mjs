@@ -11,7 +11,8 @@ const BIN = path.join(ROOT, 'bin', 'starci.mjs');
 const routes = () => {
   const help = spawnSync(process.execPath, [BIN, 'help'], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
   assert.equal(help.status, 0, help.stderr);
-  const verbs = new Set([...help.stdout.matchAll(/\bstarci ([a-z][a-z-]*)\b/g)].map((m) => m[1]).filter((v) => !['x', 'run'].includes(v)));
+  // A help line is `starci verb` or `starci verb|verb|verb` (several verbs of one usage).
+  const verbs = new Set([...help.stdout.matchAll(/^\s*starci ([a-z][a-z|-]*)/gm)].flatMap((m) => m[1].split('|')));
   for (const v of ['init', 'update', 'doctor', 'version', 'api', 'start', 'goal', 'validate', 'check', 'help']) assert.ok(verbs.has(v), `starci help names ${v}`);
   const bad = spawnSync(process.execPath, [BIN, 'definitely-not-a-verb'], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
   assert.notEqual(bad.status, 0, 'an unknown verb is refused');

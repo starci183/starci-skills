@@ -32,6 +32,7 @@ test(${JSON.stringify(name)}, async () => {
   probe('aa', 'bb'); probe('bb', 'aa');
   const parallel = runSpecFiles({ dir, files: ['aa.spec.mjs', 'bb.spec.mjs'], concurrency: 2, timeout: 120_000 });
   assert.equal(parallel.ok, true, `parallel run failed: ${parallel.stderr || JSON.stringify(parallel.failures)}`);
+  for (const name of ['aa', 'bb']) fs.rmSync(path.join(dir, name + '.start'), { force: true }); // the serial run starts without the parallel run's markers
   const serial = runSpecFiles({ dir, files: ['aa.spec.mjs', 'bb.spec.mjs'], concurrency: 1, timeout: 120_000 });
   assert.equal(serial.ok, false, 'concurrency=1 must serialize the probes');
   assert.ok((serial.failures ?? []).some((f) => f.file === 'aa.spec.mjs'), JSON.stringify(serial.failures));

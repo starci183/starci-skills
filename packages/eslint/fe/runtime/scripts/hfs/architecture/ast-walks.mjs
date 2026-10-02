@@ -206,13 +206,13 @@ export function programSourcesOf(context, checker, localFiles, { root = null } =
 
 /**
  * The CommonJS require() caveat every framework scan reports: each `require('<specifier>')` `accepted` pushes
- * `${filePath} uses a CommonJS <specifier> <detail>` (the import-shape reasoning cannot prove that binding).
+ * `${filePath} uses a CommonJS <label ?? specifier> <detail>` (the import-shape reasoning cannot prove that binding).
  */
-export function commonJsRequireReasons(ts, checker, sourceFile, accepted, reasons, filePath, detail) {
+export function commonJsRequireReasons(ts, checker, sourceFile, accepted, reasons, filePath, detail, label = null) {
   const visit = node => {
     if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)
       && node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0]) && accepted(node.arguments[0].text)) {
-      reasons.push(`${filePath} uses a CommonJS ${node.arguments[0].text} ${detail}`);
+      reasons.push(`${filePath} uses a CommonJS ${label ?? node.arguments[0].text} ${detail}`);
     }
     ts.forEachChild(node, visit);
   };

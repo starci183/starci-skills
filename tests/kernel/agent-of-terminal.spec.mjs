@@ -46,6 +46,7 @@ test('dedupe closes an agent terminal through a quit typed for ITS agent, never 
       { handle: 'term_devin', worktreePath: repo, title: 'op-fix.be-a1b2c3 (Devin)', agentIdentity: 'devin' },
     ], visualLayouts: [] }),
     read: () => 'working frame, no shell prompt',
+    bindings: () => ({ bound: new Set(), busy: null }), worktrees: (dir) => [dir],
     quit: ({ handle, agent }) => { quits.push({ handle, agent }); return { exited: true }; },
     close: () => ({ ok: true }),
   } });

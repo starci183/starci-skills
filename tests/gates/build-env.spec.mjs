@@ -11,7 +11,7 @@ test('the SWC cache is under the home unless STARCI_SWC_CACHE names one', () => 
 });
 
 test('the next build env keeps the caller env, switches telemetry off and creates the named cache', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'build-env-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-build-env-'));
   try {
     const cache = path.join(root, 'swc');
     const env = nextBuildEnv({ KEEP: '1', STARCI_SWC_CACHE: cache });

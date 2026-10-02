@@ -50,7 +50,7 @@ function frameworkTargets(config, context, checker, localFiles) {
       }
     }
     commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => [...FRAMEWORK.values()].includes(specifier),
-      reasons, relativePath(config.root, sourceFile.fileName), 'Nest framework binding whose decorator identity cannot be proved');
+      reasons, relativePath(config.root, sourceFile.fileName), 'whose decorator identity cannot be proved', 'Nest framework binding');
   }
   return { targets, reasons };
 }

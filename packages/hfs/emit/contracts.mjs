@@ -23,7 +23,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitEvents, eventServices, eventsSnapshotPath } from './events.mjs';
 import { openapiPath } from './operations.mjs';
-import { readEnv } from '../../../scripts/lib/env.mjs';
+import { readEnv } from '../runtime/scripts/lib/env.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
 const STAND_IN = 'stand-in ';
