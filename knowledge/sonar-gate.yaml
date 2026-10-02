@@ -42,7 +42,7 @@ newCode:
     unreviewedMax: 0
 # The whole code, not only the new code. Every finding of the HFS canon reaches Sonar through ONE entry, `starci app lint`
 # (packages/hfs, contract changes hfs-sonar-import and hfs-lint-entry), which writes ONE file, reports/lint.sonar.json
-# (`npm run lint -- --sonar reports/lint.sonar.json`), named by sonar.externalIssuesReportPaths; the gate holds the open-issue count of
+# (`starci app lint --sonar reports/lint.sonar.json`), named by sonar.externalIssuesReportPaths; the gate holds the open-issue count of
 # the whole project at zero. The file carries three engines:
 #   starci-hfs   the repository findings of `starci app check` (managed files, tree, pins, CI, contracts; the rule id is the finding code)
 #   eslint       ESLint's json over the repository (the BE and FE canon plugins alike, per-file and project-graph rules)

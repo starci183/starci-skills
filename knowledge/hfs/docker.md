@@ -7,8 +7,8 @@ monorepo of back-end apps (the `be.app.*` slots) and an npm-workspaces monorepo 
 
 ## What stays from the nivo images
 
-- The build context is the context root, here the APP ROOT: `docker build -f be/apps/<app>/Dockerfile -t <project>/<app>:<tag> .`. The header
-  comment of every Dockerfile states that command, and states every deliberate divergence from this canon.
+- The build context is the context root, here the APP ROOT: `starci docker build <app>`. The header
+  comment of every Dockerfile states that verb, and states every deliberate divergence from this canon.
 - Multi-stage: a `build` stage installs and builds, a last `runtime` stage ships only what it needs. `npm ci`, never `npm install`.
 - The runtime is unprivileged (`USER node`), exposes the port it serves and answers a healthcheck.
 - The base is pinned: an exact node version on an exact alpine release (`NODE_IMAGE` in `scripts/hfs/rules/docker.mjs`, one pin for the
@@ -20,18 +20,18 @@ monorepo of back-end apps (the `be.app.*` slots) and an npm-workspaces monorepo 
 ## What differs in this shape
 
 - One `.dockerignore`, at the app root, rendered by `starci app sync` (`templates/app/docker-ignore`). Every image shares it.
-- The workspace manifests come first. The lockfile lists every fe workspace, so `npm ci` needs their `package.json` files: a `manifests`
+- The workspace manifests come first. The lockfile lists every fe workspace, so `starci npm ci` needs their `package.json` files: a `manifests`
   stage copies the root manifests and the `fe/` tree and deletes every file but `package.json`, and the build and runtime stages start from it.
   The install layer is cached until a manifest changes.
-- A be image (api, worker, cli): `npm run build:be` (tsc and tsc-alias into `be/dist`, from `be/tsconfig.build.json`) in the build stage;
-  the runtime runs `npm ci --omit=dev --ignore-scripts` and copies `be/dist`. The entry is `node be/dist/apps/<app>/src/main.js`.
+- A be image (api, worker, cli): `starci docker build <app>` runs tsc and tsc-alias into `be/dist`, from `be/tsconfig.build.json`, in the build stage;
+  `starci npm ci` supplies the clean lockfile install, while the runtime keeps only production dependencies, ignores lifecycle scripts and copies `be/dist`. The entry is `node be/dist/apps/<app>/src/main.js`.
   - api: `ENV PORT`, `EXPOSE` the same port, a HEALTHCHECK of `/health/live`.
   - worker: no listener, a process HEALTHCHECK.
   - cli (and the migrate kind): one image for every one-off action, run with the command as arguments (`migrate run`): `ENTRYPOINT` is the
     entry, `CMD ["--help"]`, `HEALTHCHECK NONE`, no `EXPOSE`.
 - An fe image (Next): the build stage copies the contract snapshots (`be.contract.*`), the packages (`repo.packages`), `scripts`
   (slot `app.scripts`, the codegen) and its own app (`fe.app.next`), runs
-  `npm run codegen --silent` and `npx turbo run build --filter=@<project>/<app>`; `next.config.ts` sets `output: "standalone"` and pins
+  `starci docker build <app>` runs code generation and the filtered turbo build; `next.config.ts` sets `output: "standalone"` and pins
   `outputFileTracingRoot` to the app root. The runtime copies `.next/standalone`, `.next/static` and `public`, installs nothing, and starts
   `node` on the standalone `server.js` of the app. `NEXT_PUBLIC_*` values are the one kind of build argument (they are published to every browser by design).
 - The Dockerfile is app-owned: scaffold writes it once, the app edits it (a system package, a build argument), and the rules judge its
@@ -46,7 +46,7 @@ monorepo of back-end apps (the `be.app.*` slots) and an npm-workspaces monorepo 
 | Rule | Code | Judges |
 | --- | --- | --- |
 | R187 | `HFS_DOCKER_BUILD_CONTEXT` | the header names the app's own build command; no COPY or ADD source leaves the context |
-| R188 | `HFS_DOCKER_STAGES` | `build` then `runtime`; `USER node`; no build in the runtime; `npm ci`; the install flags of each side |
+| R188 | `HFS_DOCKER_STAGES` | `build` then `runtime`; `USER node`; no build in the runtime; `starci npm ci`; the install flags of each side |
 | R189 | `HFS_DOCKER_ENTRY` | the app's own entry; port, EXPOSE and HEALTHCHECK by kind; the standalone output of a Next app |
 | R190 | `HFS_DOCKER_BASE_PIN` | every FROM is a prior stage, the canon node image or a digest-pinned image |
 | R191 | `HFS_DOCKER_SECRETS` | no secret file, URL download or credential-named ARG or ENV |

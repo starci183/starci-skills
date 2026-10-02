@@ -75,7 +75,7 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   (`starci:<kind>:<slot>`) with no registry row, which the worktree GC adopts or removes. `worktrees:orca`: the ps read
   itself failed. A product repository's
   registered worktrees are workflow worktrees (kind `workflow`, one per Kernel workflow, keyed by Orca's worktree id,
-  created by Orca with a real `npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
+  created by Orca with a real `starci npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
   pass.
 - `integrity:tracked-deleted`, `integrity:node_modules`, `integrity:packages/node_modules`: the runtime's main checkout
   (first `git worktree list` entry) lost tracked files, or a node_modules directory is missing or empty (the signature of
@@ -143,7 +143,7 @@ Also: `starci reconciler status`, `starci reconciler up --check`,
    `orca orchestration worker-start --agent claude --model <Sonnet model id> --worktree path:<staged path> --spec "<brief>" --task-title "sonnet · .claude · <lane>"`,
    supervised with worker-show / worker-read / worker-stop / worker-release. The brief is self-contained: the evidence,
    the scope (files it may touch), the hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec
-   counts, `npm run check` exit 0, a report). Lanes never edit the same file.
+   counts, `starci check run --level L1 --changed <files>` exit 0, a report). Lanes never edit the same file.
 4. Land as soon as a lane's touching specs are green; never hold a ready lane waiting for others (owner 2026-09-29:
    held lanes keep the kernels on the broken core and collide with each other). Commits that are ready at the same
    moment go in one land (each land re-execs the engine); a busy gate is the only reason to wait, and the land runs
@@ -192,7 +192,7 @@ Also: `starci reconciler status`, `starci reconciler up --check`,
 | Supervisor seat `selector_not_found` | The nested `.claude` repo is not an Orca worktree; the seat and worker launch must fall back to the registered host repo. |
 | `LEDGER_CORRUPT` on a legacy store | Usually a false alarm for a legacy in-repo store; verify with `PRAGMA quick_check` on the registered file before acting; `start.mjs --retire-stale-ledgers` for temp/test paths. |
 | `integrity:*`: tracked files deleted and `packages/node_modules` empty in the main checkout (2026-10-01: 490 files, nothing caught it) | A `git worktree remove` ran through a node_modules junction. Fix the remover in a lane (rmdir junctions first); restoring the checkout is the owner's call. |
-| A workflow worktree left after its workflow finished, or a failed op's changes gone | The finish fast-forwards and pushes main, then marks the worktree `release-pending`; the host-side controller removes it once its terminals are released (link check, Orca's worktree removal, then `git branch -d`), so a `release-pending` row with a live terminal is expected and one without is a controller defect. A failed or blocked op's work is the ref `preserved/<workflowId>/<op>` and the tree was reset to the last checkpoint on `wf-<workflowId>`. Read the registry row (`machine.sqlite` `worktrees`, kind `workflow`) and the ref before acting; fix the runtime in a lane, never remove the tree by hand. |
+| A workflow worktree left after its workflow finished, or a failed op's changes gone | The finish fast-forwards and pushes main, then marks the worktree `release-pending`; the host-side controller removes it once its terminals are released (link check, Orca's worktree removal, then the runtime's verified branch cleanup), so a `release-pending` row with a live terminal is expected and one without is a controller defect. A failed or blocked op's work is the ref `preserved/<workflowId>/<op>` and the tree was reset to the last checkpoint on `wf-<workflowId>`. Read the registry row (`machine.sqlite` `worktrees`, kind `workflow`) and the ref before acting; fix the runtime in a lane, never remove the tree by hand. |
 | `push-mains.mjs` has no `--help` | Running it pushes. Never run it to see usage; read its source. |
 
 Add a row here when a new signature is understood, with the evidence query that found it.

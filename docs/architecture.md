@@ -369,7 +369,7 @@ only in its own system's folder). A path the target tree moves is a forbidden sl
 names its successor; files move with the move codemod, which appends the `moved[]` entries of
 `modules/kernel/retired-paths.yaml`.
 
-`npm run check` is `starci runtime check` → `scripts/checks/check-runtime.mjs`: `node --check`
+`starci runtime check` dispatches to `scripts/checks/check-runtime.mjs`: `node --check`
 over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check
 (`scripts/hfs/runtime-check.mjs`) with the runtime-rule modules of `scripts/hfs/runtime-rules/` and
 the cited-path scan over live prose; then every retained self-check of

@@ -28,7 +28,7 @@ the cause. There are no skip lists, no allowlists and no weakened specs.
 |---|---|---|---|---|
 | L0 commit | none | the staged files and format | work hygiene | none |
 | L1 working (op gate, worker) | the specs of the change and their importers | the changed files | `hfs lint --changed` (apps), the self-checks touching the change (`.claude`) | the project(s) holding the changed files |
-| L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`npm run check` / `starci runtime check`): fast and structural | every affected project |
+| L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`starci check run --level L2`): fast and structural | every affected project |
 | L3 land touching IO | L2 plus the affected integration, contract and e2e specs | as L2 | as L2 | as L2 |
 | L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `hfs check` of every example, Sonar at zero and the coverage per component | every project |
 | L5 tag CI (Linux, once) | as L4 | as L4 | as L4 | as L4 |

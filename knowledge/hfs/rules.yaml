@@ -1066,7 +1066,7 @@ rules:
       - {kind: eslint-be, id: tests-keep-constraints}
   - id: R101
     code: "BE_TEST_BUILDER_ARRANGES"
-    law: "A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `jest`, `@jest/globals`) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`)."
+    law: "A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `@jest/globals` or the Jest namespace) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`)."
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_ARRANGES"]
@@ -1659,7 +1659,7 @@ rules:
       - {kind: eslint-be, id: realtime-topic-scope}
   - id: R187
     code: "HFS_DOCKER_BUILD_CONTEXT"
-    law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
+    law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `starci docker build <app>` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOCKER_BUILD_CONTEXT"]
@@ -1780,7 +1780,7 @@ rules:
       - {kind: runtime, id: cli-app-only-templates, at: scripts/hfs/runtime-rules/app-cli-templates.mjs}
   - id: R201
     code: "CLI_ONLY_ENTRY"
-    law: "Every action enters runtime code through `starci <group> <verb>`: no tracked prompt, doc, skill, knowledge file, config, CI file, hook or scheduled-task registration runs `node scripts/...`, `node ui/start.mjs`, `node bin/...` or an `npm run` wrapper of a runtime script; the dispatcher and the specs' own spawn helpers are the declared exceptions."
+    law: "Every action enters runtime code through `starci <group> <verb>`: tracked prompts, docs, skills, knowledge files, configs, CI files, hooks and scheduled-task registrations do not bypass the catalog through direct runtime scripts or package-script wrappers; the dispatcher and the specs' own spawn helpers are the declared exceptions."
     scope: runtime
     kinds: [check]
     gates: [land, runtime]
@@ -1946,4 +1946,3 @@ retired:
   - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
-

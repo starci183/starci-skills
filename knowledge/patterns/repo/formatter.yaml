@@ -28,7 +28,7 @@ rules:
       `@starci/prettier-config` is `{ printWidth: 120, tabWidth: 4, semi: false, singleQuote: false, trailingComma: "all" }` for
       both sides, referenced by the app root's managed `.prettierrc` (the string `"@starci/prettier-config"`); a `prettier` key in
       a `package.json` is a local tool configuration (HFS_TOOL_CONFIG_LOCAL). Pre-commit runs `prettier --check` on the staged
-      files, pre-push and CI run `npm run format:check` (`prettier --check .` at the app root). `.prettierignore` is generated. No
+      files, while pre-push and CI enter the whole-app format check through `starci gate run --root <app>`. `.prettierignore` is generated. No
       other formatter, and no EditorConfig setting that contradicts these values.
     rationale: |
       One formatter with one configuration ends style debate, and the values follow the largest codebase so a reformat diff

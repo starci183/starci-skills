@@ -59,7 +59,7 @@ rules:
       doubles and builders. There is no `live/` folder and no `be/src/tests/e2e/world`. One `be/jest.config.js` uses the
       preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit
       project maps no module into the `be.tests.world`, `be.tests.integration`, `be.tests.e2e` or `be.tests.contract` slots. Scripts are `test` (unit), `test:integration`,
-      `test:e2e` and `test:contract`, each of the last three `npm run typecheck:tests && jest --selectProjects <name>`;
+      `test:e2e` and `test:contract`, each of the last three entered through `starci gate run --root <app> --tests <name>`;
       `test:contract` is never part of `test` or `test:e2e`. Integration, e2e and contract run by hand: none of their specs,
       code or dependencies enters husky, lint-staged, the default typecheck, coverage, or an automatic CI
       trigger; a kept e2e workflow is `workflow_dispatch` only. `be/tsconfig.json` excludes the trees of `be.tests.world`,
@@ -587,7 +587,7 @@ rules:
     kind: mandatory
     hfsRules: [R11, R204]
     requirement: |-
-      The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
+      The unit run (`starci gate unit --root <app>`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
       it with ONE scope, the measured files of BE-TEST-13: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
       `sonar.coverage.exclusions` listing every file the scope does not measure (SonarQube has no coverage inclusions: starci app sync renders the complement
       of the `coverage: required` slots and their `ruleParams.be.logicRoles` roles, fe/** included) and no other coverage key; the managed `codecov.yml` holds the measured roots at
@@ -604,7 +604,7 @@ rules:
         write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = the complement of the measured files (fe/** included), no other coverage key; starci app sync renders the file'
       - id: case-2
         when: CI
-        write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action with use_oidc (job permission id-token: write; no secret and no secret-guarded skip)'
+        write: 'the workflow runs `starci gate unit --root <app>` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action with use_oidc (job permission id-token: write; no secret and no secret-guarded skip)'
       - id: case-3
         when: codecov.yml
         write: 'project and patch status target 100% on the measured roots, plus one component per service app and one `platform`, each held at 100; starci app sync renders the file from the same scope as Sonar'

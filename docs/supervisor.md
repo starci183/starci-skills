@@ -72,10 +72,10 @@ Host boot phase; `starci reconciler up` (the `start` skill) does that plus the s
 seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/housekeeping/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 Product worktrees are counted and collected per workflow: each Kernel workflow has exactly one worktree, which Orca
-created at Kernel start (registry kind `workflow`, keyed by Orca's worktree id, a real `npm ci` and no junctions); a
+created at Kernel start (registry kind `workflow`, keyed by Orca's worktree id, a real `starci npm ci` and no junctions); a
 failed op inside it is preserved and reset to the last checkpoint; only the workflow's finish moves main, and it marks
 the worktree `release-pending`. The host-side controller removes it once its terminals are released (link check, Orca's
-worktree removal, `git branch -d`). The Supervisor never removes one by hand ([workflow kernel](workflow-kernel.md)).
+worktree removal, then the runtime's verified branch cleanup). The Supervisor never removes one by hand ([workflow kernel](workflow-kernel.md)).
 
 ## Claude Code updates
 
@@ -85,7 +85,7 @@ runtime therefore launches every seat with `DISABLE_AUTOUPDATER=1` (`modules/mod
 `launchEnv`: every seat is an `orchestration worker-start` worker whose command Orca composes, so `scripts/agent/trust.mjs`
 asserts the key under `env` in the launch worktree's `.claude/settings.local.json` before every Claude launch, never in a
 user-global settings file; an owner-set value is kept). Updates are applied deliberately while no seat runs:
-after a reboot, or with the seats stopped, run `npm i -g @anthropic-ai/claude-code`, check `claude --version`,
+after a reboot, or with the seats stopped, have the owner update the global Claude Code package, check `claude --version`,
 then `/start` relaunches every seat on the new binary.
 
 ## Reconciler duties and decisions
@@ -161,7 +161,7 @@ pin registry semver, never a `file:` link.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
 5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
    `starci release clean-test` is green for every package of the publish set.
-6. `npm publish --access public`, then `npm view @starci/grammar version`.
+6. `starci release publish --publish`, then verify the published `@starci/grammar` version in the registry.
 7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 
 ## Chat

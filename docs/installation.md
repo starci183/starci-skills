@@ -9,8 +9,9 @@ npm. The runtime ships sources only — it bundles its own YAML parser
 downloaded archive before executing it; `npx` executes package code. Pin a
 reviewed version instead of assuming `latest` is safe.
 
+Have the owner install the exact reviewed `@starci/cli` package globally, then run:
+
 ```sh
-npm i -g @starci/cli
 starci runtime install --cwd <host>
 starci runtime doctor --cwd <host> --quick
 ```

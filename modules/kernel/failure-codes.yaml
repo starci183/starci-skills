@@ -325,8 +325,8 @@ ARCH_TYPESCRIPT_MISSING:
   title_vi: "Kho được kiểm chưa cài TypeScript"
   meaning_vi: "Bộ kiểm kiến trúc chỉ dùng TypeScript cài trong chính kho được kiểm, không thay bằng bộ phân tích khác, nên không kiểm được."
   causes_vi:
-    - "Kho thiếu `package.json` hoặc chưa chạy `npm ci` nên `node_modules/typescript` không có."
-  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `starci app check`."
+    - "Kho thiếu `package.json` hoặc chưa chạy `starci npm ci` nên `node_modules/typescript` không có."
+  nextStep_vi: "Chạy `starci npm ci` trong kho rồi chạy lại `starci app check`."
   owner: op-retry
   kind: check-finding
 
@@ -11958,7 +11958,7 @@ HFS_CI_MISSING_CANON:
   title_vi: "CI thiếu bước canon"
   meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
   causes_vi:
-    - "Vi phạm luật R13: CI phải chạy `starci app lint` (`npm run lint` hoặc `npx @starci/cli@<pin> app lint`); pre-push phải có `typecheck` + `lint`."
+    - "Vi phạm luật R13: CI phải chạy `starci app lint`; pre-push phải có `typecheck` + `lint`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -11976,7 +11976,7 @@ HFS_DEP_VERSION_SKEW:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged` hoặc khóa Jest), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
     - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -12031,7 +12031,7 @@ HFS_RULE_CODE_UNOWNED:
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
-  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
+  meaning_vi: "`<file>` chưa được format. Chạy `starci app lint --fix`."
   causes_vi:
     - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -12043,9 +12043,9 @@ HFS_FORMAT_TOOL_MISSING:
   title_vi: "Kho chưa cài prettier của chính nó"
   meaning_vi: "Kiểm tra định dạng (R19) chạy prettier của chính kho. Kho chưa cài prettier nên không thể xác nhận định dạng, và trạng thái đó không bao giờ được tính là đạt."
   causes_vi:
-    - "Chưa chạy `npm ci` trong kho"
+    - "Chưa chạy `starci npm ci` trong kho"
     - "prettier không nằm trong devDependencies của kho"
-  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `starci app check`."
+  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml bằng `starci npm ci` rồi chạy lại `starci app check`."
   owner: op-retry
   kind: input-invalid
 
@@ -12085,7 +12085,7 @@ HFS_TS_STRICT:
 HFS_CONTRACT_SNAPSHOT_DRIFT:
   title: "The be side commits its contract snapshot and it equals the emit"
   title_vi: "Bản hợp đồng lệch bản thật"
-  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` ở gốc app rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
+  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `starci app emit` ở gốc app rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
     - "Vi phạm luật R23: phía be: `be/contracts/<app>/schema.graphql` và `be/contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `starci app emit` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. Phía fe đọc thẳng `be/contracts/` (đường đọc chéo duy nhất khai trong hfs.json `sides.fe.reads`), không giữ bản sao."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -12253,7 +12253,7 @@ BE_TEST_TOPOLOGY:
   title_vi: "Cấu hình test lệch chuẩn"
   meaning_vi: "Cấu hình test lệch chuẩn: `<detail>`."
   causes_vi:
-    - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` = `typecheck:tests && jest --selectProjects <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
+    - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` chạy qua `starci gate run --root <app> --tests <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
     - "Vi phạm luật R47 về stack thật: mọi dịch vụ khai trong `.starcistacks/<env>` (Postgres, Redis, Keycloak, mail host, k3s...) chạy THẬT trong world qua toxiproxy, world đọc dịch vụ và phiên bản image từ stack lúc chạy; `fakes/<provider>/` chỉ giả SaaS bên ngoài mà đội không vận hành. Ngoại lệ duy nhất: dịch vụ stateless cần phần cứng đặc biệt hoặc model bên ngoài (GPU inference, embedding tự host) được giả khi mục `stacks` của dịch vụ đó trong `test-world.config.ts` khai `{ fakedBy, reason }` với `reason` không rỗng; dịch vụ có trạng thái (database, cache, identity, storage, mail, queue, search hoặc có volume bền) không bao giờ được giả, và mục `fakedBy` trỏ tới dịch vụ hoặc fake (mục `fakes` hay thư mục `fakes/`) không tồn tại bị coi là cũ. `test-world.config.ts` khai world theo đúng một dạng export có tên `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (`stack`, `stacks` theo từng dịch vụ, `fakes`); export default không được đọc và bị báo lỗi."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
@@ -12305,7 +12305,7 @@ FE_WIRE_GENERATED:
   title_vi: "Kiểu wire gõ tay"
   meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi, hoặc kiểu sinh ra cũ hơn ảnh chụp hợp đồng. Dùng kiểu sinh từ `be/contracts/`."
   causes_vi:
-    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `npm run codegen` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `starci gate run --root <app>` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -12476,7 +12476,7 @@ HFS_HOOKS_PATH_REDIRECTED:
   meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua. Chỉ xét khi thư mục được kiểm tra chính là gốc work tree Git của nó; một thư mục nằm trong clone khác (một ví dụ trong clone runtime) không có hook riêng nên không bị xét."
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
-  nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
+  nextStep_vi: "Yêu cầu owner gỡ cấu hình local `core.hooksPath`, rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -13691,7 +13691,7 @@ BE_OPERATION_CONTRACT:
     - "Đầu vào hoặc kết quả của thao tác khai báo là `unknown` nên client phải tự gõ kiểu tay"
     - "Mã từ chối khai báo là `string` thay vì hợp các literal như `\"DENIED\" | \"INVALID\"`"
     - "Route nhận `@Body() body: unknown` hoặc chỉ dùng một nửa `OperationRequest` / `OperationReply`"
-  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `npm run contract:emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
+  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `starci app emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 
@@ -13762,7 +13762,7 @@ FE_GRAPHQL_CONTRACT:
   meaning_vi: "Một thao tác trong tệp `.graphql` dưới `fe/` không khớp ảnh chụp hợp đồng `be/contracts/<service>/schema.graphql` của dịch vụ phục vụ trường gốc đầu tiên của nó: trường, đối số hoặc trường input không được khai báo, thiếu đối số bắt buộc, biến khác kiểu, chọn trường trên giá trị lá hoặc thiếu lựa chọn trên đối tượng, biến khai báo mà không dùng, hoặc không hợp đồng nào phục vụ trường gốc đó."
   causes_vi:
     - "Vi phạm luật R113: front end gửi một tài liệu viết theo hợp đồng cũ (ví dụ `(request: ...)` trong khi back end nhận `input`), nên lời gọi hỏng khi chạy mà type-check của front end không thấy."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa tài liệu `.graphql` cho khớp hợp đồng (hoặc chạy `npm run contract:emit` nếu ảnh chụp đã cũ); không thêm ngoại lệ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa tài liệu `.graphql` cho khớp hợp đồng (hoặc chạy `starci app emit` nếu ảnh chụp đã cũ); không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -13803,8 +13803,8 @@ HFS_EVENT_CONTRACT:
   meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác, hoặc một hàng đợi consumer định nghĩa bằng `defineQueue` không được liệt kê trong bảng `consumes.ts` nào."
   causes_vi:
     - "Vi phạm luật R166: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
-    - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `npm run contract:emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
+    - "Bên phát đổi sự kiện nhưng chưa chạy `starci app emit`, hoặc bên nhận khai báo phiên bản cũ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `starci app emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
   owner: op-retry
   kind: check-finding
 
@@ -13844,7 +13844,7 @@ BE_SAGA_EVENT_CONTRACT:
   meaning_vi: "Một bước hoặc bù trừ không khai `readonly event = \"<tên>\"`, sự kiện đó không có trong `be/contracts/<service>/events.json`, hoặc hợp đồng của sự kiện bù trừ không khai `compensates` đúng sự kiện của bước cùng tên."
   causes_vi:
     - "Vi phạm luật R171: mọi sự kiện của saga nằm trong hợp đồng đã vendor, và sự kiện thất bại của một bù trừ nói rõ nó hoàn tác sự kiện của bước nào."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `npm run contract:emit`, và ghi tên sự kiện vào bước/bù trừ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `starci app emit`, và ghi tên sự kiện vào bước/bù trừ."
   owner: op-retry
   kind: check-finding
 
@@ -13984,7 +13984,7 @@ EXAMPLES_CI_WORKFLOW_INVALID:
   meaning_vi: "Không đọc được `.github/workflows/examples.yml`: `<detail>`."
   causes_vi:
     - "Lỗi cú pháp YAML trong workflow"
-  nextStep_vi: "Sửa cú pháp YAML của `.github/workflows/examples.yml` rồi chạy lại `npm run check`."
+  nextStep_vi: "Sửa cú pháp YAML của `.github/workflows/examples.yml` rồi chạy lại `starci check run --level L2`."
   owner: runtime-core
   kind: check-finding
 
@@ -14096,7 +14096,7 @@ HFS_MONO_WORKSPACE_DEP:
   title_vi: "Một workspace fe import gói mà nó không khai báo"
   meaning_vi: "Mọi gói mà các tệp của một workspace fe import phải được khai báo trong `package.json` của chính workspace đó (gói workspace anh em ghi `\"*\"`); `package.json` ở gốc không bao giờ khai báo một gói workspace."
   causes_vi:
-    - "Vi phạm luật R146: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
+    - "Vi phạm luật R146: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng bằng `starci docker build <app>` hoặc khi turbo không biết thứ tự phụ thuộc."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
   owner: op-retry
   kind: check-finding
@@ -14148,7 +14148,7 @@ BE_EVENT_CLASS_CONTRACT:
   causes_vi:
     - "Vi phạm luật R151: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
     - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `starci app emit`, hoặc thêm mục hợp đồng bằng tay."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `starci app emit` để hợp đồng khớp; không sửa tay `events.json`."
   owner: op-retry
   kind: check-finding
 
@@ -14307,20 +14307,20 @@ BE_SQL_RETURNING_SHAPE:
 HFS_DOCKER_BUILD_CONTEXT:
   title: "The Dockerfile does not build from the app root"
   title_vi: "Dockerfile không build từ gốc app"
-  meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` đúng đường dẫn của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
+  meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `starci docker build <app>` đúng app của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
   causes_vi:
     - "Vi phạm luật R187: context build là gốc app; lệnh build sai hoặc nguồn COPY vượt ra ngoài context khiến image build được trên máy này nhưng hỏng trên CI hoặc trộn lẫn dữ liệu của app khác."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `docker build -f <đường dẫn Dockerfile> -t <image> .` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `starci docker build <app>` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
   owner: op-retry
   kind: check-finding
 
 HFS_DOCKER_STAGES:
   title: "The Dockerfile stages, user or install break the canon"
   title_vi: "Các stage, user hoặc lệnh cài của Dockerfile sai chuẩn"
-  meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài là `npm ci` (không `npm install`); runtime của be chạy `npm ci --omit=dev --ignore-scripts`, runtime của fe không cài gì."
+  meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài đi qua `starci npm ci` (không dùng `starci npm install`); runtime của be chỉ cài dependency production và bỏ lifecycle scripts, runtime của fe không cài gì."
   causes_vi:
     - "Vi phạm luật R188: image chạy bằng root, mang theo công cụ build hoặc cài không theo lockfile thì vừa lớn vừa kém an toàn, và không tái lập được."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `npm install` thành `npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `starci npm install` thành `starci npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
   owner: op-retry
   kind: check-finding
 

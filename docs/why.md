@@ -65,7 +65,7 @@ TARGET_MISSING:
   kind: input-invalid   # check-finding | settle-reason | dispatch-refusal | blocker | check-status | verb-refusal | runtime-fault | input-invalid
 ```
 
-`npm run check` runs `scripts/checks/check-failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
+`starci runtime check` runs `scripts/checks/check-failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
 UPPER_SNAKE literal, a `[CODE]` token in a message, a kebab literal in a `code:` / `reason:` / `rejected:` / `failureKind:` /
 `signal:` position, the last argument of `refuse(...)`, `hand('...')`, constant `*_REASONS|CODES|KINDS|CLASSES` lists) and
 refuses an emitted code with no entry, an entry no code emits, a malformed entry, an owner outside the set, an

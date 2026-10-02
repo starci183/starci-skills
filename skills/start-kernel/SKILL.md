@@ -65,7 +65,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   no --parent (the nested Run rule). Nothing is launched with terminal create.
 - **One worktree per workflow**: before the Kernel starts, the boot has
   Orca create the workflow worktree (Orca's worktree create call, name and
-  branch `wf-<workflowId>`, a real `npm ci` at the app root, no
+  branch `wf-<workflowId>`, a real `starci npm ci` at the app root, no
   `node_modules` junctions), then starts the Kernel in it with `worker-start
   --worktree <its path>`. Every op of the workflow runs in it: serially per side (`be/`,
   `fe/`), in parallel across sides. Ops never commit: a green op is a

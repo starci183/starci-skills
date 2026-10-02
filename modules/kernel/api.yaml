@@ -132,8 +132,9 @@ conventions:
     included, is scoped line by line; an unreadable list refuses PATHSPEC_FILE_UNREADABLE), stash, clean
     -f, checkout/switch that moves HEAD, checkout/restore/add/rm of paths outside the job's owned paths,
     branch rewrites, forced pushes, a push to a URL or path or through a command-line remote redirect
-    (PUSH_REMOTE_NOT_CONFIGURED), `remote add|set-url|rename|remove` (REMOTE_REWRITE), a `git config`
-    write that changes core.hooksPath or a remote URL (CONFIG_GUARDED; setting core.hooksPath to its
+    (PUSH_REMOTE_NOT_CONFIGURED), `remote add|set-url|rename|remove` (REMOTE_REWRITE), or a configuration
+    write that changes core.hooksPath or a remote URL (CONFIG_GUARDED; `starci git sync` owns lane
+    synchronization, and configuration writes are owner-only; setting core.hooksPath to its
     current value, as husky's install does, passes), update-ref and filter-branch, and a hooked write
     (commit, merge, push, reset, checkout, ...) with core.hooksPath overridden by -c, --config-env or
     GIT_CONFIG_* (HOOKS_BYPASS), and an App Router pathspec git would read as a glob (APP_ROUTER_GLOB);

@@ -77,7 +77,7 @@ rules:
     cases:
       - id: case-1
         when: CI installs the canon
-        write: The workflow runs `npm ci`; nothing checks out the runtime repository.
+        write: The workflow runs `starci npm ci`; nothing checks out the runtime repository.
     verification:
       automated:
         - HFS_CANON_PIN_DRIFT

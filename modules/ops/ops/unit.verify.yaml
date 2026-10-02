@@ -33,7 +33,7 @@ reads:
     path: <app>/<bound-paths>
     purpose:
       en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the root package.json scripts (the
-        unit command is the managed `test`, which runs `cd be && jest --selectProjects unit --coverage`, the unit project as opposed to e2e), the unit runner configuration and the
+        unit command is `starci gate unit --root <app>`, which runs the managed unit project with coverage as opposed to e2e), the unit runner configuration and the
         delivered source. The evidence binds the exact tested tree, so a run without a resolved repository is
         not a unit result.
   - id: request

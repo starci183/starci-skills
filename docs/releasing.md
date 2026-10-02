@@ -18,9 +18,9 @@ reported and use `--force` only after backup and review. The operator flow is
 ## Verify source
 
 ```sh
-npm ci
-npm run check   # node --check on every .mjs, ops registry regen check, host contract
-npm test        # node --test tests/*.spec.mjs
+starci npm ci
+starci check run --level L2
+starci test run --level L2 --against <ref>
 ```
 
 Review source changes and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and read directly; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `engine/yaml.mjs`; retain its license notice (`engine/yaml-license.json`, THIRD_PARTY_NOTICES.md) when deliberately changing that dependency.
@@ -33,7 +33,7 @@ The root `.github/workflows/examples.yml` runs every example app (the matrix is 
 builds the Docker image of every be and fe app of every example (its matrix is `check-examples-ci.mjs --images`, derived from the apps of each `hfs.json`) and never pushes. Coverage is one scope: the files of
 the `ruleParams.be.logicRoles` roles inside the `coverage: required` slots (the logic of `be/src/modules/**`), derived once from the slot manifest by `scripts/hfs/coverage-scope.mjs` and shared by every be
 app, so the one scope covers every service; the fe has no tests. Each example's `codecov.yml`, its `be/jest.config.js` and the complement
-in its `sonar-project.properties` are all rendered from the one derivation by `starci runtime check --only examples-ci -- --write` (`npm run check` refuses drift, R204);
+in its `sonar-project.properties` are all rendered from the one derivation by `starci runtime check --only examples-ci -- --write` (`starci runtime check` refuses drift, R204);
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
 only. The coverage upload authenticates with GitHub's OIDC token (`use_oidc: true`, job permission `id-token: write`), so no repository secret exists to forget and no upload step skips silently (rule CI_UPLOAD_NOT_SILENT); the owner activates the repository on Codecov once. Before a release, run the local dashboard gate
 per example app against the local SonarQube after `npm test` and a project scan:
@@ -57,12 +57,9 @@ It starts seven no-op agents on the cheapest model `modules/models/runtimes.yaml
 
 ## Make an archive
 
-```sh
-npm pack --json --pack-destination <release-output>
-npm pack --json --pack-destination <release-output> packages/cli
-```
+`starci release cut` creates the reviewed release artifacts. Ad hoc package archive creation is owner-only.
 
-Create that output directory first, outside the runtime and product trees. Run `npm run check && npm test` in the packing checkout yourself before packing — `npm pack` runs no verification of its own. Inspect both resulting file inventories for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. Each package's `files[]` is the authority on what its payload contains — it is an allowlist with explicit negations for generated output; keep all runtime references available after relocation.
+Create the output directory first, outside the runtime and product trees. For an owner-approved ad hoc archive, run `starci check run --level L2` and `starci test run --level L2 --against <ref>` in the packing checkout before creating it — archive creation performs no verification of its own. Inspect both resulting file inventories for local configuration, secrets, `config.yaml`, product records, Git state, `node_modules`, `worktrees/` and unrelated build output. Each package's `files[]` is the authority on what its payload contains — it is an allowlist with explicit negations for generated output; keep all runtime references available after relocation.
 
 Test both **archives**, not only the source checkout:
 

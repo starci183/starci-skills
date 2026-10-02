@@ -58,18 +58,18 @@ maps the runtime directories below.
 
 ## Development
 
-From this repository root, run `npm ci`, `npm run check` (`starci runtime check`) for syntax and contract gates,
-and `npm test` for the Node test suite. The runtime package has no separate TypeScript
+From this repository root, run `starci npm ci` once; while working, use `starci check run --level L1 --changed <files>`
+for syntax and contract gates and `starci test run --level L1 --spec <files>` for the affected Node specs. Leads use
+L2 before land, and the release cut owns the whole suite. The runtime package has no separate TypeScript
 typecheck, lint, or build script; product examples declare their own `typecheck`,
 `lint`, `build`, and `test` commands. Run the runtime presentation gate with
 `starci gate repo-presentation --root . --runtime`.
 
 ## Install
 
-Install the one CLI globally, then install the runtime into a host:
+Have the owner install the exact reviewed `@starci/cli` package globally, then install the runtime into a host:
 
 ```sh
-npm i -g @starci/cli
 starci runtime install --cwd <host>
 starci runtime doctor --cwd <host>
 ```

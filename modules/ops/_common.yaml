@@ -442,7 +442,7 @@ sections:
         and report blocked environment only if it persists. Never create a git worktree, a junction, a symlink or a hard link, anywhere:
         work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A worker's private
         worktree beside a product front end with node_modules junctions into the live checkout was removed with
-        `git worktree remove --force`, which followed the junctions and deleted 674 live files;
+        a forced raw worktree removal that bypassed `starci machine worktrees-clean`, which followed the junctions and deleted 674 live files;
         a need for another revision, a clean build tree or a linked dependency is
         reported (blocked environment), never made. Never kill processes by image name or pattern
         (`taskkill /IM` or `/FI`, `pkill`, `killall`, `Stop-Process -Name`, `wmic process where name=...`): the

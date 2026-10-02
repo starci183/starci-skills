@@ -23,7 +23,7 @@ clone it, run it, understand it and trust it.
 | **Test quality** | End-to-end tests fake every third party at the network edge and keep the project's own infrastructure real; unit tests cover pure logic with few mocks. Sonar and Codecov are wired and green through the shared `starci-quality` gate. |
 | **Product quality** | Output projects meet `docs/quality-bar.md`: designed renders, complete UX states, code that follows the design and the grammar, evidence for every claim. |
 | **Determinism** | Model and op routing is declarative and reproducible: same inputs, same selection, with cited reasons. Spine code, not agent prose, settles truth. |
-| **Release** | `npm run check` (one `starci runtime check` entry that reports every step) and the land gate are green before anything lands; a release is gated by one release check and publishing stays an explicit human step. |
+| **Release** | `starci check run --level L2` and the land gate are green before anything lands; a release is gated by one release check and publishing stays an explicit human step. |
 | **Docs** | `CONTEXT.md` load order is accurate; a new agent cold-starts correctly from it alone. Architecture docs match what the code does, and docs are English only. |
 | **Demonstrability** | The whole loop is showable: prompt, plan, dispatched ops, evidence, settled verdict. This is the content story. |
 

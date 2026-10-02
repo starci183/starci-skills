@@ -379,7 +379,7 @@ grammarRelease:
        LICENSE, package.json only - no secrets, .env, stories, specs or tests; and
        `starci release clean-test` is green for every package of the publish set (each installed
        clean in a temp dir from its own manifest and lock, its own tests run there).
-    6. `npm publish --access public`, then verify with `npm view @starci/grammar version`.
+    6. `starci release publish --publish`, then verify the published `@starci/grammar` version in the registry.
     7. Tell the owner afterwards, and tell the consumer Kernels whose pinned range does not cover the new
        version (a caret pin of the same minor, or of the same major above 0.x, picks it up on its next install).
 

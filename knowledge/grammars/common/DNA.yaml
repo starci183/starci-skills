@@ -26,7 +26,7 @@ provenance:
     `starci work grammar-knowledge` re-measures the package source and reports every row of
     this file that no longer matches it (renderer list, kind, group, props type, classes, rule ids;
     token names, values, fallbacks and owners; counts; the package version). `tests/work-ui/grammar-knowledge.spec.mjs`
-    runs the same comparison under `npm test`, so the snapshot cannot silently fall behind the package
+    runs the same comparison through `starci test run --level L1 --spec tests/work-ui/grammar-knowledge.spec.mjs`, so the snapshot cannot silently fall behind the package
     again. Line positions (`source`), use counts (`uses`, `alsoReadBy`) and `digests` are pointers that
     `--write` refreshes; they are not compared.
   method: |

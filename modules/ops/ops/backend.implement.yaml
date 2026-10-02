@@ -93,7 +93,7 @@ writes:
         command, source tree/commit, result and sanitized logs. The lint, typecheck and slice-spec proof is the
         op loop's gate.json (the gate step below): findings the base already has are repository debt owed to
         code.refactor and measured by review.verify's whole-repository starci app lint, never an open item of this slice. Unit coverage is the
-        runner's: the unit project (`npm test`, jest with `--coverage`) fails below its per-file 100
+        runner's: `starci gate unit --root <app>` runs the unit project with coverage and fails below its per-file 100
         threshold on every measured file of the coverage scope (the `ruleParams.be.logicRoles` roles of the `coverage: required`
         slots, R204); Sonar judges the same files: `sonar-local.mjs scan` first runs the
         unit specs related to every measured file this slice touched with coverage into be/coverage/lcov.info, and the

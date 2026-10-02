@@ -197,7 +197,7 @@ orcaTree:
       Only StarCi's own terminals — a handle the ledger names, or a title the
       kernel wrote. An owner's own terminals are never findings.
     notInNpmCheck: >-
-      It reads a ledger, which `npm run check` does not have. It runs against a
+      It reads a ledger, which `starci runtime check` does not have. It runs against a
       project's .starciwork, and scripts/supervisor/poll.mjs prints the same
       findings every cycle.
 

@@ -194,7 +194,7 @@ never commit keep the shared tree.
   from the registry. The Kernel then starts with `orchestration worker-start
   --worktree <that path>`: an existing tree, so launch trust is written into
   it before the agent starts. Its
-  setup runs a real `npm ci` at the app root: there are no `node_modules`
+  setup runs a real `starci npm ci` at the app root: there are no `node_modules`
   junctions anywhere. The worktree is registered in `machine.sqlite`
   `worktrees` as kind `workflow`, keyed by Orca's worktree id, against the cap
   per repository; a workflow over the cap waits.
@@ -244,7 +244,7 @@ never commit keep the shared tree.
   terminals still run there. Any refusal leaves main untouched.
 - **Release.** The host-side controller removes a `release-pending` worktree
   once every terminal in it is released: the link check, then Orca's worktree
-  removal, then `git branch -d`. The reconciler's GC controller
+  removal, then the runtime's verified branch cleanup. The reconciler's GC controller
   (`gc:worktrees`, always active) also collects a workflow worktree whose
   owner process is gone longer than `ownerGoneMs`, always after preserving its
   work, and only through Orca. `starci machine worktrees

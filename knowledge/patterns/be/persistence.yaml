@@ -60,9 +60,9 @@ rules:
     kind: mandatory
     hfsRules: [R33, R34, R147, R174, R02, R150]
     requirement: |-
-      Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`), once per
-      connection, before any api or worker process starts (a deploy runs the cli image as an init job), and through the test
-      world over the same connection list. The cli app is required as soon as `hfs.json` `sides.be.connections` declares a
+      Migrations run only through the cli migrate command (`cli migrate run`), once per connection, before any api or worker
+      process starts (a deploy runs the cli image as an init job), and through the test
+      world over the same connection list; `starci gate run --root <app>` verifies that path. The cli app is required as soon as `hfs.json` `sides.be.connections` declares a
       connection (cli.yaml BE-CLI-1), and it composes EVERY declared connection with its entities and migrations
       (BE_CONTEXT_OWNER), because the cli is the one process that may touch the schema of every context. The command builds
       its `DataSource` from the same `<conn>.config.ts` the owning api uses. Api and worker apps never run migrations.

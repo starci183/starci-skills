@@ -20,9 +20,8 @@ to each app repository (its root README; `be/` and `fe/` carry none) and to the 
 - [ ] Keep `.github/` for required repository CI under the HFS root contract. Add
   `PULL_REQUEST_TEMPLATE.md`, `ISSUE_TEMPLATE/` and `CODEOWNERS` there when useful;
   those template and ownership files are optional.
-- [ ] Set the GitHub repository description and topics to match the current README,
-  using `gh repo edit --description "<one-line description>" --add-topic <topic>`.
-  Check with `gh repo view --json description,repositoryTopics`. Do this only for the
-  repository the owner has authorized you to edit.
+- [ ] Ask the owner to set the GitHub repository description and topics to match the
+  current README, then verify the resulting description and topic list in GitHub. Do
+  this only for the repository the owner has authorized you to edit.
 - [ ] Run the presentation gate and `canon-scan`; the HFS rules also run inside the
   architecture machine of `canon-scan`.

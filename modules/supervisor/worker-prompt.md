@@ -28,7 +28,7 @@ Specs that must pass (done criteria): {specs}
 - Change only the leased files. If the fix needs another file, stop and say so in your report (outcome `blocked`,
   `--needs <csv>`); the Supervisor extends the lease or reassigns.
 - Reproduce the defect first with a spec under `tests/` (a new or extended `*.spec.mjs`) that fails before your fix
-  and passes after it. Run specs with `node --test --test-concurrency=2 <files>` only.
+  and passes after it. Run specs with `starci test run --level L1 --spec <files> --concurrency 2` only.
 - Keep every file loadable: `node --check` on each changed .mjs, a YAML/JSON parse of each changed module file.
 - A change to a contract, schema, knowledge or op file (modules/kernel, modules/schemas, modules/ops, knowledge,
   modules/supervisor, modules/models/code-patterns.yaml) registers an entry in the SAME commit as its own file
