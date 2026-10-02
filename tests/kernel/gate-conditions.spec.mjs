@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseCondition,evaluateCondition,typedIncidents,recordRevision} from '../../scripts/kernel/gate-conditions.mjs'; const F=path.parse(os.tmpdir()).root.replace(/\\/g,'/');
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
