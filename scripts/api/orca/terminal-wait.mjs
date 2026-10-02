@@ -6,7 +6,8 @@
 // ({wait: {condition, satisfied: true, status: 'exited', exitCode, exitCause}}) and times out (error.code timeout) for a live one.
 // Returns {ok, satisfied, timedOut, status, exitCause, error, errorCode, hostUnavailable}. A timeout is a clean `satisfied: false`,
 // never an error: the condition simply did not hold in time.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function terminalWait({ terminal, for: condition = 'exit', timeoutMs = 10_000 }) {
   const r = orcaCall('terminal-wait', { terminal, for: condition, 'timeout-ms': String(timeoutMs) }, { timeout: timeoutMs + 15_000 });
