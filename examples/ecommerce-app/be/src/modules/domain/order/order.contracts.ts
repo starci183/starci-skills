@@ -26,8 +26,8 @@ export interface CheckoutPlan {
 export interface PlacedOrder {
     /** The order id. */
     readonly orderId: string
-    /** The lifecycle state. */
-    readonly status: "confirmed"
+    /** The lifecycle state: an order that confirmed and was later cancelled keeps answering as a replay with `cancelled`. */
+    readonly status: "confirmed" | "cancelled"
     /** The order total in minor units. */
     readonly totalMinorUnits: number
     /** The currency. */
@@ -158,4 +158,21 @@ export interface EmptyCartParams {
 export interface EmptiedCart {
     /** Always true. */
     readonly cleared: true
+}
+
+/** The saga that orchestrates an order from its placement to its invoice: the name of `place-order.saga.ts` of the checkout feature. */
+export const PLACE_ORDER_SAGA = "place-order"
+
+/** What cancelling an order takes. */
+export interface CancelOrderParams {
+    /** The order to cancel. */
+    readonly orderId: string
+}
+
+/** How a cancellation ended: `cancelled` is false when the order was already cancelled or is unknown and nothing changed. */
+export interface CancelledOrder {
+    /** The order. */
+    readonly orderId: string
+    /** Whether this call cancelled it. */
+    readonly cancelled: boolean
 }

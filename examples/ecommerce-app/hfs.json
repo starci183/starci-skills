@@ -7,13 +7,16 @@
       "apps": [
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },
+        { "name": "billing", "kind": "worker" },
         { "name": "migrate", "kind": "migrate" }
       ],
       "connections": [
         { "name": "identity", "envPrefix": "IDENTITY_DB" },
-        { "name": "order", "envPrefix": "ORDER_DB" }
+        { "name": "order", "envPrefix": "ORDER_DB" },
+        { "name": "billing", "envPrefix": "BILLING_DB" }
       ],
-      "optionalSlots": ["repo.docs", "be.contract.graphql"]
+      "optionalSlots": ["repo.docs", "be.contract.graphql", "be.contract.events", "be.transport.message"],
+      "patterns": ["saga", "event-bus"]
     },
     "fe": {
       "apps": [

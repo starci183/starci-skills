@@ -7,15 +7,24 @@ import type { CatalogService } from "@modules/domain/catalog"
 import { PAYMENT_SERVICE } from "@modules/domain/payment"
 import type { PaymentService } from "@modules/domain/payment"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { LOGGER } from "@modules/platform/logging"
+import { SAGA_SERVICE } from "@modules/platform/saga"
+import type { Logger } from "@modules/platform/logging"
+import type { SagaService } from "@modules/platform/saga"
+import { OrderPlacedEvent } from "@modules/events/order"
+import { EVENT_BUS } from "@modules/platform/event-bus"
+import type { EventBus } from "@modules/platform/event-bus"
 import { Test } from "@nestjs/testing"
-import { orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
+import { orderLineRow, orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
+import { PLACE_ORDER_SAGA } from "./order.contracts"
+import { OrderLogEvent } from "./order.log-events"
 import { OrderService } from "./order.service"
 import { ReceiptService } from "./receipt.service"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
-import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
+import { CANCEL_ORDER_IF_CONFIRMED, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
 const shirt = productView()
 const mug = productView({ id: "sku-2", name: "Mug", priceMinorUnits: 250, stock: 10 })
@@ -25,6 +34,9 @@ const build = async (entityManager: MockEntityManager) => {
     const catalog = mock<CatalogService>()
     const payments = mock<PaymentService>()
     const receipts = mock<ReceiptService>()
+    const bus = mock<EventBus>()
+    const logger = mock<Logger>()
+    const sagas = mock<SagaService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             OrderService,
@@ -33,9 +45,12 @@ const build = async (entityManager: MockEntityManager) => {
             { provide: CATALOG_SERVICE, useValue: catalog },
             { provide: PAYMENT_SERVICE, useValue: payments },
             { provide: ReceiptService, useValue: receipts },
+            { provide: EVENT_BUS, useValue: bus },
+            { provide: LOGGER, useValue: logger },
+            { provide: SAGA_SERVICE, useValue: sagas },
         ],
     }).compile()
-    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts }
+    return { orders: moduleRef.get(OrderService), cart, catalog, payments, receipts, bus, logger, sagas }
 }
 
 describe("OrderService", () => {
@@ -78,7 +93,7 @@ describe("OrderService", () => {
 
         it("returns the first order of a replayed key and writes nothing", async () => {
             const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ idempotencyKey: "key-1" })] })
-            const { orders, cart, payments } = await build(em)
+            const { orders, cart, payments, bus } = await build(em)
             payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
 
             expect(await orders.placeOrder({ personId: "p-1", idempotencyKey: "key-1" })).toSucceedWith(
@@ -90,6 +105,10 @@ describe("OrderService", () => {
             expect(cart.list).not.toHaveBeenCalled()
             expect(payments.capture).not.toHaveBeenCalled()
             expect(em.transaction).not.toHaveBeenCalled()
+            expect(bus.publish).toHaveBeenCalledWith(
+                OrderPlacedEvent.create({ orderId: "o-1", personId: "p-1", totalMinorUnits: 1250 }),
+                expect.anything(),
+            )
         })
 
         it("fails with the payment missing error when a replayed order has no payment", async () => {
@@ -110,7 +129,7 @@ describe("OrderService", () => {
                     insert: [OrderLineEntity, {}],
                 }),
             )
-            const { orders, cart, catalog, payments, receipts } = await build(tx.em)
+            const { orders, cart, catalog, payments, receipts, bus, sagas } = await build(tx.em)
             cart.list.mockResolvedValue([
                 { productId: "sku-1", quantity: 2 },
                 { productId: "sku-2", quantity: 1 },
@@ -148,6 +167,34 @@ describe("OrderService", () => {
             expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)
             expect(receipts.archive).toHaveBeenCalledWith("o-7")
+            expect(sagas.begin).toHaveBeenCalledWith({
+                manager: expect.anything(),
+                saga: PLACE_ORDER_SAGA,
+                correlationId: "o-7",
+            })
+            expect(bus.publish).toHaveBeenCalledWith(
+                OrderPlacedEvent.create({ orderId: "o-7", personId: "p-1", totalMinorUnits: 1250 }),
+                expect.anything(),
+            )
+        })
+
+        it("logs a failed announcement and still answers the placed order", async () => {
+            const tx = fakeTransaction(
+                mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-6" }]], insert: [OrderLineEntity, {}] }),
+            )
+            const { orders, cart, catalog, payments, bus, logger } = await build(tx.em)
+            cart.list.mockResolvedValue([{ productId: "sku-2", quantity: 4 }])
+            catalog.byIds.mockResolvedValue({ "sku-2": mug })
+            catalog.reserveStock.mockResolvedValue(true)
+            payments.capture.mockResolvedValue({ paymentId: "pay-6", amountMinorUnits: 1000 })
+            const failure = new Error("stream down")
+            bus.publish.mockRejectedValueOnce(failure)
+
+            expect(await orders.placeOrder({ personId: "p-1" })).toSucceedWith(
+                placedOrder({ orderId: "o-6", totalMinorUnits: 1000, paymentId: "pay-6" }),
+            )
+
+            expect(logger.error).toHaveBeenCalledWith(OrderLogEvent.EventPublishFailed, failure, { orderId: "o-6" })
         })
 
         it("places an order without a replay key and claims no key", async () => {
@@ -231,6 +278,48 @@ describe("OrderService", () => {
             await expect(orders.placeOrder({ personId: "p-1" })).rejects.toMatchObject({
                 code: OrderErrorCode.PlacementFailed,
             })
+        })
+    })
+
+    describe("cancelOrder", () => {
+        it("cancels a confirmed order, releases the stock of its lines and refunds its payment in one committed transaction", async () => {
+            const tx = fakeTransaction(
+                mockEntityManager({
+                    query: [CANCEL_ORDER_IF_CONFIRMED, [{ id: "o-1" }]],
+                    find: [
+                        OrderLineEntity,
+                        [orderLineRow(), orderLineRow({ id: "l-2", productId: "sku-2", quantity: 1 })],
+                    ],
+                }),
+            )
+            const { orders, catalog, payments } = await build(tx.em)
+            payments.refund.mockResolvedValue(true)
+
+            expect(await orders.cancelOrder({ orderId: "o-1" })).toEqual({ orderId: "o-1", cancelled: true })
+
+            expect(tx.em.query).toHaveBeenCalledWith(CANCEL_ORDER_IF_CONFIRMED, ["o-1"])
+            expect(catalog.releaseStock).toHaveBeenNthCalledWith(1, {
+                manager: expect.anything(),
+                productId: "sku-1",
+                quantity: 2,
+            })
+            expect(catalog.releaseStock).toHaveBeenNthCalledWith(2, {
+                manager: expect.anything(),
+                productId: "sku-2",
+                quantity: 1,
+            })
+            expect(payments.refund).toHaveBeenCalledWith({ manager: expect.anything(), orderId: "o-1" })
+            expect(tx.commits).toBe(1)
+        })
+
+        it("changes nothing for an order that is not confirmed any more, so a redelivery is a no-op", async () => {
+            const tx = fakeTransaction(mockEntityManager({ query: [CANCEL_ORDER_IF_CONFIRMED, []] }))
+            const { orders, catalog, payments } = await build(tx.em)
+
+            expect(await orders.cancelOrder({ orderId: "o-1" })).toEqual({ orderId: "o-1", cancelled: false })
+
+            expect(catalog.releaseStock).not.toHaveBeenCalled()
+            expect(payments.refund).not.toHaveBeenCalled()
         })
     })
 

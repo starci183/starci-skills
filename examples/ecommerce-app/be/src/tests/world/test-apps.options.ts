@@ -9,13 +9,22 @@ import type { WorldWiring } from "@starci/test-world"
 import { accountEntities } from "@modules/domain/account"
 import { cartEntities } from "@modules/domain/cart"
 import { catalogEntities } from "@modules/domain/catalog"
+import { invoiceEntities } from "@modules/domain/invoice"
 import { orderEntities } from "@modules/domain/order"
 import { paymentEntities } from "@modules/domain/payment"
 import { ClockModule } from "@modules/platform/clock"
 import { EnvSource, Secret } from "@modules/platform/config"
-import { DatabaseModule, parseIdentityDatabaseConfig, parseOrderDatabaseConfig } from "@modules/platform/database"
+import {
+    DatabaseModule,
+    parseBillingDatabaseConfig,
+    parseIdentityDatabaseConfig,
+    parseOrderDatabaseConfig,
+} from "@modules/platform/database"
 import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { HttpModule } from "@modules/platform/http"
+import { inboxEntities } from "@modules/platform/inbox"
+import { sagaEntities } from "@modules/platform/saga"
+import type { MessagingOptions } from "@modules/platform/messaging"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
@@ -23,6 +32,7 @@ import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
+import type { BillingAppOptions } from "../../../apps/billing/src/billing.options"
 import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
@@ -36,8 +46,8 @@ export const KEYCLOAK_SIGN_IN_CLIENT = "identity-api"
 /** The confidential client of the realm whose service account creates the shoppers (realm-ecommerce.json). */
 export const KEYCLOAK_ADMIN_CLIENT = "identity-admin"
 
-/** The wiring of the ecommerce world: its two apps and its two connections. */
-export type EcommerceWiring = WorldWiring<"identity" | "order", "identity" | "order">
+/** The wiring of the ecommerce world: its three apps and their three connections. */
+export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing">
 
 /** The entities the identity connection maps. */
 export const IDENTITY_ENTITIES: DatabaseConnectionOptions["entities"] = accountEntities
@@ -48,7 +58,11 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...cartEntities,
     ...orderEntities,
     ...paymentEntities,
+    ...sagaEntities,
 ]
+
+/** The entities the billing connection maps. */
+export const BILLING_ENTITIES: DatabaseConnectionOptions["entities"] = [...invoiceEntities, ...inboxEntities]
 
 /** The identity connection of the run, read the way the identity app's `main.ts` reads its environment. */
 const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
@@ -57,6 +71,10 @@ const identityDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
 /** The order connection of the run, read the way the order app's `main.ts` reads its environment. */
 const orderDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
     parseOrderDatabaseConfig(new EnvSource({ ORDER_DB_URL: w.db.order.url }))
+
+/** The billing connection of the run, read the way the billing worker's `main.ts` reads its environment. */
+const billingDatabase = (w: EcommerceWiring): DatabaseConnectionConfig =>
+    parseBillingDatabaseConfig(new EnvSource({ BILLING_DB_URL: w.db.billing.url }))
 
 /** The Redis of the run, the store of the identity app's cache. */
 export const cacheOptionsOf = (w: EcommerceWiring): CacheOptions => ({
@@ -90,6 +108,13 @@ export const orderApiOptionsOf = (w: EcommerceWiring): OrderApiOptions => ({
 export const identityApiOptionsOf = (w: EcommerceWiring): IdentityApiOptions => ({
     url: w.apps.identity.url,
     timeoutMs: CALL_DEADLINE_MS,
+})
+
+/** The Redis queues of the run, on the run's own Redis DB, shared by the publishers and the workers of every app. */
+export const messagingOptionsOf = (w: EcommerceWiring): MessagingOptions => ({
+    url: new Secret(w.redis.url),
+    timeoutMs: CALL_DEADLINE_MS,
+    concurrency: 1,
 })
 
 /** The bucket of the run's MinIO that archives the receipts (declared in `stacks.minio.buckets`). */
@@ -127,8 +152,19 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     port: w.apps.order.port,
     database: orderDatabase(w),
     identityApi: identityApiOptionsOf(w),
+    messaging: messagingOptionsOf(w),
     receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
+})
+
+/** The largest total the billing worker of the world invoices: small, so a spec can place an order it rejects. */
+export const BILLING_LIMIT_MINOR_UNITS = 100_000
+
+/** The options of the billing worker. */
+export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
+    database: billingDatabase(w),
+    messaging: messagingOptionsOf(w),
+    invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },
 })
 
 /** The platform base of a modules world: clock, logging and both connections, as the app roots register them. */
@@ -141,6 +177,7 @@ export const platformBase = (w: EcommerceWiring): ReadonlyArray<DynamicModule> =
         connections: [
             { ...identityDatabase(w), entities: IDENTITY_ENTITIES, migrations: [] },
             { ...orderDatabase(w), entities: ORDER_ENTITIES, migrations: [] },
+            { ...billingDatabase(w), entities: BILLING_ENTITIES, migrations: [] },
         ],
     }),
 ]

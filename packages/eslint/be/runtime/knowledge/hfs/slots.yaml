@@ -131,8 +131,8 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/queue]               # pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
-      "@nestjs/bullmq": [platform/queue]
+      bullmq: [platform/queue, platform/messaging]   # platform/messaging: interim BullMQ transport of the ecommerce example until platform/event-bus lands; pattern queue: BullMQ jobs and job schedulers (the relay of the outbox into queues)
+      "@nestjs/bullmq": [platform/queue, platform/messaging]
       kafkajs: [platform/event-bus]          # pattern event-bus: Kafka is the only event transport
       "@nestjs/schedule": []                 # no @Cron / @Interval / @Timeout anywhere: a schedule is a BullMQ job scheduler of a queue
       eventemitter2: []
@@ -171,7 +171,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, job, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, compensation, saga-state, saga, contracts, port, resolver, controller, gateway, webhook, subscription, consumer, job, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -610,6 +610,15 @@ slots:
     tests: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: be.contract.events
+    profiles: [be]
+    path: "contracts/<app>/events.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R140 HFS_EVENT_CONTRACT)
+    rules: [HFS_EVENT_CONTRACT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
   - id: be.app.api
@@ -688,6 +697,37 @@ slots:
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
+  - id: be.feature.saga
+    profiles: [be]
+    path: "src/features/<feature>/saga/"
+    pattern: saga                 # enabled by `patterns: ["saga"]` in hfs.json sides.be (R143 to R147); an undeclared saga folder is HFS_SLOT_NOT_ENABLED
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts"]   # the orchestrator (a step list plus compensations, a `*.service.ts` because a handler injects only services, unit-tested beside it) and the typed, versioned state of a run
+    forbids: [graphql/, http/, message/, schedule/, transport/]
+    tests: unit-beside            # <saga>.saga.service.spec.ts beside the orchestrator; the state machine and its fence are platform/saga's service; each compensation path has an e2e spec
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
+  - id: be.feature.saga.steps
+    profiles: [be]
+    path: "src/features/<feature>/saga/steps/"
+    pattern: saga
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.step.ts"]    # one step, dispatching one command and naming the event it puts on the wire
+    tests: none
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
+  - id: be.feature.saga.compensations
+    profiles: [be]
+    path: "src/features/<feature>/saga/compensations/"
+    pattern: saga
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.compensation.ts"]   # REQUIRED for every step: the command that undoes it, naming the failure event that triggers it
+    tests: none
+    rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
     path: "src/features/<feature>/application/support/"
@@ -731,8 +771,8 @@ slots:
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
-    composedBy: [worker]
-    rules: [BE_BACKGROUND_UNOWNED]
+    composedBy: [api, worker]
+    rules: [BE_BACKGROUND_UNOWNED, BE_SAGA_CONSUMER_DEDUPE]
   - id: be.transport.schedule
     profiles: [be]
     path: "src/features/<feature>/transport/schedule/"
@@ -742,7 +782,7 @@ slots:
     requires: ["<feature>-schedule.module.ts"]
     allows: ["<job>.job.ts"]
     tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   # ----- BE: feature kinds that are not an api: a webhook door and a realtime door. Each kind is a folder of src/features/ named by
   # the kind and holds one folder per provider or channel; a kind imports only modules/* (never another kind) and only an

@@ -11,8 +11,10 @@ import { KeycloakModule } from "@modules/integrations/keycloak"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
 import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
+import { MessagingModule } from "@modules/platform/messaging"
 import {
     cacheOptionsOf,
+    messagingOptionsOf,
     identityApiOptionsOf,
     keycloakAdminOptionsOf,
     keycloakOptionsOf,
@@ -28,6 +30,11 @@ export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 /** The cache client over the run's Redis. */
 export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => CacheModule.register({ isGlobal: true, ...cacheOptionsOf(w) }),
+]
+
+/** The messaging capability over the run's Redis: publisher and consumer registry. */
+export const MESSAGING_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) => MessagingModule.register({ isGlobal: true, ...messagingOptionsOf(w) }),
 ]
 
 /** The password-grant client over the run's realm. */

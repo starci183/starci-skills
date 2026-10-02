@@ -5,8 +5,8 @@ summary: >-
   (src/features/webhooks/<provider>/: <provider>-webhook.module.ts, <provider>.webhook.ts, <provider>.webhook.spec.ts, dto/) and
   be.feature.realtime (src/features/realtime/<channel>/: <channel>-realtime.module.ts, <channel>.gateway.ts or <x>.subscription.ts with its
   spec, dto/), each opt-in through the declared pattern webhooks or realtime (hfs.json sides.be.patterns) with the proof scenarios
-  of ruleParams.be.patternScenarios. The slot be.transport.websocket is deleted (a socket is the realtime kind). New rules R137
-  BE_WEBHOOK_SHAPE, R138 BE_WEBHOOK_UNVERIFIED, R139 BE_REALTIME_SHAPE, R140 BE_REALTIME_WRITES and R141 BE_REALTIME_TOPIC_SCOPE
+  of ruleParams.be.patternScenarios. The slot be.transport.websocket is deleted (a socket is the realtime kind). New rules R148
+  BE_WEBHOOK_SHAPE, R149 BE_WEBHOOK_UNVERIFIED, R150 BE_REALTIME_SHAPE, R151 BE_REALTIME_WRITES and R152 BE_REALTIME_TOPIC_SCOPE
   (eslint-be webhook-shape, webhook-verify-first, realtime-shape, realtime-read-only, realtime-topic-scope; ids provisional,
   renumbered to the next free ids at land). R47 now also accepts the spec of a webhook or realtime door beside its door. The door
   slots answer to the door laws (default deny, bounded input, no envelope) through isTransportSlot, and the one-dispatch shape

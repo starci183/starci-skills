@@ -114,7 +114,7 @@ export const connectionFileOf = (hfs, file, role) => {
 }
 
 /** The platform capabilities that own a `persistence/` and so may hold an `EntityManager`. */
-const PERSISTENCE_CAPABILITIES = ["database", "inbox", "outbox", "lease"]
+const PERSISTENCE_CAPABILITIES = ["database", "inbox", "outbox", "lease", "saga", "event-bus"]
 
 /**
  * Whether a class in this file may receive an `EntityManager`: an application handler, a domain service, a platform persistence capability.

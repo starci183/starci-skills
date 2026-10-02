@@ -46,6 +46,19 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
 | `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |
 | `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
+| `MESSAGING_REDIS_URL` | Redis URL of the queues the order events are published on (secret) | none |
+| `MESSAGING_TIMEOUT` | Deadline of one Redis command of a publisher | `3s` |
+| `MESSAGING_CONCURRENCY` | Messages one consumer handles at the same time (the order api consumes `billing.invoice-rejected`, billing consumes `order.placed`) | `1` |
+
+## billing worker (`apps/billing`)
+
+No listener: it consumes `order.placed` from the Redis queues and writes invoices.
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `BILLING_DB_URL` | Postgres URL of the `billing` connection (secret) | none |
+| `MESSAGING_REDIS_URL`, `MESSAGING_TIMEOUT`, `MESSAGING_CONCURRENCY` | As on the order api | as above |
+| `INVOICE_MAX_TOTAL_MINOR_UNITS` | The largest total one invoice may bill; a larger order is rejected and announced | `50000000` |
 
 ## keycloak (the stack's identity provider)
 

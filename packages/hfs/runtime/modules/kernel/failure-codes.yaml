@@ -252,6 +252,16 @@ BE_APP_COMPOSITION_ONLY:
   owner: op-retry
   kind: check-finding
 
+BE_ASYNC_SPEC_MISSING:
+  title: "Every message consumer and saga has an e2e spec"
+  title_vi: "Consumer hoặc saga chưa có spec e2e"
+  meaning_vi: "Một sự kiện mà ứng dụng tiêu thụ (mục trong `consumes.ts`) không được spec e2e nào gọi `useTestWorld` nêu tên, hoặc (với bước saga, hợp đồng khai báo `compensates`) spec không nêu cả sự kiện được bù trừ."
+  causes_vi:
+    - "Vi phạm luật R141: luồng bất đồng bộ và luồng bù trừ (saga) được chứng minh qua world: phát sự kiện, đọc lại trạng thái đã lưu, thử giao lại; với bước saga, spec chạy cả luồng (bước đầu, lỗi, rồi trạng thái đã bù trừ)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: viết spec e2e `be/src/tests/e2e/<area>/<tên>.e2e-spec.ts` khởi động world, phát sự kiện thật và đọc kết quả (với bước saga: nêu cả sự kiện được bù trừ và đọc trạng thái đã bù trừ)."
+  owner: op-retry
+  kind: check-finding
+
 BE_BACKGROUND_UNOWNED:
   title: "Every sweep, outbox or retry has a job or consumer run by a worker app"
   title_vi: "Việc nền không có ai chạy"
@@ -510,6 +520,46 @@ BE_REQUIRED_MODULE_MISSING:
     - "Tạo module hoặc tính năng mới nhưng quên tệp cửa vào index.ts hoặc tệp .module.ts"
     - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
+  owner: op-retry
+  kind: check-finding
+
+BE_SAGA_CONSUMER_DEDUPE:
+  title: "A saga consumer passes the delivery id on"
+  title_vi: "Consumer của saga không chuyển id lần giao đi tiếp"
+  meaning_vi: "Một `transport/message/<event>.consumer.ts` của feature có saga không đọc `message.eventId` để đưa vào lệnh nó gửi."
+  causes_vi:
+    - "Vi phạm luật R146: saga nhận mọi sự kiện qua inbox (R80), nên consumer phải chuyển khoá chống trùng (id lần giao) cho lệnh."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đưa `message.eventId` vào yêu cầu của lệnh để saga claim qua inbox."
+  owner: op-retry
+  kind: check-finding
+
+BE_SAGA_EVENT_CONTRACT:
+  title: "Every event of a saga step and compensation is in a vendored contract"
+  title_vi: "Sự kiện của bước saga không nằm trong hợp đồng hoặc bù trừ không khớp"
+  meaning_vi: "Một bước hoặc bù trừ không khai `readonly event = \"<tên>\"`, sự kiện đó không có trong `be/contracts/<service>/events.json`, hoặc hợp đồng của sự kiện bù trừ không khai `compensates` đúng sự kiện của bước cùng tên."
+  causes_vi:
+    - "Vi phạm luật R145: mọi sự kiện của saga nằm trong hợp đồng đã vendor, và sự kiện thất bại của một bù trừ nói rõ nó hoàn tác sự kiện của bước nào."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `npm run contract:emit`, và ghi tên sự kiện vào bước/bù trừ."
+  owner: op-retry
+  kind: check-finding
+
+BE_SAGA_STATE_VERSIONED:
+  title: "The persisted state of a saga run carries a version and goes through the fenced store"
+  title_vi: "Trạng thái saga không có phiên bản hoặc không đi qua kho có rào"
+  meaning_vi: "Orchestrator không có `<saga>.saga-state.ts`, kiểu trạng thái xuất ra không khai `status` và `version: number`, hoặc orchestrator không dùng kho có rào của `platform/saga`."
+  causes_vi:
+    - "Vi phạm luật R144: trạng thái một lần chạy saga được lưu cùng phiên bản (rào), mọi chuyển trạng thái nêu phiên bản đã đọc, nên một lần giao lại \"xác sống\" không thể chuyển hai lần."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai kiểu trạng thái có `status` và `version`, và chuyển trạng thái qua `SagaService` của `platform/saga`."
+  owner: op-retry
+  kind: check-finding
+
+BE_SAGA_STEP_COMPENSATION:
+  title: "Every saga step has a compensation and the orchestrator lists them"
+  title_vi: "Bước saga thiếu bù trừ hoặc orchestrator không liệt kê đủ"
+  meaning_vi: "Một bước `saga/steps/<step>.step.ts` không có `saga/compensations/<step>.compensation.ts` (hoặc ngược lại), thư mục saga không có orchestrator `<saga>.saga.ts`, hoặc orchestrator không import đủ mọi bước và mọi bù trừ của thư mục."
+  causes_vi:
+    - "Vi phạm luật R143: mỗi bước tiến của saga có đúng một bù trừ cùng tên; orchestrator liệt kê tất cả, nên không có bước nào chạy mà không có đường lùi."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm bù trừ cho bước (một lệnh hoàn tác) và import nó trong orchestrator; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -1132,6 +1182,17 @@ HFS_EMPTY_DIR:
   owner: op-retry
   kind: check-finding
 
+HFS_EVENT_CONTRACT:
+  title: "The async contract between services is vendored and consumers match it"
+  title_vi: "Hợp đồng sự kiện giữa các dịch vụ không khớp"
+  meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác, hoặc một hàng đợi consumer định nghĩa bằng `defineQueue` không được liệt kê trong bảng `consumes.ts` nào."
+  causes_vi:
+    - "Vi phạm luật R140: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
+    - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `npm run contract:emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
+  owner: op-retry
+  kind: check-finding
+
 HFS_FORBIDDEN_PRESENT:
   title: "Tracked path in a forbidden slot"
   title_vi: "Có tệp bị cấm trong cây mã nguồn"
@@ -1192,6 +1253,16 @@ HFS_HOOKS_PATH_REDIRECTED:
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
   nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_IMAGE_UNPINNED:
+  title: "Every image of a multi-service stack is pinned"
+  title_vi: "Image của stack nhiều dịch vụ chưa được ghim phiên bản"
+  meaning_vi: "Trong `.starcistacks/application-stacks.yaml` của một sản phẩm có từ hai dịch vụ trở lên, một `components.<name>.image` không có tag, dùng `latest`, một từ nhánh hoặc tag chỉ gồm major/minor (ví dụ `postgres:16`), nên image trôi theo thời gian."
+  causes_vi:
+    - "Vi phạm luật R138: image được ghim bằng digest (`@sha256:...`) hoặc phiên bản chính xác `x.y.z`; image của dịch vụ trong repo là `<repo>/<service>:<x.y.z>`, dịch vụ bên thứ ba cũng là image đã ghim."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: ghi tag chính xác hoặc digest vào `image` của thành phần; không dùng tag trôi."
   owner: op-retry
   kind: check-finding
 
@@ -1513,6 +1584,27 @@ HFS_RULE_OFF_WITHOUT_REPLACEMENT:
   causes_vi:
     - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SERVICE_PLACEMENT:
+  title: "A back-end service lives only at be/apps/<service>"
+  title_vi: "Dịch vụ back end nằm ngoài be/apps/<service>"
+  meaning_vi: "Một thư mục có Dockerfile hoặc package.json riêng nằm ngoài `be/apps/<service>/` (và không phải Dockerfile của front end hay package workspace của `fe/packages`), nên nó trở thành một gốc dịch vụ thứ hai bên cạnh `be/` và `fe/`."
+  causes_vi:
+    - "Vi phạm luật R137: mỗi dịch vụ back end là một ứng dụng Nest tại `be/apps/<service>/` dùng chung thư viện `be/src` và một `package.json` duy nhất của app; image của nó được build từ `be/apps/<service>/Dockerfile`."
+    - "Op đã tạo thư mục dịch vụ riêng (ví dụ `services/<name>/` hoặc `be/<name>/`) thay vì thêm ứng dụng dưới `be/apps/`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển dịch vụ vào `be/apps/<service>/` (main.ts, app.module.ts, Dockerfile) và xoá thư mục cũ; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SERVICE_STACK_DECLARATION:
+  title: "Each service app is a service component of the stack"
+  title_vi: "Ứng dụng dịch vụ chưa được khai báo trong stack"
+  meaning_vi: "Một ứng dụng api hoặc worker dưới `be/apps/<service>/` của sản phẩm nhiều dịch vụ không có thành phần `role: service` cùng tên trong `.starcistacks/application-stacks.yaml`."
+  causes_vi:
+    - "Vi phạm luật R139: mọi dịch vụ của sản phẩm nhiều dịch vụ là một thành phần `role: service` của stack (image riêng `<repo>/<service>:<x.y.z>`, build từ Dockerfile của app)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm thành phần cùng tên app (role service, image đã ghim, file compose và cổng của môi trường)."
   owner: op-retry
   kind: check-finding
 

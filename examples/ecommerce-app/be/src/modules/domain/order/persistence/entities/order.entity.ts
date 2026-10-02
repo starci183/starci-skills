@@ -14,7 +14,7 @@ export class OrderEntity {
 
     /** The lifecycle state; a varchar with a CHECK in the migration, not a native enum. */
     @Column({ name: "status", type: "varchar", length: 16 })
-    status!: "confirmed"
+    status!: "confirmed" | "cancelled"
 
     /** The order total in minor units. */
     @Column({ name: "total_minor_units", type: "int" })

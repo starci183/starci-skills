@@ -32,9 +32,17 @@ import {
     RateLimitGuard,
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
+import { EVENT_BUS_ERROR_KINDS, EVENT_BUS_MESSAGES, EventBusModule } from "@modules/platform/event-bus"
 import { LoggingModule } from "@modules/platform/logging"
+import {
+    MESSAGE_PUBLISHER,
+    MESSAGING_ERROR_KINDS,
+    MESSAGING_MESSAGES,
+    MessagingModule,
+} from "@modules/platform/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
-import { CheckoutGraphqlModule } from "@features/checkout"
+import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
+import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
 import type { OrderAppOptions } from "./order.options"
 
@@ -58,6 +66,8 @@ export class AppModule {
                         IDENTITY_API_MESSAGES,
                         ORDER_MESSAGES,
                         RECEIPT_STORAGE_MESSAGES,
+                        MESSAGING_MESSAGES,
+                        EVENT_BUS_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
                 }),
@@ -73,6 +83,8 @@ export class AppModule {
                         CART_ERROR_KINDS,
                         ORDER_ERROR_KINDS,
                         RECEIPT_STORAGE_ERROR_KINDS,
+                        MESSAGING_ERROR_KINDS,
+                        EVENT_BUS_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
                 }),
@@ -83,12 +95,19 @@ export class AppModule {
                     connections: [
                         {
                             ...options.database,
-                            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities],
+                            entities: [
+                                ...catalogEntities,
+                                ...cartEntities,
+                                ...orderEntities,
+                                ...paymentEntities,
+                                ...sagaEntities,
+                            ],
                             migrations: [
                                 ...catalogMigrations,
                                 ...cartMigrations,
                                 ...orderMigrations,
                                 ...paymentMigrations,
+                                ...sagaMigrations,
                             ],
                         },
                     ],
@@ -96,19 +115,23 @@ export class AppModule {
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
+                MessagingModule.register({ isGlobal: true, ...options.messaging }),
+                EventBusModule.register({ isGlobal: true }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),
+                SagaModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
                 ProbesModule.register({
                     isGlobal: true,
                     service: "order",
-                    probes: [DatabaseProbe, IDENTITY_API],
+                    probes: [DatabaseProbe, IDENTITY_API, MESSAGE_PUBLISHER],
                 }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,
+                CheckoutMessageModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

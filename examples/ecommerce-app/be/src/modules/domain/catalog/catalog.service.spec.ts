@@ -56,6 +56,16 @@ describe("CatalogService", () => {
         })
     })
 
+    describe("releaseStock", () => {
+        it("gives the units back with an increment through the caller transaction manager", async () => {
+            const manager = mockEntityManager({ increment: [ProductEntity, { affected: 1 }] })
+
+            await (await build(mockEntityManager())).releaseStock({ manager, productId: "sku-1", quantity: 2 })
+
+            expect(manager.increment).toHaveBeenCalledWith(ProductEntity, { id: "sku-1" }, "stock", 2)
+        })
+    })
+
     describe("reserveStock", () => {
         it("takes the units with a guarded decrement and returns true when a row changed", async () => {
             const manager = mockEntityManager({ decrement: [ProductEntity, { affected: 1 }] })

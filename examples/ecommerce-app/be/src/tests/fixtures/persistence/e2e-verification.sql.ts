@@ -1,9 +1,11 @@
 import { sql } from "@modules/platform/database"
 import type {
     CountRow,
+    InvoiceRow,
     OrderLineRow,
     OrderRow,
     OrderSummaryRow,
+    SagaStateRow,
     PaymentRow,
     PersonRow,
     RowQuery,
@@ -60,6 +62,31 @@ export const PAYMENTS_OF_PERSON: RowQuery<PaymentRow> = {
 /** How many payments one person has ($1 person id). */
 export const PAYMENT_COUNT: RowQuery<CountRow> = {
     text: sql`SELECT count(*)::int AS count FROM payments WHERE person_id = $1`,
+}
+
+/** The invoices of one order ($1 order id): at most one, whatever the redeliveries. */
+export const INVOICES_OF_ORDER: RowQuery<InvoiceRow> = {
+    text: sql`SELECT order_id, status, total_minor_units FROM invoices WHERE order_id = $1 LIMIT 10`,
+}
+
+/** The cancelled order with this id ($1 order id): one row, or none while it is still confirmed. */
+export const CANCELLED_ORDER: RowQuery<OrderSummaryRow> = {
+    text: sql`SELECT status, total_minor_units FROM orders WHERE id = $1 AND status = 'cancelled'`,
+}
+
+/** The state of the place-order saga run of one order ($1 order id). */
+export const PLACE_ORDER_SAGA_STATE: RowQuery<SagaStateRow> = {
+    text: sql`SELECT status, version FROM saga_states WHERE saga = 'place-order' AND correlation_id = $1`,
+}
+
+/** How many invoices the billing database holds for the orders of one person ($1 person id). */
+export const INVOICE_COUNT_OF_PERSON: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM invoices WHERE person_id = $1`,
+}
+
+/** How many events the billing inbox claimed ($1 source). */
+export const INBOX_CLAIM_COUNT: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM inbox_claims WHERE source = $1`,
 }
 
 /** The stock of one product ($1 SKU). */

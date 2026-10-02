@@ -3,9 +3,9 @@ import { machineKit } from './machine-ast.mjs';
 
 /**
  * R46 `background-unowned` (BE_BACKGROUND_UNOWNED, BE-CONVENTION 1.6 and 1.13). Background work is a transport that only
- * a worker app runs:
+ * a worker or api app runs (an api app composes the message transport of its own service; a separate worker is opt-in):
  *
- *   - every job (`*.job.ts`) and consumer (`*.consumer.ts`) is composed by an app of kind `worker`: the file is reachable,
+ *   - every job (`*.job.ts`) and consumer (`*.consumer.ts`) is composed by an app of kind `worker` or `api`: the file is reachable,
  *     through runtime imports, from the root module of some worker app declared in hfs.json; one no worker reaches never runs;
  *   - no scheduler outside `platform/scheduling`: a `@Cron`, `@Interval` or `@Timeout` decorator of `@nestjs/schedule` and a
  *     `setInterval` call are refused everywhere else (platform/scheduling owns the lease, the fencing and the overlap guard);
@@ -52,14 +52,15 @@ export function checkBackgroundUnowned(input) {
     return seen;
   };
 
-  const workerRoots = resolver.repo.apps.filter(app => app.kind === 'worker').map(app => `apps/${app.name}/src/app.module.ts`).filter(rel => graph.files.has(rel));
-  const composed = closure(workerRoots);
+  const rootOf = app => `apps/${app.name}/src/app.module.ts`;
+  const workerRoots = resolver.repo.apps.filter(app => app.kind === 'worker').map(rootOf).filter(rel => graph.files.has(rel));
+  const composed = closure([...workerRoots, ...resolver.repo.apps.filter(app => app.kind === 'api').map(rootOf).filter(rel => graph.files.has(rel))]);
   const background = [...graph.files.values()].filter(file => roleOf(file.rel) && file.tier === 'feature');
   const running = background.filter(file => composed.has(file.rel));
   for (const file of background) {
     if (composed.has(file.rel)) continue;
     const role = roleOf(file.rel);
-    report(file, file.sourceFile, `${file.rel} is a ${role} that no worker app composes${workerRoots.length ? '' : ' (hfs.json declares no worker app)'}; a ${role} runs only when the ${role === 'job' ? 'schedule' : 'message'} module of its feature is imported by the root module of an app of kind worker.`, { role });
+    report(file, file.sourceFile, `${file.rel} is a ${role} that no service app composes${workerRoots.length ? '' : ' (hfs.json declares no worker app)'}; a ${role} runs only when the ${role === 'job' ? 'schedule' : 'message'} module of its feature is imported by the root module of an app of kind worker or api.`, { role });
   }
 
   // Everything a composed job or consumer can reach: its imports, and the files of its own feature (command handlers).

@@ -7,7 +7,7 @@ export interface OrderRow {
     /** The buyer. */
     personId: string
     /** The lifecycle state. */
-    status: "confirmed"
+    status: "confirmed" | "cancelled"
     /** The order total in minor units. */
     totalMinorUnits: number
     /** The ISO currency code. */
@@ -30,6 +30,30 @@ export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     idempotencyKey: null,
     receiptKey: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+})
+
+/** The columns of an order line row. */
+export interface OrderLineRow {
+    /** The line id. */
+    id: string
+    /** The order the line belongs to. */
+    orderId: string
+    /** The SKU. */
+    productId: string
+    /** How many units were sold. */
+    quantity: number
+    /** The unit price captured at confirmation, in minor units. */
+    unitPriceMinorUnits: number
+}
+
+/** An order line row with valid defaults; the spec overrides only what matters. */
+export const orderLineRow = (overrides: Partial<OrderLineRow> = {}): OrderLineRow => ({
+    id: "l-1",
+    orderId: "o-1",
+    productId: "sku-1",
+    quantity: 2,
+    unitPriceMinorUnits: 500,
     ...overrides,
 })
 

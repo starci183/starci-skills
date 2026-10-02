@@ -1,5 +1,5 @@
 /**
- * Twin tests for the realtime kind (R139 `BE_REALTIME_SHAPE`, R140 `BE_REALTIME_WRITES`, R141 `BE_REALTIME_TOPIC_SCOPE`).
+ * Twin tests for the realtime kind (R150 `BE_REALTIME_SHAPE`, R151 `BE_REALTIME_WRITES`, R152 `BE_REALTIME_TOPIC_SCOPE`).
  *
  *   node --test realtime.spec.mjs
  */

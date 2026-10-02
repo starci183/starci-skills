@@ -60,6 +60,37 @@ describe("PaymentService", () => {
         })
     })
 
+    describe("refund", () => {
+        it("marks the captured payment of the order as refunded through the caller transaction manager", async () => {
+            const manager = mockEntityManager({ update: [PaymentEntity, { affected: 1 }] })
+
+            const refunded = await (
+                await build(mockEntityManager(), new FakeClock("2026-02-03T04:05:06.000Z"))
+            ).refund({ manager, orderId: "o-1" })
+
+            expect(refunded).toBe(true)
+            expect(manager.update).toHaveBeenCalledWith(
+                PaymentEntity,
+                { orderId: "o-1", status: "captured" },
+                { status: "refunded" },
+            )
+        })
+
+        it("answers false when no captured payment remained or the driver reports no affected count", async () => {
+            const service = await build(mockEntityManager(), new FakeClock("2026-02-03T04:05:06.000Z"))
+
+            expect(
+                await service.refund({
+                    manager: mockEntityManager({ update: [PaymentEntity, { affected: 0 }] }),
+                    orderId: "o-1",
+                }),
+            ).toBe(false)
+            expect(
+                await service.refund({ manager: mockEntityManager({ update: [PaymentEntity, {}] }), orderId: "o-1" }),
+            ).toBe(false)
+        })
+    })
+
     describe("findByOrder", () => {
         it("returns the payment of the order read with the caller manager when one is given", async () => {
             const own = mockEntityManager()

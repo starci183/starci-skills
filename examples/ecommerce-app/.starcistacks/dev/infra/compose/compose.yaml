@@ -10,3 +10,4 @@ include:
   - minio.yaml
   - identity.yaml
   - order.yaml
+  - billing.yaml

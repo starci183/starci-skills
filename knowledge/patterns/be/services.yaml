@@ -1,0 +1,126 @@
+schema: starci/knowledge-source@1
+id: be.services
+title: Services of one product
+purpose: |-
+  Given a product that runs more than one back-end service, where does a service live, how is a sibling or a third-party service
+  consumed, and how are the calls and messages between services kept honest? Every service is a Nest app at `be/apps/<service>/`
+  of the one repository (shared `be/src` libraries, one package.json, its own Dockerfile and image); a service the product does not
+  own is a pinned image of the stack; the contract between services is vendored under `be/contracts/<service>/`; an async consumer
+  and every saga step (the consumer of a compensating event) are each proven by an e2e spec.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner decision 2026-10-02 (be is a Nest monorepo of be/apps/<service>, each app with its own Dockerfile)
+    - examples/ecommerce-app
+  limitations: |-
+    The checks read the stack declaration, the event tables and their snapshots, the consumes tables, the compensating events of the contracts, the queues the code defines and the e2e
+    spec files. They cannot see whether a spec asserts the right behaviour beyond naming the event and booting the world, nor
+    whether a saga compensates every failure; the e2e run and review do.
+rules:
+  - id: BE-SERVICES-1
+    title: A service lives only at be/apps/<service> and no service imports its sibling
+    kind: mandatory
+    hfsRules: [R137, R142, R139]
+    requirement: |-
+      A back-end service is a Nest app at `be/apps/<service>/` (`main.ts`, `app.module.ts`, its Dockerfile) sharing the `be/src`
+      libraries and the repository's one package.json; a Dockerfile or a package.json of its own anywhere else makes a second
+      service root. In a product with more than one service each api or worker app is a `role: service` component of
+      `.starcistacks/application-stacks.yaml`. One service app never imports a file of another service app: the shared code lives
+      in `be/src`, and services meet through the wire.
+    rationale: |-
+      One repository, one install, one lockfile and one image per service keep a service deployable on its own while every rule of the
+      canon still sees all the code. An import between apps would weld two deployables back into one.
+    cases:
+      - id: case-1
+        when: A new payments service
+        write: 'Add be/apps/payments/{src/main.ts,src/app.module.ts,Dockerfile}, the component `payments` (role service) in application-stacks.yaml and, in a compose file, the service with the pinned image `<repo>/payments:1.0.0`.'
+    verification:
+      automated:
+        - HFS_SERVICE_PLACEMENT
+        - HFS_SERVICE_STACK_DECLARATION
+        - BE_SERVICE_ISOLATION
+      manual:
+        - Confirm the shared code a service needs belongs in be/src, not copied between apps.
+    relatedExamples: []
+  - id: BE-SERVICES-2
+    title: Every image of a multi-service stack is pinned
+    kind: mandatory
+    hfsRules: [R138]
+    requirement: |-
+      In a product with more than one service every component `image` of the stack declaration is a digest (`@sha256:...`) or an
+      exact version (`x.y.z`). An own service image is `<repo>/<service>:<x.y.z>` and is built from `be/apps/<service>/Dockerfile`;
+      a service the product does not own stays a pinned third-party image. No tag, `latest`, a branch word or a major or
+      minor-only tag.
+    rationale: |-
+      A moving tag makes two runs of the same commit different. The world and the deployment read the image from the stack, so the
+      stack is where the version is decided once.
+    cases:
+      - id: case-1
+        when: A third-party database and an own service
+        write: 'components: { postgres: { image: "postgres:16.4@sha256:<digest>" }, billing: { image: "ecommerce-app/billing:1.0.0", role: service } }'
+    verification:
+      automated:
+        - HFS_IMAGE_UNPINNED
+      manual:
+        - Bump a version deliberately, in one change that also rebuilds and republishes the own images.
+    relatedExamples: []
+  - id: BE-SERVICES-3
+    title: The contract between services is vendored and checked against the provider
+    kind: mandatory
+    hfsRules: [R140, R23, R113]
+    requirement: |-
+      A synchronous API keeps its snapshot (`be/contracts/<service>/schema.graphql`, `openapi.json`; R23, R113). The async contract
+      is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
+      and its snapshot `be/contracts/<service>/events.json` (`starci/event-contract@1`), emitted by `npm run contract:emit`. A
+      consumer states what it reads in the literal `CONSUMES` table of `apps/<app>/src/consumes.ts` (service, event, version); each
+      entry must exist in the provider's snapshot at that version, and every queue a consumer defines with `defineQueue` of
+      `platform/messaging` is listed in a consumes table. A breaking change bumps the event version in the provider and
+      fails every consumer that has not followed.
+    rationale: |-
+      The consumer is judged against the provider's committed contract, not against the provider's source, so a change in either is a
+      reviewed diff of one file and a failing check in the other.
+    cases:
+      - id: case-1
+        when: Order publishes order.placed and billing consumes it
+        write: 'be/apps/order/src/events.ts exports EVENTS; be/contracts/order/events.json is emitted from it; be/apps/billing/src/consumes.ts exports CONSUMES = { order: { "order.placed": 1 } }.'
+    verification:
+      automated:
+        - HFS_EVENT_CONTRACT
+        - HFS_CONTRACT_SNAPSHOT_DRIFT
+      manual:
+        - Review the payload fields of a new event version for compatibility with the old consumers.
+    relatedExamples: []
+  - id: BE-SERVICES-4
+    title: An async consumer and every saga step have an e2e spec through the world
+    kind: mandatory
+    hfsRules: [R141, R80]
+    requirement: |-
+      Every event an app consumes (an entry of its `consumes.ts`) is named by an e2e spec, a file
+      `be/src/tests/e2e/<area>/*.e2e-spec.ts` that boots the apps with `useTestWorld`, publishes the event (and redelivers it,
+      the receiver keeping the effect single) and reads the persisted effect back. A saga is a chain of services reacting to each other's events, never an in-process event
+      (BE-CQRS-1): the failure is an event whose contract declares `compensates: "<event>"` and its consumer undoes that step. The
+      spec of such a saga step also names the compensated event and drives the whole flow: the step, the failure, then the
+      compensated state.
+    rationale: |-
+      An asynchronous flow fails between processes: a unit spec of one side proves nothing about delivery, redelivery or the
+      compensation. The world runs the real services and the real queues.
+    cases:
+      - id: case-1
+        when: The consumer of order.placed in the billing app
+        write: 'be/src/tests/e2e/billing/order-placed.e2e-spec.ts publishes order.placed, waits for the invoice, redelivers the event and asserts one invoice.'
+      - id: case-2
+        when: The order service compensates a rejected invoice
+        write: 'be/apps/billing/src/events.ts declares "billing.invoice-rejected" with compensates: "order.placed"; the consumer invoice-rejected.consumer.ts cancels the order; be/src/tests/e2e/order/invoice-rejected.e2e-spec.ts names both events and asserts the cancelled order, the refunded payment and the restored stock.'
+    verification:
+      automated:
+        - BE_ASYNC_SPEC_MISSING
+        - BE_INBOX_DEDUPE_MISSING
+      manual:
+        - Check the spec covers a failed delivery that exhausts its retries, not only the happy path.
+    relatedExamples: []

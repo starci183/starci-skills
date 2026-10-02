@@ -65,3 +65,12 @@ test('a sweep, deliver, reconcile or retry method no composed job or consumer re
   const found = hits(report).filter(item => item.method);
   assert.deepEqual(found.map(item => item.method).sort(), ['deliverReceipts', 'reconcile', 'retryFailed']);
 });
+
+test('a consumer composed by the root module of an api app is not BE_BACKGROUND_UNOWNED: a service runs its own message transport', t => {
+  const report = run(t, {
+    'apps/jobs/src/app.module.ts': "import { Module } from '@nestjs/common';\n@Module({})\nexport class AppModule {}\n",
+    'apps/core/src/main.ts': 'void 0;\n',
+    'apps/core/src/app.module.ts': WORKER_APP,
+  });
+  assert.deepEqual(hits(report).filter(item => item.role), [], JSON.stringify(hits(report), null, 1));
+});

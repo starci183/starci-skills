@@ -6,16 +6,27 @@ import { InjectCatalogService } from "@modules/domain/catalog"
 import type { CatalogService } from "@modules/domain/catalog"
 import { InjectPaymentService } from "@modules/domain/payment"
 import type { PaymentService } from "@modules/domain/payment"
-import { InjectOrderEntityManager } from "@modules/platform/database"
+import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectSagaService } from "@modules/platform/saga"
+import type { SagaService } from "@modules/platform/saga"
+import { InjectLogger } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
+import { OrderPlacedEvent } from "@modules/events/order"
+import { InjectEventBus } from "@modules/platform/event-bus"
+import type { EventBus } from "@modules/platform/event-bus"
 import { ok } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
+import { PLACE_ORDER_SAGA } from "./order.contracts"
+import { OrderLogEvent } from "./order.log-events"
 import type {
     GetBuyerStatusResult,
     BuyerStatusParams,
     FindPlacedOrderParams,
     FindPlacedOrderResult,
+    CancelOrderParams,
+    CancelledOrder,
     PlaceOrderParams,
     PlaceOrderRequest,
     PlacedOrder,
@@ -25,7 +36,7 @@ import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
 import { ReceiptService } from "./receipt.service"
 import type { OrderCountRow, OrderIdRow } from "./persistence/order.rows"
-import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
+import { CANCEL_ORDER_IF_CONFIRMED, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
 @Injectable()
 /**
@@ -41,6 +52,9 @@ export class OrderService {
         @InjectCatalogService() private readonly catalog: CatalogService,
         @InjectPaymentService() private readonly payments: PaymentService,
         private readonly receipts: ReceiptService,
+        @InjectEventBus() private readonly bus: EventBus,
+        @InjectLogger() private readonly logger: Logger,
+        @InjectSagaService() private readonly sagas: SagaService,
     ) {}
 
     /**
@@ -51,7 +65,10 @@ export class OrderService {
         const { personId, idempotencyKey } = request
         if (idempotencyKey !== undefined) {
             const replay = await this.findPlaced({ personId, idempotencyKey })
-            if (replay) return ok(replay)
+            if (replay) {
+                await this.announce(replay, personId)
+                return ok(replay)
+            }
         }
         const lines = await this.cart.list({ personId })
         const products = await this.catalog.byIds({ ids: lines.map((line) => line.productId) })
@@ -62,7 +79,46 @@ export class OrderService {
         )
         // The receipt is archived after the commit: the order never waits on, or fails with, the object storage.
         if (!placed.replayed) await this.receipts.archive(placed.orderId)
+        await this.announce(placed, personId)
         return ok(placed)
+    }
+
+    /**
+     * Tells the billing service about a placed order, after the commit. The event id is the order id, so billing dedupes a
+     * repeat; a replayed confirmation announces again, which repairs an announcement a failed publish lost. A failure is
+     * logged and never fails the order the buyer already holds.
+     */
+    private async announce(placed: PlacedOrder, personId: string): Promise<void> {
+        try {
+            await this.bus.publish(
+                OrderPlacedEvent.create({ orderId: placed.orderId, personId, totalMinorUnits: placed.totalMinorUnits }),
+                this.entityManager,
+            )
+        } catch (cause) {
+            this.logger.error(OrderLogEvent.EventPublishFailed, cause, { orderId: placed.orderId })
+        }
+    }
+
+    /**
+     * Compensates an order whose invoice the billing service rejected, in one transaction: the order is cancelled, the
+     * stock its lines took is released and its payment is refunded. An order that is not confirmed any more (already
+     * cancelled, or unknown) changes nothing, so the redelivery of the rejection is a no-op.
+     */
+    async cancelOrder(params: CancelOrderParams): Promise<CancelledOrder> {
+        const cancelled = await this.entityManager.transaction(async (manager) => {
+            const rows: Array<OrderIdRow> = await manager.query(CANCEL_ORDER_IF_CONFIRMED, [params.orderId])
+            if (toOrderId(rows) === null) return false
+            const lines = await manager.find(OrderLineEntity, {
+                where: { orderId: params.orderId },
+                take: LIST_ROWS_MAX,
+            })
+            for (const line of lines) {
+                await this.catalog.releaseStock({ manager, productId: line.productId, quantity: line.quantity })
+            }
+            await this.payments.refund({ manager, orderId: params.orderId })
+            return true
+        })
+        return { orderId: params.orderId, cancelled }
     }
 
     /** Whether one person has confirmed orders; an unknown person is not an error, no orders is the honest answer. */
@@ -121,6 +177,7 @@ export class OrderService {
             amountMinorUnits: plan.totalMinorUnits,
         })
         await this.cart.clear({ manager, personId })
+        await this.sagas.begin({ manager, saga: PLACE_ORDER_SAGA, correlationId: orderId })
         return {
             orderId,
             status: "confirmed",
