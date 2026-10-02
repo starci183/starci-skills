@@ -12,9 +12,12 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # id-token: write lets the Codecov upload authenticate with GitHub's OIDC token: no repository secret, no silent skip.
+    permissions:
+      contents: read
+      id-token: write
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,9 +35,9 @@ jobs:
         run: npm test -- --ci
       - name: coverage upload
         uses: codecov/codecov-action@v5
-        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
+        if: ${{ !cancelled() }}
         with:
-          token: ${{ env.CODECOV_TOKEN }}
+          use_oidc: true
           files: be/coverage/lcov.info
           disable_search: true
           fail_ci_if_error: true

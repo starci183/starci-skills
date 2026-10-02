@@ -189,8 +189,8 @@ function assertCoverageContract(app) {
   const upload = steps.findIndex((step) => String(step.uses ?? '').startsWith('codecov/codecov-action@'));
   assert.ok(unit >= 0 && upload > unit, 'the coverage upload follows the unit run');
   assert.equal(steps[upload].with.files, LCOV, 'the upload sends the lcov Sonar imports');
-  assert.equal(steps[upload].with.token, '${{ env.CODECOV_TOKEN }}');
-  assert.equal(workflow.jobs.ci.env.CODECOV_TOKEN, '${{ secrets.CODECOV_TOKEN }}');
+  assert.equal(steps[upload].with.use_oidc, true);
+  assert.equal(workflow.jobs.ci.env.CODECOV_TOKEN, undefined);
 }
 
 const edit = (app, file, from, to) => {
