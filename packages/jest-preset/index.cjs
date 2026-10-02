@@ -5,7 +5,8 @@ const { mockEntityManager, fakeTransaction } = require("./entity-manager.cjs")
 const { FakeClock } = require("./clock.cjs")
 const { fakeCache } = require("./cache.cjs")
 const { fakeLock } = require("./lock.cjs")
-const { recordingOutbox } = require("./outbox.cjs")
+const { recordingEventBus } = require("./event-bus.cjs")
+const { recordingQueueOutbox } = require("./queue.cjs")
 const { builder } = require("./builders.cjs")
 const { fakeIds, FakeIds } = require("./ids.cjs")
 
@@ -177,7 +178,8 @@ module.exports = {
   FakeClock,
   fakeCache,
   fakeLock,
-  recordingOutbox,
+  recordingEventBus,
+  recordingQueueOutbox,
   builder,
   fakeIds,
   FakeIds,

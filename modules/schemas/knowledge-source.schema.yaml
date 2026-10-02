@@ -108,6 +108,10 @@ properties:
     type: array
     items:
       $ref: starci/knowledge-rule@1
+  pattern:
+    type: string
+    pattern: ^[a-z][a-z0-9-]*$
+    description: The declared design pattern (hfs.json sides.<side>.patterns) whose platform capability this topic places; hfs add generates a missing capability from its files tree.
   files:
     type: array
     description: The exact file tree a pattern places in a back end. The tree is the one source of the files `hfs add` generates and of the slots and rules that judge them; there is no second list.

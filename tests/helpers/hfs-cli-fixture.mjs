@@ -15,7 +15,7 @@ const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '
 export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
 
 /** An app declaration: the be side of `be` and the fe side of `fe` (hfs.json sides.<side>). */
-export const appOf = ({ be = { apps: [{ name: 'core', kind: 'api' }] }, fe = { apps: [{ name: 'web', kind: 'next' }] }, project = 'demo' } = {}) => ({ hfs: 2, kind: 'app', project, sides: { be, fe } });
+export const appOf = ({ be = { apps: [{ name: 'core', kind: 'api' }] }, fe = { apps: [{ name: 'web', kind: 'next' }] }, project = 'demo' } = {}) => ({ hfs: 2, kind: 'app', project, sides: { be: { kinds: ['api'], ...be }, fe } });
 /** The clean app of most specs: one api app, one Next app. */
 export const APP = appOf();
 /** An app whose fe side holds two Next apps. */

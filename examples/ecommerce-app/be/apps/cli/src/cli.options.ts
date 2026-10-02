@@ -13,6 +13,8 @@ import {
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { eventBusEntities, eventBusMigrations } from "@modules/platform/event-bus"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
+import { jobsEntities, jobsMigrations } from "@modules/platform/jobs"
+import { queueEntities, queueMigrations } from "@modules/platform/queue"
 import { sagaEntities, sagaMigrations } from "@modules/platform/saga"
 
 /** Everything the cli app needs from its environment: every connection with the entities and migrations of its owners. */
@@ -28,7 +30,7 @@ export const identityConnectionOf = (env: EnvSource): DatabaseConnectionOptions 
     migrations: accountMigrations,
 })
 
-/** The order database: the catalog, the carts, the orders and their payments, the place-order saga and the order outbox. */
+/** The order database: the catalog, the carts, the orders and their payments, the place-order saga, the order outbox, the queue outbox and the job table. */
 export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => ({
     ...parseOrderDatabaseConfig(env),
     entities: [
@@ -38,6 +40,8 @@ export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => 
         ...paymentEntities,
         ...sagaEntities,
         ...eventBusEntities,
+        ...queueEntities,
+        ...jobsEntities,
     ],
     migrations: [
         ...catalogMigrations,
@@ -46,6 +50,8 @@ export const orderConnectionOf = (env: EnvSource): DatabaseConnectionOptions => 
         ...paymentMigrations,
         ...sagaMigrations,
         ...eventBusMigrations,
+        ...queueMigrations,
+        ...jobsMigrations,
     ],
 })
 

@@ -60,7 +60,7 @@ $defs:
                       properties:
                         name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
                         envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
-                        owner: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'The api or worker app that owns this bounded context (the connection is the context): only it composes the connection (R160).'}
+                        owner: {type: string, pattern: '^[a-z][a-z0-9-]*$', description: 'The api or worker app that owns this bounded context (the connection is the context): only it composes the connection (R165).'}
                         isolation: {enum: [database, schema], description: 'The context is its own logical database, or its own schema of a shared database (<PREFIX>_SCHEMA); splitting a schema out into a database is an env-only change.'}
           fe:
             allOf:
@@ -86,6 +86,11 @@ $defs:
         type: array
         uniqueItems: true
         items: {type: string, pattern: '^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      kinds:
+        type: array
+        uniqueItems: true
+        description: The trigger kinds of the features this back end holds (api, webhooks, realtime, saga, reactors, jobs, cli); each declared kind has at least one feature, every kind in use is declared, and the patterns and platform capabilities of each kind exist.
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       patterns:
         type: array
         uniqueItems: true

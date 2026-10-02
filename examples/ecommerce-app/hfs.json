@@ -4,6 +4,7 @@
   "project": "ecommerce-app",
   "sides": {
     "be": {
+      "kinds": ["api", "cli"],
       "apps": [
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },

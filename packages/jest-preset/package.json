@@ -1,7 +1,7 @@
 {
   "name": "@starci/jest-preset",
   "version": "2.2.4",
-  "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, per-file 100 coverage of *.service.ts only) and the one shared unit-test double kit: typed mock<T>(), mockEntityManager(), fakeTransaction(), fakeCache(), fakeLock(), recordingOutbox(), FakeClock, fakeIds(), builder() and the Outcome matchers toBeRefused/toSucceedWith.",
+  "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, per-file 100 coverage of *.service.ts only) and the one shared unit-test double kit: typed mock<T>(), mockEntityManager(), fakeTransaction(), fakeCache(), fakeLock(), recordingEventBus(), recordingQueueOutbox(), FakeClock, fakeIds(), builder() and the Outcome matchers toBeRefused/toSucceedWith.",
   "license": "UNLICENSED",
   "private": false,
   "main": "index.cjs",
@@ -39,9 +39,13 @@
       "types": "./lock.d.ts",
       "default": "./lock.cjs"
     },
-    "./outbox": {
-      "types": "./outbox.d.ts",
-      "default": "./outbox.cjs"
+    "./event-bus": {
+      "types": "./event-bus.d.ts",
+      "default": "./event-bus.cjs"
+    },
+    "./queue": {
+      "types": "./queue.d.ts",
+      "default": "./queue.cjs"
     },
     "./builders": {
       "types": "./builders.d.ts",

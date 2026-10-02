@@ -257,7 +257,7 @@ test('explain names the slot, tier, allowed imports and required tests of a path
   assert.equal(owned.slot, 'be.feature.application');
   assert.equal(owned.tier, 'feature');
   assert.deepEqual(owned.owner, { slot: 'be.feature', root: 'be/src/features/api/orders' });
-  assert.deepEqual(owned.allowedImports, ['domain', 'platform', 'integrations', 'package']);
+  assert.deepEqual(owned.allowedImports, ['domain', 'events', 'queues', 'projections', 'platform', 'integrations', 'package']);
   assert.equal(owned.tests, 'none');
 
   const app = explainPath({ repoRoot: dir, input: 'be/apps/core/src/main.ts' });
@@ -307,7 +307,7 @@ test('the CLI: report-only backlog leaves the exit code 0; explain prints what i
   const explained = await cli(['explain', 'be/src/features/api/orders/index.ts', '--repo', dir]);
   assert.equal(explained.code, 0);
   assert.match(explained.out, /be\.feature/);
-  assert.match(explained.out, /may import domain, platform, integrations, package/);
+  assert.match(explained.out, /may import domain, events, queues, projections, platform, integrations, package/);
   assert.equal((await cli(['explain', 'be/src/stray/x.ts', '--repo', dir])).code, 1);
   assert.equal((await cli(['explain', '--repo', dir])).code, 2);
 

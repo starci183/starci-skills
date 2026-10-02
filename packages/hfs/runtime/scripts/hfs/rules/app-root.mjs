@@ -12,6 +12,7 @@ import { eventClassContractFindings, patternSpecFindings } from './event-bus.mjs
 import { feContractFindings } from './fe-contract-documents.mjs';
 import { appFrontendFindings } from './frontend-tree.mjs';
 import { integrationSpecFindings } from './integration-specs.mjs';
+import { kindFindings } from './kinds.mjs';
 import { monorepoFindings } from './monorepo.mjs';
 import { peerIntegrationFindings } from './peer-integrations.mjs';
 import { pipelineFindings } from './pipeline.mjs';
@@ -36,6 +37,7 @@ export function appRootFindings({ repoRoot, files, all, repo, resolver, pins }) 
     ...patternSpecFindings({ repoRoot, files: all, repo }),
     ...serviceFindings({ repoRoot, files: all, repo }),
     ...sagaFindings({ repoRoot, files: all }),
+    ...kindFindings({ files: all, repo }),
     ...integrationSpecFindings({ repoRoot, files: all }),
     ...feContractFindings({ repoRoot, files: all }),
     ...pipelineFindings({ repoRoot, files, pins }),

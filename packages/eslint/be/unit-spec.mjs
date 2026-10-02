@@ -374,7 +374,7 @@ const formOf = (context, node, depth = 0) => {
 }
 
 /** The kit type each double produces, by declared name: what a parameter or a property typed so is a double of. */
-const KIT_TYPES = Object.freeze({ MockEntityManager: "mockEntityManager", FakeCache: "fakeCache", FakeLock: "fakeLock", RecordingOutbox: "recordingOutbox", FakeClock: "FakeClock", FakeIds: "fakeIds", FakeTransaction: "fakeTransaction" })
+const KIT_TYPES = Object.freeze({ MockEntityManager: "mockEntityManager", FakeCache: "fakeCache", FakeLock: "fakeLock", RecordingEventBus: "recordingEventBus", RecordingQueueOutbox: "recordingQueueOutbox", FakeClock: "FakeClock", FakeIds: "fakeIds", FakeTransaction: "fakeTransaction" })
 
 /** The kit double a value's TYPE says it is (a helper parameter typed `MockEntityManager`, `tx.em` of a `fakeTransaction`), or null. */
 const kitDoubleOfType = (context, node, kit) => {

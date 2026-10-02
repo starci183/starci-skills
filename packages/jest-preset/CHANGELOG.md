@@ -9,6 +9,9 @@
 - Changed: the runner reads test-world state protocol 2 only. A missing state file or another protocol fails the run with
   `JEST_PRESET_WORLD_PAIR_MISMATCH`, naming this preset, the test-world that wrote the file and the fix (pin both together per
   knowledge/hfs/canon-pins.yaml); there is no fallback mode.
+## Unreleased
+
+- Removed (breaking): `recordingOutbox()` and the `./outbox` entry, superseded by the event bus and the queue outbox. Added `recordingEventBus()` (the `EventBus` port: `publish(event, tx)`, scripted pending retries, dead letters and one-shot failures) and `recordingQueueOutbox()` (the `QueueOutbox` port: `write(tx, queue, payload)`), each recording whether `tx` was a `fakeTransaction` manager, and the `./event-bus` and `./queue` entries. Contract change `patterns-event-bus`.
 
 ## 2.2.2 - 2026-10-01
 

@@ -13773,3 +13773,25 @@ BE_PROJECTION_SHAPE:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi tên phương thức theo `recompute*`/`get*` (hoặc chuyển logic về domain service), bỏ export entity khỏi `index.ts`, và để reactor hoặc job gọi `recompute*`."
   owner: op-retry
   kind: check-finding
+
+BE_KIND_DECLARATION:
+  title: "The trigger kinds in use are declared, whole and never unused"
+  title_vi: "Loại kích hoạt đang dùng chưa khai báo đủ trong hfs.json"
+  meaning_vi: "`sides.be.kinds` của hfs.json không khớp với các loại feature đang có: thiếu một loại đang dùng, khai báo một loại không có feature nào, thiếu pattern mà loại đó cần, hoặc thiếu platform capability của pattern đó."
+  causes_vi:
+    - "Vi phạm luật R164: mỗi loại chỉ được sinh ra khi dùng đến (không có boilerplate rỗng), và loại nào đang dùng thì hạ tầng platform của nó phải có (jobs cần platform/jobs và platform/queue, reactors cần platform/event-bus)."
+    - "Feature được tạo tay thay vì bằng `hfs add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `hfs add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
+  owner: op-retry
+  kind: check-finding
+
+BE_KIND_EMPTY:
+  title: "A kind folder has members and every member has code"
+  title_vi: "Thư mục loại feature rỗng hoặc thành viên không có mã"
+  meaning_vi: "Một tệp nằm trực tiếp trong `be/src/features/<loại>/` (ví dụ `.gitkeep` hay một feature trùng tên loại), hoặc một thư mục thành viên `<loại>/<tên>/` không có tệp TypeScript nào."
+  causes_vi:
+    - "Vi phạm luật R165: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `hfs add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
+    - "Tạo sẵn thư mục cho loại chưa dùng hoặc đổi tên feature api thành tên một loại."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `hfs add`."
+  owner: op-retry
+  kind: check-finding

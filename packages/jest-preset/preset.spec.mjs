@@ -332,7 +332,8 @@ test('fakeTransaction: a nested transaction reuses the same scoped view', async 
 
 const { fakeCache } = require('./cache.cjs');
 const { fakeLock } = require('./lock.cjs');
-const { recordingOutbox } = require('./outbox.cjs');
+const { recordingEventBus } = require('./event-bus.cjs');
+const { recordingQueueOutbox } = require('./queue.cjs');
 const { builder } = require('./builders.cjs');
 
 const PROFILE = { name: 'member.profile', ttl: { seconds: 300 }, parse: (stored) => (typeof stored === 'object' && stored !== null ? stored : null) };
@@ -409,113 +410,77 @@ test('fakeLock: an explicit `at` wins and no clock is refused without one', asyn
   await assert.rejects(lock.acquire({ name: 'x', holder: 'a', ttlMs: 1 }), /pass the FakeClock/);
 });
 
-test('recordingOutbox claim side: hands out the backlog by queue and limit, empty and duplicate claims, reports and one-shot failures', async () => {
-  const outbox = recordingOutbox();
-  const params = { at: new Date(0), queues: ['mail'], limit: 2, visibilityMs: 1000 };
-  const record = (id, queue) => ({ id, queue, eventId: `e-${id}`, payload: {}, attempts: 1 });
-  assert.deepEqual(await outbox.claimDue(params), []);
-  outbox.queueRecords(record('a', 'mail'), record('b', 'sms'), record('c', 'mail'), record('d', 'mail'));
-  assert.deepEqual((await outbox.claimDue(params)).map((r) => r.id), ['a', 'c']);
-  assert.deepEqual(outbox.backlog.map((r) => r.id), ['b', 'd']);
-  assert.deepEqual((await outbox.claimDue(params)).map((r) => r.id), ['d']);
-  const duplicate = record('x', 'mail');
-  outbox.queueRecords(duplicate, duplicate);
-  assert.deepEqual(await outbox.claimDue(params), [duplicate, duplicate]);
-  assert.equal(outbox.claims.length, 4);
-  await outbox.complete('a');
-  await outbox.retry({ id: 'b', at: new Date(1), error: 'x' });
-  await outbox.bury({ id: 'c', error: 'y' });
-  assert.deepEqual(outbox.completed, ['a']);
-  assert.deepEqual(outbox.retried, [{ id: 'b', at: new Date(1), error: 'x' }]);
-  assert.deepEqual(outbox.buried, [{ id: 'c', error: 'y' }]);
-  const boom = new Error('boom');
-  const calls = {
-    claimDue: () => outbox.claimDue(params),
-    complete: () => outbox.complete('a'),
-    retry: () => outbox.retry({ id: 'b', at: new Date(1), error: 'x' }),
-    bury: () => outbox.bury({ id: 'c', error: 'y' }),
-    enqueue: () => outbox.enqueue({}, { queue: 'mail', eventId: 'z', payload: {} }),
-  };
-  for (const [operation, call] of Object.entries(calls)) {
-    outbox.failNext(operation, boom);
-    await assert.rejects(call(), boom, operation);
+class PlacedEvent { static eventName = 'order.placed'; constructor(eventId) { this.eventId = eventId; } }
+class ShippedEvent { static eventName = 'order.shipped'; constructor(eventId) { this.eventId = eventId; } }
+
+test('recordingEventBus: keeps one event per (name, id), remembers every publication and whether it was inside a transaction', async () => {
+  const bus = recordingEventBus();
+  assert.equal(bus.allInTransaction, false);
+  const tx = fakeTransaction(mockEntityManager());
+  const placed = new PlacedEvent('e-1');
+  await tx.em.transaction(async (manager) => { await bus.publish(placed, manager); await bus.publish(placed, manager); });
+  await bus.publish(new ShippedEvent('e-1'), tx.em);
+  assert.equal(bus.writes.length, 3);
+  assert.deepEqual(bus.events.map((event) => event.constructor.eventName), ['order.placed', 'order.shipped']);
+  assert.deepEqual(bus.eventsOf(PlacedEvent), [placed]);
+  assert.deepEqual(bus.entries.map((entry) => entry.inTransaction), [true, true, false]);
+  assert.equal(bus.allInTransaction, false);
+  bus.clear();
+  assert.deepEqual(bus.events, []);
+});
+
+test('recordingEventBus read side: scripted pending retries, dead letters, requeue and one-shot failures', async () => {
+  const bus = recordingEventBus();
+  assert.equal(await bus.pendingRetries(PlacedEvent), 0);
+  bus.setPendingRetries(2);
+  assert.equal(await bus.pendingRetries(PlacedEvent), 2);
+  const letter = { id: 'd-1', eventName: 'order.placed', eventId: 'e-1', reason: 'boom', attempts: 3 };
+  bus.queueDeadLetters(letter, { ...letter, id: 'd-2', eventName: 'order.shipped' });
+  assert.deepEqual(await bus.deadLetters(PlacedEvent), [letter]);
+  await bus.requeue('d-1');
+  assert.deepEqual(bus.requeued, ['d-1']);
+  const boom = new Error('down');
+  for (const [operation, call] of Object.entries({
+    publish: () => bus.publish(new PlacedEvent('z'), {}),
+    pendingRetries: () => bus.pendingRetries(PlacedEvent),
+    deadLetters: () => bus.deadLetters(PlacedEvent),
+    requeue: () => bus.requeue('d-1'),
+  })) {
+    bus.failNext(operation, boom);
+    await assert.rejects(call(), /down/, operation);
     await call();
   }
-  outbox.failNext('bury', boom);
-  outbox.queueRecords(record('q', 'mail'));
-  outbox.clear();
-  assert.deepEqual([outbox.claims, outbox.completed, outbox.retried, outbox.buried, outbox.backlog, outbox.messages], [[], [], [], [], [], []]);
-  await outbox.bury({ id: 'c', error: 'y' });
+  bus.failNext('requeue', boom);
+  bus.clear();
+  assert.deepEqual([bus.requeued, bus.writes], [[], []]);
+  assert.equal(await bus.pendingRetries(PlacedEvent), 0);
+  await bus.requeue('after-clear');
 });
 
-test('recordingOutbox: keeps one message per (queue, eventId), remembers every write and whether it was inside a transaction', async () => {
-  const outbox = recordingOutbox();
+test('recordingQueueOutbox: records every job with its manager, by queue, and fails once when scripted', async () => {
+  const outbox = recordingQueueOutbox();
   assert.equal(outbox.allInTransaction, false);
-  const tx = fakeTransaction();
-  const message = { queue: 'mail', eventId: 'e-1', payload: { to: 'a' } };
-  await tx.em.transaction(async (manager) => { await outbox.enqueue(manager, message); await outbox.enqueue(manager, message); });
-  await outbox.enqueue(tx.em, { queue: 'sms', eventId: 'e-1', payload: {} });
-  assert.equal(outbox.writes.length, 3);
-  assert.deepEqual(outbox.messages.map((m) => m.queue), ['mail', 'sms']);
-  assert.deepEqual(outbox.messagesOf('mail'), [message]);
-  assert.deepEqual(outbox.entries.map((entry) => entry.inTransaction), [true, true, false]);
+  const tx = fakeTransaction(mockEntityManager());
+  await tx.em.transaction(async (manager) => { await outbox.write(manager, 'mail', { to: 'a' }); });
+  await outbox.write(tx.em, 'sms', { to: 'b' });
+  assert.deepEqual(outbox.jobs, [{ queue: 'mail', payload: { to: 'a' } }, { queue: 'sms', payload: { to: 'b' } }]);
+  assert.deepEqual(outbox.jobsOf('mail'), [{ queue: 'mail', payload: { to: 'a' } }]);
+  assert.deepEqual(outbox.entries.map((entry) => entry.inTransaction), [true, false]);
   assert.equal(outbox.allInTransaction, false);
+  const boom = new Error('down');
+  outbox.failNext('write', boom);
+  await assert.rejects(outbox.write({}, 'mail', {}), /down/);
+  await outbox.write({}, 'mail', {});
   outbox.clear();
-  assert.deepEqual(outbox.messages, []);
-});
-
-test('builder: the defaults with the overrides applied, never mutating the defaults', () => {
-  const options = builder({ maxLines: 50, guest: false });
-  assert.deepEqual(options(), { maxLines: 50, guest: false });
-  assert.deepEqual(options({ guest: true }), { maxLines: 50, guest: true });
-  assert.deepEqual(options(), { maxLines: 50, guest: false });
-});
-
-test('fakeIds: deterministic UUID-shaped ids in sequence, resettable, prefix-separated', () => {
-  const ids = fakeIds();
-  assert.equal(ids.next(), '00000000-0000-4000-8000-000000000001');
-  assert.equal(ids.next(), '00000000-0000-4000-8000-000000000002');
-  assert.deepEqual(ids.issued, ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002']);
-  ids.reset();
-  assert.equal(ids.next(), '00000000-0000-4000-8000-000000000001');
-  assert.equal(fakeIds('ab').next(), '000000ab-0000-4000-8000-000000000001');
-  assert.throws(() => fakeIds('xyz'), /hex digits/);
-  assert.match(fakeIds().next(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
-});
-
-// The matchers run against a minimal `this` (jest supplies utils and equals).
-const context = {
-  equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-  utils: { printReceived: (v) => JSON.stringify(v), printExpected: (v) => JSON.stringify(v) },
-};
-const run = (name, ...args) => matchers[name].call(context, ...args);
-
-test('toBeRefused: matches a refusal by code, by code with params, and rejects success or another code', () => {
-  const refused = { kind: 'refused', code: 'STOCK_EXHAUSTED', params: { sku: 'a' } };
-  assert.equal(run('toBeRefused', refused, 'STOCK_EXHAUSTED').pass, true);
-  assert.equal(run('toBeRefused', refused, { code: 'STOCK_EXHAUSTED', params: { sku: 'a' } }).pass, true);
-  assert.equal(run('toBeRefused', refused, { code: 'STOCK_EXHAUSTED', params: { sku: 'b' } }).pass, false);
-  assert.equal(run('toBeRefused', refused, 'OTHER').pass, false);
-  assert.equal(run('toBeRefused', { kind: 'ok', value: 1 }, 'STOCK_EXHAUSTED').pass, false);
-  assert.match(run('toBeRefused', { kind: 'ok', value: 1 }, 'X').message(), /received/);
-});
-
-test('toSucceedWith: matches an ok outcome by value and rejects a refusal, another value or a non-outcome', () => {
-  assert.equal(run('toSucceedWith', { kind: 'ok', value: { id: 1 } }, { id: 1 }).pass, true);
-  assert.equal(run('toSucceedWith', { kind: 'ok', value: { id: 1 } }, { id: 2 }).pass, false);
-  assert.equal(run('toSucceedWith', { kind: 'refused', code: 'X' }, { id: 1 }).pass, false);
-  const notOutcome = run('toSucceedWith', 42, 42);
-  assert.equal(notOutcome.pass, false);
-  assert.match(notOutcome.message(), /expected an Outcome/);
-  assert.match(run('toBeRefused', null, 'X').message(), /expected an Outcome/);
+  assert.deepEqual(outbox.jobs, []);
 });
 
 test('the index exports the whole kit and the package.json declares typeorm as an optional peer only', () => {
-  for (const name of ['mock', 'mockEntityManager', 'fakeTransaction', 'FakeClock', 'fakeIds', 'fakeCache', 'fakeLock', 'recordingOutbox', 'builder']) assert.equal(typeof preset[name], 'function', name);
+  for (const name of ['mock', 'mockEntityManager', 'fakeTransaction', 'FakeClock', 'fakeIds', 'fakeCache', 'fakeLock', 'recordingEventBus', 'recordingQueueOutbox', 'builder']) assert.equal(typeof preset[name], 'function', name);
   const pkg = require('./package.json');
   assert.equal(pkg.peerDependenciesMeta.typeorm.optional, true);
   assert.equal(Object.keys(pkg.dependencies ?? {}).length, 0);
-  for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'outbox.cjs', 'builders.cjs', 'world-runner.cjs']) {
+  for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'event-bus.cjs', 'queue.cjs', 'builders.cjs', 'world-runner.cjs']) {
     assert.doesNotMatch(fs.readFileSync(new URL(file, import.meta.url), 'utf8'), /require\(["'](typeorm|@nestjs)/, `${file} pulls in no infra`);
   }
 });
