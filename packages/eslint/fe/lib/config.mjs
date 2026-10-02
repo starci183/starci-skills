@@ -1,7 +1,7 @@
 /**
  * The one flat config of a StarCi front end.
  *
- * A repository's `eslint.config.mjs` is a managed file (R05/R16/R17), rendered by `hfs sync` as exactly:
+ * A repository's `eslint.config.mjs` is a managed file (R05/R16/R17), rendered by `starci app sync` as exactly:
  *
  *     import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
  *     export default starciFeConfig({ hfs: loadHfs(import.meta.url) })

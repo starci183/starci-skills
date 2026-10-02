@@ -2,7 +2,7 @@
 //
 // route-plan.mjs emits `edges` [[fromLeg, toLeg], ...] over leg labels
 // (`op` or `op#instance`); define-goal persists them as goals.json
-// opChain.edges and derivedPlan.edges; `api plan` replaces derivedPlan with the
+// opChain.edges and derivedPlan.edges; `starci kernel plan` replaces derivedPlan with the
 // Kernel's plan, whose own edges are required. The runtime keys legs by op id
 // (jobs carry op_id), so this module collapses labels to op ids. A plan without
 // provable edges is refused (plan-edges-missing); there is no linear fallback.

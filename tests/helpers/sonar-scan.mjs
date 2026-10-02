@@ -1,6 +1,6 @@
 // The green proofs a fixture that settles an op attaches: the sonar-local scan summary (knowledge/sonar-gate.yaml
 // enforcedOps), the op loop's gate.json and read-digest.json (knowledge/op-gate.yaml enforcedOps) and the mechanism proofs of
-// knowledge/op-gate.yaml opProofs (the document gate, the test-world and unit run summaries, the hfs lint report, the review
+// knowledge/op-gate.yaml opProofs (the document gate, the test-world and unit run summaries, the starci app lint report, the review
 // defect classes and the release proof). The settle reads what
 // the op attached and refuses a pass without them. These fixtures test other behaviour, so what they attach is the honest
 // "slice meets the gate, READ done" record.

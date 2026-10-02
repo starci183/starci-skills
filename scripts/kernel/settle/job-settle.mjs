@@ -20,7 +20,7 @@
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
-// path as the Kernel's: `api record-checks --checks-file` (the re-run results) then `api settle --verdict pass`, so every
+// path as the Kernel's: `starci kernel record-checks --checks-file` (the re-run results) then `starci kernel settle --verdict pass`, so every
 // refusal of settle (landed proof, cut checks, draw acceptance, handover approval ...) still holds; a refusal hands the
 // job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
 // partial report fails, a blocked or ask report settles blocked, a done report whose RAW re-run is red fails (claim
@@ -35,7 +35,7 @@
 //   - else every check the report declares must claim exit 0 (a *-before/baseline measurement is evidence, not a
 //     verdict, and is skipped), and every one that is a check (not a git/read action)
 //     must be a runtime check the settler can re-run without a shell: node <runtime>/bin/starci.mjs validate ...,
-//     node <runtime>/scripts/checks/<x>.mjs ... (never --fix/--write/--apply), node <runtime>/scripts/work/work-graph.mjs
+//     node <runtime>/scripts/checks/<x>.mjs ... (never --fix/--write/--apply), starci work graph
 //     validate|show|diff ...; each re-run (argv, no shell, cwd = the ledger repo) must exit 0;
 //   - a cut slice (payload.cut) records the two cut checks settle demands: a canon slice (params.canonFamilies) re-runs
 //     canon-scan in-process over its owned paths (cut-slice-postcondition, paths never on a command line) and the
@@ -260,7 +260,7 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
 }
 
 /**
- * Is this reported job green? {green, reason?, detail?, checks?: envelope for api record-checks (null: already recorded), via}
+ * Is this reported job green? {green, reason?, detail?, checks?: envelope for starci kernel record-checks (null: already recorded), via}
  * Seams: rerun (rerunCheck), canon (canonSliceCheck).
  */
 export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env,
@@ -313,7 +313,7 @@ export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
  * - never the exit the worker declared, never a check the Kernel recorded by hand. A declared red that is not
  * re-verifiable is the worker's own admission (declared-check-red, still subject to canon parity). A checker that could
  * not run is unavailable (H7): {green:false, unavailable:true}, never red. A red re-run carries its raw checks
- * envelope, so the settler records it (api record-checks) before it settles the claim overruled.
+ * envelope, so the settler records it (starci kernel record-checks) before it settles the claim overruled.
  */
 async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, record }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
@@ -376,7 +376,7 @@ const jsonOf = (text) => {
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   return a >= 0 && b > a ? parse(t.slice(a, b + 1)) : null;
 };
-/** `node scripts/kernel/cli.mjs <verb> ... --json` as the runtime: {ok, value, error, code} */
+/** `starci kernel <verb> ... --json` as the runtime: {ok, value, error, code} */
 export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
   const r = runNode([API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const value = jsonOf(r.stdout), err = jsonOf(r.stderr);
@@ -417,7 +417,7 @@ export function mechanicalSettleOf(item, verdict) {
   if (['failed', 'partial'].includes(item.outcome)) return { verdict: 'fail' };
   if (['blocked', 'ask'].includes(item.outcome)) return { verdict: 'blocked' };
   if (item.outcome !== 'done' || !RED_REASONS.includes(verdict.reason)) return null;
-  // A parity measurement records its own check_runs; its red is recorded for api settle as one runtime check.
+  // A parity measurement records its own check_runs; its red is recorded for starci kernel settle as one runtime check.
   const checks = verdict.checks?.checks?.length ? verdict.checks
     : { checks: [{ name: verdict.reason, exitCode: 1, command: 'runtime settler (canon parity)', evidence: (verdict.detail ?? []).join('; ').slice(0, 1500) || verdict.reason }] };
   return { verdict: 'fail', checks };
@@ -551,7 +551,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
     }
     try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, dryRun }); }
     catch (error) { out.ok = false; out.errors.push({ step: 'release', error: String(error?.message ?? error).slice(0, 300) }); }
-    // The async settle tail (api settle-tail): a failed or never-started tail run is retried here.
+    // The async settle tail (starci kernel settle-tail): a failed or never-started tail run is retried here.
     if (!dryRun) {
       try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
       // H12: leaked leases and overdue incidents are closed or escalated through their owner, every pass.
@@ -655,7 +655,7 @@ export const tailLockName = (repo, jobId) => `settle-tail-${repoKey(repo)}-${slu
 
 /* ------------------------------------------------------------ callers */
 
-/** The pass right after `api report` files: detached, never blocking the op's own terminal. */
+/** The pass right after `starci kernel report` files: detached, never blocking the op's own terminal. */
 export function startSettlerFor(repo, { workflowId = null, jobId = null, env = process.env } = {}) {
   try {
     const args = [selfFile, '--repo', path.resolve(repo), ...(workflowId ? ['--workflow', workflowId] : []), ...(jobId ? ['--job', jobId] : []), '--json'];

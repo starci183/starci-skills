@@ -24,7 +24,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
 export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify'];
-/** The ops that walk a served stack: `api dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
+/** The ops that walk a served stack: `starci kernel dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
 export const ENV_GATED_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify'];
 /** review.verify modes whose run is a measurement: scripts execute and write reports only (CONTEXT.md). */
 export const MEASUREMENT_MODES = ['lint'];
@@ -107,7 +107,7 @@ const otherNode = (rc, op) => rc && typeof rc.node === 'string' && rc.node.trim(
 /**
  * The failure class of one failed attempt.
  *   report      the filed starci/op-report@1 envelope (may be null: no report)
- *   checks      the kernel-recorded checks of the attempt (api record-checks), else the report's
+ *   checks      the kernel-recorded checks of the attempt (starci kernel record-checks), else the report's
  *   measurement true for a measurement leg (isMeasurementLeg)
  *   prior       the previous attempt of the same lineage: {report, checks} or null
  * Returns {class, reason, stated?}.

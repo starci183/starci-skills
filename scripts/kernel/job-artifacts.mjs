@@ -2,7 +2,7 @@
 // ARCHITECTURE-DB §4.2, §5.2). The bytes are blobs (engine/db/blob.mjs), the index is job_artifacts keyed
 // (attempt_id, name), and nothing is copied into the repository: the old <repo>/.starciwork/kernel-evidence job
 // directory is gone.
-//   - api report files the op's own outputs (report attachments and check outputs, api-lib/report-evidence.mjs);
+//   - starci kernel report files the op's own outputs (report attachments and check outputs, api-lib/report-evidence.mjs);
 //   - indexJobArtifacts, when the job settles, adds what the settler owns: the job's commits as a patch (patch.diff)
 //     and the same diff pre-structured for the status console (patch.json + patch.assets/*, patch-json.mjs), and the
 //     Playwright recordings its uat-slots runs wrote outside the repo (recordings/*: video, trace, screenshots);
@@ -336,7 +336,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
 }
 
 /**
- * The indexed artifacts of a workflow (or one job, or one kind/subkind), read-only, grouped by job: what `api artifacts`
+ * The indexed artifacts of a workflow (or one job, or one kind/subkind), read-only, grouped by job: what `starci kernel artifacts`
  * prints and what ui/server.mjs serves. Each artifact carries its id and sha256 (what a Work record cites) and the
  * harness path of its bytes (/api/blob/<sha256>).
  */

@@ -1,7 +1,7 @@
-// report-evidence.mjs — what `api report` carries besides the envelope (alpha.3, ARCHITECTURE-DB §2.3 row 7, H10).
+// report-evidence.mjs — what `starci kernel report` carries besides the envelope (alpha.3, ARCHITECTURE-DB §2.3 row 7, H10).
 //
 // A worker writes its report and every raw output under its job scratch (op_attempts.scratch_dir), a job-private
-// OS-temp directory outside every repository. api report reads the envelope ONCE, stores it only in `reports`, puts
+// OS-temp directory outside every repository. starci kernel report reads the envelope ONCE, stores it only in `reports`, puts
 // each --attach file and each check's stdoutPath/stderrPath/outputPath in the blob store (redacted when text), indexes
 // them as job_artifacts keyed (attempt_id, name) + report_attachments + check_runs(runner='op'), and then deletes the
 // scratch. Nothing reads a report back from a file after that: the reports row is the only copy.
@@ -61,7 +61,7 @@ export function attachedArgs(argv = process.argv.slice(2)) {
 }
 
 const ATTACH_MAX_FILES = 2000;
-/** Scratch folders api report attaches by itself when present. */
+/** Scratch folders starci kernel report attaches by itself when present. */
 export const AUTO_ATTACH = Object.freeze(['draw-loop', 'captures']);
 /** Every file under a directory (bounded), sorted. */
 function filesUnder(dir, out = []) {

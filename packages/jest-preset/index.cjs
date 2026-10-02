@@ -17,7 +17,7 @@ const { fakeIds, FakeIds } = require("./ids.cjs")
  * controllers and consumers are thin, and helpers called by a service are covered through the service's own spec, so the
  * services and the cli commands under `src` are the whole denominator and every file in it must reach 100 on every metric.
  * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
- * (`sonar.coverage.exclusions` holds every other file, rendered by hfs sync) and its quality gate holds coverage at 100 on those files.
+ * (`sonar.coverage.exclusions` holds every other file, rendered by starci app sync) and its quality gate holds coverage at 100 on those files.
  */
 const COVERAGE_SOURCES = ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts"]
 const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]
@@ -82,7 +82,7 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * The whole jest config of a Nest repository: projects `unit` (colocated `<name>.spec.ts`), `integration`
  * (`src/tests/integration/<capability>/<name>.integration-spec.ts`), `e2e` (`src/tests/e2e/<area>/<name>.e2e-spec.ts`) and
  * `contract` (`src/tests/contract/<provider>/<name>.contract-spec.ts`). It takes no options: the repository's `jest.config.js` is a managed file
- * (R05), rendered by `hfs sync` as `module.exports = require("@starci/jest-preset").starciJestConfig()`.
+ * (R05), rendered by `starci app sync` as `module.exports = require("@starci/jest-preset").starciJestConfig()`.
  *
  * The managed scripts select one project each (`test` = unit, `test:integration`, `test:e2e`, `test:contract`); the
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The

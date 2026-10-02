@@ -67,7 +67,7 @@ test('a ledger lists no live DI, blocker or open work of an ended workflow, keep
     summary: 'a stall the kernel resolved while the workflow ran', by: 'reconciler/workflow',
     idempotencyKey: `progress-stall:${WF_ARCH}:resolved`,
   }, { now: 0 }).di;
-  resolveDecision(seeded, resolved.id, { by: 'kernel', verb: 'api enqueue the retry', now: 1_000 });
+  resolveDecision(seeded, resolved.id, { by: 'kernel', verb: 'starci kernel enqueue the retry', now: 1_000 });
   seeded.write.openIncident({ workflowId: WF_RUN, kind: 'runtime-defect', detail: 'a live incident on the running workflow' });
   toPhase(seeded, WF_ARCH, ['stopped', 'archived']);
   toPhase(seeded, WF_FIN, ['finished']);

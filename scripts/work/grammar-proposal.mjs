@@ -16,7 +16,7 @@
 //
 // A proposal is the owner's to accept, never the drawing worker's and never automatic: interface.draw's draw-review
 // ask lists every proposal of the record (question.grammarProposals, their isolated renders among question.assets), the
-// job's settle records one `grammar-proposal-filed` ledger event per proposal (status proposed), and `api status`
+// job's settle records one `grammar-proposal-filed` ledger event per proposal (status proposed), and `starci kernel status`
 // lists the workflow's open ones as grammarProposals[] until a grammar lane records `grammar-proposal-resolved`.
 //
 //   starci work grammar-proposal list <file|dir>... [--json]     every proposal found, complete or not

@@ -1,4 +1,4 @@
-// api logs — the workflow's typed rows, oldest first; the ledger's events are synced
+// starci kernel logs — the workflow's typed rows, oldest first; the ledger's events are synced
 // first (scripts/kernel/typed-logs.mjs). Split out of cli.mjs (lane slim-04); its help line stays in cli.mjs
 // usage() (usageInCore).
 //

@@ -10,10 +10,10 @@
 //     verdict contract and every schema/check the brief cites, and the admission time;
 //   - a change registered as an entry file under modules/kernel/contract-changes/ names the checks and finding codes it ADDED and
 //     when it took effect; for a leg admitted before it those checks and codes are advisory
-//     suspects (api record-checks annotates them, api settle does not count them red), never refusals;
-//   - a change marked `reach: follow-up` is meant to reach in-flight work: api status lists the
+//     suspects (starci kernel record-checks annotates them, starci kernel settle does not count them red), never refusals;
+//   - a change marked `reach: follow-up` is meant to reach in-flight work: starci kernel status lists the
 //     legs admitted before it as contractFollowUps and the Kernel enqueues a follow-up leg for each
-//     (api enqueue --contract-change <id> --follow-up-of <job>) instead of holding the running one;
+//     (starci kernel enqueue --contract-change <id> --follow-up-of <job>) instead of holding the running one;
 //   - `safetyCritical: true` is the only change that applies to every leg regardless of admission;
 //   - `paths` names the Source files the change edited (knowledge/**, modules/schemas/**): a settled
 //     leg that read one of them before the change reports it as advisory sourceDrift naming the
@@ -27,7 +27,7 @@
 // frozen (modules/kernel/contract-freeze.yaml): a change that governs a frozen family carries a
 // `batch` (explicit, or the family's default for a change landing at/after its `since`), and for a
 // workflow created before the change it takes effect only at a RELEASE - one `contract-release`
-// event (api contract-release --family <op>) naming the changes it releases. Until then:
+// event (starci kernel contract-release --family <op>) naming the changes it releases. Until then:
 //   - a new leg of that workflow is admitted under the frozen set: dispatch records the unreleased
 //     changes as contract.withheld, and the leg is judged as if admitted before them (their checks
 //     and codes advisory, their settle gates off) - for life, like any admission;
@@ -253,7 +253,7 @@ export const carriesChange = (admission, change) => Number.isFinite(admission?.a
 export const admittedBeforeChange = (admission, change) => Boolean(change && !change.safetyCritical && Number.isFinite(admission?.at)
   && (admission.at < change.effectiveAt || strings(admission?.withheld).includes(change.id)));
 
-/** The ids of every change a `contract-release` event of this workflow released (api contract-release). */
+/** The ids of every change a `contract-release` event of this workflow released (starci kernel contract-release). */
 export function releasedChangesOf(db, workflowId) {
   const out = new Map();
   let rows = [];

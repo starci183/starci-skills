@@ -324,7 +324,7 @@ export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) 
   }
   const rj = parse(report.report_json, {}) ?? {};
   return {
-    // title: the workflow's display name (api rename / define-goal), else its goal slug; jobName: the asking
+    // title: the workflow's display name (starci kernel rename / define-goal), else its goal slug; jobName: the asking
     // op job's `<op label> · <what> · <workflow name>` (scripts/lib/display-names.mjs).
     workflowId, dispatchId, opId: report.op_id ?? null, title: workflowNameOf(db, workflowId), jobName: askJobName(db, workflowId, report),
     question: rj.question ?? { text: rj.summary ?? '', options: [] }, closed, serving,

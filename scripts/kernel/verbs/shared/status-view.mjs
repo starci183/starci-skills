@@ -1,4 +1,4 @@
-// _view.mjs — one progress/RCA view per `api status` call, shared by the `progress` and `rca` status fields
+// _view.mjs — one progress/RCA view per `starci kernel status` call, shared by the `progress` and `rca` status fields
 // (scripts/kernel/progress-rca.mjs workflowView). Not a status field itself (a leading `_` is skipped by the loader).
 import path from 'node:path';
 import { workflowView } from '../../progress-rca.mjs';

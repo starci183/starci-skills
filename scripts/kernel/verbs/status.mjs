@@ -1,4 +1,4 @@
-// api status: workflow projection, action frontier, and bounded host reads.
+// starci kernel status: workflow projection, action frontier, and bounded host reads.
 import path from 'node:path';
 import { sameUnit } from '../../../engine/admission.mjs';
 import { runtimeProfile } from '../../../engine/config.mjs';
@@ -58,7 +58,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       autopilotSweepOut = autopilotSweep({ ledger, repo: path.resolve(args.repo ?? process.cwd()), workflowId, settings: autopilotSettingsNow,
         wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
           `autopilot answered ask ${o.dispatchId} (answeredBy autopilot, owner ruling ${AUTOPILOT_RULING}); receipt ${o.receiptPath}.`,
-          'Re-read canonical api status now and run nextActions: re-enqueue the asking op --retry-of its job so it applies the receipt.'] }) });
+          'Re-read canonical starci kernel status now and run nextActions: re-enqueue the asking op --retry-of its job so it applies the receipt.'] }) });
     } catch (error) { autopilotSweepOut = { on: true, errors: [{ error: String(error?.message ?? error).slice(0, 300) }], answered: [], deferred: [], rerouted: [], timedOut: [], supplied: [] }; }
   }
   const byStatus = {};
@@ -110,7 +110,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });
   const slots = opSlotAdmission(db, workflowId);
   const rtDoc = runtimeProfile();
-  // Pool load fleet-wide - the same count `api route` reasons with (poolLoadOf), so status and route agree.
+  // Pool load fleet-wide - the same count `starci kernel route` reasons with (poolLoadOf), so status and route agree.
   const poolLoad = poolLoadOf(db, { now });
   const ownerGates = openOwnerGates(db, workflowId);
   const peerWaits = openPeerWaits(db, workflowId);
@@ -254,7 +254,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // idle on one, and nothing woke it because the frontier read engaged).
   const settleOwed = [...new Set(reports.filter((report) => report.consumed_at && report.job_id).filter((report) => {
     const row = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(report.job_id);
-    // A filed report moves its job to reported (api report); a job still running/answering has a
+    // A filed report moves its job to reported (starci kernel report); a job still running/answering has a
     // report filed on it by settle's fallback or an older path.
     return row && ['running', 'answering', 'reported'].includes(row.status);
   }).map((report) => report.job_id))];
@@ -263,7 +263,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // holds a queued job (nivo wf-nivo-app-auth-mudqjob3: op-backend.implement-86ff31372a's cut-closing
   // settle waited on wf-nivo-workspace-provision-mudqjokb's commit under peer-wait inc-9f2e1e7ff1f6,
   // while status read settle-ready ACTIONABLE and the watchdog re-woke the Kernel every tick for
-  // nothing). Resolving the wait (api incident --resolve, or the peer's message for --until-message)
+  // nothing). Resolving the wait (starci kernel incident --resolve, or the peer's message for --until-message)
   // makes it settle-ready again, which is actionable and wakes the Kernel.
   const settleReady = [], heldSettle = [];
   for (const jobId of settleOwed) {
@@ -272,10 +272,10 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     const wait = row && !gate ? ownerGateOf(peerWaits, row) : null;
     if (gate) {
       heldSettle.push({ jobId, opId: row.op_id ?? null, attempt: row.attempt, heldBecause: 'owner-gate', blockedBy: { incident: gate.incidentId },
-        detail: `owner-gate incident ${gate.incidentId} holds its settle; the Kernel resolves it (api incident --resolve) once the owner's step lands, then checks and settles` });
+        detail: `owner-gate incident ${gate.incidentId} holds its settle; the Kernel resolves it (starci kernel incident --resolve) once the owner's step lands, then checks and settles` });
     } else if (wait) {
       heldSettle.push({ jobId, opId: row.op_id ?? null, attempt: row.attempt, heldBecause: PEER_WAIT, blockedBy: { incident: wait.incidentId, peer: wait.peer },
-        detail: `peer-wait incident ${wait.incidentId} holds its settle until peer ${wait.peer} lands what it waits on (${wait.detail.slice(0, 160)}); a peer message from ${wait.peer} wakes the Kernel${wait.untilMessage ? ' and resolves the wait' : ', which resolves it (api incident --resolve) once the proof holds'}, then checks and settles` });
+        detail: `peer-wait incident ${wait.incidentId} holds its settle until peer ${wait.peer} lands what it waits on (${wait.detail.slice(0, 160)}); a peer message from ${wait.peer} wakes the Kernel${wait.untilMessage ? ' and resolves the wait' : ', which resolves it (starci kernel incident --resolve) once the proof holds'}, then checks and settles` });
     } else settleReady.push(jobId);
   }
   // A held settle's worker has nothing left to do: its report is consumed and only the wait holds the
@@ -300,7 +300,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   }
   const waitHeld = waitHeldOperations(queued, heldSettle, parkedBehind);
   const parkedDependants = queued.filter((item) => item.parkedBehind && (item.parkedBehind.settle || item.parkedBehind.heldBecause === PEER_WAIT));
-  // An allowlisted host dialog (worker.gateAutoAnswer) is nudge-ready too: api nudge answers it.
+  // An allowlisted host dialog (worker.gateAutoAnswer) is nudge-ready too: starci kernel nudge answers it.
   const nudgeReadyWorkers = workers.filter((worker) => (['turn-idle', 'live-idle', 'staged-input'].includes(worker.liveness)
       || (worker.liveness === 'interactive-gate' && worker.gateAutoAnswer && !worker.gateAutoAnswer.loop))
     && !reports.some((report) => report.job_id === worker.jobId));
@@ -313,20 +313,20 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // handle a live Orca no longer knows - every terminal after a host reboot)
   // has no worker left to file its report. Without this it read 'engaged' and
   // nothing ever woke the Kernel. A filed report takes the transition/settle
-  // states above instead; api reconcile --dead-worker recovers the rest.
+  // states above instead; starci kernel reconcile --dead-worker recovers the rest.
   const deadWorkers = workers.filter((worker) => DEAD_WORKER_LIVENESS.includes(worker.liveness)
     && ['running', 'answering', 'leased'].includes(worker.ledgerStatus)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker that asked its coordinator through `orca orchestration ask` waits
-  // on the Kernel until `api reply` answers (inc-b944cbaef24b). Every status
+  // on the Kernel until `starci kernel reply` answers (inc-b944cbaef24b). Every status
   // drains the workflow's Runs into the ledger first (orchestration check, then
   // the ledger write, then --ack: api-lib/messages.mjs), so the questions it
   // projects are the ledger's. A finished workflow has no worker left to ask.
   const drained = wf.phase === 'finished' ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
   const workerAsks = { pending: workerQuestionsOf(db, workflowId).pending, error: drained.error };
   const workerQuestions = workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt }));
-  // A peer workflow's pending message (api notify, or the enqueue overlap
-  // heads-up) waits on this Kernel until it reads api inbox and acks it. It
+  // A peer workflow's pending message (starci kernel notify, or the enqueue overlap
+  // heads-up) waits on this Kernel until it reads starci kernel inbox and acks it. It
   // ranks below the reports, settles and blocked workers already in flight.
   const peerMessages = wf.phase === 'finished' ? []
     : pendingPeerMessagesOf(db, workflowId).map(({ key, from, kind, subject, at }) => ({ key, from, kind, subject, at }));
@@ -366,7 +366,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     : wf.phase === 'running' && (approvalOwner.length > 0 || credentialWait || ownerGates.some((gate) => gate.kind !== SUPERVISOR_GATE)) ? 'awaiting-owner'
     // Autopilot: a supervisor-gate is the Supervisor's step; the Kernel has nothing to move until it resolves.
     : wf.phase === 'running' && ownerGates.length > 0 ? 'supervisor-wait'
-    // A typed wait on a peer workflow (api incident --kind peer-wait): the next approved step cannot
+    // A typed wait on a peer workflow (starci kernel incident --kind peer-wait): the next approved step cannot
     // pass its preflight until the peer lands something, so the peer's message, not the watchdog,
     // wakes the Kernel. Never orphaned-frontier: that re-woke the Kernel for nothing.
     : wf.phase === 'running' && peerWaits.length > 0 ? 'peer-wait'
@@ -456,35 +456,35 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     queued,
     queuedCauses,
     reason: frontierState === 'ask-reserve' || (askReserve.length > 0 && !['transition-ready', 'settle-ready', 'worker-dead', 'worker-nudge-ready', 'worker-wedged', 'peer-message', 'handover-answered', 'finish-ready'].includes(frontierState))
-      ? `unanswered ask(s) ${askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with api serve-ask --workflow <id> --dispatch <id> before yielding`
+      ? `unanswered ask(s) ${askReserve.join(', ')} never reached the owner (not notified on Telegram, and no live form: never served, or the serve-ask ttl expired); park each with starci kernel serve-ask --workflow <id> --dispatch <id> before yielding`
       : frontierState === 'worker-question'
-      ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked or escalated to the coordinator through Orca and wait for the answer; run api questions, then api reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
+      ? `${workerQuestions.map((item) => `${item.jobId} (${item.messageId})`).join(', ')} asked or escalated to the coordinator through Orca and wait for the answer; run starci kernel questions, then starci kernel reply --message <id> --body <answer> for a technical answer inside the job's authority, or --to-owner when it needs the owner (the worker then files outcome ask and serve-ask carries it)`
       : frontierState === 'settle-ready'
-      ? `${settleReady.join(', ')} filed a report you consumed but never settled; run api record-checks and api settle for each before yielding`
+      ? `${settleReady.join(', ')} filed a report you consumed but never settled; run starci kernel record-checks and starci kernel settle for each before yielding`
       : frontierState === 'worker-dead'
-      ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} read running but their worker can never file a report; run api reconcile --job <id> --dead-worker --settle-failed for each (the watchdog does it on its next tick)`
+      ? `${deadWorkers.map((worker) => `${worker.jobId} (${worker.liveness})`).join(', ')} read running but their worker can never file a report; run starci kernel reconcile --job <id> --dead-worker --settle-failed for each (the watchdog does it on its next tick)`
       : frontierState === 'worker-wedged'
-      ? `${wedgedWorkers.map((worker) => (worker.liveness === 'gate-loop' ? `${worker.jobId} (gate-loop: host dialog ${worker.gateAutoAnswer?.gate ?? worker.gate} back after ${worker.gateAutoAnswer?.answers} answers)` : worker.jobId)).join(', ')} wedged (one silent command past the wedge threshold, or a host dialog back after its answers); nudge refuses them - run api reconcile --job <id> --dead-worker --settle-failed for each`
+      ? `${wedgedWorkers.map((worker) => (worker.liveness === 'gate-loop' ? `${worker.jobId} (gate-loop: host dialog ${worker.gateAutoAnswer?.gate ?? worker.gate} back after ${worker.gateAutoAnswer?.answers} answers)` : worker.jobId)).join(', ')} wedged (one silent command past the wedge threshold, or a host dialog back after its answers); nudge refuses them - run starci kernel reconcile --job <id> --dead-worker --settle-failed for each`
       : frontierState === 'peer-message'
-      ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read api inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with api notify --kind reply --reply-to <key>), then ack each with api inbox --ack <key> --disposition <what you did> before yielding`
+      ? `${peerMessages.length} peer message(s) wait on you (${peerMessages.map((message) => `${message.key} ${message.kind} from ${message.from}`).join(', ')}); read starci kernel inbox --workflow <id>, act on each (a request in your scope becomes work, a heads-up adjusts your plan, answer with starci kernel notify --kind reply --reply-to <key>), then ack each with starci kernel inbox --ack <key> --disposition <what you did> before yielding`
       : ['handover-answered', 'finish-ready', 'handover-due'].includes(frontierState)
       ? handoverReason(handover, workflowId)
       : frontierState === 'awaiting-owner'
-      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram behind a Generate URL button (an approval ask in the chat, a credential ask in the /creds list; the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or api incident --resolve wakes the Kernel`
+      ? `no operation is open and the owner holds ${[pendingOwner.length ? `${pendingOwner.length} unanswered ask(s) (${pendingOwner.map((item) => item.dispatchId).join(', ')})` : null, ownerGates.length ? `owner-gate incident(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')}` : null].filter(Boolean).join(' and ')}${heldSettleText(heldSettle)}${askOnDemand.length ? `; ${askOnDemand.join(', ')} ${askOnDemand.length === 1 ? 'is' : 'are'} on Telegram behind a Generate URL button (an approval ask in the chat, a credential ask in the /creds list; the form is served when the owner presses it; nothing to re-serve)` : ''}; the answer or starci kernel incident --resolve wakes the Kernel`
       : frontierState === 'supervisor-wait'
       ? `no operation the Kernel can move: supervisor-gate(s) ${ownerGates.map((gate) => gate.incidentId).join(', ')} hold what is left (autopilot, owner ruling ${AUTOPILOT_RULING}); the Supervisor fixes or decides the retry and resolves --by supervisor, which wakes the Kernel - never ask the owner`
       : frontierState === 'peer-wait' || deadPeerWaits.length > 0
       ? (deadPeerWaits.length
-        ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (api incident --resolve) and continue, or raise what is still missing`
-        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}${parkedDependants.length ? `; queued behind the wait: ${parkedDependants.map((item) => `${item.jobId} (after ${item.parkedBehind.via})`).join(', ')}` : ''}; a peer message from the awaited peer (api notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (api incident --resolve) once its proof holds'}`)
+        ? `peer-wait ${deadPeerWaits.map((wait) => `${wait.incidentId} on ${wait.peer} (${wait.peerPhase})`).join(', ')} can no longer be met: the peer is not running; re-check the prerequisite yourself, then resolve the wait (starci kernel incident --resolve) and continue, or raise what is still missing`
+        : `no operation the Kernel can move: ${peerWaits.map((wait) => `peer-wait ${wait.incidentId} waits on ${wait.peer}${wait.holds.length ? ` (holds ${wait.holds.join(', ')})` : ''}: ${wait.detail.slice(0, 160)}`).join('; ')}${heldSettleText(heldSettle)}${parkedDependants.length ? `; queued behind the wait: ${parkedDependants.map((item) => `${item.jobId} (after ${item.parkedBehind.via})`).join(', ')}` : ''}; a peer message from the awaited peer (starci kernel notify) wakes the Kernel${peerWaits.every((wait) => wait.untilMessage) ? ' and resolves the wait' : '; resolve the wait (starci kernel incident --resolve) once its proof holds'}`)
       : frontierState === 'next-ready'
       ? `no operation is open and the ledger names the next steps: ${graph.nextActions.filter((action) => NEXT_ACTION_MOVES.includes(action.kind)).map(nextActionLabel).join('; ')}; run nextActions in order before yielding${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'orphaned-frontier' && peerWaitMovable.length
       ? `peer-wait ${peerWaits.map((wait) => wait.incidentId).join(', ')} holds only ${[...peerHeldOps].join(', ')} (the runtime releases it itself; never resolve it by hand); the approved legs ${peerWaitMovable.join(', ')} are not held: enqueue and dispatch them now in plan order`
       : frontierState === 'orphaned-frontier'
-      ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
+      ? `workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as starci kernel incident --kind peer-wait --peer <workflowId>, never left orphaned${credentialAsks.length ? `; credential ask(s) ${credentialAsks.join(', ')} hold only the live-proof legs: enqueue ${mainLineOwed.join(', ')} now with placeholder values (credentialPending)` : ''}`
       : frontierState === 'worker-nudge-ready'
-        ? 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; Kernel must call api nudge for each listed job now (a staged paste gets one Enter, an allowlisted dialog gets its card answer)'
+        ? 'one or more exact running workers are at an idle provider prompt, hold an unsubmitted paste in their input row, or wait on a host dialog their agent card allowlists, without a report; Kernel must call starci kernel nudge for each listed job now (a staged paste gets one Enter, an allowlisted dialog gets its card answer)'
       : actionable && readyOperations > 0
         ? 'queued or fenced operations are waiting on the Kernel; route/dispatch or reconcile them before yielding'
       : staleReady.length > 0
@@ -494,7 +494,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   };
   // Follow-up legs a contract change owes ride on whatever the frontier says: they are enqueued, never waited for.
   if (contractFollowUps.length > 0) {
-    frontier.reason = `${frontier.reason ? `${frontier.reason}; also, ` : ''}contract change(s) meant to reach in-flight work owe follow-up legs: ${contractFollowUps.map((item) => `${item.followUpOp} for ${item.jobId} (${item.op} a${item.attempt}, ${item.change})`).join(', ')}; enqueue each with api enqueue --op <followUpOp> --contract-change <change> --follow-up-of <jobId>${contractFollowUps.some((item) => item.after) ? ' (--after <jobId> while it still runs)' : ''} - never hold the running leg`;
+    frontier.reason = `${frontier.reason ? `${frontier.reason}; also, ` : ''}contract change(s) meant to reach in-flight work owe follow-up legs: ${contractFollowUps.map((item) => `${item.followUpOp} for ${item.jobId} (${item.op} a${item.attempt}, ${item.change})`).join(', ')}; enqueue each with starci kernel enqueue --op <followUpOp> --contract-change <change> --follow-up-of <jobId>${contractFollowUps.some((item) => item.after) ? ' (--after <jobId> while it still runs)' : ''} - never hold the running leg`;
   }
   // Typed release conditions still pending, what this status released, and the jobs of this workflow
   // other workflows wait on (gate-conditions.mjs, waiter-priority.mjs).
@@ -522,7 +522,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     const takenUp = Number(db.prepare("SELECT MAX(created_at) AS at FROM jobs WHERE workflow_id=? AND op_id=?").get(workflowId, DRAW_REVIEW_OP)?.at ?? 0) > answeredAt;
     if (takenUp || graph.nextActions.some((a) => a.op === DRAW_REVIEW_OP && ['retry', 'dispatch'].includes(a.kind) && (!entry.redrawOwed.jobId || a.jobId === entry.redrawOwed.jobId))) continue;
     graph.nextActions.push({ kind: 'retry', op: DRAW_REVIEW_OP, jobId: entry.redrawOwed.jobId ?? null,
-      reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): api enqueue --op ${DRAW_REVIEW_OP}${entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : ''} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` });
+      reason: `the owner asked for a redraw of ${entry.record} in ask ${entry.redrawOwed.dispatchId} (${entry.redrawOwed.notes.length} note(s)): starci kernel enqueue --op ${DRAW_REVIEW_OP}${entry.redrawOwed.jobId ? ` --retry-of ${entry.redrawOwed.jobId}` : ''} - the packet carries the answer (context.owner_answers); the redraw must address every note (draw-feedback.mjs brief)` });
   }
   // LOG_TYPED_MISSING warnings (typed-logs.mjs typedLogGaps): op jobs that settled without the typed rows they owed.
   const logTypedMissing = typedLogWarningsOf(db, workflowId);
@@ -531,10 +531,10 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   if (typedUnmeetable.length) {
     frontier.actionable = true;
     frontier.gateConditionsUnmeetable = typedUnmeetable.map((incident) => incident.incidentId);
-    frontier.reason = [frontier.reason, `typed wait ${typedUnmeetable.map((incident) => `${incident.incidentId} (${incident.unmeetable.join('; ')})`).join(', ')} can no longer be met on its own; re-check the prerequisite, then re-point the wait (api incident --attach <id> --until-...) or resolve it (api incident --resolve) and continue`].filter(Boolean).join('; ');
+    frontier.reason = [frontier.reason, `typed wait ${typedUnmeetable.map((incident) => `${incident.incidentId} (${incident.unmeetable.join('; ')})`).join(', ')} can no longer be met on its own; re-check the prerequisite, then re-point the wait (starci kernel incident --attach <id> --until-...) or resolve it (starci kernel incident --resolve) and continue`].filter(Boolean).join('; ');
   }
   // Open cut sets and which ordinal's pass closes each: that pass is the one
-  // `api settle` holds to full-regression-final, so the Kernel runs the whole-set
+  // `starci kernel settle` holds to full-regression-final, so the Kernel runs the whole-set
   // integration gate before it (inc-751dd1ac4492). A set with one open ordinal
   // names it; ordinals settle out of order, so it need not be the highest.
   const cutSets = [];
@@ -613,7 +613,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   }
   if (newestWhy) frontier.why = { headline: newestWhy.headline, op: newestWhy.op, state: newestWhy.state, next: newestWhy.next, owner: newestWhy.owner, attemptId: newestWhy.attemptId };
   const kernelNotes = kernelNotesOf(db, workflowId);
-  // The owner's "test later" list: every leg the config.yaml specs switches deferred (api run-deferred-tests runs them).
+  // The owner's "test later" list: every leg the config.yaml specs switches deferred (starci kernel run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);
   const testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
   const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, testsDeferred, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
@@ -630,8 +630,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       ...(kernel ? [`  kernel: attempt ${kernel.attempt} on ${kernel.terminal ?? '-'} (${kernel.launch ?? '-'} by ${kernel.launchedBy ?? '-'}${kernel.launchedAt ? ` at ${kernel.launchedAt}` : ''})${kernel.you ? ' — this is your terminal' : ''}`] : []),
       ...(kernelRev ? [`  kernel rev: acked ${shortRev(kernelRev.acked) ?? 'none'} current ${shortRev(kernelRev.current) ?? '-'}${kernelRev.stale ? ` STALE (${kernelRev.full ? 're-read kernel-prompt.md and driver-loop.yaml in full' : `${kernelRev.fileCount} file(s)${kernelRev.changes.length ? `, ${kernelRev.changes.length} contract change(s)` : ''}`})` : kernelRev.unacked ? ' (never acked)' : ''}`] : []),
       ...opRevDriftWarnings.map((w) => `  warn ${OP_REV_DRIFT}: ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}`),
-      ...runningRevDrift.map((w) => `  warn ${OP_REV_DRIFT} (running): ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}; it is judged by its admission${w.advisoryChanges.length ? ` (${w.advisoryChanges.join(', ')} advisory for it)` : ''} - api nudge --job ${w.jobId} carries the notice when its worker is idle`),
-      ...(frozenContract.length ? [`  contract-frozen: ${frozenContract.map((c) => c.id).join(', ')} (batch ${[...new Set(frozenContract.map((c) => c.batch))].join(', ')}) - withheld from new legs here and owing no follow-up until the Supervisor runs api contract-release --family <op>`] : []),
+      ...runningRevDrift.map((w) => `  warn ${OP_REV_DRIFT} (running): ${w.jobId} (${w.op} a${w.attempt ?? '-'}) dispatched at ${shortRev(w.from)}, its op contract changed by ${shortRev(w.to)}: ${(w.files ?? []).slice(0, 5).join(', ')}; it is judged by its admission${w.advisoryChanges.length ? ` (${w.advisoryChanges.join(', ')} advisory for it)` : ''} - starci kernel nudge --job ${w.jobId} carries the notice when its worker is idle`),
+      ...(frozenContract.length ? [`  contract-frozen: ${frozenContract.map((c) => c.id).join(', ')} (batch ${[...new Set(frozenContract.map((c) => c.batch))].join(', ')}) - withheld from new legs here and owing no follow-up until the Supervisor runs starci kernel contract-release --family <op>`] : []),
       ...outageCircuits.map((c) => `  outage-circuit: ${c.provider} (${c.failureKind}) opened from ${c.jobId}'s screen (${c.match}) until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : 'explicit recovery'}`),
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
@@ -642,7 +642,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       ...(stuck.length ? [`  stuck: ${stuck.length} wait(s), ${stuckPast.length} past SLA (${stuckPast.filter((item) => item.severity === 'critical').length} critical)`] : []),
       ...stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
       ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}${leg.deferred ? '(deferred)' : ''}`).join(' ')}`] : []),
-      ...(testsDeferred.jobs.length || testsDeferred.planned.length ? [`  tests deferred (${testsDeferred.off.length ? `owner config.yaml specs ${testsDeferred.off.map((kind) => `${kind}=false`).join(' ')}` : 'specs switches on'}; explicit-ask-only legs such as integration.verify wait for an ask): ${[...testsDeferred.jobs.map((item) => `${item.jobId} ${item.op} (${item.reason})`), ...testsDeferred.planned.map((item) => `${item.op} planned (${item.reason})`)].join('; ')} - api run-deferred-tests --workflow ${workflowId} [--kind unit|e2e|integration] runs them`] : []),
+      ...(testsDeferred.jobs.length || testsDeferred.planned.length ? [`  tests deferred (${testsDeferred.off.length ? `owner config.yaml specs ${testsDeferred.off.map((kind) => `${kind}=false`).join(' ')}` : 'specs switches on'}; explicit-ask-only legs such as integration.verify wait for an ask): ${[...testsDeferred.jobs.map((item) => `${item.jobId} ${item.op} (${item.reason})`), ...testsDeferred.planned.map((item) => `${item.op} planned (${item.reason})`)].join('; ')} - starci kernel run-deferred-tests --workflow ${workflowId} [--kind unit|e2e|integration] runs them`] : []),
       ...(workGraph ? [`  work graph v${workGraph.version}: ${Object.entries(workGraph.counts).map(([color, n]) => `${color}:${n}`).join(' ')}; runnable ${workGraph.frontier.map((node) => node.id).join(', ') || '-'}`] : []),
       ...graph.nextActions.map((action, index) => `  next ${index + 1}: ${nextActionLabel(action)} — ${action.reason}`),
       ...(frontier.ownerGatesNotOwnerWork ?? []).map((g) => `  lint owner-gate-not-owner-work: ${g.incidentId} says "${g.marker}" - not the owner's step; a runtime defect goes to the supervisor as --kind source-runtime-defect (the gate only holds jobs), and it resolves --by kernel|supervisor`),
@@ -655,8 +655,8 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       ...workerQuestions.map((item) => `  worker-question: ${item.messageId} ${item.jobId} (${item.opId} a${item.attempt}): ${item.question}${item.options?.length ? ` [${item.options.join(' | ')}]` : ''}`),
       ...peerMessages.map((message) => `  peer-message: ${message.key} from ${message.from} [${message.kind}] ${message.subject}`),
       ...peerWaits.map((wait) => `  peer-wait: ${wait.incidentId} on ${wait.peer} (${wait.peerPhase})${wait.holds.length ? ` holds ${wait.holds.join(', ')}` : ''}${wait.untilMessage ? ' until-message' : ''}${wait.untilLanded ? ` until-landed ${wait.untilLanded}` : ''} — ${wait.detail.slice(0, 160)}`),
-      ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait; worker ${item.worker}${item.worker === 'held' ? ` (release it: api reconcile --job ${item.jobId} --release-worker)` : ''}`),
-      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: api serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
+      ...heldSettle.map((item) => `  held-settle: ${item.jobId} (${item.opId ?? '-'} a${item.attempt}) ${item.heldBecause} ${item.blockedBy.incident} — report consumed, settle deferred behind the wait; worker ${item.worker}${item.worker === 'held' ? ` (release it: starci kernel reconcile --job ${item.jobId} --release-worker)` : ''}`),
+      ...askReserve.map((dispatchId) => `  ask-reserve: ${dispatchId} never reached the owner; park it: starci kernel serve-ask --repo <repo> --workflow ${workflowId} --dispatch ${dispatchId}`),
       ...askOnDemand.map((dispatchId) => `  ask-on-demand: ${dispatchId} is on Telegram; the owner generates its link (no form until then)`),
       ...typedWaits.resolved.map((item) => `  auto-resolved: ${item.incidentId} [${item.kind ?? '-'}] every typed condition holds — ${item.evidence.join('; ').slice(0, 240)}`),
       ...typedWaits.open.map((item) => `  gate-conditions: ${item.incidentId} [${item.kind ?? '-'}] ${item.results.map((r) => `${r.condition} ${r.met ? 'MET' : r.unmeetable ? `UNMEETABLE (${r.unmeetable})` : 'pending'}`).join(', ')}`),

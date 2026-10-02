@@ -1,7 +1,7 @@
 // op-session.mjs — per-op agent-session identity and release at settle.
 //
 // Host housekeeping ("per-op session release at settle", STORAGE-PROMPT item
-// 8): when `api settle` closes an op, that op's own agent session files move
+// 8): when `starci kernel settle` closes an op, that op's own agent session files move
 // to the session archive root right away instead of piling up under
 // ~/.claude/projects and the Codex session homes.
 //

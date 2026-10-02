@@ -9,7 +9,7 @@
 // brief, `policy.specsToggle: {unit?, e2e?}` (modules/ops/ops/<op>.yaml), one of SPECS_TOGGLE_VALUES:
 //   defer-leg    the op's only job is that class of testing: the kernel never dispatches it. Its queued job
 //                settles `succeeded` with result {verdict: 'deferred', deferred: {kind, reason}} and no attempt
-//                spent, so every leg behind it proceeds; `api run-deferred-tests` re-queues it later.
+//                spent, so every leg behind it proceeds; `starci kernel run-deferred-tests` re-queues it later.
 //   skip         the op runs, but neither runs nor writes that class of test and demands no coverage of it
 //                (build ops: test:ci/jest/coverage are not run, Sonar still runs).
 //   not-counted  a review/verify gate that would demand those tests or that coverage does not count them.
@@ -18,7 +18,7 @@
 // Explicit-ask-only ops (owner ruling 2026-09-29): an op whose brief declares `policy.explicitAsk: <kind>`
 // (integration.verify: live OAuth/SMTP/payment/provider verification with real credentials) runs only when the
 // goal asked for it (phraseSets.<kind>Intent in modules/goal/archetypes.yaml, read by scripts/route/explicit-ask.mjs)
-// or the owner forced it (`api run-deferred-tests`). The enqueue stamps payload.explicitAsk from the goal text; a job
+// or the owner forced it (`starci kernel run-deferred-tests`). The enqueue stamps payload.explicitAsk from the goal text; a job
 // without the stamp - an already-approved leg the goal never asked for - settles deferred at once, the same
 // deferral path as specs.e2e=false: never dispatched, no attempt spent, dependents not blocked.
 //
@@ -102,7 +102,7 @@ export function deferClassOf({ toggle, payload = {} }) {
 
 /**
  * Whether this job is deferred rather than dispatched: {kind, reason} or null. A job the owner asked to run
- * anyway (`api run-deferred-tests` stamps payload.specsForced) is never deferred again.
+ * anyway (`starci kernel run-deferred-tests` stamps payload.specsForced) is never deferred again.
  */
 export function deferralOf({ skillRoot, op, payload = {}, settings = null }) {
   if (payload?.specsForced) return null;
@@ -134,7 +134,7 @@ export function planLegDeferral({ skillRoot, op, settings = null, goalText = nul
 export function deferJob(ledger, { job, deferral, via, now = Date.now() }) {
   const db = ledger.db;
   const deferred = { kind: deferral.kind, reason: deferral.reason, at: now, via };
-  const result = { verdict: DEFERRED_VERDICT, deferred, summary: `deferred: ${deferral.reason} (${SPECS_CLASSES.includes(deferral.kind) ? 'owner config.yaml specs; ' : ''}api run-deferred-tests runs it later)` };
+  const result = { verdict: DEFERRED_VERDICT, deferred, summary: `deferred: ${deferral.reason} (${SPECS_CLASSES.includes(deferral.kind) ? 'owner config.yaml specs; ' : ''}starci kernel run-deferred-tests runs it later)` };
   const write = () => {
     if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status !== 'queued') return null;
     setJobStatus(db, { jobId: job.job_id, to: 'cancelled', reason: 'tests-deferred', at: now });
@@ -162,7 +162,7 @@ export function deferredTestsOf(db, workflowId, { kind = null } = {}) {
 }
 
 /**
- * Re-queue a workflow's deferred test legs (`api run-deferred-tests`): each gets a new queued job of the same unit
+ * Re-queue a workflow's deferred test legs (`starci kernel run-deferred-tests`): each gets a new queued job of the same unit
  * (resume_of the deferred one, retry_class resume) with payload.specsForced, so it dispatches even while its class is still off.
  * Returns the re-queued items.
  */

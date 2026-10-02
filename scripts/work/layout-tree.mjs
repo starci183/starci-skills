@@ -785,7 +785,7 @@ export function destinationFor(record, node, { route = null, activeNav = null, k
 
 // alpha.3 (ARCHITECTURE-DB §5.1): a layout capture is agent data - a blob the layout tree cites {name, sha256, ...},
 // never a file under .starciwork/shell/assets. addCapture puts the bytes in the blob store (and a copy in the job's
-// scratch/captures/layouts, which api report attaches by itself). A capture recorded with a `path` (a tree
+// scratch/captures/layouts, which starci kernel report attaches by itself). A capture recorded with a `path` (a tree
 // written before) still reads from the tree.
 /** The readable PNG of one recorded capture: the blob it cites, else its file under `shellDir`; null when neither. */
 export function captureFileOf(shellDir, capture) {

@@ -25,7 +25,7 @@ export const latestAttemptOf = (db, jobId) => db.prepare('SELECT * FROM op_attem
 export const latestReportOf = (db, jobId) => db.prepare('SELECT r.* FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))
   .map((s) => String(s).trim()).filter(Boolean));
-// (api incident --kind peer-wait --until-foundation <name>), which the landing releases.
+// (starci kernel incident --kind peer-wait --until-foundation <name>), which the landing releases.
 export const workflowRunning = (wf) => Boolean(wf && wf.phase === 'running' && wf.archived_at == null);
 export const workDirOf = (repo) => { try { return projectBinding(repo)?.workDir ?? '.starciwork'; } catch { return '.starciwork'; } };
 export const ARCHIVED_BY = ['owner', 'supervisor'];

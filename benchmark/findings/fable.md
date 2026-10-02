@@ -699,7 +699,7 @@ Work that falls to other lanes:
   `runtimes.yaml:5,23` "config.json"; bare filenames in `citation:` at
   `modules/goal/anatomy.yaml:344`, `legality.yaml:310-425`,
   `modules/schemas/relationships.yaml:46-137` (E or H, run
-  `node scripts/checks/check-contract-cites.mjs --scan modules --scan docs --scan CONTEXT.md --scan skills`).
+  `starci runtime check --only contract-cites -- --scan modules --scan docs --scan CONTEXT.md --scan skills`).
 - C already handled: `selection.yaml` model-policy cites, profiles model-catalog,
   `work-layout.yaml:38`, `schemas/index.yaml:520`.
 

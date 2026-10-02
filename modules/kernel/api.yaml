@@ -12,7 +12,7 @@
 # The op IPC is durable: contracts out (dispatch writes the contracts row,
 # the worker reads it back via `starci kernel op-contract`), reports in (the worker
 # files `starci kernel report`; the kernel integrates it via `starci kernel consume-report`),
-# checks beside them (`api record-checks` records the kernel's re-run). Report and
+# checks beside them (`starci kernel record-checks` records the kernel's re-run). Report and
 # contract truth lives in runtime.sqlite through these verbs.
 #
 # Sources (all under .claude/, relative to the skill root):
@@ -54,7 +54,7 @@ about:
     persisted) -> dispatch (contract row written, leases held; or reconcile a
     pre-contract effect_unknown launch back to the same queued attempt) -> worker
     files `starci kernel report` -> kernel `starci kernel consume-report` -> kernel re-runs
-    checks -> `api record-checks` -> `starci kernel settle` (consumption enforced — settle
+    checks -> `starci kernel record-checks` -> `starci kernel settle` (consumption enforced — settle
     marks the report consumed if the kernel did not).
   sources:
     - scripts/kernel/cli.mjs
@@ -116,7 +116,7 @@ conventions:
     job. RESIDUAL, owner-visible: the api cannot stop a raw file read - a worker with unattended
     shell permissions can still open the ledger file or unset the marker and call from a terminal
     Orca does not attribute to it. Nothing it reads that way is authority: only a filed report plus
-    the Kernel's own `api record-checks` settles, and a ledger claim quoted from a screen is never evidence.
+    the Kernel's own `starci kernel record-checks` settles, and a ledger claim quoted from a screen is never evidence.
     Nothing an op needs is only in the ledger: the packet carries the owner's goal statement
     (context.goal {revision, statement, amendment?} of the revision the job is bound to), so `starci kernel op-contract --json` answers what
     workers opened the file for (nivo auth inc-26b260e101e4). `messages` is a kernel verb too.

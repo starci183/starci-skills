@@ -13,9 +13,9 @@
 //
 //   starci runtime check --only examples-ci              check: the workflow derives its matrix from --matrix, no other root
 //                                                  workflow runs an example on its own, codecov.yml is its render (exit 1)
-//   node scripts/checks/check-examples-ci.mjs --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
-//   node scripts/checks/check-examples-ci.mjs --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
-//   node scripts/checks/check-examples-ci.mjs --write    rewrite codecov.yml and each example's own codecov.yml and sonar-project.properties from the render
+//   starci runtime check --only examples-ci -- --matrix   the matrix as JSON (["ecommerce-app"]) for $GITHUB_OUTPUT
+//   starci runtime check --only examples-ci -- --images   every image of every example as JSON ([{app, name, file}], one per be and fe app of hfs.json)
+//   starci runtime check --only examples-ci -- --write    rewrite codecov.yml and each example's own codecov.yml and sonar-project.properties from the render
 //
 // The quality files of each example (codecov.yml, sonar-project.properties) are rendered here from the SOURCE jest preset of this repository, the
 // one the root codecov.yml flag already reads, so the root flag, the app's coverage paths and sonar.coverage.exclusions are one scope. The build
@@ -80,7 +80,7 @@ export function exampleImages(root = ROOT) {
     return ['be', 'fe'].flatMap((side) => (sides[side]?.apps ?? []).map((entry) => ({ app, name: entry.name, file: dockerfilePath(side, entry.name) })));
   });
 }
-export const IMAGES_COMMAND = 'node scripts/checks/check-examples-ci.mjs --images';
+export const IMAGES_COMMAND = 'starci runtime check --only examples-ci -- --images';
 export const IMAGES_JOB = 'images';
 
 /** The root codecov.yml: one flag per example app over its coverage scope, project and patch at 100 per flag. */
@@ -172,7 +172,7 @@ export function checkExamplesCi(root = ROOT) {
   for (const app of apps) for (const target of appQualityTargets(app, root)) {
     const file = `examples/${app}/${target.path}`;
     const have = read(root, file);
-    if (have === null || have.replace(/\r\n/g, '\n') !== target.content) add('EXAMPLES_CI_APP_QUALITY_DRIFT', file, `${file} differs from its render from the source jest preset: run node scripts/checks/check-examples-ci.mjs --write`);
+    if (have === null || have.replace(/\r\n/g, '\n') !== target.content) add('EXAMPLES_CI_APP_QUALITY_DRIFT', file, `${file} differs from its render from the source jest preset: run starci runtime check --only examples-ci -- --write`);
   }
   // codecov.yml is the render: one flag per app, paths from the coverage scope.
   const codecov = read(root, CODECOV);

@@ -1,4 +1,4 @@
-// api observe: bounded output context on the bound operation worker.
+// starci kernel observe: bounded output context on the bound operation worker.
 // The context is the worker's own output, read by Dispatch (worker-read --source auto: the exact transcript when the
 // provider has one, else labelled terminal output; deep map T1). The turn state is still classified from the
 // rendered frame (terminal show + terminal read --screen): only the frame shows turn-idle versus active, a staged

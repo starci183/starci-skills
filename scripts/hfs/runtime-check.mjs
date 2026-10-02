@@ -10,7 +10,7 @@
 //      RT_ABSOLUTE_PATH, RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs),
 //      RT_CLI_APP_ONLY_TEMPLATES (managed app templates invoke only starci app)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
-//      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
+//      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci runtime check` driver)
 //   4. the pending ratchet (runtime-rules/pending.mjs): the manifest's `pending` list turns the findings it names into level
 //      pending; RT_PENDING_STALE and RT_PENDING_ADDED keep the list shrinking against the base revision
 // The base revision is the merge-base of HEAD with main (else origin/main); without one, growth and the ratchet's base
@@ -46,7 +46,7 @@ import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
 import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
 const SOURCE = /\.(?:mjs|cjs|js)$/;
-/** The codes only an extra emitter reports (scripts/checks/check-contract-cites.mjs, passed in by the `starci check` driver). */
+/** The codes only an extra emitter reports (scripts/checks/check-contract-cites.mjs, passed in by the `starci runtime check` driver). */
 export const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
 
 /** The merge-base of HEAD with main (else origin/main) in `repoRoot` and a reader of files at it; null when none resolves. */

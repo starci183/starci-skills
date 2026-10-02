@@ -38,7 +38,7 @@
 //                  area share and the nearest brand token; PRIMARY_ABSENT when that colour stands in for the
 //                  brand primary. Owner 2026-09-24: a nivo part drew its primary in blue, the brand is red.
 //
-// Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
+// Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci runtime validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev) as suspects, never refusals.
 import fs from 'node:fs';
@@ -566,7 +566,7 @@ export function implementationPaletteFindings(workRoot, implFile, ctx = paletteC
 const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);
 
 /**
- * What `starci validate` reports for every ui record under `root`: records drawn before the layout tree (no
+ * What `starci runtime validate` reports for every ui record under `root`: records drawn before the layout tree (no
  * binding, no route, a stale rev) are suspects; a declared route/surface/overlay that does not
  * hold together is refused. Composite pixels are not re-derived here - that is the op proof's.
  */
@@ -641,7 +641,7 @@ function admittedAdvisory(argv) {
 
 export function shellConformanceMain(argv = []) {
   const admitted = admittedAdvisory(argv);
-  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (api op-contract --json admission.admittedAt)\n' };
+  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (starci kernel op-contract --json admission.admittedAt)\n' };
   argv = admitted.rest;
   const args = argv.filter((a) => a !== '--json');
   if (args.includes('--help') || args.includes('-h') || args.length !== 1) {

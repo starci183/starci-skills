@@ -3,7 +3,7 @@
 //   - a `files:` entry's `slot` of a back-end pattern topic is the slot that owns its `path` (slots.yaml);
 //   - the `code` of a lint rule's entry in a `why` map (packages/eslint/fe/lib/why.mjs, packages/stylelint/lib/why.mjs) is the code of
 //     the catalog rule that lists the lint rule as its enforcer.
-// `node scripts/hfs/derived-fields.mjs --write` rewrites them in place, `--check` (the default) lists the files that differ.
+// `starci runtime derived-fields --write` rewrites them in place, `--check` (the default) lists the files that differ.
 // A typed value that names a code or an enforcer a catalog rule owns adds that rule to `hfsRules` once, so nothing a pattern
 // verified by hand is lost; a typed value no rule owns is reported and never silently dropped. Pure text in, text out.
 import fs from 'node:fs';

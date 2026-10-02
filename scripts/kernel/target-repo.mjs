@@ -1,6 +1,6 @@
 // The repository each owned path of a job lands in — one resolver for api
-// enqueue (records payload.repository), api dispatch (names the checkout per
-// owned path in the packet) and api settle (runs the landed proof there).
+// enqueue (records payload.repository), starci kernel dispatch (names the checkout per
+// owned path in the packet) and starci kernel settle (runs the landed proof there).
 // Side folders come from the app binding whose repository owns Work and the ledger.
 // Contract: modules/kernel/api.yaml commands.enqueue / commands.settle landed.
 import fs from 'node:fs';

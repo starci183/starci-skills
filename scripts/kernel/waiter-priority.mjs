@@ -13,7 +13,7 @@
 //   dependency     a queued job declared it --after
 //
 // Each job's `weight` is the sum over its waiters of 1 + hours waited, so more waiters and older
-// waiters both rank it higher. api status orders frontier.queued by it and projects
+// waiters both rank it higher. starci kernel status orders frontier.queued by it and projects
 // frontier.blockingOthers; when a queued job has blocked another workflow past BLOCKING_HEADS_UP_MS
 // its own Kernel gets one heads-up (cli.mjs blockingHeadsUp). The supervisor prints one BLOCKING line
 // per job (scripts/supervisor/poll.mjs) and the progress report names it.
@@ -31,7 +31,7 @@ export const BLOCKING_HEADS_UP_AUTO = 'blocking-waiters';
 const SETTLED = SETTLED_JOB_LIST;
 const GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'peer-wait'];
 const PEER_MESSAGE = 'peer-message';
-// Job ids are op-<op>-<10 hex> (api enqueue).
+// Job ids are op-<op>-<10 hex> (starci kernel enqueue).
 const JOB_ID = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 
 const norm = (p) => posixPath(p).replace(/\/+$/, '');
@@ -156,7 +156,7 @@ export function orderQueuedByBlocking(queued, blocking) {
     if (entry) item.blocking = { waiters: entry.waiters.length, workflows: entry.waitingWorkflows, weight: entry.weight, since: entry.since };
   }
   const indexed = queued.map((item, index) => ({ item, index }));
-  // Foundation legs (api enqueue --foundation) keep leading the list; a queued cut seam (api status
+  // Foundation legs (starci kernel enqueue --foundation) keep leading the list; a queued cut seam (starci kernel status
   // queued[].seam, scripts/kernel/seam-policy.mjs) comes next - its siblings build on it; blocking weight orders sameOrUnder.
   const foundationOf = (item) => Number(Boolean(item.foundation));
   const seamOf = (item) => Number(Boolean(item.seam));

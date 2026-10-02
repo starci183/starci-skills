@@ -16,7 +16,7 @@
 //               a file the fix changed, or a success-rate drop -> revert due (owed action experiment-revert;
 //               `revert --apply` makes the revert lane and lands it); quiet for measureMs -> kept
 //   learn       every outcome is a lesson event; `export --write` regenerates modules/supervisor/lessons.yaml (committed
-//               in a lane); `match` is consulted before diagnosing, and api dispatch injects a matching lesson beside
+//               in a lane); `match` is consulted before diagnosing, and starci kernel dispatch injects a matching lesson beside
 //               the prior attempt failures of a retry (lessonsForChecks)
 //   owner       `feedback` records owner feedback (chat relay, Telegram, draw notes) as lessons with source owner,
 //               weight allocation.supervisorLearning.ownerWeight above self-derived ones
@@ -315,7 +315,7 @@ export function recordFeedback({ text, signature = null, via = 'chat', refs = []
  */
 export const GC_LEFTOVER_OWNERS = Object.freeze({
   'op-worker': 'the Kernel settle path (scripts/kernel/cli.mjs settle: quit + close + close-verify of the op worker terminal)',
-  'kernel': 'api finish/archive (closeKernelTerminal -> close-verify.mjs closeSelfSafe) or the kernel replace in scripts/kernel/start-workflow.mjs',
+  'kernel': 'starci kernel finish/archive (closeKernelTerminal -> close-verify.mjs closeSelfSafe) or the kernel replace in scripts/kernel/start-workflow.mjs',
   'sup-worker': 'the Supervisor worker lifecycle (scripts/supervisor/workers.mjs closeWorkerTerminal at report/cancel/land)',
   'supervisor-seat': 'the Supervisor seat replace (scripts/supervisor/start-supervisor.mjs)',
   'idle-shell': 'whatever created a bare shell terminal and never closed it (terminal create without --command, or an agent that exited)',

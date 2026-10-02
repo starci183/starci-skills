@@ -933,7 +933,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   }
   // handover.review: the owner's acceptance closes every chain, after every
   // other leg (modules/ops/ops/handover.review.yaml; legality.yaml
-  // producesVocabulary 'handover: approved'). api finish refuses a workflow
+  // producesVocabulary 'handover: approved'). starci kernel finish refuses a workflow
   // the owner has not approved, so no chain is complete without it.
   if (legs.size && !legs.has(HANDOVER_OP)) {
     const others = [...legs.values()];
@@ -1203,7 +1203,7 @@ function main() {
     .sort((a, b) => (pos.get(a[0]) - pos.get(b[0])) || (pos.get(a[1]) - pos.get(b[1])));
 
   // The owner's config.yaml specs switches, read on every plan (no restart): a leg whose op only tests a class
-  // that is off stays in the chain - so `api run-deferred-tests` can run it later - but is marked deferred.
+  // that is off stays in the chain - so `starci kernel run-deferred-tests` can run it later - but is marked deferred.
   const specs = ownerSpecs(skillRoot);
   const result = {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',

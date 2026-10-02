@@ -2,7 +2,7 @@
 // op report as a localhost form and lands the answer durably, without any
 // model agent ever seeing a secret value. Spawned detached ON DEMAND: by the
 // Telegram command bridge when the owner presses an ask's "Generate URL"
-// button (--on-demand telegram), or by `api serve-ask --now` / a Kernel whose
+// button (--on-demand telegram), or by `starci kernel serve-ask --now` / a Kernel whose
 // Telegram is off (parkAsk below tells the owner instead of serving). Exits
 // after one submission or on --ttl. Port: first free in engine/config.mjs ASK_PORT_BAND (the
 // owner-facing ask lane).
@@ -30,7 +30,7 @@
 // `ask-message-closed` when the ask's Telegram messages were deleted.
 //
 // Telegram (scripts/connectors/telegram.mjs, docs/connectors.md): parkAsk —
-// what `api serve-ask` runs — sends the owner an approval ask with a "Generate
+// what `starci kernel serve-ask` runs — sends the owner an approval ask with a "Generate
 // URL" button, lists a credential ask for the bridge's /creds (askClassOf) and
 // serves nothing; this form never sends a message itself. On
 // submit (and for an ask a replacement supersedes) closeAskMessages deletes
@@ -43,7 +43,7 @@
 // same starci/ask-answer@1 receipt and `ask-answered` event a submission
 // writes, with answeredBy auto-recommended, plus an `ask-auto-accepted` audit
 // event; it wakes the Kernel and sends the owner one plain Telegram message.
-// `api serve-ask` runs the same function before it would launch the form.
+// `starci kernel serve-ask` runs the same function before it would launch the form.
 // A draw-review ask (owner ruling 2026-09-26) is accepted the same way unless
 // the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
@@ -607,7 +607,7 @@ export const wakeAskAnswered = (ledger, { workflowId, dispatchId, receiptPath, a
     answeredBy === AUTO_ACCEPTED_BY
       ? `config.yaml ${AUTO_ACCEPT_CONFIG_KEY} answered the parked ask for dispatch ${dispatchId} with its recommended option (answeredBy ${AUTO_ACCEPTED_BY}; a later owner answer supersedes). Receipt: ${receiptPath}.`
       : `The owner answered the parked ask for dispatch ${dispatchId}; sanitized receipt at ${receiptPath}.`,
-    'Re-read canonical api status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
+    'Re-read canonical starci kernel status and survey now; re-verify custody presence for the named provisions, settle or retry the waiting ask op, then continue the approved frontier.',
   ],
 });
 
@@ -745,7 +745,7 @@ export async function closeAskMessages(ledger, { ledgerFile, workflowId, dispatc
 }
 
 /**
- * Park one filed, unanswered ask for the owner — what `api serve-ask` runs after auto-accept
+ * Park one filed, unanswered ask for the owner — what `starci kernel serve-ask` runs after auto-accept
  * declined it. Earlier asks it replaces are superseded (supersedeEarlierAsks) and their messages
  * leave the chat. An approval ask (askClassOf) is then pushed to the owner on Telegram (telegram.mjs
  * notifyAsk: the question, its options and a "Generate URL" button, no link — the form is served

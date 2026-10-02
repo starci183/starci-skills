@@ -5,12 +5,12 @@
 // order, approve / feedback / question (HANDOVER_DECISIONS). serve-ask records
 // the answer receipt; this module reads it back:
 //
-//   handoverAskProblem  the ask a handover.review report must carry (api report)
+//   handoverAskProblem  the ask a handover.review report must carry (starci kernel report)
 //   handoverApprovalOf  whether the latest handover ask was approved by the owner
-//                       and still covers every business settle (api settle pass)
-//   handoverGateOf      whether `api finish` may close the workflow
-//   handoverProjection  the `handover` block of api status and its frontier state
-//   deliveriesOf        what the handover package is assembled from (api survey
+//                       and still covers every business settle (starci kernel settle pass)
+//   handoverGateOf      whether `starci kernel finish` may close the workflow
+//   handoverProjection  the `handover` block of starci kernel status and its frontier state
+//   deliveriesOf        what the handover package is assembled from (starci kernel survey
 //                       --deliveries, readable from an op terminal)
 //
 // A receipt whose answeredBy is not the owner never approves: owner delegation
@@ -130,7 +130,7 @@ export function handoverApprovalOf(db, workflowId, { attempt = Number.POSITIVE_I
 }
 
 /**
- * Whether `api finish` may close the workflow: a handover-approved event newer
+ * Whether `starci kernel finish` may close the workflow: a handover-approved event newer
  * than the last business settle. A workflow whose record the owner archived
  * (workflows.archived_at) is the one existing way out and needs no approval.
  */
@@ -150,7 +150,7 @@ export function handoverGateOf(db, workflowId) {
 }
 
 /**
- * The handover block of api status. state:
+ * The handover block of starci kernel status. state:
  *   approved        a current owner approval exists — the workflow may finish
  *   running         a handover.review job is open
  *   awaiting-owner  the latest handover ask waits on the owner
@@ -226,11 +226,11 @@ export function handoverProjection(db, workflowId, { legOps = [], alsoSettled = 
 export function handoverReason(handover, workflowId) {
   const ask = handover?.ask;
   if (handover?.state === 'approved') {
-    return `the owner approved the handover (handover-approved event ${handover.approvedSeq}, after the last business settle); retire any leftover ask with api retire-ask, then run api finish --workflow ${workflowId}`;
+    return `the owner approved the handover (handover-approved event ${handover.approvedSeq}, after the last business settle); retire any leftover ask with starci kernel retire-ask, then run starci kernel finish --workflow ${workflowId}`;
   }
   if (handover?.state === 'answered' && ask) {
     if (ask.decision === 'approve' && ask.byOwner) {
-      return `the owner approved handover ask ${ask.dispatchId}; enqueue handover.review again (it reads the approval through api survey --deliveries and files done), then api record-checks and api settle --verdict pass record handover-approved; then api finish`;
+      return `the owner approved handover ask ${ask.dispatchId}; enqueue handover.review again (it reads the approval through starci kernel survey --deliveries and files done), then starci kernel record-checks and starci kernel settle --verdict pass record handover-approved; then starci kernel finish`;
     }
     if (ask.decision === 'approve') {
       return `handover ask ${ask.dispatchId} was answered approve by ${ask.answeredBy ?? 'a delegate'}, and only the owner approves a handover; enqueue handover.review again so the owner is asked`;
@@ -244,7 +244,7 @@ export function handoverReason(handover, workflowId) {
     return `handover ask ${ask.dispatchId} was answered with no recognised option; enqueue handover.review again`;
   }
   if (handover?.due) {
-    return `every approved leg settled and no current owner approval exists; enqueue handover.review as the final leg (--paths .starciwork/evidence/${workflowId}.handover) — api finish refuses handover-not-approved until the owner approves`;
+    return `every approved leg settled and no current owner approval exists; enqueue handover.review as the final leg (--paths .starciwork/evidence/${workflowId}.handover) — starci kernel finish refuses handover-not-approved until the owner approves`;
   }
   return null;
 }

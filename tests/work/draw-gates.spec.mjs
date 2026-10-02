@@ -1,4 +1,4 @@
-// The drawer's one "run every gate" command (scripts/work/draw-gates.mjs, lane op-draw): the gates api settle and api
+// The drawer's one "run every gate" command (scripts/work/draw-gates.mjs, lane op-draw): the gates starci kernel settle and api
 // check judge an interface.draw pass by, their report.checks entries with `failing` files, and the owner gate apart.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,7 +35,7 @@ test('every gate runs; a red gate names its failing files; the owner gate is rep
   assert.deepEqual(r.gates.map((g) => g.name), ['draw-acceptance', 'draw-metrics', 'validate-strict', 'shell-conformance', 'draw-layer', 'draw-loop']);
   const strict = r.checks.find((c) => c.name === 'validate-strict');
   assert.equal(strict.exitCode, 1);
-  assert.deepEqual(strict.failing, [child], 'the child record is named so api check can attribute it (foreign)');
+  assert.deepEqual(strict.failing, [child], 'the child record is named so starci kernel record-checks can attribute it (foreign)');
   assert.deepEqual(strict.codes, ['DATA_STATUS_DRAWN']);
   assert.equal(r.checks.find((c) => c.name === 'shell-conformance').exitCode, 0);
   assert.equal(r.ok, false);

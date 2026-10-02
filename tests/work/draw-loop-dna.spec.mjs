@@ -367,7 +367,7 @@ test('the contract change registers every code the draw loop adds and reaches ru
   }
 });
 
-test('api settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
+test('starci kernel settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
   const { spawnSync } = await import('node:child_process');
   const { openLedger, ledgerFileFor, fileReport, recordCheckRun, writeContract } = await import('../../engine/db/ledger.mjs');
   const p = product(t);

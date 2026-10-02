@@ -2620,6 +2620,26 @@ starci runtime check --only cli-parity -- --root <tree>
 
 Removed spellings: `starci check`
 
+### starci runtime derived-fields
+
+regenerate or check the derived fields of the knowledge pattern files
+
+| flag | type | |
+| --- | --- | --- |
+| `--write` | boolean |  |
+| `--check` | boolean |  |
+
+exit: 0 current; 1 stale output listed; 2 bad usage
+
+json: none
+
+```sh
+starci runtime derived-fields --check
+starci runtime derived-fields --write
+```
+
+Removed spellings: `node scripts/hfs/derived-fields.mjs`, `node .claude/scripts/hfs/derived-fields.mjs`
+
 ### starci runtime doctor
 
 run the installed tree's own specs and report drift against the install manifest
@@ -2748,6 +2768,26 @@ starci runtime machine-db ledgers --all
 ```
 
 Removed spellings: `node engine/db/machine.mjs`, `node .claude/engine/db/machine.mjs`
+
+### starci runtime readme-blocks
+
+regenerate or check the generated blocks of knowledge/hfs/README.md
+
+| flag | type | |
+| --- | --- | --- |
+| `--write` | boolean |  |
+| `--check` | boolean |  |
+
+exit: 0 current; 1 stale output listed; 2 bad usage
+
+json: none
+
+```sh
+starci runtime readme-blocks --check
+starci runtime readme-blocks --write
+```
+
+Removed spellings: `node scripts/hfs/readme-blocks.mjs`, `node .claude/scripts/hfs/readme-blocks.mjs`
 
 ### starci runtime status
 

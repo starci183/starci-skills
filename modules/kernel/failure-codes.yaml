@@ -13548,7 +13548,7 @@ EXAMPLES_CI_WORKFLOW_MISSING:
   meaning_vi: "Không có `.github/workflows/examples.yml`: GitHub chỉ chạy workflow ở gốc repository, nên không ứng dụng ví dụ nào được kiểm tra trong CI."
   causes_vi:
     - "Workflow gốc bị xoá hoặc đổi tên"
-  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `node scripts/checks/check-examples-ci.mjs --matrix`."
+  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `starci runtime check --only examples-ci -- --matrix`."
   owner: runtime-core
   kind: check-finding
 
@@ -13620,7 +13620,7 @@ EXAMPLES_CI_CODECOV_MISSING:
   meaning_vi: "Codecov chỉ đọc một cấu hình gốc; không có `codecov.yml` thì không cờ nào của ứng dụng ví dụ được giữ ở mức 100."
   causes_vi:
     - "Tệp `codecov.yml` gốc bị xoá"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` để sinh lại tệp."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` để sinh lại tệp."
   owner: runtime-core
   kind: check-finding
 
@@ -13631,7 +13631,7 @@ EXAMPLES_CI_CODECOV_DRIFT:
   causes_vi:
     - "Thêm một ứng dụng ví dụ mà chưa sinh lại tệp"
     - "Sửa tay tệp sinh ra"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit tệp."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` và commit tệp."
   owner: runtime-core
   kind: check-finding
 
@@ -13987,7 +13987,7 @@ catalog-invalid:
   causes_vi:
     - "Sửa một file catalog sai schema (thiếu group/verb/impl/flags/exit/json/examples/editions/since/removed)"
     - "Đặt trùng tên verb trong hai file, hoặc khai báo flag cấm"
-  nextStep_vi: "Người giám sát đọc danh sách lỗi của loadCatalog và sửa từng file catalog theo schema; chạy lại node scripts/checks/check-cli-parity.mjs."
+  nextStep_vi: "Người giám sát đọc danh sách lỗi của loadCatalog và sửa từng file catalog theo schema; chạy lại starci runtime check --only cli-parity."
   owner: supervisor
   kind: check-finding
 RT_FACT_FALSE:
@@ -14059,7 +14059,7 @@ RT_PROSE_RESTATES_SLOTS:
 EXAMPLES_CI_IMAGES_NOT_DERIVED:
   title: "The examples workflow does not build every image from a derived matrix"
   title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
-  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `node scripts/checks/check-examples-ci.mjs --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
+  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `starci runtime check --only examples-ci -- --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
   causes_vi:
     - "Danh sách image viết tay trong workflow, hoặc thiếu job images"
     - "Một bước build có push: true hoặc docker push"
@@ -14074,6 +14074,6 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
   causes_vi:
     - "Preset nguồn đổi mà các tệp chưa được sinh lại"
     - "Sửa tay tệp sinh ra"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` và commit các tệp sinh ra."
   owner: runtime-core
   kind: check-finding

@@ -1,4 +1,4 @@
-// host-resources.mjs — the host capacity probe `api dispatch --spawn` reads before launching a worker
+// host-resources.mjs — the host capacity probe `starci kernel dispatch --spawn` reads before launching a worker
 // (spec item 3: disk and RAM guards on the existing admission path). A starved host is a typed WAIT
 // (reason 'host-resources-low', waiting:true), never a rejection: nothing is spawned, nothing is
 // recorded, and every dispatch re-probes so admission recovers on its own once there is room again.

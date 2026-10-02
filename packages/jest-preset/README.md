@@ -3,7 +3,7 @@
 The jest config of a Nest repository and the one shared unit-test double kit (`mock<T>()`, `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingEventBus`, `recordingQueueOutbox`, `fakeInbox`, `builder`, `FakeClock`, `fakeIds` and the Outcome matchers). Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 ```js
-// jest.config.js (a managed file: `hfs sync` renders it, `hfs check` compares it; do not edit)
+// jest.config.js (a managed file: `starci app sync` renders it, `starci app check` compares it; do not edit)
 module.exports = require("@starci/jest-preset").starciJestConfig()
 ```
 
@@ -36,7 +36,7 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
   `typeof Dep !== "undefined" ? Dep : Object` guard per class-typed constructor parameter, and inlined decorator helpers carry branches
   of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary`,
   `text` and `lcov`: the run writes `coverage/lcov.info` under the repository (be/) root.
-- **Sonar and Codecov import that lcov, scoped to the unit-tested roles.** `hfs sync` renders `sonar.coverage.exclusions` (the complement of the coverage sources: SonarQube has no coverage inclusions) and the `codecov.yml`
+- **Sonar and Codecov import that lcov, scoped to the unit-tested roles.** `starci app sync` renders `sonar.coverage.exclusions` (the complement of the coverage sources: SonarQube has no coverage inclusions) and the `codecov.yml`
   status paths from `COVERAGE_SOURCES` on the be side (`be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts`), so jest, Sonar and Codecov measure the same files;
   the Sonar gate holds coverage at 100 overall, on new code and per file. `sonarExclusions()` still renders `sonar.exclusions`
   (`**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**`). There is no coverage exclusion list.

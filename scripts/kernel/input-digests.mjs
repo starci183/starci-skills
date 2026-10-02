@@ -1,5 +1,5 @@
 // input-digests.mjs — the inputs an op was admitted with, digested at dispatch
-// and compared again by `api survey` / `api status`.
+// and compared again by `starci kernel survey` / `starci kernel status`.
 //
 // Two kinds of input, judged differently (owner, 2026-09-24: editing Source
 // knowledge re-staled dozens of settled jobs on every ledger, and each further
@@ -159,7 +159,7 @@ const sortLines = (lines) => lines.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 
 /**
  * A Source digester bound to one runtime root. Every file is hashed at most
  * once per digester and every path pattern resolved at most once, so one
- * `api status` call reads each distinct input once however many jobs cite it.
+ * `starci kernel status` call reads each distinct input once however many jobs cite it.
  * `skip` names the directories a walk never enters.
  */
 export function createDigester(root, { skip = SKIP_DIRS } = {}) {
@@ -284,7 +284,7 @@ const covers = (changePath, rel) => {
  *                from the one the job read (an in-flight rewrite never does) and
  *                - its owner (work-ownership.mjs ownerOf) is a peer workflow that marked the
  *                  change breaking - a committed change note `kind: breaking` with a rev above
- *                  the one the job read, written by the owner, or `api record-change --reach
+ *                  the one the job read, written by the owner, or `starci kernel record-change --reach
  *                  follow-up` - listed in `breaking` [{file, owner, via, rev?, reason?}]; an
  *                  entry whose every file is breaking is `followUp: true`: ONE targeted
  *                  follow-up leg, never held seam-first; or

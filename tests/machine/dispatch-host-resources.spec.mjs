@@ -12,7 +12,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
-// Spec item 3: `api dispatch --spawn` refuses on a host below allocation.resources.minFreeDiskGb /
+// Spec item 3: `starci kernel dispatch --spawn` refuses on a host below allocation.resources.minFreeDiskGb /
 // minFreeRamPct with the typed reason host-resources-low — a WAIT like path-lease (waiting:true, the
 // job stays queued, no leases and no dispatch-rejected event), never a failure. Each dispatch
 // re-probes, so once there is room again the very next attempt launches (auto-recovery). The probe is

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A user-facing, event-driven bridge around a prepared Playwright UAT session.
 // It never opens runtime.sqlite and never decides Work state. The surrounding
-// dispatched operation cites the write-once receipt in its ordinary api report.
+// dispatched operation cites the write-once receipt in its ordinary starci kernel report.
 
 import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // work-hygiene.mjs — the parse, scoped-validate and secret checks a product repo's Work files owe before they are
-// committed (the pre-commit hook scripts/guards/hook-install.mjs installs) and before an op settles (api settle).
+// committed (the pre-commit hook scripts/guards/hook-install.mjs installs) and before an op settles (starci kernel settle).
 //   node scripts/work/validate/work-hygiene.mjs staged --repo <root> [--json]     the staged files of <root>, from the index
 //   node scripts/work/validate/work-hygiene.mjs files  --repo <root> [--json] <file>...   the named files, from disk
 // Two failure classes slipped through on 2026-09-29: YAML the runtime loader cannot parse (a ": " inside a plain

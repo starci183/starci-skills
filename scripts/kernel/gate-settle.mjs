@@ -2,9 +2,9 @@
 // (scripts/kernel/sonar-settle.mjs).
 //
 // Every enforced op runs READ-CODE-CHECK-FIX-REPORT: it records a READ digest (scripts/gates/read-digest.mjs) before coding,
-// forces scripts/gates/gate.mjs every round, and attaches the last gate JSON and the digest to its report. At `api settle`
+// forces scripts/gates/gate.mjs every round, and attaches the last gate JSON and the digest to its report. At `starci kernel settle`
 // the runtime re-reads both itself - never the op's word - and resolves the kinds of the gate's changed files with the app's own
-// `hfs explain`. It refuses a done when:
+// `starci app explain`. It refuses a done when:
 //   op-gate-proof-missing     no gate JSON (schema starci/gate@1) is attached
 //   op-gate-tool-failed       the gate could not run a tool (exit 2): never a pass
 //   op-gate-new-findings      the gate reports findings the base does not have (lint, tsc, failing specs)
@@ -17,9 +17,9 @@
 //   test-world      op-test-world-proof-missing, op-test-world-hand-rolled, op-test-world-run-red (test-world-run.mjs)
 //   unit-kit        op-unit-proof-missing, op-unit-run-red, op-unit-coverage-below, op-unit-kit-violation (unit-run.mjs)
 //   security-lint   op-lint-proof-missing, op-lint-tool-failed, op-security-findings-missing, op-security-finding-unreported
-//                   (hfs lint --format json, and every security canon finding carried by rule in security-findings.json)
+//                   (starci app lint --format json, and every security canon finding carried by rule in security-findings.json)
 //   fe-lint,
-//   produced-lint   op-lint-proof-missing, op-lint-tool-failed, op-lint-findings (hfs lint --format json: fe/ findings of an audit,
+//   produced-lint   op-lint-proof-missing, op-lint-tool-failed, op-lint-findings (starci app lint --format json: fe/ findings of an audit,
 //                   any finding over the files a drawing or an asset op produced)
 //   review-gate     op-gate-proof-missing, op-gate-tool-failed, op-gate-new-findings (gate.mjs over the reviewed range)
 //   review-defects  op-review-defects-missing, op-review-defect-unclassified, op-review-missing-check-unrecorded
@@ -124,7 +124,7 @@ export function recordLoopJudgment(ledger, { attemptId, judgment, now = Date.now
   return { checkName: OP_GATE_CHECK, green, status: judged.status, code: judged.code, evidence };
 }
 
-/** What `api settle` prints when it refuses a done the loop does not allow. */
+/** What `starci kernel settle` prints when it refuses a done the loop does not allow. */
 export function loopRefusalText(op, judged, jobId) {
   const next = judged.code === 'op-gate-tool-failed' ? 'A gate tool could not run: fix the environment cause and rerun the gate, or settle blocked; never done without a gate.'
     : judged.code === 'op-gate-new-findings' ? 'Fix the listed findings and rerun the gate, up to params.gateRounds rounds; still red after the last round is blocked with these findings.'
@@ -220,8 +220,8 @@ export function judgeUnitRun(summary) {
 
 /** A lint judgment over the findings `relevant` keeps (the security codes, or the fe/ side). */
 export function judgeLint(report, relevant, what) {
-  if (!report || report.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no hfs lint report (schema ${LINT_SCHEMA}) is attached: run hfs lint --format json at the app root and attach lint.json`);
-  if ((report.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-lint-tool-failed' }, `hfs lint could not run: ${oneLine(report.errors.join('; '))}`, report.errors.map(String));
+  if (!report || report.schema !== LINT_SCHEMA) return refused({ status: 'missing', code: 'op-lint-proof-missing' }, `no starci app lint report (schema ${LINT_SCHEMA}) is attached: run starci app lint --format json at the app root and attach lint.json`);
+  if ((report.errors ?? []).length) return refused({ status: 'unavailable', code: 'op-lint-tool-failed' }, `starci app lint could not run: ${oneLine(report.errors.join('; '))}`, report.errors.map(String));
   const findings = (report.findings ?? []).filter(relevant);
   if (findings.length) return refused({ status: 'red', code: 'op-lint-findings' }, `${findings.length} ${what} finding(s); first: ${listed(findings)[0]}`, listed(findings));
   return pass();
@@ -330,7 +330,7 @@ export function recordProofJudgment(ledger, { attemptId, judgment, now = Date.no
   return { checkName: OP_PROOF_CHECK, green, status: judged.status, code: judged.code, evidence };
 }
 
-/** What `api settle` prints when it refuses a done a mechanism proof does not allow. */
+/** What `starci kernel settle` prints when it refuses a done a mechanism proof does not allow. */
 export function proofRefusalText(op, judgment, jobId, doc = loadOpGate()) {
   const { judged, proof } = judgment;
   const script = doc.proofs?.[proof]?.script;

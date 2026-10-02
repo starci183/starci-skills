@@ -20,7 +20,7 @@
 // slot is refused (ASSET_SLOT_UNFILLED, scripts/work/validate/check-example-work.mjs).
 //
 // The ledger: settling an interface.draw or interface.asset job records one `asset-slot-owed` event per owed slot of
-// the files it binds and one `asset-slot-filled` per filled one; `api status` lists the open ones as assetSlotsOwed[]
+// the files it binds and one `asset-slot-filled` per filled one; `starci kernel status` lists the open ones as assetSlotsOwed[]
 // and its nextActions propose an interface.asset leg for them (scripts/kernel/cli.mjs).
 //
 //   starci work asset-slot list <file|dir>... [--json]    every slot, owed or filled, with its request

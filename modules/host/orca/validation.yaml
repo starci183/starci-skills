@@ -1,8 +1,8 @@
 schema: starci/orca-provider-validation@1
 preflight:
-  - node scripts/checks/check-providers.mjs
-  - node scripts/checks/check-providers.mjs --live
-  - node scripts/checks/check-host-boundary.mjs
+  - starci runtime check --only providers
+  - starci runtime check --only providers -- --live
+  - starci runtime check --only host-boundary
 callContract:
   file: calls.yaml
   runner: scripts/api/orca/lib.mjs orcaCall (one wrapper per verb over it)

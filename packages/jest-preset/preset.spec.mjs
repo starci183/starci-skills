@@ -193,7 +193,7 @@ test('the unit run writes the lcov Sonar imports, keeps the text summary, and re
   assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
   assert.ok(config.coverageReporters.includes('text-summary'));
   assert.equal(config.coverageDirectory, 'coverage');
-  // The Sonar scope is rendered from COVERAGE_SOURCES (hfs sync prefixes the be side): the services and the cli commands, like jest's.
+  // The Sonar scope is rendered from COVERAGE_SOURCES (starci app sync prefixes the be side): the services and the cli commands, like jest's.
   assert.deepEqual(preset.COVERAGE_SOURCES, ['src/**/*.service.ts', 'src/features/cli/**/*.cli.ts']);
 });
 

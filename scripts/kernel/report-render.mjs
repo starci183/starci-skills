@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // report-render.mjs — the canonical human rendering of a starci/op-report@1
-// envelope. `api report` prints this block after filing so the op terminal
+// envelope. `starci kernel report` prints this block after filing so the op terminal
 // shows the reports row's projection — the row is the truth, this is its view.
 //
 //   node scripts/kernel/report-render.mjs <report.json>

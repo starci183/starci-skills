@@ -173,10 +173,10 @@ test('start --check: the orca-depth row reports the config, and with STARCI_ORCA
   assert.equal((await depthItems({ env: {}, config: { orca: { maxWorkerDepth: 99 } } }))[0].status, 'red');
 });
 
-test('api dispatch refuses an op whose Kernel already sits at orca.maxWorkerDepth, before its Task exists, and spends no try', (t) => {
+test('starci kernel dispatch refuses an op whose Kernel already sits at orca.maxWorkerDepth, before its Task exists, and spends no try', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-depth-dispatch-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  // api dispatch prepares the op's job scratch under the temp root (op-prompt JOB_SCRATCH_ROOT).
+  // starci kernel dispatch prepares the op's job scratch under the temp root (op-prompt JOB_SCRATCH_ROOT).
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });

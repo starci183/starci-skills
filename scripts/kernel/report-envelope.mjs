@@ -1,4 +1,4 @@
-// starci/op-report@1 — the op's filed result. `api report` validates the
+// starci/op-report@1 — the op's filed result. `starci kernel report` validates the
 // envelope before it becomes a durable reports row; the api stamps the
 // identity fields (run/task/dispatch/from) from the job row — a worker can
 // never claim another job's dispatch. Contract: modules/kernel/

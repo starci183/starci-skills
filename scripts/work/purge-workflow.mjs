@@ -73,7 +73,7 @@ export function purgeWorkflow({ repo, workflowId, apply = false, approvedBy = nu
     const wf = db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
     if (!wf) throw refuse('workflow-unknown', `unknown workflow ${workflowId}`);
     const liveJobs = db.prepare('SELECT job_id, status FROM jobs WHERE workflow_id=?').all(workflowId).filter((j) => LIVE.has(j.status));
-    // An archived workflow (api archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
+    // An archived workflow (starci kernel archive: owner or supervisor stop) is ended like a finished one (gc.mjs, owner 2026-09-28).
     const blockers = [...(wf.phase !== 'finished' && wf.archived_at == null ? [`phase is ${wf.phase ?? 'unset'}, not finished or archived`] : []), ...(liveJobs.length ? [`${liveJobs.length} job(s) still ${[...new Set(liveJobs.map((j) => j.status))].join('/')}`] : [])];
     const counts = rowCounts(db, workflowId);
     const { files, missing } = evidenceFiles(db, root, workflowId);

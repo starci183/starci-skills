@@ -149,7 +149,7 @@ test('the draw loop metric and draw-quality carry DRAW_RATIONALE_MISSING; the co
   assert.match(missing.findings[0].detail, /no rationale\.json/);
   fs.writeFileSync(path.join(dir, 'screen.rationale.json'), JSON.stringify(GOOD_RATIONALE));
   assert.deepEqual((await run()).findings, []);
-  assert.ok(DRAW_QUALITY_CODES.includes(DRAW_RATIONALE_MISSING), 'draw-quality (so draw-acceptance at api settle) refuses it');
+  assert.ok(DRAW_QUALITY_CODES.includes(DRAW_RATIONALE_MISSING), 'draw-quality (so draw-acceptance at starci kernel settle) refuses it');
   const change = loadContractChanges(ROOT).changes.find((c) => c.id === 'draw-devin-rationale');
   assert.deepEqual(change.adds.codes, [DRAW_RATIONALE_MISSING]);
   assert.equal(change.reach, 'follow-up');

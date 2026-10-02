@@ -1,4 +1,4 @@
-// Strict per-record schema enforcement for `starci validate --strict`.
+// Strict per-record schema enforcement for `starci runtime validate --strict`.
 //
 // The structural, consistency and artifact machines check ids, places, refs and proof; none of them compiles
 // a record against the JSON schema its own `schema:` const names. So a record carrying a key its closed

@@ -129,7 +129,7 @@ export function followUpMessage({ incidentId, reporter, detail, commit, via, fix
     `${reporter} is blocked by code this workflow introduced${commit ? ` (commit ${commit.slice(0, 12)}, resolved via ${via})` : ` (named via ${via})`}.`,
     `Blocker: ${detail}`,
     ...(fix ? [`Fix: ${fix}`] : []),
-    'Treat it as your own defect: enqueue the repair on the owning code, land it, then notify the reporter so it resolves its incident (api notify --kind reply).',
+    'Treat it as your own defect: enqueue the repair on the owning code, land it, then notify the reporter so it resolves its incident (starci kernel notify --kind reply).',
   ].join('\n');
   return { subject, body };
 }

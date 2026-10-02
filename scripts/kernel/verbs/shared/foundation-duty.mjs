@@ -28,6 +28,6 @@ export const foundationDutyFor = (db, wf, skillRoot, { foundations = readFoundat
     peers, declared: declared.declared, none: declared.none,
     owns: declared.owns.map((f) => foundationBriefOf(db, f)), needs: declared.needs.map((f) => foundationBriefOf(db, f)),
     required, advised: owed && !required,
-    ...(owed ? { detail: `${peers.length} running peer(s) share this ledger's source (${peers.join(', ')}) and this workflow declared no shared foundation: run api foundations, then api foundation --claim <name> for each it owns, --declare-dependent <name> for each it needs, or --declare-none${required ? '; api enqueue refuses its legs until it does' : ' (advised: it started before foundation planning, so nothing is held)'}` } : {}),
+    ...(owed ? { detail: `${peers.length} running peer(s) share this ledger's source (${peers.join(', ')}) and this workflow declared no shared foundation: run starci kernel foundations, then starci kernel foundation --claim <name> for each it owns, --declare-dependent <name> for each it needs, or --declare-none${required ? '; starci kernel enqueue refuses its legs until it does' : ' (advised: it started before foundation planning, so nothing is held)'}` } : {}),
   };
 };

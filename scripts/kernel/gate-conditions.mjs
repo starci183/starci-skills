@@ -4,8 +4,8 @@
 // .starciwork/shell/index.yaml exists", "wait for job X to settle + sha"). Nobody re-checked it and
 // workflows sat for hours after the condition held (nivo wf-nivo-app-auth-mudqjob3 inc-9f2e1e7ff1f6
 // waited on op-backend.implement-82b3110067; Collab inc-28187662c4fe on the Modules shell rev).
-// `api incident ... --until-<type> <spec>` stores TYPED conditions on the incident; the runtime
-// evaluates them read-only on every `api status` (every watchdog tick), before route/dispatch, after
+// `starci kernel incident ... --until-<type> <spec>` stores TYPED conditions on the incident; the runtime
+// evaluates them read-only on every `starci kernel status` (every watchdog tick), before route/dispatch, after
 // a settle and after a peer message, and resolves the incident itself once every condition holds
 // (events 'incident-resolved' {by:'until-conditions'} + 'incident-auto-resolved' {evidence}).
 // An incident without typed conditions keeps its free-text behaviour exactly: nothing here reads it.
@@ -18,11 +18,11 @@
 //                                              workflow after the wait was raised
 //   --until-commit <repo>:<ref-or-path>        <ref> resolves to a commit, or <path> is committed at HEAD
 //   --until-incident <incidentId>[:resolved]   that incident is no longer open
-//   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
+//   --until-foundation <name>                  the ledger's shared foundation <name> landed (starci kernel foundation
 //                                              --land; scripts/kernel/foundation-registry.mjs)
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it
 //                                              landed there at its finish (workflow-landed: a workflow lands
-//                                              into main once, at api finish, workflow-checkpoint.mjs) (a
+//                                              into main once, at starci kernel finish, workflow-checkpoint.mjs) (a
 //                                              cross-workflow hold on a restructure, e.g. a product's frontend
 //                                              legs held until its canon workflow lands into the frontend repo)
 //
@@ -187,7 +187,7 @@ export function parseConditions(db, raw, { workflowId }) {
       }
     }
     if (cond.type === 'foundation' && !readFoundation(db, cond.name)) {
-      throw Object.assign(new Error(`--until-foundation names no registered shared foundation ${cond.name}; its owner claims it (api foundation --claim ${cond.name}) or you declare the need (api foundation --declare-dependent ${cond.name}) first`), { code: 'foundation-unknown' });
+      throw Object.assign(new Error(`--until-foundation names no registered shared foundation ${cond.name}; its owner claims it (starci kernel foundation --claim ${cond.name}) or you declare the need (starci kernel foundation --declare-dependent ${cond.name}) first`), { code: 'foundation-unknown' });
     }
     if (cond.type === 'landed' && (cond.workflowId === workflowId || !db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(cond.workflowId))) {
       throw Object.assign(new Error(`--until-landed names no other workflow ${cond.workflowId} in this ledger`), { code: 'until-landed-workflow-unknown' });
@@ -334,7 +334,7 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 
 export const SHARED_BLOCKER_ROUTED = 'shared-blocker-routed';
-// Job ids are op-<op>-<10 hex> (api enqueue).
+// Job ids are op-<op>-<10 hex> (starci kernel enqueue).
 const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 /**
  * The typed release of a shared blocker routed to workflow `to`: the reporter waits on the job of `to`

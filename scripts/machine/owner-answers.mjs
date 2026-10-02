@@ -8,7 +8,7 @@
 // text. The same shape hit another product's architecture.decide.
 //
 // Now dispatch binds the answers into the packet (context.owner_answers) and the
-// op prompt, and `api report` refuses an ask that repeats one of them
+// op prompt, and `starci kernel report` refuses an ask that repeats one of them
 // (modules/kernel/api.yaml commands.dispatch ownerAnswers, commands.report
 // refuses ask-already-answered; modules/kernel/dispatch.yaml packet).
 //

@@ -1,4 +1,4 @@
-// api plan: split from cli.mjs.
+// starci kernel plan: split from cli.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from '../../lib/json.mjs';
@@ -34,7 +34,7 @@ export default {
     const storedOps = storedLegs ? storedLegs.map((l) => l?.op ?? l).filter(Boolean) : null;
     // A chain approved before the owner handover existed lacks its final leg.
     // Appending handover.review as the LAST leg is the one addition the Kernel
-    // makes without the owner (api finish requires it), so it is no divergence.
+    // makes without the owner (starci kernel finish requires it), so it is no divergence.
     const handoverAppended = Boolean(storedOps) && !storedOps.includes(HANDOVER_OP) && planOps.at(-1) === HANDOVER_OP
       && planOps.indexOf(HANDOVER_OP) === planOps.length - 1;
     const comparedOps = handoverAppended ? planOps.slice(0, -1) : planOps;
@@ -76,7 +76,7 @@ export default {
       });
     });
 
-    // The legs the owner's config.yaml specs switches defer (never dispatched; api run-deferred-tests runs them later).
+    // The legs the owner's config.yaml specs switches defer (never dispatched; starci kernel run-deferred-tests runs them later).
     const specs = ownerSpecs(internals.skillRoot);
     const deferredLegs = legs.map((leg) => ({ op: leg.op, deferral: planLegDeferral({ skillRoot: internals.skillRoot, op: leg.op, settings: specs, goalText: g?.markdown ?? null }) })).filter((leg) => leg.deferral)
       .map((leg) => ({ op: leg.op, reason: leg.deferral.reason }));

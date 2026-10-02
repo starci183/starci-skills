@@ -1,4 +1,4 @@
-// api retire-ask — close an ask the owner should no longer answer (api-lib/asks.mjs retireAsk):
+// starci kernel retire-ask — close an ask the owner should no longer answer (api-lib/asks.mjs retireAsk):
 // the ask is recorded ask-superseded with by:null and the reason, the same terminal kind
 // serve-ask writes for a replaced ask; its Telegram messages leave the owner's chat. Split out
 // of cli.mjs (lane slim-api); its help line stays in cli.mjs usage() (usageInCore).

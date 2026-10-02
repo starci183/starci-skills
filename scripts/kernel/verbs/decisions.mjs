@@ -1,4 +1,4 @@
-// api decisions — Decision Items (reconciler DESIGN §10.3, §11; lane rc-decisions). A DI is the durable message a
+// starci kernel decisions — Decision Items (reconciler DESIGN §10.3, §11; lane rc-decisions). A DI is the durable message a
 // decider acts on: controllers and the SLA layer open them for the Kernel, the Supervisor opens `supervisor-ruling`
 // DIs instead of typing notices, the Kernel reads them first every wake and resolves each with an allowed verb.
 // Rows: the ledger `inbox` table, kind 'decision', key = idempotencyKey; events decision-*. The store logic is
@@ -9,7 +9,7 @@
 //             [--due-ms <ms>] [--key <idempotencyKey>] [--evidence-file <f> | --evidence <t> | --evidence-json <json>]
 //             [--allowed-verbs <csv>] [--options-json <json>] [--severity critical] [--item <owed key>] --by <actor>
 //   decisions --claim <id> --by <actor>
-//   decisions --resolve <id> --by <actor> --verb <what you ran> [--decision <api decide id>] [--note <t>]
+//   decisions --resolve <id> --by <actor> --verb <what you ran> [--decision <starci kernel decide id>] [--note <t>]
 //   decisions --escalate <id> [--to supervisor|owner] --by <actor> [--reason <t>]
 import fs from 'node:fs';
 import path from 'node:path';

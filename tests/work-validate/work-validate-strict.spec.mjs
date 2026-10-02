@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { validateWork } from '../../scripts/work/validate/work-validate.mjs';
 
-// inc-16fe1a2895fd: `starci validate` went green on records an ajv 2020 compile of their own schema refused
+// inc-16fe1a2895fd: `starci runtime validate` went green on records an ajv 2020 compile of their own schema refused
 // (closed objects, slug and timestamp patterns). `--strict` is that compile; the default stays lenient
 // because live trees still carry records written before it, and ops run strict on what they write.
 

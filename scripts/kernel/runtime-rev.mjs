@@ -4,17 +4,17 @@
 // so a later runtime change (grammar, knowledge, prompts, op manifests) never reached a running Kernel
 // without a restart (nine Kernels were restarted that day). Instead the runtime tells it what to re-read:
 //   - the runtime revision is the runtime root's git HEAD (contract-version.mjs runtimeShaOf);
-//   - the Kernel records the revision it has read with `api kernel-ack-rev` (event runtime-rev-acked);
+//   - the Kernel records the revision it has read with `starci kernel kernel-ack-rev` (event runtime-rev-acked);
 //     start-workflow records the boot revision the same way (source boot);
 //   - every Kernel wake carries `Runtime rev <short-sha>` (revWakeLine) and, when the acked revision is
 //     behind, the kernel-relevant files that changed in between (KERNEL_REV_PATHS) plus the
 //     contract-change entry files added in between, one line each - or, past REV_DIFF_MAX_FILES or
 //     for a revision git no longer knows, "re-read kernel-prompt.md and driver-loop.yaml in full";
-//   - until the Kernel acks the current revision, api enqueue / dispatch of a leg whose op contract
+//   - until the Kernel acks the current revision, starci kernel enqueue / dispatch of a leg whose op contract
 //     (contractFilesOf: its brief, _common, the verdict contract, the schemas and checks it cites, the
 //     op prompt builder) or a contract change scoped to that op changed in between is refused
 //     kernel-rev-stale (opRevStale); every other leg is unaffected;
-//   - api settle compares the revision a leg was dispatched under (contracts.context_json.contract
+//   - starci kernel settle compares the revision a leg was dispatched under (contracts.context_json.contract
 //     runtimeSha) with the current one and WARNs op-rev-drift when that op's contract files changed
 //     in between (opRevDrift) - never a refusal.
 // A workflow with no runtime-rev-acked event yet (a Kernel booted before this module) is `unacked`: its
@@ -96,7 +96,7 @@ const changesAt = (root, rev) => {
         const everyOp = !ops.length && (Boolean(c.adds?.checks?.length || c.adds?.codes?.length) || c.safetyCritical === true);
         const paths = Array.isArray(c.paths) ? c.paths.filter((p) => typeof p === 'string') : [];
         const out = { id: c.id, summary: clip(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
-        // reach and paths ride non-enumerable: the wake and api status keep their shape.
+        // reach and paths ride non-enumerable: the wake and starci kernel status keep their shape.
         Object.defineProperty(out, 'reach', { value: typeof c.reach === 'string' ? c.reach : null, enumerable: false });
         Object.defineProperty(out, 'paths', { value: paths, enumerable: false });
         return out;
@@ -138,7 +138,7 @@ export function latestRevAck(db, workflowId) {
 }
 
 /**
- * api status kernelRev: {current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount,
+ * starci kernel status kernelRev: {current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount,
  * changes[]}. stale: the acked revision is behind and a kernel-relevant file or a contract change moved
  * in between (a revision git cannot compare is stale and full). `files` is capped at REV_DIFF_MAX_FILES;
  * the whole list rides as the non-enumerable `allFiles` for the gate.
@@ -212,7 +212,7 @@ export function opRevStale(state, op, { root = revRootOf() } = {}) {
   return files.length || changes.length ? { files, changes } : null;
 }
 
-const ackCommand = (workflowId, rev) => `api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev)}`;
+const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev)}`;
 
 /** The one sentence a Kernel wake carries about the runtime revision (no newline); null without a revision. */
 export function revWakeLine(state, workflowId) {

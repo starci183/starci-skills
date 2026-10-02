@@ -2,22 +2,22 @@
 // draw-gates.mjs — every gate an interface.draw pass is judged by, run locally in one command BEFORE the drawer reports
 // (lane op-draw, 2026-09-28). Measured 2026-09-27: 18 interface.draw jobs failed after the drawer reported, most on a
 // gate it never ran or ran differently from the runtime (a strict validate of a whole ui tree, a hand-picked ui-proof
-// score, the owner gate mistaken for a failure). This runs exactly what api settle and api record-checks run, in their order,
-// and prints the report.checks entries - each red one with `failing` (the implicated files), so api record-checks attributes
+// score, the owner gate mistaken for a failure). This runs exactly what starci kernel settle and starci kernel record-checks run, in their order,
+// and prints the report.checks entries - each red one with `failing` (the implicated files), so starci kernel record-checks attributes
 // a red gate on a record outside the job's owned paths instead of spending the attempt on it.
 //
 //   starci work draw-gates --ui <ui-record-dir> --repo <product repo> [--files <a,b,...>] [--no-remeasure]
 //        [--checks-out <file>] [--json]
 //
 // The gates (names are the report.checks names):
-//   draw-acceptance   scripts/work/draw/draw-acceptance.mjs over the record dir and --files (what api settle judges:
+//   draw-acceptance   scripts/work/draw/draw-acceptance.mjs over the record dir and --files (what starci kernel settle judges:
 //                     token-rendered shapes of ui.shapes, no data status, draw quality, DNA, taste, rationale, the
 //                     loop). DRAW_NOT_OWNER_ACCEPTED is the owner gate, reported apart (owner-review), never a red gate.
 //   draw-metrics      scripts/work/draw-loop-settle.mjs: every live part re-rendered and re-measured by the runtime
 //                     (DRAW_METRICS_FAILED / DRAW_METRICS_UNVERIFIED / DRAW_FEEDBACK_UNADDRESSED). --no-remeasure
 //                     skips it (it renders; the settle still runs it).
 //   validate-strict   bin/starci.mjs validate <ui dir> --strict: each refused record is named in `failing`; a refusal
-//                     in a child record outside the job's owned paths is attributed foreign by api record-checks.
+//                     in a child record outside the job's owned paths is attributed foreign by starci kernel record-checks.
 //   shell-conformance scripts/work/ui/shell-conformance.mjs <ui dir>.
 //   draw-layer        scripts/work/draw/draw-layer.mjs over every live part (standard principles of every drawing, owner
 //                     2026-09-28): DRAW_NESTED_VARIANT on its rendered DOM, DRAW_MEASURE_UNCAPPED on its record's
@@ -45,7 +45,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const rel = (repo, p) => slash(path.relative(repo, p));
 const uniq = (xs) => [...new Set(xs.filter(Boolean))];
 
-/** The command line a gate is re-run by (the evidence names it, api record-checks records it). */
+/** The command line a gate is re-run by (the evidence names it, starci kernel record-checks records it). */
 const WORK_VERBS = new Map([
   ['scripts/work/draw/draw-acceptance.mjs', 'draw-acceptance'],
   ['scripts/work/draw-loop.mjs', 'draw-loop'],
@@ -57,7 +57,7 @@ const cmd = (script, args) => `starci work ${WORK_VERBS.get(script)} ${args.join
 /** The repo-relative file a finding implicates: its path, else the record. */
 const fileOf = (f, fallback) => (typeof f?.path === 'string' && f.path ? f.path.split('#')[0] : fallback);
 
-/** Parse `<path>: <message> [CODE]` refusal lines (starci validate --json) into {file, code, message}. */
+/** Parse `<path>: <message> [CODE]` refusal lines (starci runtime validate --json) into {file, code, message}. */
 export function refusalsOf(lines, cwd, repo) {
   return (Array.isArray(lines) ? lines : []).map((line) => {
     const m = /^(.+?\.(?:ya?ml|json)):\s*(.*?)(?:\s*\[([A-Z0-9_]+)\])?\s*$/.exec(String(line));
@@ -85,7 +85,7 @@ export async function drawGates({ ui, repo, files = [], remeasure = true, runner
   const bound = uniq([uiDir, ...files.map((f) => path.resolve(root, f))]);
   const gates = [];
 
-  // 1. draw-acceptance: exactly what api settle judges (draw-not-accepted); the owner gate is reported apart.
+  // 1. draw-acceptance: exactly what starci kernel settle judges (draw-not-accepted); the owner gate is reported apart.
   const acc = drawAcceptanceFindings({ repo: root, files: bound });
   const owner = acc.findings.filter((f) => f.code === OWNER_GATE_CODE);
   const red = acc.findings.filter((f) => f.code !== OWNER_GATE_CODE);

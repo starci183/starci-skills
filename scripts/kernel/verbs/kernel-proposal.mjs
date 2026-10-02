@@ -1,4 +1,4 @@
-// api kernel-proposal — tier 2 (owner 2026-09-28): a change the Kernel needs in SHARED .claude (an op manifest,
+// starci kernel kernel-proposal — tier 2 (owner 2026-09-28): a change the Kernel needs in SHARED .claude (an op manifest,
 // knowledge, grammar, a gate, runtime code) is never made by the Kernel. It files a proposed patch with its evidence;
 // the Supervisor lands AUTO-tier ones through a lane (lessons.mjs tiers) and forwards IMPORTANT ones to the owner. A
 // local op-override or graph-edit keeps the workflow moving meanwhile. The proposal is a ledger event plus a line in

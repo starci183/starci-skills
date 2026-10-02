@@ -2,15 +2,15 @@
 //
 // A job queued `--after` (or behind an earlier leg, its cut's seam, a record it dependsOn) a job that a
 // typed wait holds reads queuedBecause dependency, yet nothing but that wait can release it: it runs only
-// after the held job does. api status counted it as engaged work, so a workflow whose only open operations
+// after the held job does. starci kernel status counted it as engaged work, so a workflow whose only open operations
 // were a peer-wait-held job and its dependant read frontier `engaged` instead of `peer-wait`, and the
 // supervisor's stall check (scripts/supervisor/stall.mjs, which reads that frontier) alerted STALLED on a
 // workflow correctly parked on its peer (a subscription workflow: ord-6
 // --after ord-3, ord-3 held by peer-wait; a debt workflow read "queued: peer-wait 1,
-// dependency 1"). api status (cmdStatus) is the one place that judges it; stall reads the frontier.
+// dependency 1"). starci kernel status (cmdStatus) is the one place that judges it; stall reads the frontier.
 
 /**
- * The wait at the end of each queued dependant's chain. `queued` is api status frontier.queued
+ * The wait at the end of each queued dependant's chain. `queued` is starci kernel status frontier.queued
  * ([{jobId, queuedBecause, blockedBy}]), `heldSettle` its heldSettleJobs ([{jobId, heldBecause, blockedBy}]).
  * A queued job held by an owner-gate or peer-wait, or a settle a wait defers, is a root; a queued job whose
  * queuedBecause is `dependency` and whose blockedBy.job is a root or another parked dependant is parked

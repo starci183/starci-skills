@@ -7,7 +7,7 @@
 //                      the [Worker] is started by scripts/agent/start-worker.mjs startWorkerAgent from the
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
 //   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
-//                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
+//                      the [Op] is started the starci kernel dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
 //                      <kernel terminal>, worker-start --spec --run --from); the critic by
 //                      scripts/work/draw-critic.mjs launchCriticWorker on its criticWorkspace placement, from the Op's
 //                      terminal.
@@ -66,7 +66,7 @@ const slash = (p) => String(p).replaceAll('\\', '/');
 
 /**
  * Each role: its depth under the entry, its parent role, its title; an op role also its side (be/fe) and whether its
- * no-op fails on purpose. `by: 'smoke'` is a role the smoke itself starts from its parent's terminal (the api dispatch
+ * no-op fails on purpose. `by: 'smoke'` is a role the smoke itself starts from its parent's terminal (the starci kernel dispatch
  * shape: the dispatcher names the Kernel terminal as --from) instead of the parent's stage.
  */
 export const ROLES = Object.freeze({

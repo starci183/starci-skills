@@ -155,7 +155,7 @@ const fixture=t=>{
   return {repo,wf,api,ok,seed,read,leg};
 };
 
-test('api record-checks records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
+test('starci kernel record-checks records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
   const fx=fixture(t);
   fx.leg('job-old-draw','interface.draw',T_TREE+60_000);
   fx.leg('job-new-draw','interface.draw',Date.now());

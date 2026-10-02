@@ -9,7 +9,7 @@
 //             events decision-opened|claimed|resolved|escalated|expired|superseded. The Supervisor's own DIs are
 //             machine.sqlite sup_decision_items (+ sup_decisions, sup_events sup-decision-*); its doorbell is a
 //             sup_events supervisor-ring and one deliveries row (doorbell, seat supervisor) per attempt.
-//   verb      `api decisions` (scripts/kernel/verbs/decisions.mjs) is the only writer of product DIs; this
+//   verb      `starci kernel decisions` (scripts/kernel/verbs/decisions.mjs) is the only writer of product DIs; this
 //             module's openDecision(repo, di) runs it as a child; the functions taking a `ledger` are its core.
 //   doorbell  ringDoorbell: one fixed line through wake-delivery.mjs, ONLY when the seat reads turn-idle; a busy
 //             seat is `deferred` (the DI is not lost), at most one ring per RING_MIN_GAP_MS per seat, never the
@@ -343,7 +343,7 @@ const appOf = (p) => String(p).replace(/\\/g, '/').match(/(?:^|\/)((?:apps|packa
  * integration and parity on the current tip) or drop it. Every command is an existing verb; the api refuses a wrong one.
  */
 export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {}) {
-  const wf = di.workflowId, api = 'node scripts/kernel/cli.mjs', R = `--repo ${q(repo)}`;
+  const wf = di.workflowId, api = 'starci kernel', R = `--repo ${q(repo)}`;
   const base = { id: di.id, kind: di.kind, summary: di.summary };
   const resolve = (verb) => `${api} decisions ${R} --resolve ${di.id} --by kernel:${wf} --verb ${q(verb)} --decision <decide id>`;
   if (!(JOB_KINDS.includes(di.kind) && di.entity?.type === 'job')) {
@@ -392,12 +392,12 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
 /** The refusal text of decisions-first: the top item and its exact commands. */
 export function decisionsFirstText(verb, workflowId, blocking, top) {
   const step = top.decide ? 2 : 1;
-  return [`${DECISIONS_FIRST}: ${blocking.length} Decision Item(s) of ${workflowId} wait on you, open and unclaimed for more than ${Math.round(BLOCK_AGE_MS / 60_000)} min - ${verb} is refused until you decide them (api decisions --workflow ${workflowId}).`,
+  return [`${DECISIONS_FIRST}: ${blocking.length} Decision Item(s) of ${workflowId} wait on you, open and unclaimed for more than ${Math.round(BLOCK_AGE_MS / 60_000)} min - ${verb} is refused until you decide them (starci kernel decisions --workflow ${workflowId}).`,
     `Oldest: ${top.id} - ${top.what}`,
     top.decide ? `1. log it: ${top.decide}` : null,
     ...top.commands.map((c, i) => `${step}${String.fromCharCode(97 + i)}. ${c.title}: ${c.run}`),
     `${step + 1}. ${top.resolve}`,
-    `(api decisions --claim ${top.id} --by kernel:${workflowId} holds it 15 min; a command carrying --resolves ${top.id} passes this guard)`].filter(Boolean).join('\n');
+    `(starci kernel decisions --claim ${top.id} --by kernel:${workflowId} holds it 15 min; a command carrying --resolves ${top.id} passes this guard)`].filter(Boolean).join('\n');
 }
 
 /**
@@ -445,7 +445,7 @@ export function sweepDecisions(ledger, workflowId, { now = Date.now(), prefix = 
 }
 
 /**
- * api archive / api finish close the workflow's live DIs (open|claimed|escalated) inside their own transaction,
+ * starci kernel archive / starci kernel finish close the workflow's live DIs (open|claimed|escalated) inside their own transaction,
  * BEFORE the phase flips: an archived workflow takes no further writes (events_refuse_archived), so a DI left
  * live there could never be resolved and would keep counting, escalating and digesting forever. Each resolves
  * by 'runtime' (verb workflow-archived | workflow-finished, event decision-resolved auto:true). Rows are read
@@ -467,7 +467,7 @@ export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.no
 
 /* ------------------------------------------------------------ the verb as a child (controllers, notify.mjs) */
 
-/** Run `api decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
+/** Run `starci kernel decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
 export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
   const r = runNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env });
   let json = null;
@@ -491,7 +491,7 @@ export function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs
 /**
  * Open a DI (lane rc-engine ctx.openDecision). `di` uses the schema field names, as the controllers build it. A DI
  * whose `ledger` is 'supervisor' goes to machine.sqlite (openSupervisorDecision; `repo` unused); any other goes
- * to the product ledger at `repo` through `api decisions --open` (a child). Returns {ok, json: {decision, ...}}.
+ * to the product ledger at `repo` through `starci kernel decisions --open` (a child). Returns {ok, json: {decision, ...}}.
  */
 export function openDecision(repo, di, { env = process.env, run = runDecisionsVerbAsync, now = Date.now() } = {}) {
   if (di?.ledger === 'supervisor') {
@@ -515,7 +515,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 /* ------------------------------------------------------------ the doorbell */
 
-export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: api decisions --workflow ${workflowId}`,
+export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: starci kernel decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
     `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';

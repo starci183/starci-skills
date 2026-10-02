@@ -20,7 +20,7 @@ export function isGeneratedPath(root, fileName) {
 // A `<tool>.config.*` or `<tool>.setup.*` module at the root of a project (beside a package manifest or a tsconfig.json:
 // next.config.ts and postcss.config.mjs of an app, which has no package.json of its own) is build tooling a broad `**/*.ts`
 // include pulls in; a `*.config.ts` inside a source tree (src/config/database.config.ts) has neither beside it and stays source.
-// The architecture program still reads tooling modules (a profile may declare one as source); the lint (hfs lint) judges one only
+// The architecture program still reads tooling modules (a profile may declare one as source); the lint (starci app lint) judges one only
 // through the repository's own eslint.config.
 const TOOLING_MODULE = /^[^/]+\.(?:config|setup)\.[cm]?[jt]sx?$/i;
 export function isToolingModule(fileName) {

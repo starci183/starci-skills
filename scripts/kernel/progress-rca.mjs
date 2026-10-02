@@ -2,7 +2,7 @@
 // computed in deterministic code, so a Kernel on a modest model only has to pick the top untried action.
 //
 // Owner ruling 2026-09-28: the workflows move themselves forward, not the supervisor. Ops draw the graph, the Kernel
-// makes LIGHT edits (api graph-edit) and dispatches the owning op for a heavy redesign (api redesign). The Kernel
+// makes LIGHT edits (starci kernel graph-edit) and dispatches the owning op for a heavy redesign (starci kernel redesign). The Kernel
 // stays on Devin, so the thinking lives here:
 //
 //   progressOf  units that PASSED their gates (a succeeded job; never a job count, never a self-marked done), units
@@ -16,7 +16,7 @@
 //               a runtime or cross-workflow cause the Kernel cannot fix) and whether the decision log already
 //               tried it (a failed try sinks, it is never offered as new).
 //
-// Read-only over the ledger. `api status` exposes `progress` and `rca` (scripts/kernel/status/*.mjs); the
+// Read-only over the ledger. `starci kernel status` exposes `progress` and `rca` (scripts/kernel/status/*.mjs); the
 // workflow controller (modules/reconciler/workflow.yaml) reuses it for the progress-stall DI and escalation.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,7 @@ const HOUR = 3_600_000;
 const one = (s, n = 240) => clipLine(String(s ?? '').replace(/\s+/g, ' ').trim(), n);
 const parse = (s, d = {}) => parseJsonOr(s, d) ?? d;
 
-/** runtimes.yaml allocation.progress with safe defaults (a missing block never breaks api status). */
+/** runtimes.yaml allocation.progress with safe defaults (a missing block never breaks starci kernel status). */
 export function progressSettings(allocation = null) {
   let a = allocation;
   if (!a) { try { a = allocationSettings(); } catch { a = {}; } }
@@ -108,7 +108,7 @@ export function priorities() {
 
 /**
  * How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
- * fleet RAM cap, the pools and its queued-ready work allow). Pure over `core` (the api status fields ramThrottle,
+ * fleet RAM cap, the pools and its queued-ready work allow). Pure over `core` (the starci kernel status fields ramThrottle,
  * poolLoad) and the counts. {allowed, why, fleetFree, poolFree, cap}.
  */
 export function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
@@ -139,7 +139,7 @@ export function isPriority(workflowId, prio = priorities()) {
 }
 
 /**
- * The progress block of `api status`. Pure over its inputs: `jobs` (opJobsOf), `core` (the api status out: legs,
+ * The progress block of `starci kernel status`. Pure over its inputs: `jobs` (opJobsOf), `core` (the starci kernel status out: legs,
  * frontier, ramThrottle, poolLoad, stuck), `createdAt` (the workflow row), `now`, `settings`.
  */
 export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now = Date.now(), settings = progressSettings(), prio = priorities(), kernelItems = null }) {
@@ -353,7 +353,7 @@ const actionKey = (...parts) => parts.join(':');
  * Each: {rank, key, tier: light|heavy|proposal|supervisor, title, command, expected, unblocks, cause, tried}.
  */
 export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo>', decisions = [], missingQueued = [], settings = progressSettings(), recutOp = null, importsBroken = null }) {
-  const api = `node scripts/kernel/cli.mjs`;
+  const api = `starci kernel`;
   const base = `--repo ${q(repo)} --workflow ${workflowId}`;
   const acts = [];
   const add = (a) => acts.push(a);
@@ -371,7 +371,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
     const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
     const verdictOf = (it) => (it.outcome === 'done' ? 'pass' : it.outcome === 'blocked' || it.outcome === 'ask' ? 'blocked' : it.outcome ? 'fail' : '<pass|fail|blocked from its report>');
     add({ key: actionKey('settle-backlog', ids.length), tier: 'light', cause: 'needs-kernel-decision', unblocks: 1000 + ids.length,
-      title: `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (api route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => `${it.jobId}${it.reason ? ` [${it.reason}]` : ''}`).join(', ')}`,
+      title: `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (starci kernel route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => `${it.jobId}${it.reason ? ` [${it.reason}]` : ''}`).join(', ')}`,
       command: items.slice(0, 20).map((it) => `${it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : ''}${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${verdictOf(it)}`).join(' ; '),
       expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
   }
@@ -460,7 +460,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
     } else if (c.cause === 'tool-timeout') {
       add({ key: actionKey('params', 'commandTimeoutMs'), tier: 'light', cause: c.cause, unblocks: c.open,
         title: 'give the op a longer command window and the background-run rule for long validators',
-        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, gate.mjs, hfs lint) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
+        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, gate.mjs, starci app lint) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
         expected: 'no unit blocks on a 30 s tool window; applies to every later dispatch of the op in this workflow' });
     } else if (c.cause === 'test-gap' && unitSpecsOff()) {
       add({ key: actionKey('params', 'specs-unit-off'), tier: 'light', cause: c.cause, unblocks: c.open,
@@ -596,8 +596,8 @@ export function stallNotice(w, { lang = 'vi' } = {}) {
   return [
     `PROGRESS-STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}.`,
     r ? `${whyLine(r, { language: lang }) ?? ''}` : '',
-    p.queuedReady > 0 && p.running < p.allowedParallel ? tr('Run now: api dispatch-ready --workflow {wf} (running {running}/{allowed}, {ready} ready).', { wf: w.workflowId, running: p.running, allowed: p.allowedParallel, ready: p.queuedReady }) : '',
-    top ? tr('Action #{rank} [{tier}] {title}. Log: api decide --workflow {wf} --hypothesis "..." --action-key {key} --metric "units/h". Run: {command}', { rank: top.rank, tier: top.tier, title: top.title, wf: w.workflowId, key: top.key, command: top.command }) : '',
+    p.queuedReady > 0 && p.running < p.allowedParallel ? tr('Run now: starci kernel dispatch-ready --workflow {wf} (running {running}/{allowed}, {ready} ready).', { wf: w.workflowId, running: p.running, allowed: p.allowedParallel, ready: p.queuedReady }) : '',
+    top ? tr('Action #{rank} [{tier}] {title}. Log: starci kernel decide --workflow {wf} --hypothesis "..." --action-key {key} --metric "units/h". Run: {command}', { rank: top.rank, tier: top.tier, title: top.title, wf: w.workflowId, key: top.key, command: top.command }) : '',
     'driver-loop.yaml progress: FIRST DUTY every wake.',
   ].filter(Boolean).join(' ');
 }

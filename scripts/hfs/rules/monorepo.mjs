@@ -29,7 +29,7 @@ export const WORKSPACE_LINT = 'starci app lint --workspace .';
 export const FE_APP_SCRIPTS = Object.freeze({ build: 'next build', dev: 'next dev', lint: WORKSPACE_LINT, start: 'next start', typecheck: 'tsc --noEmit' });
 /** The scripts every fe package workspace has (its build and typecheck commands are its own; its lint is the workspace lint). */
 export const FE_PACKAGE_SCRIPTS = Object.freeze(['build', 'typecheck', 'lint']);
-/** The package manager every app root declares (turbo reads it to parse the lockfile); the hfs scaffold writes it. */
+/** The package manager every app root declares (turbo reads it to parse the lockfile); the starci app scaffold writes it. */
 export const PACKAGE_MANAGER = 'npm@11.6.2';
 /** The npm name of an fe app workspace. */
 export const feAppPackageName = (project, app) => `@${project}/${app}`;

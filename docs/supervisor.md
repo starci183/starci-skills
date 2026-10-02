@@ -154,7 +154,7 @@ pin registry semver, never a `file:` link.
 1. Bump the version in a lane (`packages/grammar/package.json` and `package-lock.json`) by semver: additive is
    minor or patch, a fix is patch.
 2. Build (`npm ci` then `npm run build` in `packages/grammar`, a real directory, never a `node_modules` junction)
-   and verify the stamp: `node scripts/checks/check-grammar-dist.mjs` is fresh.
+   and verify the stamp: `starci runtime check --only grammar-dist` is fresh.
 3. Move the CHANGELOG entry under the version with its date; `starci work grammar-knowledge --write`
    and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.

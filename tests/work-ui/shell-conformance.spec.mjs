@@ -192,7 +192,7 @@ test('the product-locale rule is kept: every content prompt states it', async (t
   assert.equal(productLocaleFor(null), null);
 });
 
-test('starci validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
+test('starci runtime validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
   const p = await settledProduct(t);
   const legacyUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
   fs.mkdirSync(legacyUi, { recursive: true });

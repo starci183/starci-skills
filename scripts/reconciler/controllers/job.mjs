@@ -10,7 +10,7 @@
 //   held worker (frontier.heldWorkerJobs)       -> starci kernel reconcile --job <id> --release-worker                job.worker
 //   reported, not yet settled or handed over    -> the runtime settler for this job                          job.settle
 //                                                  (node scripts/kernel/settle/job-settle.mjs --repo R --job J: reconcileJobSettle -
-//                                                  consume, re-verify or canon parity, api record-checks + starci kernel settle; wrapped, never
+//                                                  consume, re-verify or canon parity, starci kernel record-checks + starci kernel settle; wrapped, never
 //                                                  re-implemented)
 //   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
 //   answering                                   -> starci kernel questions --workflow (bridge) + DI worker-question    job.consume-check
@@ -295,7 +295,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
       return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
     case 'settle':
-      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api record-checks + settle, release).
+      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };

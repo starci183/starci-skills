@@ -71,9 +71,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - id: list
-        run: echo "apps=$(node scripts/checks/check-examples-ci.mjs --matrix)" >> "$GITHUB_OUTPUT"
+        run: echo "apps=$(starci runtime check --only examples-ci -- --matrix)" >> "$GITHUB_OUTPUT"
       - id: images
-        run: echo "images=$(node scripts/checks/check-examples-ci.mjs --images)" >> "$GITHUB_OUTPUT"
+        run: echo "images=$(starci runtime check --only examples-ci -- --images)" >> "$GITHUB_OUTPUT"
 
   # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
   records:
@@ -88,7 +88,7 @@ jobs:
       - name: Install runtime dependencies
         run: npm ci
       - name: Example YAML parses under the runtime's own loader
-        run: node scripts/checks/check-example-yaml.mjs
+        run: starci runtime check --only example-yaml
       - name: Example Work-tree layout (ids, refs, evidence)
         run: node scripts/work/validate/check-example-work.mjs
       - name: Example Work-gate fixture suite

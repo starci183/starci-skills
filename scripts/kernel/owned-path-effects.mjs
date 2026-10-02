@@ -89,7 +89,7 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
   return { dirty: [...new Set(dirty)] };
 };
 
-// The owned-path half of a dead worker's no-effect proof (api reconcile
+// The owned-path half of a dead worker's no-effect proof (starci kernel reconcile
 // --dead-worker): every uncommitted change under the job's owned paths, and
 // every commit on any ref that touched them since `sinceMs` (the dispatch
 // contract's time). {provable:false, why} when the paths cannot be read — an

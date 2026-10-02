@@ -176,7 +176,7 @@ test('a redo still withheld from a change owes it only after the release; a canc
   assert.deepEqual(owedNow(),[['refactor-gate-two','job-b']],'admitted with gate two withheld, job-b owes one redo at its release');
 });
 
-test('dispatch withholds the frozen changes; api record-checks reads their codes advisory; the release re-stamps queued legs and drops a duplicate',t=>{
+test('dispatch withholds the frozen changes; starci kernel record-checks reads their codes advisory; the release re-stamps queued legs and drops a duplicate',t=>{
   const fx=fixture(t);
   const first=fx.ok(['enqueue','--workflow',fx.wf,'--op','code.refactor','--paths','docs/']).job_id;
   const d=fx.api(['dispatch','--job',first,'--model','codex-agent','--spawn']);

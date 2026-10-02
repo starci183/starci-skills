@@ -1,4 +1,4 @@
-// api hierarchy: split from cli.mjs.
+// starci kernel hierarchy: split from cli.mjs.
 import { AWAITING_OWNER } from '../../../engine/admission.mjs';
 
 export default {

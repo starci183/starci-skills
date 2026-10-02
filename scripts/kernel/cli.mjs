@@ -3,7 +3,7 @@
 // state operation; the long-lived [Kernel] never opens .starciwork/runtime.sqlite
 // itself and never spawns op terminals by hand — `dispatch` owns that.
 //
-//   node scripts/kernel/cli.mjs <cmd> --repo <path> [...] [--json]
+//   starci kernel <cmd> --repo <path> [...] [--json]
 //
 //   survey   --repo <path> --workflow <id> [--deliveries]
 //   status   --repo <path> --workflow <id>
@@ -215,7 +215,7 @@ const isCheckResultEnvelope = (value) => {
     return true;
   });
 };
-// A red check api record-checks marked `advisory` (a check or finding code a contract change added after
+// A red check starci kernel record-checks marked `advisory` (a check or finding code a contract change added after
 // the leg was admitted) is a suspect, and one it marked `peerBlocked` (its failing files are a
 // peer's change, scripts/kernel/gate-attribution.mjs) is the peer's: neither counts passed or
 // failed, and a pass still needs at least one green check.
@@ -233,7 +233,7 @@ const summarizeCheckEvidence = (value) => {
   if (isCheckResultEnvelope(value)) {
     const advisory = value.checks.filter(isAdvisoryCheck).length;
     const peerBlocked = value.checks.filter(isPeerBlockedCheck).length;
-    // A measurement leg's check that ran and measured findings (api record-checks marks it `measured`,
+    // A measurement leg's check that ran and measured findings (starci kernel record-checks marks it `measured`,
     // scripts/kernel/verify-failure.mjs) is a completed measurement: it counts passed.
     const measured = value.checks.filter(isMeasuredCheck).length;
     const declared = value.checks.filter(isDeclaredGreen).length, unavailable = value.checks.filter(isUnavailableCheck).length;
@@ -274,7 +274,7 @@ const summarizeCheckEvidence = (value) => {
 };
 
 const usage = (code) => {
-  console.error(`use: node scripts/kernel/cli.mjs <cmd> --repo <path> [...] [--json]
+  console.error(`use: starci kernel <cmd> --repo <path> [...] [--json]
   survey   --workflow <id> [--deliveries]
   status   --workflow <id>
   hierarchy --workflow <id>
@@ -341,7 +341,7 @@ const usage = (code) => {
   rename   --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
            set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
   run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]
-           re-queue the test legs the owner's config.yaml specs switches deferred (api status testsDeferred)`);
+           re-queue the test legs the owner's config.yaml specs switches deferred (starci kernel status testsDeferred)`);
   process.exit(code);
 };
 
@@ -486,7 +486,7 @@ const opSlotAdmission = (db, workflowId, { excludeJobId = null } = {}) => {
 
 /**
  * The queued cut seams of a workflow that a free slot would launch: ordinal 1 of a cut of more than one,
- * not held by an owner-gate or peer-wait. api dispatch gives them the workflow's last free slot.
+ * not held by an owner-gate or peer-wait. starci kernel dispatch gives them the workflow's last free slot.
  */
 const queuedSeamsOf = (db, workflowId) => {
   const rows = db.prepare(`SELECT job_id,workflow_id,op_id,status,payload_json FROM jobs WHERE workflow_id=? AND status='queued'
@@ -605,7 +605,7 @@ const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet', '
 // Mid-run host dialogs the runtime answers (owner rule 2026-09-23: the runtime, never the owner, answers
 // launch and host prompts). A gate the worker's agent card allowlists (gateAutoAnswer.gates) reads
 // interactive-gate with gateAutoAnswer {gate, select, answers, limit}: status lists it nudge-ready and
-// api nudge answers it, one op-worker-gate-answered event per answer. After `limit` answers on the same
+// starci kernel nudge answers it, one op-worker-gate-answered event per answer. After `limit` answers on the same
 // attempt (the gate's maxPerAttempt, default GATE_ANSWER_LIMIT) the gate is a loop, not a prompt: the
 // worker reads `gate-loop`, nudge refuses it, and it recovers like a wedged worker through
 // reconcile --dead-worker --settle-failed, so repeats across attempts become a retry-loop finding
@@ -652,7 +652,7 @@ const heartbeatAtOf = (job) => {
   } catch { return null; }
 };
 // `frame: true` returns the raw screen and input-box draft of the one read this worker paid for, so a
-// caller that reasons on the same frame (api nudge's foreign-input check) does not read the terminal
+// caller that reasons on the same frame (starci kernel nudge's foreign-input check) does not read the terminal
 // a second time with a TOCTOU window between classification and send.
 const observeOperationWorker = (job, now = Date.now(), db = null, { frame = false } = {}) => {
   const terminalHandle = operationTerminalHandleOf(job);
@@ -665,7 +665,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
   }
   // A leased job with no worker bound is a launch: in flight until its lease deadline (jobs.deadline,
   // dispatchLeaseTtlMs after the lease), abandoned after it. A dispatch killed mid-spawn (a shell timeout
-  // around api dispatch, nivo inc-c1d5bdbea173) leaves exactly that row.
+  // around starci kernel dispatch, nivo inc-c1d5bdbea173) leaves exactly that row.
   if (job.status === 'leased' && !terminalHandle) {
     const deadline = Number(job.deadline);
     return { jobId: job.job_id, opId: job.op_id, ledgerStatus: job.status, terminalHandle: null,
@@ -695,7 +695,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
           screenState = classified.state;
           screenGate = classified.state === 'interactive-gate' ? classified.gate ?? null : null;
         }
-        // An outage error row the provider CLI rendered: evidence for the provider circuit (api status
+        // An outage error row the provider CLI rendered: evidence for the provider circuit (starci kernel status
         // records it). An active turn is getting completions, so an old error row above it proves nothing.
         if (read?.ok && screenState !== 'active') providerOutage = workerOutageEvidence(job, read.screen);
       } catch { /* terminal-show fallback below remains conservative */ }
@@ -714,7 +714,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const unwritable = refused && !(heartbeatAt > refusedAt);
     const writable = shownWritable && !unwritable;
     // A host dialog the worker's card allowlists (a loop-detection menu) is the runtime's to
-    // answer: api nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
+    // answer: starci kernel nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
     const gateAnswer = screenState === 'interactive-gate' && connected && writable ? workerGateAnswerOf(db, job, screenGate) : null;
     // 'gone' is a running Orca's typed answer that the handle names no
     // terminal (after a host reboot Orca knows none of them); an unreachable
@@ -758,7 +758,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
 const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) => wakeKernelForTransition(ledger, {
   workflowId, transition, ids: { jobId, dispatchId }, lines: [
     `Operation job ${jobId} filed dispatch ${dispatchId}.`,
-    'Re-read canonical api status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
+    'Re-read canonical starci kernel status and survey now; consume, independently check and settle the exact report, release its worker, then continue the approved frontier.',
   ],
 });
 
@@ -767,7 +767,7 @@ const reportFiledWake = (ledger, { workflowId, transition, jobId, dispatchId }) 
 // modules/kernel/driver-loop.yaml foundations): a layout tree/shell, a brand, a @starci/grammar
 // version, a shared module - each with ONE owner workflow, a state and its dependents. The owner's
 // foundation legs run first; a dependent waits on the landing with a typed wait
-// (api incident --kind peer-wait --until-foundation <name>), which the landing releases.
+// (starci kernel incident --kind peer-wait --until-foundation <name>), which the landing releases.
 const foundationDutyOf = (db, wf, options) => foundationDutyFor(db, wf, skillRoot, options);
 
 const agentHierarchyOf = (db, workflowId) => agentHierarchyFor(db, workflowId, skillRoot);
@@ -808,7 +808,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 /**
  * Why one queued job is not running, in the order the causes actually bite. `dependency` is the
  * plan gate the Kernel applies before it routes at all; the four after it are the admission checks
- * `api route` and `api dispatch` run, in their own order (workflow ceiling, provider circuit, path
+ * `starci kernel route` and `starci kernel dispatch` run, in their own order (workflow ceiling, provider circuit, path
  * fence, pool saturation); `ready` means nothing blocks it and the Kernel is the only thing left.
  */
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
@@ -818,7 +818,7 @@ const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-t
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
- * Kernel resolves the incident. `api incident --kind owner-gate --holds` names
+ * Kernel resolves the incident. `starci kernel incident --kind owner-gate --holds` names
  * the held ops or jobs; without --holds the incident's --op is held. A job the
  * owner holds is not work the Kernel can do, so status never calls it ready
  * and the watchdog never wakes a Kernel for it.
@@ -847,7 +847,7 @@ const ownerGateOf = (gates, job) => {
 };
 /**
  * Open peer-wait incidents of a workflow: work that cannot pass its preflight until a PEER workflow
- * lands something (installs a dependency, writes a record). `api incident --kind peer-wait --peer
+ * lands something (installs a dependency, writes a record). `starci kernel incident --kind peer-wait --peer
  * <workflowId>` records it; --holds (else --op) names the held ops or jobs, which read queuedBecause
  * peer-wait, and with nothing else open the frontier reads `peer-wait`, not actionable, instead of
  * orphaned-frontier (a brand.decide waited
@@ -922,7 +922,7 @@ function afterChainReaches(db, row, targetId) {
 /** runtimes.yaml allocation.routeHoldMs: how long a routed-but-queued job keeps its pool slot after its latest route. */
 const routeHoldMsOf = () => allocationMs('routeHoldMs');
 /**
- * Pool load fleet-wide, the one count `api route` (capacity) and `api status` (queuedBecause pool-full) both
+ * Pool load fleet-wide, the one count `starci kernel route` (capacity) and `starci kernel status` (queuedBecause pool-full) both
  * reason with, so they agree: every non-settled job whose payload.model names a pool holds a slot of it - running,
  * leased and answering jobs always, and a routed-but-QUEUED one only while its latest route decision (payload.routedAt,
  * else its newest route-decided event) is younger than allocation.routeHoldMs. The hold lets sequential route calls of
@@ -969,7 +969,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
     } : {
       queuedBecause: 'owner-gate',
       blockedBy: { incident: gate.incidentId },
-      detail: `owner-gate incident ${gate.incidentId} holds it; the Kernel resolves it (api incident --resolve) once the owner's step lands`,
+      detail: `owner-gate incident ${gate.incidentId} holds it; the Kernel resolves it (starci kernel incident --resolve) once the owner's step lands`,
     };
   }
   // Autopilot: a deferred leg, or a live proof waiting for the handover credential checklist.
@@ -980,7 +980,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
     return {
       queuedBecause: 'peer-wait',
       blockedBy: { incident: peerWait.incidentId, peer: peerWait.peer },
-      detail: `peer-wait incident ${peerWait.incidentId} holds it until peer ${peerWait.peer} lands what it waits on (${peerWait.detail.slice(0, 160)}); a peer message from ${peerWait.peer} wakes the Kernel${peerWait.untilMessage ? ' and resolves the wait' : ', which resolves it (api incident --resolve) once the proof holds'}`,
+      detail: `peer-wait incident ${peerWait.incidentId} holds it until peer ${peerWait.peer} lands what it waits on (${peerWait.detail.slice(0, 160)}); a peer message from ${peerWait.peer} wakes the Kernel${peerWait.untilMessage ? ' and resolves the wait' : ', which resolves it (starci kernel incident --resolve) once the proof holds'}`,
     };
   }
 
@@ -1105,7 +1105,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   }
 
   // A routed-but-queued job counts toward its pool while its route hold lasts (poolLoadOf, the same count
-  // `api route` reasons with); what bounds it is the OTHER holders of the lane.
+  // `starci kernel route` reasons with); what bounds it is the OTHER holders of the lane.
   const maxParallel = Number(card?.maxParallel);
   const otherHolders = Math.max(0, (poolLoad.byModel[target] ?? 0) - (poolLoad.holders.has(job.job_id) ? 1 : 0));
   if (target && Number.isInteger(maxParallel) && maxParallel > 0 && otherHolders >= maxParallel) {
@@ -1124,7 +1124,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
 /**
  * op-rev-drift at settle (WARN, never a refusal): the runtime rev the leg was dispatched under
  * (contracts.context_json.contract.runtimeSha) against the current one; when the op's contract files
- * changed in between, one op-rev-drift event {op, attempt, from, to, files} (api status opRevDrift, typed
+ * changed in between, one op-rev-drift event {op, attempt, from, to, files} (starci kernel status opRevDrift, typed
  * log warning). Returns it, or null.
  */
 function recordOpRevDrift(ledger, job) {
@@ -1144,7 +1144,7 @@ function recordOpRevDrift(ledger, job) {
 /** The nextActions step a stale Kernel runs first: re-read what changed, then ack the current rev. */
 const rereadActionOf = (rev, workflowId) => ({ kind: 'reread', rev: rev.current, acked: rev.acked, files: rev.full ? ['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml'] : rev.files,
   ...(rev.changes.length ? { changes: rev.changes.map((c) => c.id) } : {}),
-  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}${rev.changes.length ? ` and the contract changes ${rev.changes.map((c) => c.id).join(', ')}` : ''}, then api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev.current)}; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
+  reason: `the runtime moved from the rev you acked (${shortRev(rev.acked)}) to ${shortRev(rev.current)}: re-read ${rev.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : rev.files.join(', ')}${rev.changes.length ? ` and the contract changes ${rev.changes.map((c) => c.id).join(', ')}` : ''}, then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev.current)}; until then enqueue/dispatch of a leg whose op contract changed is refused ${KERNEL_REV_STALE}` });
 /**
  * The RUNNING legs whose op contract moved on the runtime since their dispatch (op-rev-drift before settle): the
  * worker still runs its brief, is judged by its admission, and hears it on its next nudge. [{jobId, op, attempt, from,
@@ -1163,7 +1163,7 @@ function runningOpRevDriftOf(db, workflowId, { root = revRootOf() } = {}) {
   }
   return out;
 }
-/** The newest op-rev-drift warnings of a workflow (api settle): [{jobId, op, attempt, from, to, files, at}]. */
+/** The newest op-rev-drift warnings of a workflow (starci kernel settle): [{jobId, op, attempt, from, to, files, at}]. */
 const opRevDriftOf = (db, workflowId, limit = 5) => db.prepare('SELECT entity_id,payload_json,created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?')
   .all(workflowId, OP_REV_DRIFT, limit).map((row) => ({ jobId: row.entity_id, ...(parseJson(row.payload_json) ?? {}), at: row.created_at }));
 
@@ -1179,7 +1179,7 @@ function refuseStaleKernelRev(db, workflowId, op, verb) {
   const hit = opRevStale(state, op, { root });
   if (!hit) return;
   const what = [...hit.files, ...hit.changes.map((id) => `contract change ${id}`)].join(', ');
-  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(state.current)} and ${verb} again (api status kernelRev)`),
+  throw Object.assign(new Error(`${KERNEL_REV_STALE}: ${verb} of ${op} refused - its op contract changed between the runtime rev you acked (${shortRev(state.acked)}) and the current one (${shortRev(state.current)}): ${what}. Re-read ${state.full ? 'modules/kernel/kernel-prompt.md and modules/kernel/driver-loop.yaml in full' : state.files.join(', ')}, then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(state.current)} and ${verb} again (starci kernel status kernelRev)`),
     { code: KERNEL_REV_STALE, op, acked: state.acked, current: state.current, files: hit.files, changes: hit.changes });
 }
 
@@ -1212,16 +1212,16 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     const step = (jobResult(db, row.job_id) ?? {}).nextStep;
     if (!step || ownerGateOf(ownerGates, row) || step.kind === 'deferred' || deferredJobs.has(row.job_id)) continue;
     actions.push({ kind: 'retry', op: row.op_id, jobId: row.job_id,
-      reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? `${step.kind} ${step.incidentId} resolved` : step.reason}): api enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
+      reason: `${row.job_id} failed and nothing follows it (${['owner-gate', SUPERVISOR_GATE].includes(step.kind) ? `${step.kind} ${step.incidentId} resolved` : step.reason}): starci kernel enqueue --op ${row.op_id} with its paths and records --retry-of ${row.job_id}` });
   }
   for (const item of awaitingOwner.filter((ask) => ask.answer === 'answered')) {
     actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: item.answeredBy === AUTOPILOT_BY
-      ? `autopilot answered ask ${item.dispatchId} (${item.provisional ? `provisional acceptance, ${PROVISIONAL_LABEL}` : 'redraw/revise with the gate findings as the brief'}; owner ruling ${AUTOPILOT_RULING}): api enqueue --op ${item.opId} --retry-of ${item.jobId} so it applies the receipt`
-      : `the owner answered ask ${item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer` });
+      ? `autopilot answered ask ${item.dispatchId} (${item.provisional ? `provisional acceptance, ${PROVISIONAL_LABEL}` : 'redraw/revise with the gate findings as the brief'}; owner ruling ${AUTOPILOT_RULING}): starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it applies the receipt`
+      : `the owner answered ask ${item.dispatchId}: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} so it runs with the answer` });
   }
   // The owner's handover feedback re-opened a provisional acceptance: only that op re-runs (draw-feedback loop).
   for (const item of autopilot?.reopened ?? []) {
-    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: api enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` });
+    actions.push({ kind: 'retry', op: item.opId, jobId: item.jobId, reason: `the owner's handover answer ${item.handoverDispatchId} re-opened the provisional ${item.record ?? item.dispatchId}: starci kernel enqueue --op ${item.opId} --retry-of ${item.jobId} - the redraw's brief is the owner's note in ${item.receiptPath}` });
   }
   // A queued leg the specs switches defer needs nothing it waits on: whatever holds it, its route settles it
   // deferred at once (no dispatch, no attempt), which releases every leg behind it.
@@ -1229,16 +1229,16 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const item of queued.filter((row) => deferredQueued.has(row.jobId))) {
     const deferral = deferredQueued.get(item.jobId);
     actions.push({ kind: 'dispatch', op: item.opId, jobId: item.jobId, deferred: deferral.reason,
-      reason: `deferred (${deferral.reason}): api route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
+      reason: `deferred (${deferral.reason}): starci kernel route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
   }
   for (const item of queued.filter((row) => row.queuedBecause === 'ready' && !deferredQueued.has(row.jobId))) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
     actions.push({ kind: payload.rootVerify ? 'root-verify' : 'dispatch', op: item.opId, jobId: item.jobId,
       ...(item.seam ? { seamDuty: 'dispatch-seam' } : {}),
-      reason: payload.rootVerify ? `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): api route --job ${item.jobId}, then api dispatch`
-        : item.seam ? `dispatch seam now: ordinal 1 of cut ${item.seam.cutId}, ${item.seam.siblings} sibling ordinal(s) build on it (priority ${SEAM_PRIORITY_CLASS}): api route --job ${item.jobId}, then api dispatch - before any other queued work`
-        : item.seamStub ? `ready on a stub (${item.seamStub.mode}): ${item.seamStub.reason}; api route --job ${item.jobId}, then api dispatch - it owes ${SEAM_RECONCILE_CHECK} once the seam lands`
-        : `ready: api route --job ${item.jobId}, then api dispatch` });
+      reason: payload.rootVerify ? `read-only check of the root-cause claim on ${payload.rootVerify.node} (for ${payload.rootVerify.of}): starci kernel route --job ${item.jobId}, then starci kernel dispatch`
+        : item.seam ? `dispatch seam now: ordinal 1 of cut ${item.seam.cutId}, ${item.seam.siblings} sibling ordinal(s) build on it (priority ${SEAM_PRIORITY_CLASS}): starci kernel route --job ${item.jobId}, then starci kernel dispatch - before any other queued work`
+        : item.seamStub ? `ready on a stub (${item.seamStub.mode}): ${item.seamStub.reason}; starci kernel route --job ${item.jobId}, then starci kernel dispatch - it owes ${SEAM_RECONCILE_CHECK} once the seam lands`
+        : `ready: starci kernel route --job ${item.jobId}, then starci kernel dispatch` });
   }
   const firstReached = legOps.findIndex((op) => jobsByOp.has(op));
   const succeeded = new Set(workflowJobs.filter((row) => row.status === 'succeeded').map((row) => row.op_id));
@@ -1257,8 +1257,8 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
         const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
         const deferral = deferredPlanOps.get(op);
         actions.push({ kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}), reason: deferral
-          ? `approved leg ${op} is deferred (${deferral.reason}): api enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`
-          : `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
+          ? `approved leg ${op} is deferred (${deferral.reason}): starci kernel enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`
+          : `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: starci kernel enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
       }
     }
   }
@@ -1266,7 +1266,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const followedUp = new Set(contractFollowUps.map((item) => item.jobId));
   for (const node of workGraph?.frontier ?? []) {
     if (node.color !== 'red' || !node.lastOp || followedUp.has(node.lastJob)) continue;
-    actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: api enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
+    actions.push({ kind: 'dispatch', op: node.lastOp, nodes: [node.id], reason: `work-graph v${workGraph.version} turned ${node.id} red: starci kernel enqueue --op ${node.lastOp} --paths ${node.ownedPaths.join(',')}, then route and dispatch it` });
   }
   // A proof whose every piece of evidence is stale re-runs only the check that made it (proof-integrity.mjs).
   for (const item of staleProofs.filter((proof) => !staleReady.some((stale) => stale.jobId === proof.jobId))) {
@@ -1278,7 +1278,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     const nodes = (workGraph?.frontier ?? []).filter((node) => node.color === 'red' && node.lastJob === item.jobId);
     const paths = [...new Set(nodes.flatMap((node) => node.ownedPaths ?? []))];
     actions.push({ kind: 'dispatch', op: item.followUpOp, jobId: item.jobId, change: item.change, ...(nodes.length ? { nodes: nodes.map((node) => node.id) } : {}),
-      reason: `contract change ${item.change} owes ${item.followUpOp} a follow-up of ${item.jobId} (${item.op} a${item.attempt} ${item.status}): api enqueue --op ${item.followUpOp} --contract-change ${item.change} --follow-up-of ${item.jobId}${item.after ? ` --after ${item.after}` : ''} ${paths.length ? `--paths ${paths.join(',')}` : 'with its paths'}, then route and dispatch it` });
+      reason: `contract change ${item.change} owes ${item.followUpOp} a follow-up of ${item.jobId} (${item.op} a${item.attempt} ${item.status}): starci kernel enqueue --op ${item.followUpOp} --contract-change ${item.change} --follow-up-of ${item.jobId}${item.after ? ` --after ${item.after}` : ''} ${paths.length ? `--paths ${paths.join(',')}` : 'with its paths'}, then route and dispatch it` });
   }
   // Artwork slots a drawing declared and interface.asset has not filled (scripts/work/asset-slot.mjs): propose the
   // interface.asset leg that owes them, unless one is already queued or in flight.
@@ -1286,7 +1286,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   if (assetSlotsOwed.length && !assetLegOpen) {
     const records = [...new Set(assetSlotsOwed.map((slot) => slot.ui).filter(Boolean))];
     actions.push({ kind: 'dispatch', op: ASSET_OP, slots: assetSlotsOwed.map((slot) => slot.key),
-      reason: `${assetSlotsOwed.length} artwork slot(s) the drawing owes to interface.asset (${assetSlotsOwed.slice(0, 5).map((slot) => slot.key).join(', ')}${assetSlotsOwed.length > 5 ? ` (+${assetSlotsOwed.length - 5})` : ''}): api enqueue --op ${ASSET_OP} --paths ${records.join(',')}, then route and dispatch it - it generates each slot under the brand imagery.promptRules and replaces the placeholder (src + data-asset-sha256)` });
+      reason: `${assetSlotsOwed.length} artwork slot(s) the drawing owes to interface.asset (${assetSlotsOwed.slice(0, 5).map((slot) => slot.key).join(', ')}${assetSlotsOwed.length > 5 ? ` (+${assetSlotsOwed.length - 5})` : ''}): starci kernel enqueue --op ${ASSET_OP} --paths ${records.join(',')}, then route and dispatch it - it generates each slot under the brand imagery.promptRules and replaces the placeholder (src + data-asset-sha256)` });
   }
   for (const item of staleReady) {
     actions.push({ kind: 'impact-check', op: item.op, jobId: item.jobId, reason: item.followUp
@@ -1299,7 +1299,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       ? { kind: SUPERVISOR_GATE, op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
         reason: `supervisor-gate ${gate.incidentId}: ${gate.detail}; the Supervisor's step (never the owner's) - keep driving every other leg; its resolve --by supervisor wakes you` }
       : { kind: 'owner-gate', op: gate.opId ?? (held ? rowOf.get(held).op_id : null), ...(held ? { jobId: held } : {}), incidentId: gate.incidentId,
-        reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then api incident --resolve` });
+        reason: `owner-gate ${gate.incidentId}: ${gate.detail}; the owner's step, then starci kernel incident --resolve` });
   }
   // Under autopilot nothing waits on the owner but the end of the flow: a pending ask the sweep could not handle
   // is the handover's (or its credential checklist's).
@@ -1308,14 +1308,14 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   }
   // The ONE end-of-flow credential step: every business leg but the deferred live proofs settled (or deferred).
   if (autopilot?.on && autopilot.checklistDue) {
-    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "supply credentials": api enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`api autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (api autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
+    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "supply credentials": starci kernel enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`starci kernel autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (starci kernel autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
   }
   for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
     actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
   }
   for (const item of queued.filter((row) => !['ready', 'owner-gate', SUPERVISOR_GATE].includes(row.queuedBecause) && !deferredQueued.has(row.jobId))) {
     const seamFirst = item.seam && ['max-ops', 'pool-full', 'circuit-open', 'path-lease'].includes(item.queuedBecause)
-      ? '; seam first: it takes the next free slot of this workflow (api dispatch refuses other work the last slot while it is queued)' : '';
+      ? '; seam first: it takes the next free slot of this workflow (starci kernel dispatch refuses other work the last slot while it is queued)' : '';
     actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}${seamFirst}` });
   }
   for (const wait of peerWaits) actions.push({ kind: 'wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
@@ -1380,7 +1380,7 @@ function seamSettleReconciles(db, { job, jobId, payload, closesSet }) {
   return out;
 }
 /**
- * The seam view of one cut set for api status cutSets[].seam (scripts/kernel/seam-policy.mjs): the seam head,
+ * The seam view of one cut set for starci kernel status cutSets[].seam (scripts/kernel/seam-policy.mjs): the seam head,
  * the siblings released to a stub (from the queued projection), the reconcile duty and a re-cut plan once
  * the seam slipped. Null when the cut has no seam attempt.
  */
@@ -1413,11 +1413,11 @@ function seamActionsOf(set) {
   const actions = [];
   for (const item of view.reconcile?.owed ?? []) {
     actions.push({ kind: 'impact-check', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile',
-      reason: `cut ${set.id} seam ${view.jobId} landed after ordinal ${item.ordinal} (${item.jobId}) passed on a stub (${item.mode}): re-verify it against the real seam - rerun its scoped checks (typecheck/build and its slice tests) and record api cut-seam --reconcile --job ${item.jobId} --exit-code <n> --command "<cmd>"; a light re-check, not a redo` });
+      reason: `cut ${set.id} seam ${view.jobId} landed after ordinal ${item.ordinal} (${item.jobId}) passed on a stub (${item.mode}): re-verify it against the real seam - rerun its scoped checks (typecheck/build and its slice tests) and record starci kernel cut-seam --reconcile --job ${item.jobId} --exit-code <n> --command "<cmd>"; a light re-check, not a redo` });
   }
   for (const item of view.reconcile?.red ?? []) {
     actions.push({ kind: 'retry', op: set.op, jobId: item.jobId, cutId: set.id, seamDuty: 'reconcile-red',
-      reason: `ordinal ${item.ordinal} (${item.jobId}) does not reconcile with the landed seam (${SEAM_RECONCILE_CHECK} red): api enqueue --op ${set.op} with its paths --cut-id ${set.id} --cut-ordinal ${item.ordinal} --cut-total ${set.total} --retry-of ${item.jobId} (that ordinal only)` });
+      reason: `ordinal ${item.ordinal} (${item.jobId}) does not reconcile with the landed seam (${SEAM_RECONCILE_CHECK} red): starci kernel enqueue --op ${set.op} with its paths --cut-id ${set.id} --cut-ordinal ${item.ordinal} --cut-total ${set.total} --retry-of ${item.jobId} (that ordinal only)` });
   }
   if (view.recutPlan) {
     actions.push({ kind: 'retry', op: set.op, jobId: view.jobId, cutId: set.id, seamDuty: 'recut',
@@ -1426,7 +1426,7 @@ function seamActionsOf(set) {
   return actions;
 }
 /* ------------------------------------------------------- status git memo */
-// api status took 26-31 s per workflow under load (8 s idle) on the nivo ledger, nearly all of it in
+// starci kernel status took 26-31 s per workflow under load (8 s idle) on the nivo ledger, nearly all of it in
 // spawnSync: every git call pays a process start (0.1-2.5 s on a loaded Windows host), and status repeated
 // the same reads - runtime-rev.mjs re-resolved the current rev once per running job and re-diffed the same
 // commit pair on every call, and two typed waits naming the same --until-commit targets ran the same
@@ -1649,7 +1649,7 @@ async function prefetchStatusOrcaReads(db, workflowId, env = process.env) {
   return prefetched;
 }
 
-/** api status with its Orca reads prefetched in parallel and its git reads memoised (see status git memo). */
+/** starci kernel status with its Orca reads prefetched in parallel and its git reads memoised (see status git memo). */
 /** `fn` over `items` with at most `limit` in flight; results in item order. */
 async function mapConcurrent(items, limit, fn) {
   const results = new Array(items.length);
@@ -1680,10 +1680,10 @@ function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
   const deferred = deferJob(ledger, { job, deferral, via });
   if (!deferred) return false;
   const out = { ok: true, jobId: job.job_id, op, status: 'succeeded', deferred };
-  emit(out, `${via} of ${job.job_id} (${op}) DEFERRED: ${deferral.reason} - settled without dispatch, no attempt spent; the legs behind it proceed; api run-deferred-tests --workflow ${job.workflow_id} runs it later`, args.json);
+  emit(out, `${via} of ${job.job_id} (${op}) DEFERRED: ${deferral.reason} - settled without dispatch, no attempt spent; the legs behind it proceed; starci kernel run-deferred-tests --workflow ${job.workflow_id} runs it later`, args.json);
   return true;
 }
-// `api run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]`: the owner's "test later" - every leg the
+// `starci kernel run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]`: the owner's "test later" - every leg the
 // specs switches deferred goes back to queued on its same attempt, stamped specsForced so it dispatches even while
 // its class is still off; then the Kernel routes and dispatches it as usual.
 /* ----------------------------------------------------------------- route */
@@ -1705,7 +1705,7 @@ const probeQuotaSafe = async (provider) => {
   }
 };
 
-// A Kernel does not bias a route (owner decision 2026-09-25): `api route` and `api dispatch` refuse
+// A Kernel does not bias a route (owner decision 2026-09-25): `starci kernel route` and `starci kernel dispatch` refuse
 // --prefer/--avoid as unknown options. The router decides from ledger facts; the owner's goal
 // routing_bias is the only bias.
 const refuseKernelBias = (verb, args) => {
@@ -1740,13 +1740,13 @@ const currentCredentialOf = (provider) => {
   if (accountsOnce === undefined) { try { accountsOnce = accountList() ?? null; } catch { accountsOnce = null; } }
   return credentialFingerprintOf(provider, { accounts: accountsOnce?.ok ? accountsOnce : null });
 };
-// An open circuit, closed early only by a rotated credential or api provider-health --recover.
+// An open circuit, closed early only by a rotated credential or starci kernel provider-health --recover.
 const providerHealthOf = (db, provider, now = Date.now()) => providerCircuitOf(db, provider, now, { credential: currentCredentialOf });
 // The one command that clears an open circuit before its expiry (kernel caller only).
-const providerRecoverCommand = (provider) => `api provider-health --provider ${provider} --recover --reason <text> --probe`;
+const providerRecoverCommand = (provider) => `starci kernel provider-health --provider ${provider} --recover --reason <text> --probe`;
 // How an open circuit clears: a quota circuit by its recovery probe (the watchdog runs it), any other by the Kernel's --recover.
 const circuitClearHint = (circuit) => circuit?.failureKind === 'quota'
-  ? `; its quota probe clears it (${circuit.recover ?? `api provider-health --provider ${circuit.provider} --quota-probe`}, run by the watchdog at most once per probe interval and right after the plan reset)`
+  ? `; its quota probe clears it (${circuit.recover ?? `starci kernel provider-health --provider ${circuit.provider} --quota-probe`}, run by the watchdog at most once per probe interval and right after the plan reset)`
   : `; the Kernel clears it early with ${providerRecoverCommand(circuit?.provider)}`;
 const providerCooldownMs = (failureKind) =>
   allocationMs(`cooldownMs.${Object.hasOwn(allocationSettings().cooldownMs ?? {}, failureKind) ? failureKind : 'other'}`);
@@ -1818,12 +1818,12 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
 
 /* -------------------------------------------------------- outage circuits */
 // A provider whose agent card declares an outage key (scripts/agent/provider-outage.mjs) opens its
-// circuit on the evidence of a launch failure text (rejectDispatch) or a worker screen row (api status /
-// api observe). quotaExhausted opens failureKind quota: the circuit lasts for
+// circuit on the evidence of a launch failure text (rejectDispatch) or a worker screen row (starci kernel status /
+// starci kernel observe). quotaExhausted opens failureKind quota: the circuit lasts for
 // allocation.cooldownMs.quota and
-// `api provider-health --quota-probe` clears it earlier on a passing 1-token completion.
+// `starci kernel provider-health --quota-probe` clears it earlier on a passing 1-token completion.
 // capacityExhausted opens failureKind capacity for allocation.cooldownMs.capacity (circuitBackoff on a reopen).
-const providerQuotaProbeCommand = (provider) => `api provider-health --provider ${provider} --quota-probe`;
+const providerQuotaProbeCommand = (provider) => `starci kernel provider-health --provider ${provider} --quota-probe`;
 const jobProviderOf = (job) => {
   const payload = jobPayloadOf(job);
   const declared = payload?.hierarchy?.runtime?.provider ?? null;
@@ -1847,7 +1847,7 @@ const openOutageCircuit = (db, { evidence, ...fields }) => evidence?.failureKind
   : writeProviderCircuit(db, { signal: null, error: null, model: null, jobId: null, ...fields, failureKind: evidence.failureKind, extra: { evidence } });
 // Whether an open quota circuit's recovery probe is due: never probed, a probe interval since the
 // last one, or the plan reset passed since it.
-// `api provider-health [--provider <p>] --quota-probe [--force] [--workflow <id>]`: for each provider
+// `starci kernel provider-health [--provider <p>] --quota-probe [--force] [--workflow <id>]`: for each provider
 // whose card declares quotaExhausted.probe (or the one named) with an OPEN quota circuit in this
 // ledger, one real 1-token completion when due (quotaProbeDue; --force ignores the throttle). A pass
 // clears the circuit (status recovered, event provider-health-recovered); a quota answer keeps it and,
@@ -1888,7 +1888,7 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 }
 
 /* -------------------------------------------------------- provider-health */
-// `api provider-health --provider <p>` shows this ledger's provider-health row
+// `starci kernel provider-health --provider <p>` shows this ledger's provider-health row
 // for one provider credential: open or not, the fingerprint of the credential
 // it recorded and of the one a launch would present now (never the value).
 // `--recover --reason <text> [--probe]` clears an OPEN circuit before its
@@ -1903,7 +1903,7 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 // rewrites the row as status 'recovered' expiring now (failures and trips
 // restart) and appends 'provider-health-recovered' with the reason, the probe
 // and the circuit it cleared.
-// `api route` — resolve the pool/model for one job and persist the decision on
+// `starci kernel route` — resolve the pool/model for one job and persist the decision on
 // its payload so `dispatch --spawn` launches exactly what was routed. Bias: only
 // the owner's routing_bias {prefer[], avoid[]} on the workflow goal's json
 // (define-goal). A Kernel's --prefer/--avoid is refused as an unknown option
@@ -1949,7 +1949,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
       goal_identity: payload.goal_binding?.identity ?? goal?.goal_identity ?? null,
     },
     // The owner's goal text of the revision the job is bound to, so an op reads it from
-    // `api op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
+    // `starci kernel op-contract --json` and never opens the ledger for it (nivo auth inc-26b260e101e4).
     ...((boundGoal ?? (payload.goal_binding?.revision == null ? goal : null)) ? { goal: goalForPacket(boundGoal ?? goal) } : {}),
     attempt: tryOf(job),
     owner_language: ownerLanguage(),
@@ -1964,7 +1964,7 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
     // The asks this job's retry lineage already had answered (scripts/machine/owner-answers.mjs):
     // binding input for this attempt, never a question to file again.
     ...(ownerAnswers.length ? { owner_answers: ownerAnswers } : {}),
-    // The owner asked for this deferred test leg to run anyway (api run-deferred-tests): its specs switch no longer applies.
+    // The owner asked for this deferred test leg to run anyway (starci kernel run-deferred-tests): its specs switch no longer applies.
     ...(payload.specsForced ? { specs_forced: payload.specsForced } : {}),
   },
   constraints: { model: model.target, provider: model.provider, budget: payload.budget ?? null, lease: job.lease_token ?? null },
@@ -2230,7 +2230,7 @@ const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
 /**
  * The dispatch's attempt and its contract (DBTREE op_attempts + contracts): one op_attempts row per dispatch - the
  * dispatch guard admits it only for a leased job of a running workflow - carrying the job scratch the op reports from
- * (a3-3: api report reads the report ONLY from op_attempts.scratch_dir), then the contract keyed by that attempt.
+ * (a3-3: starci kernel report reads the report ONLY from op_attempts.scratch_dir), then the contract keyed by that attempt.
  * Returns the attempt id. Runs inside the caller's transaction.
  */
 const fileContract = (db, { job, op, dispatchId, markdown, context, now, attempt = {} }) => {
@@ -2276,7 +2276,7 @@ function raiseEnvironmentIncident(ledger, job, health) {
 // launcher context. Every operation Task in that Run is therefore a semantic
 // child of the Kernel coordinator even when its terminal is a peer tab in the
 // same worktree.
-// Every Run-scoped call (dispatch, api reply, a Task close) binds the Run to the workflow's current Kernel
+// Every Run-scoped call (dispatch, starci kernel reply, a Task close) binds the Run to the workflow's current Kernel
 // terminal first: a replaced Kernel (start-workflow) is not the Run's consumer until one run-use, and Orca
 // refuses its reply and task-update consumer_fenced until then (nivo inc-e523617a3c31). bindWorkflowRun
 // is a no-op once bound. A rebind is recorded as event run-rebound when a ledger handle is given.
@@ -2545,7 +2545,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     }
     const released = releaseDeadWorker(ledger, job);
     const out = { ok: true, jobId, recovery: 'fenced', alreadyRecovered: true, status: 'effect_unknown', attempt: tryOf(job), evidence: prior.evidence ?? [], ...(released ? { managedWorker: released } : {}) };
-    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and api settle it${workerNote(released)}`, args.json);
+    emit(out, `reconcile ${jobId}: dead worker already fenced effect_unknown (${(prior.evidence ?? []).join(', ')}); inspect and starci kernel settle it${workerNote(released)}`, args.json);
     return;
   }
   // Already settled failed-no-report (by the watchdog, or a repeat): the receipt names its retry.
@@ -2573,7 +2573,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
   if (!DEAD_WORKER_LIVENESS.includes(worker.liveness) && !(wedged && args['settle-failed'])) {
     const reason = worker.liveness === 'unknown' ? 'worker-liveness-unproven' : worker.liveness === 'gate-loop' ? 'worker-gate-loop' : wedged ? 'worker-wedged' : 'worker-alive';
     const out = { ok: false, jobId, recovery: null, reason, worker };
-    emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through api reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
+    emit(out, `reconcile REFUSED for ${jobId}: ${reason} (liveness ${worker.liveness}${worker.reason ? `: ${worker.reason}` : ''}); nothing written${wedged ? ` - a wedged worker recovers only through starci kernel reconcile --job ${jobId} --dead-worker --settle-failed` : ''}`, args.json);
     process.exit(1);
   }
   const contract = latestContractOf(db, jobId);
@@ -2583,13 +2583,13 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       AND (dispatch_id=? OR attempt_id=(SELECT max(attempt_id) FROM op_attempts WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`)
     .get(job.workflow_id, reportDispatchIdOf(db, job), jobId);
   if (report) {
-    const next = report.consumed_at ? 'api record-checks, then api settle' : 'api consume-report, api record-checks, then api settle';
+    const next = report.consumed_at ? 'starci kernel record-checks, then starci kernel settle' : 'starci kernel consume-report, starci kernel record-checks, then starci kernel settle';
     const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker,
       report: { dispatchId: report.dispatch_id, outcome: report.outcome, consumed: Boolean(report.consumed_at) }, next };
     emit(out, `reconcile ${jobId}: the dead worker filed report ${report.dispatch_id} (${report.outcome}); nothing written - ${next}`, args.json);
     return;
   }
-  // A report the worker wrote but never filed is filed on its behalf through api report itself, so every
+  // A report the worker wrote but never filed is filed on its behalf through starci kernel report itself, so every
   // report guard still applies (scripts/kernel/report-salvage.mjs); the Kernel then checks and settles it.
   if (!args['no-salvage']) {
     const salvage = bestEffort(() => {
@@ -2604,8 +2604,8 @@ function reconcileDeadWorker(ledger, args, job, repo) {
     if (salvage?.salvaged) {
       ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'report-salvaged',
         payload: { opId: op, attempt: tryOf(job), file: salvage.salvaged.file, outcome: salvage.salvaged.outcome, liveness: worker.liveness, tried: salvage.tried.length } });
-      const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'api consume-report, api record-checks, then api settle' };
-      emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - api consume-report, api record-checks, then api settle`, args.json);
+      const out = { ok: true, jobId, recovery: 'settle', route: 'settle', worker, salvaged: salvage.salvaged, tried: salvage.tried, next: 'starci kernel consume-report, starci kernel record-checks, then starci kernel settle' };
+      emit(out, `reconcile ${jobId}: the dead worker wrote report ${salvage.salvaged.file} (${salvage.salvaged.outcome}) but never filed it; filed on its behalf - starci kernel consume-report, starci kernel record-checks, then starci kernel settle`, args.json);
       return;
     }
   }
@@ -2717,7 +2717,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       evidence: recorded, worker, paths: pathProof, ...(released ? { managedWorker: released } : {}) };
   emit(out, recovery === 'requeued'
     ? `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness} and the attempt proved no effect; same attempt ${tryOf(job)} queued (leases released: ${leasesReleased}) - route and dispatch it again${workerNote(released)}`
-    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and api settle it (fail or blocked), then retry as a new attempt${workerNote(released)}`, args.json);
+    : `reconciled ${jobId}: worker ${worker.terminalHandle} is ${worker.liveness}; fenced effect_unknown on ${recorded.join(', ')} - inspect the evidence and starci kernel settle it (fail or blocked), then retry as a new attempt${workerNote(released)}`, args.json);
 }
 
 // `reconcile --job <id> --dead-worker --settle-failed`: a dead worker's attempt settled with no
@@ -2731,7 +2731,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // failed-no-report, reportFiled false: a business attempt spent, engine/admission.mjs
 // retryDisposition), its leases, managed worker, terminal and Orca Task are released, and the
 // no-report route of modules/models/kinds.yaml runs (enqueueNextStep): ONE retry of the same op and
-// cut ordinal as attempt+1, which api route moves off the pools its lineage died on
+// cut ordinal as attempt+1, which starci kernel route moves off the pools its lineage died on
 // (lineage-route.mjs), and past the route's limit an owner gate on the job instead. Evidence the owned paths cannot bound (an op's external,
 // runtime, live-provider or destructive risk hint, an unverifiable tree) stays fenced for the
 // Kernel. Once one op of a workflow has ended failed-no-report DEAD_WORKER_PATTERN_THRESHOLD
@@ -2742,7 +2742,7 @@ const DEAD_WORKER_PATTERN_TAG = '[worker-died-no-report-pattern]';
 const SETTLEABLE_EVIDENCE = /^(?:dirty:|commit:|checks$|worker-question:|infra-retries-exhausted:|\+\d+ more$)/;
 const settleableEvidence = (evidence) => Array.isArray(evidence) && evidence.every((item) => SETTLEABLE_EVIDENCE.test(String(item)));
 // A follow-on job the runtime enqueues itself: `template`'s op (or `op`), records, owned paths and cut
-// ordinal as a new attempt, exactly as `api enqueue` builds it, marked retryReason.auto. `retryOf`
+// ordinal as a new attempt, exactly as `starci kernel enqueue` builds it, marked retryReason.auto. `retryOf`
 // pins the predecessor and makes it idempotent: a job already naming it as retry.retryOf is returned
 // instead. Runs inside the caller's transaction.
 // `repair` {records, ownedPaths, repository, params} enqueues a FRESH job of `op` for the owner a failed
@@ -2918,7 +2918,7 @@ const openRouteGate = (ledger, job, detail, route) => {
 /** The .starciwork record directories a job owns: where a read-only verify of its node writes its evidence. */
 const recordPathsOf = (payload) => (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && /^\.starciwork\//.test(p));
 /**
- * The report's own red checks, attributed like api record-checks attributes the Kernel's (gate-attribution.mjs):
+ * The report's own red checks, attributed like starci kernel record-checks attributes the Kernel's (gate-attribution.mjs):
  * {peer:true, checks[], peers[], routes[]} when every red check (at least one) names files and reads
  * `peer`, and no check the Kernel recorded for this attempt read `own`; else {peer:false, reason}.
  */
@@ -2991,7 +2991,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       }
       const detail = route.to?.needUser
         ? `${op} ${job.job_id}: route ${route.id} needs the owner${failure?.class ? ` (failure class ${failure.class}: ${failure.reason}${envelope?.rootCause?.node ? `; the report names ${envelope.rootCause.node}, which resolves to no build op this workflow can repair` : ''})` : ''}`
-        : exhausted ? `${op} ${job.job_id}: unit ${unit.unit.unit_id} spent ${spentTriesOf(ledger.db, unit.unit)} of its ${unit.unit.try_budget} tries (unit-try-budget-exhausted); the owner or the Supervisor decides - api unit --raise-budget, a reshaped unit, or drop it`
+        : exhausted ? `${op} ${job.job_id}: unit ${unit.unit.unit_id} spent ${spentTriesOf(ledger.db, unit.unit)} of its ${unit.unit.try_budget} tries (unit-try-budget-exhausted); the owner or the Supervisor decides - starci kernel unit --raise-budget, a reshaped unit, or drop it`
         : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group; the owner decides whether it runs again`;
       return record({ kind: 'owner-gate', route: route.id, limit, firing: fired, ...(failure?.class ? { class: failure.class, classReason: failure.reason } : {}), incidentId: openRouteGate(ledger, job, detail, route.id), reason: detail });
     }
@@ -3057,7 +3057,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
     // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db and another
     // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
-    // report's own checks pin on a peer's change settles peer-blocked like api record-checks's (no business
+    // report's own checks pin on a peer's change settles peer-blocked like starci kernel record-checks's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
     const foreignRoot = envelope?.rootCause && envelope.rootCause.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
     if (foreignRoot && route.then === 'retry' && targets.length === 1 && targets[0] === op) {
@@ -3066,14 +3066,14 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       if (attributed.peer) {
         const peerBlocked = { checks: attributed.checks, peers: attributed.peers, routes: attributed.routes, source: 'report' };
         const step = { kind: 'peer-blocked', route: route.id, limit, firing: fired, counted: false, rootCause, jobs: [],
-          reason: `the report's red ${attributed.checks.join(', ')} is a peer's change (${attributed.peers.map((p) => p.workflowId).join(', ')}): no blind retry of ${op} and no business attempt spent; run ${attributed.routes.join(' ; ')}, then api enqueue --op ${op} --retry-of ${job.job_id} once it is released` };
+          reason: `the report's red ${attributed.checks.join(', ')} is a peer's change (${attributed.peers.map((p) => p.workflowId).join(', ')}): no blind retry of ${op} and no business attempt spent; run ${attributed.routes.join(' ; ')}, then starci kernel enqueue --op ${op} --retry-of ${job.job_id} once it is released` };
         const result = jobResult(db, job.job_id) ?? {};
         recordJobResult(db, { jobId: job.job_id, result: { ...result, peerBlocked, nextStep: step } });
         ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape, ...step, peerBlocked } });
         return step;
       }
       return record({ kind: 'root-elsewhere', route: route.id, limit, firing: fired, counted: false, rootCause, jobs: [],
-        reason: `rootCause names ${node || 'another node'} (self false${rootCause.category ? `, ${rootCause.category}` : ''}) that this workflow runs no job of; a same-op retry would re-run identical work (${attributed.reason}). Hand the root to its owner - api incident --kind shared-blocker --introduced-by <sha> | --introducer <workflow> for another workflow's change, a widened --owned-paths re-enqueue for a scope gap - then api enqueue --op ${op} --retry-of ${job.job_id}` });
+        reason: `rootCause names ${node || 'another node'} (self false${rootCause.category ? `, ${rootCause.category}` : ''}) that this workflow runs no job of; a same-op retry would re-run identical work (${attributed.reason}). Hand the root to its owner - starci kernel incident --kind shared-blocker --introduced-by <sha> | --introducer <workflow> for another workflow's change, a widened --owned-paths re-enqueue for a scope gap - then starci kernel enqueue --op ${op} --retry-of ${job.job_id}` });
     }
     if (targets.length === 1 && targets[0] === op) {
       const retry = enqueueFollowOn(ledger, job, { retryOf: job.job_id, reason, of: job.job_id, liveness, routed });
@@ -3521,7 +3521,7 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   return gate ? { ...gate, op, status: job.status } : null;
 }
 // The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
-// runtime reads the op's attached sonar.json itself. Read-only here - api settle records the judgment. A leg admitted before
+// runtime reads the op's attached sonar.json itself. Read-only here - starci kernel settle records the judgment. A leg admitted before
 // the sonar-enforce change settles on its old contract. Null when the op is not held to the gate.
 function settleSonarGate(db, jobId, repo) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
@@ -3539,8 +3539,8 @@ function settleSonarGate(db, jobId, repo) {
   return judgment ? { ...judgment, workflowId: job.workflow_id, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
 }
 // The op loop a code-writing op's settle owes (scripts/kernel/gate-settle.mjs over knowledge/op-gate.yaml): the runtime re-reads
-// the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own hfs explain. Read-only
-// here - api settle records the judgment. A leg admitted before the op-gate-loop change settles on its old contract. Null when
+// the op's attached gate JSON and READ digest itself and resolves the touched kinds with the app's own starci app explain. Read-only
+// here - starci kernel settle records the judgment. A leg admitted before the op-gate-loop change settles on its old contract. Null when
 // the op is not held to the loop.
 async function settleOpGate(db, jobId, repo) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
@@ -3561,7 +3561,7 @@ async function settleOpGate(db, jobId, repo) {
 }
 // The mechanism proofs an op owes at settle (scripts/kernel/gate-settle.mjs judgeJobProofs over knowledge/op-gate.yaml opProofs):
 // the test world, the unit kit, the document gate, the READ of a deciding op, the lint of a security or interface op, the review
-// gate and defect classes, the release proof. The runtime re-reads each attached document itself. Read-only here - api settle
+// gate and defect classes, the release proof. The runtime re-reads each attached document itself. Read-only here - starci kernel settle
 // records the judgment. A leg admitted before the op-mechanism-proofs change settles on its old contract. Null when the op owes
 // no proof for its mode.
 async function settleOpProofs(db, jobId, repo) {
@@ -3681,7 +3681,7 @@ function indexSettledArtifacts(ledger, job, repo) {
     return r.ok ? { indexed: r.indexed, byKind: r.byKind, patch: r.patch, ...(r.patchJson ? { patchJson: r.patchJson } : {}), ...(r.missing.length ? { missing: r.missing.slice(0, 20) } : {}), logs } : { error: r.error, logs };
   } catch (error) { return { error: String(error?.message ?? error) }; }
 }
-// A settled job's typed log is complete: the op's own rows came through `api log`, and the rows its settle events stand
+// A settled job's typed log is complete: the op's own rows came through `starci kernel log`, and the rows its settle events stand
 // for are derived here (typed-logs.mjs). A failure never un-settles; the next read of the workflow's logs catches up.
 function settleJobLogs(ledger, job, repo) {
   let logs = null;
@@ -3695,7 +3695,7 @@ function settleJobLogs(ledger, job, repo) {
 }
 // LOG_TYPED_MISSING (WARN, never a refusal): an op job settled without the typed rows it owed of itself - a step.start,
 // a step.end and a cmd.run per check its report ran (typed-logs.mjs typedLogGaps). Recorded once per job as a
-// log-typed-missing ledger event (api status logTypedMissing) and a runtime `warning` row in the job's own log.
+// log-typed-missing ledger event (starci kernel status logTypedMissing) and a runtime `warning` row in the job's own log.
 function warnTypedLogGaps(ledger, logs, job) {
   if (job.kind === 'kernel' || !jobOpOf(job)) return null;
   const { envelope } = filedReportOf(ledger.db, job, { dispatchId: reportDispatchIdOf(ledger.db, job) });
@@ -3706,7 +3706,7 @@ function warnTypedLogGaps(ledger, logs, job) {
   const prepared = prepareLogRow({ workflowId: job.workflow_id, jobId: job.job_id, actor: 'runtime', kind: 'warning', level: 'warn', src: `ltm:${job.job_id}`,
     msg: `${LOG_TYPED_MISSING}: ${translator(ownerLanguage())('the op did not write the structured log rows it owed ({missing})', { missing: `${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''}` })}`,
     data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${tryOf(job)} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
-      hint: 'op prompt logging: block - api log step.start, step.end and cmd.run per check' } });
+      hint: 'op prompt logging: block - starci kernel log step.start, step.end and cmd.run per check' } });
   if (prepared.row) insertLogRows(logs, [prepared.row]);
   const seen = ledger.db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(LOG_TYPED_MISSING_EVENT, job.job_id);
   if (!seen) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: LOG_TYPED_MISSING_EVENT,
@@ -3723,7 +3723,7 @@ function typedLogWarningsOf(db, workflowId, { limit = 20 } = {}) {
  * The settle's async tail for one settled job (owner ruling settle-runtime-service): session retention, the Telegram
  * media sender, the input re-baseline, artifact indexing (evidence copy + typed logs). Each step is best effort and
  * never un-settles; {ok, sessionReleased, artifacts, errors}. Run inline by settle under the test runner, else by
- * `api settle-tail` (scripts/kernel/verbs/settle-tail.mjs), retried by the settler until it succeeds.
+ * `starci kernel settle-tail` (scripts/kernel/verbs/settle-tail.mjs), retried by the settler until it succeeds.
  */
 async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   const db = ledger.db, jobId = job.job_id, errors = [];
@@ -3775,12 +3775,12 @@ function handoverProofGate(db, job, repo) {
   if (!change || admittedBeforeChange(admitted, change)) return;
   let cov;
   try { cov = coverageOf(db, job.workflow_id, { repo, notCounted: specsOff(ownerSpecs(skillRoot)) }); }
-  catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: api coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
+  catch (error) { throw Object.assign(new Error(`handover-proof-unjudged: starci kernel coverage could not be computed (${String(error?.message ?? error).slice(0, 300)}); a handover cannot claim proof it cannot read`), { code: 'handover-proof-unjudged' }); }
   if (cov.mustOwed.length) {
-    throw Object.assign(new Error(`handover-proof-owed: ${cov.mustOwed.map((i) => `${i.kind} ${i.id} is ${i.status}`).join('; ')}. A must-have is never handed over unproven: file outcome blocked, blocker kind test-gap, naming each; the Kernel re-runs the check that proves it (api coverage --workflow ${job.workflow_id}, api status nextActions)`), { code: 'handover-proof-owed', owed: cov.mustOwed });
+    throw Object.assign(new Error(`handover-proof-owed: ${cov.mustOwed.map((i) => `${i.kind} ${i.id} is ${i.status}`).join('; ')}. A must-have is never handed over unproven: file outcome blocked, blocker kind test-gap, naming each; the Kernel re-runs the check that proves it (starci kernel coverage --workflow ${job.workflow_id}, starci kernel status nextActions)`), { code: 'handover-proof-owed', owed: cov.mustOwed });
   }
   const flagged = cov.items.filter((i) => i.status !== 'proven');
-  if (flagged.length) console.error(`api report WARNING: ${flagged.length} scoped item(s) not proven, none a must-have: ${flagged.slice(0, 12).map((i) => `${i.kind} ${i.id} ${i.status}`).join(', ')}${flagged.length > 12 ? ', ...' : ''}; the package lists them under what was not proven`);
+  if (flagged.length) console.error(`starci kernel report WARNING: ${flagged.length} scoped item(s) not proven, none a must-have: ${flagged.slice(0, 12).map((i) => `${i.kind} ${i.id} ${i.status}`).join(', ')}${flagged.length > 12 ? ', ...' : ''}; the package lists them under what was not proven`);
 }
 
 /* --------------------------------------------------------------- report */
@@ -3830,7 +3830,7 @@ function attributeChecks(db, { repo, job, checks }) {
 const agentOfJob = (payload) => /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
   ?? (payload?.managed ? 'claude' : null);
 // Path leases of a running job whose worker is not proven dead are renewed to a full
-// dispatchLeaseTtlMs once less than half of it is left (api status). Settle and the dead-worker
+// dispatchLeaseTtlMs once less than half of it is left (starci kernel status). Settle and the dead-worker
 // recovery still release them; only a worker nobody observes can outlive its fence.
 function renewLiveWorkerLeases(ledger, workers, now) {
   const live = workers.filter((worker) => ['running', 'answering'].includes(worker.ledgerStatus) && !DEAD_WORKER_LIVENESS.includes(worker.liveness) && worker.liveness !== 'released');
@@ -3955,7 +3955,7 @@ const runExtensionVerb = async (spec, args, repo) => {
   const caller = callerOf(ledger.db);
   if (caller.role === OP_ROLE && spec.kernelOnly) {
     refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
-      detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own api report and nothing else` });
+      detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own starci kernel report and nothing else` });
   }
   if (caller.role === OP_ROLE && spec.jobOwnerOnly && caller.jobId !== args.job) {
     refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'report-identity-mismatch',

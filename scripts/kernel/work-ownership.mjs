@@ -14,7 +14,7 @@
 //               `peerDrift`, never staleInput and never a redo.
 //   breaking    only the record's OWNER turns a change into owed work: its committed change note
 //               (`change: {rev, kind: breaking}` with a rev above the one the job read) or an
-//               explicit `api record-change --record <path> --reach follow-up --reason <text>`. The
+//               explicit `starci kernel record-change --record <path> --reach follow-up --reason <text>`. The
 //               dependent job is then owed ONE targeted follow-up leg, never a seam-first cascade.
 //   committed   only committed revisions count: an in-flight (uncommitted) rewrite of a record by
 //               a leased job is never a change (committedReader below).

@@ -2,9 +2,9 @@
 // sync-runtime.mjs - refreshes the self-contained copies of the runtime files the published packages read, so each package
 // works in a product repository that has no runtime checkout. Every copy mirrors the runtime layout (engine/,
 // scripts/lib/, knowledge/hfs/, modules/kernel/) byte for byte, so the imports need no rewriting.
-//   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name hfs check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
+//   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name starci app check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
-//                                holding exactly the codes `hfs check` can emit (its own and the machine's rule id lists)
+//                                holding exactly the codes `starci app check` can emit (its own and the machine's rule id lists)
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view) and the project graph
 //                                (scripts/hfs/project-rule.mjs -> project-graph.mjs -> the architecture machine) its project rules share
 //   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
@@ -31,7 +31,7 @@ const SLOT_FILES = [
   'scripts/hfs/allows.mjs',
   'knowledge/hfs/slots.yaml',
 ];
-/** The entry modules of `hfs check` and `hfs secret`; everything they import, statically, is bundled. */
+/** The entry modules of `starci app check` and `starci app secret`; everything they import, statically, is bundled. */
 const CHECK_ENTRIES = ['scripts/hfs/check.mjs', 'scripts/hfs/architecture.mjs', 'scripts/hfs/secret.mjs'];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
@@ -59,7 +59,7 @@ export function importClosure(entries) {
   return [...seen].sort();
 }
 
-/** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `hfs add` generates a kind from them, so the hfs bundle carries them. */
+/** The pattern topics (knowledge/patterns/be) that carry a `files:` tree: `starci app add` generates a kind from them, so the hfs bundle carries them. */
 export function patternTopicFiles() {
   const dir = path.join(runtimeRoot, 'knowledge', 'patterns', 'be');
   return fs.readdirSync(dir).filter((name) => name.endsWith('.yaml') && Array.isArray(parseYaml(fs.readFileSync(path.join(dir, name), 'utf8'))?.files)).sort().map((name) => `knowledge/patterns/be/${name}`);

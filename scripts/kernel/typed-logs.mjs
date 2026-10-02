@@ -10,8 +10,8 @@
 // owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
 // verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (alpha.3: no log file
 // anywhere in a repository - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
-//   - `api log` (scripts/kernel/cli.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
-//     lines an op kept in <STARCI_JOB_SCRATCH>/log.jsonl instead are ingested by api report (ingestScratchLog)
+//   - `starci kernel log` (scripts/kernel/cli.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write; the
+//     lines an op kept in <STARCI_JOB_SCRATCH>/log.jsonl instead are ingested by starci kernel report (ingestScratchLog)
 //     before it deletes the scratch;
 //   - the ledger's own events (syncDerivedLogs): dispatch, report, checks, settle, land, incident rows are
 //     DERIVED from the events that already record them (rowsOfEvent), never re-written by the code paths
@@ -230,12 +230,12 @@ export function appendLog(logs, row, { clip = false, ...options } = {}) {
   return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), ...(r.deferred ? { deferred: true } : {}), row: prepared.row };
 }
 
-/** The typed-log file an op may keep in its job scratch (never in the repository); api report ingests it. */
+/** The typed-log file an op may keep in its job scratch (never in the repository); starci kernel report ingests it. */
 export const SCRATCH_LOG_FILE = 'log.jsonl';
 /**
  * Ingest the typed rows an op wrote to <scratch>/log.jsonl (one JSON object per line: {kind, msg, data?, refs?, at?,
- * level?, node?}) into the ledger's logs table through the writer, as actor `op` - what api report runs before it
- * deletes the scratch, so a row the op kept in a file instead of `api log` is not lost. Each line is keyed by the hash
+ * level?, node?}) into the ledger's logs table through the writer, as actor `op` - what starci kernel report runs before it
+ * deletes the scratch, so a row the op kept in a file instead of `starci kernel log` is not lost. Each line is keyed by the hash
  * of the job, its offset and its text (src), so ingesting the same file twice stores nothing twice. A malformed line
  * is counted, never stored. Returns {read, inserted, duplicate, invalid}.
  */
@@ -388,7 +388,7 @@ export function rowsOfEvent(event, ctx = {}) {
     case 'job-dropped':
       return [{ ...base, jobId, kind: 'job.drop', src: src(), msg: tr('Job dropped: {reason}', { reason: clipText(p.reason, 200) }), data: compact({ reason: clipText(p.reason ?? 'dropped', 600), op, attempt }) }];
     case 'op-rev-drift':
-      // api settle: the op's contract changed on the runtime after the leg was dispatched (runtime-rev.mjs); WARN only.
+      // starci kernel settle: the op's contract changed on the runtime after the leg was dispatched (runtime-rev.mjs); WARN only.
       return [{ ...base, jobId, kind: 'warning', level: 'warn', src: src(), msg: tr('The contract of op {op} changed after dispatch ({from} → {to})', { op: op ?? '-', from: String(p.from ?? '').slice(0, 12), to: String(p.to ?? '').slice(0, 12) }),
         data: compact({ code: 'op-rev-drift', message: clipText(`contract files changed after dispatch: ${(Array.isArray(p.files) ? p.files : []).join(', ')}`, 600) }) }];
     case 'foundation-landed':
@@ -470,7 +470,7 @@ export const LOG_TYPED_MISSING_EVENT = 'log-typed-missing';
 const normCmd = (c) => String(c ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
- * The typed rows an op job owed but never wrote itself (actor op: `api log`): at least one
+ * The typed rows an op job owed but never wrote itself (actor op: `starci kernel log`): at least one
  * step.start and one step.end, and a cmd.run for each check its report says it ran (matched by command, else by
  * count). `checks` are the report's [{name, command, exitCode}]. Returns {missing: [...], opRows, kinds}: missing is
  * empty when the job logged what it owed. Read-only.

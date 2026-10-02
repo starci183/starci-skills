@@ -1,4 +1,4 @@
-// api log — one typed row (typed-logs.mjs) into the ledger's logs table - validated per kind,
+// starci kernel log — one typed row (typed-logs.mjs) into the ledger's logs table - validated per kind,
 // redacted, capped per job - through the process's buffered log writer (log-writer.mjs: its own
 // connection, one short transaction, flushed before this returns), never an events row, so an op
 // logging every step holds the ledger lock for milliseconds only. An op caller logs only for its

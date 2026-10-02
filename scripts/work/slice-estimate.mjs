@@ -1,4 +1,4 @@
-// slice-estimate.mjs — the deterministic slice sizing `api estimate` reports and the work-graph validator
+// slice-estimate.mjs — the deterministic slice sizing `starci kernel estimate` reports and the work-graph validator
 // bounds slices with. Every number lives in modules/models/runtimes.yaml allocation.slicing; this module
 // holds only the computation.
 import { allocationSettings, slicingGears } from '../../engine/config.mjs';

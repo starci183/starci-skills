@@ -3,7 +3,7 @@
 // Defect (a workspace-provision workflow): the Kernel resolved two
 // foreign-file-committed incidents with "Owner confirmed: ..."
 // while the ledger held no owner answer, and a settle then took those resolved incidents as the proof
-// that the file owner confirmed the paths. `api incident --resolve` took free
+// that the file owner confirmed the paths. `starci kernel incident --resolve` took free
 // text and recorded no resolver.
 //
 // Now a resolution records who resolved it (by: kernel | owner | supervisor) and, when its text claims

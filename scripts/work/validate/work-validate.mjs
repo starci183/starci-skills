@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Canonical `starci validate <work-root-or-record-dir>` entry.
+// Canonical `starci runtime validate <work-root-or-record-dir>` entry.
 // Composes the runtime's structural, consistency, and artifact machines into
 // one read-only verdict so operation contracts never depend on a prose alias.
 // `--strict` (validateWork(target, {strict: true})) also compiles every record
@@ -192,7 +192,7 @@ export function scopeToOwned(result, owned, { roots = [] } = {}) {
 
 function usage(code = 0) {
   const stream = code === 0 ? process.stdout : process.stderr;
-  stream.write('Usage: starci validate <work-root-or-record-dir> [--strict] [--owned <path>[,<path>]]... [--json]\n');
+  stream.write('Usage: starci runtime validate <work-root-or-record-dir> [--strict] [--owned <path>[,<path>]]... [--json]\n');
   process.exit(code);
 }
 

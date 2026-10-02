@@ -2,7 +2,7 @@
 //
 // One unit is one bounded piece of work: one op, one subject key (engine/admission.mjs unitSubjectKey) and one goal
 // revision - a work_units row. Every op job is a try of exactly one unit (jobs.unit_id, try_no, retry_of|resume_of).
-// Every way a job enters the ledger - api enqueue, graph-edit, the failure routes (cli.mjs enqueueFollowOn) - admits the
+// Every way a job enters the ledger - starci kernel enqueue, graph-edit, the failure routes (cli.mjs enqueueFollowOn) - admits the
 // try HERE, so none of them can start a fresh budget for the same work, chain a retry to another unit's or a passed
 // job, or re-run a passed unit without a reopen reason. The schema triggers refuse the same things; this answers first
 // with a typed refusal the Kernel can act on. admitUnit only reads; writeUnitTry writes inside the caller's transaction.
@@ -84,7 +84,7 @@ export function admitUnit(db, { workflowId, op, payload, goalRevision, retryOf =
     }
     const overlaps = failedOverlapsOf(db, { workflowId, op, goalRevision, payload, exclude: new Set(sources) });
     if (overlaps.length) {
-      throw refuse(`this ${op} work overlaps failed unit(s) ${overlaps.map((o) => `${o.unitId} (latest ${o.jobId}, ${o.tries}/${o.budget} tries)`).join(', ')}: a new unit would restart their budget. Retry it with --retry-of ${overlaps[0].jobId} (a widened shape stays in its unit), or reshape it through api graph-edit`,
+      throw refuse(`this ${op} work overlaps failed unit(s) ${overlaps.map((o) => `${o.unitId} (latest ${o.jobId}, ${o.tries}/${o.budget} tries)`).join(', ')}: a new unit would restart their budget. Retry it with --retry-of ${overlaps[0].jobId} (a widened shape stays in its unit), or reshape it through starci kernel graph-edit`,
         'unit-overlaps-failed-unit', { overlaps });
     }
   }

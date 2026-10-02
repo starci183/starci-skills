@@ -1,5 +1,5 @@
 // failure-steps.mjs — which failed attempts the frontier still owes a step (the job's settle result nextStep, recorded by
-// cli.mjs enqueueNextStep on a failed settle). api status reads unresolvedFailures for nextActions and leg colours.
+// cli.mjs enqueueNextStep on a failed settle). starci kernel status reads unresolvedFailures for nextActions and leg colours.
 import { AWAITING_OWNER_STATUS, sameUnit } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retryAttemptOf } from './gate-conditions.mjs';

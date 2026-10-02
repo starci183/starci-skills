@@ -121,7 +121,7 @@ test('each implicated file is own, a peer\'s commit, a peer\'s in-flight change 
   });
 });
 
-test('api record-checks records a peer-attributed red gate peerBlocked; settle spends no business attempt on it', (t) => {
+test('starci kernel record-checks records a peer-attributed red gate peerBlocked; settle spends no business attempt on it', (t) => {
   const fx = fixture(t);
   const checks = JSON.stringify({ checks: [
     { name: 'container', exitCode: 0, command: 'npm run test:container' },
@@ -166,7 +166,7 @@ test('retry accounting: peer-blocked is free only off a pass and only when the a
 
 // Strict validate of login/ui stayed red on DATA_STATUS_DRAWN
 // in ui/session-ending records outside the job's owned paths that nothing had touched; three attempts were spent on it.
-test('an untouched Work record outside the owned paths is foreign debt: api record-checks records it advisory', (t) => {
+test('an untouched Work record outside the owned paths is foreign debt: starci kernel record-checks records it advisory', (t) => {
   const fx = fixture(t);
   commit(fx.repo, { '.starciwork/features/login/ui/session-ending/index.yaml': 'schema: work/ui-screen@1\n' }, 'old record', Date.now() - 2 * DAY);
   commit(fx.repo, { '.starciwork/features/peer/ui/touched/index.yaml': 'schema: work/ui-screen@1\n' }, `peer record (${PEER})`, Date.now() - 1_000);
@@ -236,7 +236,7 @@ test('failing files are read from a red check\'s own text when it names no list'
   assert.deepEqual(failingFromText('typecheck evidence in composition-r4/typecheck.txt'), []);
 });
 
-test('api record-checks attributes a red Kernel check on the files its evidence names', (t) => {
+test('starci kernel record-checks attributes a red Kernel check on the files its evidence names', (t) => {
   const fx = fixture(t);
   preexisting(fx);
   const recorded = fx.okSettler(['record-checks', '--job', 'job-self', '--checks', JSON.stringify({ checks: [

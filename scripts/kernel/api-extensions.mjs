@@ -13,7 +13,7 @@
 //   modules/cli/commands/kernel/<verb>.yaml  its catalog contract (what `commands.<verb>` of api.yaml would hold)
 //   scripts/kernel/status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}
 //                                            ctx {ledger, db, wf, workflowId, args, repo, now, core}; a null/undefined
-//                                            value adds nothing; `lines` adds human lines to `api status`
+//                                            value adds nothing; `lines` adds human lines to `starci kernel status`
 //   scripts/kernel/api-boolean-flags.txt     one boolean flag per line (any verb); merge=union, order free
 //
 // The verbs, flags and fields already in cli.mjs stay where they are; check-cli-parity reads both.

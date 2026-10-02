@@ -1,4 +1,4 @@
-// api record-checks: record independent checks against a filed worker report.
+// starci kernel record-checks: record independent checks against a filed worker report.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from '../../lib/json.mjs';
@@ -52,7 +52,7 @@ export default {
       const r = rerunCheck(cls, { repo, timeoutMs: rerunTimeoutMs });
       const v = checkVerdictOf(r);
       return { ...check, authority: 'runtime', declaredExitCode: check.exitCode, exitCode: Number.isInteger(r.exitCode) ? r.exitCode : 127,
-        ...(v.verdict === 'unavailable' ? { unavailable: true } : {}), evidence: `api record-checks re-run: raw exit ${r.exitCode} (declared ${check.exitCode}) ${r.tail ?? ''}`.slice(0, 1000) };
+        ...(v.verdict === 'unavailable' ? { unavailable: true } : {}), evidence: `starci kernel record-checks re-run: raw exit ${r.exitCode} (declared ${check.exitCode}) ${r.tail ?? ''}`.slice(0, 1000) };
     });
   } else parsed.checks = parsed.checks.map((check) => ({ ...check, authority: 'runtime' }));
   const dispatchId = requireDispatchedReportBinding(db, job);

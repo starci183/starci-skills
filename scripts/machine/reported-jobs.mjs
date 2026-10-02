@@ -4,7 +4,7 @@
 
 /** The ledger event the settler records once per dispatch and reason when it hands a reported job to the Kernel. */
 export const NEEDS_KERNEL_EVENT = 'job-settle-needs-kernel';
-// A job whose op filed its report (api report moves it to reported) until a verdict settles it.
+// A job whose op filed its report (starci kernel report moves it to reported) until a verdict settles it.
 const LIVE = ['running', 'answering', 'effect_unknown', 'reported', 'deciding'];
 /** Ops whose pass is an owner act, never a machine verdict. */
 export const KERNEL_ONLY_OPS = Object.freeze(['handover.review']);

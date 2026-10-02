@@ -32,7 +32,7 @@ const readSchema = file => parseYaml(fs.readFileSync(path.join(schemaDir, file),
 // The family list is read off the catalog rather than typed out here. A hand-kept list is a third copy of
 // the same fact - the catalog has it, each schema's `schema` const has it - and the copy that rots is
 // always the one a spec keeps privately. `subsystem: work-tree` is what the catalog calls the schemas a
-// .starciwork tree's own files carry; `node scripts/checks/check-schema-catalog.mjs` keeps that list from
+// .starciwork tree's own files carry; `starci runtime check --only schema-catalog` keeps that list from
 // drifting away from the files. The one entry with no `properties.schema.const` is the metadata monolith,
 // which discriminates through a oneOf instead and is not a per-family authority.
 const catalog = parseYaml(fs.readFileSync(path.join(schemaDir, 'index.yaml'), 'utf8'));

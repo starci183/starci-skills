@@ -3,7 +3,7 @@
 // 2026-09-29: a colon-space inside a plain scalar was committed to product .starciwork and to .claude knowledge, and
 // literal usernames/passwords sat in product accounts.yaml files with no check to flag them. Three paths now refuse
 // them: the lib (scripts/work/validate/work-hygiene.mjs), the product repo's pre-commit hook (scripts/guards/hook-install.mjs
-// ensureWorkHook) and api settle (reason work-hygiene-red, contract change work-hygiene-gate). A clean change passes.
+// ensureWorkHook) and starci kernel settle (reason work-hygiene-red, contract change work-hygiene-gate). A clean change passes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -136,7 +136,7 @@ test('the hook wraps husky\'s generated pre-commit dispatcher and never overwrit
   assert.deepEqual(guardReceiptErrors({ workHooks: [{ repo, installed: false, reason: 'foreign-hook' }] }), [`work hook ${repo}: foreign-hook`]);
 });
 
-// ------------------------------------------------------------------------------------------------ api settle
+// ------------------------------------------------------------------------------------------------ starci kernel settle
 const registry = loadContractChanges(ROOT);
 const admittedAfter = () => { const c = registry.changes.find((x) => x.id === WORK_HYGIENE_CHANGE); assert.ok(c, 'work-hygiene-gate is registered'); return c.effectiveAt; };
 
@@ -174,7 +174,7 @@ const settle = (repo, jobId) => {
 };
 const statusOf = (repo, jobId) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status; } finally { l.close(); } };
 
-test('api settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), a clean change and an older leg pass', (t) => {
+test('starci kernel settle refuses an unparseable Work YAML and a literal password (work-hygiene-red), a clean change and an older leg pass', (t) => {
   const at = admittedAfter() + 1000;
 
   const brokenRepo = checkout(t);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // telegram.mjs — tells the owner about an owner ask over a Telegram bot
 // (docs/connectors.md). The one send point is the KERNEL's ask path:
-// `api serve-ask` (scripts/kernel/ask-server.mjs parkAsk) calls notifyAsk()
+// `starci kernel serve-ask` (scripts/kernel/ask-server.mjs parkAsk) calls notifyAsk()
 // when an ask is parked; only an approval ask is pushed, a credential ask waits
 // under the bridge's /creds (serve-ask.mjs askClassOf). The message carries
 // the workflow, the question and its numbered options, and ONE inline button "Generate URL" — never a link:
@@ -443,7 +443,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
 
 /**
  * Take one ask off the chat once it no longer waits: answered (serve-ask on submit, auto-accept) or
- * retired (api retire-ask, a superseding ask). Every message that shows it is DELETED (owner,
+ * retired (starci kernel retire-ask, a superseding ask). Every message that shows it is DELETED (owner,
  * 2026-09-24: "delete it once answered"); one Telegram refuses to delete is edited to say it was answered,
  * with the question kept and no link or button. Never throws; an ask with no message (or Telegram
  * off) is a no-op. Returns {ok, reason, deleted:[ids], edited:[ids], failed:[ids]}; a failed one

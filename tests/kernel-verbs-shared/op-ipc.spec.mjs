@@ -23,7 +23,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 //                                   upserts reports UNIQUE(workflow_id,
 //                                   dispatch_id); emits 'report-filed'
 //   starci kernel op-contract --job           prints the contracts row markdown
-//   api record-checks --job --checks <json> upserts checks PK(workflow_id,op_id,
+//   starci kernel record-checks --job --checks <json> upserts checks PK(workflow_id,op_id,
 //                                   attempt); emits 'checks-recorded'
 //   starci kernel consume-report --job        sets reports.consumed_at
 //   starci kernel settle                      sets reports.consumed_at for the job's
@@ -240,7 +240,7 @@ test('starci kernel report immediately wakes an idle Kernel after committing the
 
 /* ------------------------------------- consume-report + checks durability */
 
-test('starci kernel consume-report marks the dispatch report consumed; api record-checks records each check run',t=>{
+test('starci kernel consume-report marks the dispatch report consumed; starci kernel record-checks records each check run',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   const {job}=dispatchRunning(fx,jobId);
@@ -255,9 +255,9 @@ test('starci kernel consume-report marks the dispatch report consumed; api recor
     {name:'tests',command:'npm test',exitCode:0,evidence:'tests passed'},
   );
   const k1=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(first),'--json');
-  assert.equal(k1.status,0,`api record-checks failed: ${k1.stderr||k1.stdout}`);
+  assert.equal(k1.status,0,`starci kernel record-checks failed: ${k1.stderr||k1.stdout}`);
   let rows=checkRows(fx);
-  assert.equal(rows.length,2,'api record-checks records one row per check');
+  assert.equal(rows.length,2,'starci kernel record-checks records one row per check');
   assert.deepEqual(rows.map(r=>r.name).sort(),['lint','tests']);
   assert.ok(rows.every(r=>r.job_id===jobId && r.attempt_id===reportRows(fx)[0].attempt_id));
   assert.ok(rows.every(r=>r.authority==='declared'),'unrerunnable commands remain declared evidence');
@@ -268,14 +268,14 @@ test('starci kernel consume-report marks the dispatch report consumed; api recor
     {name:'tests',command:'npm test',exitCode:1,evidence:'tests failed'},
   );
   const k2=fx.run(API,'record-checks','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(rerun),'--json');
-  assert.equal(k2.status,0,`api record-checks (re-run) failed: ${k2.stderr||k2.stdout}`);
+  assert.equal(k2.status,0,`starci kernel record-checks (re-run) failed: ${k2.stderr||k2.stdout}`);
   rows=checkRows(fx);
   assert.equal(rows.length,4,'a second check run appends without erasing the first');
   assert.equal(rows.filter(r=>r.name==='tests').at(-1).declared_exit_code,1);
-  assert.ok(eventKinds(fx).includes('checks-recorded'),'api record-checks must emit the checks-recorded event');
+  assert.ok(eventKinds(fx).includes('checks-recorded'),'starci kernel record-checks must emit the checks-recorded event');
 });
 
-test('api record-checks rejects scalar and double-encoded payloads before recording evidence',t=>{
+test('starci kernel record-checks rejects scalar and double-encoded payloads before recording evidence',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx,'job-op-ipc-check-shape');
   const valid=checkEnvelope({name:'validator',command:'starci runtime validate',exitCode:0,evidence:'green'});
@@ -331,7 +331,7 @@ test('settle consumes the dispatch report and releases every owned-path lease',t
   const verdictReport=path.join(fx.repo,'verdict-report.md');
   fs.writeFileSync(verdictReport,'# verdict\npass\n');
   const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
-  assert.equal(checked.status,0,`api record-checks failed: ${checked.stderr||checked.stdout}`);
+  assert.equal(checked.status,0,`starci kernel record-checks failed: ${checked.stderr||checked.stdout}`);
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--report',verdictReport,'--json');
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
   assert.equal(jobRow(fx,jobId)?.status,'succeeded');
@@ -498,7 +498,7 @@ test('A7: a report binds to the contracts row, never to a dispatch that was reje
 
   // check and settle resolve the same binding, so the attempt can finish.
   const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
-  assert.equal(checked.status,0,`api record-checks must bind to the live dispatch: ${checked.stderr||checked.stdout}`);
+  assert.equal(checked.status,0,`starci kernel record-checks must bind to the live dispatch: ${checked.stderr||checked.stdout}`);
   const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(settled.status,0,`starci kernel settle must bind to the live dispatch: ${settled.stderr||settled.stdout}`);
   assert.equal(jobRow(fx,jobId)?.status,'succeeded');

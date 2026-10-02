@@ -1,0 +1,18 @@
+group: runtime
+verb: readme-blocks
+owner: runtime
+summary: regenerate or check the generated blocks of knowledge/hfs/README.md
+impl: {script: scripts/hfs/readme-blocks.mjs}
+flags:
+  - {name: write, type: boolean, summary: rewrite the stale output in place}
+  - {name: check, type: boolean, summary: list the stale output (the default)}
+exit: {"0": current, "1": stale output listed, "2": bad usage}
+json: none
+examples:
+  - starci runtime readme-blocks --check
+  - starci runtime readme-blocks --write
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/hfs/readme-blocks.mjs
+  - node .claude/scripts/hfs/readme-blocks.mjs

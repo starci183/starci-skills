@@ -17,7 +17,7 @@ export function generatedBlockFindings(ctx) {
   const manifest = loadSlotManifest({ root: ctx.root });
   const catalog = loadRuleCatalog({ root: ctx.root });
   const found = [];
-  const add = (file, what) => found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: ${what}; run "node scripts/hfs/readme-blocks.mjs --write" or "node scripts/hfs/derived-fields.mjs --write" (never edit a generated value by hand)` });
+  const add = (file, what) => found.push({ code: CODE, level: 'error', path: file, message: `${CODE} ${file}: ${what}; run "starci runtime readme-blocks --write" or "starci runtime derived-fields --write" (never edit a generated value by hand)` });
   const readme = ctx.read(README);
   if (readme !== null && readme !== undefined) for (const name of staleBlocks(readme, manifest, catalog)) add(README, `the generated block ${name} is missing or differs from slots.yaml / rules.yaml`);
   const resolver = createProseResolver(ctx, manifest);

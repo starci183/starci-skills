@@ -110,7 +110,7 @@ const jobsOf = (db, workflowId) => db.prepare("SELECT job_id,op_id,status,payloa
 
 /**
  * Version `row` as the ledger stands now: {colors, jobs: Map(node id -> covering jobs, oldest first)}. `rework` names
- * succeeded jobs a contract change owes a follow-up (api status contractFollowUps): they colour their nodes as rework
+ * succeeded jobs a contract change owes a follow-up (starci kernel status contractFollowUps): they colour their nodes as rework
  * (red), never done.
  */
 export function liveCoverage(db, row, { rework = new Set() } = {}) {
@@ -169,7 +169,7 @@ export function domainsOfPaths(graph, paths) {
 }
 
 /**
- * What `api status` reads of the work graph: null without one, else {version, event, graph, colors, counts, frontier}
+ * What `starci kernel status` reads of the work graph: null without one, else {version, event, graph, colors, counts, frontier}
  * where frontier holds the runnable nodes (work-graph-model.mjs frontierOf) with the op of the last job on their paths.
  */
 export function workGraphStatus(db, workflowId, { rework = new Set() } = {}) {

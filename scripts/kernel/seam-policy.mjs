@@ -7,18 +7,18 @@
 // more than a day behind seam op-backend.implement-9a2c4c2f03 (attempt 11, queued under a peer-wait).
 //
 // The contract here is contract-first:
-//   - the seam publishes its interface early (`api cut-seam --publish-interface`: the types/contract/stub
+//   - the seam publishes its interface early (`starci kernel cut-seam --publish-interface`: the types/contract/stub
 //     files it committed, each with its sha256) and every sibling is released at once to build against it;
 //   - a sibling is also released - with a stub of its own inside its owned paths - when the seam's latest
 //     attempt settled failed/blocked, when the seam slipped `recutAfterFailures` times, when the Kernel
-//     released the cut (`api cut-seam --release`), or when it has waited allocation.cutSeam.maxSiblingWaitMs
+//     released the cut (`starci kernel cut-seam --release`), or when it has waited allocation.cutSeam.maxSiblingWaitMs
 //     (modules/models/runtimes.yaml) - never longer;
 //   - a sibling dispatched before the seam passed carries payload.cut.seamStub and owes ONE light
-//     re-verify against the real seam once it lands (`cut-seam-reconcile`, `api cut-seam --reconcile`), not
+//     re-verify against the real seam once it lands (`cut-seam-reconcile`, `starci kernel cut-seam --reconcile`), not
 //     a redo. A stub sibling that settles after the seam passed is reconciled by its own settle checks.
 //   - a seam that slipped is re-cut: status names a plan that keeps the feature-local interface paths as
 //     the seam and moves the shared-root paths into one wire leg after every ordinal.
-// Everything here reads the ledger; the three writers are the api cut-seam CLI's events.
+// Everything here reads the ledger; the three writers are the starci kernel cut-seam CLI's events.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -177,11 +177,11 @@ export function recutPlanOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
   const cut = payloadOf(seam.head).cut ?? {};
   const split = wire.length && keep.length
     ? { seam: keep, wire, steps: [
-      `api reconcile --job ${seam.head.job_id} --drop --reason "re-cut: seam slipped ${seam.failures}x"` + (seam.head.status === 'queued' ? '' : ' (only while it is queued; a settled seam needs no drop)'),
-      `api enqueue --op ${op} --paths ${keep.join(',')} --cut-id ${cutId} --cut-ordinal 1 --cut-total ${cut.total} (the smaller seam: its interface first)`,
-      `api enqueue --op ${op} --paths ${wire.join(',')} --after <every ordinal of cut ${cutId}> (ONE wire leg: the shared-root registration once the slices land)`,
+      `starci kernel reconcile --job ${seam.head.job_id} --drop --reason "re-cut: seam slipped ${seam.failures}x"` + (seam.head.status === 'queued' ? '' : ' (only while it is queued; a settled seam needs no drop)'),
+      `starci kernel enqueue --op ${op} --paths ${keep.join(',')} --cut-id ${cutId} --cut-ordinal 1 --cut-total ${cut.total} (the smaller seam: its interface first)`,
+      `starci kernel enqueue --op ${op} --paths ${wire.join(',')} --after <every ordinal of cut ${cutId}> (ONE wire leg: the shared-root registration once the slices land)`,
     ] }
-    : { seam: seamPaths.slice(0, 1), wire: seamPaths.slice(1), steps: [`split the seam one path per job: ${seamPaths.join(', ')} - publish the interface file first (api cut-seam --publish-interface)`] };
+    : { seam: seamPaths.slice(0, 1), wire: seamPaths.slice(1), steps: [`split the seam one path per job: ${seamPaths.join(', ')} - publish the interface file first (starci kernel cut-seam --publish-interface)`] };
   return { cutId: String(cutId), op, seamJobId: seam.head.job_id, failures: seam.failures, featureRoot: root || null, ...split };
 }
 
@@ -210,7 +210,7 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/cli.mjs',
   if (isSeamCut(cut)) {
     return [
       `seam: you are ordinal 1 of cut ${cut.id} - ${Number(cut.total) - 1} sibling ordinal(s) build on you. CONTRACT FIRST: author the seam's interface (types, DTOs, ports/contracts, a stub implementation) before anything else, then publish it:`,
-      `  node ${api} cut-seam --repo ${repoLabel} --publish-interface --job ${jobLabel} --files <interface files, csv> --summary "<one line>"`,
+      `  starci kernel cut-seam --repo ${repoLabel} --publish-interface --job ${jobLabel} --files <interface files, csv> --summary "<one line>"`,
       `  every sibling is released to build against it at once; then finish the seam. Keep the published signatures stable - a change after publishing owes the siblings a reconcile.`,
     ];
   }
@@ -356,11 +356,11 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   const commands = [];
   for (const [index, wave] of waves.entries()) {
     for (const slice of out.filter((item) => item.wave === wave)) {
-      commands.push(`api enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total} --canon-scan ${scanFile ?? '<this scan file>'}`
+      commands.push(`starci kernel enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total} --canon-scan ${scanFile ?? '<this scan file>'}`
         + (index ? ` --after <every job of wave ${waves[index - 1]} and its canon-wire leg>` : ''));
     }
     const wire = wires.find((item) => item.wave === wave);
-    if (wire) commands.push(`api enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg${wire.repoint ? `; ${REPOINT_BRIEF}` : ''})`);
+    if (wire) commands.push(`starci kernel enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg${wire.repoint ? `; ${REPOINT_BRIEF}` : ''})`);
   }
   return { cutId: cutId == null ? null : String(cutId), op, total, slices: out, wires, commands };
 }
@@ -379,7 +379,7 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
   const params = { resumeFrom: preserved };
   const owned = [...new Set([...(payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean), ...extraPaths])];
   const cut = payload.cut;
-  const command = `api enqueue --workflow ${row.workflow_id} --op ${row.op_id} --paths ${owned.join(',')}`
+  const command = `starci kernel enqueue --workflow ${row.workflow_id} --op ${row.op_id} --paths ${owned.join(',')}`
     + (cut?.id != null ? ` --cut-id ${cut.id} --cut-ordinal ${cut.ordinal} --cut-total ${cut.total}` : '')
     + ` --retry-of ${row.job_id} --params '${JSON.stringify(params)}'`;
   return { jobId: row.job_id, status: row.status, ...params, owned, command };
@@ -432,7 +432,7 @@ export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
 export function cutManifestPromptLines(manifest) {
   if (!manifest) return [];
   return [
-    `cut_manifest: bound at dispatch from the ledger (packet context.cut.manifest, api op-contract --json): ${manifest.total} ordinal(s), path union ${manifest.pathUnion.length} path(s), ${manifest.disjoint ? 'pairwise-disjoint' : `OVERLAPS ${manifest.overlaps.map((o) => `${o.ordinals.join('/')}@${o.path}`).slice(0, 3).join(', ')}`}`,
+    `cut_manifest: bound at dispatch from the ledger (packet context.cut.manifest, starci kernel op-contract --json): ${manifest.total} ordinal(s), path union ${manifest.pathUnion.length} path(s), ${manifest.disjoint ? 'pairwise-disjoint' : `OVERLAPS ${manifest.overlaps.map((o) => `${o.ordinals.join('/')}@${o.path}`).slice(0, 3).join(', ')}`}`,
     `  passed ordinals: ${manifest.passed.join(',') || '(none)'}; open: ${manifest.open.join(',') || '(none)'}${manifest.absent.length ? `; no job yet: ${manifest.absent.join(',')}` : ''}; canon-wire legs: ${manifest.wires.map((w) => `${w.jobId} ${w.status}`).join(', ') || '(none)'}`,
     `  this IS the complete path-union manifest and passed-ordinal state the brief requires: bind it, never block for it; a sibling path is never yours to edit`,
   ];
@@ -486,7 +486,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
 //   starci machine seam-policy canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
 //   starci machine seam-policy canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
-// Each prints JSON whose `commands` / `command` are the api enqueue lines to run. Ledger reads only.
+// Each prints JSON whose `commands` / `command` are the starci kernel enqueue lines to run. Ledger reads only.
 async function main(argv) {
   const [verb, ...rest] = argv;
   const flag = (name) => { const at = rest.indexOf(`--${name}`); return at >= 0 ? rest[at + 1] : undefined; };

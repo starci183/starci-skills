@@ -9,7 +9,7 @@
 //   (a) progress counts only units that passed their gates (progress-rca.mjs unitsOf: a succeeded job)
 //   (b) no verb weakens a gate (an override is additive; a note that says skip/disable/relax a check is refused), changes
 //       the goal, edits owner rulings, or touches another workflow's open paths or leases (foreignOverlap)
-//   (c) credentials and real money stay deferred (every new unit goes through `api enqueue`, whose autopilot refusal
+//   (c) credentials and real money stay deferred (every new unit goes through `starci kernel enqueue`, whose autopilot refusal
 //       holds; no verb dispatches a provision.ask)
 //   (d) every mutating verb names an OPEN decision of the Kernel's decision log (hypothesis -> action -> metric ->
 //       keep/revert); a reverted action key is refused as a new decision, a failing unit shape is never re-dispatched
@@ -164,7 +164,7 @@ export function checkPaths(db, { repo, workflowId, op, payload = {}, current = [
   } catch (e) { if (e.code) throw e; }
   const qualified = add.map((p) => (heads.size === 1 && !slash(p).startsWith(`${[...heads][0]}/`) && /^(apps|packages|src|libs|e2e)\//.test(slash(p)) ? `${[...heads][0]}/${slash(p)}` : slash(p)));
   const hits = foreignOverlap(db, { repo, workflowId, op, payload, paths: qualified });
-  if (hits.length) throw refuse(`another workflow holds ${hits.slice(0, 4).map((h) => `${h.path} (${h.workflowId} ${h.jobId})`).join(', ')}: never take its paths - message it (api notify) or wait`, 'path-held-by-other-workflow', { hits });
+  if (hits.length) throw refuse(`another workflow holds ${hits.slice(0, 4).map((h) => `${h.path} (${h.workflowId} ${h.jobId})`).join(', ')}: never take its paths - message it (starci kernel notify) or wait`, 'path-held-by-other-workflow', { hits });
   return qualified;
 }
 
@@ -194,7 +194,7 @@ export function failedShapesOf(db, workflowId, job) {
 /* ------------------------------------------------------------ the decision log (guardrail d) */
 
 export function requireDecision(db, workflowId, id) {
-  if (!id) throw refuse('this edit needs --decision <id>: log it first (api decide --workflow <wf> --hypothesis <why> --action-key <key from api status rca.actions> --metric <what you will measure>)', 'decision-required');
+  if (!id) throw refuse('this edit needs --decision <id>: log it first (starci kernel decide --workflow <wf> --hypothesis <why> --action-key <key from starci kernel status rca.actions> --metric <what you will measure>)', 'decision-required');
   const d = decisionsOf(db, workflowId).find((x) => x.id === id);
   if (!d) throw refuse(`decision ${id} is not in ${workflowId}'s decision log`, 'decision-unknown');
   if (d.status !== 'open') throw refuse(`decision ${id} is closed (${d.status}); open a new one`, 'decision-closed');
@@ -242,7 +242,7 @@ export function opOverrideOf(db, workflowId, op) {
 }
 
 /**
- * What api dispatch puts in packet.context.kernel_override for one job: the workflow's op override merged with the
+ * What starci kernel dispatch puts in packet.context.kernel_override for one job: the workflow's op override merged with the
  * job's own (graph-edit params, redesign). Null when there is none. Never throws.
  */
 export function kernelOverrideFor(db, workflowId, op, payload = {}) {
@@ -284,6 +284,6 @@ export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } =
   const s = progressSettings().settleBacklog;
   const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
-    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; api status settleDecisions): api settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (api record-checks) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
+    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; starci kernel status settleDecisions): starci kernel settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (starci kernel record-checks) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
   }
 }

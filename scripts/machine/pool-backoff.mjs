@@ -12,7 +12,7 @@
 //
 // Readers: route (scripts/agent/models.mjs selectPool, a live route with a capacity map) rejects a pool whose running
 // count reached its backed-off cap, so the next eligible pool of the order takes the job (and a job with no other
-// eligible pool stays queued); `api dispatch-ready` routes every job before dispatching, so dispatch respects it.
+// eligible pool stays queued); `starci kernel dispatch-ready` routes every job before dispatching, so dispatch respects it.
 // A row past its until_at is ignored (a dead engine never pins a pool at its floor).
 //
 // Pure over its inputs except poolCapsNow (one machine.sqlite read, cached CACHE_MS).

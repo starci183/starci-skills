@@ -1,4 +1,4 @@
-// api nudge: recover a running worker at its exact terminal without widening authority.
+// starci kernel nudge: recover a running worker at its exact terminal without widening authority.
 import { createHash } from 'node:crypto';
 import { jobPayloadOf, jobRowOf } from './shared/rows.mjs';
 import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake-delivery.mjs';
@@ -15,7 +15,7 @@ export default {
     const { observeOperationWorker, LAUNCH_GRACE_MS, stagedInputEvidenceOf, workerCardOf,
       GATE_ANSWERED_EVENT, runningOpRevDriftOf, workerInputRowText, INPUT_ROW_PLACEHOLDER,
       runtimeOwnedInput, TERMINAL_NOT_WRITABLE, UNWRITABLE_EVENT } = internals;
-    const deadWorkerRecovery = (jobId) => `run api reconcile --job ${jobId} --dead-worker --settle-failed`;
+    const deadWorkerRecovery = (jobId) => `run starci kernel reconcile --job ${jobId} --dead-worker --settle-failed`;
     // What sat in a worker's input box could be anything a human pasted, so a ledger event never carries
     // a foreign draft verbatim: the labelled digest proves WHICH text it was without quoting it (M10).
     // The operator-facing refusal keeps the bounded slice.
@@ -31,7 +31,7 @@ export default {
         payload: { opId: job.op_id, attempt: job.attempt, dispatchId, terminal: worker.terminalHandle, priorLiveness: worker.liveness, errorCode: TERMINAL_NOT_WRITABLE } }));
       return refused;
     };
-    const refusedNote = (jobId) => `; Orca refused the write: the worker reads disconnected until it prints or heartbeats again, and api reconcile --job ${jobId} --dead-worker --settle-failed recovers it`;
+    const refusedNote = (jobId) => `; Orca refused the write: the worker reads disconnected until it prints or heartbeats again, and starci kernel reconcile --job ${jobId} --dead-worker --settle-failed recovers it`;
 
   const db = ledger.db, jobId = args.job;
   const job = jobRowOf(db, jobId);
@@ -154,7 +154,7 @@ export default {
   const prompt = [
     `Operation liveness wake for durable job ${jobId} (${job.op_id}) attempt ${job.attempt}.`,
     'Your accepted contract remains running but no durable report is filed.',
-    'Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report.',
+    'Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report.',
     'Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.',
     ...(() => {
       // op-rev-drift while running: the worker hears that its op contract moved and that it is judged by its admission.

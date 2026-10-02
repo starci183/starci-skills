@@ -1,4 +1,4 @@
-// api questions: drain the workflow's Runs into the ledger (api-lib/messages.mjs) and list the pending worker questions.
+// starci kernel questions: drain the workflow's Runs into the ledger (api-lib/messages.mjs) and list the pending worker questions.
 import { getWorkflow } from './shared/rows.mjs';
 import { drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
 

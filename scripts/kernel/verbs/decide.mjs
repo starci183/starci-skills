@@ -1,4 +1,4 @@
-// api decide — the Kernel's DECISION LOG (owner 2026-09-28, guardrail d): every idea is a row hypothesis -> action ->
+// starci kernel decide — the Kernel's DECISION LOG (owner 2026-09-28, guardrail d): every idea is a row hypothesis -> action ->
 // metric -> keep/revert, so a restarted Kernel reads what was tried and never repeats a failed idea. The Supervisor
 // audits it. Every mutating kernel verb (graph-edit, redesign, op-override) names an open decision.
 //
@@ -7,7 +7,7 @@
 //   decide --workflow <wf> --list
 //
 // A new decision whose --action-key was already reverted is refused (decision-repeats-failed); so is one whose key
-// is still open (decision-open). Brainstorming beyond api status rca.actions is allowed: invent a key, log it here.
+// is still open (decision-open). Brainstorming beyond starci kernel status rca.actions is allowed: invent a key, log it here.
 import { recordKernel, refuse, newId } from '../kernel-authority.mjs';
 import { DECISION_KIND, DECISION_RESULT_KIND, decisionsOf, opJobsOf, unitsOf } from '../progress-rca.mjs';
 
@@ -42,14 +42,14 @@ export default {
         payload: { result: args.result, observed: String(args.observed), after, before: d.baseline ?? null },
         msg: `decision ${d.id} ${args.result}: ${args.observed}`, markdown: `Decision **${d.id}** (${d.actionKey}) -> **${args.result}**\n\nObserved: ${args.observed}\n\nBefore: ${JSON.stringify(d.baseline ?? null)}\nAfter: ${JSON.stringify(after)}`,
         level: args.result === 'keep' ? 'info' : 'warn' });
-      const hint = args.result === 'revert' ? `; undo its edits: api graph-edit --workflow ${wf} --edit undo --undo <edit id> for each edit citing ${d.id}` : '';
+      const hint = args.result === 'revert' ? `; undo its edits: starci kernel graph-edit --workflow ${wf} --edit undo --undo <edit id> for each edit citing ${d.id}` : '';
       emit({ ok: true, workflowId: wf, id: d.id, result: args.result, after }, `decision ${d.id} closed ${args.result}${hint}`, args.json);
       return;
     }
     for (const k of ['hypothesis', 'action-key', 'metric']) if (!String(args[k] ?? '').trim()) throw refuse(`decide needs --${k}`, 'decision-incomplete');
     const key = String(args['action-key']).trim();
     const failed = log.find((d) => d.actionKey === key && d.status === 'revert');
-    if (failed) throw refuse(`action ${key} was tried in ${failed.id} and reverted (${failed.observed ?? 'no effect'}): pick the next untried action in api status rca.actions, or change the shape and log it under a new key`, 'decision-repeats-failed', { tried: failed.id });
+    if (failed) throw refuse(`action ${key} was tried in ${failed.id} and reverted (${failed.observed ?? 'no effect'}): pick the next untried action in starci kernel status rca.actions, or change the shape and log it under a new key`, 'decision-repeats-failed', { tried: failed.id });
     const open = log.find((d) => d.actionKey === key && d.status === 'open');
     if (open) throw refuse(`action ${key} is already being measured in ${open.id}: close it first (decide --close ${open.id} --result keep|revert --observed ...)`, 'decision-open', { open: open.id });
     const id = newId('dec');

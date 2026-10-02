@@ -1,7 +1,7 @@
-// api provider-backoff — open a provider circuit when a rate limit persists (reconciler Resource controller, adaptive
+// starci kernel provider-backoff — open a provider circuit when a rate limit persists (reconciler Resource controller, adaptive
 // per-pool concurrency; lane rc-gc-resource). The controller halves a rate-limited pool's parallelism down to a floor
 // (scripts/machine/pool-backoff.mjs); when the provider still rate-limits at the floor for persistMs it opens the circuit
-// here, the same provider-health row `api dispatch` and `api route` already refuse on, so no new launch reaches the
+// here, the same provider-health row `starci kernel dispatch` and `starci kernel route` already refuse on, so no new launch reaches the
 // provider until it expires (allocation.cooldownMs.<kind>) or its quota probe / the Kernel's --recover clears it.
 //
 //   provider-backoff --provider <p> --open-circuit [--kind quota|rate-limited] --reason <text> --by <actor>
@@ -43,7 +43,7 @@ export default {
       return;
     }
     const cooldownMs = allocationMs(`cooldownMs.${kind}`);
-    const recover = kind === 'quota' ? `api provider-health --provider ${key} --quota-probe` : `api provider-health --provider ${key} --recover --reason <text> --probe`;
+    const recover = kind === 'quota' ? `starci kernel provider-health --provider ${key} --quota-probe` : `starci kernel provider-health --provider ${key} --recover --reason <text> --probe`;
     const value = { schema: 'starci/provider-health@1', provider: key, status: 'unavailable', failureKind: kind, strikeLimit: 1, model: null, jobId: null,
       step: 'reconciler-pool-backoff', signal: null, detail: String(args.reason).slice(0, 400), observedAt: now, failures: 1, trips: 1, cooldownMs,
       openedBy: String(args.by).slice(0, 80), recover };

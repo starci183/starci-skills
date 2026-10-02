@@ -831,7 +831,7 @@ schemas:
 # schema file: the document is its own contract, and its shape is whatever the
 # file declares. They are listed here, once, so that every `schema:` const in
 # the tree is accounted for in exactly one place —
-# `node scripts/checks/check-schema-catalog.mjs` fails on a stamp that appears
+# `starci runtime check --only schema-catalog` fails on a stamp that appears
 # in neither list, on a file this block does not name, and on an entry no file
 # stamps. modules/ops/ops/*.yaml is excluded: those manifests all carry the one
 # op kind the generated modules/ops/registry.yaml indexes.
@@ -846,6 +846,10 @@ moduleLocalDocumentKinds:
       - modules/schemas/hfs-peer-integrations.schema.yaml
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml
+
+  - id: starci/cli-global-flags@1
+    governs: "The global flags every starci command accepts (modules/cli/commands/_global.yaml)."
+    files: [modules/cli/commands/_global.yaml]
 
   - id: starci/document@1
     governs: "A sectioned prose policy document (title/blocks)."

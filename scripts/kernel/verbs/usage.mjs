@@ -1,4 +1,4 @@
-// api usage — measured token usage (llm_usage, written by scripts/kernel/usage-record.mjs): by op, by model and for the
+// starci kernel usage — measured token usage (llm_usage, written by scripts/kernel/usage-record.mjs): by op, by model and for the
 // Kernel of one workflow (--workflow <id> [--legs]), or per workflow and by model over the whole ledger (no --workflow).
 // Read-only. Its contract is modules/cli/commands/kernel/usage.yaml.
 import { getWorkflow } from './shared/rows.mjs';

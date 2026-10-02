@@ -10,7 +10,7 @@
 // not the Run's current coordinator.
 //
 // Routes (nothing in a Delivery is skipped):
-//   question, escalation  inbox row kind worker-question (the Kernel answers it with api reply)
+//   question, escalation  inbox row kind worker-question (the Kernel answers it with starci kernel reply)
 //   heartbeat             counted on the Delivery's event only: Orca keeps dispatch.lastHeartbeatAt (worker-show), which
 //                         is what lease renewal reads, and one nivo Run held 2616 of them
 //   every other type      one event kind orchestration-message per message (worker_done included: the Orca-side echo, kept for
@@ -33,7 +33,7 @@ const BODY_MAX = 4000;
 export const OWNER_ROUTED_REPLY = [
   'This question needs the owner, and an Orca ask never reaches them.',
   'Do not wait for a reply here: write your report.json with outcome ask and question {text, options},',
-  'file it with api report exactly as your contract says, and end your turn.',
+  'file it with starci kernel report exactly as your contract says, and end your turn.',
   'The Kernel serves the question to the owner (serve-ask) and re-enqueues this operation with the answer bound.',
 ].join(' ');
 export const workflowRunIdsOf = (db, workflowId) => {

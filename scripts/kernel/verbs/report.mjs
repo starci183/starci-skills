@@ -1,4 +1,4 @@
-// api report: validate and durably file the worker's report (alpha.3, H10).
+// starci kernel report: validate and durably file the worker's report (alpha.3, H10).
 //
 // The report file and every file it carries live under the attempt's STARCI_JOB_SCRATCH. The envelope is read once,
 // validated, and stored ONLY in `reports` (fileReport: immutable, one per attempt); attachments and check outputs go
@@ -29,7 +29,7 @@ import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { send } from '../../api/orca/send.mjs';
 
 // orca-deep-map REPLACE #9: the op settles its own Orca Task and Dispatch. After the report row committed - and
-// before the settler starts, which would otherwise race it - api report, running in the op's own pane, sends exactly
+// before the settler starts, which would otherwise race it - starci kernel report, running in the op's own pane, sends exactly
 // one worker_done (an ask keeps its worker: no worker_done). A refile is a replay and sends nothing. The receipt is
 // payload.workerDone; a failed send is recorded, never fatal: settle then reads the Dispatch not settled and fences it.
 const WORKER_DONE_OUTCOME = { done: 'succeeded', partial: 'succeeded', failed: 'failed', blocked: 'failed' };
@@ -39,8 +39,8 @@ function sendOpWorkerDone(ledger, job, payload, report, reportPath, dispatchCapa
   if (!outcome || !managed?.dispatchId || !managed?.taskId) return null;
   let sent;
   // Orca authenticates a worker_done with the Dispatch capability only the worker holds (its preamble: `--dispatch-capability dcap_...`;
-  // live E3, 2026-10-02: dispatch_capability_invalid without it). The op passes it to api report; it is never stored.
-  if (!dispatchCapability) sent = { ok: false, outcome: 'failed', errorCode: 'dispatch_capability_missing', error: 'api report was given no --dispatch-capability (the one in the op\'s Orca preamble)' };
+  // live E3, 2026-10-02: dispatch_capability_invalid without it). The op passes it to starci kernel report; it is never stored.
+  if (!dispatchCapability) sent = { ok: false, outcome: 'failed', errorCode: 'dispatch_capability_missing', error: 'starci kernel report was given no --dispatch-capability (the one in the op\'s Orca preamble)' };
   else try {
     sent = send({ taskId: managed.taskId, dispatchId: managed.dispatchId, from: managed.agentTerminalHandle ?? null,
       outcome, reportPath, subject: `${jobOpOf(job)} ${report.outcome}`, dispatchCapability });
@@ -129,8 +129,8 @@ export default {
       owed = admittedBefore(DRAW_OWNER_EVERY_CHANGE) ? judged.owed.filter((o) => o.owedBefore) : judged.owed;
       if (judged.unjudged.length) {
         const what = judged.unjudged.map((u) => `${u.path}: ${u.error}`).join('; ').slice(0, 800);
-        if (admittedBefore(DRAW_REVIEW_UNJUDGED_CHANGE)) console.error(`api report WARNING: the draw review guard could not judge ${what}`);
-        else throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. A record it cannot read may owe the owner review, so the done report is not filed: repair the record (starci validate names what is wrong) and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
+        if (admittedBefore(DRAW_REVIEW_UNJUDGED_CHANGE)) console.error(`starci kernel report WARNING: the draw review guard could not judge ${what}`);
+        else throw Object.assign(new Error(`draw-review-unjudged: the owner-review guard could not judge ${what}. A record it cannot read may owe the owner review, so the done report is not filed: repair the record (starci runtime validate names what is wrong) and file the report again`), { code: 'draw-review-unjudged', unjudged: judged.unjudged });
       }
     }
     if (owed.length) {
@@ -148,7 +148,7 @@ export default {
     if (!before) {
       let verdict;
       try { verdict = reportFeedbackFindings(db, { repo, report }); } catch (error) { verdict = { findings: [], error: String(error?.message ?? error) }; }
-      if (verdict.error) console.error(`api report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
+      if (verdict.error) console.error(`starci kernel report WARNING: the owner-feedback guard could not run: ${verdict.error.slice(0, 300)}`);
       if (verdict.findings.length) {
         throw Object.assign(new Error(`draw-feedback-unaddressed: ${verdict.findings.map((f) => f.detail).join(' | ').slice(0, 1600)}. The owner's notes ride in the redraw's brief (node ${path.join(skillRoot, 'scripts', 'work', 'draw-feedback.mjs')} brief --ui <dir>) and the critic gates each; redraw through draw-loop.mjs and check with draw-feedback.mjs check --ui <dir> before reporting`), { code: 'draw-feedback-unaddressed', findings: verdict.findings.slice(0, 50) });
       }
@@ -160,7 +160,7 @@ export default {
   // The guard fails open: a declaration it cannot read never blocks a report.
   if (report.outcome === 'ask') {
     let declared = null;
-    try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`api report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
+    try { declared = ownerAskConflict({ repo, question: report.question }); } catch (error) { console.error(`starci kernel report WARNING: stack declaration ask guard unavailable: ${String(error?.message ?? error).slice(0, 200)}`); }
     if (declared) throw Object.assign(new Error(`ask-declared-in-stack: ${declared.message} File done|partial|failed|blocked using the declared custody instead; a custody or server gap is repaired in the stack, never asked of the owner.`), { code: 'ask-declared-in-stack', declared });
   }
   // An ask the job's retry lineage already had answered is never filed again (scripts/machine/owner-answers.mjs):
@@ -211,7 +211,7 @@ export default {
   if (fs.existsSync(scratchLog)) {
     let logs = null;
     try { logs = openLogs(repo); ingestScratchLog(logs, { file: scratchLog, workflowId: job.workflow_id, jobId: job.job_id }); }
-    catch (error) { console.error(`api report WARNING: the op's ${SCRATCH_LOG_FILE} was not ingested: ${String(error?.message ?? error).slice(0, 200)}`); }
+    catch (error) { console.error(`starci kernel report WARNING: the op's ${SCRATCH_LOG_FILE} was not ingested: ${String(error?.message ?? error).slice(0, 200)}`); }
     finally { try { logs?.close(); } catch { /* closing */ } }
   }
   removeScratch(scratch);
@@ -223,7 +223,7 @@ export default {
   // The worker's output up to this report, read by Dispatch; settle replaces it with the fuller one (after the
   // release, from Orca's archive, or before an unmanaged worker's terminal is closed).
   if (!process.env.NODE_TEST_CONTEXT) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, dispatch: operationDispatchOf(jobPayloadOf(job)), repoRoots });
-  if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
+  if (reask) console.error(`starci kernel report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   const kernelWake = reportFiledWake(ledger, {
     workflowId: job.workflow_id,
     transition: `report-filed:${report.outcome}`,

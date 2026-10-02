@@ -1,4 +1,4 @@
-// api verify-proofs — every indexed file re-hashed against its chained sha256, and the events chain walked
+// starci kernel verify-proofs — every indexed file re-hashed against its chained sha256, and the events chain walked
 // (proof-integrity.mjs verifyProofs); exit 1 on tampering. Split out of cli.mjs (lane slim-04); its help
 // line stays in cli.mjs usage() (usageInCore).
 //

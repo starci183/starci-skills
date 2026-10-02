@@ -3,7 +3,7 @@
 //
 //   op attempt, live    attempt_transcript_snapshots: one row per 60 s (TRANSCRIPT_SNAPSHOT_MS) while the attempt
 //                       is open; an unchanged output adds no row (UNIQUE attempt+sha).
-//   op attempt, ended   op_attempts.transcript_sha: the full output when the attempt ends — at api report, before
+//   op attempt, ended   op_attempts.transcript_sha: the full output when the attempt ends — at starci kernel report, before
 //                       an unmanaged worker's terminal is closed, and after a managed worker's release (from Orca's
 //                       archive), so the last one written is the fullest.
 //   Kernel/Supervisor   machine.sqlite seat_transcript_snapshots, same cadence, for every live seat whose record

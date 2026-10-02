@@ -22,7 +22,7 @@ const fixture = (t) => {
   return { repo, ledger };
 };
 const stall = (ledger, extra = {}, now = T0) => openDecisionRow(ledger, { workflowId: WF, kind: 'progress-stall', entity: { type: 'workflow', id: WF }, summary: 'no unit passed in 60 min',
-  options: [{ key: 'dispatch-ready', verb: `node scripts/kernel/cli.mjs dispatch-ready --workflow ${WF}`, title: 'push the ready units' }], by: 'reconciler/workflow', ...extra }, { now }).di;
+  options: [{ key: 'dispatch-ready', verb: `starci kernel dispatch-ready --workflow ${WF}`, title: 'push the ready units' }], by: 'reconciler/workflow', ...extra }, { now }).di;
 const kernelEnv = {};
 
 test('an open, unclaimed Kernel DI older than 2 min refuses new work with the top item and its commands', (t) => {
@@ -72,13 +72,13 @@ test('the doorbell carries the oldest item in copy-paste form', (t) => {
   const sent = [];
   const r = ringDoorbellWith({ ledger, workflowId: WF, wake: ({ text }) => { sent.push(text); return { action: 'kernel-woken', delivered: true }; }, repo: 'repo-r' });
   assert.equal(r.action, 'rung');
-  assert.match(sent[0], /^\[decide\] 1 waiting: api decisions --workflow wf-first \| oldest /);
+  assert.match(sent[0], /^\[decide\] 1 waiting: starci kernel decisions --workflow wf-first \| oldest /);
   assert.match(sent[0], new RegExp(`oldest ${di.id}`));
   assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/cli\.mjs dispatch-ready/);
-  assert.match(sent[0], new RegExp(`then: node scripts/kernel/cli.mjs decisions --repo repo-r --resolve ${di.id}`));
+  assert.match(sent[0], new RegExp(`then: starci kernel decisions --repo repo-r --resolve ${di.id}`));
 });
 
-test('api enqueue and dispatch-ready refuse decisions-first through the CLI; api decisions --next prints the commands', (t) => {
+test('starci kernel enqueue and dispatch-ready refuse decisions-first through the CLI; starci kernel decisions --next prints the commands', (t) => {
   const { repo, ledger } = fixture(t);
   const di = stall(ledger);
   ledger.close();

@@ -33,7 +33,7 @@
 //          verbatim (generation.loop names this loop and round). Outcome `passed`, or `blocked` with the remaining
 //          failures of the best round - the worker then reports blocked with them, never pass
 //   verify --ui <ui-record-dir> --repo <product repo> [--json]
-//          what api settle runs: re-renders every live part of the record from its render source and re-runs every
+//          what starci kernel settle runs: re-renders every live part of the record from its render source and re-runs every
 //          machine metric itself (never the loop's self-reported numbers); exit 1 when one fails
 //
 // Machine metrics (each finding a code): the capture itself (DRAW_RENDER_RED: a missing font, horizontal overflow, a
@@ -235,7 +235,7 @@ export const loopFileOf = (out) => path.join(out, 'loop.json');
 export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
   context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
-/** The manifest file finish writes beside the loop dir (<out>.bundle.json), so api report --attach carries it too. */
+/** The manifest file finish writes beside the loop dir (<out>.bundle.json), so starci kernel report --attach carries it too. */
 export const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
 
 export function readLoop(out) {

@@ -129,7 +129,7 @@ async function run(args) {
   process.on('exit', () => { try { writeConnectorState('gateway', { state: 'stopped' }); } catch { /* the store is gone */ } claim.release(); });
   const live = () => { try { return connectorsConfig(ownerConfig() ?? undefined); } catch { return null; } };
   const server = createGateway({
-    // The configured repos plus every repo a Telegram ask notice named (a kernel's `api serve-ask`
+    // The configured repos plus every repo a Telegram ask notice named (a kernel's `starci kernel serve-ask`
     // notifies from its own repo).
     resolve: ledgerResolver({ repos: () => askRepos(live(), { extra: [...extra, ...notifiedRepos()] }) }),
     exposeCredentialAsks: () => live()?.telegram?.exposeCredentialAsks === true,

@@ -1,4 +1,4 @@
-// api finish: finalize an owner-approved workflow and release its kernel seat.
+// starci kernel finish: finalize an owner-approved workflow and release its kernel seat.
 import { changeWorkflowPhase, resolveIncident, setInboxStatus, updateIncident } from '../../../engine/db/ledger.mjs';
 import { getWorkflow } from './shared/rows.mjs';
 import { requirePhase } from './shared/workflow-transitions.mjs';
@@ -36,7 +36,7 @@ export default {
   // handoverGateOf). An archived workflow is the one existing way out.
   const handoverGate = already ? null : handoverGateOf(db, workflowId);
   if (handoverGate && !handoverGate.ok) {
-    throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (api status handover)`), {
+    throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (starci kernel status handover)`), {
       code: 'handover-not-approved', approvedSeq: handoverGate.approvedSeq ?? null, lastBusinessSettleSeq: handoverGate.lastBusinessSettleSeq ?? null,
     });
   }

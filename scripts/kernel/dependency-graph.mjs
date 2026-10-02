@@ -18,7 +18,7 @@
 //              foundation        a dependent of a foundation that has not landed          (soft)
 //              foreign-file      an open [foreign-file-committed] incident names a file a
 //                                peer owns                                                (hard)
-//              record-owner      api record-change was refused: the record is a peer's    (soft)
+//              record-owner      starci kernel record-change was refused: the record is a peer's    (soft)
 //              work-graph-read   a work-graph node reads a path a peer's node owns        (soft)
 //   finding  circular-wait   a cycle over hard edges
 //            unowned-need    a need nobody live owns: a foundation with live dependents whose owner
@@ -115,7 +115,7 @@ function cyclesOf(nodes, edges) {
 
 /**
  * The dependency graph of one ledger: {nodes, edges, findings, bridges, transfers}. `light` skips the
- * work-graph and foreign-file reads (api status). Never throws on one source: a source that fails is
+ * work-graph and foreign-file reads (starci kernel status). Never throws on one source: a source that fails is
  * named in `errors`.
  */
 export function dependencyGraph(db, { repo = null, now = Date.now(), light = false } = {}) {
@@ -389,7 +389,7 @@ export function dependencyGraph(db, { repo = null, now = Date.now(), light = fal
   };
 }
 
-/** The part of the graph that touches one workflow (api peers / api status). */
+/** The part of the graph that touches one workflow (starci kernel peers / starci kernel status). */
 export function dependenciesOf(graph, workflowId) {
   const edges = graph.edges.filter((e) => e.from === workflowId || e.to === workflowId);
   return {

@@ -11,7 +11,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
-/** What `hfs sync` would load from the jest preset an app installs for its be side: the Sonar exclusions and the coverage sources. */
+/** What `starci app sync` would load from the jest preset an app installs for its be side: the Sonar exclusions and the coverage sources. */
 export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
 
 /** An app declaration: the be side of `be` and the fe side of `fe` (hfs.json sides.<side>). */
@@ -26,7 +26,7 @@ export const FORMATTED = Object.freeze({ getFileInfo: async () => ({ ignored: fa
 /** application-stacks.yaml as the standard shape wants it: a Sonar owned by the host. */
 export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', `    qualityGate: ${loadSonarGate().gate.name}`, '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', ''].join('\n');
 
-const readmeOf = (name) => [`# ${name}`, '', 'A demo app for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'be/ and fe/.', '',
+const readmeOf = (name) => [`# ${name}`, '', 'A demo app for the starci app check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'be/ and fe/.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint', 'npm test', '```', '', '## Work', '', 'Records live in `.starciwork`.', ''].join('\n');
 
 /**
@@ -126,7 +126,7 @@ export function cleanup(dirs) {
   for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** Installs the coverage preset `hfs sync` and `hfs check` load from a checked app (a fresh process has no injected presets), without tracking it. */
+/** Installs the coverage preset `starci app sync` and `starci app check` load from a checked app (a fresh process has no injected presets), without tracking it. */
 export function installPresets(dir) {
   fs.cpSync(path.resolve(import.meta.dirname, '..', '..', 'packages', 'jest-preset'), path.join(dir, 'node_modules', '@starci', 'jest-preset'), { recursive: true });
   return dir;

@@ -26,7 +26,7 @@
 // agent and model. The Kernel then creates its workflow Run from its own terminal and coordinates its ops there
 // (cli.mjs ensureWorkflowRun). A restart reuses the entry Run while Orca knows it and accepts the new Task.
 //
-//   node scripts/kernel/start-workflow.mjs --repo <path> [--goal <workflow_id>] [--agent <name>] [--launched-by watchdog|supervisor] [--plan] [--json]
+//   starci workflow start --repo <path> [--goal <workflow_id>] [--agent <name>] [--launched-by watchdog|supervisor] [--plan] [--json]
 //
 // A replacement needs a kernel proven dead: worker-show on its Dispatch. An Orca outage is refused with step
 // host-unavailable and exit 75, touching nothing; a kernel job whose own Dispatch is still alive while its signal is gone
@@ -342,17 +342,17 @@ const launchAuthorityText = ({ workflowId, goalRevision, goalIdentity, approvedA
     `  (bridge ${bridge.bridgeId ?? '-'}${bridge.reason ? `: ${String(bridge.reason).replace(/\s+/g, ' ').slice(0, 240)}` : ''}). The owner has not approved it and may`,
     '  revert it; it owns only the shared part its goal names, and other workflows wait on its bridge foundation.',
     ...(restart ? [`  ${restart.launcher} started this terminal as Kernel attempt ${restart.attempt} because attempt ${restart.previousAttempt ?? '?'} ${restart.reason}.`] : []),
-    '  Begin the LOOP now and never ask for a confirmation to start or to continue. Run api survey, api status and',
-    '  api foundations; land the bridge foundation (api foundation --land <name> --proof <what landed>) once the shared',
+    '  Begin the LOOP now and never ask for a confirmation to start or to continue. Run starci kernel survey, starci kernel status and',
+    '  starci kernel foundations; land the bridge foundation (starci kernel foundation --land <name> --proof <what landed>) once the shared',
     '  part is committed and verified, then finish.'].join('\n');
   if (restart) return [
     `LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt ${restart.attempt}; ask no one to confirm.`,
     `  Approval: the owner approved ${workflowId} ${goal}${approvedAt ? `; its first Kernel booted on that approval at ${approvedAt}` : ''}.`,
     `  Launcher: ${restart.launcher} started this terminal because Kernel attempt ${restart.previousAttempt ?? '?'}${restart.previousTerminal ? ` (terminal ${restart.previousTerminal})` : ''} ${restart.reason}.`,
-    `  Proof, recorded seconds after this prompt lands: api status --workflow ${workflowId} shows kernel.attempt ${restart.attempt},`,
-    `  kernel.launchedBy ${restart.launchedBy} and kernel.you true; api survey shows the approved goal. Every runtime wake`,
+    `  Proof, recorded seconds after this prompt lands: starci kernel status --workflow ${workflowId} shows kernel.attempt ${restart.attempt},`,
+    `  kernel.launchedBy ${restart.launchedBy} and kernel.you true; starci kernel survey shows the approved goal. Every runtime wake`,
     '  ends with the Kernel attempt it is for; check it the same way. No person watches this terminal: the runtime',
-    '  types this prompt and every wake. Run api survey and api status, then do what the frontier names.'].join('\n');
+    '  types this prompt and every wake. Run starci kernel survey and starci kernel status, then do what the frontier names.'].join('\n');
   return [`LAUNCH AUTHORITY — the owner approved ${workflowId} (${goal}) through the start-kernel plan gate`,
     '  before this terminal launched. This prompt is that go: begin the LOOP now and never ask for a',
     '  confirmation to start or to continue.',
@@ -603,7 +603,7 @@ try {
   // operation worker, so boot performs no run/task/dispatch mutation.
   let route = await resolveKernelRoute(ledger.db);
   for (const warning of route.warnings ?? []) console.error(`start-workflow: warning: ${warning}`);
-  // The tab title a person reads: the workflow's display name (api rename; define-goal derives it), the
+  // The tab title a person reads: the workflow's display name (starci kernel rename; define-goal derives it), the
   // goal slug before one exists. workflow_id stays the key (the signal, the kernel job, the ledger).
   const kernelName = workflowNameOf(ledger.db, workflowId);
   const title = `[Kernel] ${kernelName}`;
@@ -642,7 +642,7 @@ try {
   // The workflow's ONE worktree (owner decision WFWT, scripts/kernel/workflow-worktree.mjs): Orca creates it before the
   // Kernel starts - an existing worktree takes launch trust - and the Kernel and every op of the workflow work in it.
   // EVERY workflow has one - the bound app checkout's, else the git checkout of the ledger repo (the runtime repo
-  // included). A ledger repo in no git checkout has none: the Kernel starts on it, and api dispatch refuses its ops
+  // included). A ledger repo in no git checkout has none: the Kernel starts on it, and starci kernel dispatch refuses its ops
   // workflow-worktree-missing.
   const appRepo = workflowAppRepo(repo);
   let workflowWorktree = null;

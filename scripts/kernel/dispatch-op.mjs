@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // dispatch-op.mjs — build and preview the dispatch packet for one op. It launches nothing: every operation starts
-// through `api dispatch --spawn` (scripts/kernel/verbs/dispatch.mjs), the one agent launch
+// through `starci kernel dispatch --spawn` (scripts/kernel/verbs/dispatch.mjs), the one agent launch
 // (orca orchestration worker-start, modules/kernel/contract-changes/launch-through-worker-start.yaml).
 //
 // Packet contract per modules/kernel/dispatch.yaml +
@@ -18,7 +18,7 @@
 // owner's and the kernel's overrides against the brief with the same function
 // that resolves them here, so a value refused at enqueue cannot appear in a packet.
 //
-// The preview's orca command is the launch api dispatch issues (it files the Task itself):
+// The preview's orca command is the launch starci kernel dispatch issues (it files the Task itself):
 //   orca orchestration worker-start --spec <prompt> --worktree <sel> --agent <provider> [--model <id> --effort <level>]
 // CLI:
 //   node scripts/kernel/dispatch-op.mjs --op <id> [--records a,b] [--state <.starciwork>]
@@ -194,7 +194,7 @@ function resolveModel(target, modelsDir) {
 }
 
 // The [Op] prompt is one canonical builder (scripts/kernel/op-prompt.mjs OPS-07): this preview
-// renders exactly what api dispatch sends - shared-checkout rules, commit policy, report filing and
+// renders exactly what starci kernel dispatch sends - shared-checkout rules, commit policy, report filing and
 // questions included - with <job-id>/<target-repo> placeholders where only a real job binds values,
 // and the context pack's resolved read list as its MANDATORY READS block.
 
@@ -255,7 +255,7 @@ function main() {
   const title = `[Op] ${args.op}`;
   const worktree = args.worktree ?? 'active';
 
-  // The launch api dispatch issues for this packet (modules/kernel/dispatch.yaml spawnMechanics).
+  // The launch starci kernel dispatch issues for this packet (modules/kernel/dispatch.yaml spawnMechanics).
   const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel, modelsDir });
   const orcaCommands = [
     { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${args.op} #<attempt>`, '--display-name', title, '--worktree', worktree, '--agent', model.provider ?? '<agent>',

@@ -1,11 +1,11 @@
-// api-lib/asks.mjs — the ask writes shared by the ask verbs and `api archive` (split out of
+// api-lib/asks.mjs — the ask writes shared by the ask verbs and `starci kernel archive` (split out of
 // cli.mjs, lane slim-api).
 import { ledgerFileFor } from '../../../../engine/db/ledger.mjs';
 import { closeAskMessages } from '../../ask-server.mjs';
 import { getWorkflow } from './rows.mjs';
 
 // The open owner asks of a workflow: every ask dispatch no ask-answered/ask-superseded event closed,
-// oldest report first (`api archive` retires each before the phase moves).
+// oldest report first (`starci kernel archive` retires each before the phase moves).
 export const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.dispatch_id FROM reports r
    WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
      AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)

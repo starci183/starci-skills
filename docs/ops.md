@@ -4,7 +4,7 @@ An **op** is the unit of work the kernel dispatches to one ephemeral `[Op]`
 agent. Every op is an authored YAML manifest at `modules/ops/ops/<id>.yaml` —
 data, not code. Every manifest holds one shape, `starci/op@1`, declared by
 `modules/schemas/op.schema.yaml` and enforced by
-`node scripts/checks/check-op-manifest.mjs`. The kernel never reads a whole
+`starci runtime check --only op-manifest`. The kernel never reads a whole
 manifest to route: routing reads only the `route:` block; the rest is the brief
 the dispatched agent executes under.
 
@@ -119,7 +119,7 @@ means the kernel sets it and a goal leg cannot. One resolver does all of it:
 
 ## What the check refuses
 
-`node scripts/checks/check-op-manifest.mjs` validates every manifest and exits 1
+`starci runtime check --only op-manifest` validates every manifest and exits 1
 on any finding.
 
 | Code | Refused because |
@@ -164,7 +164,7 @@ non-green decisions through `modules/kernel/driver-loop.yaml`
 7. Declare every legitimate stop as a `blockers` entry.
 8. Put anything op-specific left over under `policy:`.
 9. Fill `route:` so route-op resolves it.
-10. Run `node scripts/checks/check-op-manifest.mjs`, then
+10. Run `starci runtime check --only op-manifest`, then
     `starci runtime gen-ops` to regenerate the registry and
     `--check` to verify (never hand-edit it; see
     [ops-source-ownership](ops-source-ownership.md)).

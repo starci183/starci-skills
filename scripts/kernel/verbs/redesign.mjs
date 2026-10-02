@@ -1,11 +1,11 @@
-// api redesign — the HEAVY path (owner 2026-09-28: "ops draw the graph, the Kernel only makes light edits"): when the
+// starci kernel redesign — the HEAVY path (owner 2026-09-28: "ops draw the graph, the Kernel only makes light edits"): when the
 // RCA says the cut, the scope or the leg plan is wrong, the Kernel does not redesign it itself. It dispatches the op
 // that owns that artifact with the RCA as its brief:
 //   work.author   re-cut the remaining units (work graph `cut`)
 //   scope.define  re-scope (work graph `draw`)
 //   goal.revise   change the leg plan
 // runtimes.yaml allocation.redesign names the ops and routes them to a strong reasoning pool (routeAs, minDifficulty)
-// whatever their usual order: api route honours payload.redesign. The RCA (clusters, examples, ranked actions) rides
+// whatever their usual order: starci kernel route honours payload.redesign. The RCA (clusters, examples, ranked actions) rides
 // in packet context.kernel_override.redesign, so the op reads WHY before it redesigns.
 //
 //   redesign --workflow <wf> --op work.author|scope.define|goal.revise --paths <csv> --decision <id> [--brief <text>]
@@ -21,7 +21,7 @@ export default {
     const db = ledger.db, wf = args.workflow;
     const cfg = allocationSettings()?.redesign ?? {};
     const ops = Array.isArray(cfg.ops) ? cfg.ops : ['work.author', 'scope.define', 'goal.revise'];
-    if (!ops.includes(args.op)) throw refuse(`redesign dispatches only ${ops.join(', ')} (runtimes.yaml allocation.redesign.ops); a light change is api graph-edit`, 'redesign-op-refused');
+    if (!ops.includes(args.op)) throw refuse(`redesign dispatches only ${ops.join(', ')} (runtimes.yaml allocation.redesign.ops); a light change is starci kernel graph-edit`, 'redesign-op-refused');
     const decision = requireDecision(db, wf, args.decision);
     const st = apiRun(['status', '--workflow', wf], { repo, timeoutMs: 300_000 });
     const rca = st.json?.rca ?? null;
@@ -45,6 +45,6 @@ export default {
     recordKernel(ledger, { workflowId: wf, entityType: 'redesign', entityId: id, kind: 'kernel-redesign', repo, payload: { id, op: args.op, jobId, rca: brief.id, decision: decision.id },
       msg: `redesign ${args.op} (${jobId}) from RCA ${brief.id}`, markdown: `Heavy redesign: **${args.op}** enqueued as ${jobId} with RCA ${brief.id} as its brief (decision ${decision.id}).\n\n${brief.why ?? ''}` });
     emit({ ok: true, workflowId: wf, id, jobId, op: args.op, rca: brief.id, routeAs: payload.redesign.routeAs, difficulty: payload.difficulty },
-      `redesign ${id}: ${args.op} enqueued as ${jobId} with RCA ${brief.id}; it routes as ${payload.redesign.routeAs} at >= ${payload.difficulty} - now api route --job ${jobId} and api dispatch --job ${jobId} --spawn (or api dispatch-ready)`, args.json);
+      `redesign ${id}: ${args.op} enqueued as ${jobId} with RCA ${brief.id}; it routes as ${payload.redesign.routeAs} at >= ${payload.difficulty} - now starci kernel route --job ${jobId} and starci kernel dispatch --job ${jobId} --spawn (or starci kernel dispatch-ready)`, args.json);
   },
 };

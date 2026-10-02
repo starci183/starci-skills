@@ -2,7 +2,7 @@
 // ledger (owner ruling 2026-09-29 draw-from-todo: "interface.draw must start from todo; if the parent is not drawn,
 // draw the parent, or tell the supervisor"; the shell/layout ancestors are shared by the five nivo workflows).
 //
-// interface.draw never refuses because a layout above its record is todo or unsettled. `api dispatch` decides who
+// interface.draw never refuses because a layout above its record is todo or unsettled. `starci kernel dispatch` decides who
 // draws the parents (scripts/kernel/verbs/dispatch.mjs):
 //   - the chain is settled                        -> nothing to do, the draw only draws its screens;
 //   - nobody owns foundation `shell` (or its owner stopped running, or it landed and the tree went unsettled again)
@@ -142,7 +142,7 @@ export function gateShellFoundation(ledger, { job, need, now = Date.now(), setti
     const claimedAt = existing.owner?.claimedAt ?? now;
     let decision = null;
     if (now - claimedAt > stallMsOf(settings)) {
-      const summary = `Foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) has been claimed by ${ownerId} for ${Math.round((now - claimedAt) / 60000)} min and is still not landed; interface.draw ${job.job_id} of ${workflowId} waits on it. Re-dispatch a parent draw (interface.draw of the surface-layout record) or hand the foundation to a live workflow (api foundation --claim ${SHELL_FOUNDATION}).`;
+      const summary = `Foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) has been claimed by ${ownerId} for ${Math.round((now - claimedAt) / 60000)} min and is still not landed; interface.draw ${job.job_id} of ${workflowId} waits on it. Re-dispatch a parent draw (interface.draw of the surface-layout record) or hand the foundation to a live workflow (starci kernel foundation --claim ${SHELL_FOUNDATION}).`;
       try {
         decision = openDecisionRow(ledger, { workflowId, kind: 'cross-workflow', decider: 'supervisor', summary,
           entity: { type: 'workflow', id: ownerId }, idempotencyKey: `shell-foundation-stalled:${ownerId}:${claimedAt}`,
@@ -189,5 +189,5 @@ export function shellFoundationWaitOf(db, workflowId) {
   if (!foundation || foundation.state !== 'claimed' || !ownerId || ownerId === workflowId) return null;
   if (!(foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) return null;
   if (!workflowRunning(getWorkflow(db, ownerId))) return null;
-  return { owner: ownerId, detail: `foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) is drawn by ${ownerId}; the draw dispatches once it lands (api foundation --land) - never a second shell draft` };
+  return { owner: ownerId, detail: `foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) is drawn by ${ownerId}; the draw dispatches once it lands (starci kernel foundation --land) - never a second shell draft` };
 }
