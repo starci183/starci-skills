@@ -136,7 +136,7 @@ test('full is untouched: no lite-only slot exists, every presence and path answe
   }
   const whole = openHfs({ declaration: app() });
   assert.equal(whole.classifyPath('.starciwork/_resources/identities/users.yaml').slot, 'app.starciwork', 'full: no uat slot, .starciwork answers');
-  assert.equal(whole.classifyPath('fe/apps/web/src/app/auth/callback/route.ts').status, 'forbidden', 'full keeps the callback route forbidden');
+  assert.equal(whole.classifyPath('fe/apps/web/src/app/auth/callback/route.ts').status, 'not-enabled', 'a full app without a Supabase connection holds no callback route (it is an opt-in slot of the supabase provider)');
 });
 
 test('a supabase connection provider enables the supabase slots of every profile; without it they stay opt-in', () => {

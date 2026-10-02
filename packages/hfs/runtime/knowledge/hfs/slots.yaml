@@ -526,7 +526,7 @@ slots:
     tests: none
     requires: [application-stacks.yaml]
     allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
-             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
+             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/secrets/.gitkeep", "<env>/seeds/**"]
     forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     # Lite runs one managed host: the reduced shape keeps the stack declaration, the environment descriptor and the sealed
     # secrets; infra/, runtime/ and seeds/ are the full edition's.
@@ -1674,15 +1674,15 @@ slots:
     rules: [FE_NEXT_CONVENTIONS]
   - id: fe.route.callback
     profiles: [fe]
-    # The auth callback of a Supabase session (the PKCE code exchange): the one non-health route handler a lite app is
-    # allowed (L15); a full app keeps every route handler out of fe/.
+    # The auth callback of a Supabase session (the PKCE code exchange): the one non-health route handler of an app with a Supabase
+    # connection, in either edition (an upgrade lite -> full leaves it as it is, fe/** is never touched); an app without one has no
+    # route handler in fe/ (L15).
     path: "apps/<app>/src/app/auth/callback/route.ts"
-    presence: forbidden
-    litePresence: optional        # lite relaxes this one handler; the external tracking returns with it
-    tracked: external
+    presence: opt-in
+    provider: supabase
+    tracked: tracked
     tier: route
     tests: none
-    goesTo: "a be feature: webhooks, third-party callbacks and public APIs are be features; the front end holds no route handler (the lite exception is the auth callback alone)"
     since: 2.1.0
   - id: fe.feature
     profiles: [fe]
