@@ -165,6 +165,18 @@ export const writeLate=async(input:unknown)=>{'use server';const parsed=schema.p
   assert.ok(trust.some(item => item.path.endsWith('/items/write-late.ts') && /must begin with/.test(item.message)), JSON.stringify(trust, null, 2));
 });
 
+test('L14 the anonymous Server Actions are slot data (anonymousActions): sign-in and sign-out run for an anonymous principal, any other write module must refuse it', t => {
+  const root = freshFe(t, {
+    'apps/web/src/modules/db/auth/write-sign-out.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
+export const writeSignOut=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
+    'apps/web/src/modules/db/items/write-other.ts': `'use server'; import {getPrincipal} from '../principal'; const schema={parse:(value:unknown)=>String(value)};
+export const writeOther=async(input:unknown)=>{const principal=await getPrincipal();const parsed=schema.parse(input);return {kind:'ok' as const,data:{principal,parsed}}};\n`,
+  });
+  const trust = findings(runArch(root), 'FE_AUTH_SESSION_TRUST');
+  assert.equal(trust.some(item => item.path.endsWith('/auth/write-sign-out.ts')), false, JSON.stringify(trust, null, 2));
+  assert.ok(trust.some(item => item.path.endsWith('/items/write-other.ts') && /refuse an anonymous/.test(item.message)), JSON.stringify(trust, null, 2));
+});
+
 test('L15 FE_ROUTE_HANDLER_FORBIDDEN: any FE route beyond health/live and the callback slot is refused', t => {
   const root = freshFe(t, { 'apps/web/src/app/api/export/route.ts': `export const POST=()=>new Response('no');\n` });
   const routes = findings(runArch(root), 'FE_ROUTE_HANDLER_FORBIDDEN');

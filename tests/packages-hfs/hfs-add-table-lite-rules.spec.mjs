@@ -144,9 +144,25 @@ test("add table --fe stays database- and architecture-clean for every accepted t
     const sql = fs.readFileSync(path.join(root, ...migration.split("/")), "utf8");
     const sqlTable = RESERVED.has(item.table) ? `"${item.table}"` : item.table;
     assert.match(sql, new RegExp(`public\\.${sqlTable}`));
+    assert.match(sql, /owner_id uuid not null references auth\.users \(id\) on delete cascade/);
+    assert.match(sql, new RegExp(`create index ${item.table}_owner_id_idx on public\\.${sqlTable} \\(owner_id\\)`));
+    assert.match(sql, new RegExp(`create trigger ${item.table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}`));
+    assert.match(sql, new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`));
+    assert.match(sql, new RegExp(`grant update \\(updated_at\\) on table public\\.${sqlTable} to authenticated`));
     if (RESERVED.has(item.table)) {
       assert.doesNotMatch(sql, new RegExp(`public\\.${item.table}\\b`));
     }
+    const service = fs.readFileSync(
+      path.join(root, "be", "src", "modules", "domain", item.feature, `${item.feature}.service.ts`),
+      "utf8",
+    );
+    const statement = fs.readFileSync(
+      path.join(root, "be", "src", "modules", "domain", item.feature, "persistence", `${item.feature}.sql.ts`),
+      "utf8",
+    );
+    assert.match(service, /\(principalId: string, id: string\)/);
+    assert.match(service, /\[id, principalId\]/);
+    assert.match(statement, /WHERE id = \$1 AND owner_id = \$2 LIMIT 1/);
     for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
       const text = fs.readFileSync(path.join(root, ...file.split("/")), "utf8");
       const diagnostics = ts.transpileModule(text, {

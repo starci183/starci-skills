@@ -9,30 +9,6 @@ import { sessionCookieOptions, supabaseAnonKey, supabaseUrl } from "@/modules/co
 import { toOutcome } from "./outcome"
 import type { DbOutcome, SupabaseData, SupabaseResult } from "./outcome"
 
-interface OwnedRowInput {
-    readonly id: string
-}
-
-type OwnedRowParse =
-    | { readonly success: true; readonly data: OwnedRowInput }
-    | { readonly success: false }
-
-/** The common id schema used by generated table Server Actions. */
-export const rowSchema = {
-    safeParse: (input: unknown): OwnedRowParse => {
-        if (
-            typeof input !== "object" ||
-            input === null ||
-            !("id" in input) ||
-            typeof input.id !== "string" ||
-            input.id === ""
-        ) {
-            return { success: false }
-        }
-        return { success: true, data: { id: input.id } }
-    },
-}
-
 interface OwnedRowIdentity {
     readonly id: string
     readonly owner_id: string

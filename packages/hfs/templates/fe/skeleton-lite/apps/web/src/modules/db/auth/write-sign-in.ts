@@ -5,27 +5,7 @@ import { getPrincipal } from "../principal"
 import { createServerDbClient } from "../server"
 import { dbFailure, dbOk, toOutcome } from "../outcome"
 import type { DbOutcome } from "../outcome"
-
-interface SignInInput {
-    readonly email: string
-    readonly password: string
-}
-
-type SignInParse = { readonly success: true; readonly data: SignInInput } | { readonly success: false }
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-/** The input schema at the Server Action boundary. */
-const signInInputSchema = {
-    safeParse: (input: FormData): SignInParse => {
-        const email = input.get("email")
-        const password = input.get("password")
-        if (typeof email !== "string" || !EMAIL.test(email) || typeof password !== "string" || password === "") {
-            return { success: false }
-        }
-        return { success: true, data: { email, password } }
-    },
-}
+import { signInInputSchema } from "../schema"
 
 /** Result exposed to the client boundary after sign-in. */
 export interface SignInResult {

@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { checkTargets, renderTargets } from '../../packages/hfs/sync/index.mjs';
 import { checkRepository } from '../../scripts/hfs/check.mjs';
+import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -80,6 +81,7 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/http-security/index.ts',
   'be/src/modules/platform/http-security/messages/http-security.messages.ts',
   'be/src/modules/platform/http-security/origin.guard.ts', 'be/src/modules/platform/http-security/rate-limit.guard.ts',
+  'be/src/modules/platform/http-security/request-validation.service.ts',
   'be/src/modules/platform/http-security/webhook-signature.service.ts',
   'be/src/modules/platform/i18n/bundle-message-catalog.service.ts',
   'be/src/modules/platform/i18n/i18n.contracts.ts', 'be/src/modules/platform/i18n/i18n.decorators.ts',
@@ -117,15 +119,17 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'fe/apps/web/src/features/pages/AppHomePage/index.tsx',
   'fe/apps/web/src/features/pages/AppLoadingPage/index.tsx',
   'fe/apps/web/src/features/pages/AppNotFoundPage/index.tsx',
-  'fe/apps/web/src/hooks/auth/index.ts', 'fe/apps/web/src/hooks/auth/useSignOut.ts',
+  'fe/apps/web/src/hooks/auth/index.ts', 'fe/apps/web/src/hooks/auth/useAuthRefresh.ts',
   'fe/apps/web/src/modules/brand/brand.css', 'fe/apps/web/src/modules/brand/index.ts',
   'fe/apps/web/src/modules/config/index.ts', 'fe/apps/web/src/modules/db/auth/read-session.ts',
-  'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/browser.ts',
+  'fe/apps/web/src/modules/db/auth/write-sign-in.ts', 'fe/apps/web/src/modules/db/auth/write-sign-out.ts',
+  'fe/apps/web/src/modules/db/browser.ts',
   'fe/apps/web/src/modules/db/index.ts', 'fe/apps/web/src/modules/db/outcome.ts',
-  'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/server.ts',
+  'fe/apps/web/src/modules/db/principal.ts', 'fe/apps/web/src/modules/db/schema.ts',
+  'fe/apps/web/src/modules/db/server.ts',
   'fe/apps/web/src/modules/i18n/index.ts', 'fe/apps/web/src/modules/i18n/messages/vi.json',
   'fe/apps/web/src/modules/i18n/request.ts', 'fe/apps/web/src/modules/i18n/routing.ts',
-  'fe/apps/web/src/modules/routes/index.ts',
+  'fe/apps/web/src/modules/routes/index.ts', 'fe/apps/web/src/modules/routes/safe-next-path.ts',
   'fe/apps/web/src/proxy.ts', 'fe/apps/web/tsconfig.json', 'fe/eslint.config.mjs',
   'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'hfs.json', 'package-lock.json', 'package.json',
   'scripts/codegen.mjs', 'sonar-project.properties', 'supabase/config.toml',
@@ -148,12 +152,18 @@ const scaffoldLite = into => scaffoldApp({
   now: () => CREATED_AT,
 });
 
-test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) => {
+test('lite scaffold emits the design 8.5 tree and is structurally clean', async (t) => {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-lite-'));
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldLite(into);
   assert.deepEqual(files, EXPECTED_LITE_FILES);
   const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));
+  assert.deepEqual(declaration.supabase, {
+    enableSignup: false,
+    jwtExpiry: 3600,
+    siteUrl: 'http://127.0.0.1:3000',
+    redirectUrls: ['http://127.0.0.1:3000/auth/callback'],
+  });
   assert.deepEqual(declaration.sides, {
     be: {
       apps: [{ name: 'api', kind: 'api' }],
@@ -178,6 +188,13 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) =>
     'next', 'next-intl', 'react', 'react-dom', 'server-only',
   ].sort());
   assert.equal(fs.readFileSync(path.join(root, ...'supabase/types/database.types.ts'.split('/')), 'utf8'), GENERATED_TYPES);
+  const baselineSql = fs.readFileSync(path.join(root, ...'supabase/migrations/20261002123456_baseline.sql'.split('/')), 'utf8');
+  assert.match(baselineSql, /create function private\.set_updated_at\(\)[\s\S]*returns trigger[\s\S]*language plpgsql[\s\S]*set search_path = ''/);
+  assert.doesNotMatch(baselineSql, /security definer/);
+  assert.match(baselineSql, /create trigger profiles_set_updated_at[\s\S]*before update on public\.profiles[\s\S]*execute function private\.set_updated_at\(\)/);
+  assert.match(baselineSql, /revoke all on table public\.profiles from public, anon/);
+  assert.match(baselineSql, /grant update \(display_name\) on table public\.profiles to authenticated/);
+  assert.doesNotMatch(baselineSql, /grant select, insert, update on table public\.profiles to authenticated/);
   assert.match(
     fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/migration-runner.service.ts'.split('/')), 'utf8'),
     /\["run", "db:push"\]/,
@@ -194,6 +211,7 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', (t) =>
   })), 'hfs sync is a no-op immediately after scaffold');
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: root, stdio: 'ignore' });
+  assert.deepEqual(await checkDatabase({ repoRoot: root, files, emitTypes: async () => GENERATED_TYPES }), []);
   const checked = checkRepository({
     repoRoot: root,
     // Architecture requires the scaffold's own TypeScript install; this no-install unit spec proves the HFS rules and tree.

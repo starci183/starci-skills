@@ -1,11 +1,18 @@
 create table public.{{tableSql}} (
     id uuid primary key default gen_random_uuid(),
-    owner_id uuid not null references auth.users (id),
+    owner_id uuid not null references auth.users (id) on delete cascade,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
 
+create index {{table}}_owner_id_idx on public.{{tableSql}} (owner_id);
+
 alter table public.{{tableSql}} enable row level security;
+
+create trigger {{table}}_set_updated_at
+before update on public.{{tableSql}}
+for each row
+execute function private.set_updated_at();
 
 create policy "{{table}}_authenticated_select"
 on public.{{tableSql}}
@@ -32,4 +39,6 @@ for delete
 to authenticated
 using (owner_id = (select auth.uid()));
 
-grant select, insert, update, delete on table public.{{tableSql}} to authenticated;
+revoke all on table public.{{tableSql}} from public, anon;
+grant select, insert, delete on table public.{{tableSql}} to authenticated;
+grant update (updated_at) on table public.{{tableSql}} to authenticated;

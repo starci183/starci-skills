@@ -361,7 +361,7 @@ function checkFrontendAuthAndRoutes(input) {
     if (FE_DB_SLOTS.has(file.slot) && path.posix.basename(file.rel).startsWith('write-')) {
       const classified = input.graph.resolver.classifyPath(file.rel);
       const belowSlot = classified.root && file.rel.startsWith(`${classified.root}/`) ? file.rel.slice(classified.root.length + 1) : '';
-      const authenticatesAnonymous = file.slot === 'fe.modules.db' && belowSlot === 'auth/write-sign-in.ts';
+      const authenticatesAnonymous = (input.graph.resolver.slot(file.slot)?.anonymousActions ?? []).includes(belowSlot);
       const declared = exportedActions(ts, file.sourceFile);
       if (!declared.length) reportAt(violations, kit, FE_WRITE_SHAPE, file, file.sourceFile, `${file.rel} is a write module but exports no Server Action function.`);
       for (const action of declared) {

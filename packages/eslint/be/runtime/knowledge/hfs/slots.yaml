@@ -41,6 +41,7 @@ versioning:
 #   tier        node of the import direction matrix (tiers below); none = takes no part in import checks;
 #               inherit = the tier of the enclosing owner.
 #   owner       true when every directory matching the slot is an owner: the unit cross-owner imports and cycles use.
+#   anonymousActions  on a directory slot: the Server Action files (relative to it) that authenticate or end a session and so run for an anonymous principal (FE_AUTH_SESSION_TRUST exempts them from refusing it; they still parse their input).
 #   entries     on a directory slot that sits inside an owner (not an owner itself): the files, besides the owner's index.ts, an importer
 #               outside the owner may enter through (a client-safe entry of a module whose barrel is server-only). Each is a relative
 #               path the slot allows. Everything else of the owner is entered through index.ts only (ARCH_OWNER_EXPORT_BYPASS).
@@ -1838,6 +1839,7 @@ slots:
     requires: [index.ts, server.ts, browser.ts, principal.ts]
     allows: [index.ts, server.ts, browser.ts, principal.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/write-*.ts", "<domain>/<domain>.mapper.ts"]
     entries: [browser.ts]
+    anonymousActions: [auth/write-sign-in.ts, auth/write-sign-out.ts]     # the Server Actions that run for an anonymous principal by design (FE_AUTH_SESSION_TRUST)
     tests: none
     since: 2.1.0
   - id: fe.db.outcome

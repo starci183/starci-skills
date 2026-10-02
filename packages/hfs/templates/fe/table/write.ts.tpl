@@ -5,7 +5,8 @@ import type { Database } from "../../../../../../../supabase/types/database.type
 import { getPrincipal } from "../principal"
 import { dbFailure } from "../outcome"
 import type { DbOutcome } from "../outcome"
-import { insertRow, rowSchema } from "../server"
+import { rowSchema } from "../schema"
+import { insertRow } from "../server"
 
 /** One {{table}} row returned after a successful write. */
 type {{Name}}Row = Database["public"]["Tables"]["{{table}}"]["Row"]

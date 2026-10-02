@@ -87,9 +87,35 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
     const migration = `supabase/migrations/20261002123456_${feature}.sql`;
     assert.ok(result.created.includes(migration));
     const sqlTable = quoted ? `"${table}"` : table;
+    const sql = read(root, migration);
     assert.match(
-      read(root, migration),
+      sql,
       new RegExp(`create table public\\.${sqlTable} \\(`),
+    );
+    assert.match(
+      sql,
+      /owner_id uuid not null references auth\.users \(id\) on delete cascade/,
+    );
+    assert.match(
+      sql,
+      new RegExp(`create index ${table}_owner_id_idx on public\\.${sqlTable} \\(owner_id\\)`),
+    );
+    assert.match(
+      sql,
+      new RegExp(`create trigger ${table}_set_updated_at[\\s\\S]*before update on public\\.${sqlTable}[\\s\\S]*execute function private\\.set_updated_at\\(\\)`),
+    );
+    assert.match(
+      sql,
+      new RegExp(`revoke all on table public\\.${sqlTable} from public, anon`),
+    );
+    assert.match(
+      sql,
+      new RegExp(`grant update \\(updated_at\\) on table public\\.${sqlTable} to authenticated`),
+    );
+    assert.doesNotMatch(
+      sql,
+      new RegExp(`grant select, insert, update, delete on table public\\.${sqlTable} to authenticated`),
+      "table-level update is not granted",
     );
     assert.match(
       read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`),

@@ -506,6 +506,12 @@ $defs:
         uniqueItems: true
         items: {type: string, minLength: 1}
         description: 'the files of a directory slot (not an owner) that an importer outside the owner may enter through besides index.ts, each a relative path the slot allows; the owner holding the slot keeps index.ts as the entry of everything else'
+      anonymousActions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+        description: 'the Server Action files of a directory slot that authenticate or end a session and therefore run for an anonymous principal (they still parse their input; every other write-*.ts must refuse an anonymous principal)'
       outcomeHome:
         const: true
         description: 'on a file slot: the one file that declares the repository''s Outcome union (one per repository; no other file declares a second)'
