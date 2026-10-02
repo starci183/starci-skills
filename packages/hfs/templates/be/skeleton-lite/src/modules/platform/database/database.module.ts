@@ -41,6 +41,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                         name: connection.name,
                         type: "postgres",
                         url: connection.url.reveal(),
+                        schema: connection.schema,
                         synchronize: false,
                         retryAttempts: 2,
                     }),

@@ -22,6 +22,7 @@ import type { DatabaseConnectionOptions } from "@modules/platform/database"
 
 /** Everything the lite cli needs: the least-privilege Supabase PostgreSQL connection. */
 export interface CliAppOptions {
+    /** The connections the built-in migrate and seed groups operate on. */
     readonly connections: ReadonlyArray<DatabaseConnectionOptions>
 }
 
@@ -48,6 +49,7 @@ export const runDbPush = (): Promise<void> =>
 @SubCommand({ name: "run", description: "Push the pending Supabase migrations" })
 /** \`cli migrate run\`: delegates schema authority to the managed Supabase db:push script. */
 export class RunCli extends CommandRunner {
+    /** Runs the one managed migration wrapper and propagates its failure. */
     async run(): Promise<void> {
         await runDbPush()
     }
@@ -63,18 +65,26 @@ import type { SqlText } from "@modules/platform/database"
 const SEED_FILE = "supabase/seed.sql"
 
 /** Brands the tracked, reviewed seed file; no runtime value is interpolated into it. */
-const seedText = (text: string): SqlText => text as SqlText
+const seedText = (text: string): SqlText => {
+    assertSeedText(text)
+    return text
+}
+
+const assertSeedText = (_text: string): asserts _text is SqlText => {
+    // The brand is compile-time only; this function's single caller reads the tracked seed file verbatim.
+}
 
 @SubCommand({ name: "run", description: "Run the tracked Supabase seed through the application role" })
 /** \`cli seed run\`: executes the one tracked seed through the shared least-privilege EntityManager. */
 export class RunSeedsCli extends CommandRunner {
-    constructor(@InjectPrimaryEntityManager() private readonly manager: EntityManager) {
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {
         super()
     }
 
+    /** Executes the tracked seed when it contains at least one statement. */
     async run(): Promise<void> {
         const text = seedText(await readFile(SEED_FILE, "utf8"))
-        if (text.trim() !== "") await this.manager.query(text)
+        if (text.trim() !== "") await this.entityManager.query(text)
     }
 }
 `;

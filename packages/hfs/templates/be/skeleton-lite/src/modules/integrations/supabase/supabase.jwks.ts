@@ -25,8 +25,8 @@ export const createSupabaseAccessTokenVerifier = (options: SupabaseOptions): Ver
                 ...(typeof payload.email === "string" ? { email: payload.email } : {}),
             }
             return ok(principal)
-        } catch {
-            return refused(SupabaseErrorCode.AccessTokenInvalid)
+        } catch (cause) {
+            return refused(SupabaseErrorCode.AccessTokenInvalid, { cause: String(cause) })
         }
     }
 }

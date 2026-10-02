@@ -8,9 +8,13 @@ import type { HttpSecurityOptions } from "./http-security.options"
 
 /** The exact signed material of one webhook delivery. */
 export interface WebhookDelivery {
+    /** The configured provider whose secret signs this delivery. */
     readonly provider: string
+    /** The unparsed request bytes covered by the signature. */
     readonly rawBody: Buffer | undefined
+    /** The provider signature header, when supplied. */
     readonly signature: string | undefined
+    /** The provider timestamp header used for replay protection, when supplied. */
     readonly timestamp: string | undefined
 }
 

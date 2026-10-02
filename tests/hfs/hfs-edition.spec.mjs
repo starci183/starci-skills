@@ -74,6 +74,9 @@ test('lite removes the slots its editions exclude, keeps the rest, and adds its 
   // ruleParams merge their lite overrides over the base
   assert.equal(fullBe.ruleParams().schemaAuthority, undefined);
   assert.equal(liteBe.ruleParams().schemaAuthority, 'supabase');
+  // no test world: no unit role owes a spec under lite (the unit-spec lint reads ruleParams.unitRoles through the same view)
+  assert.deepEqual(liteBe.ruleParams().unitRoles, []);
+  assert.ok(fullBe.ruleParams().unitRoles.length > 0);
 });
 
 test('lite classification: the test tree, the worker app and the event patterns are forbidden paths with a goesTo', () => {
