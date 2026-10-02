@@ -239,7 +239,7 @@ refuses:
   - "host-resources-low (field `reason`, `waiting: true`): the host itself is short — free disk on
     the drive that holds %TEMP% and the repositories under runtimes.yaml
     allocation.resources.minFreeDiskGb, or the RAM-aware throttle (scripts/machine/ram-throttle.mjs,
-    owner ruling 2026-09-28) refusing this op: the fleet already at maxParallelOps, a slot or the
+    owner ruling 2026-09-28) refusing this op: the workers already at maxParallelOps, a slot or the
     RAM a higher-priority workflow (allocation.resources.ramThrottle.priorities,
     scripts/supervisor/ram-cap.mjs prioritize) still claims (priority-reserved), a heavy op
     (allocation.resources.opRam class heavy) while free RAM is under minFreeRamPct or CPU is

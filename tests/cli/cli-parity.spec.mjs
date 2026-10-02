@@ -140,12 +140,12 @@ test('a catalog verb with no handler is a finding', () => {
 
 test('a direct kernel-owned script outside the kernel group needs no cli.mjs switch case', () => {
   const root = fixture((t, put) => {
-    put('scripts/kernel/watchdog.mjs', '#!/usr/bin/env node\nconsole.log("ok");\n');
+    put('scripts/kernel/sample-tool.mjs', '#!/usr/bin/env node\nconsole.log("ok");\n');
     put('modules/cli/commands/machine/_group.yaml', 'group: machine\nsummary: machine verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n');
-    put('modules/cli/commands/machine/watchdog.yaml', verbYaml('watchdog', [])
+    put('modules/cli/commands/machine/sample-tool.yaml', verbYaml('sample-tool', [])
       .replace('group: kernel', 'group: machine')
-      .replace('impl: {script: scripts/kernel/cli.mjs, args: [watchdog]}', 'impl: {script: scripts/kernel/watchdog.mjs}')
-      .replace('starci kernel watchdog', 'starci machine watchdog'));
+      .replace('impl: {script: scripts/kernel/cli.mjs, args: [sample-tool]}', 'impl: {script: scripts/kernel/sample-tool.mjs}')
+      .replace('starci kernel sample-tool', 'starci machine sample-tool'));
   });
   try {
     const report = checkCliParity(root);

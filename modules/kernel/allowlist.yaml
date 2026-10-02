@@ -383,6 +383,9 @@ json-exceptions:
       reason: npm lockfile; package managers require JSON filename and syntax.
     - path: package.json
       reason: npm package manifest; Node/npm require JSON filename and syntax.
+    - path: packages/cli/package.json
+      reason: >
+        npm package manifest of the @starci/cli dispatcher package; the npm toolchain requires JSON.
     - path: packages/eslint/be/fixtures/typed/tsconfig.json
       reason: >
         TypeScript project for the typed-lint fixture of @starci/eslint-canon-be; typescript-eslint reads a JSON tsconfig.

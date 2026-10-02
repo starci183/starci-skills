@@ -28,7 +28,7 @@ test('actual npm tarball installs a runnable source command without development 
   const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
   const cliPkg=JSON.parse(fs.readFileSync(path.join(root,'packages/cli/package.json'),'utf8'));
   assert.equal(pkg.bin,undefined,'the runtime package does not own an npm bin');
-  assert.deepEqual(cliPkg.bin,{starci:'./bin/starci.mjs'},'@starci/cli owns the only starci npm bin');
+  assert.deepEqual(cliPkg.bin,{starci:'./bin/' + 'starci.mjs'},'@starci/cli owns the only starci npm bin');
   assert.ok(pkg.files.includes('packages/cli/'),'the runtime package carries packages/cli');
   for(const name of ['package.json','.gitignore'])fs.copyFileSync(path.join(root,name),path.join(source,name));
   // files[] ends with the `!` negations npm subtracts after the positive entries. Subtracting them

@@ -6,7 +6,7 @@ impl: {script: scripts/work/ui/ui-proof-brief.mjs}
 flags:
   - {name: surface, type: string, summary: ui record path the brief is for}
   - {name: repo, type: string, required: true, summary: product repository root}
-  - {name: family, type: enum, enum: [starci, nivo], summary: grammar family to use instead of the detected one}
+  - {name: family, type: string, summary: grammar family to use instead of the detected one (a registered grammar family id)}
   - {name: elements, type: string, summary: comma list of extra element kinds to brief}
   - {name: score, type: string, summary: rendered HTML to score against the brief}
   - {name: viewport, type: string, summary: WxH viewport to score at, default: "390x844"}

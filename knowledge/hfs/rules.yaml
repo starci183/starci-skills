@@ -1745,6 +1745,7 @@ rules:
   - id: R197
     code: "RT_RETIRED_CLI_CALL"
     law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields, changelogs and contract-change history are exempt."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_RETIRED_CLI_CALL"]
@@ -1753,6 +1754,7 @@ rules:
   - id: R198
     code: "RT_CLI_CATALOG_DRIFT"
     law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CLI_CATALOG_DRIFT"]
@@ -1761,6 +1763,7 @@ rules:
   - id: R199
     code: "RT_CLI_VERB_PARITY"
     law: "The CLI catalog of modules/cli/commands and the implementation agree: every catalog verb has a handler and a doc, every kernel verb module and cli.mjs dispatch case has a catalog file, and every --flag a verb module names (usage, required, api-boolean-flags.txt) is a catalog flag."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CLI_VERB_PARITY"]
@@ -1769,6 +1772,7 @@ rules:
   - id: R200
     code: "RT_CLI_APP_ONLY_TEMPLATES"
     law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and test-stack commands, and any other starci group, are forbidden there."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]
@@ -1777,6 +1781,7 @@ rules:
   - id: R201
     code: "CLI_ONLY_ENTRY"
     law: "Every action enters runtime code through `starci <group> <verb>`: no tracked prompt, doc, skill, knowledge file, config, CI file, hook or scheduled-task registration runs `node scripts/...`, `node ui/start.mjs`, `node bin/...` or an `npm run` wrapper of a runtime script; the dispatcher and the specs' own spawn helpers are the declared exceptions."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["CLI_ONLY_ENTRY"]

@@ -42,7 +42,7 @@ export function retiredNameTokens(root = DEFAULT_ROOT) {
   const doc = fs.existsSync(file) ? (parseYaml(fs.readFileSync(file, 'utf8')) ?? {}) : {};
   const tokens = [];
   for (const r of doc.retired ?? []) if (r?.path) tokens.push({ token: String(r.path), kind: 'retired path', why: r.replacedBy ? `replaced by ${r.replacedBy}` : 'retired' });
-  for (const m of doc.moved ?? []) if (m?.from) tokens.push({ token: String(m.from), kind: 'moved path', why: `moved to ${m.to}` });
+  for (const m of doc.moved ?? []) if (m?.from) tokens.push({ token: String(m.from), kind: 'moved path', why: `moved to ${m.to}`, to: String(m.to ?? '') });
   for (const n of doc.retiredNames ?? []) if (n?.name) tokens.push({ token: String(n.name), kind: 'retired name', why: n.note ?? 'a retired name' });
   return tokens;
 }
@@ -88,8 +88,12 @@ export function checkRetiredNames(root = DEFAULT_ROOT, tokens = retiredNameToken
     if (buffer.includes(0)) continue;
     const text = MANIFESTS.has(rel) ? blankRefusals(buffer.toString('utf8')) : buffer.toString('utf8');
     for (const t of tokens) {
+      // A moved path that is the tail of its own destination (bin/starci.mjs -> packages/cli/bin/starci.mjs) is not a use of the old path.
+      const prefix = t.to && t.to.endsWith(t.token) ? t.to.slice(0, t.to.length - t.token.length) : '';
       let at = text.indexOf(t.token);
       while (at !== -1) {
+        // ...nor is a file inside the destination directory naming it relative to itself (packages/cli/package.json: ./bin/starci.mjs).
+        if (prefix && (rel.startsWith(prefix) || text.slice(Math.max(0, at - prefix.length), at) === prefix)) { at = text.indexOf(t.token, at + t.token.length); continue; }
         dead.push({ file: rel, line: lineOf(text, at), token: t.token, kind: t.kind, why: t.why });
         at = text.indexOf(t.token, at + t.token.length);
       }

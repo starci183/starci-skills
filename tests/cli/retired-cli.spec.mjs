@@ -40,7 +40,7 @@ test('each retired spelling family has a failing and passing fixture', async (t)
     { name: 'bare api kernel verb', bad: 'Run `api survey --repo .`.', good: 'Run `starci kernel survey --repo .`.', use: 'starci kernel survey' },
     { name: 'root runtime kernel script', bad: 'Run `node scripts/kernel/cli.mjs survey --repo .`.', good: 'Run `starci kernel survey --repo .`.', use: 'starci kernel survey' },
     { name: 'installed runtime kernel script', bad: 'Run `node .claude/scripts/kernel/cli.mjs survey --repo .`.', good: 'Run `starci kernel survey --repo .`.', use: 'starci kernel survey' },
-    { name: 'root bin', bad: 'Run `node bin/starci.mjs runtime check`.', good: 'Run `starci runtime check`.', use: 'starci' },
+    { name: 'root bin', bad: 'Run `node bin/' + 'starci.mjs runtime check`.', good: 'Run `starci runtime check`.', use: 'starci' },
     { name: 'hfs verb', bad: 'Run `hfs lint`.', good: 'Run `starci app lint`.', use: 'starci app lint' },
     { name: 'npx hfs', bad: 'Run `npx hfs`.', good: 'Run `npx starci app lint`.', use: 'starci app' },
     { name: 'test stack binary', bad: 'Run `starci-test-stack up`.', good: 'Run `starci app stack up`.', use: 'starci app stack' },

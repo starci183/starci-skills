@@ -32,8 +32,7 @@ import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
 import { recordLaunchedTerminal } from './launched-terminals.mjs';
-import { loadModelRegistry } from './models.mjs';
-import { addStarciShimToPath } from './starci-shim.mjs';
+import { loadModelRegistry } from './models.mjs'; import { addStarciShimToPath } from './starci-shim.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 

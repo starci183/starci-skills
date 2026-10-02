@@ -2,7 +2,7 @@
 //
 // Every lane that added a verb, a boolean flag or a status field edited the same few shared lines of
 // scripts/kernel/cli.mjs (the boolean-flag list, KERNEL_ONLY_VERBS, the `required` map, the dispatch switch,
-// usage(), cmdStatus's `out` line), of modules/kernel/api.yaml (`commands:` tail) and of bin/starci.mjs (the
+// usage(), cmdStatus's `out` line), of modules/kernel/api.yaml (`commands:` tail) and of the CLI dispatcher (the
 // verb help line), so each land invalidated every queued lane. New work goes through files instead, one per
 // thing, discovered at startup:
 //

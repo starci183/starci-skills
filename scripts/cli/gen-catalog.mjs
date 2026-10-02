@@ -55,9 +55,10 @@ const flagSig = (f) => `--${f.name}${f.type === 'boolean' ? '' : f.type === 'enu
 /** docs/cli.md — generated English reference. */
 const renderDocs = (cat) => {
   const out = [
+    'Owner: modules/cli/commands/_global.yaml', '',
     `# starci CLI reference`, '',
     `<!-- ${GENERATED} -->`, '',
-    'One binary, six groups. Global flags: `--json`, `--cwd <dir>`, `--quiet`, `--help`, `--edition full`.',
+    'One binary, ' + cat.groups.length + ' groups. Global flags: `--json`, `--cwd <dir>`, `--quiet`, `--help`, `--edition full`.',
     'Exit codes: 0 clean, 1 findings, 2 refusal or bad usage, 3 the runtime group needs a runtime that is not installed.', '',
   ];
   for (const g of cat.groups) {

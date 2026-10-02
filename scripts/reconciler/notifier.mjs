@@ -12,7 +12,7 @@
 // Each send is one machine.sqlite sup_events row (notifier-digest-sent | notifier-urgent-sent), which is also the
 // dedupe state; the AUTO lands are the land_runs rows. Language: config.yaml language.
 //
-// Internal entry: spawned by scripts/reconciler/controllers/fleet.mjs; not invoked directly.
+// Internal entry: spawned by scripts/reconciler/controllers/workers.mjs; not invoked directly.
 // Args: judge --text "<one line>" [--json]
 //       digest [--send] [--force] [--json]
 //       urgent --class <class> --key <key> --text "<text>" [--send] [--json].

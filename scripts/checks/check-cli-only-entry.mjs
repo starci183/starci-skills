@@ -13,6 +13,7 @@ import { codexGuardBlock, toolGuardCommand } from '../agent/trust.mjs';
 import { historyHookBody, workHookBody } from '../guards/hook-install.mjs';
 import { taskScript as reconcilerTaskScript } from '../reconciler/boot.mjs';
 import { tunnelTaskScript } from '../reconciler/tunnel-task.mjs';
+import { escapeRegExp } from '../lib/regex.mjs';
 import { sentencesOf } from './check-guidance-commands.mjs';
 import { loadInternalRegistry } from './check-cli-parity.mjs';
 import { maskCatalogRemoved, retiredCallsInText, retiredMatchers } from './check-retired-cli.mjs';
@@ -40,8 +41,7 @@ Exit 0 is clean, 1 reports findings, and 2 is bad usage or unreadable input.`;
 class CliOnlyEntryInputError extends Error {}
 
 const posix = (file) => String(file).replace(/\\/g, '/');
-const escapeRx = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const slashPattern = (value) => posix(value).split('/').map(escapeRx).join('[\\\\/]');
+const slashPattern = (value) => posix(value).split('/').map(escapeRegExp).join('[\\\\/]');
 const lineAt = (text, at) => text.slice(0, at).split('\n').length;
 
 const fullyExempt = (file) => file.startsWith('packages/cli/src/')

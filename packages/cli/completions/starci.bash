@@ -504,7 +504,7 @@ _starci() {
         orca:terminal-send:--text) return 0;;
         orca:terminal-send:--text-file) return 0;;
         orca:terminal-send:--wait-submit) return 0;;
-        reconciler:once:--controller) COMPREPLY=( $(compgen -W "job host gc resource workflow fleet learning" -- "$cur") ); return 0;;
+        reconciler:once:--controller) COMPREPLY=( $(compgen -W "job host gc resource workflow workers learning" -- "$cur") ); return 0;;
         reconciler:once:--key) return 0;;
         reconciler:up:--wait) return 0;;
         reconciler:up:--set-profile) COMPREPLY=( $(compgen -W "operational observe" -- "$cur") ); return 0;;
@@ -762,7 +762,7 @@ _starci() {
         work:example-verify:--record) return 0;;
         work:example-verify:--cwd) return 0;;
         work:grammar-geometry:--repo) return 0;;
-        work:grammar-geometry:--family) COMPREPLY=( $(compgen -W "starci nivo" -- "$cur") ); return 0;;
+        work:grammar-geometry:--family) return 0;;
         work:grammar-geometry:--check) return 0;;
         work:grammar-geometry:--viewport) return 0;;
         work:grammar-registry-pin:--repo) return 0;;
@@ -802,7 +802,7 @@ _starci() {
         work:shell-conformance:--op) return 0;;
         work:ui-proof-brief:--surface) return 0;;
         work:ui-proof-brief:--repo) return 0;;
-        work:ui-proof-brief:--family) COMPREPLY=( $(compgen -W "starci nivo" -- "$cur") ); return 0;;
+        work:ui-proof-brief:--family) return 0;;
         work:ui-proof-brief:--elements) return 0;;
         work:ui-proof-brief:--score) return 0;;
         work:ui-proof-brief:--viewport) return 0;;

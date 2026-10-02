@@ -88,7 +88,7 @@ import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs';
 const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
-export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */

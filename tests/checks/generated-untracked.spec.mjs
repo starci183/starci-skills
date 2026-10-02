@@ -30,7 +30,7 @@ test('GENERATED_UNTRACKED: every tracked file inside a generated root fails, nam
 
 test('GENERATED_UNTRACKED: sources beside the roots and a same-named path elsewhere give no finding', () => {
   assert.deepEqual(generatedUntrackedFindings(ctx([
-    'packages/hfs/bin/hfs.mjs',
+    'packages/hfs/src/main.mjs',
     'packages/hfs/runtime-other/file.mjs',
     'vendor/packages/hfs/runtime/kept.mjs',
     'packages/eslint/fe/index.mjs',

@@ -67,7 +67,7 @@ peerBlocked: "Ops share one checkout, so a repo-wide gate reads every peer's cha
   such a commit resolves to another workflow (scripts/kernel/introducer.mjs); peer via preexisting
   when nothing touched it since the lineage began, it is clean, it imports nothing under the job's
   owned paths, and its last (older) commit resolves to another workflow - the gate was red on that
-  workflow's change before this op started (nivo collab inc-72edd7aa6741); else unknown. A failing
+  workflow's change before this op started (a collaborating workflow incident); else unknown. A failing
   file printed relative to, or absolute under, another repository of the project binding is read
   with git there. A check with no own file and at least one peer file is recorded attribution
   {class:peer, files} and peerBlocked {peers:[{workflowId, via:lease|commit|preexisting, jobId?,
