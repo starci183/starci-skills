@@ -11,6 +11,7 @@ const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..",
 
 const nextConfig: NextConfig = {
     reactStrictMode: true,
+    experimental: { rootParams: true },
     outputFileTracingRoot: WORKSPACE_ROOT,
     turbopack: { root: WORKSPACE_ROOT },
 }

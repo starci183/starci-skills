@@ -923,7 +923,7 @@ $defs:
         type: string
         pattern: ^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$
         description: The reference file, relative to the same --source root as sources[] (for example
-          examples/ecommerce-app/fe/apps/shop/src/app/globals.css). Read-only.
+          examples/ecommerce-app/fe/apps/app/src/app/globals.css). Read-only.
       token:
         type: string
         pattern: ^--[A-Za-z0-9_-]+$

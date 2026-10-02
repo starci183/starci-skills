@@ -70,7 +70,7 @@ function picture(root) {
 const rows = (env) => withMachine((m) => m.db.prepare('SELECT * FROM worktrees ORDER BY created_at').all(), { env });
 
 test("the spec names the Orca creation: wf-<id> off main with setup; the workflow branch is Orca's wf-<id>", () => {
-  const spec = workflowWorktreeSpec({ workflowId: 'wf-shop-k2', appRepo: path.resolve('/apps/shop') });
+  const spec = workflowWorktreeSpec({ workflowId: 'wf-shop-k2', appRepo: path.resolve('/apps/app') });
   assert.equal(spec.name, 'wf-wf-shop-k2');
   assert.equal(spec.baseBranch, 'main');
   assert.equal(spec.branch, 'wf-wf-shop-k2');
