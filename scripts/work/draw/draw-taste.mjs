@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
+import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { decodePng } from '../png.mjs';
 import { parseColor, parseCssCustomProperties } from '../brand/brand.mjs';
@@ -53,9 +54,8 @@ const BAND_CLASS = /(^|[-_])band($|[-_]|s$)/i;
 const BADGE_CLASS = /(^|[-_])(badge|chip|pill|status-pill)($|[-_]{2}|$)/i;
 const nameOf = (el) => String(el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 const partOf = (el) => String(el?.attrs?.[PART_ATTR] ?? '').trim();
-const up = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 /** A component root (not one of its own parts that repeats the component attribute). */
-const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && up(el).find((a) => nameOf(a)) && nameOf(up(el).find((a) => nameOf(a))) === nameOf(el));
+const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && ancestorsOf(el).find((a) => nameOf(a)) && nameOf(ancestorsOf(el).find((a) => nameOf(a))) === nameOf(el));
 const isSeparator = (el) => nameOf(el) === 'Divider' || el.tag === 'hr' || /divider/.test(partOf(el)) || classesOf(el).some((c) => SEPARATOR_CLASS.test(c));
 const isBandMarked = (el) => /(^|-)band$/.test(partOf(el)) || classesOf(el).some((c) => BAND_CLASS.test(c) && !/(badge|brand)/i.test(c));
 const isBadge = (el) => ['Badge', 'StateMark'].includes(nameOf(el)) && !(partOf(el) && nameOf(el.parent ?? {}) === nameOf(el))
@@ -72,7 +72,7 @@ export function bandsOfCard(card) {
 }
 
 const isEntity = (el) => rootOf(el, CARDS) || nameOf(el) === 'StaticStateRow' || ENTITY_PARTS.test(partOf(el))
-  || ((el.tag === 'li' || el.tag === 'tr') && up(el).some((a) => CARDS.has(nameOf(a)) || nameOf(a) === 'DataTable'));
+  || ((el.tag === 'li' || el.tag === 'tr') && ancestorsOf(el).some((a) => CARDS.has(nameOf(a)) || nameOf(a) === 'DataTable'));
 
 /** The badges an entity carries itself (a nested entity's badges are its own). */
 export function badgesOfEntity(entity) {

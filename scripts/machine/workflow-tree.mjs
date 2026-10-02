@@ -7,9 +7,11 @@ import { mergeBase } from '../api/git/merge-base.mjs';
 import { diffNames } from '../api/git/diff-names.mjs';
 import { revParse as gitRevParse } from '../api/git/rev-parse.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
+import { isInside } from '../lib/walk.mjs';
+import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 
 const SHA = /^[0-9a-f]{40,64}$/;
-const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const insidePath = (child, parent) => isInside(path.resolve(parent), path.resolve(child));
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 const revParse = (cwd, ref) => { const sha = gitRevParse(cwd, ref); return sha && SHA.test(sha) ? sha : null; };
 const mainOf = (ctx) => ctx?.main ?? 'main';
@@ -48,11 +50,7 @@ const registryOf = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, ...(ctx?.
 
 /** The registry record of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
 function presentRecordOf(ctx, workflowId) {
-  const rec = registryOf(ctx).workflowWorktreeOf(ctx, workflowId);
-  if (!rec) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no workflow worktree in the registry`);
-  if (!rec.path || !fs.existsSync(rec.path)) throw fail({ code: 'workflow-worktree-missing' }, `the worktree of workflow ${workflowId} (${rec.path ?? '-'}) is gone`);
-  if (!rec.branch) throw fail({ code: 'workflow-worktree-missing' }, `the registry records no branch for the worktree of workflow ${workflowId} (${rec.path})`);
-  return rec;
+  return requireWorktreeRecord(registryOf(ctx).workflowWorktreeOf(ctx, workflowId), workflowId);
 }
 
 /**

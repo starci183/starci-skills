@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnNode } from '../api/node/spawn-node.mjs';
-import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/db/ledger.mjs';
+import { inspectLedger, ledgerFileFor, isRuntimeRoot, hasLedger } from '../../engine/db/ledger.mjs';
 import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
@@ -219,9 +219,7 @@ export const spawnDetached = (script, args = [], { env = process.env } = {}) => 
 };
 
 
-const hasLedger = (root) => {
-  try { return !isRuntimeRoot(root) && fs.existsSync(ledgerFileFor(root)); } catch { return false; }
-};
+
 
 /**
  * The repositories whose ledgers the connectors read. `connectors.repos` when the owner listed any

@@ -38,20 +38,18 @@ import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-import { readJsonFile } from '../lib/json.mjs';
+import { readJsonFile, jsonFromStdout } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { arg as argvValue } from '../lib/cli-arg.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
 const startFile = path.join(skillRoot, 'scripts', 'kernel', 'start-workflow.mjs');
 
 const argv = process.argv.slice(2);
-const valueOf = (name, fallback = null) => {
-  const index = argv.indexOf(`--${name}`);
-  return index >= 0 ? argv[index + 1] : fallback;
-};
+const valueOf = (name, fallback = null) => argvValue(argv, name, fallback);
 const has = name => argv.includes(`--${name}`);
 
 const repo = valueOf('repo');
@@ -65,17 +63,6 @@ const CADENCE_MS = allocationMs('watchdogCadenceMs');
 const ACTIVE_STALE_MS = allocationMs('liveness.activeStaleMs');
 const intervalMs = Math.max(10_000, Number(valueOf('interval-ms')) || CADENCE_MS);
 
-const jsonFrom = stdout => {
-  const text = String(stdout ?? '').trim();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { /* fall through */ }
-  const first = text.indexOf('{'), last = text.lastIndexOf('}');
-  if (first >= 0 && last > first) {
-    try { return JSON.parse(text.slice(first, last + 1)); } catch { /* fall through */ }
-  }
-  return null;
-};
-
 const runNodeJson = (file, args) => {
   const result = runNode([file, ...args], {
     cwd: skillRoot,
@@ -84,7 +71,7 @@ const runNodeJson = (file, args) => {
   return {
     ok: result.status === 0,
     status: result.status,
-    value: jsonFrom(result.stdout),
+    value: jsonFromStdout(result.stdout),
     stdout: String(result.stdout ?? '').trim(),
     stderr: String(result.stderr ?? '').trim(),
     error: result.error?.message ?? null,
@@ -173,7 +160,7 @@ const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) =
 // The kernel job's worker ({dispatchId, agentTerminalHandle}) when the seat signal is gone, or null.
 const lostSeatWorker = () => withKernelLedger((ledger) => {
   const row = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
-  const managed = jsonFrom(row?.payload_json)?.managed ?? null;
+  const managed = jsonFromStdout(row?.payload_json)?.managed ?? null;
   return managed?.dispatchId && managed.agentTerminalHandle ? managed : null;
 });
 // A bare shell prompt at the end of the frame on two reads (the death settle between them): the agent exited.
@@ -335,7 +322,7 @@ function kernelTick(status, phase) {
     error: survey.error ?? survey.value?.reason ?? survey.stderr ?? survey.stdout,
   };
   const kernelSignal = (survey.value.signals ?? []).find(signal => signal.scope === 'kernel' && signal.key === workflowId);
-  const signalValue = kernelSignal?.value ?? jsonFrom(kernelSignal?.value_json) ?? {};
+  const signalValue = kernelSignal?.value ?? jsonFromStdout(kernelSignal?.value_json) ?? {};
   const terminal = signalValue.terminal ?? null;
 
   if (!terminal) {

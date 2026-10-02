@@ -26,6 +26,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
 import { claudeDebugSettings } from '../../engine/config.mjs';
 import { readJsonFile } from '../lib/json.mjs';
+import { valueAfter } from '../lib/cli-arg.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { snapshot, watchOptions } from './core-watch.mjs';
 
@@ -117,7 +118,7 @@ export function settleFix(state, key, { now, lane = null, reason = null, release
   return { key, ...state.fixes[key] };
 }
 
-function flag(argv, name) { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] ?? null : null; }
+function flag(argv, name) { return valueAfter(argv, name); }
 
 async function main(argv = process.argv.slice(2)) {
   const verb = argv[0];

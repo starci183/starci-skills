@@ -27,6 +27,7 @@
 import { allocationMs } from '../../engine/config.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { processList } from '../api/process/process-list.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 export const REAP_WINDOW_MS = allocationMs('reap.windowMs');
 
@@ -69,7 +70,7 @@ export function matchAgentProcess(processes, { agent, dispatchedAt, windowMs = R
  * (NODE_TEST_CONTEXT) never reads or stops the host's real processes.
  */
 export function reapAgentProcess({ agent, dispatchedAt, windowMs = REAP_WINDOW_MS, otherLaunches = null, list = listAgentProcesses, run = undefined, platform = process.platform, env = process.env } = {}) {
-  if (env.NODE_TEST_CONTEXT && (list === listAgentProcesses || run === undefined)) return { reaped: false, reason: 'test context: the host process table is never read or stopped', candidates: [] };
+  if (isSpecRun(env) && (list === listAgentProcesses || run === undefined)) return { reaped: false, reason: 'test context: the host process table is never read or stopped', candidates: [] };
   if (!Array.isArray(otherLaunches)) return { reaped: false, reason: 'live launch census unavailable: another live agent may own every candidate', candidates: [] };
   const match = matchAgentProcess(list({ platform }), { agent, dispatchedAt, windowMs, otherLaunches });
   if (!match.pid) return { reaped: false, reason: match.reason, candidates: match.candidates, ...(match.rival ? { rival: match.rival } : {}) };

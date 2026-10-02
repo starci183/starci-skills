@@ -18,15 +18,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { samePath } from '../lib/path-key.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Contract defaults when the injected allocation omits them (runtimes.yaml declares the live values). */
 const DEFAULT_ARCHIVE_AFTER_MS = 7 * DAY_MS;
 const DEFAULT_RECENT_MS = DAY_MS;
-
-/** The positive number `value` carries, else null. */
-const positiveMs = (value) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null);
 
 /** `allocation` may be the full allocationSettings() block or its `housekeeping` sub-block. */
 const housekeepingOf = (allocation) => {
@@ -127,8 +125,8 @@ function moveFile(from, to, stat) {
  */
 export async function sweepClaudeTranscripts({ apply = false, now = Date.now(), env = process.env, allocation } = {}) {
   const hk = housekeepingOf(allocation);
-  const archiveAfterMs = positiveMs(hk.claudeTranscriptArchiveAfterMs) ?? DEFAULT_ARCHIVE_AFTER_MS;
-  const recentMs = positiveMs(hk.claudeTranscriptRecentMs) ?? DEFAULT_RECENT_MS;
+  const archiveAfterMs = positiveNumber(hk.claudeTranscriptArchiveAfterMs) ?? DEFAULT_ARCHIVE_AFTER_MS;
+  const recentMs = positiveNumber(hk.claudeTranscriptRecentMs) ?? DEFAULT_RECENT_MS;
   const archiveRoot = archiveRootOf({ env });
   const out = { ok: true, apply, freedBytes: 0, movedBytes: 0, deleted: 0, moved: [], skipped: [], errors: [] };
 

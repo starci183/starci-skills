@@ -22,6 +22,9 @@ import {acquireUatSlot} from './uat-slots.mjs';
 import {launchFor} from './launch.mjs';
 import {recordingDirUnder,withRecording} from './playwright-recording.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { isSpecRun, readEnv } from '../lib/env.mjs';
+import { isInside } from '../lib/walk.mjs';
+import { need as refuseUnless } from '../lib/refuse.mjs';
 
 export const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
@@ -39,7 +42,7 @@ const STATUSES=new Set(['completed','failed','not-run','cancelled','inconclusive
 const SIGNALS=new Set(['ok','fail','cancel']);
 const SAFE_ENV=['PATH','Path','PATHEXT','SystemRoot','COMSPEC','TEMP','TMP','HOME','USERPROFILE','LOCALAPPDATA','APPDATA','NODE_PATH'];
 const launchEnv=prepared=>Object.fromEntries([...SAFE_ENV,...prepared.session.launch.envNames]
-  .filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
+  .filter(name=>readEnv(name)!==undefined).map(name=>[name,readEnv(name)]));
 // How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
 export {launchFor};
 
@@ -53,8 +56,8 @@ const iso=()=>new Date().toISOString();
 const readYaml=file=>parseYaml(fs.readFileSync(file,'utf8'));
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
 const relativePosix=(base,file)=>path.relative(base,file).replace(/\\/g,'/');
-const inside=(base,file)=>{const rel=path.relative(path.resolve(base),path.resolve(file));return rel===''||(!rel.startsWith('..'+path.sep)&&rel!=='..'&&!path.isAbsolute(rel));};
-const need=(condition,message,code='assisted-uat-invalid')=>{if(!condition)throw Object.assign(new Error(message),{code});};
+const inside=(base,file)=>isInside(path.resolve(base),path.resolve(file));
+const need=(condition,message,code='assisted-uat-invalid')=>refuseUnless(condition,message,code);
 
 let validators;
 const schemaValidators=()=>{
@@ -229,7 +232,7 @@ const redactionPolicy=prepared=>{
   return rules.filter(rule=>typeof rule?.pattern==='string'&&rule.pattern.length).map(rule=>({pattern:new RegExp(rule.pattern,'giu'),replacement:String(rule.replacement??'[REDACTED]')}));
 };
 const sanitizer=(prepared)=>{
-  const secretValues=prepared.session.launch.envNames.map(name=>process.env[name]).filter(value=>typeof value==='string'&&value.length>=4);
+  const secretValues=prepared.session.launch.envNames.map(name=>readEnv(name)).filter(value=>typeof value==='string'&&value.length>=4);
   const rules=redactionPolicy(prepared);
   return value=>{
     let text=String(value??'');
@@ -318,7 +321,7 @@ const runSession=async(prepared,state,slot)=>{
   // The owner's headed session keeps its console. Under node --test that console is a Windows Terminal
   // default-terminal handoff per run: a tab left open, and a handoff WT stalls under suite load, so the
   // driver never starts and the run times out.
-  const child=startProgram(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(process.env.NODE_TEST_CONTEXT)});
+  const child=startProgram(launch.file,launch.args,{cwd:resolveCwd(prepared.root,prepared.session.launch.cwd),env,stdio:['pipe','pipe','ignore'],windowsHide:Boolean(isSpecRun())});
   const childExit=new Promise(resolve=>{
     child.once('exit',code=>resolve(Number.isInteger(code)?code:1));
     child.once('error',error=>{protocolError=error;resolve(1);});

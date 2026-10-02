@@ -50,6 +50,7 @@ import { goalTextRefusal } from '../../goal/goal-text.mjs';
 import { clocksOf } from '../sla.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
+import { pathKey } from '../../lib/path-key.mjs';
 import os from 'node:os';
 
 /**
@@ -131,7 +132,7 @@ export function goalProblem(markdown, refusal) {
   return refusal(markdown) ? 'goal-text-unresolved' : null;
 }
 
-const normRepo = (p) => path.resolve(String(p)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const normRepo = (p) => pathKey(p, { fold: true });
 const argOf = (cmd, name) => {
   const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;

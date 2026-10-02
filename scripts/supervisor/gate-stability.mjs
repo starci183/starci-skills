@@ -22,11 +22,11 @@ import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { loadContractFreeze } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { asList } from '../lib/list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
-const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [value]);
 
 /** The ledger files of this host's registry (machine.sqlite `ledgers`) that still exist. */
 export function registeredLedgers({ machine = machineFileFor() } = {}) {
@@ -46,8 +46,8 @@ export function acceptedLegsOf(ledgerFile, family) {
       const job = jobs[0];
       if (!job) continue;
       const payload = parseJson(job.payload_json, {}) ?? {};
-      const files = [...list(payload.owned_paths)];
-      for (const r of db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND job_id=?').all(workflowId, job.job_id)) files.push(...list(parseJson(r.report_json, {})?.files));
+      const files = [...asList(payload.owned_paths)];
+      for (const r of db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND job_id=?').all(workflowId, job.job_id)) files.push(...asList(parseJson(r.report_json, {})?.files));
       out.push({ workflowId, jobId: job.job_id, attempt: job.attempt, files: [...new Set(files.filter((f) => typeof f === 'string' && f.trim()))] });
     }
     return out;
@@ -73,7 +73,7 @@ export async function gateSide({ tree = SELF_ROOT, family, ledgers = registeredL
         if (error || !fn) { errors.push(`${gate.module}#${gate.export}: ${error}`); continue; }
         try {
           const verdict = await fn({ repo, files: leg.files });
-          for (const f of list(verdict?.findings)) findings.push({ code: f.code, path: f.path ?? null, gate: `${gate.module}#${gate.export}` });
+          for (const f of asList(verdict?.findings)) findings.push({ code: f.code, path: f.path ?? null, gate: `${gate.module}#${gate.export}` });
         } catch (e) { errors.push(`${gate.module}#${gate.export}: ${String(e?.message ?? e).slice(0, 200)}`); }
       }
       legs.push({ ledger, repo, workflowId: leg.workflowId, jobId: leg.jobId, attempt: leg.attempt, findings, errors });

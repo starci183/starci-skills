@@ -6,6 +6,7 @@
 
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { claimsProblems } from './proof-integrity.mjs';
+import { normPath } from '../lib/path-key.mjs';
 
 export const OP_REPORT_SCHEMA = 'starci/op-report@1';
 export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
@@ -25,7 +26,7 @@ const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'f
 // The api derives it from the evidence and accepts a stated one only where the evidence does not contradict it.
 export const FAILURE_CLASSES = ['environment', 'tool', 'findings', 'product', 'deterministic', 'transient'];
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
-const normalizePath = (p) => String(p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+const normalizePath = (p) => normPath(p, { collapse: true, dot: true });
 
 const underOwned = (file, ownedPaths) => {
   if (!ownedPaths.length) return true; // no declared write set → nothing to check against

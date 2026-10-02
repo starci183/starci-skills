@@ -30,14 +30,16 @@ import { goalTextRefusal } from './goal-text.mjs';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { deriveWorkflowDisplayName, normalizeDisplayName } from '../lib/display-names.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { arg as argvValue } from '../lib/cli-arg.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Source = the repository containing this .claude; the project registry lives
 // beside it at .workspaces/projects/<name>/work.json. STARCI_SOURCE_ROOT points
 // the registry lookup at another Source — the seam for fixtures and for a
 // runtime copy (a worktree) that does not sit inside its Source.
-const sourceRoot = process.env.STARCI_SOURCE_ROOT ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot);
-const arg = (n, d = null) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
+const sourceRoot = readEnv('STARCI_SOURCE_ROOT') ? path.resolve(readEnv('STARCI_SOURCE_ROOT')) : path.dirname(skillRoot);
+const arg = (n, d = null) => argvValue(process.argv, n, d);
 const projectName = arg('project');
 const repoArg = arg('repo');
 const text = arg('text');

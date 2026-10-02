@@ -18,7 +18,8 @@
 //   A key may declare only `probe`: nothing classifies an outage for that provider, and the probe clears a
 //   quota circuit opened some other way.
 // A card without an outage key is never classified: no guessing for other providers.
-import { agentCardOf, providerKeyOf } from './credential-fingerprint.mjs';
+import { agentCardOf } from './credential-fingerprint.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,7 +43,7 @@ function outageSpecFrom(provider, card, key) {
   const screen = typeof spec.screen === 'string' ? compile(spec.screen, 'im') : null;
   const probe = key === 'quotaExhausted' && spec.probe && typeof spec.probe === 'object'
     ? { ...spec.probe, everyMs: Number(spec.probe.everyMs) > 0 ? Number(spec.probe.everyMs) : DEFAULT_QUOTA_PROBE_EVERY_MS } : null;
-  return { provider: providerKeyOf(provider), failureKind: OUTAGE_KEYS[key], text, screen, probe };
+  return { provider: normalizeProvider(provider), failureKind: OUTAGE_KEYS[key], text, screen, probe };
 }
 
 /** The card's quotaExhausted spec compiled, or null. */

@@ -17,6 +17,7 @@ import { subkindOf } from './artifact-subkind.mjs';
 import { recordingsRootOf } from '../uat/playwright-recording.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { resolvedKey } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
 import { hostPathHits } from '../lib/host-path.mjs';
@@ -24,6 +25,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { revList } from '../api/git/rev-list.mjs';
 import { formatPatch as gitFormatPatch } from '../api/git/format-patch.mjs';
 import { gitResultOf } from '../lib/git.mjs';
+import { isInside } from '../lib/walk.mjs';
 import { landingRepos, specBatches } from './owned-path-effects.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
@@ -51,9 +53,9 @@ const RUNTIME_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const WALK_MAX = 2000;
 const WALK_DEPTH = 6;
 const slashed = (p) => String(p).replace(/\\/g, '/');
-const keyOf = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+
 const statOf = (p) => { try { return fs.statSync(p); } catch { return null; } };
-const inside = (root, p) => { const rel = path.relative(path.resolve(root), path.resolve(p)); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
+const inside = (root, p) => isInside(path.resolve(root), path.resolve(p), { includeSelf: false });
 
 /** The job's working directory outside the repository: its STARCI_JOB_SCRATCH (dispatch writes the packet file there). */
 export const jobDirOf = (repo, workflowId, jobId) => jobScratchDirOf(repo, workflowId, jobId);
@@ -101,7 +103,7 @@ function walk(dir, found, keep = () => true) {
 export function collectJobFiles({ repo, envelope = null, roots = [], jobId = null, artifacts = [] }) {
   const searchRoots = [...new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))];
   const files = [], missing = [], seen = new Set();
-  const push = (entry) => { const k = keyOf(entry.abs); if (!seen.has(k)) { seen.add(k); files.push(entry); } };
+  const push = (entry) => { const k = resolvedKey(entry.abs); if (!seen.has(k)) { seen.add(k); files.push(entry); } };
   for (const p of [...arr(envelope?.files), ...arr(envelope?.rootCause?.evidence)].filter((v) => typeof v === 'string' && v.trim())) {
     const abs = path.isAbsolute(p) ? (statOf(p) ? path.resolve(p) : null) : searchRoots.map((r) => path.resolve(r, p)).find((c) => statOf(c));
     if (!abs) { if (/\.starciwork[\\/]/.test(p)) missing.push(slashed(p)); continue; }
@@ -151,11 +153,11 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
   const top = gitResult(revParseQuery, ['--show-toplevel'], { dir: holder, timeout });
   const root = top.ok ? path.resolve(top.stdout.trim()) : holder;
   const full = revParse(root, target, timeout);
-  let specs = landedRepos.find((r) => r?.repo && keyOf(r.repo) === keyOf(root))?.paths ?? null;
+  let specs = landedRepos.find((r) => r?.repo && resolvedKey(r.repo) === resolvedKey(root))?.paths ?? null;
   if (!specs && !shas.cherryPicked) {
     const owned = arr(payload?.owned_paths).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p);
     const grouped = landingRepos({ base: repo, ownedPaths: owned, placements: placements ?? undefined, timeoutMs: timeout });
-    specs = [...grouped].find(([r]) => keyOf(r) === keyOf(root))?.[1]?.specs ?? null;
+    specs = [...grouped].find(([r]) => resolvedKey(r) === resolvedKey(root))?.[1]?.specs ?? null;
   }
   specs = arr(specs).filter((s) => typeof s === 'string' && s && s !== '.');
   let base = null;

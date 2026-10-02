@@ -2,6 +2,8 @@
 // truncated payload, so a malformed column is the caller's fallback, never a throw. The parse of the
 // literal 'null' is kept as null (callers that want {} instead write `parseJsonOr`).
 import fs from 'node:fs';
+import path from 'node:path';
+import { readParsedFile } from './read-text.mjs';
 
 /** `text` as JSON, or `fallback` when it does not parse. */
 export const parseJson = (text, fallback = null) => {
@@ -17,6 +19,22 @@ export const parseJsonOr = (text, fallback = {}) => parseJson(text) ?? fallback;
 export const withPayload = (row, fallback = {}) => (row ? { ...row, payload: parseJsonOr(row.payload_json, fallback) } : row);
 
 /** `file` read and parsed as JSON, or `fallback` when the file is missing, unreadable or malformed. */
-export const readJsonFile = (file, fallback = null) => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
+export const readJsonFile = (file, fallback = null) => readParsedFile(file, JSON.parse, fallback);
+
+/** `stdout` as JSON: the trimmed text, else its first-{-to-last-} span; null when neither parses. */
+export const jsonFromStdout = (stdout) => {
+  const text = String(stdout ?? '').trim();
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  const first = text.indexOf('{'), last = text.lastIndexOf('}');
+  if (first >= 0 && last > first) {
+    try { return JSON.parse(text.slice(first, last + 1)); } catch { /* not json */ }
+  }
+  return null;
+};
+
+/** `value` written to `file` as two-space JSON plus a trailing newline (parent directories created). */
+export const writeJsonFile = (file, value) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 };

@@ -53,6 +53,9 @@ import {
   CONTROLLER_NAMES, LEADER_NAME, MODES, SKILL_ROOT, START_REASON_ENV, configuredMode, controllerModule, reconcilerConfig, reconcilerNumbers,
 } from './state.mjs';
 import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { positiveNumber } from '../lib/number.mjs';
+import { valueAfter } from '../lib/cli-arg.mjs';
 
 export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
@@ -69,7 +72,6 @@ export const STALE_ACTION_MS = 150_000;
 export const CHECKPOINT_MS = 60_000;
 
 const selfFile = fileURLToPath(import.meta.url);
-const posInt = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 
 /**
  * Discover the controller modules of `dir`: [{name, file, module}] and the load errors [{file, error}].
@@ -166,9 +168,9 @@ export class Engine {
     this.controllers = found.controllers.map(({ name, module }) => {
       const yaml = controllerModule(name);
       return { name, module, mode: 'off', lastResyncAt: 0,
-        resyncMs: posInt(yaml.resyncMs, posInt(module.resyncMs, DEFAULTS.resyncMs)),
-        concurrency: posInt(yaml.concurrency, posInt(module.concurrency, DEFAULTS.concurrency)),
-        timeoutMs: posInt(yaml.timeoutMs, posInt(module.timeoutMs, DEFAULTS.timeoutMs)) };
+        resyncMs: positiveNumber(yaml.resyncMs, positiveNumber(module.resyncMs, DEFAULTS.resyncMs)),
+        concurrency: positiveNumber(yaml.concurrency, positiveNumber(module.concurrency, DEFAULTS.concurrency)),
+        timeoutMs: positiveNumber(yaml.timeoutMs, positiveNumber(module.timeoutMs, DEFAULTS.timeoutMs)) };
     });
     this.refreshConfig();
     return this;
@@ -580,7 +582,7 @@ export function safeForStart({ argv = [], reloaded = false, numbers = reconciler
   return { safe: plan.looping, inherited, reevaluated: true, starts: plan.starts.length, max, windowMs };
 }
 
-const argValue = (argv, name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
+const argValue = (argv, name) => valueAfter(argv, name);
 
 async function main(argv = process.argv.slice(2)) {
   setPriority();
@@ -603,13 +605,13 @@ async function main(argv = process.argv.slice(2)) {
     process.exitCode = result.ok ? 0 : 1;
     return;
   }
-  const handoverFrom = process.env[RELOAD_ENV.handoverFrom] ?? null;
-  const reloadedAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
+  const handoverFrom = readEnv(RELOAD_ENV.handoverFrom) ?? null;
+  const reloadedAt = Number(readEnv(RELOAD_ENV.reloadedAt)) || null;
   delete process.env[RELOAD_ENV.handoverFrom];
   delete process.env[RELOAD_ENV.reloadedAt];
   const safeStart = safeForStart({ argv, reloaded: Boolean(handoverFrom) });
   const safe = safeStart.safe;
-  const startReason = handoverFrom ? 'self-reload' : process.env[START_REASON_ENV] || 'manual';
+  const startReason = handoverFrom ? 'self-reload' : readEnv(START_REASON_ENV) || 'manual';
   delete process.env[START_REASON_ENV];
   // Before machine.sqlite opens, stdout is the only place a crash can go (boot.mjs spawns the engine with no log file).
   const rev = runtimeHead({ root: SKILL_ROOT });

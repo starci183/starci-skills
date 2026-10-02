@@ -1,7 +1,11 @@
 import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
 import { parseContract, installedSWR } from './next-data-contract.mjs';
-import { relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
+import {
+  anyDescendant, normalizedSymbol, normalizedSymbolValue, relativePath, selectedNode,
+  unwrapExpression, valueSymbol as sharedValueSymbol,
+} from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 export const SWR_KEY_RULE_ID = 'FE_SWR_KEY_IDENTITY';
 export const SWR_MUTATION_RULE_ID = 'FE_SWR_MUTATION_RESOURCE_IDENTITY';
@@ -9,41 +13,9 @@ export const SWR_DATA_RULE_IDS = [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID];
 
 const SWR_SPECIFIERS = new Set(['swr', 'swr/immutable', 'swr/mutation']);
 
-function normalizedSymbol(ts, checker, value) {
-  let symbol = value ?? null;
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol);
-    const target = checker.getAliasedSymbol(symbol);
-    if (!target || target === symbol) break;
-    symbol = target;
-  }
-  return symbol;
-}
-
-function selectedNode(ts, expression) {
-  expression = unwrapExpression(ts, expression);
-  if (ts.isIdentifier(expression)) return expression;
-  if (ts.isPropertyAccessExpression(expression)) return expression.name;
-  if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression;
-  return null;
-}
-
-function symbolAt(ts, checker, node) {
-  return normalizedSymbol(ts, checker, checker.getSymbolAtLocation(node));
-}
-
-function valueSymbol(ts, checker, expression, seen = new Set()) {
-  const selected = selectedNode(ts, expression);
-  const symbol = selected ? symbolAt(ts, checker, selected) : null;
-  if (!symbol || seen.has(symbol)) return symbol;
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
-    return valueSymbol(ts, checker, declarations[0].initializer, new Set(seen).add(symbol));
-  }
-  return symbol;
-}
+/* null when the expression selects no name at all (the shared default traces the unselected node itself). */
+const valueSymbol = (ts, checker, expression, seen = new Set()) =>
+  sharedValueSymbol(ts, checker, expression, seen, { unselected: 'null' });
 
 function declarationsInside(symbol, root) {
   const declarations = symbol?.getDeclarations?.() ?? [];
@@ -70,7 +42,7 @@ function officialTargets(config, context, installed, reasons) {
         reasons.push(`${relativePath(config.root, source.fileName)} cannot resolve ${statement.moduleSpecifier.text} through the target TypeScript program`);
         continue;
       }
-      const exports = new Map(checker.getExportsOfModule(moduleSymbol).map(symbol => [symbol.getName(), normalizedSymbol(context.ts, checker, symbol)]));
+      const exports = new Map(checker.getExportsOfModule(moduleSymbol).map(symbol => [symbol.getName(), normalizedSymbolValue(context.ts, checker, symbol)]));
       for (const [name, kind] of selected) {
         const target = exports.get(name);
         if (!target) continue;
@@ -136,7 +108,7 @@ function configMutateSymbols(config, context, targets) {
         for (const element of node.name.elements) {
           const property = element.propertyName && context.ts.isIdentifier(element.propertyName) ? element.propertyName.text
             : context.ts.isIdentifier(element.name) ? element.name.text : null;
-          if (property === 'mutate' && context.ts.isIdentifier(element.name)) symbols.add(symbolAt(context.ts, checker, element.name));
+          if (property === 'mutate' && context.ts.isIdentifier(element.name)) symbols.add(normalizedSymbol(context.ts, checker, element.name));
         }
       }
       context.ts.forEachChild(node, visit);
@@ -181,7 +153,7 @@ function exportedHook(config, context, entry, reasons) {
   const checker = context.checkerFor(source.fileName);
   const moduleSymbol = checker.getSymbolAtLocation(source);
   const exported = moduleSymbol ? checker.getExportsOfModule(moduleSymbol).find(symbol => symbol.getName() === entry.export) : null;
-  const symbol = normalizedSymbol(context.ts, checker, exported);
+  const symbol = normalizedSymbolValue(context.ts, checker, exported);
   const declarations = (symbol?.getDeclarations?.() ?? []).filter(declaration => canonical(declaration.getSourceFile().fileName) === canonical(source.fileName));
   const functions = declarations.map(declaration => functionNode(context.ts, declaration)).filter(Boolean);
   if (functions.length !== 1) {
@@ -195,7 +167,7 @@ function bindingSymbols(ts, checker, fn) {
   const found = new Map();
   const addName = name => {
     if (ts.isIdentifier(name)) {
-      const symbol = symbolAt(ts, checker, name);
+      const symbol = normalizedSymbol(ts, checker, name);
       if (symbol) {
         if (!found.has(name.text)) found.set(name.text, new Set());
         found.get(name.text).add(symbol);
@@ -233,7 +205,7 @@ function resolvedIdentities(ts, checker, fn, entry, reasons) {
 
 function accessPath(ts, checker, node) {
   node = unwrapExpression(ts, node);
-  if (ts.isIdentifier(node)) return { symbol: symbolAt(ts, checker, node), parts: [node.text] };
+  if (ts.isIdentifier(node)) return { symbol: normalizedSymbol(ts, checker, node), parts: [node.text] };
   if (ts.isPropertyAccessExpression(node)) {
     const base = accessPath(ts, checker, node.expression);
     return base ? { symbol: base.symbol, parts: [...base.parts, node.name.text] } : null;
@@ -249,7 +221,7 @@ function expandedAccessPath(ts, checker, node, seen = new Set(), depth = 0) {
   if (!node || depth > 10) return null;
   node = unwrapExpression(ts, node);
   if (ts.isIdentifier(node)) {
-    const symbol = symbolAt(ts, checker, node);
+    const symbol = normalizedSymbol(ts, checker, node);
     if (!symbol || seen.has(symbol)) return symbol ? { symbol, parts: [node.text] } : null;
     const initializer = constInitializer(ts, symbol);
     return initializer ? expandedAccessPath(ts, checker, initializer, new Set(seen).add(symbol), depth + 1)
@@ -272,19 +244,8 @@ function matchesIdentityAccess(ts, checker, node, identity) {
   return matches(accessPath(ts, checker, node)) || matches(expandedAccessPath(ts, checker, node));
 }
 
-function expressionReferences(ts, checker, expression, identity) {
-  let found = false;
-  const visit = node => {
-    if (found) return;
-    if (matchesIdentityAccess(ts, checker, node, identity)) {
-      found = true;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(expression);
-  return found;
-}
+const expressionReferences = (ts, checker, expression, identity) =>
+  anyDescendant(ts, expression, (node) => matchesIdentityAccess(ts, checker, node, identity));
 
 function constInitializer(ts, symbol) {
   const declarations = symbol?.getDeclarations?.() ?? [];
@@ -316,7 +277,7 @@ function identityContribution(ts, checker, expression, identity, seen = new Set(
   expression = unwrapExpression(ts, expression);
   if (matchesIdentityAccess(ts, checker, expression, identity)) return 'yes';
   if (ts.isIdentifier(expression)) {
-    const symbol = symbolAt(ts, checker, expression);
+    const symbol = normalizedSymbol(ts, checker, expression);
     if (!symbol || seen.has(symbol)) return 'no';
     const initializer = constInitializer(ts, symbol);
     return initializer ? identityContribution(ts, checker, initializer, identity, new Set(seen).add(symbol), depth + 1) : 'no';
@@ -378,8 +339,8 @@ function rootKeyExpression(ts, checker, expression, identities, seen = new Set()
     const returned = returnedExpression(ts, expression);
     return returned ? rootKeyExpression(ts, checker, returned, identities, seen, depth + 1) : null;
   }
-  if (ts.isIdentifier(expression) && !identities.some(identity => identity.symbol === symbolAt(ts, checker, expression))) {
-    const symbol = symbolAt(ts, checker, expression);
+  if (ts.isIdentifier(expression) && !identities.some(identity => identity.symbol === normalizedSymbol(ts, checker, expression))) {
+    const symbol = normalizedSymbol(ts, checker, expression);
     if (symbol && !seen.has(symbol)) {
       const declarations = symbol.getDeclarations?.() ?? [];
       if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
@@ -417,8 +378,8 @@ function staticKeyExpression(ts, checker, expression, identities, seen = new Set
     return false;
   }
   if (ts.isIdentifier(expression)) {
-    if (expression.text === 'undefined' || identities.some(identity => identity.symbol === symbolAt(ts, checker, expression))) return true;
-    const symbol = symbolAt(ts, checker, expression);
+    if (expression.text === 'undefined' || identities.some(identity => identity.symbol === normalizedSymbol(ts, checker, expression))) return true;
+    const symbol = normalizedSymbol(ts, checker, expression);
     if (!symbol || seen.has(symbol)) return false;
     const declarations = symbol.getDeclarations?.() ?? [];
     if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
@@ -494,7 +455,7 @@ function isUnshadowedCommonJsRequire(ts, checker, expression, seen = new Set(), 
 
 function symbolOfRequireAlias(ts, checker, expression) {
   const symbol = checker.getSymbolAtLocation(expression);
-  return normalizedSymbol(ts, checker, symbol);
+  return normalizedSymbolValue(ts, checker, symbol);
 }
 
 function swrReferences(config, context) {
@@ -535,7 +496,7 @@ function containerSymbolsFromKey(ts, checker, expression, found = new Set(), see
   if (!expression || depth > 12) return found;
   expression = unwrapExpression(ts, expression);
   if (ts.isIdentifier(expression)) {
-    const symbol = symbolAt(ts, checker, expression);
+    const symbol = normalizedSymbol(ts, checker, expression);
     if (!symbol || seen.has(symbol)) return found;
     const initializer = constInitializer(ts, symbol);
     if (!initializer) return found;
@@ -555,7 +516,7 @@ function keyContainerRisks(ts, checker, key, owner) {
     .filter(ts.isVariableDeclaration).map(declaration => declaration.name)));
   const risks = [];
   const visit = node => {
-    if (ts.isIdentifier(node) && symbols.has(symbolAt(ts, checker, node)) && !declarationNames.has(node)
+    if (ts.isIdentifier(node) && symbols.has(normalizedSymbol(ts, checker, node)) && !declarationNames.has(node)
       && !(node.pos >= key.pos && node.end <= key.end)) risks.push(node);
     ts.forEachChild(node, visit);
   };

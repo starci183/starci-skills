@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import { JOB_HANDLE_FIELDS, WORKER_HOLDING_STATUSES, jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../../scripts/machine/terminal-ledger.mjs';
-import { ledgerBindings } from '../../scripts/kernel/terminal-dedupe.mjs';
+import { ledgerBindings, dedupeTerminals } from '../../scripts/kernel/terminal-dedupe.mjs';
+import { orcaTreeFindings } from '../../scripts/supervisor/orca-tree.mjs';
+import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 // The stray-terminal policies (terminal-dedupe's close plan, check-orca-tree's findings) each
 // carried the same field list, the same held statuses and the same ledger SELECTs.
@@ -55,11 +57,22 @@ test('pathUnder is the path-prefix test both scripts spelt locally', () => { con
   assert.ok(!pathUnder(`${FW}a`, null));
 });
 
-test('the dedupe and check scripts read the shared facts', () => {
-  const dedupe = fs.readFileSync(new URL('../../scripts/kernel/terminal-dedupe.mjs', import.meta.url), 'utf8');
-  const check = fs.readFileSync(new URL('../../scripts/supervisor/orca-tree.mjs', import.meta.url), 'utf8');
-  for (const src of [dedupe, check]) {
-    assert.match(src, /from '\.\.\/machine\/terminal-ledger\.mjs'/, 'imports the shared module');
-    assert.doesNotMatch(src, /hierarchy\?\.runtime\?\.terminalHandle/, 'no local field list remains');
-  }
+// A handle hiding only under payload.hierarchy.runtime.terminalHandle must count as bound for BOTH readers —
+// proof they read the shared field list, not a local copy.
+test('the dedupe and check readers bind a terminal named only under hierarchy.runtime', async (t) => {
+  await withLedger(t, async ({ repoRoot, ledger }) => {
+    seedWorkflow(ledger, { id: 'wf-tl', jobs: [{ jobId: 'j-nested', opId: 'code.refactor', status: 'running',
+      payload: { opId: 'code.refactor', hierarchy: { runtime: { terminalHandle: 'term_nested' } } } }] });
+    const out = dedupeTerminals({ repos: [repoRoot], env: {}, deps: {
+      list: () => ({ ok: true, terminals: [{ handle: 'term_nested', worktreePath: repoRoot, title: 'op-x' }], visualLayouts: [] }),
+      read: () => 'agent frame, no shell prompt',
+      quit: () => { throw new Error('a bound terminal is never quit'); },
+      close: () => { throw new Error('a bound terminal is never closed'); },
+    } });
+    assert.equal(out.listed, 1);
+    assert.deepEqual(out.closed, []);
+    const findings = orcaTreeFindings(ledger.db, [{ handle: 'term_nested', live: true, worktreePath: repoRoot, title: 'x' }],
+      { repo: repoRoot, owned: new Set(), workers: [] });
+    assert.deepEqual(findings.filter((f) => f.terminal === 'term_nested'), [], JSON.stringify(findings));
+  });
 });

@@ -9,6 +9,7 @@ import { startAgent } from './lib.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { isOrcaDepthRefusal } from '../lib/worker-depth.mjs';
+import { bestEffortCall } from './best-effort-call.mjs';
 import { MAX_WORKER_DEPTH_CEILING } from '../../engine/orca-config.mjs';
 
 export const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no command, edit no file, start no worker. Wait to be released.';
@@ -53,4 +54,4 @@ export async function probeWorkerDepth({ entry = null, worktree, agent = 'claude
     released: started.map((w) => ({ dispatchId: w.dispatchId, ...w.cleanup })), error };
 }
 
-const attempt = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const attempt = bestEffortCall;

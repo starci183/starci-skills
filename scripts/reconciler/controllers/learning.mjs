@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../engine/yaml.mjs';
+import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { clipLine } from '../../lib/clip.mjs';
 import { translator } from '../../lib/i18n.mjs';
 
@@ -23,11 +23,7 @@ export const KEY = 'learning:tick';
 export const DEFAULTS = Object.freeze({ resyncMs: 1_800_000, concurrency: 1, windowMs: 86_400_000, decisionDueMs: 3_600_000 });
 
 export function learningControllerSettings(file = LEARNING_FILE) {
-  let doc = {};
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
-  const out = { ...DEFAULTS };
-  for (const k of Object.keys(DEFAULTS)) if (Number.isFinite(Number(doc[k])) && Number(doc[k]) > 0) out[k] = Number(doc[k]);
-  return out;
+  return yamlNumberSettings(file, DEFAULTS);
 }
 
 /**

@@ -5,6 +5,7 @@
 // contract, keyed by attempt_id, before the job goes running). A redispatch after a dead worker is a new attempt
 // (dispatch_seq + 1) with its own contract, so an old dispatch can never file into the new one.
 import { jobRowOf } from './rows.mjs';
+import { latestAttemptOf } from '../../../machine/job-row.mjs';
 
 /** The jobs row through JOB_ROW (`attempt` = try_no, `result_json` = the settle result), or a typed refusal. */
 export const resolveJob = (db, jobId) => {
@@ -15,14 +16,12 @@ export const resolveJob = (db, jobId) => {
 // 'reported' stays reportable: the same report filed again replays the stored result (H10), and settle verifies it.
 export const REPORTABLE_JOB_STATUSES = new Set(['running', 'answering', 'effect_unknown', 'reported']);
 
-/** The job's latest attempt (any state), or null. */
-export const latestAttemptOf = (db, job) => db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY dispatch_seq DESC LIMIT 1').get(job.job_id) ?? null;
 /** The job's open attempt (no end state, not settled), or null. */
 export const openAttemptOf = (db, job) => db.prepare(`SELECT * FROM op_attempts WHERE job_id=? AND end_state IS NULL AND settled_at IS NULL
   ORDER BY dispatch_seq DESC LIMIT 1`).get(job.job_id) ?? null;
 
 /** The dispatch id a report of this job carries: its open attempt's, else its latest attempt's, else null. */
-export const reportDispatchIdOf = (db, job) => (openAttemptOf(db, job) ?? latestAttemptOf(db, job))?.dispatch_id ?? null;
+export const reportDispatchIdOf = (db, job) => (openAttemptOf(db, job) ?? latestAttemptOf(db, job, { order: 'dispatch_seq' }))?.dispatch_id ?? null;
 
 /** The open attempt a report of `job` files into; refused unless the job is live and the attempt has its contract. */
 export const requireReportAttempt = (db, job) => {
@@ -51,6 +50,6 @@ export const parseAttempt = (v) => {
 
 /** The identity fields a report must match (report-envelope.mjs validateOpReport): the open attempt's. */
 export const reportIdentityOf = (db, job) => {
-  const attempt = openAttemptOf(db, job) ?? latestAttemptOf(db, job);
+  const attempt = openAttemptOf(db, job) ?? latestAttemptOf(db, job, { order: 'dispatch_seq' });
   return { run: attempt?.run_id ?? null, task: attempt?.task_id ?? null, dispatch: attempt?.dispatch_id ?? null, from: job.job_id };
 };

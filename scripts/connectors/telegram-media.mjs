@@ -29,7 +29,7 @@ import { spawnNode } from '../api/node/spawn-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { inspectLedger } from '../../engine/db/ledger.mjs';
 import { configRoot } from '../../engine/config.mjs';
-import { DEFAULT_API_BASE, botCall, botPolite, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
+import { DEFAULT_API_BASE, botCall, botPolite, endpoint, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
@@ -41,6 +41,7 @@ import { pathKey, slash } from '../lib/path-key.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { readYamlFile } from '../lib/read-yaml.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
@@ -369,7 +370,6 @@ export function uatCaption({ workflow, flow, verdict, summary, language, index =
 
 /* ------------------------------------------------------------ Bot API uploads */
 
-const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
 const blobOf = async (file) => {
   const type = MIME[extOf(file)] ?? 'application/octet-stream';
   if (typeof fs.openAsBlob === 'function') return fs.openAsBlob(file, { type });
@@ -507,7 +507,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
 } = {}) {
   try {
     if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
-    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
+    if (isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: true, skipped: 'test context' };
     if (!mediaKindOf(op)) return { ok: true, skipped: 'not a media op' };
     const settings = telegramSettings({ config, env, root });
     if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
@@ -547,7 +547,7 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     if (env.STARCI_CONNECTORS_OFF === '1') return { queued: false, skipped: 'STARCI_CONNECTORS_OFF' };
     // A spec run (node --test sets NODE_TEST_CONTEXT, which a spawned cli.mjs inherits) never
     // reaches the real Bot API: only a spec that points STARCI_TELEGRAM_API_BASE at a fake queues.
-    if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
+    if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) return { queued: false, skipped: 'test context' };
     const settings = telegramSettings({ config: config === undefined ? ownerConfig() : config, env });
     if (!settings.ready) return { queued: false, skipped: 'telegram off' };
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,

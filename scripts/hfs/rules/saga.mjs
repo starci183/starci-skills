@@ -17,7 +17,7 @@
 //                                   (an outage of an infra service, an app or a fake: `during`, `cut`, `latency`, `failNext`, `interruptDatabase`).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
 
 export const SAGA_STEP_COMPENSATION = 'BE_SAGA_STEP_COMPENSATION';
@@ -40,10 +40,7 @@ const INJECTION = /\.(?:during|cut|latency|failNext|interruptDatabase)\s*\(/;
 const STORE_MODULE = /(?:^|\/)platform\/saga$/;
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 const parse = (ts, text) => ts.createSourceFile('saga.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 

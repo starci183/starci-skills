@@ -21,6 +21,7 @@ import { main } from '../../packages/hfs/bin/hfs.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { coverageExclusions } from '../../packages/hfs/sync/index.mjs';
 import { dockerFindings } from '../../scripts/hfs/rules/docker.mjs';
+import { nextBuildEnv } from '../../scripts/lib/build-env.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
@@ -468,11 +469,8 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
 const FE_BUILD_DEPENDENCIES = Object.freeze(['server-only']);
 const feBuildGate = gate('scaffold fe build', missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
 
-/** The SWC native-binding cache of `next build`: a directory under the user's home (STARCI_SWC_CACHE overrides), because SWC refuses a cache ancestor whose ACL grants write to other accounts. */
-const swcCache = () => { const dir = process.env.STARCI_SWC_CACHE ?? path.join(os.homedir(), 'starci-swc-cache'); fs.mkdirSync(dir, { recursive: true }); return dir; };
-
-/** The environment `next build` runs in. */
-const buildEnv = () => ({ ...process.env, NEXT_TELEMETRY_DISABLED: '1', SWC_NATIVE_BINDING_CACHE: swcCache() });
+/** The environment `next build` runs in: the one managed build env (scripts/lib/build-env.mjs). */
+const buildEnv = () => nextBuildEnv();
 
 test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { skip: feBuildGate.skip, timeout: 900_000 }, async (t) => {
   if (feBuildGate.required) assert.fail(feBuildGate.required);

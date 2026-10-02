@@ -130,6 +130,7 @@ test('HTML capture: one png and one record per viewport, green', { skip: NO_BROW
     for (const rec of records) {
       const png = fs.readFileSync(rec.image.path);
       assert.equal(rec.image.sha256, (await import('node:crypto')).createHash('sha256').update(png).digest('hex'));
+      assert.equal(rec.tool.settleMs, SETTLE_MS, 'the settle wait the capture applied, recorded on the render record');
       assert.equal(png.readUInt32BE(16), rec.viewport.width * 2, 'deviceScaleFactor 2');
       assert.equal(rec.layout.pageWidth, rec.viewport.width);
       assert.equal(rec.layout.horizontalOverflow, false);
@@ -204,5 +205,6 @@ test('fixture capture: the real pure HandoffBlockBase renders with fixture props
 
 test('the settle delay is runtimes.yaml allocation.drawRender.settleMs, one number in one place', () => {
   assert.equal(SETTLE_MS, allocationSettings().drawRender.settleMs);
-  assert.doesNotMatch(fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'scripts', 'work', 'draw-render.mjs'), 'utf8'), /SETTLE_MS = \d/);
+  assert.ok(Number.isInteger(SETTLE_MS) && SETTLE_MS > 0, 'a configured wait, not a literal');
+  // The capture applies it per viewport and records it: rec.tool.settleMs === SETTLE_MS in the HTML-capture test above.
 });

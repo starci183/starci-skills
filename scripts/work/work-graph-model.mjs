@@ -9,6 +9,7 @@ import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { sliceBound } from './slice-estimate.mjs';
 import { list } from '../lib/list.mjs';
+import { pathsOverlap } from '../lib/path-key.mjs';
 
 const SCHEMA_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../modules/schemas/work-graph.schema.yaml');
 export const WORK_GRAPH_SCHEMA = parseYaml(fs.readFileSync(SCHEMA_FILE, 'utf8'));
@@ -23,7 +24,7 @@ const ROOT_KINDS = new Set(['foundation', 'slice']);
 export const ownedPathKey = (p) => {
   try { return normalizeOwnedPath(typeof p === 'string' ? p : p?.path).toLowerCase(); } catch { return null; }
 };
-const within = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+const within = pathsOverlap;
 const edgeKey = (e) => `${e.from}\u0000${e.to}\u0000${e.kind}`;
 
 /** The graph in canonical order: domains, nodes and edges sorted, so equal graphs digest equal. */

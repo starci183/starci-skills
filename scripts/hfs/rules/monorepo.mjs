@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import { isBuiltin } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
 
 export const MONO_WORKSPACES = 'HFS_MONO_WORKSPACES';
@@ -111,10 +111,7 @@ function nestFindings(repoRoot, files, beApps) {
 }
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The path-alias patterns of a workspace (its tsconfig.json as TypeScript resolves it, `extends` included): [{ prefix, exact }]. */
 function aliasesOf(ts, dir) {

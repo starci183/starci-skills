@@ -26,6 +26,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
+import { opGateRules } from '../lib/op-gate.mjs';
 
 export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
 export const WORLD_PROJECTS = Object.freeze({
@@ -40,8 +41,7 @@ const USAGE = 'usage: test-world-run.mjs --root <app> --project e2e|integration|
 
 /** op-gate.yaml testWorld: {required[], forbidden[], outage[]}. */
 export function testWorldRules(runtime = runtimeRoot) {
-  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
-  return { required: doc?.testWorld?.required ?? [], forbidden: doc?.testWorld?.forbidden ?? [], outage: doc?.testWorld?.outage ?? [] };
+  return opGateRules(runtime, 'testWorld');
 }
 
 /** The harness of the app: {jestConfig, preset, declaration, defineTestWorld}. */

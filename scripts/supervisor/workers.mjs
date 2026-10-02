@@ -61,6 +61,8 @@ import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { slugify } from '../lib/slug.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/hook-install.mjs guardLaunch), bound to
@@ -96,7 +98,7 @@ const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-promp
 
 const parse = parseJsonOr;
 const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v.map(String) : []);
-const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'fix';
+const slug = (v) => slugify(v, { max: 40, fallback: 'fix' });
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
 /** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
@@ -666,7 +668,7 @@ async function main() {
     if (verb === 'report') {
       const summary = value('summary-file') ? fs.readFileSync(value('summary-file'), 'utf8') : value('summary') ?? '';
       const r = fileReport(m, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
-        needs: csv(value('needs')), terminal: process.env.ORCA_TERMINAL_HANDLE ?? null });
+        needs: csv(value('needs')), terminal: readEnv('ORCA_TERMINAL_HANDLE') ?? null });
       supervisorLog('workers', `report ${value('job')}: ${r.ok ? r.outcome : r.error}`, { level: r.ok ? 'info' : 'warn', data: r });
       return out(r);
     }

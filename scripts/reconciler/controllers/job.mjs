@@ -39,6 +39,7 @@ import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { positiveNumber } from '../../lib/number.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -53,7 +54,7 @@ const SETTLED = SETTLED_JOB_LIST;
 
 /* ------------------------------------------------------------------------------------------------ settings */
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+const num = (v, d) => positiveNumber(v, d, { orZero: true });
 /** modules/reconciler/job.yaml + the runtimes.yaml numbers it cites. Never throws. */
 export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
   let doc = {};

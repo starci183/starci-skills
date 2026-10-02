@@ -35,6 +35,7 @@ import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { workflowRecordOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { isInside } from '../lib/walk.mjs';
 
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
@@ -49,7 +50,7 @@ const WORK_DIR = '.starciwork';
 const posix = (p) => String(p).replace(/\\/g, '/');
 const ctxOf = (ctx) => ({ env: ctx?.env ?? process.env, orca: ctx?.orca ?? orcaWorktreeClient, git: ctx?.git ?? null });
 const gitIn = (call, cwd, args) => { const r = call(args, { cwd, timeout: 60_000 }); return { ok: !r.error && r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() }; };
-const insidePath = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const insidePath = (child, parent) => isInside(path.resolve(parent), path.resolve(child));
 
 /**
  * The Orca creation of a workflow's worktree. {name: 'wf-<id>', baseBranch: 'main', branch: 'wf-<id>' (the branch Orca

@@ -24,15 +24,17 @@ import { posixPath } from '../lib/path-key.mjs';
 import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { mainTipOf, mergeGuard, resolveGateBase } from './gate.mjs';
+import { tailLines } from '../lib/clip.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 
 export const RELEASE_PROOF_SCHEMA = 'starci/release-proof@1';
 export const RELEASE_STEPS = Object.freeze(['app-installs', 'canon-pins', 'merge-guard', 'check']);
 export const STEP_STATUS = Object.freeze({ pass: 'pass', red: 'red', skipped: 'skipped', toolFailed: 'tool-failed' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const USAGE = 'usage: release-proof.mjs --repo <released repository> --base <commit> [--main <ref>] [--out <file>]';
-const tail = (text, n = 3) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join(' | ').slice(0, 600);
+const tail = (text, n = 3) => tailLines(text, n, { join: ' | ', max: 600 });
 
-const isApp = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'hfs.json'), 'utf8'))?.kind === 'app'; } catch { return false; } };
+const isApp = (repo) => readJsonFile(path.join(repo, 'hfs.json'))?.kind === 'app';
 
 /** The default runners of a step's process (node <args>, npm <args>): {status, stdout, stderr, error}. */
 const defaultNode = (args, opts) => runNode(args, { maxBuffer: 512 * 1024 * 1024, ...opts });

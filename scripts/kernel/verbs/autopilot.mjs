@@ -1,18 +1,11 @@
 // api autopilot: workflow autonomy controls.
 import { createHash } from 'node:crypto';
-import { csvList, getWorkflow } from './shared/rows.mjs';
+import { csvList, verbWorkflow, workflowVerb } from './shared/rows.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot-run.mjs';
 import { wakeKernelForTransition } from '../wake-delivery.mjs';
 
-export default {
-  verb: 'autopilot',
-  required: ['workflow'],
-  kernelOnly: true,
-  usageInCore: true,
-  run({ ledger, args, repo, emit }) {
-    const db = ledger.db, workflowId = args.workflow;
-    const wf = getWorkflow(db, workflowId);
-    if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
+export default workflowVerb('autopilot', ({ ledger, args, repo, emit }) => {
+    const { db, workflowId, workflow: wf } = verbWorkflow(ledger, args);
     const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
     const by = typeof args.by === 'string' && ['supervisor', 'kernel', AUTOPILOT_BY].includes(args.by.trim()) ? args.by.trim() : 'supervisor';
     const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };
@@ -81,5 +74,4 @@ export default {
     }
     const out = { ok: true, workflowId, ...autopilotProjection(db, workflowId) };
     emit(out, `autopilot ${out.on ? 'ON' : 'off'} (${out.source}) ${workflowId}: provisional ${out.provisional.length}, deferred ${out.deferred.length}, deferred-to-handover ${out.deferredToHandover.length}`, args.json);
-  },
-};
+});

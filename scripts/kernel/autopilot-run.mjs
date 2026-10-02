@@ -52,6 +52,8 @@ import { livePartsOf, LOOP_SCHEMA } from '../work/draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from '../work/draw/draw-rationale.mjs';
 import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 export const AUTOPILOT_BY = 'autopilot';
 export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
@@ -80,7 +82,7 @@ const DRAW_REVIEW_KIND = 'draw-review';
 const DIRECTION_REVIEW_KIND = 'brand-direction-review';
 const DAY = 86_400_000;
 
-const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
+const num = (value, fallback) => positiveNumber(value, fallback, { orZero: true });
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
 
 /* ------------------------------------------------------------------ settings */
@@ -91,7 +93,7 @@ export function autopilotSettings(source = null) {
   try { raw = (source ?? allocationSettings())?.autopilot ?? {}; } catch { raw = {}; }
   const budgets = raw.budgets ?? {};
   // STARCI_AUTOPILOT=on|off overrides the runtimes.yaml default for this process (a spec exercising the owner flow).
-  const env = String(process.env.STARCI_AUTOPILOT ?? '').trim().toLowerCase();
+  const env = String(readEnv('STARCI_AUTOPILOT') ?? '').trim().toLowerCase();
   return {
     enabled: env === 'on' ? true : env === 'off' ? false : raw.enabled !== false,
     workflows: raw.workflows && typeof raw.workflows === 'object' ? raw.workflows : {},

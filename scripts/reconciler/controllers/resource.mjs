@@ -29,6 +29,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { providerCircuits } from '../../machine/provider-circuit.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { readSupervisor, withSupervisor } from '../../machine/home.mjs';
+import { normalizeProvider } from '../../lib/provider.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'resource';
@@ -319,7 +320,6 @@ export function createResourceController(overrides = {}) {
     const byTarget = new Map(pools.map((p) => [p.target, p]));
     const byProvider = new Map();
     for (const p of pools) if (p.provider) { const l = byProvider.get(p.provider) ?? []; l.push(p.target); byProvider.set(p.provider, l); }
-    const providerKey = (v) => String(v ?? '').trim().toLowerCase().replace(/-agent$/, '');
     const hits = {}; // pool target -> newest signal time
     const hit = (target, at) => { if (target && byTarget.has(target)) hits[target] = Math.max(hits[target] ?? 0, Number(at) || now); };
     const seedSince = now - settings.backoffIncreaseAfterMs;
@@ -328,7 +328,7 @@ export function createResourceController(overrides = {}) {
     const hitSignal = (p, at) => {
       const named = [p.model, p.pool, p.target, p.jobPool].find((v) => v && byTarget.has(v));
       if (named) return hit(named, at);
-      const prov = [p.provider, p.pool].map(providerKey).find((v) => v && byProvider.has(v));
+      const prov = [p.provider, p.pool].map(normalizeProvider).find((v) => v && byProvider.has(v));
       for (const target of byProvider.get(prov) ?? []) hit(target, at);
     };
     // The Job controller's worker-health probe logs reconciler.provider-rate-limited typed rows (ctx.log, lane B) in
@@ -366,7 +366,7 @@ export function createResourceController(overrides = {}) {
     for (const c of (deps.providerCircuits ?? providerCircuits)()) {
       const v = c.value ?? {};
       const at = Number(v.observedAt) || Number(c.at) || 0;
-      const k = providerKey(v.provider ?? c.provider);
+      const k = normalizeProvider(v.provider ?? c.provider);
       if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
       memory.providerSeen[k] = at;
       for (const target of byProvider.get(k) ?? []) hit(target, at);

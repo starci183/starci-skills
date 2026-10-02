@@ -54,8 +54,9 @@ import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, product
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
 import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
-import { slash } from '../lib/path-key.mjs';
+import { foldCase, realPath, slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/sops-envelope.mjs';
+import { forEachFileLine } from '../lib/read-text.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs'; import { isMain } from '../lib/is-main.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
@@ -113,24 +114,6 @@ export function diffScanner(files = [], { encText = null } = {}) {
  *  repository's own .starcistacks + sops convention, or a value generated per run. */
 export const TEST_SECRET_HINT = `move it to .starcistacks/<stack>/secrets/test/<name> and encrypt it with the repository's own command (${setCommand('<name>', '<stack>')}; commit only the .enc, read it with testSecret() from scripts/uat/test-secret.mjs) or generate it per run; never a plaintext literal`;
 export const scanHint = (findings = []) => (findings.some((f) => f.pattern === 'assigned-secret') ? TEST_SECRET_HINT : null);
-
-/** Feed a file's lines to `onLine` in bounded chunks. An outgoing range can be hundreds of MB of diff
- *  (one push was 334 commits, 567 MB of evidence JSON), past any spawn buffer and V8's string cap. */
-export function forEachFileLine(file, onLine, { chunkBytes = 8 * 1024 * 1024 } = {}) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(chunkBytes);
-    let carry = '';
-    for (;;) {
-      const n = fs.readSync(fd, buf, 0, chunkBytes, null);
-      if (n <= 0) break;
-      const lines = (carry + buf.toString('utf8', 0, n)).split(/\r?\n/);
-      carry = lines.pop();
-      for (const l of lines) onLine(l);
-    }
-    if (carry) onLine(carry);
-  } finally { fs.closeSync(fd); }
-}
 
 /** Scan the range `from..to` of `cwd`: {ok, findings, files}. The diff is written to a temp file and read
  *  in chunks, never held whole in a spawn buffer (a 64 MB overflow read as `scan failed: git diff failed`). */
@@ -442,8 +425,7 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   } catch (error) { return unavailable(String(error?.message ?? error)); }
 }
 
-const canonical = (p) => { const resolved = path.resolve(p); try { return fs.realpathSync.native(resolved); } catch { return resolved; } };
-const repoKey = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
+const repoKey = (p) => foldCase(realPath(p));
 
 /**
  * The app repository the ledger owner `repo` binds in work.json. [] when no

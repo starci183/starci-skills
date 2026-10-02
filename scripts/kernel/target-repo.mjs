@@ -9,12 +9,9 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { readModuleJson, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
+import { foldCase, realPath } from '../lib/path-key.mjs';
 
-const canonical = (value) => {
-  const resolved = path.resolve(value);
-  try { return fs.realpathSync.native(resolved); } catch { return resolved; }
-};
-const key = (value) => (process.platform === 'win32' ? canonical(value).toLowerCase() : canonical(value));
+const key = (value) => foldCase(realPath(value));
 const samePath = (a, b) => key(a) === key(b);
 
 

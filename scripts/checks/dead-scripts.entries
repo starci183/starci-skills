@@ -8,7 +8,6 @@ scripts/checks/check-example-architecture.mjs	CLI run by the owner (RED14: the e
 scripts/checks/check-example-derived.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
 scripts/example/example-evidence.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); specs read it
 scripts/example/example-verify.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
-scripts/gates/hfs-sync.mjs	gate CLI that a product repository runs (docs/application-stacks.md); specs read it
 scripts/gates/repo-presentation.mjs	gate CLI that a product repository runs (docs/repo-presentation.md); no spec
 scripts/kernel/launch-smoke.mjs	release smoke run by the owner (docs/releasing.md); specs read it
 scripts/route/route-op.mjs	routing CLI named by the op prompts (docs/ops.md); no spec

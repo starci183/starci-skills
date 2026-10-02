@@ -28,6 +28,8 @@ import { openLedgerReader, ledgerFileFor } from '../../../engine/db/ledger.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { positiveNumber } from '../../lib/number.mjs';
+import { productLedgers } from '../../lib/ledgers.mjs';
 import { stallFindings, peerWaits, ownerGates, namedWorkflows, lastProgress, apiFrontier } from '../../supervisor/stall.mjs';
 import { openAsks } from '../../supervisor/poll.mjs';
 import { progressSettings } from '../../kernel/progress-rca.mjs';
@@ -56,7 +58,7 @@ const DEFAULT_ROUTES = ['incident-raised', 'incident-resolved', 'ask-serving', '
 
 /* ------------------------------------------------------------------------------------------------ settings */
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+const num = (v, d) => positiveNumber(v, d, { orZero: true });
 
 /** modules/reconciler/workflow.yaml + the runtimes.yaml numbers it cites. Never throws (defaults on a bad file). */
 export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, catalog = null } = {}) {
@@ -92,7 +94,6 @@ export function parseKey(key) {
 }
 export const workflowEntity = (ledgerId, workflowId) => `workflow:${ledgerId}:${workflowId}`;
 export const stuckPrefix = (ledgerId, workflowId) => `stuck:${ledgerId}:${workflowId}:`;
-const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l && l.ledgerId !== SUPERVISOR_LEDGER && l.file);
 const evWorkflow = (ev) => ev?.workflowId ?? ev?.workflow_id ?? null;
 const evLedger = (ev) => ev?.ledgerId ?? ev?.ledger_id ?? null;
 

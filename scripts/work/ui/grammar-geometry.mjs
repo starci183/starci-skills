@@ -23,6 +23,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { flag as argOf } from '../work-io.mjs';
 import { walkFiles } from '../../lib/walk.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { readEnv } from '../../lib/env.mjs';
+import { readJsonFile } from '../../lib/json.mjs';
+import { alphaOver } from '../../lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
@@ -390,7 +393,7 @@ function substitute(value, lookup, level, trace, depth = 0) {
 // Source discovery
 // ---------------------------------------------------------------------------------------------------------
 
-const versionOf = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version ?? '0.0.0'; } catch { return '0.0.0'; } };
+const versionOf = (dir) => readJsonFile(path.join(dir, 'package.json'))?.version ?? '0.0.0';
 const semverDesc = (a, b) => {
   const pa = String(a.version).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
   const pb = String(b.version).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
@@ -791,7 +794,7 @@ export function normalizeShadowText(value) {
 
 /** Playwright's chromium, resolved from the product repo first (the way .claude runs the project's own Playwright). */
 export async function loadChromium(repo) {
-  const bases = [repo, ROOT, process.env.STARCI_PLAYWRIGHT_DIR].filter(Boolean).map((d) => path.join(path.resolve(d), 'package.json'));
+  const bases = [repo, ROOT, readEnv('STARCI_PLAYWRIGHT_DIR')].filter(Boolean).map((d) => path.join(path.resolve(d), 'package.json'));
   for (const base of bases) for (const name of ['playwright', '@playwright/test', 'playwright-core']) {
     let resolved;
     try { resolved = createRequire(base).resolve(name); } catch { continue; }
@@ -924,7 +927,7 @@ const CONTROL_TAGS = new Set(['button', 'input', 'select', 'textarea', 'a', 'lab
 const INPUT_SKIP = new Set(['checkbox', 'radio', 'range', 'hidden', 'submit', 'button', 'reset', 'file', 'color', 'image']);
 export const alphaOf = (c) => (c ? c[3] : 0);
 export const sameColor = (a, b, tol = 3) => Boolean(a && b) && Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol && Math.abs(a[3] - b[3]) <= 0.03;
-const over = (top, under) => { const a = top[3]; return [0, 1, 2].map((k) => Math.round(top[k] * a + under[k] * (1 - a))).concat([1]); };
+
 
 /** Index a snapshot: children, ancestors, composed backgrounds and the classified elements. */
 export function readSnapshot(snap) {
@@ -936,10 +939,10 @@ export function readSnapshot(snap) {
   const pageBg = [snap.root.bodyBg, snap.root.htmlBg].find((c) => c && c[3] > 0) ?? [255, 255, 255, 1];
   const composed = new Map();
   const bgOf = (e) => {
-    if (!e) return alphaOf(pageBg) >= 1 ? pageBg : over(pageBg, [255, 255, 255, 1]);
+    if (!e) return alphaOf(pageBg) >= 1 ? pageBg : alphaOver(pageBg, [255, 255, 255, 1]);
     if (composed.has(e.i)) return composed.get(e.i);
     const under = bgOf(e.parent != null ? byI.get(e.parent) : null);
-    const own = e.style.bg && alphaOf(e.style.bg) > 0 ? over(e.style.bg, under) : under;
+    const own = e.style.bg && alphaOf(e.style.bg) > 0 ? alphaOver(e.style.bg, under) : under;
     composed.set(e.i, own);
     return own;
   };

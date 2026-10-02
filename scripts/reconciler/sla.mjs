@@ -27,6 +27,9 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { readSupervisor, supervisorEvent } from '../machine/home.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { dotGet } from '../lib/dot-path.mjs';
+import { hasTable as sqliteHasTable } from '../lib/sqlite.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -40,8 +43,8 @@ export const CLEAR_REPORT_WINDOW_MS = 7 * 86_400_000;
 
 /* ------------------------------------------------------------------------------------------------ catalogue */
 
-const dotted = (root, key) => String(key).split('.').reduce((node, k) => (node == null ? node : node[k]), root);
-const positiveOrZero = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null);
+const dotted = dotGet;
+const positiveOrZero = (v) => positiveNumber(v, null, { orZero: true });
 
 /**
  * The catalogue with every number resolved: {passMs, codes: {CODE: {slaMs, criticalMs, severity, owner, autoAction,
@@ -316,7 +319,7 @@ export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
 export const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
 const TRANSCRIPT_WINDOW_MS = 86_400_000;
 const TRANSCRIPT_LIMIT = 200;
-const hasTable = (db, name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name=?").get(name));
+const hasTable = (db, name) => sqliteHasTable(db, name, { views: true });
 
 /** The closed attempts of one ledger that lack a transcript: [{attemptId, workflowId, closedAt}]. Pure over the handle. */
 export function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {

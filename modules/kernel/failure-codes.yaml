@@ -10020,6 +10020,17 @@ retry-exists:
   nextStep_vi: "Kernel sửa job thử lại đang chờ (mở rộng phạm vi hoặc tham số) thay vì tạo job mới."
   owner: op-retry
   kind: verb-refusal
+retry-lineage-invalid:
+  title: "Retry does not follow the latest failed try"
+  title_vi: "Lần thử lại không nối tiếp lần thử thất bại gần nhất"
+  meaning_vi: "Lệnh thử lại trỏ tới một lần thử không phải lần mới nhất của đơn vị công việc, hoặc lần thử đó chưa thất bại."
+  causes_vi:
+    - "Tham số --retry-of trỏ tới lần thử cũ"
+    - "Lần thử gần nhất đang chạy hoặc đã thành công"
+    - "Đơn vị công việc chưa có lần thử nào"
+  nextStep_vi: "Lệnh bị từ chối và không ghi gì; chạy lại với --retry-of là lần thử thất bại gần nhất của đơn vị đó."
+  owner: supervisor
+  kind: verb-refusal
 retry-of-foreign:
   title: "Retry target is not an earlier job of this op"
   title_vi: "Job thử lại không thuộc op này"
@@ -10432,6 +10443,16 @@ unit-done:
   nextStep_vi: "Lệnh bị từ chối; không cần làm gì thêm cho đơn vị này."
   owner: op-retry
   kind: verb-refusal
+unit-in-flight:
+  title: "Work unit already has an open try"
+  title_vi: "Đơn vị công việc đã có một lần thử đang mở"
+  meaning_vi: "Đơn vị công việc còn một lần thử chưa kết thúc nên không mở thêm lần thử mới."
+  causes_vi:
+    - "Lần thử trước còn đang chạy hoặc chờ"
+    - "Lệnh chạy lại được gọi quá sớm"
+  nextStep_vi: "Lệnh bị từ chối; sửa lần thử đang mở (api graph-edit) hoặc đợi nó kết thúc rồi chạy lại."
+  owner: supervisor
+  kind: verb-refusal
 unit-not-admitted:
   title: "Work unit not admitted"
   title_vi: "Đơn vị việc chưa được nhận"
@@ -10449,6 +10470,16 @@ unit-overlaps-failed-unit:
     - "Tạo job mới thay vì thử lại đơn vị cũ"
   nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua api graph-edit."
   owner: op-retry
+  kind: verb-refusal
+unit-try-budget-exhausted:
+  title: "Work unit spent its try budget"
+  title_vi: "Đơn vị công việc đã dùng hết ngân sách thử"
+  meaning_vi: "Số lần thử của đơn vị công việc đã chạm ngân sách đã khai báo nên không có lần thử nào nữa."
+  causes_vi:
+    - "Đơn vị thất bại nhiều lần liên tiếp"
+    - "Ngân sách thử đặt quá thấp"
+  nextStep_vi: "Lệnh bị từ chối; chủ dự án hoặc Supervisor quyết định nâng ngân sách (api unit --raise-budget), không tự thử thêm."
+  owner: supervisor
   kind: verb-refusal
 unit-unknown:
   title: "Work unit not found"

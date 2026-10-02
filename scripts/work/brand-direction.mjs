@@ -26,14 +26,14 @@
 // the rubric is `brand.direction.rubric.checks`; the reference renders are `brand.direction.golden`.
 // scripts/work/brand/brand.mjs `direction` re-checks every acceptance against the owner receipt on disk.
 import fs from 'node:fs';
-import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
+import { readAnswerReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import {
   DIRECTION_ARCHETYPES, DIRECTION_DECISIONS, DIRECTION_REVIEW_KIND, DIRECTION_REVIEW_SCHEMA, OWNER_ANSWER_SCHEMA, readBrandRecord,
 } from './brand/brand.mjs';
-import { flag, sha256File, slash, writeRecordFile } from './work-io.mjs';
+import { flag, reviewMain, sha256File, slash, writeRecordFile } from './work-io.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { translator } from '../lib/i18n.mjs';
 
@@ -191,14 +191,7 @@ export function promoteGolden(work, { uiDir, archetype, parts, receiptFile, html
 export function applyDirectionReview(work, receiptFile, { write = false } = {}) {
   const loaded = loadDirection(work);
   const { direction, repoRoot, record, file } = loaded;
-  // The receipt is the blob serve-ask stored (ask-receipts.mjs: receiptPath, or `blob:<sha256>`); a Work record cites
-  // it as blob:<sha256>. A path inside the repository is still read (an example tree's own receipt).
-  const receiptAbs = receiptFileOf(String(receiptFile), { base: process.cwd() }) ?? path.resolve(String(receiptFile));
-  const receiptRel = receiptRefOf(receiptAbs, repoRoot);
-  if (!isBlobFile(receiptAbs) && (receiptRel.startsWith('../') || path.isAbsolute(receiptRel))) throw new Error(`receipt ${slash(receiptFile)} is neither a stored answer (blob:<sha256>, the receiptPath serve-ask returned) nor a file inside the repository ${slash(repoRoot)}`);
-  let receipt;
-  try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
-  if (receipt?.schema !== OWNER_ANSWER_SCHEMA) throw new Error(`${slash(receiptFile)} is ${receipt?.schema ?? 'not a receipt'}, not ${OWNER_ANSWER_SCHEMA}`);
+  const { receipt, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot, schema: OWNER_ANSWER_SCHEMA });
   const review = receipt.review;
   if (review?.schema !== DIRECTION_REVIEW_SCHEMA) throw new Error(`the receipt of ask ${receipt.dispatchId ?? '?'} carries no direction review (question.review): park the brand-direction-review ask (brand-direction.mjs question) and apply its answer`);
   const archetype = review.archetype;
@@ -252,33 +245,28 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
 }
 
 export function brandDirectionMain(argv = []) {
-  const [command, ...args] = argv;
-  const json = args.includes('--json');
-  const work = flag(args, '--work');
   const usage = 'Usage: node scripts/work/brand-direction.mjs <status|question|apply> --work <tree> [--archetype <name>] [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
-  if (!['status', 'question', 'apply'].includes(command) || !work) return { exitCode: 2, text: usage };
-  try {
-    if (command === 'status') {
+  return reviewMain(argv, {
+    targetFlag: '--work', usage, tag: 'brand-direction',
+    status: (work) => {
       const s = directionStatus(work);
-      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `brand.direction rev ${s.rev} (${s.status}): ready ${s.ready.join(', ') || 'none'}; missing ${s.missing.join(', ') || 'none'}\n` };
-    }
-    if (command === 'question') {
+      return { result: s, text: `brand.direction rev ${s.rev} (${s.status}): ready ${s.ready.join(', ') || 'none'}; missing ${s.missing.join(', ') || 'none'}\n` };
+    },
+    question: (work, args) => {
       const archetype = flag(args, '--archetype');
       if (!archetype) return { exitCode: 2, text: usage };
-      return { exitCode: 0, text: `${JSON.stringify(directionReviewQuestion(work, { archetype, lang: flag(args, '--lang') ?? 'en' }), null, 2)}\n` };
-    }
-    const receipt = flag(args, '--receipt');
-    if (!receipt) return { exitCode: 2, text: usage };
-    const r = applyDirectionReview(work, receipt, { write: args.includes('--write') });
-    const text = r.decision === 'revise'
-      ? `the owner asked for a revision of ${r.archetype} (ask ${r.dispatchId}); nothing written. Brief: ${r.brief}`
-      : r.provisional
-        ? `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype}.provisional (autopilot, ask ${r.provisional.acceptedBy}, receipt ${r.provisional.receipt}); the status stays proposed until the owner reviews it at handover`
-        : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
-    return { exitCode: 0, text: json ? `${JSON.stringify(r, null, 2)}\n` : `${text}\n` };
-  } catch (error) {
-    return { exitCode: 1, text: `brand-direction: ${error.message}\n` };
-  }
+      return { result: directionReviewQuestion(work, { archetype, lang: flag(args, '--lang') ?? 'en' }) };
+    },
+    apply: (work, receipt, args) => {
+      const r = applyDirectionReview(work, receipt, { write: args.includes('--write') });
+      const text = r.decision === 'revise'
+        ? `the owner asked for a revision of ${r.archetype} (ask ${r.dispatchId}); nothing written. Brief: ${r.brief}`
+        : r.provisional
+          ? `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype}.provisional (autopilot, ask ${r.provisional.acceptedBy}, receipt ${r.provisional.receipt}); the status stays proposed until the owner reviews it at handover`
+          : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} brand.direction.archetypes.${r.archetype} accepted in ask ${r.acceptance.acceptedBy} (receipt ${r.acceptance.receipt})`;
+      return { result: r, text: `${text}\n` };
+    },
+  });
 }
 
 if (isMain(import.meta.url)) {

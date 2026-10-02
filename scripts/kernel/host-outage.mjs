@@ -21,10 +21,11 @@ import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalList as defaultList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { readEnv } from '../lib/env.mjs';
 
 // The windows are modules/models/runtimes.yaml allocation.hostOutage; the env names are a spec's seam.
 const envMs = (name, key) => {
-  const declared = allocationMs(key), value = Number(process.env[name]);
+  const declared = allocationMs(key), value = Number(readEnv(name));
   return Number.isFinite(value) && value >= 0 ? value : declared;
 };
 // How long one watchdog tick waits for an unavailable Orca to answer again.

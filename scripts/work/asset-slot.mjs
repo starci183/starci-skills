@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { sha256File } from '../../engine/digest.mjs';
+import { openEventItems } from '../../engine/db/ledger.mjs';
 import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from './draw/draw-dna.mjs';
 import { isDir, isFile, slash } from './work-io.mjs';
 
@@ -226,19 +227,10 @@ export function recordAssetSlots(ledger, { job, repo, files, now = Date.now() })
 
 /** The workflow's open asset slots (owed, not filled since): [{key, id, ui, html, request, jobId, opId, owedAt}]. */
 export function openAssetSlots(db, workflowId) {
-  let rows = [];
-  try {
-    rows = db.prepare('SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId, ASSET_SLOT_OWED, ASSET_SLOT_FILLED);
-  } catch { return []; }
-  const open = new Map();
-  for (const row of rows) {
-    let p = {};
-    try { p = JSON.parse(row.payload_json ?? '{}') ?? {}; } catch { p = {}; }
-    if (!p.key) continue;
-    if (row.kind === ASSET_SLOT_FILLED) { open.delete(p.key); continue; }
-    open.set(p.key, { key: p.key, id: p.id ?? null, ui: p.ui ?? null, html: p.html ?? null, request: p.request ?? null, requested: p.requested !== false, jobId: p.jobId ?? null, opId: p.opId ?? null, owedAt: row.created_at });
-  }
-  return [...open.values()];
+  return openEventItems(db, workflowId, {
+    owedKind: ASSET_SLOT_OWED, resolvedKind: ASSET_SLOT_FILLED, keyOf: (p) => p.key,
+    item: (p, row) => ({ key: p.key, id: p.id ?? null, ui: p.ui ?? null, html: p.html ?? null, request: p.request ?? null, requested: p.requested !== false, jobId: p.jobId ?? null, opId: p.opId ?? null, owedAt: row.created_at }),
+  });
 }
 
 function main(argv) {

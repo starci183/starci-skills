@@ -16,7 +16,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findStackDeclaration } from '../../lib/stack-declaration.mjs';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
+import { propertyText } from '../../lib/ts-ast.mjs';
 import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
 import { found, readText } from './read.mjs';
 
@@ -43,10 +44,7 @@ const USE_TEST_WORLD = /\buseTestWorld\s*\(/;
 const servicesOf = (repo) => (repo.sides?.be?.apps ?? []).filter((app) => SERVICE_KINDS.has(app.kind));
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 // ------------------------------------------------------------------------------------------------ R163 placement
 
@@ -169,14 +167,7 @@ export function eventContractFindings({ repoRoot, files }) {
 
 /** The class an expression names, from `readonly event = <Class>` of a consumer: the identifier, or null. */
 function consumedClassOf(ts, text) {
-  const sourceFile = ts.createSourceFile('consumer.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  let name = null;
-  const visit = (node) => {
-    if (ts.isPropertyDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'event' && node.initializer && ts.isIdentifier(node.initializer)) name = node.initializer.text;
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return name;
+  return propertyText(ts, text, { file: 'consumer.ts', key: 'event', declaration: true, kind: 'identifier' });
 }
 
 /** The events the consumers consume: `[{ file, className, service, event }]` from `readonly event = <EventClass>` of every `transport/message/*.consumer.ts`. */

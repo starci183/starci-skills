@@ -36,6 +36,7 @@ import { log as gitLog } from '../api/git/log.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { isoOr } from '../lib/time.mjs';
 import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { resolveIncident } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
@@ -118,7 +119,7 @@ const PEER_MESSAGE = 'peer-message';
 const GIT_TIMEOUT_MS = 10_000;
 
 const invalid = (detail) => Object.assign(new Error(detail), { code: 'until-invalid' });
-const iso = (ms) => (Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : '?');
+const iso = (ms) => isoOr(ms, '?');
 
 /** One raw `--until-<type> <spec>` into its stored shape, or a thrown until-invalid. */
 export function parseCondition(type, raw) {

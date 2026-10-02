@@ -47,6 +47,8 @@ import { lsFiles } from '../api/git/ls-files.mjs'; import { revParseQuery } from
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { isSpecRun } from '../lib/env.mjs';
+import { orcaUserData } from './host-agents.mjs';
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
@@ -58,12 +60,7 @@ const ATTEMPTS = 5;
 /** Orca's CODEX_HOME: <Electron userData>/codex-runtime-home/home, resolved the way Orca does. */
 export function orcaCodexHome({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
   if (env.STARCI_ORCA_CODEX_HOME) return env.STARCI_ORCA_CODEX_HOME;
-  const appData = platform === 'win32'
-    ? (env.APPDATA || path.join(home, 'AppData', 'Roaming'))
-    : platform === 'darwin'
-      ? path.join(home, 'Library', 'Application Support')
-      : (env.XDG_CONFIG_HOME || path.join(home, '.config'));
-  return path.join(appData, 'orca', 'codex-runtime-home', 'home');
+  return path.join(orcaUserData({ env, platform, home }), 'codex-runtime-home', 'home');
 }
 
 /**
@@ -73,7 +70,7 @@ export function orcaCodexHome({ env = process.env, platform = process.platform, 
  */
 export function trustTargets({ env = process.env, platform = process.platform } = {}) {
   const root = env.STARCI_AGENT_TRUST_HOME || null;
-  if (!root && env.NODE_TEST_CONTEXT)
+  if (!root && isSpecRun(env))
     return { skipped: 'a test process writes agent trust only under STARCI_AGENT_TRUST_HOME' };
   const home = root || os.homedir();
   const claudeDir = !root && env.CLAUDE_CONFIG_DIR ? env.CLAUDE_CONFIG_DIR : null;

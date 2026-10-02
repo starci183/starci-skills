@@ -4,6 +4,7 @@
 // (sides, app kinds) and refuses a manifest whole on any problem (HFS_MANIFEST_INVALID). Pure: every function takes a
 // parsed manifest or slot and returns a list of problems in the words of modules/schemas/hfs-slots.schema.yaml.
 import { isPlainObject } from '../../engine/plain-object.mjs';
+import { stringList } from '../lib/list.mjs';
 
 export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
@@ -54,7 +55,7 @@ export const RUNTIME_KIND = 'runtime';
 export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 /** The kind of a parsed manifest: `kind`, or app when absent (knowledge/hfs/slots.yaml carries none). */
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
-export const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
+export const strList = (v) => stringList(v);
 
 const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */

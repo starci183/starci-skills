@@ -9,6 +9,9 @@ import {SETTLED_JOB_LIST} from '../admission.mjs';
 import {putBlob,blobPath} from './blob.mjs';
 import {redactData,redactText} from '../../scripts/lib/redact.mjs';
 import {isBusyError,isUnderTempDir,localProjectsRoot,machineFileFor,newSpanId,newTraceId,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine.mjs';
+import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
+import { pathKey } from '../../scripts/lib/path-key.mjs';
+import { hasTable as sqliteHasTable, insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 // The machine-side path helpers have one definition (engine/db/machine.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
@@ -67,14 +70,16 @@ const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
 const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
   &&fs.existsSync(path.join(root,'engine','db','ledger.mjs'));
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
+/** True when `root` is a repository with a ledger on this host (the runtime checkout itself never is one). */
+export const hasLedger=(root)=>{try{return !isRuntimeRoot(root)&&fs.existsSync(ledgerFileFor(root));}catch{return false;}};
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
-const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
+const normDir=file=>pathKey(file,{fold:true});
 /** %LOCALAPPDATA%/StarCi/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
   const root=localProjectsRoot(env);
-  if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
+  if(isSpecRun(env)&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
   return root;
 };
 /** The normalized identity of a repository root: resolved, realpath when it exists, forward slashes, lower case. */
@@ -187,7 +192,7 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
 const makeTransaction=(db,label)=>{let inside=false;const tx=fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
-const hasTable=(db,name)=>Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
+const hasTable=(db,name)=>sqliteHasTable(db,name);
 /** True when the ledger `db` holds `table`. */
 export const hasLedgerTable=hasTable;
 /** True when `table` of the ledger `db` has `column`. */
@@ -222,7 +227,7 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     const id=ledgerId??(UUID.test(dirId)?dirId:crypto.randomUUID());
     const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
     const meta={ledger_id:id,schema:LEDGER_SCHEMA,created_at:String(at),journal_mode:journalMode.toLowerCase(),sqlite_version:sqliteVersion,
-      blob_root:path.resolve(process.env.STARCI_ARTIFACT_ROOT||path.join(os.homedir(),'.starci','artifacts')),runtime_rev:runtimeRev()};
+      blob_root:path.resolve(readEnv('STARCI_ARTIFACT_ROOT')||path.join(os.homedir(),'.starci','artifacts')),runtime_rev:runtimeRev()};
     if(repoRoot)meta.repo_root=path.resolve(repoRoot);
     if(product)meta.product=product;
     for(const [k,v] of Object.entries(meta))if(v!=null)seed.run(k,String(v));
@@ -331,11 +336,7 @@ function toColumns(db,table,fields){
   }
   return out;
 }
-function insertRow(db,table,fields,{orIgnore=false}={}){
-  const pairs=toColumns(db,table,fields);
-  const sql=`INSERT ${orIgnore?'OR IGNORE ':''}INTO ${table}(${pairs.map(p=>p[0]).join(',')}) VALUES(${pairs.map(()=>'?').join(',')})`;
-  return db.prepare(sql).run(...pairs.map(p=>p[1]));
-}
+const insertRow=insertRowWith(toColumns);
 function updateRow(db,table,where,fields){
   const pairs=toColumns(db,table,fields),keys=toColumns(db,table,where);
   if(!pairs.length)return {changes:0};
@@ -393,6 +394,26 @@ export function verifyEventChain(db,workflowId){
     prev=row.digest;
   }
   return {ok:true,count,brokenAt:null};
+}
+/**
+ * The workflow's open items of an owed/resolved event pair (grammar proposals, asset slots): replay the kinds in seq
+ * order — a `resolvedKind` row deletes the item `keyOf` names, an `owedKind` row sets `item(payload,row)`; a row
+ * whose key is falsy is skipped. Returns the open items in first-seen order, [] when the table cannot be read.
+ */
+export function openEventItems(db,workflowId,{owedKind,resolvedKind,keyOf,item}){
+  let rows=[];
+  try{rows=db.prepare('SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq').all(workflowId,owedKind,resolvedKind);}
+  catch{return[];}
+  const open=new Map();
+  for(const row of rows){
+    let p={};
+    try{p=JSON.parse(row.payload_json??'{}')??{};}catch{p={};}
+    const key=keyOf(p);
+    if(!key)continue;
+    if(row.kind===resolvedKind){open.delete(key);continue;}
+    open.set(key,item(p,row));
+  }
+  return[...open.values()];
 }
 
 // --- workflows, lifecycle, goals ----------------------------------------------------------------------------

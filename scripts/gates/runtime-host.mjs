@@ -6,13 +6,14 @@
 // identity, never from the folder this runtime tree happens to sit in: a lane worktree of the runtime
 // (<lanes root>/<lane>/<name>) resolves to the same host as the main checkout. STARCI_SOURCE_ROOT overrides it.
 import path from 'node:path';
-import { skillRoot } from '../../engine/runtime-root.mjs';
+import { skillRoot, starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 import { repositoryHome, repositoryName } from '../hfs/repo-identity.mjs';
 
 /** The repository hosting this runtime: STARCI_SOURCE_ROOT, else the folder holding the runtime's main checkout. */
 export function runtimeHostRoot(env = process.env) {
-  return env.STARCI_SOURCE_ROOT ? path.resolve(env.STARCI_SOURCE_ROOT) : path.dirname(repositoryHome(skillRoot));
+  if (env.STARCI_SOURCE_ROOT) return starciSourceRoot(env);
+  return path.dirname(repositoryHome(skillRoot));
 }
 
 const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);

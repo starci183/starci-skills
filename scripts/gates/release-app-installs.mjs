@@ -18,6 +18,7 @@ import { runNpx } from '../api/npm/run-npx.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { nextBuildEnv } from '../lib/build-env.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
@@ -43,7 +44,7 @@ try {
   step(`npx ${pinned('@starci/hfs')} scaffold app release-app`, runNpx, ['-y', '-p', pinned('@starci/hfs'), '-p', pinned('@starci/jest-preset'), 'hfs', 'scaffold', 'app', 'release-app', '--into', into], { cwd: into });
   const lock = fs.existsSync(path.join(app, 'package-lock.json'));
   step(lock ? 'npm ci (registry)' : 'npm install (registry)', runNpm, [lock ? 'ci' : 'install', '--no-audit', '--no-fund'], { cwd: app });
-  const env = { ...process.env, STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
+  const env = { ...nextBuildEnv(), STARCI_APP_INSTALLS: path.join(app, 'node_modules'), STARCI_REQUIRE_APP_INSTALLS: '1' };
   const r = runNode(['--test', path.join(root, 'tests/packages-hfs/hfs-scaffold-app.spec.mjs')], { cwd: root, env, stdio: 'inherit' });
   exit = r.status ?? 1;
   console.log(exit === 0 ? 'release-app-installs: OK (scaffold lint, typecheck and api boot ran against fresh registry installs)' : `release-app-installs: FAILED (spec exit ${exit})`);

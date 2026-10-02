@@ -14,11 +14,10 @@
 //                                reason: a string or template literal in the call or option, or an identifier/member whose
 //                                one-hop definition in the file holds one. A silent skip passes without running; a skip
 //                                that stays says what is missing and what provisions it.
-import fs from 'node:fs';
-import path from 'node:path';
-import { lsFiles } from '../api/git/ls-files.mjs';
+import { trackedTextFiles } from '../lib/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { runCheckCli } from '../lib/check-cli.mjs';
 import { lineOf, parseSource, ts } from '../hfs/runtime-rules/source-ast.mjs';
 
 export const SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui']);
@@ -135,18 +134,10 @@ export function specFindings(files) {
 
 /** Run the check on the runtime at `root`. */
 export function checkSpecs(root = skillRoot) {
-  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
-  const files = tracked.filter((rel) => SPEC.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && fs.existsSync(path.join(root, rel)))
-    .map((rel) => ({ rel, text: fs.readFileSync(path.join(root, rel), 'utf8') }));
+  const files = trackedTextFiles(root, (rel) => SPEC.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel));
   return specFindings(files);
 }
 
 if (isMain(import.meta.url)) {
-  const findings = checkSpecs();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: no spec reads implementation text and every skip says why.');
-  }
-  process.exit(findings.length ? 1 : 0);
+  runCheckCli(checkSpecs(), 'OK: no spec reads implementation text and every skip says why.');
 }

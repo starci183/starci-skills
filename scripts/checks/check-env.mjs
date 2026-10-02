@@ -18,13 +18,15 @@
 // in the same file counts too.
 import fs from 'node:fs';
 import path from 'node:path';
-import { lsFiles } from '../api/git/ls-files.mjs';
+import { trackedTextFiles } from '../lib/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { runCheckCli } from '../lib/check-cli.mjs';
 import { lineOf, parseSource, ts } from '../hfs/runtime-rules/source-ast.mjs';
 
 export const CATALOG_FILE = 'modules/schemas/env.yaml';
+const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const ENV_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 export const KINDS = Object.freeze(['config', 'seam', 'handoff', 'host']);
 const TEST_RUNNER_VARIABLE = 'NODE_TEST_CONTEXT';
@@ -87,9 +89,9 @@ export function parseCatalog(text) {
 
 /**
  * The findings of a source set: [{code, path, line, message}]. files: [{rel, text}] (the runtime sources among them are
- * judged); catalog: parseCatalog(...).
+ * judged); catalog: parseCatalog(...); failureCodes: the names of modules/kernel/failure-codes.yaml (a STARCI_* refusal code is not a variable).
  */
-export function envFindings(files, catalog) {
+export function envFindings(files, catalog, failureCodes = new Set()) {
   const findings = [];
   const known = new Set(Object.keys(catalog.variables));
   const seen = new Set();
@@ -105,6 +107,7 @@ export function envFindings(files, catalog) {
     }
     for (const d of facts.dynamic) if (d.direct && !owner) findings.push({ code: 'RT_ENV_READ_OUTSIDE_OWNER', path: rel, line: d.line, message: `a name computed at run time is read straight from process.env in ${rel}: read it through ${catalog.reader} (readEnv)` });
     for (const m of facts.mentions) {
+      if (failureCodes.has(m.name)) continue; // a refusal code spelled STARCI_*, owned by the failure-code catalog, not a variable
       seen.add(m.name);
       if (!known.has(m.name)) findings.push({ code: 'RT_ENV_UNCATALOGUED', path: rel, line: m.line, message: `${m.name} is an environment variable of the runtime and is not a variable of ${CATALOG_FILE}: add it with its purpose and kind` });
     }
@@ -118,19 +121,11 @@ export function envFindings(files, catalog) {
 
 /** Run the check on the runtime at `root`. */
 export function checkEnv(root = skillRoot) {
-  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
-  const files = tracked
-    .filter((rel) => rel.endsWith('.mjs') && !GENERATED.test(rel) && !VENDORED.test(rel) && fs.existsSync(path.join(root, rel)))
-    .map((rel) => ({ rel, text: fs.readFileSync(path.join(root, rel), 'utf8') }));
-  return envFindings(files, parseCatalog(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8')));
+  const files = trackedTextFiles(root, (rel) => rel.endsWith('.mjs') && !GENERATED.test(rel) && !VENDORED.test(rel));
+  const failureCodes = new Set(Object.keys(parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {}));
+  return envFindings(files, parseCatalog(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8')), failureCodes);
 }
 
 if (isMain(import.meta.url)) {
-  const findings = checkEnv();
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: findings.length === 0, findings }, null, 2));
-  else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line} ${f.message}`);
-    if (!findings.length) console.log('OK: every environment variable is catalogued and read through its owner.');
-  }
-  process.exit(findings.length ? 1 : 0);
+  runCheckCli(checkEnv(), 'OK: every environment variable is catalogued and read through its owner.');
 }

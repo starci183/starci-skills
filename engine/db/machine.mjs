@@ -37,6 +37,10 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { sleepSync as scaledSleepSync } from '../../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from './blob.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
+import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
+import { pathKey } from '../../scripts/lib/path-key.mjs';
+import { insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
+import { need as refuseUnless } from '../../scripts/lib/refuse.mjs';
 
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +76,7 @@ export const projectLedgerFile = (ledgerId, env = process.env) => {
 };
 /** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
 export const TEST_REGISTRY_ENV = 'STARCI_TEST_MACHINE_FILE';
-const normDir = (file) => path.resolve(String(file)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const normDir = (file) => pathKey(file, { fold: true });
 const tempDirsOf = (env = process.env) => [...new Set([os.tmpdir(), env.TEMP, env.TMP].filter(Boolean)
   .flatMap((dir) => { const out = [normDir(dir)]; try { out.push(normDir(fs.realpathSync.native(dir))); } catch { /* missing */ } return out; }))]
   .filter((dir) => !/^(?:[a-z]:)?$/.test(dir));
@@ -91,14 +95,14 @@ export function isUnderTempDir(file, { env = process.env, tempDirs = tempDirsOf(
 export const machineFileFor = (env = process.env) => {
   if (env[TEST_REGISTRY_ENV]) return path.resolve(env[TEST_REGISTRY_ENV]);
   const file = path.join(starciLocalRoot(env), 'machine.sqlite');
-  if (env.NODE_TEST_CONTEXT && !isUnderTempDir(file, { env })) return path.join(os.tmpdir(), 'starci-test-registry', 'machine.sqlite');
+  if (isSpecRun(env) && !isUnderTempDir(file, { env })) return path.join(os.tmpdir(), 'starci-test-registry', 'machine.sqlite');
   return file;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------------------------------------------------
-const need = (ok, message, code = 'STARCI_MACHINE_DB') => { if (!ok) throw Object.assign(Error(message), { code }); };
+const need = (ok, message, code = 'STARCI_MACHINE_DB') => refuseUnless(ok, message, code);
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 const hex = (bytes) => crypto.randomBytes(bytes).toString('hex');
 export const newTraceId = () => hex(16);
@@ -242,7 +246,7 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
  * 'unknown' sorts before every real rev.
  */
 export function runtimeRev() {
-  return process.env.STARCI_RUNTIME_REV ? String(process.env.STARCI_RUNTIME_REV) : 'unknown';
+  return readEnv('STARCI_RUNTIME_REV') ? String(readEnv('STARCI_RUNTIME_REV')) : 'unknown';
 }
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
@@ -370,11 +374,7 @@ function rowCells(db, table, row) {
   for (const [k] of entries) need(cols.has(k), `machine-db: ${table} has no column ${k}`);
   return entries;
 }
-function insertRow(db, table, row, { orIgnore = false } = {}) {
-  const entries = rowCells(db, table, row);
-  const sql = `INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO ${table}(${entries.map(([k]) => k).join(',')}) VALUES(${entries.map(() => '?').join(',')})`;
-  return db.prepare(sql).run(...entries.map(([, v]) => v));
-}
+const insertRow = insertRowWith(rowCells);
 function upsertRow(db, table, row, keys) {
   const entries = rowCells(db, table, row);
   const updates = entries.filter(([k]) => !keys.includes(k));

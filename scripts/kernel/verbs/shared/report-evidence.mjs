@@ -12,12 +12,14 @@ import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kind
 import { subkindOf } from '../../artifact-subkind.mjs';
 import { safeRemove } from '../../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../../machine/artifact-hold.mjs';
+import { refuse } from '../../../lib/refuse.mjs';
+import { resolvedKey } from '../../../lib/path-key.mjs';
 
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const slash = (s) => String(s).replace(/\\/g, '/');
-const keyOf = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
+
 const inside = (root, file) => {
-  const rel = path.relative(keyOf(root), keyOf(file));
+  const rel = path.relative(resolvedKey(root), resolvedKey(file));
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } };

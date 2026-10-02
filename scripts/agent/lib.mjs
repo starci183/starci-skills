@@ -15,7 +15,8 @@ import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWithDraft, wakeDeliveryOf,
-  WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS, collapse as squash } from '../lib/terminal-liveness.mjs';
+  WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../lib/terminal-liveness.mjs';
+import { squash } from '../lib/clip.mjs';
 import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
 import { hostAgentVerdict } from './host-agents.mjs';

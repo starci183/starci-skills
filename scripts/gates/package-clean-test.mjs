@@ -39,6 +39,7 @@ import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { diff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
+import { tailLines } from '../lib/clip.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -51,7 +52,7 @@ const NETWORK = /\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUN
 const USAGE = 'usage: package-clean-test.mjs [--changed <file>... | --base <rev>]';
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
-const tail = (text, n = 30) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
+const tail = (text, n = 30) => tailLines(text, n);
 
 /** The published packages: [{name, dir}] with `dir` runtime-relative (posix), from the starci pins that name a source. */
 export function publishSet(root = runtimeRoot) {

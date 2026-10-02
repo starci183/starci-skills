@@ -9,9 +9,10 @@
 import { AWAITING_OWNER_STATUS, UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
 import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/db/ledger.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { refuse } from '../lib/refuse.mjs';
 
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const pathsOf = (list) => (Array.isArray(list) ? list : []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim());
 const safeIntersect = (a, b) => { try { return ownedPathsIntersect(a, b); } catch { return a === b; } };
 

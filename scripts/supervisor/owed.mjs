@@ -74,6 +74,7 @@ import { guardReceiptErrors } from '../guards/hook-install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { shortHash } from '../lib/hash.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
@@ -329,7 +330,7 @@ export function classifyIncidents(db, { repo = null, ledgers = [], now = Date.no
 
 /* ------------------------------------------------------------ patterns with no incident */
 
-const hash = (s) => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 8);
+const hash = (s) => shortHash(s, { algo: 'sha1', n: 8 });
 const ownedPaths = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : []).map(String);
 const pathsKey = (payload) => JSON.stringify([...ownedPaths(payload)].sort());
 const bare = (p) => p.replace(/\\/g, '/').replace(/(\/\*\*?)+$/, '').replace(/\/+$/, '');

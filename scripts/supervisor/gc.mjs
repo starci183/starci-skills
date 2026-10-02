@@ -85,6 +85,7 @@ import { evictOverCap, spareInfo } from './lane-cap.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
@@ -105,21 +106,20 @@ const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
 const SHELL_TITLE = /^Terminal \d+$/;
 const PROMPT = /PS [A-Za-z]:\\[^>\r\n]*>/g;
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 /** The gc windows of runtimes.yaml allocation.housekeeping, with their defaults. */
 export function gcSettings(allocation = allocationSettings()) {
   const hk = allocation?.housekeeping ?? {};
   const gc = allocation?.gc ?? {};
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
-  return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
+  return { minAgeMs: positiveNumber(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: positiveNumber(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
     archiveRoot: archiveRootOf(), housekeeping: hk,
-    sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
-    leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
-    laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
+    sweepMs: positiveNumber(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
+    leaseMinAgeMs: positiveNumber(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: positiveNumber(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
+    laneLogRetentionMs: positiveNumber(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
     // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
-    laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
+    laneIdleMs: Math.max(positiveNumber(gc.laneIdleMs, DEFAULTS.laneIdleMs), positiveNumber(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
     // One pass judges lanes for at most laneBudgetMs, then resumes there; laneCap: most lanes that stay registered (lane-cap.mjs).
-    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
+    laneBudgetMs: positiveNumber(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: positiveNumber(gc.laneCap, DEFAULTS.laneCap) };
 }
 
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */

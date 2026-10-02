@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { words } from './dockerfile.mjs';
 
 /**
  * The services of a repository's own stack definition, read from `.starcistacks/application-stacks.yaml` and the compose
@@ -74,29 +75,6 @@ export const imagePathOf = image => {
 
 /** True when the image reference carries a tag or digest (an external image, not a placeholder of the repository's own build). */
 export const isTagged = image => image.includes('@') || image.slice(image.lastIndexOf('/') + 1).includes(':');
-
-/** The shell-like words of a compose `command` string, double and single quotes grouping a word. */
-const words = text => {
-  const out = [];
-  let current = '';
-  let quote = null;
-  let started = false;
-  for (const char of text) {
-    if (quote) {
-      if (char === quote) quote = null;
-      else current += char;
-    } else if (char === '"' || char === "'") {
-      quote = char;
-      started = true;
-    } else if (/\s/u.test(char)) {
-      if (started || current) out.push(current);
-      current = '';
-      started = false;
-    } else current += char;
-  }
-  if (started || current) out.push(current);
-  return out;
-};
 
 const asList = value => (Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]);
 

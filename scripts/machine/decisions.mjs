@@ -28,8 +28,10 @@ import { runNode } from '../api/node/run-node.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
+import { refuse as refuseError } from '../lib/refuse.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
 import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { oneLine } from '../lib/clip.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -58,8 +60,8 @@ export const RING_MIN_GAP_MS = 2 * 60_000;
 export const RING_TAG = '[decide]';
 const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFrom'];
 
-const one = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-export const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+const one = (s, n = 300) => oneLine(s, n);
+export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
 export const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(`${workflowId}\0${key}`).digest('hex').slice(0, 8)}`;
 const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
 

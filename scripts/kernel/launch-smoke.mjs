@@ -58,6 +58,10 @@ import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { writeJsonFile } from '../lib/json.mjs';
+import { valueAfter } from '../lib/cli-arg.mjs';
+import { bestEffortCall, bestEffortCallAsync } from '../agent/best-effort-call.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -145,15 +149,14 @@ const SMOKE_CALLS = { 'rev-parse': revParseQuery, 'ls-files': lsFiles, status: g
 export const stateParentOf = (tmp = os.tmpdir()) => path.join(tmp, 'starci-launch-smoke');
 const dirs = (state) => ({ agents: path.join(state, 'agents'), stages: path.join(state, 'stages'), results: path.join(state, 'results') });
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-const writeJson = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`); };
 const agentFile = (state, role) => path.join(dirs(state).agents, `${role}.json`);
 const stageFile = (state, role) => path.join(dirs(state).stages, `${role}.json`);
 const resultFile = (state, role) => path.join(dirs(state).results, `${role}.txt`);
 const planFile = (state) => path.join(state, 'plan.json');
 export const planOf = (state) => readJson(planFile(state));
 export const agentOf = (state, role) => readJson(agentFile(state, role));
-const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
-const settleAsync = async (fn) => { try { return await fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const settle = bestEffortCall;
+const settleAsync = bestEffortCallAsync;
 
 // ------------------------------------------------------------------ the workflow worktree
 /** The app-relative file an op role owns in the workflow worktree. */
@@ -238,7 +241,7 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
   const prompt = noopSpec({ role, script });
   const { title } = ROLES[role];
   const objective = `${SMOKE_SCHEMA} ${role}`;
-  const record = (extra) => writeJson(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
+  const record = (extra) => writeJsonFile(agentFile(state, role), { ...(agentOf(state, role) ?? {}), role, creatorTerminal: entry, ...extra });
   const onCreated = (terminal, dispatchId) => record({ terminal, dispatchId });
   const route = { provider: noop.provider, model: noop.model, effort: noop.effort };
   const request = { smoke: state, role }; let launched; // request: the launch's ledger identity (calls.yaml replay: request)
@@ -323,7 +326,7 @@ export function markResult({ role, state, now = Date.now }) {
  */
 export async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, holdMs = 0, sleep = defaultSleep, now = Date.now }) {
   const children = CHILDREN[role];
-  const done = (receipt) => { writeJson(stageFile(state, role), receipt); return receipt; };
+  const done = (receipt) => { writeJsonFile(stageFile(state, role), receipt); return receipt; };
   if (!children) return done({ ok: false, role, error: `${role} has no child to start` });
   let recorded = agentOf(state, role);
   for (const deadline = now() + waitMs; !recorded?.terminal && now() < deadline;) { await sleep(500); recorded = agentOf(state, role); }
@@ -463,7 +466,7 @@ function workflowProblems(wf, spec) {
  * checkout (also its Orca repository selector); `timeoutMs` bounds the wait for every agent to settle. Returns the
  * starci/launch-smoke@2 result; never throws.
  */
-export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
+export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null, orca, appRepo = null, root = SKILL_ROOT, script = SCRIPT, noop = noopAgent(),
   timeoutMs = 1200000, releaseTimeoutMs = 600000, pollMs = 5000, sleep = defaultSleep, now = Date.now, stateRoot = os.tmpdir(), workflowId = `smoke-${Date.now().toString(36)}` }) {
   const startedAt = now();
   const out = { schema: SMOKE_SCHEMA, ok: false, entry, noop: noop?.error ? null : { provider: noop.provider, model: noop.model, effort: noop.effort },
@@ -491,7 +494,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
   wf.baseHead = head.ok ? head.stdout.trim() : null;
   fs.mkdirSync(stateParentOf(stateRoot), { recursive: true });
   const state = fs.mkdtempSync(path.join(stateParentOf(stateRoot), 'run-'));
-  writeJson(planFile(state), { schema: SMOKE_SCHEMA, root: slash(root), entry, noop: out.noop, appRepo: slash(appRepo),
+  writeJsonFile(planFile(state), { schema: SMOKE_SCHEMA, root: slash(root), entry, noop: out.noop, appRepo: slash(appRepo),
     workflow: { workflowId, feApp, name: spec.name, branch: wf.branch, path: wf.path, orcaWorktreeId: wf.orcaWorktreeId } });
   if (!before.ok) wf.problems.push(`main manifest before: ${before.error}`);
   const seen = {};
@@ -638,7 +641,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
   return out;
 }
 
-const argOf = (argv, name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] ?? null : null; };
+const argOf = (argv, name) => valueAfter(argv, `--${name}`);
 
 async function main(argv) {
   const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
@@ -653,7 +656,7 @@ async function main(argv) {
   }
   if (verb) { console.error(`unknown verb ${verb}`); return 2; }
   const timeout = Number(argOf(argv, 'timeout-ms'));
-  const result = await runSmoke({ entry: argOf(argv, 'entry') || process.env.ORCA_TERMINAL_HANDLE || null, orca: await defaultClient(), appRepo: argOf(argv, 'app-repo'),
+  const result = await runSmoke({ entry: argOf(argv, 'entry') || readEnv('ORCA_TERMINAL_HANDLE') || null, orca: await defaultClient(), appRepo: argOf(argv, 'app-repo'),
     ...(Number.isFinite(timeout) && timeout > 0 ? { timeoutMs: timeout } : {}) });
   const text = JSON.stringify(result, null, 2);
   const file = argOf(argv, 'out');

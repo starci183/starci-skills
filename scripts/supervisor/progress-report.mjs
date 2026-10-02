@@ -18,6 +18,7 @@ import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { botCall, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { escapeHtml } from '../lib/escape.mjs';
 import { blockingJobs, blockingOthersOf } from '../kernel/waiter-priority.mjs';
 import { askClassOf } from '../kernel/ask-server.mjs';
 import { RUNTIME_INCIDENT } from './poll.mjs';
@@ -46,7 +47,6 @@ const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(AL
 const namedWorkflows = (db) => { try { return new Map(db.prepare('SELECT * FROM workflows').all().filter((w) => w.display_name).map((w) => [w.workflow_id, w.display_name])); } catch { return new Map(); } };
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
-const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const dur = (ms, tr) => (ms == null ? '?' : ms < 60000 ? tr('<1 minute') : ms < 3600000 ? tr('{n} minutes', { n: Math.round(ms / 60000) }) : tr('{h} hours', { h: (ms / 3600000).toFixed(1) }));
 const clock = (ms) => new Date(ms).toLocaleString('vi-VN', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
@@ -184,7 +184,7 @@ export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
     ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`
     : tr('you');
   return tr('⏸ {op} ({jobId}): {outcome}, waiting on {on} ({incident}) — for {ago}', {
-    op: esc(legLabel(h.op, language)), jobId: esc(h.jobId), outcome: esc(outcomeText(h.outcome, tr)), on: esc(on), incident: esc(h.incident), ago: esc(dur(now - h.since, tr)) })
+    op: escapeHtml(legLabel(h.op, language)), jobId: escapeHtml(h.jobId), outcome: escapeHtml(outcomeText(h.outcome, tr)), on: escapeHtml(on), incident: escapeHtml(h.incident), ago: escapeHtml(dur(now - h.since, tr)) })
     + (h.workerReleased ? tr(', worker released') : '');
 }
 
@@ -192,28 +192,28 @@ export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
 export function workflowSection(r, { now = Date.now(), language = 'vi' } = {}) {
   const tr = translator(language);
   const line = [];
-  line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: esc(r.name), done: r.done, total: r.total }));
-  if (r.goal) line.push(tr('Goal: {goal}', { goal: esc(r.goal) }));
+  line.push(tr('<b>▶ {name}</b> — {done}/{total} legs done', { name: escapeHtml(r.name), done: r.done, total: r.total }));
+  if (r.goal) line.push(tr('Goal: {goal}', { goal: escapeHtml(r.goal) }));
   const doneLegs = r.legs.filter((l) => l.state === 'done' && !l.rework).map((l) => legLabel(l.op, language));
   const active = r.legs.filter((l) => l.state === 'running' || l.rework);
   const queued = r.legs.filter((l) => l.state === 'queued').map((l) => legLabel(l.op, language));
   const failed = r.legs.filter((l) => l.state === 'failed').map((l) => legLabel(l.op, language));
   const todo = r.legs.filter((l) => l.state === 'todo').map((l) => legLabel(l.op, language));
-  if (doneLegs.length) line.push(tr('✅ Done: {legs}', { legs: esc(doneLegs.join(', ')) }));
-  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: esc(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: esc(dur(now - l.since, tr)) }) : ''}`);
-  if (queued.length) line.push(tr('⏳ Waiting its turn: {legs}', { legs: esc(queued.join(', ')) }));
-  if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: esc(failed.join(', ')) }));
-  if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: esc(todo.join(' → ')) }));
-  if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: esc(legLabel(r.lastReport.op, language)), outcome: esc(outcomeText(r.lastReport.outcome, tr)), at: esc(clock(r.lastReport.at)), summary: esc(r.lastReport.summary) }));
-  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`${tr('❓ Waiting on your answer ({op}): {text}', { op: esc(legLabel(a.op, language)), text: esc(a.text) })}${a.link ? `\n   ${esc(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`}`);
+  if (doneLegs.length) line.push(tr('✅ Done: {legs}', { legs: escapeHtml(doneLegs.join(', ')) }));
+  for (const l of active) line.push(`${tr('🔄 In progress: <b>{op}</b>', { op: escapeHtml(legLabel(l.op, language)) })}${l.rework ? tr(' (rework)') : ''}${l.count > 1 ? tr(' — {count} ops in parallel', { count: l.count }) : ''}${l.since ? tr(', running for {ago}', { ago: escapeHtml(dur(now - l.since, tr)) }) : ''}`);
+  if (queued.length) line.push(tr('⏳ Waiting its turn: {legs}', { legs: escapeHtml(queued.join(', ')) }));
+  if (failed.length) line.push(tr('⚠️ The last run failed; the kernel will retry: {legs}', { legs: escapeHtml(failed.join(', ')) }));
+  if (todo.length) line.push(tr('⬜ Remaining: {legs}', { legs: escapeHtml(todo.join(' → ')) }));
+  if (r.lastReport) line.push(tr('📝 Latest report ({op}, {outcome}, {at}): {summary}', { op: escapeHtml(legLabel(r.lastReport.op, language)), outcome: escapeHtml(outcomeText(r.lastReport.outcome, tr)), at: escapeHtml(clock(r.lastReport.at)), summary: escapeHtml(r.lastReport.summary) }));
+  for (const a of r.asks.filter((ask) => ask.askClass !== 'credential')) line.push(`${tr('❓ Waiting on your answer ({op}): {text}', { op: escapeHtml(legLabel(a.op, language)), text: escapeHtml(a.text) })}${a.link ? `\n   ${escapeHtml(a.link)}` : `\n   ${tr('(press /asks for an answer link)')}`}`);
   for (const h of r.holds ?? []) line.push(holdLine(h, { now, language }));
-  for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: esc(g) }));
-  for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: esc(legLabel(b.op, language)), jobId: esc(b.jobId), count: b.workflows.length, workflows: esc(b.workflows.join(', ')), ago: esc(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
+  for (const g of r.ownerGates) line.push(tr('🔒 Waiting on you: {gate}', { gate: escapeHtml(g) }));
+  for (const b of r.blocking ?? []) line.push(`${tr('⛓ Blocking other workflows: <b>{op}</b> ({jobId}) — {count} workflow(s) waiting ({workflows}), for {ago}', { op: escapeHtml(legLabel(b.op, language)), jobId: escapeHtml(b.jobId), count: b.workflows.length, workflows: escapeHtml(b.workflows.join(', ')), ago: escapeHtml(dur(now - b.since, tr)) })}${b.status === 'queued' ? tr(', not yet dispatched') : ''}`);
   if (r.runtime.length) line.push(tr('🐞 Open runtime defects: {count} (the supervisor is on them)', { count: r.runtime.length }));
   line.push(r.etaAt == null
     ? tr('🕒 ETA: cannot estimate yet (no leg done)')
     : r.etaMs <= 0 ? tr('🕒 All legs done, waiting for handover')
-    : tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: esc(dur(r.etaMs, tr)), etaAt: esc(clock(r.etaAt)), startedAt: esc(clock(r.startedAt)) }));
+    : tr('🕒 ETA: ~{dur} more (around {etaAt}), at the pace since it started ({startedAt})', { dur: escapeHtml(dur(r.etaMs, tr)), etaAt: escapeHtml(clock(r.etaAt)), startedAt: escapeHtml(clock(r.startedAt)) }));
   return line.join('\n');
 }
 
@@ -226,14 +226,14 @@ export function progressMessages(rows, { now = Date.now(), language = 'vi' } = {
   const runtime = ok.reduce((n, r) => n + r.runtime.length, 0);
   const etas = ok.map((r) => r.etaAt).filter((x) => x != null);
   const header = [
-    tr('<b>[StarCi] Progress report at {now}</b>', { now: esc(clock(now)) }),
+    tr('<b>[StarCi] Progress report at {now}</b>', { now: escapeHtml(clock(now)) }),
     tr('{running} workflow(s) running · {done}/{total} legs done', { running: ok.length, done: ok.reduce((n, r) => n + r.done, 0), total: ok.reduce((n, r) => n + r.total, 0) }),
     asks ? tr('❓ {count} question(s) waiting on you (/asks sends each with a link button)', { count: asks }) : tr('❓ No questions waiting on you'),
     ...(creds ? [tr('🔑 {count} credential request(s) waiting, not blocking the main work: /creds', { count: creds })] : []),
     tr('🐞 {count} open runtime defect(s)', { count: runtime }),
     ...(ok.some((r) => r.holds?.length) ? [tr('⏸ {count} done job(s) waiting on another workflow or on you before settling (see ⏸ per workflow)', { count: ok.reduce((n, r) => n + (r.holds?.length ?? 0), 0) })] : []),
-    etas.length ? tr('🕒 All done by: around {eta}', { eta: esc(clock(Math.max(...etas))) }) : '',
-    ...rows.filter((r) => r.error).map((r) => tr('⚠️ Cannot read ledger {repo}: {error}', { repo: esc(r.repo), error: esc(r.error) })),
+    etas.length ? tr('🕒 All done by: around {eta}', { eta: escapeHtml(clock(Math.max(...etas))) }) : '',
+    ...rows.filter((r) => r.error).map((r) => tr('⚠️ Cannot read ledger {repo}: {error}', { repo: escapeHtml(r.repo), error: escapeHtml(r.error) })),
   ].filter(Boolean).join('\n');
   const messages = [];
   let current = header;
@@ -255,7 +255,7 @@ async function main() {
   // One model-scorecard line (pool shares/pass rates) over the same repos, last 24h; a failure adds nothing.
   try {
     const sc = await import('../agent/model-scorecard.mjs');
-    const line = `\n📊 ${esc(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;
+    const line = `\n📊 ${escapeHtml(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;
     const at = messages[0].indexOf('\n\n'); // end of the header block
     messages[0] = at < 0 ? messages[0] + line : messages[0].slice(0, at) + line + messages[0].slice(at);
   } catch { /* optional line */ }

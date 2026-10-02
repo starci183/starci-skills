@@ -42,6 +42,8 @@ import { jobResultSql } from '../machine/job-row.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
 import { logWriterFor } from '../machine/log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
+import { clipLine } from '../lib/clip.mjs';
+import { shortHash } from '../lib/hash.mjs';
 
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
 export const LOG_LEVELS = Object.freeze(['info', 'warn', 'error']);
@@ -268,10 +270,10 @@ export const DERIVED_EVENT_KINDS = Object.freeze(['op-dispatched', 'dispatch-rej
   'incident-raised', 'incident-resolved', 'incident-auto-resolved', 'worker-failed-no-report', 'job-dropped', 'foundation-landed', 'artifacts-indexed']);
 /** Rows one artifacts-indexed event may derive per family (file.edit, media): a huge draw loop stays readable. */
 export const DERIVED_ARTIFACT_ROWS_MAX = 300;
-const shortHash = (text) => crypto.createHash('sha256').update(String(text)).digest('hex').slice(0, 24);
+
 // A check's evidence names a file when it looks like a path (never prose): the cmd.run row refs it.
 const PATHISH = /^(?:[a-z]:)?[\\/]?[\w.@-]+(?:[\\/][\w.@ -]+)+\.[a-z0-9]{1,8}$/i;
-const clipText = (v, n = 240) => { const s = String(v ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+const clipText = (v, n = 240) => clipLine(v, n);
 const intOr = (v) => (Number.isInteger(v) ? v : undefined);
 const strOr = (v) => (typeof v === 'string' && v ? v : undefined);
 const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null));
@@ -336,7 +338,7 @@ export function rowsOfEvent(event, ctx = {}) {
       for (const file of (Array.isArray(patchDoc?.files) ? patchDoc.files : []).slice(0, DERIVED_ARTIFACT_ROWS_MAX)) {
         if (typeof file?.path !== 'string' || !file.path) continue;
         const added = intOr(file.added), removed = intOr(file.removed);
-        rows.push({ ...base, jobId, kind: 'file.edit', src: `ev:${ak}:f:${shortHash(`${jobId}\n${patchRef}\n${file.path}`)}`,
+        rows.push({ ...base, jobId, kind: 'file.edit', src: `ev:${ak}:f:${shortHash(`${jobId}\n${patchRef}\n${file.path}`, { n: 24 })}`,
           msg: `${({ A: tr('Added'), D: tr('Deleted'), R: tr('Renamed'), M: tr('Modified') })[file.status] ?? tr('Modified')} ${clipText(file.path, 160)}${added != null || removed != null ? ` (+${added ?? 0} -${removed ?? 0})` : ''}`,
           refs: [patchJsonRef], data: compact({ path: file.path, added, removed, status: strOr(file.status), oldPath: strOr(file.oldPath), binary: file.binary === true ? true : undefined, image: file.image === true ? true : undefined, diffRef: `${patchJsonRef}#${file.path}` }) });
       }
@@ -352,7 +354,7 @@ export function rowsOfEvent(event, ctx = {}) {
         const subkind = strOr(row?.subkind) ?? strOr(a.subkind);
         const label = strOr(row?.label);
         const noun = logKind === 'render' ? tr('Image') : logKind === 'video' ? tr('Video') : tr('Trace');
-        rows.push({ ...base, jobId, kind: logKind, src: `ev:${ak}:a:${shortHash(`${jobId}\n${a.path}\n${a.sha256 ?? ''}`)}`,
+        rows.push({ ...base, jobId, kind: logKind, src: `ev:${ak}:a:${shortHash(`${jobId}\n${a.path}\n${a.sha256 ?? ''}`, { n: 24 })}`,
           msg: `${noun}${subkind ? ` ${subkind}` : ''}: ${clipText(label ?? a.path.split('/').pop(), 160)}`, refs: [a.path],
           data: compact({ artifactRef: a.path, label, subkind, bytes: intOr(row?.bytes), mime: logKind === 'trace' ? undefined : strOr(row?.mime), sha256: strOr(a.sha256) ?? strOr(row?.sha256) }) });
       }

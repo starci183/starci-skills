@@ -11,11 +11,13 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readModuleJson } from '../../../engine/runtime-root.mjs';
 import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
+import { readEnv } from '../../lib/env.mjs';
+import { dotGet } from '../../lib/dot-path.mjs';
 
 export const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
 export const ORCA = (() => {
-  if (process.env.STARCI_ORCA_COMMAND) return process.env.STARCI_ORCA_COMMAND;
+  if (readEnv('STARCI_ORCA_COMMAND')) return readEnv('STARCI_ORCA_COMMAND');
   if (process.platform !== 'win32') return 'orca';
   const w = spawnSync('where.exe', ['orca'], { encoding: 'utf8' });
   const exe = (w.stdout || '').split(/\r?\n/).find((l) => l.trim().endsWith('.exe'));
@@ -30,7 +32,7 @@ export const orcaAppExe = (cli = ORCA) => {
 };
 
 export const ORCA_PREFIX_ARGS = (() => {
-  try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
+  try { return JSON.parse(readEnv('STARCI_ORCA_ARGS') || '[]'); } catch { return []; }
 })();
 
 // A read can answer more than spawnSync's 1 MB default (a worker-read
@@ -84,7 +86,7 @@ const entryOf = (verb) => {
 };
 
 const words = (command) => String(command ?? '').split(/\s+/).filter(Boolean);
-const at = (root, dotted) => String(dotted).split('.').reduce((o, k) => (o == null ? o : o[k]), root);
+const at = (root, dotted) => dotGet(root, dotted);
 const filled = (v) => v !== undefined && v !== null && v !== false && v !== '';
 const nonEmpty = (v) => Array.isArray(v) ? v.length > 0
   : (v && typeof v === 'object' ? Object.keys(v).length > 0 : Boolean(v));
@@ -316,7 +318,7 @@ export function orcaCall(verb, params = {}, { timeout, request } = {}) {
     throw new Error(`orcaCall ${verb}: a request identity is only for replay: request mutations (calls.yaml declares ${mode ?? 'a read'})`);
   const requestId = mode === 'request' ? orcaRequestIdOf(verb, request) : null;
   const argv = buildArgv(verb, entry, requestId ? { ...params, [RETRY_FLAG]: requestId } : params);
-  if (entry.kind === 'mutation' && process.env.STARCI_ORCA_SKIP_LIVE_CHECK !== '1') {
+  if (entry.kind === 'mutation' && readEnv('STARCI_ORCA_SKIP_LIVE_CHECK') !== '1') {
     const missing = liveDrift(entry);
     if (missing) return driftEnvelope(verb, entry, missing);
   }
@@ -334,4 +336,19 @@ export function orcaCall(verb, params = {}, { timeout, request } = {}) {
     ? { outcome: 'unknown', effectState: 'unknown', reason: 'request-absent' }
     : { outcome: 'unknown', effectState: 'unknown', reason: 'request-show-unreadable' };
   return envelopeOf(verb, entry, first, { id: requestId, replayed: false, state }, unsettled);
+}
+
+/** The normalized result of a worker lifecycle verb (worker-stop, worker-release): {ok, outcome, effectState, dispatchId, state, result, error}. */
+export function workerVerb(verb, dispatch) {
+  const r = orcaCall(verb, { dispatch });
+  const result = r.result;
+  return {
+    ok: r.outcome === 'ok',
+    outcome: r.outcome,
+    effectState: r.effectState,
+    dispatchId: result?.dispatchId ?? null,
+    state: result?.state ?? null,
+    result,
+    error: r.error,
+  };
 }

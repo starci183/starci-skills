@@ -32,6 +32,7 @@ import { credentialFingerprintOf, credentialRotated } from './credential-fingerp
 import { parseJsonOr } from '../lib/json.mjs';
 import { readProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -474,7 +475,6 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
 //   limited     — the probe reads 'limited' (near the window cap, or a
 //                 refreshable stale token): still launchable, ordered last;
 //   available   — 'ok' or 'unknown' (an unanswered probe never blocks).
-const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
 
 // The OPEN provider-health circuit for a provider in one ledger, or null.
 // An auth circuit that recorded the fingerprint of the credential it rejected
@@ -488,7 +488,7 @@ const providerKey = (provider) => String(provider ?? '').trim().toLowerCase().re
 // The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one fleet-wide fact per provider;
 // `db` (a ledger) is not read and stays in the signature for its callers.
 export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
-  const key = providerKey(provider);
+  const key = normalizeProvider(provider);
   if (!key) return null;
   const row = readProviderCircuit(key);
   if (!row || (row.expiresAt != null && row.expiresAt <= now)) return null;

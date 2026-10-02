@@ -26,6 +26,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { captureNames } from '../lib/i18n.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems, unitRolesProblems } from './manifest-shape.mjs';
 import { declaredSlotEnabled, kindParamProblems, kindShapeProblems, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
@@ -74,7 +75,7 @@ const SCOPES = [APP_SCOPE, ...PROFILES];
 // ------------------------------------------------------------------------------------------------ patterns
 
 const VAR = /<([A-Za-z][A-Za-z0-9-]*)>/g;
-const varsOf = (text) => [...String(text).matchAll(VAR)].map((m) => m[1]);
+const varsOf = (text) => captureNames(text, VAR);
 const hasWildcard = (segment) => /[*?]/.test(segment);
 
 /** Weight of one pattern segment: literal 4, literal mixed with a variable 3, a bare variable 2, a wildcard 1, `**` 0. */

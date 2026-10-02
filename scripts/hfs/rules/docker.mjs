@@ -14,7 +14,8 @@
 //                             URL, no ARG or ENV whose name is a credential (NEXT_PUBLIC_* are published by design and are the one exception)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
+import { propertyText } from '../../lib/ts-ast.mjs';
 import { execForm, parseDockerfile, shellCommands, words } from '../../lib/dockerfile.mjs';
 import { found, readText } from './read.mjs';
 
@@ -133,14 +134,7 @@ function stageFindings(file, parsed, side, kind) {
 
 /** The Next config's `output` property, read with TypeScript's parser: the string literal assigned to `output` in an object literal. */
 function nextOutput(ts, text) {
-  const source = ts.createSourceFile('next.config.ts', text, ts.ScriptTarget.Latest, true);
-  let output = null;
-  const visit = (node) => {
-    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === 'output' && ts.isStringLiteralLike(node.initializer)) output = node.initializer.text;
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return output;
+  return propertyText(ts, text, { file: 'next.config.ts', key: 'output' });
 }
 
 /** R189: the entry, the port and the health of the runtime. */
@@ -237,10 +231,7 @@ function secretFindings(file, parsed) {
 }
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The findings of the docker rules over the tracked paths `files` (app-relative) of the app at `repoRoot`. */
 export function dockerFindings({ repoRoot, files, repo }) {

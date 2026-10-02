@@ -54,6 +54,7 @@ import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
 
@@ -256,7 +257,7 @@ export const managerAlive = (env = process.env) => {
 export function ensureAskConnectors({ env = process.env, config = undefined, spawn: launch = spawnDetached } = {}) {
   try {
     if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
-    if (env.NODE_TEST_CONTEXT && !env.STARCI_CLOUDFLARED_COMMAND) return { ok: true, skipped: 'test context' };
+    if (isSpecRun(env) && !env.STARCI_CLOUDFLARED_COMMAND) return { ok: true, skipped: 'test context' };
     const owner = config === undefined ? ownerConfig() : config;
     if (!owner) return { ok: false, error: 'config.yaml cannot be read' };
     const connectors = connectorsConfig(owner, env), cf = connectors.cloudflare, port = String(connectors.gateway.port);

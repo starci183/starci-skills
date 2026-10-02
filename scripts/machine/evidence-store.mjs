@@ -21,6 +21,7 @@ import { redactBytes } from '../lib/redact.mjs';
 import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript,
   JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/db/ledger.mjs';
 import { newSpanId } from '../../engine/db/machine.mjs';
+import { refuse } from '../lib/refuse.mjs';
 
 export const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
 export const ARTIFACT_KINDS = JOB_ARTIFACT_KINDS;
@@ -33,7 +34,7 @@ export const CHECK_STATUSES = Object.freeze(['pass', 'fail', 'unavailable', 'err
 export const RED_CHECK_STATUSES = Object.freeze(['fail', 'error']);
 export const TRANSCRIPT_SNAPSHOT_MS = 60_000;
 
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const slash = (p) => String(p).replace(/\\/g, '/');
 
 const IMAGE = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };

@@ -43,6 +43,7 @@ import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 import { supervisorDecisions } from '../machine/decisions.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { bestEffortCall } from '../agent/best-effort-call.mjs';
 
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
 export const INBOX_REWAKE_MS = 10 * 60_000;
@@ -220,7 +221,7 @@ export function repairSupervisorTabTitles(seatTerminal, workers, d) {
 
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
-const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const bestEffort = bestEffortCall;
 
 /**
  * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.

@@ -15,6 +15,7 @@
 // text), written through engine/db/ledger.mjs upsertFoundation / declareFoundations.
 // Every write also appends an event on the acting workflow (entity_type 'foundation').
 import { parseJson } from '../lib/json.mjs';
+import { fail } from '../lib/refuse.mjs';
 import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
 export const FOUNDATION_SCHEMA = 'starci/foundation@1';
@@ -24,7 +25,7 @@ export const FOUNDATION_KINDS = ['layout-tree', 'brand', 'grammar', 'module', 'c
 export const FOUNDATION_CHANGE_ID = 'shared-foundation-planning';
 const NAME_RX = /^[a-z0-9][a-z0-9._@/-]{0,79}$/;
 
-const fail = (message, code, extra = {}) => { throw Object.assign(new Error(message), { code, ...extra }); };
+
 
 export function normalizeFoundationName(name) {
   const value = String(name ?? '').trim().toLowerCase();

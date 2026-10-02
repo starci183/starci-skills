@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
-import { isUnshadowedCommonJsRequire, referencedExports, relativePath, sourceLocation, unwrapExpression } from './typescript.mjs';
+import {
+  commonJsRequireReasons, decoratorCallee, moduleExportsOf, mutableDecoratorKind, normalizedSymbol,
+  normalizedSymbolValue, programSourcesOf, referencedExports, relativePath, selectedNode,
+  unwrapExpression, valueSymbol,
+} from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 const REGISTRATION_RULE_IDS = ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'];
 const FRAMEWORK = new Map([
@@ -9,106 +14,46 @@ const FRAMEWORK = new Map([
   ['QueryHandler', '@nestjs/cqrs'],
 ]);
 
-function normalizedSymbolValue(ts, checker, value) {
-  let symbol = value ?? null;
-  const seen = new Set();
-  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
-    seen.add(symbol);
-    const target = checker.getAliasedSymbol(symbol);
-    if (!target || target === symbol) break;
-    symbol = target;
-  }
-  return symbol;
-}
-
-function normalizedSymbol(ts, checker, node) {
-  return normalizedSymbolValue(ts, checker, checker?.getSymbolAtLocation(node) ?? null);
-}
-
-function valueSymbol(ts, checker, node, seen = new Set()) {
-  const selected = selectedNode(ts, node) ?? node;
-  const symbol = normalizedSymbol(ts, checker, selected);
-  if (!symbol || seen.has(symbol)) return symbol;
-  seen.add(symbol);
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length === 1 && ts.isVariableDeclaration(declarations[0]) && declarations[0].initializer
-    && (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) {
-    return valueSymbol(ts, checker, declarations[0].initializer, seen);
-  }
-  return symbol;
-}
-
-function calledExpression(ts, decorator) {
-  const expression = decorator.expression;
-  return ts.isCallExpression(expression) ? expression.expression : expression;
-}
-
-function selectedNode(ts, expression) {
-  expression = unwrapExpression(ts, expression);
-  if (ts.isIdentifier(expression)) return expression;
-  if (ts.isPropertyAccessExpression(expression)) return expression.name;
-  if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) return expression.argumentExpression;
-  return null;
-}
-
 function frameworkDecorator(ts, checker, decorator, targets) {
-  const selected = selectedNode(ts, calledExpression(ts, decorator));
+  const selected = selectedNode(ts, decoratorCallee(ts, decorator));
   if (!selected) return null;
   const symbol = valueSymbol(ts, checker, selected);
   for (const [name, target] of targets) if (symbol === target) return name;
   return null;
 }
 
-function mutableFrameworkAlias(ts, checker, decorator, targets) {
-  const selected = selectedNode(ts, calledExpression(ts, decorator));
-  const symbol = selected ? normalizedSymbol(ts, checker, selected) : null;
-  const declarations = symbol?.getDeclarations?.() ?? [];
-  if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
-    || (ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) return null;
-  const target = valueSymbol(ts, checker, declarations[0].initializer);
-  for (const [name, expected] of targets) if (target === expected) return name;
-  return null;
-}
+/* This module's framework map keys decorator names, not symbols - invert it (first name wins, as the old
+ * `for...of` scan did) for the shared symbol-keyed lookup. */
+const mutableFrameworkAlias = (ts, checker, decorator, targets) => {
+  const bySymbol = new Map();
+  for (const [name, symbol] of targets) if (!bySymbol.has(symbol)) bySymbol.set(symbol, name);
+  return mutableDecoratorKind(ts, checker, decorator, bySymbol);
+};
 
 function frameworkTargets(config, context, checker, localFiles) {
   const targets = new Map();
   const reasons = [];
-  const program = context.programs.find(candidate => candidate.getTypeChecker() === checker);
-  if (!program) return { targets, reasons: ['a TypeScript program checker could not be associated with its source'] };
-  for (const sourceFile of program.getSourceFiles()) {
-    if (!localFiles.has(canonical(sourceFile.fileName))) continue;
+  const files = programSourcesOf(context, checker, localFiles);
+  if (!files) return { targets, reasons: ['a TypeScript program checker could not be associated with its source'] };
+  for (const sourceFile of files) {
     for (const statement of sourceFile.statements) {
-      const moduleSpecifier = (context.ts.isImportDeclaration(statement) || context.ts.isExportDeclaration(statement))
-        && statement.moduleSpecifier && context.ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier : null;
-      const importEquals = context.ts.isImportEqualsDeclaration(statement) && context.ts.isExternalModuleReference(statement.moduleReference)
-        && statement.moduleReference.expression && context.ts.isStringLiteralLike(statement.moduleReference.expression)
-        ? statement.moduleReference.expression : null;
-      const specifier = (moduleSpecifier ?? importEquals)?.text;
-      if (!specifier || ![...FRAMEWORK.values()].includes(specifier)) continue;
-      const expected = new Set([...FRAMEWORK].filter(([, packageName]) => packageName === specifier).map(([name]) => name));
+      const bound = moduleExportsOf(context.ts, checker, statement);
+      if (!bound || ![...FRAMEWORK.values()].includes(bound.specifier)) continue;
+      const expected = new Set([...FRAMEWORK].filter(([, packageName]) => packageName === bound.specifier).map(([name]) => name));
       const selected = referencedExports(context.ts, statement, expected);
       if (!selected.length) continue;
-      const moduleSymbol = checker.getSymbolAtLocation(moduleSpecifier ?? importEquals);
-      if (!moduleSymbol) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${specifier}`);
+      if (!bound.symbol) {
+        reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${bound.specifier}`);
         continue;
       }
-      const exports = new Map(checker.getExportsOfModule(moduleSymbol).map(symbol => [symbol.getName(), normalizedSymbolValue(context.ts, checker, symbol)]));
       for (const name of selected) {
-        const target = exports.get(name);
+        const target = bound.exports.get(name);
         if (target) targets.set(name, target);
-        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${specifier}`);
+        else reasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot resolve ${name} from ${bound.specifier}`);
       }
     }
-    const visitRequire = node => {
-      if (context.ts.isCallExpression(node) && isUnshadowedCommonJsRequire(context.ts, checker, node.expression)
-        && node.arguments.length === 1 && context.ts.isStringLiteralLike(node.arguments[0])
-        && [...FRAMEWORK.values()].includes(node.arguments[0].text)) {
-        reasons.push(`${relativePath(config.root, sourceFile.fileName)} uses a CommonJS Nest framework binding whose decorator identity cannot be proved`);
-      }
-      context.ts.forEachChild(node, visitRequire);
-    };
-    visitRequire(sourceFile);
+    commonJsRequireReasons(context.ts, checker, sourceFile, (specifier) => [...FRAMEWORK.values()].includes(specifier),
+      reasons, relativePath(config.root, sourceFile.fileName), 'Nest framework binding whose decorator identity cannot be proved');
   }
   return { targets, reasons };
 }

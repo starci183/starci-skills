@@ -33,6 +33,8 @@ import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
+import { isSpecRun } from '../lib/env.mjs';
+import { agentOfJob } from '../lib/job-agent.mjs';
 
 // A worker's session file exists before the op-dispatched event lands (the
 // terminal launch precedes prompt send and attestation), so the identity
@@ -41,12 +43,6 @@ export const SESSION_LEAD_MS = 30 * 60 * 1000;
 // Only the head of a session file is scanned for the job id: the dispatch
 // preamble is the worker's first user message.
 const SESSION_GREP_BYTES = 256 * 1024;
-
-// The agent provider of a job payload — the same read cli.mjs agentOfJob
-// makes, kept local so the module is usable without the api's bindings.
-export const sessionAgentOf = (payload) =>
-  /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
-  ?? (payload?.managed ? 'claude' : null);
 
 /** The project-dir slug an agent CLI derives from a cwd: every non-alphanumeric becomes '-'. */
 export const sessionProjectSlug = (cwd) => String(path.resolve(cwd)).replace(/[^A-Za-z0-9]/g, '-');
@@ -60,7 +56,7 @@ export const sessionProjectSlug = (cwd) => String(path.resolve(cwd)).replace(/[^
  */
 export function sessionHomes({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
   const root = env.STARCI_AGENT_TRUST_HOME || null;
-  if (!root && env.NODE_TEST_CONTEXT) return { skipped: 'test-env-unrooted' };
+  if (!root && isSpecRun(env)) return { skipped: 'test-env-unrooted' };
   const h = root || home;
   const codexHomes = [];
   const add = (dir) => { if (dir && !codexHomes.some((d) => path.resolve(d).toLowerCase() === path.resolve(dir).toLowerCase())) codexHomes.push(path.resolve(dir)); };
@@ -175,7 +171,7 @@ const sessionCwdsOf = (db, job, repo) => {
  * housekeeping handles when no devin.exe runs; it is never moved here).
  */
 export function sessionIdentityOf(db, job, payload, repo, { env = process.env, home = os.homedir(), now = Date.now() } = {}) {
-  const agent = sessionAgentOf(payload);
+  const agent = agentOfJob(payload);
   const identity = { agent, resolvedAt: now };
   if (!agent) return { ...identity, reason: 'agent-unknown' };
   if (agent === 'devin') return { ...identity, reason: 'sessions-db-owned' };
@@ -209,7 +205,7 @@ const sessionArchiver = async (env) => {
  * scripts/housekeeping/hk-sessions.mjs archiveSessionFiles(paths, {archiveRoot, agent, apply:true}).
  */
 export async function releaseSettledSession({ db, job, payload, repo, env = process.env, home = os.homedir(), archiveRoot = null, show = terminalShow, archive = null, beforeArchive = null, now = Date.now() } = {}) {
-  const agent = sessionAgentOf(payload);
+  const agent = agentOfJob(payload);
   if (job.kind !== 'op') return { released: false, agent, reason: 'not-an-op-job' };
   if (!agent) return { released: false, agent, reason: 'agent-unknown' };
   if (agent === 'devin') return { released: false, agent, reason: 'sessions-db-owned' };

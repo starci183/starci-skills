@@ -39,6 +39,7 @@ import { loadSonarGate } from './sonar-gate.mjs';
 import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from './runtime-host.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
+import { readProperties } from '../lib/properties.mjs';
 
 export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
@@ -222,16 +223,7 @@ function workflowTexts(repo) {
   return entries.map((name) => ({ file: `.github/workflows/${name}`, text: readText(path.join(dir, name)) ?? '' }));
 }
 
-function readProperties(file) {
-  const out = {};
-  for (const raw of String(readText(file) ?? '').split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#') || line.startsWith('!')) continue;
-    const at = line.search(/[=:]/);
-    if (at > 0) out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
-  }
-  return out;
-}
+
 
 function git(call, repo, args) {
   try {

@@ -39,7 +39,8 @@ import { fileURLToPath } from 'node:url';
 import { inspectLedger, ledgerFileFor, newToken, openLedger } from '../../engine/db/ledger.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { list } from '../lib/list.mjs';
+import { list, splitList } from '../lib/list.mjs';
+import { fail } from '../lib/refuse.mjs';
 import {
   BRIDGE_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
 } from '../kernel/dependency-graph.mjs';
@@ -50,6 +51,7 @@ import { TRANSFER_SCHEMA, createOwnership } from '../kernel/work-ownership.mjs';
 import { normWork } from '../lib/path-key.mjs';
 import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 const DEFINE_GOAL = path.join(SKILL_ROOT, 'scripts', 'goal', 'define-goal.mjs');
@@ -57,9 +59,8 @@ const START_WORKFLOW = path.join(SKILL_ROOT, 'scripts', 'kernel', 'start-workflo
 export const ACTION_KIND = 'supervisor-action';
 export const TAG = '[supervisor-bridge]';
 const BOOLEAN_FLAGS = new Set(['json', 'start', 'dry-run', 'no-notify', 'request-only', 'owner-ok']);
-const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-const clip = (s, n = 400) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
-const fail = (message, code, extra = {}) => { throw Object.assign(new Error(message), { code, ...extra }); };
+const csv = (v) => splitList(v);
+const clip = (s, n = 400) => clipLine(s, n);
 
 export function parseArgs(argv) {
   const out = { _: [] };

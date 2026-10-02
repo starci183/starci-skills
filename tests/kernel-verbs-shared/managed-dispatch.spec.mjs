@@ -901,5 +901,8 @@ test('a managed worker quits with its own agent CLI, not always Claude\'s input'
   const src=fs.readFileSync(API,'utf8');
   assert.doesNotMatch(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: 'claude' \}\)/);
   assert.match(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: agentOfJob\(settledPayload\) \?\? 'claude' \}\)/);
-  assert.match(src,/const agentOfJob = \(payload\) => \/\^\(claude\|codex\|devin\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
+  // agentOfJob is the one shared definition (scripts/lib/job-agent.mjs) cli.mjs imports.
+  assert.match(src,/import \{ agentOfJob \} from '\.\.\/lib\/job-agent\.mjs'/);
+  const jobAgent=fs.readFileSync(path.join(ROOT,'scripts','lib','job-agent.mjs'),'utf8');
+  assert.match(jobAgent,/\^\(claude\|codex\|devin\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
 });

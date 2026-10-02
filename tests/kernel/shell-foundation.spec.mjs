@@ -38,7 +38,7 @@ function ledgerFixture(t) {
 }
 const need = (reasons = ['/[locale]/(console): layout is todo, not done']) => ({ needed: true, reasons });
 
-test('interface.draw starts from todo: no shell prerequisite, it writes the layout tree, every screen is drawn', () => {
+test('interface.draw starts from todo: no shell prerequisite, it writes the layout tree, every screen is drawn', (t) => {
   const shell = DRAW.reads.find((r) => r.id === 'shell');
   assert.equal(shell.mustExist, undefined);
   assert.equal(shell.layoutChain, undefined);
@@ -50,7 +50,15 @@ test('interface.draw starts from todo: no shell prerequisite, it writes the layo
   assert.doesNotMatch(JSON.stringify(DRAW.route.prerequisites), /layout-unsettled|layoutChain|every layout above/);
   assert.match(DRAW.route.prerequisites.join('|'), /brand\.decide done \(the brand record and its direction, never the layouts/, 'brand.decide stays for the brand record only, never for layouts');
   assert.match(DRAW.route.prerequisites.join('\n'), /todo or absent layout tree is admitted/);
-  assert.doesNotMatch(fs.readFileSync(path.join(ROOT, 'scripts/kernel/prerequisites.mjs'), 'utf8'), /layout-unsettled|layoutChain/);
+  // The prerequisites engine itself admits the draw: a ui record whose layout tree is still todo raises no gate.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-todo-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
+  const repo = path.join(root, 'repo');
+  fs.mkdirSync(path.join(repo, '.starciwork', 'features', 'reports', 'ui', 'board'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.starciwork', 'features', 'reports', 'ui', 'board', 'index.yaml'),
+    'schema: work/ui-screen@1\nid: ui.reports.board\ntitle: Board\n');
+  const admitted = checkPrerequisites({ brief, repo, payload: { records: [BOARD], owned_paths: [BOARD] } });
+  assert.deepEqual(admitted.unmet, [], `no layout prerequisite fires on a todo tree: ${JSON.stringify(admitted.unmet)}`);
 });
 
 test('the first draw with parents to draw claims foundation shell; a second workflow waits and never drafts a second shell', (t) => {

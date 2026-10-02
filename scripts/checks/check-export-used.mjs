@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { boundNames } from '../lib/ast-names.mjs';
 
 export const EXPORT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 const TEXT = /\.(mjs|cjs|js|ts|tsx|json|ya?ml|md|sh|ps1|sql|txt|css|html|hbs|ejs|tpl)$/;
@@ -24,16 +25,6 @@ const isSpec = (rel) => /\.(test|spec)\.mjs$/.test(rel) || /(^|\/)tests?\//.test
 const MAX_TEXT_BYTES = 3_000_000;
 
 const acorn = () => createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
-
-/** Names bound by a declaration pattern. */
-function patternNames(pattern, into) {
-  if (!pattern) return;
-  if (pattern.type === 'Identifier') into.push(pattern.name);
-  else if (pattern.type === 'ObjectPattern') pattern.properties.forEach((p) => patternNames(p.value ?? p.argument, into));
-  else if (pattern.type === 'ArrayPattern') pattern.elements.forEach((p) => patternNames(p, into));
-  else if (pattern.type === 'AssignmentPattern') patternNames(pattern.left, into);
-  else if (pattern.type === 'RestElement') patternNames(pattern.argument, into);
-}
 
 /** [{name, line}] of the named exports of a module's source (declarations and `export { a, b as c }` lists; `default` and re-exports from another module are not judged). */
 export function exportedNames(text, parse = acorn().parse) {
@@ -45,7 +36,7 @@ export function exportedNames(text, parse = acorn().parse) {
     if (stmt.declaration) {
       const names = [];
       if (stmt.declaration.id) names.push(stmt.declaration.id.name);
-      else for (const d of stmt.declaration.declarations ?? []) patternNames(d.id, names);
+      else for (const d of stmt.declaration.declarations ?? []) boundNames(d.id, names);
       for (const name of names) out.push({ name, line: stmt.loc.start.line });
     } else if (!stmt.source) for (const s of stmt.specifiers) out.push({ name: s.exported.name, line: stmt.loc.start.line });
   }

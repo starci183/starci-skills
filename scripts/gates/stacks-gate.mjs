@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {slash} from '../lib/path-key.mjs';
+import { isInside } from '../lib/walk.mjs';
 
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
@@ -11,7 +12,7 @@ const MAX_INPUT_BYTES=4*1024*1024;
 const SCHEMA_ID='starci/application-stacks@1';
 const RUNBOOK_COMMANDS=['prepare','doctor','up','status','logs','down','verification'];
 const PLAINTEXT_SECRET_PATTERN=/\.(key|pem|p12|pfx)$/i;
-const inside=(root,target)=>{const rel=path.relative(path.resolve(root),path.resolve(target));return rel===''||(!rel.startsWith('..')&&!path.isAbsolute(rel));};
+const inside=(root,target)=>isInside(path.resolve(root),path.resolve(target));
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const sensitive=/pass(word)?|secret|token|credential|private[_-]?key|api[_-]?key/i;
 const nonempty=value=>typeof value==='string'&&Boolean(value.trim());

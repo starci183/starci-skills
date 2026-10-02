@@ -1,17 +1,17 @@
 // api route: choose and persist one pool for a queued operation.
 import { updateJob } from '../../../engine/db/ledger.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
+import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
 export default {
   verb: 'route',
   required: ['job'],
   kernelOnly: true,
   usageInCore: true,
   async run({ ledger, args, emit, internals }) {
-    const { FINAL_SETTLED, refuseSettleBacklog, operationTerminalHandleOf, observeOperationWorker,
-      jobPayloadOf, deferQueuedTestLeg, releaseTypedWaits, ownerGateOf, openOwnerGates, openPeerWaits,
-      PEER_WAIT, opSlotAdmission, livePathLeaseWait, goalJsonOf, latestGoal, csvList,
+    const { FINAL_SETTLED, deferQueuedTestLeg, releaseTypedWaits,
+      livePathLeaseWait, goalJsonOf, latestGoal, csvList,
       refuseKernelBias, lineageRouteAdjust, path, fs, skillRoot, parseYaml,
-      poolLoadOf, accountList, normalizeProviderId, probeQuotaSafe, providerHealthOf,
+      poolLoadOf, accountList, normalizeProvider, probeQuotaSafe, providerHealthOf,
       circuitClearHint, ownerRoot, configuredAllocationPolicy, loadConfig, recentDispatchCounts,
       kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool, AGENT_HIERARCHY_SCHEMA,
       operationNodeId, kernelNodeId, blockingViewOf } = internals;
@@ -26,16 +26,7 @@ export default {
     &&lastResult.effectState==='none'&&lastResult.attemptConsumed===false;
   if (job.status !== 'queued'&&!reusableReady) throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs and proven no-effect launch rejections are routable`), { code: 'job-not-queued' });
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new route while filed reports wait unconsumed.
-  refuseSettleBacklog(db, job.workflow_id, 'route');
-  const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
-  if (priorWorker?.connected && priorWorker?.writable) {
-    throw Object.assign(new Error(`job ${jobId} is queued in the ledger but exact worker ${priorWorker.terminalHandle} is still live; reconcile it instead of rerouting`), {
-      code: 'job-live-worker', worker: priorWorker,
-    });
-  }
-  const payload = jobPayloadOf(job);
-  const kind = job.op_id ?? payload.opId;
-  if (!kind) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  const { payload, op: kind } = queuedJobOp(ledger, { job, verb: 'route', liveHint: 'rerouting', internals });
   if (deferQueuedTestLeg(ledger, { job, op: kind, payload, via: 'route', args })) return;
 
   // Concurrency admission BEFORE the pool decision: a route that lands on a
@@ -45,24 +36,9 @@ export default {
   releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: job.workflow_id });
   // An owner-gate incident naming this job refuses first: no pool can run a
   // step only the owner drives.
-  const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
-  if (heldBy) {
-    const out = { ok: false, jobId, kind, reason: heldBy.kind ?? 'owner-gate', incident: heldBy.incidentId };
-    emit(out, `route REFUSED for ${jobId} (${kind}): ${heldBy.kind ?? 'owner-gate'} — incident ${heldBy.incidentId} holds it until the Kernel resolves it`, args.json);
-    process.exit(1);
-  }
-  const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
-  if (peerHeldBy) {
-    const out = { ok: false, jobId, kind, reason: PEER_WAIT, incident: peerHeldBy.incidentId, peer: peerHeldBy.peer };
-    emit(out, `route REFUSED for ${jobId} (${kind}): peer-wait — incident ${peerHeldBy.incidentId} holds it until peer ${peerHeldBy.peer} lands what it waits on and the wait is resolved`, args.json);
-    process.exit(1);
-  }
-  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
-  if (!slots.ok) {
-    const out = { ok: false, jobId, kind, reason: 'max-ops', slots };
-    emit(out, `route REFUSED for ${jobId} (${kind}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource})`, args.json);
-    process.exit(1);
-  }
+  refuseOwnerGate(ledger, { job, op: kind, opKey: 'kind', verb: 'route', suffix: '', emit, args, internals });
+  refusePeerWait(ledger, { job, op: kind, opKey: 'kind', verb: 'route', suffix: '', emit, args, internals });
+  opSlotsOrRefuse(ledger, { job, op: kind, opKey: 'kind', verb: 'route', suffix: '', emit, args, internals });
   // A live lease on the write set: no pool decision is spent (a route-decided per wake would read as a
   // reroute loop); the job waits queued path-lease and routes once the holder releases it.
   const leaseWait = livePathLeaseWait(db, job, payload, { repo: path.resolve(args.repo ?? process.cwd()) });
@@ -104,7 +80,7 @@ export default {
   for (const [poolId, rt] of Object.entries(pools)) {
     const target = rt?.target ?? poolId;
     const provider = rt?.provider ?? null;
-    const providerKey = normalizeProviderId(provider);
+    const providerKey = normalizeProvider(provider);
     if (provider && !quotaByProvider.has(providerKey)) quotaByProvider.set(providerKey, await probeQuotaSafe(provider));
     const quota = provider ? quotaByProvider.get(providerKey)
       : { state: 'unknown', usedPercent: null, detail: 'pool declares no provider' };

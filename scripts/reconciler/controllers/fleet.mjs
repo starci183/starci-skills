@@ -31,9 +31,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../engine/yaml.mjs';
+import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
+import { productLedgers } from '../../lib/ledgers.mjs';
 import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { shortHash } from '../../lib/hash.mjs';
 import { translator } from '../../lib/i18n.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
@@ -48,11 +50,7 @@ export const PUSH_RUN_TIMEOUT_MS = 1_800_000;
 
 /** modules/reconciler/fleet.yaml over DEFAULTS; a missing or bad number keeps its default. */
 export function fleetSettings(file = FLEET_FILE) {
-  let doc = {};
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
-  const out = { ...DEFAULTS };
-  for (const k of Object.keys(DEFAULTS)) if (Number.isFinite(Number(doc[k])) && Number(doc[k]) > 0) out[k] = Number(doc[k]);
-  return out;
+  return yamlNumberSettings(file, DEFAULTS);
 }
 
 /* ------------------------------------------------------------ pure planners */
@@ -170,9 +168,6 @@ export function planLand({ land = null, events = [], dist = null, now, settings 
   return { set, clear };
 }
 
-/** A key component of a free-text signature: a short digest, so the key never carries ':' or spaces. Pure. */
-const sigId = (signature) => crypto.createHash('sha256').update(String(signature)).digest('hex').slice(0, 10);
-
 /**
  * The push pass: one `push-refused` DI per refused repo of a push-mains result. The key names every identity field
  * (MB-07): repo, the stable failure signature and the head; a result missing one opens nothing and is reported
@@ -190,7 +185,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = 'v
     const why = r.refused ?? r.error;
     decisions.push({
       ...fleetDecision({
-        kind: 'push-refused', key: `push-refused:${repo}:${sigId(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
+        kind: 'push-refused', key: `push-refused:${repo}:${shortHash(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
         entity: { type: 'repo', id: repo }, summary: tr('Push to main refused at {repo} ({signature}{repeat}): {why}', { repo, signature, repeat: r.repeat > 1 ? tr(', attempt {n} at the same head', { n: r.repeat }) : '', why }),
         evidence: [String(why ?? ''), r.outputSha ? tr('blob:{sha} (the full push/hook output, {bytes} bytes)', { sha: r.outputSha, bytes: r.outputBytes ?? '?' }) : null, `head ${r.head}`],
         options: [{ key: 'fix-and-push', title: tr('Fix the cause and let the next push run retry it'), recommended: true }],
@@ -225,7 +220,6 @@ export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalation
 
 /* ------------------------------------------------------------ reads */
 
-const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l.ledgerId !== SUPERVISOR && l.file);
 function withReaders(ctx, fn) {
   const readers = [];
   for (const l of productLedgers(ctx)) {

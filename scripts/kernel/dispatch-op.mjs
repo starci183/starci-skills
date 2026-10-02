@@ -29,11 +29,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
+import { ownedRecordPaths } from '../work/record-ownership.mjs';
 import { resolveWorkerLaunchModel, defaultOperationTarget } from '../agent/models.mjs';
 import { buildContext } from '../context/pack.mjs';
 import { buildOpPrompt } from './op-prompt.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { walkFiles } from '../lib/walk.mjs';
+import { opCli } from '../lib/cli-arg.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -124,40 +126,17 @@ export const splitGoalLegParams = (brief, leg) => {
   return { owner: Object.keys(owner).length ? owner : null, kernel };
 };
 
-function usage(code) {
-  console.error(`use: node scripts/kernel/dispatch-op.mjs --op <id>
+const { usage, parseArgs } = opCli(`use: node scripts/kernel/dispatch-op.mjs --op <id>
     [--records a,b] [--state <.starciwork dir>] [--params '<json>'] [--model <target>]
-    [--budget <n>] [--lease <token>] [--worktree <selector>] [--json]`);
-  process.exit(code);
-}
+    [--budget <n>] [--lease <token>] [--worktree <selector>] [--json]`, {
+  '--params': (o, take) => { o.params = take(); },
+  '--model': (o, take) => { o.model = take(); },
+  '--budget': (o, take) => { o.budget = take(); },
+  '--lease': (o, take) => { o.lease = take(); },
+  '--worktree': (o, take) => { o.worktree = take(); },
+});
 
-function parseArgs(argv) {
-  const a = { records: [] };
-  const take = () => {
-    const v = argv[++parseArgs.i];
-    if (v === undefined) usage(2);
-    return v;
-  };
-  for (parseArgs.i = 0; parseArgs.i < argv.length; parseArgs.i++) {
-    const k = argv[parseArgs.i];
-    if (k === '--op') a.op = take();
-    else if (k === '--records') a.records.push(...take().split(','));
-    else if (k === '--state') a.state = take();
-    else if (k === '--params') a.params = take();
-    else if (k === '--model') a.model = take();
-    else if (k === '--budget') a.budget = take();
-    else if (k === '--lease') a.lease = take();
-    else if (k === '--worktree') a.worktree = take();
-    else if (k === '--json') a.json = true;
-    else if (k === '--help' || k === '-h') usage(0);
-    else usage(2);
-  }
-  a.records = [...new Set(a.records.map(s => s.trim()).filter(Boolean))];
-  return a;
-}
-
-const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
-  .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
+const walk = dir => (fs.existsSync(dir) ? walkFiles(dir) : []);
 
 /** Resolve the record list to owned paths via the example-ownership helpers —
  *  the same ownership resolution check scripts use, so the allowlist the packet
@@ -166,17 +145,7 @@ function resolveOwnedPaths(records, stateDir) {
   if (!stateDir) return { ownedPaths: [], note: 'no --state given — owned_paths empty; the kernel must fill them before a real dispatch' };
   const workRoot = path.resolve(stateDir);
   if (!fs.existsSync(workRoot)) return { ownedPaths: [], error: `state dir missing: ${workRoot}` };
-  const recordsById = loadRecords(workRoot, walk);
-  const workspaceDoc = readWorkspace(workRoot);
-  const ownedPaths = [];
-  const missing = [];
-  for (const rid of records) {
-    const rec = recordsById.get(rid);
-    if (!rec) { missing.push(rid); continue; }
-    for (const d of resolveOwnedDirs(rid, rec, recordsById, workspaceDoc, workRoot)) {
-      ownedPaths.push({ record: rid, path: d.rel.replaceAll('\\', '/'), via: d.via, exists: fs.existsSync(d.abs) });
-    }
-  }
+  const { ownedPaths, missing } = ownedRecordPaths(records, workRoot, { walk });
   return { ownedPaths, missing: missing.length ? missing : undefined };
 }
 

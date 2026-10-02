@@ -19,8 +19,8 @@
 import { JOB_STATUSES, postInbox, setInboxStatusByKey } from '../../../../engine/db/ledger.mjs';
 import { parseJson } from '../../../lib/json.mjs';
 import { check as orcaCheck } from '../../../api/orca/check.mjs';
-import { JOB_ROW } from '../../../machine/job-row.mjs';
-import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
+import { JOB_ROW, latestKernelJobOf } from '../../../machine/job-row.mjs';
+import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf, verbWorkflow } from './rows.mjs';
 
 export const WORKER_QUESTION = 'worker-question';
 export const ORCHESTRATION_MESSAGE = 'orchestration-message';
@@ -48,7 +48,6 @@ export const jobDispatchIdsOf = (db, job) => {
   const payload = jobPayloadOf(job);
   return new Set([payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, contractDispatchIdOf(db, job)].filter(Boolean));
 };
-const latestKernelJobOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind='kernel' ORDER BY updated_at DESC LIMIT 1`).get(workflowId);
 const operationJobsOf = (db, workflowId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel'`).all(workflowId);
 
 /** The job a message came from: its dispatch (payload.dispatchId or from_handle dispatch:<id>) or its terminal handle. */
@@ -199,4 +198,15 @@ export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, r
   out.ok = out.errors.length === 0;
   out.error = out.ok ? null : out.errors.map((e) => `${e.runId ?? '-'}: ${e.code}: ${e.error}`).join('; ');
   return out;
+}
+
+/**
+ * The workflow-check + drain prelude `api questions` and `api messages` share: the workflow must exist
+ * (workflow-unknown via verbWorkflow), then every Run of it drains into the ledger with strayed Runs rebound to the
+ * Kernel seat under the verb's `by`. Returns { db, workflowId, drained }.
+ */
+export function drainForVerb(ledger, { args, internals, by }) {
+  const { db, workflowId } = verbWorkflow(ledger, args);
+  const drained = drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by }) });
+  return { db, workflowId, drained };
 }

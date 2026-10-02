@@ -22,6 +22,8 @@ import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
 import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
+import {ancestorsOf} from '../../lib/dom-tree.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
@@ -67,7 +69,6 @@ const describe = (el) => {
   const name = el.attrs?.name ?? el.attrs?.id ?? walkElements(el).find((d) => d.attrs?.name)?.attrs?.name ?? null;
   return `${component ?? el.tag}${name ? ` "${name}"` : ''}`;
 };
-const ancestorsOf = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 const surfaceAncestor = (el) => ancestorsOf(el).find((a) => isSurface({ component: componentOf(a.attrs), attrs: a.attrs ?? {}, classes: classesOf(a) })) ?? null;
 const isPrimaryButton = (el) => (componentOf(el.attrs) === 'Button' && (classesOf(el).includes('button--primary') || el.attrs?.['data-variant'] === 'primary' || el.attrs?.['data-grammar-variant'] === 'primary'))
   || (el.tag === 'button' && el.attrs?.type === 'submit');
@@ -247,7 +248,7 @@ async function main(argv) {
   if (!paths.length) { process.stderr.write('use: node scripts/work/draw/draw-layer.mjs <render dir | part png>... [--playwright <product dir>] [--json]\n'); return 2; }
   const parts = partsUnder(paths);
   let playwright = null;
-  try { const { loadPlaywright } = await import('../draw-render.mjs'); playwright = loadPlaywright([opts.playwright, process.env.STARCI_PLAYWRIGHT_DIR, process.cwd()].filter(Boolean)); } catch { playwright = null; }
+  try { const { loadPlaywright } = await import('../draw-render.mjs'); playwright = loadPlaywright([opts.playwright, readEnv('STARCI_PLAYWRIGHT_DIR'), process.cwd()].filter(Boolean)); } catch { playwright = null; }
   const results = await layerFindingsForParts(parts, { playwright });
   const red = results.filter((r) => r.findings.length);
   if (opts.json) process.stdout.write(`${JSON.stringify({ schema: 'starci/draw-layer@1', parts: results.length, red: red.length, results }, null, 2)}\n`);

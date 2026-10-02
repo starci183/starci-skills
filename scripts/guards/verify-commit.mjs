@@ -14,6 +14,7 @@ import { diffTree } from '../api/git/diff-tree.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { refusalLines, logRefusal } from './refusals.mjs';
+import { readEnv } from '../lib/env.mjs';
 
 const say = (line) => process.stderr.write(`${line}\n`);
 
@@ -60,6 +61,6 @@ export function verifyCommit(oldSha, newSha, guard, { cwd = process.cwd() } = {}
 
 if (isMain(import.meta.url)) {
   const [oldSha, newSha] = process.argv.slice(2);
-  const guard = process.env.STARCI_GUARD_FILE ? readJsonFile(process.env.STARCI_GUARD_FILE) : null;
+  const guard = readEnv('STARCI_GUARD_FILE') ? readJsonFile(readEnv('STARCI_GUARD_FILE')) : null;
   process.exit(verifyCommit(oldSha, newSha, guard));
 }

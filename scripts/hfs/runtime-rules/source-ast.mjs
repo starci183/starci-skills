@@ -12,6 +12,58 @@ let typescript = null;
 /** The TypeScript compiler, loaded once from the runtime's own dependencies. */
 export const ts = () => (typescript ??= createRequire(import.meta.url)('typescript'));
 
+const FS_MODULES = new Set(['fs', 'node:fs', 'fs/promises', 'node:fs/promises']);
+
+/** `node` is a string literal naming an fs module specifier ('fs', 'node:fs', 'fs/promises', 'node:fs/promises'). */
+export const fsSpecifier = (t, node) => Boolean(node && t.isStringLiteralLike(node) && FS_MODULES.has(node.text));
+
+/** `node` is a `require('fs' | 'node:fs' | 'fs/promises' | 'node:fs/promises')` call. */
+export const fsRequireCall = (t, node) => node && t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'require' && fsSpecifier(t, node.arguments[0]);
+
+/**
+ * The fs bindings a parsed source declares: `{ namespaces, members }`. `namespaces` holds the local names bound to
+ * a whole fs module - a default or namespace import, a `promises` named import, `const fs = require('fs')`.
+ * `members` is a Map(local name -> imported name) of named imports `wanted` accepts, plus the names of a
+ * `const {x} = require('fs')` destructure unless `destructuredRequires` is false.
+ */
+export function fsBindings(source, wanted, { destructuredRequires = true } = {}) {
+  const t = ts();
+  const namespaces = new Set();
+  const members = new Map();
+  const bind = (node) => {
+    if (t.isImportDeclaration(node) && fsSpecifier(t, node.moduleSpecifier)) {
+      const c = node.importClause;
+      if (c?.name) namespaces.add(c.name.text);
+      const b = c?.namedBindings;
+      if (b && t.isNamespaceImport(b)) namespaces.add(b.name.text);
+      if (b && t.isNamedImports(b)) for (const el of b.elements) {
+        const imported = (el.propertyName ?? el.name).text;
+        if (imported === 'promises') namespaces.add(el.name.text);
+        else if (wanted(imported)) members.set(el.name.text, imported);
+      }
+    }
+    if (t.isVariableDeclaration(node) && node.initializer && fsRequireCall(t, node.initializer)) {
+      if (t.isIdentifier(node.name)) namespaces.add(node.name.text);
+      else if (destructuredRequires && t.isObjectBindingPattern(node.name)) for (const el of node.name.elements) {
+        const imported = el.propertyName && t.isIdentifier(el.propertyName) ? el.propertyName.text : t.isIdentifier(el.name) ? el.name.text : null;
+        if (imported && wanted(imported) && t.isIdentifier(el.name)) members.set(el.name.text, imported);
+      }
+    }
+    t.forEachChild(node, bind);
+  };
+  bind(source);
+  return { namespaces, members };
+}
+
+/** The fs member `callee` (a property access: `fs.X`, `fs.promises.X`) reaches through `namespaces`, or null. */
+export const fsMemberAccess = (t, callee, namespaces, wanted) => {
+  if (!t.isPropertyAccessExpression(callee) || !wanted(callee.name.text)) return null;
+  const target = callee.expression;
+  if (t.isIdentifier(target) && namespaces.has(target.text)) return callee.name.text;
+  if (t.isPropertyAccessExpression(target) && target.name.text === 'promises' && t.isIdentifier(target.expression) && namespaces.has(target.expression.text)) return callee.name.text;
+  return null;
+};
+
 /** The SourceFile of `text`; `.ts` files parse as TypeScript, everything else as JavaScript. */
 export function parseSource(text, file = 'x.mjs') {
   const t = ts();

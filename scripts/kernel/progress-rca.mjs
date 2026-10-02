@@ -41,7 +41,7 @@ export const DECISION_KIND = 'kernel-decision';
 export const DECISION_RESULT_KIND = 'kernel-decision-result';
 export const GRAPH_EDIT_KIND = 'kernel-graph-edit';
 const HOUR = 3_600_000;
-const one = (s, n = 240) => clipLine(String(s ?? '').replace(/\s+/g, ' ').trim(), n);
+const one = (s, n = 240) => clipLine(s, n);
 const parse = (s, d = {}) => parseJsonOr(s, d) ?? d;
 
 /** runtimes.yaml allocation.progress with safe defaults (a missing block never breaks api status). */

@@ -62,6 +62,10 @@ import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
 import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
+import { splitList } from '../lib/list.mjs';
+import { underAny } from '../lib/path-key.mjs';
+import { commitShaOf } from '../lib/git.mjs';
+import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'gates', 'gate.mjs');
@@ -93,7 +97,7 @@ function git(call, cwd, args, { env = null, timeout = 600_000, input, config = n
   const r = call(args, { cwd, timeout, input, config, env: env ? { ...process.env, ...env } : process.env, maxBuffer: 256 * 1024 * 1024 });
   return { ok: !r.error && r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() };
 }
-const revParse = (cwd, ref) => { const r = git(revParseQuery, cwd, ['--verify', '--quiet', `${ref}^{commit}`]); return r.ok && SHA.test(r.stdout) ? r.stdout : null; };
+const revParse = (cwd, ref) => commitShaOf(git, cwd, ref);
 const lines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean);
 const mainOf = (ctx) => ctx?.main ?? 'main';
 /** Part A's functions: ctx.worktree in a spec, the module itself in the runtime. */
@@ -101,11 +105,7 @@ const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, ma
 
 /** The registry row of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
 export function recordOf(ctx, workflowId) {
-  const rec = wt(ctx).workflowWorktreeOf(ctx, workflowId);
-  if (!rec) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no workflow worktree in the registry`);
-  if (!rec.path || !fs.existsSync(rec.path)) throw fail({ code: 'workflow-worktree-missing' }, `the worktree of workflow ${workflowId} (${rec.path ?? '-'}) is gone`);
-  if (!rec.branch) throw fail({ code: 'workflow-worktree-missing' }, `the registry records no branch for the worktree of workflow ${workflowId} (${rec.path})`);
-  return rec;
+  return requireWorktreeRecord(wt(ctx).workflowWorktreeOf(ctx, workflowId), workflowId);
 }
 /** The branch the worktree is on must be the workflow branch: a checkpoint never lands on another branch. */
 function requireOnBranch(rec) {
@@ -132,9 +132,9 @@ export function leasesOf(ctx, { workflowId, opId }) {
 }
 /** The gate bases an op's settle accepts (gateBasesOf over its owned paths), newest first; [] outside a workflow worktree. */
 export const opGateBasesOf = (ctx, { workflowId, opId }) => (wt(ctx).workflowWorktreeOf(ctx, workflowId) ? gateBasesOf(ctx, workflowId, { owned: leasesOf(ctx, { workflowId, opId }).own }) : []);
-const under = (file, owned) => owned.some((o) => o === '.' || file === o || file.startsWith(`${o}/`));
+const under = (file, owned) => underAny(file, owned, { dot: true });
 const literal = (files) => files.map((f) => `:(literal)${f}`);
-const zlist = (text) => String(text ?? '').split('\0').map((l) => l.trim()).filter(Boolean);
+const zlist = (text) => splitList(text, { sep: '\0' });
 /** Every path of the worktree that differs from HEAD: tracked changes (staged or not, deletions included) and untracked files. */
 function changedFiles(dir) {
   const tracked = git(gitDiff, dir, ['--name-only', '--no-renames', '-z', 'HEAD', '--', '.', ...NO_MODULES]);

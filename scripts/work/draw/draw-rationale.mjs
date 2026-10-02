@@ -37,6 +37,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
 import { readContractChangesDoc } from '../../machine/contract-changes-store.mjs';
 import { list } from '../../lib/list.mjs';
+import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { isFile } from '../../lib/fs-kind.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
@@ -288,13 +289,12 @@ const refsOf = (record) => list(record?.refs).map((r) => (typeof r === 'string' 
 // ---------------------------------------------------------------------------------------------------------
 
 const PHRASING = new Set(['strong', 'em', 'b', 'i', 'u', 's', 'small', 'sub', 'sup', 'abbr', 'mark', 'time', 'code', 'bdi', 'bdo', 'q', 'cite', 'dfn', 'var', 'data', 'kbd', 'br', 'wbr', 'span']);
-const up = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 const describe = (el) => {
   const cls = classesOf(el).slice(0, 2).join('.');
   return `<${el.tag}${el.attrs.id ? `#${el.attrs.id}` : ''}${cls ? `.${cls}` : ''}>`;
 };
 const whysOf = (el) => str(el?.attrs?.[WHY_ATTR]).split(/\s+/).filter(Boolean);
-const inRedline = (el) => [el, ...up(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
+const inRedline = (el) => [el, ...ancestorsOf(el)].some((a) => a.attrs?.[REDLINE_ATTR] != null || a.attrs?.id === 'redlines');
 
 /** The region container of a render: the PageContainer root, else <main>, else <body>. */
 export function regionContainerOf(tree) {
@@ -332,7 +332,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
   const tree = parseHtml(html);
   const visible = walkElements(tree).filter((el) => visibleElement(el) && !inRedline(el));
   for (const el of visible) {
-    if (up(el).some((a) => a.tag === 'svg')) continue;
+    if (ancestorsOf(el).some((a) => a.tag === 'svg')) continue;
     const ids = whysOf(el);
     if (!ids.length) {
       if (PHRASING.has(el.tag) && (el.tag === 'br' || el.tag === 'wbr' || (!el.attrs.class && !el.attrs.style && !el.attrs.id)) && el.parent?.tag !== '#root') continue;

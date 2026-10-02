@@ -9,10 +9,10 @@ import {encrypt} from '../api/sops/encrypt.mjs';
 const IS_WINDOWS=process.platform==='win32';
 
 /** PATH lookup with PATHEXT and the winget package tree, the way scripts/stack-secret.mjs finds sops. */
-export function resolveCommand(command){
-  const dirs=(process.env.PATH||'').split(IS_WINDOWS?';':':').filter(Boolean);
-  if(IS_WINDOWS&&process.env.LOCALAPPDATA){
-    const winget=path.join(process.env.LOCALAPPDATA,'Microsoft','WinGet');
+export function resolveCommand(command,env=process.env){
+  const dirs=(env.PATH||'').split(IS_WINDOWS?';':':').filter(Boolean);
+  if(IS_WINDOWS&&env.LOCALAPPDATA){
+    const winget=path.join(env.LOCALAPPDATA,'Microsoft','WinGet');
     dirs.push(path.join(winget,'Links'));
     const packages=path.join(winget,'Packages');
     try{
@@ -23,7 +23,7 @@ export function resolveCommand(command){
       }
     }catch{/* no winget packages */}
   }
-  const exts=IS_WINDOWS?(process.env.PATHEXT||'.EXE;.CMD;.BAT').split(';').filter(Boolean):[''];
+  const exts=IS_WINDOWS?(env.PATHEXT||'.EXE;.CMD;.BAT').split(';').filter(Boolean):[''];
   for(const dir of dirs)for(const ext of exts){
     const candidate=path.join(dir,`${command}${ext}`);
     if(fs.existsSync(candidate))return candidate;

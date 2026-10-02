@@ -27,6 +27,7 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { reduceJest } from './test-world-run.mjs';
 import { loadSlotManifest } from '../hfs/slots.mjs';
 import { unitRolesOf } from '../hfs/manifest-shape.mjs';
+import { opGateRules } from '../lib/op-gate.mjs';
 
 export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
 export const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
@@ -36,8 +37,8 @@ const USAGE = 'usage: unit-run.mjs --root <app> [--out <file>]';
 
 /** op-gate.yaml unitKit: {required[], forbidden[]}. */
 export function unitKitRules(runtime = runtimeRoot) {
-  const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
-  return { required: doc?.unitKit?.required ?? [], forbidden: doc?.unitKit?.forbidden ?? [] };
+  const rules = opGateRules(runtime, 'unitKit');
+  return { required: rules.required, forbidden: rules.forbidden };
 }
 
 /** The folder a role's coverage glob roots at, app-relative (`src/**\/*.service.ts` -> be/src/, `src/features/cli/**\/*.cli.ts` -> be/src/features/cli/). */

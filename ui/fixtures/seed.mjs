@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { openMachine, openMachineReader } from '../../engine/db/machine.mjs';
 import { openLedger, openLedgerReader, ledgerIdForRepo } from '../../engine/db/ledger.mjs';
 import { redactText } from '../../scripts/lib/redact.mjs';
+import { readEnv } from '../../scripts/lib/env.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const canonical = p => path.resolve(p).replaceAll('\\','/').toLowerCase();
@@ -42,7 +43,7 @@ fs.writeFileSync(path.join(root, 'planted-secrets.txt'), secrets.join('\n') + '\
 const fakeSha = n => n.toString(16).padStart(64, '0');
 const trace = n => n.toString(16).padStart(32, '0');
 const span = n => n.toString(16).padStart(16, '0');
-const machine = openMachine({ file: process.env.STARCI_TEST_MACHINE_FILE, now });
+const machine = openMachine({ file: readEnv('STARCI_TEST_MACHINE_FILE'), now });
 const runtimes = [];
 
 function makeRuntime(name, n) {
@@ -205,7 +206,7 @@ try {
     rows.sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
     return crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex');
   };
-  for (const [label,file,open] of [['machine',process.env.STARCI_TEST_MACHINE_FILE,openMachineReader],...runtimes.map(r=>[r.name,r.file,openLedgerReader])]) {
+  for (const [label,file,open] of [['machine',readEnv('STARCI_TEST_MACHINE_FILE'),openMachineReader],...runtimes.map(r=>[r.name,r.file,openLedgerReader])]) {
     const reader = label === 'machine' ? open({file}) : open(file);
     const source = label === 'machine' ? reader.db : reader;
     const tables = source.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name").all().map(r=>r.name);

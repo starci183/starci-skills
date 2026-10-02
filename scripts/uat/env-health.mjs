@@ -46,11 +46,13 @@ import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { normPath } from '../lib/path-key.mjs';
 
 export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
 export const EXIT_READY = 0, EXIT_NOT_READY = 3, EXIT_USAGE = 2;
 // STARCI_ENV_PROBE_TIMEOUT_MS bounds one probe (specs); a first Next compile can take ~15s, so the default waits 20s.
-export const DEFAULT_PROBE_TIMEOUT_MS = Number(process.env.STARCI_ENV_PROBE_TIMEOUT_MS) > 0 ? Number(process.env.STARCI_ENV_PROBE_TIMEOUT_MS) : 20_000;
+export const DEFAULT_PROBE_TIMEOUT_MS = Number(readEnv('STARCI_ENV_PROBE_TIMEOUT_MS')) > 0 ? Number(readEnv('STARCI_ENV_PROBE_TIMEOUT_MS')) : 20_000;
 export const DEFAULT_READY_TIMEOUT_MS = 120_000;
 // Discovery order: the conventional liveness/readiness paths, then a GraphQL typename query (a Nest
 // GraphQL API answers it without auth), then the origin root.
@@ -86,7 +88,7 @@ export function stopListener(pid, { platform = process.platform } = {}) {
   } catch { return false; }
 }
 
-const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const norm = (p) => normPath(p, { fold: true });
 /** Whether a listener is one of this workspace's servers: its command line runs inside a repository root. */
 export const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.some((root) => root && norm(commandLine).includes(norm(root)));
 

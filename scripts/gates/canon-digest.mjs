@@ -13,6 +13,7 @@ import path from 'node:path';
 import { packDryRun } from '../api/npm/pack-dry-run.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { stringList } from '../lib/list.mjs';
 
 export const CANON_DIGEST_ALGORITHMS = Object.freeze(['sha256']);
 export const CANON_DIGEST_FRAMINGS = Object.freeze(['sorted-posix-relative-path-null-raw-bytes-null']);
@@ -22,7 +23,7 @@ export const CANON_DIGEST_FRAMINGS = Object.freeze(['sorted-posix-relative-path-
 const ORDER = new Intl.Collator('en', { usage: 'sort', sensitivity: 'variant' });
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const matchAny = (file, globs) => globs.flatMap(braceVariants).some((pattern) => globExpression(pattern).test(file));
-const globList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string' && item.trim());
+const globList = (value) => stringList(value, { blank: false });
 
 /** The policy itself, or a typed refusal: CANON_DIGEST_ALGORITHM_UNKNOWN, CANON_DIGEST_FRAMING_UNKNOWN, CANON_DIGEST_POLICY_INVALID. */
 export function assertDigestPolicy(policy) {

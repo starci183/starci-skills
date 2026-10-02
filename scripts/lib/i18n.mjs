@@ -44,8 +44,14 @@ export function loadCatalog(root = skillRoot) {
 /** Forget the cached catalogs (a spec that rewrites a catalog file). */
 export const resetCatalogCache = () => cache.clear();
 
+/** The names each `pattern` match captures (group 1) in `text`, in match order (`sort` sorts them). */
+export const captureNames = (text, pattern, { sort = false } = {}) => {
+  const names = [...String(text).matchAll(pattern)].map((m) => m[1]);
+  return sort ? names.sort() : names;
+};
+
 /** The names of the placeholders of a message. */
-export const placeholdersOf = (text) => [...String(text).matchAll(PLACEHOLDER)].map((m) => m[1]).sort();
+export const placeholdersOf = (text) => captureNames(text, PLACEHOLDER, { sort: true });
 
 /** `text` with each `{name}` replaced by vars[name] (an unknown name is left as written). */
 export const fill = (text, vars = {}) => String(text).replace(PLACEHOLDER, (whole, name) => (Object.hasOwn(vars, name) ? String(vars[name]) : whole));

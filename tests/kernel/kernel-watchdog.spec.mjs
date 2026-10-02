@@ -3,8 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
-import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs'; const F = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
+import { buildWakePrompt, wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
+import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
+const F = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
 
 test('provider input prompt is turn-idle even when it carries an Orca message',()=>{
   const screen=`Worked for 18m 4s · done 6:56 AM
@@ -171,17 +175,9 @@ test('watchdog wake names the Kernel seat it is for, checkable with api status, 
   assert.match(prompt,/^Watchdog liveness wake for wf-example: .*act on it now\./);
   assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: api status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
   assert.doesNotMatch(prompt,/already approved|needs no confirmation/);
-  const src=fs.readFileSync(new URL('../../scripts/kernel/kernel-watchdog.mjs',import.meta.url),'utf8');
-  assert.match(src,/text: wakePromptOf\(workflowId, status\.value\)/,'the liveness wake is built from api status');
-  assert.match(src,/buildWakePrompt\(workflow, statusValue\?\.kernel\?\.attempt \?\? null, /,'it takes the attempt (and the runtime rev) from api status');
-  assert.match(src,/'--launched-by', 'watchdog'/,'a repair names its launcher');
 });
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{
-  const src=fs.readFileSync(new URL('../../scripts/kernel/kernel-watchdog.mjs',import.meta.url),'utf8');
-  const idle=src.indexOf("classified.state === 'turn-idle'"),gate=src.indexOf('frontier?.actionable',idle),send=src.indexOf('sendWakeWithProof(',idle);
-  assert.ok(idle>0&&gate>idle&&send>gate,'the actionable gate sits between the turn-idle branch and the wake send');
-  assert.match(src,/action: 'idle-waiting'/);
   const supervise=fs.readFileSync(new URL('../../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
   assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
 });
@@ -209,13 +205,8 @@ test('the watchdog is one --once pass the Host controller runs; there is no loop
   });
 });
 
-// The watchdog repairs the sidebar tab title through the public Orca wrapper;
-// it never imports the raw runner or restores the removed keepTitles loop.
-test('the watchdog repairs tab titles through the Orca wrapper', () => {
-  const src = fs.readFileSync(new URL('../../scripts/kernel/kernel-watchdog.mjs', import.meta.url), 'utf8');
-  assert.match(src, /from ['"]\.\.\/api\/orca\/terminal-rename\.mjs['"]/);
-  assert.doesNotMatch(src, /\borcaCall\b|keepTitles/);
-});
+// The watchdog repairs the sidebar tab title through the public Orca wrapper (proved end to
+// end below: a drifted tab title is renamed to the seat's [Kernel] title on a repair tick).
 
 // A Codex release put its update menu in front of every fresh op launch for
 // three hours; it is a named gate the Codex card lets the runtime answer.
@@ -249,3 +240,127 @@ test('the Codex rate-limit model nudge is a gate the Codex card answers by keepi
 // child, and the edge in runtime/guards/host-resources.json keeps a fresh --once child from
 // starting it again while the host stays low. The probe is stubbed here (the contract is
 // {lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); a spec run never measures the real host.
+
+/* --------------------------------------------------------- e2e: --once --repair ticks */
+
+// One real --once --repair tick against a fake Orca (the world shape of
+// tests/kernel/kernel-wake-delivery-proof.spec.mjs), seeded with a live kernel seat.
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
+const WATCHDOG_E2E = path.join(ROOT, 'scripts', 'kernel', 'kernel-watchdog.mjs');
+const KERNEL = 'kernel-terminal-1';
+const json = (text) => { try { return JSON.parse(text); } catch { return null; } };
+const KERNEL_IDLE = [' Yielding — waiting on the code.refactor report.', '✻ Brewed for 3m 2s', '─────', '❯', '─────',
+  '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+
+const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signalValue = null } = {}) => {
+  const { seedWorkflow } = await import('../helpers/ledger-fixture.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-watchdog-e2e-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
+  const stubFile = path.join(root, 'fake-orca.mjs'); fs.writeFileSync(stubFile, FAKE_ORCA);
+  const stateFile = path.join(root, 'state.json'), logFile = path.join(root, 'calls.jsonl');
+  const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stubFile]),
+    STARCI_FAKE_ORCA_LOG: logFile, STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1',
+    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
+  const workflowId = 'wf-watchdog-e2e';
+  const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
+  try {
+    seedWorkflow(ledger, { id: workflowId, state: { phase: 'running' }, goal: { markdown: '# goal' },
+      jobs: [{ jobId: `kernel-${workflowId}`, kind: 'kernel', status: 'running', workerId: KERNEL,
+        payload: { hierarchy: { attempt: 2, runtime: { terminalHandle: KERNEL } } } }, ...jobs],
+      events: [{ kind: 'kernel-booted', entityType: 'kernel', payload: { terminal: KERNEL, launchedBy: 'supervisor', attempt: 2 } }, ...events],
+      signals: [{ key: workflowId, value: signalValue ?? { terminal: KERNEL, dispatch: 'dispatch-kernel-1', host: 'orca', agent: 'claude', launch: 'worker' } }] });
+  } finally { ledger.close(); }
+  fs.writeFileSync(stateFile, JSON.stringify({ terminals: { [KERNEL]: { handle: KERNEL, connected: true, writable: true,
+    sent: false, prompt: null, command: 'claude --model claude-opus-5-5', screen: KERNEL_IDLE, ...(tabTitle ? { tabTitle } : {}) } } }));
+  const run = (script, args, more = {}) => spawnSync(process.execPath, [script, ...args],
+    { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...env, ...more } });
+  const tick = (more = {}) => { const r = run(WATCHDOG_E2E, ['--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'], more);
+    return { status: r.status, result: json(r.stdout.trim().split('\n').at(-1)), stderr: r.stderr, stdout: r.stdout }; };
+  const api = (...args) => json(run(API, [...args, '--repo', repo, '--workflow', workflowId, '--json']).stdout);
+  const orcaCalls = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean).map(json) : []).map((e) => e.argv);
+  const kernelWakes = () => orcaCalls().filter((a) => a[0] === 'terminal' && a[1] === 'send' && a[a.indexOf('--terminal') + 1] === KERNEL)
+    .map((a) => ({ text: a.includes('--text') ? a[a.indexOf('--text') + 1] : '', enter: a.includes('--enter') }));
+  const orcaState = () => (fs.existsSync(stateFile) ? json(fs.readFileSync(stateFile, 'utf8')) : null) ?? {};
+  const eventsOf = (kind) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) });
+    try { return l.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(workflowId, kind).map((r) => json(r.payload_json)); }
+    finally { l.close(); } };
+  return { root, repo, env, workflowId, tick, api, orcaCalls, kernelWakes, orcaState, eventsOf };
+};
+
+// The liveness wake a tick types is built from the api status read that same tick did: its seat
+// attempt, its launcher and its runtime rev are the status values, not watchdog constants.
+test('a liveness tick types exactly the wake api status implies', async (t) => {
+  const fx = await watchdogWorld(t);
+  const { status, result, stderr } = fx.tick();
+  assert.equal(status, 0, stderr);
+  assert.equal(result.action, 'woken', JSON.stringify(result));
+  const wakes = fx.kernelWakes();
+  assert.equal(wakes.length, 1, 'exactly one wake typed');
+  const statusValue = fx.api('status').value;
+  assert.equal(wakes[0].text, result.nextWake ?? wakePromptOf(fx.workflowId, statusValue),
+    'the typed wake is the wake built from the status read');
+  assert.match(wakes[0].text, /Runtime wake for Kernel attempt 2 of wf-watchdog-e2e/,
+    'the Kernel attempt api status names rides in the wake');
+});
+
+// A Kernel idle at its prompt with nothing actionable for it (an owner-gate is open, the frontier
+// is awaiting-owner) is left alone: the tick answers idle-waiting and types nothing.
+test('a turn-idle Kernel behind a non-actionable frontier is left alone', async (t) => {
+  const fx = await watchdogWorld(t);
+  const incident = fx.api('incident', '--kind', 'owner-gate', '--detail', 'the owner decides the scope');
+  assert.equal(incident.ok, true, JSON.stringify(incident));
+  assert.equal(fx.api('status').value.frontier.actionable, false);
+  const { status, result, stderr } = fx.tick();
+  assert.equal(status, 0, stderr);
+  assert.equal(result.action, 'idle-waiting', JSON.stringify(result));
+  assert.equal(fx.kernelWakes().length, 0, 'nothing typed while the frontier waits on the owner');
+});
+
+// The repair tick restores a moved tab's sidebar title through the Orca `terminal rename` call -
+// the answer carries the repair and the host saw one rename for the Kernel terminal.
+test('a repair tick renames a drifted Kernel tab title through Orca', async (t) => {
+  const fx = await watchdogWorld(t, { tabTitle: 'restored session' });
+  const { status, result, stderr } = fx.tick();
+  assert.equal(status, 0, stderr);
+  assert.equal(result.action, 'woken', JSON.stringify(result));
+  const expected = `[Kernel] ${fx.api('status').value.title ?? fx.workflowId}`;
+  assert.equal(result.titleRepair?.title, expected, JSON.stringify(result.titleRepair));
+  assert.equal(result.titleRepair?.ok, true);
+  const renames = fx.orcaCalls().filter((a) => a[0] === 'terminal' && a[1] === 'rename');
+  assert.equal(renames.length, 1, 'one terminal rename call');
+  assert.equal(renames[0][renames[0].indexOf('--terminal') + 1], KERNEL);
+  assert.equal(renames[0][renames[0].indexOf('--title') + 1], expected);
+});
+
+// A seat whose signal names no worker Dispatch is replaced through start-workflow, launched-by the
+// watchdog: the kernel-restarted event and api status kernel.launchedBy name it.
+test('a repair replaces a seat with no worker under the watchdog launcher', async (t) => {
+  const fx = await watchdogWorld(t, { signalValue: { terminal: KERNEL, host: 'orca', agent: 'claude', launch: 'worker' } });
+  const { status, result, stderr, stdout } = fx.tick();
+  assert.equal(status, 0, stderr || stdout);
+  assert.equal(result.action, 'restarted', JSON.stringify(result));
+  const restarts = fx.eventsOf('kernel-restarted');
+  assert.equal(restarts.length, 1);
+  assert.equal(restarts[0].launchedBy, 'watchdog', 'the repair named its launcher');
+  assert.equal(fx.api('status').value.kernel.launchedBy, 'watchdog');
+});
+
+// An idle Kernel due for replacement (3 delivered wakes with no move, the first past the window)
+// whose seat cannot be fenced - Orca refuses worker-release - is replaced by nothing: the tick
+// answers kernel-terminal-close-failed, no kernel-replaced-idle is recorded and no start-workflow ran.
+test('an idle Kernel whose release is refused is close-failed, not replaced', async (t) => {
+  const minute = 60_000, now = Date.now();
+  const fx = await watchdogWorld(t, { events: [
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 12 * minute, payload: { terminal: KERNEL } },
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11.5 * minute, payload: { terminal: KERNEL } },
+    { kind: 'kernel-woken', entityType: 'kernel', created_at: now - 11 * minute, payload: { terminal: KERNEL } },
+  ] });
+  const { result } = fx.tick({ STARCI_FAKE_ORCA_RELEASE_FAILS: '1' });
+  assert.equal(result.action, 'kernel-terminal-close-failed', JSON.stringify(result));
+  assert.equal(result.ok, false);
+  assert.equal(fx.eventsOf('kernel-replaced-idle').length, 0, 'a close that failed counted no replacement');
+  assert.equal(fx.eventsOf('kernel-restarted').length, 0, 'start-workflow never ran');
+  assert.equal(fx.orcaCalls().filter((a) => a[0] === 'orchestration' && a[1] === 'worker-start').length, 0, 'no worker started');
+});

@@ -55,6 +55,7 @@ import { parseJson } from '../lib/json.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { isSpecRun, readEnv } from '../lib/env.mjs';
 
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
@@ -154,7 +155,7 @@ export function closedMessage({ reason, by = null, title, question, language, no
 }
 /* ------------------------------------------------------------ Bot API */
 
-const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
+export const endpoint = (apiBase, token, method) => `${apiBase.replace(/\/+$/, '')}/bot${token}/${method}`;
 
 /**
  * The polite retry loop every Bot API transport shares: `issue()` performs one attempt's fetch; 429 waits
@@ -398,7 +399,7 @@ const readAsk = (ledgerFile, workflowId, dispatchId, now) => {
 const guarded = (env, apiBase, fetchImpl) => (env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children such as a serve-ask under
   // test inherit) never reaches the real Bot API, whatever the owner config says.
-  : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
+  : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context' : null);
 
 /**
  * The resolved context of one owner-facing send: every option defaulted, Telegram checked (a guarded-off
@@ -609,7 +610,7 @@ async function main() {
   const args = argsOf(process.argv.slice(2));
   const verb = args._[0] ?? (args['discover-chat'] ? 'discover-chat' : null);
   const out = (value) => console.log(JSON.stringify(value));
-  const apiBase = process.env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE;
+  const apiBase = readEnv('STARCI_TELEGRAM_API_BASE') || DEFAULT_API_BASE;
   if (verb === 'notify') {
     if (!args.ledger || !args.workflow || !args.dispatch) { out({ ok: false, error: 'notify needs --ledger <file> --workflow <id> --dispatch <id> [--repo <path>]' }); process.exit(2); }
     out(await notifyAsk({ ledgerFile: args.ledger, repo: typeof args.repo === 'string' ? args.repo : null, workflowId: args.workflow, dispatchId: args.dispatch })); return;
@@ -644,7 +645,7 @@ if (isMain(import.meta.url)) main();
 export async function ownerPush(text, { env = process.env, settings = null, apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE, fetchImpl = fetch, sleepImpl = undefined } = {}) {
   const s = settings ?? telegramSettings({ env });
   const skipped = env.STARCI_CONNECTORS_OFF === '1' ? 'STARCI_CONNECTORS_OFF'
-    : env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
+    : isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch ? 'test context: refusing the real Bot API'
     : !s?.ready ? (s?.warning ?? 'telegram is off (connectors.telegram)') : null;
   if (skipped) return { ok: true, skipped };
   try {

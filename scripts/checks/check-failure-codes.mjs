@@ -14,7 +14,7 @@
 // RT_CODE_SOLE_EMITTER.
 // What counts as an emitted code (see `emittedCodes`):
 //   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
-//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var;
+//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var (`env.X`, `env['X']`, `readEnv('X')`);
 //   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
 //          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
 import fs from 'node:fs';
@@ -121,7 +121,7 @@ export function emittedCodes(base = root) {
     if (SKIP_FILES.has(rel)) continue;
     const text = fs.readFileSync(file, 'utf8');
     texts.push([rel, text]);
-    for (const m of text.matchAll(/\b(?:process\.)?env(?:\.|\[\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
+    for (const m of text.matchAll(/\b(?:(?:process\.)?env(?:\.|\[\s*['"])|readEnv\(\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
   }
   for (const [rel, text] of texts) {
     for (const m of text.matchAll(UPPER_RE)) {

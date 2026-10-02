@@ -46,10 +46,11 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { diffTree } from '../api/git/diff-tree.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
+import { SKILL_ROOT, supervisorRead, supervisorEvent, withSupervisor } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
 import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { verbCli } from '../lib/cli-arg.mjs';
 
 export { LESSONS_FILE, lessonsForChecks, parseLessonsFile };
 
@@ -57,7 +58,7 @@ export const KINDS = Object.freeze({
   hypothesis: 'supervisor-hypothesis', experiment: 'supervisor-experiment', result: 'supervisor-experiment-result',
   lesson: 'supervisor-lesson', proposal: 'supervisor-proposal',
 });
-export const one = (s, n = 300) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
+export const one = (s, n = 300) => clipLine(s, n);
 const norm = posixPath;
 
 /** allocation.supervisorLearning, every number checked. */
@@ -136,7 +137,7 @@ export function learningState(m) {
   }
   return { signatures, experiments, lessons, proposals };
 }
-export const readLearning = ({ env = process.env } = {}) => readSupervisor((m) => learningState(m), EMPTY_STATE(), { env });
+export const readLearning = supervisorRead((m) => learningState(m), EMPTY_STATE);
 
 /** The sup_learning row of one change: {itemId, kind, parentId, title, state}. Pure over `kind` and the payload. */
 function learningItem(kind, p) {
@@ -372,12 +373,7 @@ export function learningDigest(state, { since = 0 } = {}) {
 /* ------------------------------------------------------------ CLI */
 
 if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const verb = argv[0];
-  const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const csv = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const asJson = argv.includes('--json');
-  const print = (r, human) => console.log(asJson ? JSON.stringify(r) : human);
+  const { argv, verb, value, csv, print } = verbCli();
   try {
     if (verb === 'list') {
       const s = readLearning();

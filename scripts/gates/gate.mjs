@@ -47,6 +47,7 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
 import { setPriority } from '../api/process/set-priority.mjs'; import { runNode } from '../api/node/run-node.mjs';
 import { sha256 } from '../../engine/digest.mjs';
@@ -288,7 +289,7 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
 /* ------------------------------------------------------------------------------------ codegen + build */
 
 const npm = (cwd, script) => runNpm(['run', script], { cwd, maxBuffer: 256 * 1024 * 1024 });
-const readManifest = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; } };
+const readManifest = (dir) => readJsonFile(path.join(dir, 'package.json'));
 /** A stamp of what `paths` hold in this worktree: their index entries plus their uncommitted state. */
 const inputStamp = (root, paths) => sha256(`${gitText(lsFiles, root, ['-s', '--', ...paths]) ?? ''}\0${gitText(gitStatus, root, ['--porcelain', '--', ...paths]) ?? ''}`);
 const exposesDist = (manifest) => /(^|\/)dist\//.test(JSON.stringify([manifest?.exports ?? null, manifest?.main ?? null, manifest?.types ?? null, manifest?.module ?? null]));
@@ -365,7 +366,7 @@ const errorsOf = (ts, diagnostics, root) => diagnostics.filter((d) => d.category
 const programDiagnostics = (program) => [...program.getConfigFileParsingDiagnostics(), ...program.getOptionsDiagnostics(), ...program.getGlobalDiagnostics(), ...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()];
 const NO_OUTPUT = { noEmit: true, composite: false, declaration: false, declarationMap: false, emitDeclarationOnly: false, sourceMap: false };
 
-const isAppDeclaration = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, HFS_DECLARATION_FILE), 'utf8'))?.kind === APP_SCOPE; } catch { return false; } };
+const isAppDeclaration = (dir) => readJsonFile(path.join(dir, HFS_DECLARATION_FILE))?.kind === APP_SCOPE;
 
 /**
  * The app root of `project` (the root-relative path of a file in it, e.g. its tsconfig.json): the nearest directory from the

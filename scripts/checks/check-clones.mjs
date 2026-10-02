@@ -12,13 +12,13 @@
 // the same two locations merge into one maximal block. Blocks are compared inside one unit (the runtime proper, or one published package: packages/eslint/be and packages/eslint/fe are two); packages/grammar is out of scope. A block whose nodes are mostly type declarations is ignored. The
 // finding sits on the later location, names the first one and the home of the shared code.
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { lsFiles } from '../api/git/ls-files.mjs';
+import { trackedTextFiles } from '../lib/tracked-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
+import { tokenize as tokenizeSource } from '../hfs/architecture/clones.mjs';
 
 export const CLONE_LINES = 8;
 export const CLONE_TOKENS = 60;
@@ -35,46 +35,11 @@ const MAX_FINDINGS = 400;
 
 let typescript = null;
 const tsOf = () => { typescript ??= createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('typescript'); return typescript; };
-const ID = -1;
-const LIT = -2;
-
 /** The normalised node sequence of a source file: {kinds, lines, types} (the line of each node, and whether it sits in a type declaration). */
 function tokenize(rel, text) {
   const ts = tsOf();
   const kindOfFile = rel.endsWith('.tsx') ? ts.ScriptKind.TSX : rel.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS;
-  const sourceFile = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, kindOfFile);
-  const { SyntaxKind } = ts;
-  const literalKinds = new Set([SyntaxKind.StringLiteral, SyntaxKind.NumericLiteral, SyntaxKind.BigIntLiteral, SyntaxKind.RegularExpressionLiteral,
-    SyntaxKind.NoSubstitutionTemplateLiteral, SyntaxKind.TemplateHead, SyntaxKind.TemplateMiddle, SyntaxKind.TemplateTail, SyntaxKind.JsxText]);
-  const kinds = [];
-  const lines = [];
-  const types = [];
-  const lineStarts = sourceFile.getLineStarts();
-  const lineOf = (position) => {
-    let low = 0;
-    let high = lineStarts.length - 1;
-    while (low < high) {
-      const mid = (low + high + 1) >> 1;
-      if (lineStarts[mid] <= position) low = mid; else high = mid - 1;
-    }
-    return low + 1;
-  };
-  const visit = (node, inType) => {
-    const kind = node.kind;
-    if (kind >= SyntaxKind.FirstJSDocNode && kind <= SyntaxKind.LastJSDocNode) return;
-    if (kind === SyntaxKind.JsxText && node.containsOnlyTriviaWhiteSpaces) return;
-    const typeScope = inType || kind === SyntaxKind.InterfaceDeclaration || kind === SyntaxKind.TypeAliasDeclaration;
-    kinds.push(kind === SyntaxKind.Identifier || kind === SyntaxKind.PrivateIdentifier ? ID : literalKinds.has(kind) ? LIT : kind);
-    lines.push(lineOf(node.getStart(sourceFile)));
-    types.push(typeScope ? 1 : 0);
-    ts.forEachChild(node, (child) => { visit(child, typeScope); });
-  };
-  for (const statement of sourceFile.statements) {
-    if (statement.kind === SyntaxKind.ImportDeclaration || statement.kind === SyntaxKind.ImportEqualsDeclaration
-      || (statement.kind === SyntaxKind.ExportDeclaration && statement.moduleSpecifier)) continue;
-    visit(statement, false);
-  }
-  return { kinds: Int32Array.from(kinds), lines: Int32Array.from(lines), types: Uint8Array.from(types) };
+  return tokenizeSource(ts, ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, kindOfFile));
 }
 
 /** Where the shared code of a block belongs, by the files that hold it. */
@@ -165,10 +130,8 @@ export function cloneFindings(files, { lines: N = CLONE_LINES, tokens: T = CLONE
 
 /** Run the check on the runtime at `root`. */
 export function checkClones(root = skillRoot) {
-  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
-  const files = tracked
-    .filter((rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && !OUT_OF_SCOPE.test(rel) && fs.existsSync(path.join(root, rel)))
-    .map((rel) => ({ rel, text: fs.readFileSync(path.join(root, rel), 'utf8') }));
+  const files = trackedTextFiles(root,
+    (rel) => CLONE_ROOTS.some((r) => rel.startsWith(`${r}/`)) && SOURCE.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel) && !OUT_OF_SCOPE.test(rel));
   return cloneFindings(files);
 }
 

@@ -59,9 +59,10 @@ import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf } from '../lib/terminal-liveness.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { conditionLabel, evaluateCondition, lineageHeadById, typedIncidents } from '../kernel/gate-conditions.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
+import { parseJsonOr, jsonFromStdout } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'cli.mjs');
@@ -354,15 +355,6 @@ export function judgePeerWait({ db, workflowId, wait, repo = null, dbOf = () => 
 
 /* ------------------------------------------------------------ the frontier */
 
-const jsonFrom = (stdout) => {
-  const text = String(stdout ?? '').trim();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { /* fall through */ }
-  const first = text.indexOf('{'), last = text.lastIndexOf('}');
-  if (first >= 0 && last > first) { try { return JSON.parse(text.slice(first, last + 1)); } catch { /* not json */ } }
-  return null;
-};
-
 /**
  * `api status --json` for one workflow — the frontier the watchdog reads every tick (a read
  * projection: it writes nothing). {ok, frontier, workers} or {ok:false, error}.
@@ -372,7 +364,7 @@ export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   delete env.ORCA_TERMINAL_HANDLE;
   const r = runNode([API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
     { cwd: skillRoot, timeout: timeoutMs, env });
-  const value = jsonFrom(r.stdout);
+  const value = jsonFromStdout(r.stdout);
   if (r.status !== 0 || !value?.ok) return { ok: false, error: clipLine(value?.error ?? r.stderr ?? r.error?.message ?? `exit ${r.status}`, 160) };
   return { ok: true, frontier: value.frontier ?? {}, workers: value.workers ?? [], phase: value.phase ?? null, kernelRev: value.kernelRev ?? null, nextActions: value.nextActions ?? [], awaitingOwner: value.awaitingOwner ?? [], stuck: Array.isArray(value.stuck) ? value.stuck : [],
     progress: value.progress ?? null, rca: value.rca ?? null };
@@ -387,7 +379,7 @@ const gateLabel = (gate, held) => `${gate.incidentId} [${gate.kind}] holds ${hel
  * never reaches a real Orca (NODE_TEST_CONTEXT).
  */
 export function kernelTurnState(db, workflowId, { show = terminalShow, read = terminalRead, env = process.env } = {}) {
-  if (env.NODE_TEST_CONTEXT && show === terminalShow) return null;
+  if (isSpecRun(env) && show === terminalShow) return null;
   try {
     const terminal = parse(db?.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId)?.value_json, null)?.terminal;
     if (!terminal) return null;

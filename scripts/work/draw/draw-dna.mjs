@@ -56,6 +56,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { PROPOSAL_FILE_NAMES, readProposals } from '../grammar-proposal.mjs'; import { isMain } from '../../lib/is-main.mjs';
+import { ancestorsOf } from '../../lib/dom-tree.mjs';
 
 export const DRAW_OFF_GRAMMAR_COMPONENT = 'DRAW_OFF_GRAMMAR_COMPONENT';
 export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
@@ -186,7 +187,6 @@ export function textOf(node) {
   return node.children.map(textOf).join(' ').replace(/\s+/g, ' ').trim();
 }
 export const classesOf = (el) => String(el?.attrs?.class ?? '').split(/\s+/).filter(Boolean);
-const ancestors = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 const describe = (el) => {
   const cls = classesOf(el).slice(0, 3).join('.');
   const text = textOf(el).slice(0, 40);
@@ -253,15 +253,15 @@ const NOT_RENDERED = new Set(['#root', 'html', 'head', 'body', 'script', 'style'
 /** Phrasing that inherits the mapping of its parent when it carries no class, style or id of its own. */
 const PHRASING = new Set(['strong', 'em', 'b', 'i', 'u', 's', 'small', 'sub', 'sup', 'abbr', 'mark', 'time', 'code', 'bdi', 'bdo', 'q', 'cite', 'dfn', 'var', 'data', 'kbd', 'br', 'wbr', 'span']);
 const hiddenEl = (el) => el.attrs.hidden != null || /display\s*:\s*none/i.test(el.attrs.style ?? '') || el.attrs.type === 'hidden';
-const insideSvg = (el) => ancestors(el).some((a) => a.tag === 'svg');
-const inHead = (el) => ancestors(el).some((a) => a.tag === 'head' || NOT_RENDERED.has(a.tag) && a.tag !== 'html' && a.tag !== 'body');
+const insideSvg = (el) => ancestorsOf(el).some((a) => a.tag === 'svg');
+const inHead = (el) => ancestorsOf(el).some((a) => a.tag === 'head' || NOT_RENDERED.has(a.tag) && a.tag !== 'html' && a.tag !== 'body');
 const mappedSelf = (el) => el.attrs[COMPONENT_ATTR] != null || el.attrs[PART_ATTR] != null || el.attrs[PROPOSAL_ATTR] != null;
 const plainPhrasing = (el) => PHRASING.has(el.tag) && (el.tag === 'br' || el.tag === 'wbr' || (!el.attrs.class && !el.attrs.style && !el.attrs.id));
 
 /** Whether an element renders and so must say what it is. */
 export function visibleElement(el) {
   if (NOT_RENDERED.has(el.tag) || inHead(el)) return false;
-  if (hiddenEl(el) || ancestors(el).some(hiddenEl)) return false;
+  if (hiddenEl(el) || ancestorsOf(el).some(hiddenEl)) return false;
   return true;
 }
 
@@ -270,11 +270,11 @@ const componentNameOf = (el) => (el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 export const componentRootOf = (el) => {
   const name = componentNameOf(el);
   if (!name) return '';
-  const up = ancestors(el).find((a) => a.attrs?.[COMPONENT_ATTR]);
+  const up = ancestorsOf(el).find((a) => a.attrs?.[COMPONENT_ATTR]);
   return up && componentNameOf(up) === name && el.attrs[PART_ATTR] ? '' : name;
 };
-const proposalOf = (el) => [el, ...ancestors(el)].map((a) => a.attrs?.[PROPOSAL_ATTR]).find((p) => p && p.trim()) ?? null;
-const inComponent = (el, names) => [el, ...ancestors(el)].some((a) => names.includes(componentNameOf(a)));
+const proposalOf = (el) => [el, ...ancestorsOf(el)].map((a) => a.attrs?.[PROPOSAL_ATTR]).find((p) => p && p.trim()) ?? null;
+const inComponent = (el, names) => [el, ...ancestorsOf(el)].some((a) => names.includes(componentNameOf(a)));
 
 /** The tone an element declares: data-tone / data-grammar-tone / tone / data-state / data-status, else a tone class. */
 export function toneOf(el) {
@@ -389,7 +389,7 @@ const RASTER_SRC = /\.(png|jpe?g|webp|gif|avif)(?:[?#]|$)|^data:image\/(png|jpe?
 /** Raster artwork: an Image/MediaFrame/RankArtwork root, or an img of a raster file outside Avatar/Icon/IconTile. */
 export function isArtwork(el) {
   const name = componentRootOf(el);
-  if (ARTWORK_COMPONENTS.has(name) && !ancestors(el).some((a) => ARTWORK_COMPONENTS.has(componentNameOf(a)))) return true;
+  if (ARTWORK_COMPONENTS.has(name) && !ancestorsOf(el).some((a) => ARTWORK_COMPONENTS.has(componentNameOf(a)))) return true;
   if (el.tag !== 'img' || inComponent(el, ['Avatar', 'AvatarGroup', 'Icon', 'IconTile', ...ARTWORK_COMPONENTS])) return false;
   return RASTER_SRC.test(String(el.attrs.src ?? '').trim());
 }
@@ -462,7 +462,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
       add(DRAW_OFF_GRAMMAR_COMPONENT, 'proposal without an entry', el, `data-grammar-proposal="${proposal}" has no complete entry (name, gap, anatomy, tokens, claims, isolated render) in grammar-proposal.md/.yaml`);
     }
     if (part && !proposalOf(el)) {
-      const owners = [el, ...ancestors(el)].map(componentNameOf).filter(Boolean).map((n) => dna.components.get(n)).filter(Boolean);
+      const owners = [el, ...ancestorsOf(el)].map(componentNameOf).filter(Boolean).map((n) => dna.components.get(n)).filter(Boolean);
       const judged = owners.filter((c) => c.parts.size);
       if (judged.length && judged.length === owners.length && !judged.some((c) => c.parts.has(part))) {
         add(DRAW_OFF_GRAMMAR_COMPONENT, 'unknown anatomy part', el, `part "${part}" is none of ${[...new Set(judged.map((c) => c.name))].slice(0, 3).join('/')}'s anatomy`);
@@ -502,7 +502,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
     const tone = container ? toneOf(el) : null;
     if (tone && tone.tone !== 'neutral') reasons.push(`a ${tone.raw}-toned ${name}`);
     if (container) {
-      const tiles = walkElements(el).filter((d) => componentNameOf(d) === 'IconTile' && ancestors(d).find((a) => CONTAINERS.has(componentNameOf(a))) === el);
+      const tiles = walkElements(el).filter((d) => componentNameOf(d) === 'IconTile' && ancestorsOf(d).find((a) => CONTAINERS.has(componentNameOf(a))) === el);
       const outcomeTile = tiles.find((t) => OUTCOME_STATES.has(toneOf(t)?.tone));
       if (outcomeTile && walkElements(el).some(isAction)) reasons.push(`an ${toneOf(outcomeTile).raw}-toned IconTile beside an action`);
     }
@@ -542,7 +542,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
   for (const el of all.filter((e) => componentRootOf(e) === 'Alert')) {
     const bg = declaredBackgroundsOf(el, rules).find((b) => !surfaceBackground(b.value));
     if (bg) add(DRAW_ALERT_ANATOMY, 'tone-filled Alert', el, `${bg.via} sets background ${bg.value}: the HeroUI Alert is bg-surface (white) with shadow-surface - its tone lives in the indicator glyph and the title, never a fill`);
-    const inside = walkElements(el).filter((d) => !ancestors(d).slice(0, ancestors(d).indexOf(el)).some((a) => componentRootOf(a) === 'Alert'));
+    const inside = walkElements(el).filter((d) => !ancestorsOf(d).slice(0, ancestorsOf(d).indexOf(el)).some((a) => componentRootOf(a) === 'Alert'));
     const tone = toneOf(el);
     const wanted = tone ? alertActionVariantFor(tone.tone) : null;
     for (const tile of inside.filter((d) => componentNameOf(d) === 'IconTile')) add(DRAW_ALERT_ANATOMY, 'IconTile in an Alert', tile, 'an Alert carries no IconTile: its indicator is the HeroUI size-4 glyph (alert__indicator)');
@@ -587,7 +587,7 @@ export function dnaFindings(html, { dna = loadDna(), proposals = new Set(), labe
   // 6. Artwork is an interface.asset slot, never reused ad hoc.
   for (const el of all) {
     if (insideSvg(el) || !isArtwork(el)) continue;
-    const slotEl = [el, ...ancestors(el)].find((a) => (a.attrs?.[ASSET_SLOT_ATTR] ?? '').trim());
+    const slotEl = [el, ...ancestorsOf(el)].find((a) => (a.attrs?.[ASSET_SLOT_ATTR] ?? '').trim());
     if (!slotEl) { add(DRAW_ASSET_SLOT_UNDECLARED, 'artwork without an asset slot', el, `mark it ${ASSET_SLOT_ATTR}="<id>" (a placeholder is fine) and request it in asset-request.md: interface.asset owes the artwork, never a reused file`); continue; }
     const id = slotEl.attrs[ASSET_SLOT_ATTR].trim();
     if (assetRequests && !assetRequests.has(id)) add(DRAW_ASSET_SLOT_UNDECLARED, 'asset slot without a request', slotEl, `${ASSET_SLOT_ATTR}="${id}" has no entry in the drawing's asset-request.md`);

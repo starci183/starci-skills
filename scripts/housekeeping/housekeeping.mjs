@@ -24,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -44,7 +45,7 @@ export const AREAS = Object.freeze({
 export const AREA_NAMES = Object.freeze(Object.keys(AREAS));
 
 const csv = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
-const number = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+const number = (v) => positiveNumber(v, 0);
 /** A sweep's errors list as strings: plain entries, Error-likes, and {path, error} records (hk-tmp). */
 const errorStrings = (v) => (Array.isArray(v) ? v.map((e) => {
   if (e == null) return '';

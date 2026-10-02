@@ -34,6 +34,7 @@ import { RETIRED_PATHS_FILE, movedFrom, pinnedFindings, retiredFindings } from '
 import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 import { sourceNameFindings } from './runtime-rules/source-name.mjs';
 import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
 import { tierFindings } from './runtime-rules/tier-direction.mjs';
@@ -80,7 +81,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   const params = ruleParams(runtimeManifest, 'runtime');
   const tracked = files ?? trackedFiles(repoRoot);
   const fileSet = new Set(tracked);
-  const read = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel), 'utf8'); } catch { return null; } };
+  const read = (rel) => readTextFile(repoRoot, rel);
   const readBytes = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel)); } catch { return null; } };
   const sourcePaths = runtimeSources(tracked, params);
   const sources = sourcePaths.map((p) => ({ path: p, text: read(p) ?? '' }));

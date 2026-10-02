@@ -21,18 +21,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { normalizeProvider } from '../lib/provider.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const AGENTS_DIR = path.join(skillRoot, 'modules', 'models', 'agents');
 
-export const providerKeyOf = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
 
 /** First 12 hex of sha256(value); null for an empty value. */
 export const fingerprintOf = (value) => (typeof value === 'string' && value.length
   ? sha256(value).slice(0, 12) : null);
 
 export function agentCardOf(provider) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   if (!key || /[\\/]|\.\./.test(key)) return null;
   const file = path.join(AGENTS_DIR, `${key}.yaml`);
   try { return fs.existsSync(file) ? parseYaml(fs.readFileSync(file, 'utf8')) : null; } catch { return null; }
@@ -52,7 +52,7 @@ const orcaAccountIdentity = (provider, accounts) => {
  * Orca-managed provider with no account list passed).
  */
 export function credentialFingerprintOf(provider, { accounts, card } = {}) {
-  const key = providerKeyOf(provider);
+  const key = normalizeProvider(provider);
   const adapter = card ?? agentCardOf(key);
   if (adapter?.quota?.probe === 'orca-account') {
     if (accounts === undefined) return { fingerprint: null, source: 'orca-account', resolved: false };

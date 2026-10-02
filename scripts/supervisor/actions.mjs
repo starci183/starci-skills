@@ -59,7 +59,7 @@ const RETRY_PATTERNS = new Set(['retry-loop', 'repeat-check', 'reroute-loop', 'r
 // A retry cap a Kernel recorded as an incident (route failed-retries-the-same-op, "fired 3 of 3", attempt caps).
 const RETRY_CAP_TEXT = /failed-retries|retr(?:y|ies) cap|attempt cap|max(?:imum)? (?:retries|attempts)|fired \d+ of \d+ times/i;
 const key = (...parts) => parts.filter((p) => p != null && p !== '').join('|');
-const one = (s, n = 220) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
+const one = (s, n = 220) => clipLine(s, n);
 
 /** Push refusal class from its text: secret | lint | test | hook | other. Pure. */
 export function pushClass(p) {

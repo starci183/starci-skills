@@ -73,6 +73,7 @@ import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-g
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { withSwcCache } from '../lib/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
@@ -84,6 +85,7 @@ import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 import { fullCheckStep } from './land-full-check.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { tailLines } from '../lib/clip.mjs';
 
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
@@ -246,9 +248,9 @@ const node = (args, { cwd, timeout = 1_200_000, env = process.env } = {}) => out
 export function specRunEnv(parent = process.env) {
   const env = withoutGitLocalEnv(parent);
   delete env.NODE_TEST_CONTEXT;
-  return env;
+  return withSwcCache(env);
 }
-const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
+const tail = (text, n = 25) => tailLines(text, n);
 
 /**
  * Remove ONE scratch this land made (never another land's: the name carries the pid and a per-attempt token) and drop

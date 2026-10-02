@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
-import { readJsonFile } from '../lib/json.mjs';
+import { readJsonFile, writeJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
@@ -87,7 +87,7 @@ export const LOOP_DIR = 'draw-loop';
 export const STOP = Object.freeze({ passed: 'passed', maxRounds: 'max-rounds', noProgress: 'no-progress' });
 export const DESKTOP_MIN_WIDTH = 768;
 
-const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, `${JSON.stringify(v, null, 2)}\n`); };
+
 export const breakpointOf = (viewport) => (Number(viewport?.width) >= DESKTOP_MIN_WIDTH ? 'desktop' : 'mobile');
 const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
 
@@ -322,6 +322,30 @@ const loadUi = (uiDir) => {
 };
 
 /**
+ * The loop directory's prelude both round kinds share: resolve `out` (default under the ui dir or the source's
+ * directory), refuse a foreign or stopped loop, load the ui record and its archetype, and create the loop record on
+ * first round. `extra` carries the component-round fields ({mode, product}) in the record's own key order.
+ */
+const openLoop = (o, sourcePath, { settings, extra = {} }) => {
+  const uiDir = o.ui ? path.resolve(o.ui) : null;
+  const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(sourcePath), o.base, o.state));
+  const name = `${o.base}#${o.state}`;
+  let loop = readLoop(out);
+  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
+  if (loop?.stop) throw Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
+  const ui = loadUi(uiDir);
+  const archetype = ui?.record ? archetypeOf(ui.record) : null;
+  // Paths are relative to the loop directory, so the record reads the same from any checkout.
+  loop ??= { schema: LOOP_SCHEMA, base: o.base, state: o.state, ...(extra.mode ? { mode: extra.mode } : {}),
+    ui: uiDir ? slash(path.relative(out, uiDir)) || '.' : null,
+    source: slash(path.relative(out, sourcePath)), ...(extra.product ? { product: extra.product } : {}),
+    viewports: o.viewports, archetype: archetype?.archetype ?? null,
+    settings: { maxRounds: settings.maxRounds, stallRounds: settings.stallRounds, beautyMin: settings.beautyMin, accentBudget: settings.accentBudget, bandsPerCardMax: settings.bandsPerCardMax, badgesPerEntityMax: settings.badgesPerEntityMax },
+    rounds: [], stop: null, best: null, outcome: null };
+  return { uiDir, out, name, loop, ui, archetype };
+};
+
+/**
  * One round of the loop. Options: {ui, html, base, state, viewports:[{width,height}], repo, out?, family?, fullPage?,
  * critic? (false: no critic), render? probes? criticOrca? (tests: a fake Orca client for the critic worker)}. Returns {loop, round, stop}.
  */
@@ -330,19 +354,7 @@ export async function runRound(o) {
   const settings = o.settings ?? drawLoopSettings();
   const html = path.resolve(o.html);
   if (!isFile(html)) throw Error(`${o.html} does not exist`);
-  const uiDir = o.ui ? path.resolve(o.ui) : null;
-  const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(html), o.base, o.state));
-  const name = `${o.base}#${o.state}`;
-  let loop = readLoop(out);
-  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
-  if (loop?.stop) throw Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
-  const ui = loadUi(uiDir);
-  const archetype = ui?.record ? archetypeOf(ui.record) : null;
-  // Paths are relative to the loop directory, so the record reads the same from any checkout.
-  loop ??= { schema: LOOP_SCHEMA, base: o.base, state: o.state, ui: uiDir ? slash(path.relative(out, uiDir)) || '.' : null,
-    source: slash(path.relative(out, html)), viewports: o.viewports, archetype: archetype?.archetype ?? null,
-    settings: { maxRounds: settings.maxRounds, stallRounds: settings.stallRounds, beautyMin: settings.beautyMin, accentBudget: settings.accentBudget, bandsPerCardMax: settings.bandsPerCardMax, badgesPerEntityMax: settings.badgesPerEntityMax },
-    rounds: [], stop: null, best: null, outcome: null };
+  const { uiDir, out, name, loop, ui, archetype } = openLoop(o, html, { settings });
   const n = loop.rounds.length + 1;
   const roundDir = path.join(out, `round-${n}`);
   fs.mkdirSync(roundDir, { recursive: true });
@@ -353,8 +365,8 @@ export async function runRound(o) {
   const captures = records.map((r) => ({ png: r.image.path, record: r, viewport: { width: r.viewport.width, height: r.viewport.height } }));
   const { doc: metrics, scores } = await machineMetrics({ html, captures, ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes, proposalDirs: [out] });
   metrics.round = n;
-  for (const [png, s] of scores) writeJson(png.replace(/\.png$/i, '.score.json'), s);
-  writeJson(path.join(roundDir, 'metrics.json'), metrics);
+  for (const [png, s] of scores) writeJsonFile(png.replace(/\.png$/i, '.score.json'), s);
+  writeJsonFile(path.join(roundDir, 'metrics.json'), metrics);
 
   let critique = null;
   if (o.critic !== false) {
@@ -368,7 +380,7 @@ export async function runRound(o) {
   loop.rounds.push(round);
   loop.stop = stopOf(loop.rounds, settings);
   loop.best = bestRound(loop.rounds)?.n ?? null;
-  writeJson(loopFileOf(out), loop);
+  writeJsonFile(loopFileOf(out), loop);
   return { out, loop, round, metrics, critique, stop: loop.stop };
 }
 
@@ -395,7 +407,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   }
   critique.critic = { ...(critique.critic ?? {}), drawer: who };
   critique.round = n;
-  writeJson(path.join(roundDir, 'critique.json'), critique);
+  writeJsonFile(path.join(roundDir, 'critique.json'), critique);
   return critique;
 }
 
@@ -422,7 +434,7 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
     ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}) });
   if (loop.stop?.reason !== STOP.maxRounds) loop.stop = stopOf(loop.rounds, settings) ?? loop.stop;
   loop.best = bestRound(loop.rounds)?.n ?? null;
-  writeJson(loopFileOf(out), loop);
+  writeJsonFile(loopFileOf(out), loop);
   return { ran: true, critique, round: best.n };
 }
 
@@ -442,7 +454,7 @@ export async function componentMeasure({ source, fixtures, fixtureFiles, product
   if (keep) {
     fs.copyFileSync(source, path.join(out, 'source.tsx'));
     for (const f of fixtureFiles) fs.copyFileSync(f, path.join(out, f === fixtures.default ? 'fixture.json' : `fixture.${Object.keys(fixtures.byWidth).find((w) => fixtures.byWidth[w] === f)}.json`));
-    writeJson(path.join(out, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
+    writeJsonFile(path.join(out, 'grammar.json'), { schema: 'starci/draw-grammar@1', grammarSource: gate.grammar.grammarSource ?? null, pick: gate.grammar.pick ?? null,
       productVersion: gate.grammar.productVersion ?? null, productRange: gate.grammar.productRange ?? null, upgradeOwed: gate.grammar.upgradeOwed ?? null, attempts: gate.grammar.attempts ?? [] });
     if (whyFile) fs.copyFileSync(whyFile, path.join(out, 'rationale.json'));
   }
@@ -477,18 +489,7 @@ export async function runComponentRound(o) {
   const fixtures = o.fixtures ?? fixturesByWidth(o.fixture ? [o.fixture] : []);
   const fixtureFiles = [...new Set([fixtures.default, ...Object.values(fixtures.byWidth)].filter(Boolean))];
   if (!fixtureFiles.length) throw Error('--fixture <fixture.json> is required for a --source drawing');
-  const uiDir = o.ui ? path.resolve(o.ui) : null;
-  const out = path.resolve(o.out ?? defaultOutOf(uiDir ?? path.dirname(source), o.base, o.state));
-  const name = `${o.base}#${o.state}`;
-  let loop = readLoop(out);
-  if (loop && (loop.base !== o.base || loop.state !== o.state)) throw Error(`${out} is the loop of ${loop.base}#${loop.state}, not ${name}`);
-  if (loop?.stop) throw Error(`the loop stopped at round ${loop.stop.atRound} (${loop.stop.reason}): run finish`);
-  const ui = loadUi(uiDir);
-  const archetype = ui?.record ? archetypeOf(ui.record) : null;
-  loop ??= { schema: LOOP_SCHEMA, base: o.base, state: o.state, mode: 'component', ui: uiDir ? slash(path.relative(out, uiDir)) || '.' : null,
-    source: slash(path.relative(out, source)), product: slash(productDir), viewports: o.viewports, archetype: archetype?.archetype ?? null,
-    settings: { maxRounds: settings.maxRounds, stallRounds: settings.stallRounds, beautyMin: settings.beautyMin, accentBudget: settings.accentBudget, bandsPerCardMax: settings.bandsPerCardMax, badgesPerEntityMax: settings.badgesPerEntityMax },
-    rounds: [], stop: null, best: null, outcome: null };
+  const { uiDir, out, name, loop, ui, archetype } = openLoop(o, source, { settings, extra: { mode: 'component', product: slash(productDir) } });
   const n = loop.rounds.length + 1;
   const roundDir = path.join(out, `round-${n}`);
   fs.mkdirSync(roundDir, { recursive: true });
@@ -496,8 +497,8 @@ export async function runComponentRound(o) {
     ui: ui ? { ...ui, state: o.state } : null, repo: o.repo, family: o.family ?? null, settings, probes: o.probes ?? browserProbes, out: roundDir, proposalDirs: [out, path.dirname(source)],
     viewports: o.viewports, name, fullPage: o.fullPage !== false, render: o.render ?? defaultComponentRender, sourceCheck: o.sourceCheck ?? checkDrawSource, keep: true });
   metrics.round = n;
-  for (const [png, sc] of scores) writeJson(png.replace(/\.png$/i, '.score.json'), sc);
-  writeJson(path.join(roundDir, 'metrics.json'), metrics);
+  for (const [png, sc] of scores) writeJsonFile(png.replace(/\.png$/i, '.score.json'), sc);
+  writeJsonFile(path.join(roundDir, 'metrics.json'), metrics);
 
   let critique = null;
   if (o.critic !== false) {
@@ -516,7 +517,7 @@ export async function runComponentRound(o) {
   loop.rounds.push(round);
   loop.stop = stopOf(loop.rounds, settings);
   loop.best = bestRound(loop.rounds)?.n ?? null;
-  writeJson(loopFileOf(out), loop);
+  writeJsonFile(loopFileOf(out), loop);
   return { out, loop, round, metrics, critique, stop: loop.stop };
 }
 
@@ -575,7 +576,7 @@ function installJson(from, to, { out, installed }) {
   let doc;
   try { doc = JSON.parse(fs.readFileSync(from, 'utf8')); } catch { fs.copyFileSync(from, to); return; }
   const rel = new Map([...installed].map(([k, abs]) => [k, slash(path.relative(path.dirname(to), abs))]));
-  writeJson(to, scratchRewriter({ out, installed: rel }).value(doc));
+  writeJsonFile(to, scratchRewriter({ out, installed: rel }).value(doc));
 }
 
 /**
@@ -667,10 +668,10 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   loop.installed = installed;
   loop.finishedAt = new Date().toISOString();
   if (!loop.stop) loop.stop = { reason: 'finished-early', atRound: loop.rounds.length };
-  writeJson(loopFileOf(out), loop);
+  writeJsonFile(loopFileOf(out), loop);
   // The whole loop (loop.json, every round, critique and metrics) becomes one blob bundle the ui assets cite.
   loopRef.sha256 = putBundle(out);
-  writeJson(bundleFileOf(out), { schema: 'starci/draw-loop-bundle@1', sha256: loopRef.sha256, base: loop.base ?? null, state: loop.state ?? null });
+  writeJsonFile(bundleFileOf(out), { schema: 'starci/draw-loop-bundle@1', sha256: loopRef.sha256, base: loop.base ?? null, state: loop.state ?? null });
   const proposals = readProposals([...new Set([...proposalFilesUnder(out, 3), ...proposalFilesFor(source), ...(uiDir ? proposalFilesUnder(uiDir, 1) : [])])]);
   return { outcome: loop.outcome, stop: loop.stop, bundle: loopRef.sha256, best: { n: best.n, failures: best.failures, beauty: best.beauty, codes: best.codes }, remaining, installed, assets,
     grammarProposals: proposals.map((p) => ({ name: p.name, complete: p.complete, file: p.file })) };

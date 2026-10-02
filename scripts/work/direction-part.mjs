@@ -17,13 +17,14 @@
 //   3. the sibling <name>.content.<ext> exists on disk (the naming interface.draw writes).
 import path from 'node:path';
 import { assetsOf, isFile, list, readYamlOrNull, sha256File, slash } from './work-io.mjs';
+import { resolvedKey } from '../lib/path-key.mjs';
 import { assetStateOf } from './ui/ui-shapes.mjs';
 
 export const PART_ROLE = 'direction-content';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 const PART_NAME = /\.content\.(png|jpe?g|webp)$/i;
 
-const keyOf = (file) => (process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file));
+
 
 /** Whether a file name follows the part naming (<name>.content.<ext>). */
 export const isPartName = (file) => PART_NAME.test(String(file));
@@ -58,7 +59,7 @@ export function partOf(file, { cache = new Map() } = {}) {
   if (isPartName(abs)) return { file: abs, composite: null, kind: 'part' };
   const ui = uiRecordOf(abs, cache);
   if (ui) {
-    const asset = assetsOf(ui.record).find((a) => keyOf(path.resolve(ui.dir, a.path)) === keyOf(abs));
+    const asset = assetsOf(ui.record).find((a) => resolvedKey(path.resolve(ui.dir, a.path)) === resolvedKey(abs));
     if (asset?.role === PART_ROLE) return { file: abs, composite: null, kind: 'part' };
     const content = asset?.composite?.content?.path;
     if (typeof content === 'string' && isFile(path.resolve(ui.dir, content))) return { file: path.resolve(ui.dir, content), composite: abs, kind: 'composite' };
@@ -81,7 +82,7 @@ export function ownerImages(items, { cache = new Map() } = {}) {
     const original = typeof item === 'string' ? item : item?.abs ?? item?.file;
     if (typeof original !== 'string' || !original) continue;
     const part = partOf(original, { cache });
-    const key = keyOf(part.file);
+    const key = resolvedKey(part.file);
     if (byKey.has(key)) { const seen = byKey.get(key); if (!seen.aliases.includes(original)) seen.aliases.push(original); continue; }
     const entry = typeof item === 'string'
       ? { file: part.file, composite: part.composite, kind: part.kind, aliases: [original] }

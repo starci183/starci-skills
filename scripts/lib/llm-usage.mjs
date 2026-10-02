@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readYamlFile } from './read-yaml.mjs';
+import { positiveNumber } from './number.mjs';
 
 export const USAGE_SOURCE = 'cli-transcript';
 export const USAGE_UNAVAILABLE = 'unavailable';
@@ -26,7 +27,7 @@ export const USAGE_AGENTS = Object.freeze(['claude', 'codex']);
 export const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'prices.yaml');
 
 const COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'];
-const int = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.trunc(Number(v)) : 0);
+const int = (v) => positiveNumber(v, 0, { int: true });
 const emptyRow = (model, { reasoning = true, toolErrors = true } = {}) => ({
   model, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
   reasoningTokens: reasoning ? 0 : null, turns: 0, toolCalls: 0, toolErrors: toolErrors ? 0 : null,

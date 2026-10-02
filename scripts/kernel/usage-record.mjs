@@ -22,7 +22,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { extractUsage, costOfRow, loadPrices, sumRows, promptTokens, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
-import { sessionHomes, sessionAgentOf } from './op-session.mjs';
+import { sessionHomes } from './op-session.mjs';
+import { agentOfJob } from '../lib/job-agent.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 export const SESSION_HEAD_BYTES = 256 * 1024;
@@ -152,7 +153,7 @@ export function indexSessions(options = {}) {
 /* ------------------------------------------------------------------------------------------------- op attempts */
 
 /** The agent adapter of an attempt row (op_attempts.agent is a legacy column; provider carries the family). */
-export const attemptAgent = (a) => sessionAgentOf({ agent: a?.agent, provider: a?.provider, model: a?.model });
+export const attemptAgent = (a) => agentOfJob({ agent: a?.agent, provider: a?.provider, model: a?.model });
 
 /**
  * The session entries of one attempt, by EXACT id only: the entry whose first user message names this attempt's dispatch id

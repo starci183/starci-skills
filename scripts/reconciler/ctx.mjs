@@ -37,6 +37,7 @@ import { wakeKernel } from '../kernel/wake-delivery.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
+import { clip } from '../lib/clip.mjs';
 
 export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
@@ -47,7 +48,7 @@ export const WOULD_DEDUPE_MS = 10 * 60_000;
 const SUMMARY_VALUE_BYTES = 6000;
 
 export const digestOf = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
-const clip = (text, n = 300) => { const s = String(text ?? ''); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+
 
 /** Node's own warning lines ("(node:123) ExperimentalWarning: ...", "(Use `node --trace-warnings ...`"). */
 export const isNodeWarningLine = (line) => /^\(node:\d+\) \w*Warning:|^\(Use `node --trace-warnings/.test(String(line).trim());

@@ -23,6 +23,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { pathKey, samePath, slash } from '../lib/path-key.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
@@ -35,10 +36,7 @@ export const HK_SESSION_DEFAULTS = Object.freeze({
 });
 
 const message = (error) => String(error?.message ?? error);
-const positiveMs = (value, fallback) => {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-};
+
 const result = () => ({ ok: true, freedBytes: 0, movedBytes: 0, deleted: [], moved: [], skipped: [], errors: [] });
 
 /**
@@ -163,8 +161,8 @@ function pruneEmptyDirs(root) {
 export async function sweepAgentSessions({ apply = false, now = Date.now(), env = process.env, allocation } = {}) {
   const out = result();
   const hk = housekeepingOf(allocation);
-  const archiveAfterMs = positiveMs(hk.sessionArchiveAfterMs, HK_SESSION_DEFAULTS.sessionArchiveAfterMs);
-  const archiveMaxAgeMs = positiveMs(hk.archiveMaxAgeMs, HK_SESSION_DEFAULTS.archiveMaxAgeMs);
+  const archiveAfterMs = positiveNumber(hk.sessionArchiveAfterMs, HK_SESSION_DEFAULTS.sessionArchiveAfterMs);
+  const archiveMaxAgeMs = positiveNumber(hk.archiveMaxAgeMs, HK_SESSION_DEFAULTS.archiveMaxAgeMs);
   const archiveRoot = archiveRootOf({ env });
   const skip = (p, reason) => out.skipped.push({ path: p, reason });
   const fail = (p, error) => out.errors.push({ path: p, error: message(error) });

@@ -22,6 +22,8 @@ import {text} from '../lib/stack-declaration.mjs';
 import {extSecretsDir,launcher,resolveCommand,sealExtCustody} from './sonar-ext-custody.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
+import { isSpecRun } from '../lib/env.mjs';
+import { readProperties } from '../lib/properties.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -379,7 +381,7 @@ async function recordRemint(cfg,event){
   const payload={...event,host:cfg.host,stack:cfg.stackDir};
   try{
     if(typeof cfg.record==='function')return void cfg.record({kind:REMINT_EVENT,payload});
-    if(process.env.NODE_TEST_CONTEXT)return;
+    if(isSpecRun())return;
     const {withSupervisor,supervisorEvent}=await import('../machine/home.mjs');
     withSupervisor(m=>supervisorEvent(m,{entityType:'service',entityId:'sonar',kind:REMINT_EVENT,payload}));
   }catch{/* the repaired custody stands without its event */}
@@ -586,18 +588,6 @@ export async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={})
   const periodSet=period?await call(cfg,'POST','/api/new_code_periods/set',{token,form:{project:key,type:period.type,value:String(period.value)}}):null;
   if(periodSet&&periodSet.status!==200&&periodSet.status!==204)return failed('new-code period',periodSet);
   return {...base,outcome:'ok',changed};
-}
-
-export function readProperties(file){
-  const out={};
-  if(!fs.existsSync(file))return out;
-  for(const raw of fs.readFileSync(file,'utf8').split(/\r?\n/)){
-    const line=raw.trim();
-    if(!line||line.startsWith('#')||line.startsWith('!'))continue;
-    const at=line.search(/[=:]/);
-    if(at>0)out[line.slice(0,at).trim()]=line.slice(at+1).trim();
-  }
-  return out;
 }
 
 const quote=arg=>/^[\w@%+=:,./\\-]+$/.test(arg)?arg:`"${String(arg).replace(/"/g,'\\"')}"`;

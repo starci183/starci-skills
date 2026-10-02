@@ -12,6 +12,7 @@ import path from 'node:path';
 import { recordDecision } from '../../engine/db/ledger.mjs';
 import { artifactRoot, blobPath } from '../../engine/db/blob.mjs';
 import { stageBlob, putArtifact } from './evidence-store.mjs';
+import { slash } from '../lib/path-key.mjs';
 
 export const RECEIPT_PREFIX = 'asks/';
 export const receiptNameOf = (dispatchId, at) => `${RECEIPT_PREFIX}${dispatchId}/answer-${at}.json`;
@@ -63,6 +64,24 @@ export function receiptFileOf(ref, { base = process.cwd() } = {}) {
 
 /** How a Work record cites a receipt file: `blob:<sha256>` for a blob, else the path relative to `repoRoot`. */
 export const receiptRefOf = (file, repoRoot) => (isBlobFile(file) ? `blob:${path.basename(file)}` : path.relative(repoRoot, file).replace(/\\/g, '/'));
+
+/**
+ * The prelude of every `apply` that settles from a serve-ask answer (scripts/work/draw-review.mjs,
+ * scripts/work/brand-direction.mjs): resolve the receipt ref (a `blob:<sha256>` the store kept, or a path inside
+ * `repoRoot`), refuse a file outside the repository, and parse it as the `schema` receipt. Returns
+ * {receipt, receiptAbs, receiptRel} - receiptRel is how the record cites it.
+ */
+export function readAnswerReceipt(receiptFile, { repoRoot, base = process.cwd(), schema = 'starci/ask-answer@1' } = {}) {
+  // The receipt is the blob serve-ask stored (receiptPath, or `blob:<sha256>`); a Work record cites it as
+  // blob:<sha256>. A path inside the repository is still read (an example tree's own receipt).
+  const receiptAbs = receiptFileOf(String(receiptFile), { base }) ?? path.resolve(String(receiptFile));
+  const receiptRel = receiptRefOf(receiptAbs, repoRoot);
+  if (!isBlobFile(receiptAbs) && (receiptRel.startsWith('../') || path.isAbsolute(receiptRel))) throw new Error(`receipt ${slash(receiptFile)} is neither a stored answer (blob:<sha256>, the receiptPath serve-ask returned) nor a file inside the repository ${slash(repoRoot)}`);
+  let receipt;
+  try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
+  if (receipt?.schema !== schema) throw new Error(`${slash(receiptFile)} is ${receipt?.schema ?? 'not a receipt'}, not ${schema}`);
+  return { receipt, receiptAbs, receiptRel };
+}
 
 /** Every receipt answering `dispatchId` in a ledger, newest first: [{file, receipt, name}]. */
 export function receiptsAnswering(db, dispatchId) {

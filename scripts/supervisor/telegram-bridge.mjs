@@ -84,6 +84,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
 
@@ -660,7 +661,7 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
   try {
     if (env.STARCI_CONNECTORS_OFF === '1') return { ok: true, skipped: 'STARCI_CONNECTORS_OFF' };
     const apiBase = env.STARCI_TELEGRAM_API_BASE || DEFAULT_API_BASE;
-    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE) return { ok: true, skipped: 'test context' };
+    if (isSpecRun(env) && apiBase === DEFAULT_API_BASE) return { ok: true, skipped: 'test context' };
     const live = bridgeAlive(env);
     if (live) return { ok: true, already: true, pid: live.pid };
     if (requireRegistered && !listSupervisors({ env }).length) return { ok: true, skipped: 'no supervisor registered' };
@@ -697,7 +698,7 @@ async function runMain() {
   const env = process.env;
   const log = bridgeLog(env, process.stderr.isTTY === true);
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children inherit) never polls the real bot.
-  if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
+  if (isSpecRun(env) && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
   const first = telegramSettings({ env });
   if (!first.ready) { console.log(JSON.stringify({ ok: true, skipped: first.warning ?? 'telegram off' })); return; }
   // A replacement the running bridge spawned (self-reload) takes its lock over; nothing else may.

@@ -27,6 +27,7 @@ import { requireReportAttempt } from './shared/report-binding.mjs';
 import { attachedArgs, scratchOf, scratchFile, stageReportEvidence, storedReportOf, fileReportEvidence, removeScratch } from './shared/report-evidence.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { send } from '../../api/orca/send.mjs';
+import { isSpecRun } from '../../lib/env.mjs';
 
 // orca-deep-map REPLACE #9: the op settles its own Orca Task and Dispatch. After the report row committed - and
 // before the settler starts, which would otherwise race it - api report, running in the op's own pane, sends exactly
@@ -219,7 +220,7 @@ export default {
   }
   // The worker's output up to this report, read by Dispatch; settle replaces it with the fuller one (after the
   // release, from Orca's archive, or before an unmanaged worker's terminal is closed).
-  if (!process.env.NODE_TEST_CONTEXT) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, dispatch: operationDispatchOf(jobPayloadOf(job)), repoRoots });
+  if (!isSpecRun()) finalizeAttemptTranscript(ledger, { attemptId: attempt.attempt_id, dispatch: operationDispatchOf(jobPayloadOf(job)), repoRoots });
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   const kernelWake = reportFiledWake(ledger, {
     workflowId: job.workflow_id,
@@ -236,7 +237,7 @@ export default {
   // SETTLE AS A RUNTIME SERVICE (owner ruling settle-runtime-service): the settler runs for this job right away,
   // detached and outside the op's identity, so a green done report settles without waiting for the Kernel's turn and
   // anything else is handed to the Kernel as needs-kernel-decision (scripts/kernel/settle/job-settle.mjs).
-  if (!process.env.NODE_TEST_CONTEXT) startSettlerFor(repo, { workflowId: job.workflow_id, jobId: job.job_id });
+  if (!isSpecRun()) startSettlerFor(repo, { workflowId: job.workflow_id, jobId: job.job_id });
   releaseWorkerOnReport(ledger, job, jobPayload, report);
 
   },

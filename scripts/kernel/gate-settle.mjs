@@ -35,6 +35,8 @@ import { DIGEST_SCHEMA, judgeKnowledgeDigest, judgeReadDigest, kindsOf, loadOpGa
 import { TEST_WORLD_RUN_SCHEMA, testWorldFindings } from '../gates/test-world-run.mjs';
 import { UNIT_RUN_SCHEMA, unitFindings } from '../gates/unit-run.mjs';
 import { RELEASE_PROOF_SCHEMA, RELEASE_STEPS, STEP_STATUS } from '../gates/release-proof.mjs';
+import { attachedNameOf } from '../lib/display-names.mjs';
+import { oneLine } from '../lib/clip.mjs';
 
 export const OP_GATE_CHANGE = 'op-gate-loop';
 export const OP_GATE_CHECK = 'op-gate';
@@ -45,9 +47,6 @@ export const SECURITY_FINDINGS_SCHEMA = 'starci/security-findings@1';
 export const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
 const DOC_MAX_BYTES = 16 * 1024 * 1024;
 const FINDINGS_LISTED = 40;
-
-const nameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''))).replace(/\\/g, '/');
-const oneLine = (text, n = 380) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 /**
  * The newest JSON document of `schema` among a job's files ([{abs, name?}] from collectJobFiles), or null. A file counts only
@@ -63,7 +62,7 @@ export function readAttached(files, schema, accept = () => true) {
       doc = JSON.parse(fs.readFileSync(file.abs, 'utf8'));
     } catch { continue; }
     if (doc?.schema !== schema || !accept(doc)) continue;
-    if (!best || String(doc.at ?? '') >= String(best.doc.at ?? '')) best = { doc, file: nameOf(file) };
+    if (!best || String(doc.at ?? '') >= String(best.doc.at ?? '')) best = { doc, file: attachedNameOf(file) };
   }
   return best;
 }

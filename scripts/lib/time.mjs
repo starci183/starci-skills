@@ -40,3 +40,6 @@ export const stampMinuteShort = (ms) => `${new Date(ms).toISOString().slice(5, 1
 export const hhmm = (ms) => `${new Date(ms).toISOString().slice(11, 16)}Z`;
 /** 'HH:mm:ss' — the same with seconds, no zone letter. */
 export const hhmmss = (ms) => new Date(ms).toISOString().slice(11, 19);
+
+/** `ms` as an ISO timestamp, or `fallback` when it is null or not a finite number. */
+export const isoOr = (ms, fallback = null) => (ms != null && Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : fallback);

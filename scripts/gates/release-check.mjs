@@ -32,12 +32,13 @@ import { tapSummary } from '../lib/tap-summary.mjs';
 import { buildPlan } from './release-plan.mjs';
 import { npmRegistry } from './release-registry.mjs';
 import { appInstallsStep, canonPinsStep, checkStep, STEP_STATUS } from './release-proof.mjs';
+import { tailLines } from '../lib/clip.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const PROOFS = Object.freeze(['publish-plan', 'canon-pins', 'app-installs', 'package-clean', 'check', 'specs', 'checkout']);
 export const FINAL_PROOFS = Object.freeze(['identity']);
 const SPEC_SETUP = ['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs'];
-const tail = (text, n = 3) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join(' | ').slice(0, 500);
+const tail = (text, n = 3) => tailLines(text, n, { join: ' | ', max: 500 });
 const result = (id, ok, detail, extra = {}) => ({ id, status: ok ? STEP_STATUS.pass : STEP_STATUS.red, detail, ...extra });
 const unrun = (id, detail) => ({ id, status: STEP_STATUS.toolFailed, detail });
 

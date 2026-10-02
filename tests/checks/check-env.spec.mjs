@@ -13,6 +13,12 @@ test('a name absent from the catalog is flagged wherever it is read or named', (
   ], ['STARCI_NEW']), [['RT_ENV_UNCATALOGUED', 'scripts/b.mjs'], ['RT_ENV_UNCATALOGUED', 'scripts/b.mjs']]);
 });
 
+test('a STARCI_* refusal code of the failure-code catalog is not an environment variable', () => {
+  const files = [{ rel: 'scripts/a.mjs', text: "export const refuse = () => { throw Object.assign(new Error('x'), { code: 'STARCI_JOB_NOT_FOUND' }); };\n" }];
+  assert.deepEqual(envFindings(files, catalog([]), new Set(['STARCI_JOB_NOT_FOUND'])), []);
+  assert.deepEqual(envFindings(files, catalog([])).map((f) => f.code), ['RT_ENV_UNCATALOGUED']);
+});
+
 test('a catalogued name read from an injected env passes; the same name from process.env outside the owner is flagged', () => {
   assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = (env) => env.STARCI_ROOT;\n" }], ['STARCI_ROOT']), []);
   assert.deepEqual(run([{ rel: 'scripts/a.mjs', text: "export const a = () => process.env.STARCI_ROOT;\nexport const b = (name) => process.env[name];\n" }], ['STARCI_ROOT']),

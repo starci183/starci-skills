@@ -23,6 +23,25 @@ const SHELLS = new Set(['cmd', 'sh', 'bash', 'powershell', 'pwsh']);
 let typescript = null;
 const ts = () => (typescript ??= createRequire(import.meta.url)('typescript'));
 
+/** The declared name of a function declaration or a `const x = (arrow|function)` binding, else null. */
+export const nameOfFn = (t, fn) => {
+  if (t.isFunctionDeclaration(fn) && fn.name) return fn.name.text;
+  if ((t.isArrowFunction(fn) || t.isFunctionExpression(fn)) && fn.parent && t.isVariableDeclaration(fn.parent) && t.isIdentifier(fn.parent.name)) return fn.parent.name.text;
+  return null;
+};
+
+/** The function whose parameter list `node` (an identifier) reads, walking up parents: {fn, index} or null. */
+export const paramOf = (t, node) => {
+  if (!node || !t.isIdentifier(node)) return null;
+  for (let p = node.parent; p; p = p.parent) {
+    if (t.isFunctionLike(p)) {
+      const index = p.parameters.findIndex((q) => t.isIdentifier(q.name) && q.name.text === node.text);
+      return index >= 0 ? { fn: p, index } : null;
+    }
+  }
+  return null;
+};
+
 /** The program a command word names: basename, lower case, without a .cmd/.exe/.bat/.ps1 shim suffix. */
 export const programOf = (word) => path.posix.basename(String(word ?? '').replace(/^["']|["']$/g, '').replaceAll('\\', '/')).toLowerCase().replace(/\.(?:cmd|exe|bat|ps1)$/, '');
 const firstWord = (text) => String(text ?? '').trim().split(/\s+/)[0] ?? '';
@@ -116,21 +135,6 @@ export function spawnCalls(text, file = 'x.mjs') {
   // function whose spawn takes the command from one of its own parameters is a spawner, and a call of it by name is a
   // spawn of its argument at that position (wrappers of wrappers too, to a fixed point). Same file only.
   const spawners = new Map(); // function name -> {cmd: param index, args: param index | null}
-  const nameOfFn = (fn) => {
-    if (t.isFunctionDeclaration(fn) && fn.name) return fn.name.text;
-    if ((t.isArrowFunction(fn) || t.isFunctionExpression(fn)) && fn.parent && t.isVariableDeclaration(fn.parent) && t.isIdentifier(fn.parent.name)) return fn.parent.name.text;
-    return null;
-  };
-  const paramOf = (node) => {
-    if (!node || !t.isIdentifier(node)) return null;
-    for (let p = node.parent; p; p = p.parent) {
-      if (t.isFunctionLike(p)) {
-        const index = p.parameters.findIndex((q) => t.isIdentifier(q.name) && q.name.text === node.text);
-        return index >= 0 ? { fn: p, index } : null;
-      }
-    }
-    return null;
-  };
   const spawnOf = (call) => {
     const fn = spawnFnOf(call.expression);
     if (fn) return { callee: fn, cmd: call.arguments[0], args: call.arguments[1] };
@@ -145,10 +149,10 @@ export function spawnCalls(text, file = 'x.mjs') {
     const learn = (node) => {
       if (t.isCallExpression(node)) {
         const s = spawnOf(node);
-        const from = s && paramOf(s.cmd);
-        const name = from && nameOfFn(from.fn);
+        const from = s && paramOf(t, s.cmd);
+        const name = from && nameOfFn(t, from.fn);
         if (name && !spawners.has(name)) {
-          const args = paramOf(s.args);
+          const args = paramOf(t, s.args);
           spawners.set(name, { cmd: from.index, args: args && args.fn === from.fn ? args.index : null });
           grew = true;
         }
@@ -172,8 +176,8 @@ export function spawnCalls(text, file = 'x.mjs') {
           const program = args.elements.flatMap((el) => valuesOf(el).filter((v) => v != null).slice(0, 1)).find((w) => !/^[-/]/.test(w));
           if (program != null) programs.push(programOf(firstWord(program)));
         }
-        const from = paramOf(cmd);
-        const passThrough = Boolean(from && spawners.has(nameOfFn(from.fn)));
+        const from = paramOf(t, cmd);
+        const passThrough = Boolean(from && spawners.has(nameOfFn(t, from.fn)));
         out.calls.push({ line: lineOf(node), callee, programs: [...new Set(programs)], resolved: !values.includes(null), passThrough });
       }
     }

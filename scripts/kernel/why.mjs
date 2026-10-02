@@ -18,6 +18,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { blobPath } from '../../engine/db/blob.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { translator } from '../lib/i18n.mjs';
+import { clipLine } from '../lib/clip.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WHY_SCHEMA = 'starci/why@1';
@@ -39,7 +40,7 @@ export function explainCode(code, catalog = loadCatalog()) {
   return e ? { code, known: true, ...e } : { code, known: false, title_vi: code, meaning_vi: null, nextStep_vi: null, owner: 'runtime-core', kind: null };
 }
 
-const clip = (s, n = 220) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+const clip = (s, n = 220) => clipLine(s, n);
 /** A Windows or POSIX absolute path shortened to its last three segments (the owner reads names, not temp roots). */
 const shortPaths = (s) => String(s ?? '').replace(/(?:[A-Za-z]:)?[\\/](?:[^\s"'\\/:*?<>|]+[\\/])+([^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+[\\/][^\s"'\\/:*?<>|]+|[^\s"'\\/:*?<>|]+)/g, '…/$1').replace(/\\/g, '/');
 const BRACKET = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;

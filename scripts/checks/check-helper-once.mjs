@@ -15,6 +15,7 @@ import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
+import { boundNames } from '../lib/ast-names.mjs';
 
 // acorn lives in packages/node_modules (a dev dependency of the packages workspace); no other path is tried.
 const acorn = createRequire(path.join(skillRoot, 'packages', 'node_modules', 'x.js'))('acorn');
@@ -29,15 +30,8 @@ const GENERATED = /^packages\/[^/]+\/runtime\//;
 
 const parse = (text) => acorn.parse(text, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true, allowReturnOutsideFunction: true });
 
-/** Names a pattern binds (identifiers, destructuring, defaults, rest). */
-function bound(pattern, into) {
-  if (!pattern) return;
-  if (pattern.type === 'Identifier') into.add(pattern.name);
-  else if (pattern.type === 'ObjectPattern') pattern.properties.forEach((p) => bound(p.value ?? p.argument, into));
-  else if (pattern.type === 'ArrayPattern') pattern.elements.forEach((p) => bound(p, into));
-  else if (pattern.type === 'AssignmentPattern') bound(pattern.left, into);
-  else if (pattern.type === 'RestElement') bound(pattern.argument, into);
-}
+/** Names a pattern binds (identifiers, destructuring, defaults, rest), added into `into` (a Set). */
+const bound = (pattern, into) => boundNames(pattern).forEach((name) => into.add(name));
 
 /** Every name declared anywhere inside `node` (params, var/let/const, functions, classes, catch parameters). */
 function declaredNames(node) {

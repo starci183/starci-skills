@@ -18,6 +18,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { allocationSettings } from '../../engine/config.mjs';
 import { redactText } from '../lib/redact.mjs';
+import { forEachFileLine } from '../lib/read-text.mjs';
 
 export const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
 const DEFAULT_CAPS = { fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5 * 1024 * 1024 };
@@ -211,22 +212,9 @@ export function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   };
 }
 
-/** Feed a file's lines to `onLine` in bounded chunks: a patch can exceed any single string. */
-function forEachLine(file, onLine, chunkBytes = 8 * 1024 * 1024) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(chunkBytes);
-    let carry = '';
-    for (;;) {
-      const n = fs.readSync(fd, buf, 0, chunkBytes, null);
-      if (n <= 0) break;
-      const lines = (carry + buf.toString('utf8', 0, n)).split('\n');
-      carry = lines.pop();
-      for (const l of lines) onLine(l);
-    }
-    if (carry) onLine(carry);
-  } finally { fs.closeSync(fd); }
-}
+/** Feed a file's lines to `onLine` in bounded chunks: a patch can exceed any single string. The split is on '\n'
+ *  alone — patchParser.line strips a trailing '\r' itself. */
+const forEachLine = (file, onLine, chunkBytes = 8 * 1024 * 1024) => forEachFileLine(file, onLine, { chunkBytes, eol: '\n' });
 
 /** Parse patch text (a string) - what the specs and small callers use. */
 export function parsePatchText(text, options = {}) {

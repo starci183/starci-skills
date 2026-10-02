@@ -22,15 +22,12 @@ import { appNamesOf, appOfUi, isLayoutTree, layoutChainOf, layoutSettlement, loa
 import { openDecisionRow } from '../machine/decisions.mjs';
 import { getWorkflow, workflowRunning } from './verbs/shared/rows.mjs';
 import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundation-registry.mjs';
+import { boundRecordPaths, segments, WORK_ROOT } from './bound-records.mjs';
+import { normRel } from '../lib/path-key.mjs';
 
 export const SHELL_FOUNDATION = 'shell';
 export const FOUNDATION_WAIT = 'foundation-wait';
-const WORK_ROOT = '.starciwork';
 const DEFAULT_STALL_MS = 2 * 60 * 60 * 1000;
-
-const plainPath = (value) => String(typeof value === 'string' ? value : value?.path ?? '')
-  .trim().replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '').replace(/^\.\//, '');
-const segments = (value) => value.split('/').filter((part) => part && part !== '.');
 
 /**
  * For every bound path that is a ui record (.../.starciwork/features/<f>/ui/<name>) carrying a `route`, the layout
@@ -39,16 +36,9 @@ const segments = (value) => value.split('/').filter((part) => part && part !== '
  */
 export function layoutChainVerdicts(repo, bindings) {
   const verdicts = [];
-  const seen = new Set();
-  for (const binding of bindings) {
-    const parts = segments(plainPath(binding));
-    const at = parts.indexOf(WORK_ROOT);
-    if (at < 0 || !parts.slice(at + 1).includes('ui')) continue;
-    const record = parts.join('/');
-    if (seen.has(record)) continue;
-    seen.add(record);
+  for (const { record, parts, workParts } of boundRecordPaths(bindings, 'ui')) {
     try {
-      const workRoot = path.join(repo, ...parts.slice(0, at + 1));
+      const workRoot = path.join(repo, ...workParts);
       const file = path.join(repo, ...parts, 'index.yaml');
       if (!fs.existsSync(file)) { verdicts.push({ record, unknown: 'the ui record does not exist yet' }); continue; }
       const ui = parseYaml(fs.readFileSync(file, 'utf8'));
@@ -83,11 +73,11 @@ export function layoutChainVerdicts(repo, bindings) {
 export function shellFoundationNeed({ brief, payload, repo }) {
   const read = (Array.isArray(brief?.reads) ? brief.reads : []).find((item) => item?.layoutFoundation === true);
   if (!read) return null;
-  const records = (Array.isArray(payload?.records) ? payload.records : []).map(plainPath).filter(Boolean);
+  const records = (Array.isArray(payload?.records) ? payload.records : []).map(normRel).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
   const workRoot = (() => {
     for (const binding of bindings) {
-      const parts = segments(plainPath(binding));
+      const parts = segments(normRel(binding));
       const at = parts.indexOf(WORK_ROOT);
       if (at >= 0) return path.join(repo, ...parts.slice(0, at + 1));
     }
