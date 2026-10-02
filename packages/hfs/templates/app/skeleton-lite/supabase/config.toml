@@ -2,12 +2,28 @@ project_id = "{{project}}"
 
 [api]
 enabled = true
+port = {{supabasePortApi}}
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
+port = {{supabasePortDb}}
+shadow_port = {{supabasePortShadow}}
 major_version = 17
+
+[db.pooler]
+enabled = false
+port = {{supabasePortPooler}}
+
+[studio]
+port = {{supabasePortStudio}}
+
+[inbucket]
+port = {{supabasePortInbucket}}
+
+[analytics]
+port = {{supabasePortAnalytics}}
 
 [auth]
 enabled = true

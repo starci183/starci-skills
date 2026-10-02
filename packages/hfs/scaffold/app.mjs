@@ -32,6 +32,7 @@ import { parseYaml } from '../runtime/engine/yaml.mjs';
 import { dbTypesPath, generateDbTypes } from '../emit/db-types.mjs';
 import { TEMPLATES_DIR, appSource, imageFiles, render, renderTargets, writeTargets } from '../sync/index.mjs';
 import { ScaffoldError } from './service.mjs';
+import { SUPABASE_PORT_VARIABLES, supabasePortVars } from './supabase-ports.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
@@ -246,8 +247,8 @@ function nextAppTsconfig() {
   };
 }
 
-/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app) and {{sonarGate}}. */
-const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate']);
+/** The names a skeleton file may fill: {{project}}, {{app}}, {{appPascal}} (the side's app), {{sonarGate}} and the lite Supabase port block ({{supabasePort<Section>}}, supabase-ports.mjs). */
+const SKELETON_VARIABLES = Object.freeze(['project', 'app', 'appPascal', 'sonarGate', ...SUPABASE_PORT_VARIABLES]);
 
 /**
  * A skeleton file with its variables filled. Only the skeleton names are variables: every other `{{name}}` is source the app keeps
@@ -368,7 +369,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),
-    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp })),
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) })),
   ];
   for (const file of files) {
     const target = path.join(root, ...file.path.split('/'));

@@ -1,7 +1,7 @@
 // hfs-scaffold-lite.e2e.spec.mjs - the lite scaffold proved as an installed app over its own local Supabase stack.
 // The source-canon registry supplies this checkout's unpublished @starci packages; every other dependency comes from npm.
 // Docker is the only optional prerequisite: scaffold-time type generation, the database proof and type drift all use the
-// scaffolded supabase/config.toml and its default local ports.
+// scaffolded supabase/config.toml and the port block it carries for its project name (never the CLI defaults).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
+import { supabasePortVars } from '../../packages/hfs/scaffold/supabase-ports.mjs';
 import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
 import { runNpx } from '../../scripts/api/npm/run-npx.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
@@ -23,29 +24,41 @@ const listFiles = (dir, base = dir) => fs.readdirSync(dir, { withFileTypes: true
 
 const gitStatus = cwd => execFileSync('git', ['status', '--porcelain=v1'], { cwd, encoding: 'utf8' });
 
-/** The Supabase CLI default local ports (api, db, studio, inbucket, analytics): the scaffold's own stack claims them. */
-const DEFAULT_STACK_PORTS = Object.freeze([54321, 54322, 54323, 54324, 54327]);
+const APP_NAME = 'litedemo';
+
+/** The one prerequisite that may skip: Docker answering. A busy port never skips; it fails (below). */
+const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+const skipReason = dockerProbe.status === 0 ? false
+  : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/?
+/)[0] ?? 'docker info failed'}`;
+
 const portBusy = (port) => new Promise((resolve) => {
   const socket = net.connect({ host: '127.0.0.1', port });
   socket.once('connect', () => { socket.destroy(); resolve(true); });
   socket.once('error', () => resolve(false));
 });
-const busyPorts = (await Promise.all(DEFAULT_STACK_PORTS.map(async (port) => ((await portBusy(port)) ? port : null)))).filter((port) => port !== null);
 
-/** Docker answering is the one prerequisite; the other is that no stack holds the default ports (a busy host is never disturbed). */
-const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
-const skipReason = dockerProbe.status !== 0
-  ? `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`
-  : busyPorts.length > 0 ? `the default Supabase ports ${busyPorts.join(', ')} are held by another stack; this proof never shares or stops it` : false;
+/** Who holds a port: the Docker container publishing it, else an unnamed local process. */
+const holderOf = (port) => {
+  const listing = spawnSync('docker', ['ps', '--format', '{{.Names}} {{.Ports}}'], { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+  const row = String(listing.stdout ?? '').split(/?
+/).find((line) => new RegExp(`:${port}->`).test(line));
+  return row ? `the container ${row.split(' ')[0]}` : 'a local process outside Docker';
+};
 
 test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+  // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
+  // A port of that block already taken is a failure naming the port and its holder, never a skip.
+  for (const port of Object.values(supabasePortVars(APP_NAME)).map(Number)) {
+    assert.equal(await portBusy(port), false, `HFS_E2E_PORT_BUSY: the local Supabase port ${port} of the ${APP_NAME} stack is held by ${holderOf(port)}; stop that holder or free the port`);
+  }
   let stopDatabase = () => {};
   const into = mkdtemp(t, 'hfs-scaffold-lite-e2e-', () => stopDatabase());
-  const app = path.join(into, 'litedemo');
+  const app = path.join(into, APP_NAME);
   const registry = await startSourceCanonRegistry();
   t.after(() => registry.close());
 
-  const scaffolded = scaffoldApp({ name: 'litedemo', into, edition: 'lite', lock: registry.lock });
+  const scaffolded = scaffoldApp({ name: APP_NAME, into, edition: 'lite', lock: registry.lock });
   assert.equal(scaffolded.root, app, 'the lite scaffold wrote the app');
 
   // Lite has no test layer or test tool. Check before npm ci, so dependencies' own test files are not mistaken for app files.
