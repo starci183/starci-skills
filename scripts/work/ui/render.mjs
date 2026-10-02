@@ -44,21 +44,21 @@ export const PALETTE_TOLERANCE=TOKEN_TOLERANCE*12;
  */
 export const MIN_BUCKET_SHARE=0.02;
 /** OKLab chroma below this is grey to a reader; the brand's palette question is about colour, not about ink. */
-export const CHROMA_FLOOR=0.04;
+const CHROMA_FLOOR=0.04;
 /** Lightness outside this band is the page's paper and its ink: near-white and near-black are never a palette. */
-export const MIN_LIGHTNESS=0.12;
+const MIN_LIGHTNESS=0.12;
 export const MAX_LIGHTNESS=0.95;
 /** Steps per OKLab axis. Eight steps put roughly a tenth of the gamut in a bucket - a hue, not a shade. */
-export const DEFAULT_BUCKETS=8;
+const DEFAULT_BUCKETS=8;
 /** Under half opaque is not painted: a pixel the reader cannot see is not part of the palette. */
 const ALPHA_FLOOR=128;
 /** Three is a list. Two rows are a pair the reader reads as two facts; three are a collection. */
-export const MIN_REPEATED_ITEMS=3;
+const MIN_REPEATED_ITEMS=3;
 /**
  * The card classes to look for when the family's DNA snapshot cannot be read. Only the families we ship:
  * both render the Common card renderers, so both carry Common's card classes.
  */
-export const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
+const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
 const OFFENDER_CAP=20;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));

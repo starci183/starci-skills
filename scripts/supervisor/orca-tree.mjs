@@ -45,7 +45,7 @@ export const ledgerRuns = (db) => distinctRuns(ledgerJobs(db).map((job) => runId
  * handles every job of the ledger names (finished workflows included — a
  * terminal they own is bound, not orphaned).
  */
-export function projectLedger(db) {
+function projectLedger(db) {
   // SELECT *: an older read-only ledger has no display_name column.
   const workflows = db.prepare('SELECT * FROM workflows ORDER BY workflow_id').all();
   const signals = new Map(kernelSignalRows(db).map((row) => [row.key, row.value.terminal ?? null]));

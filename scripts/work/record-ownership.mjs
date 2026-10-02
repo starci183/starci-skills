@@ -85,7 +85,7 @@ export const APP_SIDES = Object.freeze(['be', 'fe']);
  * and every finding use. Refused: a `repository:<id>/` prefix, an absolute or ../ path, and a side-relative path (src/x
  * where be/src/x exists): OWNER_PATH_NOT_APP_RELATIVE.
  */
-export function ownerPathProblem(rawPath, appRoot) {
+function ownerPathProblem(rawPath, appRoot) {
   const rel = String(rawPath).replaceAll('\\', '/');
   const hint = 'an owner path is app-relative: be/<path>, fe/<path> or a directory of the app root';
   if (/^repository:/.test(rel)) return `${rawPath} names a repository; ${hint}`;

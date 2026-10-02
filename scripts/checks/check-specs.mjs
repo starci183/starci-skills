@@ -133,7 +133,7 @@ export function specFindings(files) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkSpecs(root = skillRoot) {
+function checkSpecs(root = skillRoot) {
   const files = trackedTextFiles(root, (rel) => SPEC.test(rel) && !GENERATED.test(rel) && !VENDORED.test(rel));
   return specFindings(files);
 }

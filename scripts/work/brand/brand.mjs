@@ -29,15 +29,15 @@ import {readJsonFile as readJson} from '../../lib/json.mjs';
 export const BRAND_CHECKS='starci/brand-checks@1';
 export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-distinct','mascot-assets-present','icon-set-only','tokens-in-grammar','direction'];
 /** WCAG 2.x: text needs 4.5:1, a non-text indicator (primary on its surface) needs 3:1. */
-export const DEFAULT_MIN_CONTRAST=4.5;
-export const NON_TEXT_MIN_CONTRAST=3;
+const DEFAULT_MIN_CONTRAST=4.5;
+const NON_TEXT_MIN_CONTRAST=3;
 /**
  * HeroUI status tones: a solid pair (`--<tone>` + `--<tone>-foreground`) and a soft pair (`--<tone>-soft` +
  * `--<tone>-soft-foreground`, the Chip/Badge/Alert `soft` and `flat` variants). Owner decision 2026-09-30: the
  * soft foreground on its own soft tint is accepted at 3:1, and a bare status glyph on a page ground takes the
  * soft foreground instead of a darkened solid tone. A soft pair is a token with role `<tone>-soft`.
  */
-export const SOFT_MIN_CONTRAST=3;
+const SOFT_MIN_CONTRAST=3;
 export const STATUS_TONES=['success','warning','info','danger'];
 const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec(token.role??'');return match?match[1]:null;};
 /**
@@ -48,7 +48,7 @@ const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec
  */
 export const MIN_PRIMARY_DANGER_DELTA=20;
 export const TOKEN_TOLERANCE=0.5;
-export const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
+const ASSET_EXTENSIONS=['.png','.svg','.webp','.jpg','.jpeg'];
 export const OFFENDER_CAP=20;
 const SCAN_EXCLUDED=new Set(['node_modules','dist','.next','.git','.dist','coverage','build','out','.turbo','.cache']);
 const SCAN_FILE_LIMIT=5000;
@@ -66,11 +66,11 @@ const digest=sha256;
 
 const clamp01=value=>value<0?0:value>1?1:value;
 /** sRGB transfer function and its inverse; the piecewise form, not the 2.2 approximation. */
-export const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
-export const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
+const srgbToLinear=channel=>channel<=0.04045?channel/12.92:((channel+0.055)/1.055)**2.4;
+const linearToSrgb=channel=>channel<=0.0031308?channel*12.92:1.055*channel**(1/2.4)-0.055;
 
 /** Linear-light sRGB (0..1 each) to OKLab. */
-export function linearRgbToOklab([red,green,blue]){
+function linearRgbToOklab([red,green,blue]){
   const long=Math.cbrt(0.4122214708*red+0.5363325363*green+0.0514459929*blue);
   const medium=Math.cbrt(0.2119034982*red+0.6806995451*green+0.1073969566*blue);
   const short=Math.cbrt(0.0883024619*red+0.2817188376*green+0.6299787005*blue);
@@ -80,7 +80,7 @@ export function linearRgbToOklab([red,green,blue]){
 }
 
 /** OKLab to linear-light sRGB (unclamped: a value outside 0..1 is outside the sRGB gamut). */
-export function oklabToLinearRgb({L,a,b}){
+function oklabToLinearRgb({L,a,b}){
   const long=(L+0.3963377774*a+0.2158037573*b)**3;
   const medium=(L-0.1055613458*a-0.0638541728*b)**3;
   const short=(L-0.0894841775*a-1.2914855480*b)**3;
@@ -159,7 +159,7 @@ function color({notation,rgb,alpha,raw,lab=null,clipped=false}){
 /** Euclidean OKLab distance on the x100 scale: black against white is 100. */
 export const deltaEOk=(first,second)=>100*Math.hypot(first.oklab.L-second.oklab.L,first.oklab.a-second.oklab.a,first.oklab.b-second.oklab.b);
 /** WCAG 2.x relative luminance of a parsed colour. */
-export const relativeLuminance=({rgb:[red,green,blue]})=>0.2126*srgbToLinear(red/255)+0.7152*srgbToLinear(green/255)+0.0722*srgbToLinear(blue/255);
+const relativeLuminance=({rgb:[red,green,blue]})=>0.2126*srgbToLinear(red/255)+0.7152*srgbToLinear(green/255)+0.0722*srgbToLinear(blue/255);
 /** WCAG 2.x contrast ratio: 21 for black against white, 1 for a colour against itself. */
 export function contrastRatio(first,second){
   const one=relativeLuminance(first),two=relativeLuminance(second);
@@ -813,7 +813,7 @@ export function checkTokensInGrammar({brand,family,grammarRoot}){
 
 /** The page archetypes a direction settles (work/brand@1 $defs.direction.archetypes). */
 export const DIRECTION_ARCHETYPES=Object.freeze(['dashboard','list','detail','form','wizard','empty']);
-export const DIRECTION_STATUSES=Object.freeze(['proposed','accepted']);
+const DIRECTION_STATUSES=Object.freeze(['proposed','accepted']);
 /** The owner ask that accepts a direction archetype (scripts/work/brand-direction.mjs question), and its receipt review. */
 export const DIRECTION_REVIEW_KIND='brand-direction-review';
 export const DIRECTION_REVIEW_SCHEMA='starci/brand-direction-review@1';
@@ -822,7 +822,7 @@ export const DIRECTION_DECISIONS=Object.freeze(['accept','revise']);
 const DIRECTION_ACCEPT_OPTION=0;
 /** The review a draw-review receipt carries (scripts/work/draw-review.mjs DRAW_REVIEW_SCHEMA): a golden's owner accept. */
 const DRAW_REVIEW_RECEIPT_SCHEMA='starci/draw-review@1';
-export const LEARNED_STATUSES=Object.freeze(['proposed','accepted']);
+const LEARNED_STATUSES=Object.freeze(['proposed','accepted']);
 const ARCHETYPE_FIELDS=['regionOrder','grid1184','grid390','emphasis','primaryActionPlacement','never','whenNotToUse'];
 
 /** The component names one grammar family's DNA renders (`renderers[].component`). */
@@ -868,7 +868,7 @@ function judgeAcceptance({acceptance,rev,brandDir,archetype=null,golden=[]}){
 }
 
 /** Autopilot's provisional accept (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). */
-export const AUTOPILOT_ANSWERER='autopilot';
+const AUTOPILOT_ANSWERER='autopilot';
 /**
  * Whether an archetype's `provisional` block is backed by an autopilot receipt for the rev it names, with passing gate
  * evidence, reviewing this archetype and the golden bytes on disk now: {ok, why?, receipt?}. Never an owner acceptance.

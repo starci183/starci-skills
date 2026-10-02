@@ -63,8 +63,8 @@ export const DRAW_NOTICE_NOT_ALERT = 'DRAW_NOTICE_NOT_ALERT';
 export const DRAW_RATIO_NOT_METER = 'DRAW_RATIO_NOT_METER';
 export const DRAW_ALERT_ANATOMY = 'DRAW_ALERT_ANATOMY';
 /** Grammar 0.5.3 Badge isDot: the dot's class and its one size (HeroUI's <CircleFill width={6} />). */
-export const BADGE_DOT_CLASS = 'starci-core-badge-dot';
-export const BADGE_DOT_PX = 6;
+const BADGE_DOT_CLASS = 'starci-core-badge-dot';
+const BADGE_DOT_PX = 6;
 const DOT_CLASS = /(?:^|[-_])(dot|status-dot|dot-indicator)(?:$|[-_])/i;
 /**
  * The grammar Alert's action Button variant for a PresentationState tone (@starci/grammar 0.5.3 Alert, after HeroUI v3's
@@ -78,37 +78,37 @@ export const DRAW_DNA_CODES = Object.freeze([DRAW_OFF_GRAMMAR_COMPONENT, DRAW_NO
 /** The attribute a drawing marks an artwork slot with; interface.asset fills it (scripts/work/asset-slot.mjs). */
 export const ASSET_SLOT_ATTR = 'data-asset-slot';
 /** The HeroUI Meter/Progress track height (meter.css `.meter__track` h-2), in CSS px. */
-export const METER_TRACK_PX = 8;
+const METER_TRACK_PX = 8;
 /** The segmented Meter track height (grammar 0.5.2 `.starci-core-meter-segments` h-1), in CSS px. */
-export const METER_SEGMENTED_TRACK_PX = 4;
+const METER_SEGMENTED_TRACK_PX = 4;
 /** The widest gap between two segments that still reads as one track (the grammar sets 0.25rem). */
-export const METER_SEGMENT_GAP_MAX_PX = 8;
+const METER_SEGMENT_GAP_MAX_PX = 8;
 /** The indicator size at which an Alert glyph has become a tile (IconTile sm is 32px; HeroUI's glyph is size-4 + p-1). */
-export const ALERT_INDICATOR_MAX_PX = 32;
+const ALERT_INDICATOR_MAX_PX = 32;
 /** A track at least this share of its band's content width spans it (sub-pixel rounding, borders). */
-export const METER_FULL_WIDTH_SHARE = 0.95;
+const METER_FULL_WIDTH_SHARE = 0.95;
 export const COMPONENT_ATTR = 'data-grammar-component';
 export const PART_ATTR = 'data-grammar-part';
-export const PROPOSAL_ATTR = 'data-grammar-proposal';
+const PROPOSAL_ATTR = 'data-grammar-proposal';
 /** The segmented-meter proposal the owner accepted; since grammar 0.5.2 it is DNA `Meter segments` (2..12). */
-export const METER_SEGMENTS_PROPOSAL = 'Meter.segments';
+const METER_SEGMENTS_PROPOSAL = 'Meter.segments';
 /** A segment of a Meter spelled with the DNA anatomy (part / class / grammar hook), not a hand-cut bar. */
 const dnaSegment = (d) => /^(meter-)?segments?$/.test((d.attrs?.[PART_ATTR] ?? '').trim()) || classesOf(d).some((c) => /^starci-core-meter-segments?$/.test(c))
   || d.attrs?.['data-grammar-meter-segment'] != null || d.attrs?.['data-grammar-meter-segments'] != null;
 /** Whether a Meter root draws segments (DNA `segments`, its hooks, or segment anatomy under it). */
-export const segmentedMeter = (el) => el.attrs?.['data-segments'] != null || el.attrs?.['data-grammar-meter-segments'] != null
+const segmentedMeter = (el) => el.attrs?.['data-segments'] != null || el.attrs?.['data-grammar-meter-segments'] != null
   || walkElements(el).some((d) => dnaSegment(d) || /segment/i.test(`${d.attrs?.[PART_ATTR] ?? ''} ${classesOf(d).join(' ')}`));
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const GRAMMARS = path.join(ROOT, 'knowledge', 'grammars');
-export const DEFAULT_FAMILY = 'starci';
+const DEFAULT_FAMILY = 'starci';
 
 /**
  * The Grammar's PresentationState vocabulary (knowledge/ui/composition/state.yaml: neutral, informative,
  * affirmative, cautionary, negative, pending, unavailable) and the HeroUI tone names a drawing spells them with.
  */
-export const PRESENTATION_STATES = Object.freeze(['neutral', 'informative', 'affirmative', 'cautionary', 'negative', 'pending', 'unavailable']);
-export const TONE_ALIASES = Object.freeze({ default: 'neutral', muted: 'neutral', info: 'informative', accent: 'informative', primary: 'informative',
+const PRESENTATION_STATES = Object.freeze(['neutral', 'informative', 'affirmative', 'cautionary', 'negative', 'pending', 'unavailable']);
+const TONE_ALIASES = Object.freeze({ default: 'neutral', muted: 'neutral', info: 'informative', accent: 'informative', primary: 'informative',
   success: 'affirmative', warning: 'cautionary', danger: 'negative', error: 'negative' });
 /** The tone of `value` in the PresentationState vocabulary, or null. */
 export const presentationStateOf = (value) => {
@@ -127,7 +127,7 @@ const TAG_RX = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\?[^>]*>|<\/(
 const ATTR_RX = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 const decode = (s) => String(s).replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
 
-export function parseAttrs(text) {
+function parseAttrs(text) {
   const out = {};
   for (const m of String(text ?? '').matchAll(ATTR_RX)) {
     const name = m[1].toLowerCase();
@@ -199,7 +199,7 @@ const describe = (el) => {
 
 const dnaCache = new Map();
 /** The DNA file of a Grammar family: knowledge/grammars/<family>/DNA.yaml, else the starci family's. */
-export function dnaFileOf(family = DEFAULT_FAMILY, root = GRAMMARS) {
+function dnaFileOf(family = DEFAULT_FAMILY, root = GRAMMARS) {
   for (const f of [family, DEFAULT_FAMILY]) {
     const file = path.join(root, String(f ?? DEFAULT_FAMILY), 'DNA.yaml');
     if (fs.existsSync(file)) return file;
@@ -320,7 +320,7 @@ const declsOf = (text) => {
 };
 
 /** The flat rules of the render's <style> blocks: [{selector, decls}] (innermost blocks of an @media included). */
-export function styleRulesOf(tree) {
+function styleRulesOf(tree) {
   const out = [];
   for (const el of walkElements(tree).filter((e) => e.tag === 'style')) {
     const css = String(el.raw ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -351,7 +351,7 @@ function selectorMatches(selector, el) {
 }
 
 /** Every background an element declares: [{value, via}] from its style, a bg-* utility class, and matching <style> rules. */
-export function declaredBackgroundsOf(el, rules = []) {
+function declaredBackgroundsOf(el, rules = []) {
   const out = [];
   const inline = declsOf(el.attrs.style);
   for (const k of ['background', 'background-color']) if (inline[k]) out.push({ value: inline[k], via: `style ${k}` });
@@ -373,7 +373,7 @@ export function surfaceBackground(value) {
 }
 
 /** The pixel size an element declares for `prop` (inline style, then matching <style> rules), px or rem; else null. */
-export function declaredPx(el, prop, rules = []) {
+function declaredPx(el, prop, rules = []) {
   const read = (v) => {
     const m = /^(-?\d+(?:\.\d+)?)(px|rem)$/.exec(String(v ?? '').trim());
     return m ? Number(m[1]) * (m[2] === 'rem' ? 16 : 1) : null;
@@ -387,7 +387,7 @@ export function declaredPx(el, prop, rules = []) {
 const ARTWORK_COMPONENTS = new Set(['Image', 'MediaFrame', 'RankArtwork']);
 const RASTER_SRC = /\.(png|jpe?g|webp|gif|avif)(?:[?#]|$)|^data:image\/(png|jpe?g|webp|gif|avif)/i;
 /** Raster artwork: an Image/MediaFrame/RankArtwork root, or an img of a raster file outside Avatar/Icon/IconTile. */
-export function isArtwork(el) {
+function isArtwork(el) {
   const name = componentRootOf(el);
   if (ARTWORK_COMPONENTS.has(name) && !ancestorsOf(el).some((a) => ARTWORK_COMPONENTS.has(componentNameOf(a)))) return true;
   if (el.tag !== 'img' || inComponent(el, ['Avatar', 'AvatarGroup', 'Icon', 'IconTile', ...ARTWORK_COMPONENTS])) return false;
@@ -636,7 +636,7 @@ export function proposalFilesFor(htmlFile, dirs = []) {
 }
 
 /** Judge one render source file. */
-export function dnaFindingsOfFile(file, { family = DEFAULT_FAMILY, proposalFiles = null, dirs = [], assetRequests = null } = {}) {
+function dnaFindingsOfFile(file, { family = DEFAULT_FAMILY, proposalFiles = null, dirs = [], assetRequests = null } = {}) {
   const html = fs.readFileSync(file, 'utf8');
   const files = proposalFiles ?? proposalFilesFor(file, dirs);
   return dnaFindings(html, { dna: loadDna({ family }), proposals: proposalNamesIn(files), label: path.basename(file), assetRequests });

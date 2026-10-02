@@ -47,7 +47,7 @@ const blockTexts = (language) => {
  * 'dead' and ⚠ on 'limited'. Providers with no number are skipped; nothing is
  * rendered when no provider reports a figure.
  */
-export function renderQuotaLine(quota, { language = 'en' } = {}) {
+function renderQuotaLine(quota, { language = 'en' } = {}) {
   const t = blockTexts(language);
   const parts = [];
   for (const [name, q] of Object.entries(quota ?? {})) {

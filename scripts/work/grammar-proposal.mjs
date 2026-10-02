@@ -32,7 +32,7 @@ import { isDir, isFile } from './work-io.mjs';
 export const GRAMMAR_PROPOSAL_FILED = 'grammar-proposal-filed';
 export const GRAMMAR_PROPOSAL_RESOLVED = 'grammar-proposal-resolved';
 export const PROPOSAL_FILE_NAMES = Object.freeze(['grammar-proposal.yaml', 'grammar-proposal.yml', 'grammar-proposal.md']);
-export const PROPOSAL_FIELDS = Object.freeze(['gap', 'anatomy', 'tokens', 'claims', 'render']);
+const PROPOSAL_FIELDS = Object.freeze(['gap', 'anatomy', 'tokens', 'claims', 'render']);
 /** A proposal is never accepted by the runtime: it stays proposed until the owner, through a grammar lane, decides. */
 export const PROPOSED = 'proposed';
 
@@ -48,7 +48,7 @@ const MD_FIELDS = {
 };
 
 /** The names a markdown heading declares for its proposal. */
-export function headingNames(raw) {
+function headingNames(raw) {
   const names = new Set();
   for (const q of String(raw).matchAll(/data-grammar-proposal=["']([^"']+)["']/g)) names.add(q[1].trim());
   const heading = String(raw).replace(/[`*]/g, '').trim().replace(/^\d+[.)]\s*/, '');
@@ -126,7 +126,7 @@ export function proposalFilesUnder(dir, depth = 6) {
 }
 
 /** The proposal files among `files` (files or directories). */
-export function proposalFilesIn(files) {
+function proposalFilesIn(files) {
   const out = new Map();
   for (const f of files ?? []) for (const p of proposalFilesUnder(f)) out.set(path.resolve(p).toLowerCase(), path.resolve(p));
   return [...out.values()];

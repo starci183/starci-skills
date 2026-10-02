@@ -75,7 +75,7 @@ export function launchAuthorityText({ restart = null } = {}) {
     '  or continue (owner rule: the owner never approves launch gates).'].join('\n');
 }
 
-export function renderSupervisorPrompt({ template, doc, settings, restart = null, skillRoot = SKILL_ROOT }) {
+function renderSupervisorPrompt({ template, doc, settings, restart = null, skillRoot = SKILL_ROOT }) {
   return template
     .replaceAll('{launchAuthority}', launchAuthorityText({ restart }))
     .replaceAll('{doctrine}', doctrineOf(doc))
@@ -180,7 +180,7 @@ function closeDuplicates(entries, deps, fallbackAgent) {
 /** Why no [Supervisor] kernel starts in chat mode (config.yaml supervisor.mode). */
 export const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
 
-export const START_LOCK = 'supervisor-start';
+const START_LOCK = 'supervisor-start';
 /**
  * The launcher lock (host_locks 'supervisor-start', TTL the startup reservation): {ok, release} or {ok:false, holder}.
  * A holder whose process is gone never blocks the next launcher.

@@ -158,7 +158,7 @@ export function validateWork(target, { strict = false } = {}) {
 const FINDING_FILE = /^(.+?): /;
 const UNDER_FILE = / under (.+?) \[[A-Z_]+\]$/;
 /** The absolute file a finding names, or null: its "under <file>" tail, else its leading path. */
-export function findingFile(finding, { roots = [] } = {}) {
+function findingFile(finding, { roots = [] } = {}) {
   const text = String(finding);
   const candidates = [UNDER_FILE.exec(text)?.[1], FINDING_FILE.exec(text)?.[1]].filter(Boolean);
   for (const candidate of candidates) {

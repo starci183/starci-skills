@@ -17,7 +17,7 @@ export const resolveJob = (db, jobId) => {
 export const REPORTABLE_JOB_STATUSES = new Set(['running', 'answering', 'effect_unknown', 'reported']);
 
 /** The job's open attempt (no end state, not settled), or null. */
-export const openAttemptOf = (db, job) => db.prepare(`SELECT * FROM op_attempts WHERE job_id=? AND end_state IS NULL AND settled_at IS NULL
+const openAttemptOf = (db, job) => db.prepare(`SELECT * FROM op_attempts WHERE job_id=? AND end_state IS NULL AND settled_at IS NULL
   ORDER BY dispatch_seq DESC LIMIT 1`).get(job.job_id) ?? null;
 
 /** The dispatch id a report of this job carries: its open attempt's, else its latest attempt's, else null. */

@@ -72,7 +72,7 @@ export function sessionHomes({ env = process.env, platform = process.platform, h
 }
 
 /** Directories an agent's session files for `cwd` live under (claude keys sessions by project dir). */
-export function sessionDirsFor(agent, cwd, homes) {
+function sessionDirsFor(agent, cwd, homes) {
   if (agent === 'claude') return [{ dir: path.join(homes.claude, 'projects', sessionProjectSlug(cwd)), match: (f) => f.endsWith('.jsonl') }];
   return [];
 }

@@ -23,7 +23,7 @@ import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '
 
 export const GRAMMAR_PACKAGE='@starci/grammar';
 export const GRAMMAR_DIST_FIX='run npm run build in packages/grammar';
-export const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
+const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
 const TOKEN_DIFF_CAP=20;
 
 
@@ -47,7 +47,7 @@ function cssFamilies(packageRoot){
  * Compares every family's `--*` token declarations in dist CSS with the source CSS they were copied from.
  * Returns the differing tokens (capped) and how many declarations were compared.
  */
-export function compareCssTokens(packageRoot){
+function compareCssTokens(packageRoot){
   const differences=[];let compared=0;
   for(const family of cssFamilies(packageRoot)){
     const dir=path.join(packageRoot,'src',family);

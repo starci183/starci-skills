@@ -41,7 +41,7 @@ import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
 const SOURCE = /\.(?:mjs|cjs|js)$/;
 /** The codes only an extra emitter reports (scripts/checks/check-contract-cites.mjs, passed in by the `starci check` driver). */
-export const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
+const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
 
 /** The merge-base of HEAD with main (else origin/main) in `repoRoot` and a reader of files at it; null when none resolves. */
 export function baseRevision(repoRoot) {
@@ -53,7 +53,7 @@ export function baseRevision(repoRoot) {
 }
 
 /** The `pending` list of the runtime manifest at the base revision, or null when the base has none (or no base). */
-export function basePendingOf(base) {
+function basePendingOf(base) {
   if (!base) return null;
   const text = base.show(RUNTIME_MANIFEST_FILE);
   if (text === null) return null;
@@ -61,7 +61,7 @@ export function basePendingOf(base) {
 }
 
 /** The production sources of the runtime: tracked .mjs/.cjs/.js under ruleParams.runtime.sourceRoots, generated copies excluded. */
-export function runtimeSources(files, params) {
+function runtimeSources(files, params) {
   const roots = params.sourceRoots;
   const generated = params.generated.map((g) => `${g.root}/`);
   return files.filter((f) => SOURCE.test(f) && roots.some((r) => f === r || f.startsWith(`${r}/`)) && !generated.some((g) => f.startsWith(g)));

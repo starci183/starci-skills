@@ -4,7 +4,7 @@ import {isPlainObject as plain} from './plain-object.mjs';
 export const invalid=section=>message=>{throw Error(`Invalid config.yaml: ${section}${message}`);};
 
 /** The host roots the owner may relocate (config.yaml `roots`): the archive root and the lanes root. */
-export const ROOT_KEYS=Object.freeze(['archive','lanes']);
+const ROOT_KEYS=Object.freeze(['archive','lanes']);
 /** config.yaml `roots` - {archive?, lanes?}: absolute directories, or null; an absent key means <starciLocalRoot>/archive and <starciLocalRoot>/lanes. */
 export function validateRoots(roots){
   if(roots===null)return;

@@ -12,9 +12,9 @@ import { list } from '../lib/list.mjs';
 import { pathsOverlap } from '../lib/path-key.mjs';
 
 const SCHEMA_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../modules/schemas/work-graph.schema.yaml');
-export const WORK_GRAPH_SCHEMA = parseYaml(fs.readFileSync(SCHEMA_FILE, 'utf8'));
+const WORK_GRAPH_SCHEMA = parseYaml(fs.readFileSync(SCHEMA_FILE, 'utf8'));
 export const WORK_GRAPH_ID = WORK_GRAPH_SCHEMA.properties.schema.const;
-export const COLORS = Object.freeze([...WORK_GRAPH_SCHEMA.$defs.color.enum]);
+const COLORS = Object.freeze([...WORK_GRAPH_SCHEMA.$defs.color.enum]);
 export const EVENTS = Object.freeze([...WORK_GRAPH_SCHEMA.$defs.event.enum]);
 const [GRAY, YELLOW, GREEN, RED] = COLORS;
 export { GRAY, YELLOW, GREEN, RED };
@@ -58,7 +58,7 @@ const ancestorsIn = (nodes) => {
 };
 
 /** Every node reachable from `ids` along edges and containment, the start nodes included. */
-export function descendantsOf(graph, ids) {
+function descendantsOf(graph, ids) {
   const nodes = list(graph.nodes);
   const next = containment(nodes);
   for (const e of list(graph.edges)) next.get(e.from)?.add(e.to);

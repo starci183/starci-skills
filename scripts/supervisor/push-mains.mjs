@@ -195,13 +195,13 @@ const fullHeadOf = (repo, run) => run(['rev-parse', 'main'], { cwd: repo }).stdo
 /** MB-03: a push (with its pre-push hook: one repo's Jest alone takes ~4 min) may run this long; a timeout is its own reason. */
 export const PUSH_TIMEOUT_MS = 600_000;
 /** MB-03: a refusal identical to the previous one (same head, same signature) is not re-run before base x 2^(n-1), capped. */
-export const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
+const REFUSAL_BACKOFF = Object.freeze({ baseMs: 1_800_000, maxMs: 86_400_000 });
 
 const outputOf = (r) => [r?.stdout, r?.stderr, r?.error].filter(Boolean).join('\n');
 const WHY_LINE = /\b(?:error|errors|failed|failure|fail|rejected|denied|refused|timed out|ERR!)\b|✖|×/i;
 
 /** The lines that say why a push failed: its error/fail lines (at most 8), else its last 8 lines. Pure. */
-export function failureSummary(text, { max = 8 } = {}) {
+function failureSummary(text, { max = 8 } = {}) {
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const why = lines.filter((l) => WHY_LINE.test(l));
   // The error lines first, then the tail (a hook's own last words: `LINT_ERROR ...`, a failing suite), once each.
@@ -231,7 +231,7 @@ export function failureSignature(r, text = outputOf(r)) {
 }
 
 /** The full (redacted) push/hook output as a blob: {sha, bytes} or null (the store refused). Never throws. */
-export function storeOutput(text, { put = null } = {}) {
+function storeOutput(text, { put = null } = {}) {
   if (!String(text ?? '').trim()) return null;
   try {
     const bytes = Buffer.from(redactText(String(text)), 'utf8');
@@ -258,7 +258,7 @@ const failureOf = (r, { store = storeOutput } = {}) => {
  * repeat, signature} while inside the backoff, else {hold: false}. `prior` = the last refusal {head, signature, at,
  * repeat}. Pure.
  */
-export function refusalHold(prior, { head, now = Date.now(), backoff = REFUSAL_BACKOFF } = {}) {
+function refusalHold(prior, { head, now = Date.now(), backoff = REFUSAL_BACKOFF } = {}) {
   if (!prior?.head || !head || prior.head !== head || !prior.signature) return { hold: false };
   const repeat = Math.max(1, Number(prior.repeat) || 1);
   const until = Number(prior.at) + Math.min(backoff.maxMs, backoff.baseMs * 2 ** (repeat - 1));
@@ -282,7 +282,7 @@ const unlinkLink = (link) => { try { fs.unlinkSync(link); } catch { try { fs.rmd
 /** Installed dependencies, build and tool output a scratch never borrows from the live tree: the hook judges the commit,
  *  not a stale build of the working tree, and the scratch installs its own dependencies. Matched against every path
  *  segment of an ignored entry. */
-export const LOCAL_STATE_EXCLUDED = /^(?:node_modules|dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
+const LOCAL_STATE_EXCLUDED = /^(?:node_modules|dist|build|coverage|\.turbo|\.next|\.scannerwork|test-results|tmp|target|\.git)$|\.log$/i;
 
 /** A local-state path that is linked in place or not at all, never copied: the stack runtime and every file
  *  the outgoing scan forbids (env files, keys, credentials, .secrets). */
@@ -296,7 +296,7 @@ const neverCopied = (rel) => /(^|\/)\.starcistacks\//i.test(rel) || FORBIDDEN_FI
  * excluded output and anything the worktree already holds (its own npm ci install, the hooks link) are skipped.
  * Returns [{rel, dir}], `rel` '/'-separated, one point per subtree.
  */
-export function localStateEntries(repo, worktree, { run = git } = {}) {
+function localStateEntries(repo, worktree, { run = git } = {}) {
   const listed = run(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory'], { cwd: repo });
   if (!listed.ok) return [];
   const points = new Map();
@@ -455,7 +455,7 @@ export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot =
  * MB-03: the last push outcome per repository when it was a refusal with a signature: Map(repoKey -> {head, signature,
  * at, repeat}). A later successful push clears it. Never throws.
  */
-export function lastRefusals({ env = process.env } = {}) {
+function lastRefusals({ env = process.env } = {}) {
   const out = new Map();
   try {
     // machine.sqlite pushes: a held (skipped) attempt is not an attempt; repeat = the consecutive refusals at that head.

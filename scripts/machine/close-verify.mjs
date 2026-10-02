@@ -44,9 +44,9 @@ import { workerRelease } from '../api/orca/worker-release.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export const VERIFY_MS = 6000;
-export const VERIFY_INTERVAL_MS = 500;
-export const SELF_CLOSE_DELAY_MS = 2500;
+const VERIFY_MS = 6000;
+const VERIFY_INTERVAL_MS = 500;
+const SELF_CLOSE_DELAY_MS = 2500;
 const RUNTIME_SCRIPT = /[\\/](?:scripts[\\/](?:supervisor|kernel|lib|api|work|route|agent)|engine)[\\/][\w.-]+\.mjs/i;
 const AGENT_IMAGE = /^(?:codex|claude|devin)(?:\.exe)?$/i;
 const AGENT_NODE_CLI = /(?:@openai[\\/]codex|@anthropic-ai[\\/]claude-code|[\\/]codex(?:\.js)?\s|[\\/]claude(?:\.js)?\s)/i;
@@ -64,7 +64,7 @@ export function terminalState(handle, { show = terminalShow } = {}) {
 }
 
 /** Close `handle` by tab when nothing else lives in its tab, else by pane. {ok, tab?, error?}. */
-export function closeOnce(handle, { list = terminalList, close = terminalClose, byPane = false } = {}) {
+function closeOnce(handle, { list = terminalList, close = terminalClose, byPane = false } = {}) {
   let tabId = null, alone = false;
   if (!byPane) {
     try {
@@ -164,7 +164,7 @@ export function reapOrphaned(before, { table = processTable, kill = (pid) => kil
 }
 
 /** True when this process runs inside `handle` (Orca exports the terminal's own handle to it). */
-export const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env.ORCA_TERMINAL_HANDLE === handle;
+const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env.ORCA_TERMINAL_HANDLE === handle;
 
 /**
  * Close `handle` from a caller that may be running inside it: inline closeAndVerify when it is another terminal, a

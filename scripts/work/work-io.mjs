@@ -13,7 +13,7 @@ export { slash };
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
 export const RECORD_DEPTH = 12;
 /** Directories a record walk never enters: a record's own files and the kernel's evidence hold no records. */
-export const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals']);
+const RECORD_SKIP = Object.freeze(['node_modules', 'assets', 'evidence', 'runs', '_derived', 'kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** The share of a keyed #FF00FF rectangle that must be key-coloured for it to count as a slot. */
 export const SLOT_FILL_MIN = 0.98;
 

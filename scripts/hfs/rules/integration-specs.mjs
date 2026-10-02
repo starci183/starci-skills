@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readText } from './read.mjs';
 
-export const INTEGRATION_SPEC_MISSING = 'BE_INTEGRATION_SPEC_MISSING';
+const INTEGRATION_SPEC_MISSING = 'BE_INTEGRATION_SPEC_MISSING';
 
 const CONFIG_FILE = /^((?:[^/]+\/)*?)src\/modules\/integrations\/([^/]+)\/\2\.config\.ts$/;
 const SPEC_SUFFIX = '.integration-spec.ts';

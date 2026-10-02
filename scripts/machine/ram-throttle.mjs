@@ -62,10 +62,10 @@ import { isoOr } from '../lib/time.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
 export const RECONCILER_WRITER = 'reconciler/resource';
-export const RECONCILER_MODE_FRESH_MS = 120_000;
+const RECONCILER_MODE_FRESH_MS = 120_000;
 
 export const DISPATCH_THROTTLED = 'dispatch-throttled';
-export const OP_RAM_FOOTPRINT = 'op-ram-footprint';
+const OP_RAM_FOOTPRINT = 'op-ram-footprint';
 /** host_samples.kind of one op-ram-footprint sample. */
 export const FOOTPRINT_SAMPLE_KIND = 'op-footprint';
 export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
@@ -102,8 +102,8 @@ export function opRamTable(settings = null) {
   return { default: def, kinds };
 }
 
-export const opClassOf = (op, table) => (table.kinds[op] ?? table.default).class;
-export const priorMbOf = (op, table) => (table.kinds[op] ?? table.default).mb;
+const opClassOf = (op, table) => (table.kinds[op] ?? table.default).class;
+const priorMbOf = (op, table) => (table.kinds[op] ?? table.default).mb;
 
 /**
  * Per-kind RAM observations out of op-ram-footprint samples [{opAgentRamMb, kernels, running:{kind:n}}]: the op
@@ -140,7 +140,7 @@ export function opRamEstimates(table, samples = [], thresholds = throttleThresho
   return out;
 }
 
-export const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
+const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
 
 /**
  * The next mode from the previous state and one host sample, with hysteresis. `prev`: {ramMode, cpuHot} (a missing
@@ -279,7 +279,7 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 
 /** The DB mode (throttle_state / throttle_events enum normal|heavy|critical) of a code mode, and back. */
 export const dbMode = (mode) => (mode === 'heavy-paused' ? 'heavy' : MODES.includes(mode) ? mode : 'normal');
-export const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
+const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
 
 
 /**
@@ -288,7 +288,7 @@ export const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.inc
  * {count, open, last}}; {} with neither. ramMode is not a column: it reads as the mode (conservative - after a CPU-only
  * heavy pause the RAM hysteresis holds until free RAM clears heavyResumeAbovePct).
  */
-export function throttleStateOf(m) {
+function throttleStateOf(m) {
   const row = m.throttleState();
   const decisions = m.db.prepare('SELECT count(*) n, sum(released_at IS NULL) open FROM throttle_decisions').get();
   const last = m.db.prepare('SELECT * FROM throttle_decisions ORDER BY seq DESC LIMIT 1').get();
@@ -382,7 +382,7 @@ export function fleetCensus({ db = null, ledgerFile = null, env = process.env } 
   return { ops, kernels };
 }
 
-export const countByKind = (ops) => ops.reduce((acc, o) => { acc[o.op] = (acc[o.op] ?? 0) + 1; return acc; }, {});
+const countByKind = (ops) => ops.reduce((acc, o) => { acc[o.op] = (acc[o.op] ?? 0) + 1; return acc; }, {});
 
 const overrideOf = (env) => {
   const raw = env?.[HOST_RESOURCES_ENV];

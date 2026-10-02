@@ -46,7 +46,7 @@ import { isSpecRun } from '../lib/env.mjs';
 const SELF = fileURLToPath(import.meta.url);
 const DRAW_OPS = new Set(['interface.draw', 'interface.asset']);
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify', 'e2e.verify']);
-export const LIMITS = {
+const LIMITS = {
   photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: TEXT_MAX,
   screenshots: 20, walkFiles: 2000, walkDepth: 6,
 };
@@ -156,7 +156,7 @@ const uiLabelOf = (dir) => {
   return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : path.basename(dir);
 };
 
-export const bandOf = (value) => {
+const bandOf = (value) => {
   const v = String(value ?? '').toLowerCase();
   if (!v) return null;
   const n = Number(v.match(/\d{3,4}/)?.[0] ?? NaN);
@@ -227,7 +227,7 @@ export function collectDrawings({ files, repo }) {
 }
 
 /** Screens, states, width bands and themes the ui records (and the drawn picks) cover. */
-export function drawingCounts(nodes, picks) {
+function drawingCounts(nodes, picks) {
   const screens = new Set(), states = new Set(), bands = new Set(), themes = new Set();
   const addBand = (v) => { const b = bandOf(v); if (b) bands.add(b); };
   const addTheme = (v) => { const t = themeOf(v); if (t) themes.add(t); };
@@ -254,7 +254,7 @@ export function drawingCounts(nodes, picks) {
 }
 
 /** The album caption for a settled draw. */
-export function drawCaption({ workflow, nodes, picks, counts, summary, oversize = [], language }) {
+function drawCaption({ workflow, nodes, picks, counts, summary, oversize = [], language }) {
   const t = textFor(language);
   const title = workflow.title || workflow.id;
   const names = nodes.length ? nodes.map((n) => n.label).join(', ') : [...new Set(picks.map((p) => p.screen).filter(Boolean))].join(', ') || '?';
@@ -339,7 +339,7 @@ function runFlowsOf(file) {
  * The UAT media one report produced: its videos (with their flows) and, for the album, its
  * screenshots. The run folders of the uat records it names are searched too.
  */
-export function collectUat({ files, repo }) {
+function collectUat({ files, repo }) {
   const seen = expand(files);
   const records = [...seen.values()].filter((f) => /\/uat\/[^/]+\/index\.yaml$/.test(posix(f)) && !/\/uat\/runs\//.test(posix(f)));
   const runDirs = records.map((r) => { const ev = readYaml(r)?.evidence; return typeof ev === 'string' ? path.resolve(path.dirname(r), ev) : null; }).filter((d) => d && isDir(d));
@@ -353,7 +353,7 @@ export function collectUat({ files, repo }) {
 const featureOf = (file) => posix(file).match(/\/features\/([^/]+)\//)?.[1] ?? null;
 
 /** The caption for one UAT video (or a screenshot album when `shots` is set). */
-export function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
+function uatCaption({ workflow, flow, verdict, summary, language, index = 1, total = 1, runFlows = [], fallbackName = null, shots = 0, note = null, prepare = false }) {
   const t = textFor(language);
   const name = `${clipLine(flow?.name ?? fallbackName ?? workflow.title ?? workflow.id, 140)}${prepare ? ` (${t.prepare})` : ''}`;
   const head = [`${t.uat(name, verdictText(t, verdict))}${total > 1 ? ` (${t.video} ${index}/${total})` : ''}`, `${t.workflow}: ${workflow.title || workflow.id}`];
@@ -424,7 +424,7 @@ const chunk = (list, n) => { const out = []; for (let i = 0; i < list.length; i 
 // One send per workflow|job|attempt: a machine.sqlite notifications row (kind 'media', dedupe_key
 // `media|<workflow>|<job>|<attempt>`) claimed before the upload (delivery 'sending') and settled after it
 // (sent | partial, ref {op, verdict, sent, failed}); a send that delivered nothing gives its claim up.
-export const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
+const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
 /** The dedupe row of one settle ({delivery, sent_at, ref: {...}}), or null. */
 export const mediaSent = (key, env = process.env) => readMachine((m) => {
   const row = m.db.prepare("SELECT delivery, sent_at, ref FROM notifications WHERE dedupe_key=? AND kind='media'").get(key);
@@ -452,7 +452,7 @@ function readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }) {
 }
 
 /** What a settle has to send: {kind, sends:[{type, files|file, caption|text}]} or {skip}. */
-export function planSettleMedia({ op, verdict, report, workflow, repo, language }) {
+function planSettleMedia({ op, verdict, report, workflow, repo, language }) {
   const kind = mediaKindOf(op);
   if (!kind) return { skip: 'not a media op' };
   if (!report) return { skip: 'no report filed' };

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 
 /** The `section` object of knowledge/op-gate.yaml under `runtime`, {} when the doc omits it. Throws when the file is unreadable. */
-export const opGateSection = (runtime, section) =>
+const opGateSection = (runtime, section) =>
   (parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'))?.[section]) ?? {};
 
 /** The {required, forbidden, outage} rule lists of a gate `section` (absent lists read as []). */

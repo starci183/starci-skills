@@ -39,12 +39,12 @@ import { attachedNameOf } from '../lib/display-names.mjs';
 import { oneLine } from '../lib/clip.mjs';
 
 export const OP_GATE_CHANGE = 'op-gate-loop';
-export const OP_GATE_CHECK = 'op-gate';
+const OP_GATE_CHECK = 'op-gate';
 export const OP_PROOF_CHANGE = 'op-mechanism-proofs';
-export const OP_PROOF_CHECK = 'op-proof';
+const OP_PROOF_CHECK = 'op-proof';
 export const REVIEW_DEFECTS_SCHEMA = 'starci/review-defects@1';
 export const SECURITY_FINDINGS_SCHEMA = 'starci/security-findings@1';
-export const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
+const DEFECT_CLASS_VALUES = Object.freeze(['business', 'non-business']);
 const DOC_MAX_BYTES = 16 * 1024 * 1024;
 const FINDINGS_LISTED = 40;
 
@@ -52,7 +52,7 @@ const FINDINGS_LISTED = 40;
  * The newest JSON document of `schema` among a job's files ([{abs, name?}] from collectJobFiles), or null. A file counts only
  * when it parses as JSON carrying that schema, whatever it is called.
  */
-export function readAttached(files, schema, accept = () => true) {
+function readAttached(files, schema, accept = () => true) {
   let best = null;
   for (const file of files ?? []) {
     if (!file?.abs || !/\.json$/i.test(file.abs)) continue;
@@ -92,7 +92,7 @@ export function judgeLoop({ gate, digest, kinds, doc = loadOpGate(), gateBases =
 }
 
 /** Whether an op is held to the loop. */
-export const enforcesLoop = (op, doc = loadOpGate()) => loopOps(doc).has(op);
+const enforcesLoop = (op, doc = loadOpGate()) => loopOps(doc).has(op);
 
 /**
  * The judgment of a job's files: {op, judged, gateFile, digestFile} - null when the op is not held to the loop. `roots` are the
@@ -141,7 +141,7 @@ const isDocGate = (doc) => doc?.profile === DOC_PROFILE;
 const nameOfDefect = (d) => oneLine(d?.id ?? d?.title ?? JSON.stringify(d), 160);
 
 /** The proof entries an op owes for this dispatch ([{proof, projects}]): op-gate.yaml opProofs, a `modes` entry kept only for its modes. */
-export function proofEntriesOf(op, { mode = null, doc = loadOpGate() } = {}) {
+function proofEntriesOf(op, { mode = null, doc = loadOpGate() } = {}) {
   const entries = doc.opProofs?.[op] ?? [];
   return entries.map((e) => (typeof e === 'string' ? { proof: e, modes: null, projects: [] } : { proof: String(e.proof), modes: e.modes ?? null, projects: e.projects ?? [] }))
     .filter((e) => !e.modes || !mode || e.modes.includes(mode)).map(({ proof, projects }) => ({ proof, projects }));
@@ -150,7 +150,7 @@ export function proofEntriesOf(op, { mode = null, doc = loadOpGate() } = {}) {
 export const proofsOf = (op, opts = {}) => proofEntriesOf(op, opts).map((e) => e.proof);
 
 /** Every JSON document of `schema` among a job's files, newest first ([{doc, file}]). */
-export function readAllAttached(files, schema) {
+function readAllAttached(files, schema) {
   const out = [];
   for (const file of files ?? []) {
     const one = readAttached([file], schema);
@@ -285,7 +285,7 @@ export function judgeRelease(proof) {
 }
 
 /** The judgment of one proof over a job's files. */
-export function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {
+function judgeProof(proof, files, doc = loadOpGate(), { projects = [] } = {}) {
   const read = (schema, accept) => readAttached(files, schema, accept)?.doc ?? null;
   switch (proof) {
     case 'read-knowledge': return judgeKnowledgeRead(read(DIGEST_SCHEMA));

@@ -28,9 +28,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 export const WORKFLOW = '.github/workflows/examples.yml';
 export const CODECOV = 'codecov.yml';
 /** The step that prints the matrix, and the expression every matrix job reads it through. */
-export const MATRIX_COMMAND = 'node scripts/checks/check-examples-ci.mjs --matrix';
-export const MATRIX_JOB = 'apps';
-export const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
+const MATRIX_COMMAND = 'node scripts/checks/check-examples-ci.mjs --matrix';
+const MATRIX_JOB = 'apps';
+const MATRIX_EXPRESSION = `\${{ fromJSON(needs.${MATRIX_JOB}.outputs.apps) }}`;
 
 /** The example apps: every examples/<name>/hfs.json of kind app, sorted by name. */
 export function exampleApps(root = ROOT) {

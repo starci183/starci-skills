@@ -56,7 +56,7 @@ import { processList } from '../api/process/process-list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 
-export const TUNNEL_FILE = fileURLToPath(import.meta.url);
+const TUNNEL_FILE = fileURLToPath(import.meta.url);
 
 const QUICK_URL = /https:\/\/(?!api\.)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.trycloudflare\.com\b/i;
 const CONNECTED = /Registered tunnel connection|Connection [0-9a-f-]+ registered/i;
@@ -72,7 +72,7 @@ export const parseConnected = (text) => CONNECTED.test(String(text ?? ''));
 /** The tunnel manager's connectors row ({pid, childPid, baseUrl, connected, ...}), or null. */
 export const tunnelState = (env = process.env) => connectorState('tunnel', env);
 /** The config file cloudflared is started with: %LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml. */
-export const cloudflaredConfigFile = (env = process.env) => path.join(starciLocalRoot(env), 'cloudflared', 'cloudflared.yml');
+const cloudflaredConfigFile = (env = process.env) => path.join(starciLocalRoot(env), 'cloudflared', 'cloudflared.yml');
 
 /**
  * The public base the notifier may link to: only while the manager is alive and cloudflared has
@@ -280,7 +280,7 @@ export function ensureAskConnectors({ env = process.env, config = undefined, spa
 }
 
 /** Whether something answers HTTP on 127.0.0.1:<port> — the gateway 404s `/` with its no-store headers. */
-export const probeGateway = async (port, { timeoutMs = 3000 } = {}) => {
+const probeGateway = async (port, { timeoutMs = 3000 } = {}) => {
   if (!Number.isInteger(Number(port)) || Number(port) <= 0) return { reachable: false, status: null };
   const r = await probe(`http://127.0.0.1:${Number(port)}/`, { timeoutMs, follow: 0 });
   return r.state === 'answered' ? { reachable: true, status: r.status ?? null, gateway: r.headers?.['x-robots-tag'] === 'noindex, nofollow' } : { reachable: false, status: null };

@@ -20,7 +20,7 @@ import { assetsOf, isFile, list, readYamlOrNull, sha256File, slash } from './wor
 import { resolvedKey } from '../lib/path-key.mjs';
 import { assetStateOf } from './ui/ui-shapes.mjs';
 
-export const PART_ROLE = 'direction-content';
+const PART_ROLE = 'direction-content';
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 const PART_NAME = /\.content\.(png|jpe?g|webp)$/i;
 
@@ -33,7 +33,7 @@ export const isPartName = (file) => PART_NAME.test(String(file));
 export const partNameOf = (file) => (isPartName(file) || !IMAGE_EXT.test(String(file)) ? null : String(file).replace(IMAGE_EXT, '.content.$1'));
 
 /** The work/ui-screen@1 record owning `file`: the nearest ancestor index.yaml of that schema, or null. */
-export function uiRecordOf(file, cache = new Map()) {
+function uiRecordOf(file, cache = new Map()) {
   let dir = path.dirname(path.resolve(file));
   for (let i = 0; i < 7; i += 1) {
     const index = path.join(dir, 'index.yaml');

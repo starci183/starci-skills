@@ -27,7 +27,7 @@ let cache = { file: null, at: 0, repos: [] };
 const openReadOnly = (file) => openLedgerReader(file);
 
 /** The repositories whose ledgers the registry enrols: [{repo, ledger}], cached briefly per registry file; null when the registry cannot be read. */
-export function registeredRepos({ env = process.env, now = Date.now() } = {}) {
+function registeredRepos({ env = process.env, now = Date.now() } = {}) {
   const file = machineFileFor(env);
   if (cache.file === file && now - cache.at < REGISTRY_TTL_MS) return cache.repos;
   const repos = fs.existsSync(file) ? readMachine((m) => m.listLedgers().map((l) => ({ ledger: l.file, repo: l.repoRoot })), null, { file, env }) : [];

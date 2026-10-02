@@ -43,7 +43,7 @@ export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'cli.mjs');
 export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'machine', 'decisions.mjs');
 export const DEFAULT_TIMEOUT_MS = 120_000;
 /** The same would-row (controller, verb, argv) is written at most once per this window. */
-export const WOULD_DEDUPE_MS = 10 * 60_000;
+const WOULD_DEDUPE_MS = 10 * 60_000;
 /** A value up to this many bytes rides in the action summary (engine_actions.result_json, <= 8 KiB); the full result is a blob. */
 const SUMMARY_VALUE_BYTES = 6000;
 
@@ -51,13 +51,13 @@ export const digestOf = (value) => crypto.createHash('sha256').update(JSON.strin
 
 
 /** Node's own warning lines ("(node:123) ExperimentalWarning: ...", "(Use `node --trace-warnings ...`"). */
-export const isNodeWarningLine = (line) => /^\(node:\d+\) \w*Warning:|^\(Use `node --trace-warnings/.test(String(line).trim());
+const isNodeWarningLine = (line) => /^\(node:\d+\) \w*Warning:|^\(Use `node --trace-warnings/.test(String(line).trim());
 
 /**
  * The one line that says why a child failed: the JSON answer's error / reason / code (its `error` text itself
  * cleaned of node warnings), else the first stderr line that is not a node warning, else the exit. Pure.
  */
-export function errorLineOf(r) {
+function errorLineOf(r) {
   if (!r || r.ok === true) return null;
   const firstReal = (text) => {
     const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l));
@@ -76,7 +76,7 @@ export function errorLineOf(r) {
  * The engine_actions.result_json summary of a result: {ok, code, error?, timedOut?, fenced?, value | valueBytes}. The value
  * rides only when small; the full result is the action's result blob (machine-db actionFinish). Pure.
  */
-export function actionSummary(r) {
+function actionSummary(r) {
   const base = { ok: r?.ok === true, code: r?.code ?? null, ...(r?.timedOut ? { timedOut: true } : {}), ...(r?.fenced ? { fenced: true } : {}), ...(r?.ok ? {} : { error: errorLineOf(r) }) };
   let value = null;
   try { value = JSON.stringify(r?.value ?? null); } catch { value = 'null'; }
@@ -100,7 +100,7 @@ export function reconcilerLog(m, row, { env = process.env } = {}) {
 }
 
 /** The last JSON line of a child's stdout, or null. Pure. */
-export function lastJsonLine(stdout) {
+function lastJsonLine(stdout) {
   const lines = String(stdout ?? '').trim().split(/\r?\n/).filter(Boolean);
   for (let i = lines.length - 1; i >= 0; i -= 1) { try { return JSON.parse(lines[i]); } catch { /* not JSON */ } }
   return null;
@@ -137,7 +137,7 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
 }
 
 /** The typed-log kinds a ctx.log row may carry as is; any other kind rides under reconciler.event (or .error). */
-export const CTX_LOG_KINDS = Object.freeze(['reconciler.would', 'reconciler.act', 'reconciler.error', 'reconciler.event', 'invariant.violated', 'invariant.cleared']);
+const CTX_LOG_KINDS = Object.freeze(['reconciler.would', 'reconciler.act', 'reconciler.error', 'reconciler.event', 'invariant.violated', 'invariant.cleared']);
 
 /**
  * The typed row a ctx.log call writes. A kind of CTX_LOG_KINDS is kept; any other kind (reconciler.gc.close,

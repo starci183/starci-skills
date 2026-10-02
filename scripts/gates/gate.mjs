@@ -73,7 +73,7 @@ const INSTALL_MISSING = 'GATE_INSTALL_MISSING';
 const LISTED_MAX = 500;
 const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | gate.mjs --profile docs [--tree <work root>] [--out <file>]';
 export const DOC_PROFILE = 'docs';
-export const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
+const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
 /** The flags; `--changed` takes every argument up to the next flag (an empty list is an empty slice). */
 export function parseGateArgs(argv) {
@@ -122,7 +122,7 @@ export function resolveGateBase(root, base = null, { workflowBase = (dir) => gat
  * renamed Map(new -> old)}. A rename's old path counts as deleted and its new path is measured against the old path's base
  * blob, so the findings a move carries stay preexisting; untracked files are additions.
  */
-export function gateDelta(root, base) {
+function gateDelta(root, base) {
   const status = lines(gitText(gitDiff, root, ['--name-status', '--find-renames', '--relative', base]));
   const added = new Set(), deleted = new Set(), changed = new Set(), renamed = new Map();
   for (const row of status) {
@@ -197,7 +197,7 @@ function runHfsLint(root, files, hfs) {
   return { findings, errors };
 }
 
-export const lintKey = (finding) => `${posixPath(finding.path ?? '')}|${finding.engine}/${finding.rule}`;
+const lintKey = (finding) => `${posixPath(finding.path ?? '')}|${finding.engine}/${finding.rule}`;
 const countBy = (items, key) => { const m = new Map(); for (const item of items) m.set(key(item), (m.get(key(item)) ?? 0) + 1); return m; };
 
 /** Head lint findings minus the base's, per (file, engine/rule) count: {fresh[], preexisting}. */
@@ -340,7 +340,7 @@ function prepareTypes(root, cache) {
 /* ------------------------------------------------------------------------------------------------ tsc */
 
 /** The tsconfig.json nearest above each changed TypeScript file, root-relative. */
-export function tsProjectsOf(root, files) {
+function tsProjectsOf(root, files) {
   return [...new Set(files.filter((f) => TS_SOURCE.test(f)).map((f) => nearestWith(root, f, ['tsconfig.json'])).filter(Boolean)
     .map((dir) => posixPath(path.relative(root, path.join(dir, 'tsconfig.json')))))].sort();
 }
@@ -353,7 +353,7 @@ function removeStaleBuildInfo(root) {
 }
 
 /** A diagnostic as {path, line, code, message, key}; the key drops the position and the absolute root. */
-export function tscFinding(ts, diagnostic, root) {
+function tscFinding(ts, diagnostic, root) {
   const rootPaths = [path.resolve(root), posixPath(path.resolve(root))];
   const scrub = (text) => rootPaths.reduce((acc, p) => acc.split(p).join('<ROOT>'), text);
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n').split('\n')[0];
@@ -754,7 +754,7 @@ function finish(report) {
 }
 
 /** The document checks of op-gate.yaml docChecks: [{id, script, tree}]. */
-export function docChecksOf(runtime = runtimeRoot) {
+function docChecksOf(runtime = runtimeRoot) {
   const doc = parseYaml(fs.readFileSync(path.join(runtime, 'knowledge', 'op-gate.yaml'), 'utf8'));
   return (doc?.docChecks ?? []).map((c) => ({ id: String(c.id), script: String(c.script), tree: c.tree === true }));
 }
@@ -802,7 +802,7 @@ export function runDocGate({ tree = null, runtime = runtimeRoot, checks = docChe
   return finish(report);
 }
 
-export async function gateMain(argv, { stdout = (s) => process.stdout.write(s) } = {}) {
+async function gateMain(argv, { stdout = (s) => process.stdout.write(s) } = {}) {
   let opts;
   try { opts = parseGateArgs(argv); } catch (error) { stdout(`${JSON.stringify({ schema: GATE_SCHEMA, ok: false, exit: GATE_EXIT.toolFailed, errors: [error.message] })}\n`); return GATE_EXIT.toolFailed; }
   const report = opts.profile === DOC_PROFILE ? runDocGate({ tree: opts.tree })

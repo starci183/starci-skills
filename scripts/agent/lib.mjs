@@ -185,7 +185,7 @@ export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io
 
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.
-export function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
+function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
   const text = String(screen ?? '').split(/\r?\n/).map((row) => row.replace(/\s+$/u, '')).filter((row) => row.trim()).slice(-rows).join('\n');
   return text.length > chars ? text.slice(-chars) : text;
 }

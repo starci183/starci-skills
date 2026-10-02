@@ -34,11 +34,11 @@ import { ASSET_SLOT_ATTR, COMPONENT_ATTR, parseHtml, walkElements } from './draw
 import { isDir, isFile, slash } from './work-io.mjs';
 
 export { ASSET_SLOT_ATTR };
-export const ASSET_SHA_ATTR = 'data-asset-sha256';
-export const ASSET_REQUEST_FILE = 'asset-request.md';
+const ASSET_SHA_ATTR = 'data-asset-sha256';
+const ASSET_REQUEST_FILE = 'asset-request.md';
 export const ASSET_SLOT_OWED = 'asset-slot-owed';
 export const ASSET_SLOT_FILLED = 'asset-slot-filled';
-export const ASSET_PROMPT_ATTR = 'data-asset-prompt';
+const ASSET_PROMPT_ATTR = 'data-asset-prompt';
 export const ASSET_OP = 'interface.asset';
 export const ASSET_SLOT_UNFILLED = 'ASSET_SLOT_UNFILLED';
 const SKIP_DIRS = new Set(['node_modules', '.git', 'draw-loop']);
@@ -56,7 +56,7 @@ export function uiDirOf(file) {
 }
 
 /** The asset-request.md files that belong to a render source: beside it, up to its ui record dir, and in `dirs`. */
-export function requestFilesFor(htmlFile, dirs = []) {
+function requestFilesFor(htmlFile, dirs = []) {
   const out = [];
   const add = (dir) => { const f = path.join(dir, ASSET_REQUEST_FILE); if (isFile(f) && !out.includes(f)) out.push(f); };
   const stop = uiDirOf(htmlFile);
@@ -102,7 +102,7 @@ export function readAssetRequests(files) {
 export const assetRequestIdsFor = (htmlFile, dirs = []) => new Set(readAssetRequests(requestFilesFor(htmlFile, dirs)).map((r) => r.id));
 
 /** The .starciwork directory above `file`, or null. */
-export function workRootAbove(file) {
+function workRootAbove(file) {
   let dir = path.dirname(path.resolve(file));
   for (let i = 0; i < 12; i++) {
     if (path.basename(dir) === '.starciwork') return dir;
@@ -115,7 +115,7 @@ export function workRootAbove(file) {
 }
 
 /** The sha256 of every brand master file (<work>/brand/assets/**): the landing's art, never a product slot's bytes. */
-export function brandMasterShas(workRoot) {
+function brandMasterShas(workRoot) {
   if (!workRoot) return new Set();
   const root = path.join(workRoot, 'brand', 'assets');
   const out = new Set();
@@ -159,7 +159,7 @@ export function slotsOfHtml(html, { htmlFile = null, masters = new Set() } = {})
 }
 
 /** The render sources among `targets` (files, or directories walked without draw-loop rounds). */
-export function renderSourcesIn(targets, depth = 6) {
+function renderSourcesIn(targets, depth = 6) {
   const out = new Map();
   const walk = (d, left) => {
     let entries = [];

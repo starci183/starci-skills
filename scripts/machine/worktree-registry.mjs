@@ -28,7 +28,7 @@ export const ENDED_WORKFLOW_PHASES = Object.freeze(['stopped', 'finished', 'arch
 export const TERMINAL_JOB_STATUSES = Object.freeze(['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown']);
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
 export const SETTLED_JOBS = new Set(SETTLED_JOB_LIST);
-export const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000, rebaseMilestoneBehind: 20 });
+const WORKTREE_DEFAULTS = Object.freeze({ capPerRepo: 10, ownerGoneMs: 1_800_000, gcEveryMs: 300_000, gcBudgetMs: 120_000, rebaseMilestoneBehind: 20 });
 
 /** worktrees.{capPerRepo, ownerGoneMs, gcEveryMs, gcBudgetMs, rebaseMilestoneBehind} of modules/kernel/product-land.yaml over the defaults. */
 export function worktreeSettings(file = SETTINGS_FILE) {

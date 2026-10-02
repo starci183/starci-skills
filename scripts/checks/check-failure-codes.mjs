@@ -28,9 +28,9 @@ import { CODE_FINDINGS, PLUGIN_ENFORCERS } from './failure-code-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
-export const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']);
+const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']);
 /** other-op:<op> is also an owner: the finding is another op's to fix. */
-export const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
+const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
 const SCAN_DIRS = ['scripts', 'engine', 'modules'];
 // The HFS rule catalog names the code of every rule, including rules whose checker is still owed, so it emits them too.
 const SCAN_FILES = ['knowledge/hfs/rules.yaml'];
@@ -69,7 +69,7 @@ const KEBAB_RES = [
 const LIST_RE = /\b[A-Z][A-Z0-9_]*_(?:REASONS|CODES|KINDS|CLASSES)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]/g;
 
 /** Closed vocabularies that are verdict reasons too: blocker kinds, failure classes, route verdicts (modules/models/kinds.yaml) and the ledger's own attempt/check enums (0001-init.sql). Keyed `<family>:<value>`. */
-export function vocabularyCodes(base = root) {
+function vocabularyCodes(base = root) {
   const out = [];
   const kinds = parseYaml(fs.readFileSync(path.join(base, 'modules/models/kinds.yaml'), 'utf8'))?.vocabularies ?? {};
   const fam = (prefix, list, file) => { for (const v of Array.isArray(list) ? list : []) out.push({ code: `${prefix}:${v}`, kind: 'vocab', sites: [{ file, line: 1 }] }); };
@@ -149,7 +149,7 @@ export function emittedCodes(base = root) {
 
 // The entry's scalar fields. Its Vietnamese fields (FAILURE_CODE_VIETNAMESE_FIELDS) are the one declared exception of the English-only document law (HFS_DOC_NOT_ENGLISH); causes_vi is their list companion.
 const FIELDS = ['title', ...FAILURE_CODE_VIETNAMESE_FIELDS.filter((field) => field !== 'causes_vi'), 'owner', 'kind'];
-export const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
+const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
 
 /** Read the catalog: a flat map code -> entry. */
 export function readCatalog(base = root) {

@@ -86,12 +86,12 @@ export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = 
 }
 
 export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
-export const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
-export const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
-export const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
+const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
+const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
+const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
 const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
-export const MAX_SPAWN_ATTEMPTS = 3;
+const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
@@ -164,7 +164,7 @@ function attemptIdOf(m, jobId) {
 // Neither is the directory itself: every brief names the bare path, and a lease on it serialized every contract
 // job behind its holder (worker-lease-contract-changes-dir, 2026-09-30). A row a finished job left there no
 // longer matches leaseConflicts either, since the asking job's files are filtered the same way.
-export const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
+const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
 const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !sameOrUnder(f, CONTRACT_CHANGES_DIR));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
@@ -229,7 +229,7 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orc
 }
 
 /** The payload.staging record of a created checkout. */
-export const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
+const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
  * Remove a job's staging checkout (`staging`: its payload.staging record) through Orca: removeOrcaWorktree unlinks every
@@ -323,7 +323,7 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
 }
 
 /** Providers whose [Worker] spawn failed readiness or on a provider outage at least `min` times since `since` (sup_events worker-spawn-failed). */
-export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
+function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
   const counts = {};
   for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
@@ -334,7 +334,7 @@ export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_H
 
 /* ------------------------------------------------------------ spawn */
 
-export function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_ROOT } = {}) {
+function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_ROOT } = {}) {
   const p = job.payload;
   return (template ?? fs.readFileSync(PROMPT_FILE, 'utf8'))
     .replaceAll('{jobId}', job.job_id).replaceAll('{cluster}', p.cluster).replaceAll('{title}', p.title ?? p.cluster)
@@ -602,7 +602,7 @@ export function selfJobsLandedBy(m, commits, { root = SKILL_ROOT } = {}) {
 }
 
 /** Remove the checkouts of every finished job that still has one. */
-export function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient } = {}) {
+function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient } = {}) {
   const done = jobsOf(m, FINAL_STATUSES).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging?.path && fs.existsSync(j.payload.staging.path));
   return done.map((j) => removeStaging({ jobId: j.job_id, staging: j.payload.staging, root, env, landed: j.status === 'succeeded', orca }));
 }

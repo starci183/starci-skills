@@ -475,7 +475,7 @@ export async function unguardedVerdict({ command, cwd, env = process.env, dialec
 }
 
 /** The shell text of one hook input: Claude's Bash/PowerShell, Codex's Bash and Devin's exec all carry `command`. */
-export function shellCallOf(input) {
+function shellCallOf(input) {
   const command = input?.tool_input?.command;
   if (typeof command !== 'string' || !command.trim()) return null;
   const cwd = input.tool_input.workdir || input.cwd || process.cwd();

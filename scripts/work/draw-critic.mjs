@@ -44,8 +44,8 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
 
-export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
-export const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
+const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
+const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
 
 /** The built-in rubric: the r5 bake-off critic sheet (<tmp>/draw-bakeoff/r5/inputs/08-RUBRIC.md), brand-neutral. */
 export const DEFAULT_RUBRIC = Object.freeze({
@@ -115,7 +115,7 @@ export function rubricFor({ workRoot = null, archetype = null, record = null, sh
 }
 
 /** The gate check ids of a rubric: every check marked gate. */
-export const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
+const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
 
 /** The one file the critic writes, in its clean directory. */
 export const VERDICT_FILE = 'verdict.json';
@@ -124,7 +124,7 @@ export const VERDICT_FILE = 'verdict.json';
  * The critic's Task spec. It never sees the drawing brief, the worker's notes or any earlier round: only the clean
  * directory `dir` with the images, the HTML and the rubric. Its one write is `dir`/verdict.json.
  */
-export function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
+function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
   const at = (f) => slash(path.join(dir, f));
   return [
     'You are an independent senior product-design critic. You did NOT draw this screen and you have no other context.',

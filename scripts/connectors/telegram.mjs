@@ -91,7 +91,7 @@ export const redact = (text, secret) => {
 /* ------------------------------------------------------------ ask keys and buttons */
 
 /** The store key of one ask (`<workflow>|<dispatch>`). */
-export const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
+const askStoreKey = (workflowId, dispatchId) => `${workflowId}|${dispatchId}`;
 /** The short key a "Generate URL" button carries: 16 hex chars of sha256(workflow|dispatch). */
 export const askKeyOf = (workflowId, dispatchId) => sha256(askStoreKey(workflowId, dispatchId)).slice(0, 16);
 export const ASK_CALLBACK = /^ask:([0-9a-f]{16})$/;
@@ -147,7 +147,7 @@ export function autoAcceptedMessage({ workflow, question, label, language }) {
   return clip([line, '', workflowLine(t, workflow)].join('\n'), TEXT_MAX);
 }
 /** The text a message is edited to when Telegram refuses to delete it (answered / retired). */
-export function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
+function closedMessage({ reason, by = null, title, question, language, now = Date.now() }) {
   const t = textFor(language);
   const stamp = new Date(now).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const head = `${reason === 'retired' ? t.retired : t.answered} (${t.at} ${stamp}${by ? `, ${by}` : ''})`;
@@ -290,13 +290,13 @@ const withStore = (env, fn) => withHostMutex(SENT_LOCK, async () => {
 }, { env });
 
 /** The message ids that show one ask (a pre-button entry kept one `messageId`). */
-export const messageIdsOf = (entry) => [...new Set([
+const messageIdsOf = (entry) => [...new Set([
   ...(Array.isArray(entry?.messageIds) ? entry.messageIds : []), ...(Number.isInteger(entry?.messageId) ? [entry.messageId] : []),
 ].filter(Number.isInteger))];
 /** Read the store (no lock): a snapshot for lookups. */
 export const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
 /** Change the store under its lock; `fn(store)` mutates it and returns the result. */
-export const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
+const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
 /** The ask a button key names ({askKey, key, repo, ledgerFile, workflowId, dispatchId, ...}), or null. */
 export const askEntryByKey = (key, env = process.env) => {
   const store = readSentStore(env), askKey = store.keys[key];
@@ -329,7 +329,7 @@ const CAPTION_MAX = 1000;
 export const drawReplyHint = (language) => translator(language)('Answer by REPLYING to this message (or to one image): "ok" / "approve" accepts (add "golden" to make it the reference); anything else is your feedback and the drawing is redrawn.');
 
 /** The caption of a draw-review album: the shapes, the round and the notes this drawing answers. */
-export function drawAlbumCaption(question, language) {
+function drawAlbumCaption(question, language) {
   const tr = translator(language);
   const review = question.review ?? {};
   const shapes = [...new Set((review.parts ?? []).map((p) => p?.shape).filter(Boolean))];

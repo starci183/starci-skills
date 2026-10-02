@@ -26,7 +26,7 @@ import { isSpecRun, readEnv } from '../lib/env.mjs';
 import { isInside } from '../lib/walk.mjs';
 import { need as refuseUnless } from '../lib/refuse.mjs';
 
-export const RUNNER_VERSION='1.0.0';
+const RUNNER_VERSION='1.0.0';
 export const PROTOCOL_PREFIX='@@STARCI_ASSISTED_UAT@@';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const ROOT=path.resolve(HERE,'..','..');

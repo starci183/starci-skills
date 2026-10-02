@@ -19,17 +19,17 @@ import { propertyText } from '../../lib/ts-ast.mjs';
 import { execForm, parseDockerfile, shellCommands, words } from '../../lib/dockerfile.mjs';
 import { found, readText } from './read.mjs';
 
-export const DOCKER_BUILD_CONTEXT = 'HFS_DOCKER_BUILD_CONTEXT';
-export const DOCKER_STAGES = 'HFS_DOCKER_STAGES';
-export const DOCKER_ENTRY = 'HFS_DOCKER_ENTRY';
-export const DOCKER_BASE_PIN = 'HFS_DOCKER_BASE_PIN';
-export const DOCKER_SECRETS = 'HFS_DOCKER_SECRETS';
+const DOCKER_BUILD_CONTEXT = 'HFS_DOCKER_BUILD_CONTEXT';
+const DOCKER_STAGES = 'HFS_DOCKER_STAGES';
+const DOCKER_ENTRY = 'HFS_DOCKER_ENTRY';
+const DOCKER_BASE_PIN = 'HFS_DOCKER_BASE_PIN';
+const DOCKER_SECRETS = 'HFS_DOCKER_SECRETS';
 
 /** The one node base image of every Dockerfile of the canon: an exact node version on an exact alpine release. */
 export const NODE_IMAGE = 'node:22.14.0-alpine3.21';
 /** The two stages every Dockerfile has: the build, then the runtime that ships. */
-export const BUILD_STAGE = 'build';
-export const RUNTIME_STAGE = 'runtime';
+const BUILD_STAGE = 'build';
+const RUNTIME_STAGE = 'runtime';
 /** The port a listening app serves unless its environment says otherwise (ENV PORT of the runtime stage). */
 export const DEFAULT_PORT = '3000';
 
@@ -45,9 +45,9 @@ const DIGEST = /@sha256:[0-9a-f]{64}$/;
 /** The path of the Dockerfile of a be or fe app, app-relative. */
 export const dockerfilePath = (side, app) => `${side}/apps/${app}/Dockerfile`;
 /** The entry a built be app starts (from the app root). */
-export const beEntry = (app) => `be/dist/apps/${app}/src/main.js`;
+const beEntry = (app) => `be/dist/apps/${app}/src/main.js`;
 /** The entry a Next standalone fe app starts (from the app root: the standalone tree keeps the workspace layout). */
-export const feEntry = (app) => `fe/apps/${app}/server.js`;
+const feEntry = (app) => `fe/apps/${app}/server.js`;
 
 const instructionsOf = (stage, keyword) => stage.instructions.filter((item) => item.keyword === keyword);
 /** The commands a stage's RUN instructions run, each as its words (shell form; an exec-form RUN is one command). */

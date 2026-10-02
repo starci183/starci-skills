@@ -20,10 +20,10 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { redactText } from '../lib/redact.mjs';
 import { forEachFileLine } from '../lib/read-text.mjs';
 
-export const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
+const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
 const DEFAULT_CAPS = { fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5 * 1024 * 1024 };
 /** allocation.logs.diff (modules/models/runtimes.yaml) over the defaults. */
-export function diffCaps() {
+function diffCaps() {
   const raw = allocationSettings()?.logs?.diff ?? {};
   const out = { ...DEFAULT_CAPS };
   for (const k of Object.keys(out)) if (Number.isInteger(Number(raw[k])) && Number(raw[k]) > 0) out[k] = Number(raw[k]);
@@ -37,7 +37,7 @@ const LANGUAGE = {
   '.py': 'python', '.go': 'go', '.rs': 'rust', '.sh': 'shell', '.ps1': 'powershell', '.toml': 'toml', '.xml': 'xml', '.svg': 'xml', '.graphql': 'graphql', '.prisma': 'prisma',
 };
 export const languageOf = (p) => LANGUAGE[path.extname(String(p)).toLowerCase()] ?? (/(^|\/)Dockerfile$/.test(p) ? 'dockerfile' : 'text');
-export const isImagePath = (p) => IMAGE_EXT.has(path.extname(String(p)).toLowerCase());
+const isImagePath = (p) => IMAGE_EXT.has(path.extname(String(p)).toLowerCase());
 
 /** A git-quoted path ("a/\303\251.ts") as its UTF-8 string; an unquoted one as it is. */
 export function unquoteGitPath(value) {
@@ -91,7 +91,7 @@ export function decodeBase85Line(line) {
  * `onLiteral({path, side, blob, data})` receives each decoded image literal (side 'after' for the forward
  * section, 'before' for the reverse one).
  */
-export function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
+function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   const files = new Map(), commits = [];
   let totalLines = 0, anyTruncated = false;
   const omitted = new Set();

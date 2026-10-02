@@ -40,7 +40,7 @@ import { translator } from '../../lib/i18n.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const FLEET_FILE = path.join(ROOT, 'modules', 'reconciler', 'fleet.yaml');
+const FLEET_FILE = path.join(ROOT, 'modules', 'reconciler', 'fleet.yaml');
 export const KEYS = Object.freeze({ deps: 'fleet:deps', owed: 'fleet:owed', land: 'fleet:land', push: 'fleet:push', metrics: 'fleet:metrics', direct: 'fleet:direct', notify: 'fleet:notify' });
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000, metricsEveryMs: 1_800_000, directEveryMs: 900_000,
   decisionDueMs: 3_600_000, landStallMs: 1_800_000, landFailedMs: 3_600_000, derivedMs: 300_000, urgentOverdueEscalations: 3 });
@@ -49,14 +49,14 @@ const SUPERVISOR = 'supervisor';
 export const PUSH_RUN_TIMEOUT_MS = 1_800_000;
 
 /** modules/reconciler/fleet.yaml over DEFAULTS; a missing or bad number keeps its default. */
-export function fleetSettings(file = FLEET_FILE) {
+function fleetSettings(file = FLEET_FILE) {
   return yamlNumberSettings(file, DEFAULTS);
 }
 
 /* ------------------------------------------------------------ pure planners */
 
 /** A Supervisor DI (DESIGN §10.3) the Fleet controller opens. Pure. */
-export function fleetDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
+function fleetDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
   return {
     schema: 'starci/decision-item@1', idempotencyKey: key, kind, decider: 'supervisor', ledger: SUPERVISOR,
     ...(productLedger ? { productLedger } : {}), ...(workflowId ? { productWorkflowId: workflowId } : {}),
@@ -198,7 +198,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = 'v
 }
 
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
-export function planDirect({ commits = [], now, settings = DEFAULTS, language = 'vi' }) {
+function planDirect({ commits = [], now, settings = DEFAULTS, language = 'vi' }) {
   const tr = translator(language);
   return commits.map((c) => fleetDecision({
     kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,

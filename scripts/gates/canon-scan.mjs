@@ -37,7 +37,7 @@ import { emitCheckOutput } from './output.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { splitList } from '../lib/list.mjs';
 
-export const CANON_FINDINGS = 'starci/canon-findings@1';
+const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MACHINES = ['eslint', 'architecture'];
 const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
@@ -392,7 +392,7 @@ function human(report) {
   return lines.join('\n');
 }
 
-export async function canonScanMain(argv, { write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text) } = {}) {
+async function canonScanMain(argv, { write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text) } = {}) {
   let options;
   try { options = parseCanonScanArgs(argv); } catch (error) { fail(`${error.message}\n`); return 2; }
   let report;

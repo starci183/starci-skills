@@ -85,10 +85,10 @@ export const AUTOPILOT_BY = 'autopilot';
 /** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);
 /** Whether an acceptance block is autopilot's provisional one (machine gates passed; the owner reviews it at handover). */
-export const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
+const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
 
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
-export function loadDrawing(uiDir) {
+function loadDrawing(uiDir) {
   const dir = path.resolve(uiDir);
   const file = path.join(dir, 'index.yaml');
   if (!fs.existsSync(file)) throw new Error(`${slash(dir)} holds no index.yaml`);
@@ -283,7 +283,7 @@ export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportI
 }
 
 /** drawOwnerRulingOf read from the repository's ledger for op job `jobId` (read-only). Throws when it cannot read it. */
-export function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
+function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
   const file = ledgerFileFor(repoRoot);
   if (!fs.existsSync(file)) throw new Error(`job ${jobId} is named but ${slash(file)} does not exist: cannot read whether the owner asked for this drawing`);
   const ledger = inspectLedger({ file });

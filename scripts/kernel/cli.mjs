@@ -2000,7 +2000,7 @@ const screenTailOf = (screen) => {
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
 // The one human-readable line of a refused launch (op attempt settle_json.message, the UI): what step refused it and why.
-export const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
+const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
   `dispatch rejected at ${step ?? 'launch'}${signal ? ` (${signal})` : ''}${error ? `: ${String(error).slice(0, 300)}` : ''}; no try spent, the job goes back to ready`;
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,

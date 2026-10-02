@@ -145,7 +145,7 @@ const segmentsOf = (filename) =>
  * quotes, so this is not only an authoring question: the product's own URLs stop being readable to
  * anybody outside one language.
  */
-export const noSecondLanguageInPath = {
+const noSecondLanguageInPath = {
   meta: {
     type: "problem",
     docs: { description: "File and route names are written in the repository's one shared language." },

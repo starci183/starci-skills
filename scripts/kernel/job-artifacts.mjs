@@ -74,7 +74,7 @@ export function filedReportOf(db, job, { dispatchId = null } = {}) {
 }
 
 /** The artifacts of one attempt, with the blob file each one reads from. */
-export const attemptArtifactsOf = (db, attemptId) => db.prepare(`SELECT a.artifact_id,a.name,a.role,a.kind,a.subkind,a.sha256,a.media_type,a.label,b.file_uri
+const attemptArtifactsOf = (db, attemptId) => db.prepare(`SELECT a.artifact_id,a.name,a.role,a.kind,a.subkind,a.sha256,a.media_type,a.label,b.file_uri
   FROM job_artifacts a JOIN blobs b ON b.sha256=a.sha256 WHERE a.attempt_id=? ORDER BY a.artifact_id`).all(attemptId)
   .map((r) => ({ artifactId: r.artifact_id, name: r.name, role: r.role, kind: r.kind, subkind: r.subkind, sha256: r.sha256, mediaType: r.media_type, label: r.label, abs: r.file_uri }));
 

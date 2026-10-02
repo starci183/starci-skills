@@ -75,7 +75,7 @@ import { loadRationale, measuresOf, rationaleFileOf, rationaleFindings, ruleReso
 
 export { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings };
 
-export const METRICS_SCHEMA = 'starci/draw-metrics@1';
+const METRICS_SCHEMA = 'starci/draw-metrics@1';
 export const DRAW_RENDER_RED = 'DRAW_RENDER_RED';
 export const DRAW_METRICS_UNVERIFIED = 'DRAW_METRICS_UNVERIFIED';
 export const DRAW_METRICS_FAILED = 'DRAW_METRICS_FAILED';
@@ -83,9 +83,9 @@ export const GEOMETRY_OFF_GRAMMAR = 'GEOMETRY_OFF_GRAMMAR';
 export const DRAW_BEAUTY_BELOW = 'DRAW_BEAUTY_BELOW';
 /** The best round carries no beauty: no critic ran (--no-critic) or the critic could not answer - never a low score. */
 export const DRAW_CRITIC_MISSING = 'DRAW_CRITIC_MISSING';
-export const LOOP_DIR = 'draw-loop';
+const LOOP_DIR = 'draw-loop';
 export const STOP = Object.freeze({ passed: 'passed', maxRounds: 'max-rounds', noProgress: 'no-progress' });
-export const DESKTOP_MIN_WIDTH = 768;
+const DESKTOP_MIN_WIDTH = 768;
 
 
 export const breakpointOf = (viewport) => (Number(viewport?.width) >= DESKTOP_MIN_WIDTH ? 'desktop' : 'mobile');
@@ -96,7 +96,7 @@ const stemOf = (png) => path.basename(png).replace(/\.png$/i, '');
 // ---------------------------------------------------------------------------------------------------------
 
 /** The real browser-backed metrics; tests replace them. */
-export const browserProbes = {
+const browserProbes = {
   async geometry(html, viewport, { repo, family, drawCss = {} }) {
     const { checkGeometry } = await import('./ui/grammar-geometry.mjs');
     return checkGeometry(html, { repo, family, viewport, ...drawCss });
@@ -228,7 +228,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 // The loop record
 // ---------------------------------------------------------------------------------------------------------
 
-export const loopFileOf = (out) => path.join(out, 'loop.json');
+const loopFileOf = (out) => path.join(out, 'loop.json');
 // The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
 // (engine/db/blob.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
@@ -236,7 +236,7 @@ export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => pat
   context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
 /** The manifest file finish writes beside the loop dir (<out>.bundle.json), so api report --attach carries it too. */
-export const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
+const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
 
 export function readLoop(out) {
   const doc = readJsonFile(loopFileOf(out));
@@ -479,7 +479,7 @@ export async function componentMeasure({ source, fixtures, fixtureFiles, product
  * product (app dir), css [], grammar ('auto'), grammarDist, ui, base, state, viewports, repo, out?, family?, fullPage?,
  * critic?, render? probes? criticOrca? sourceCheck? (tests)}.
  */
-export async function runComponentRound(o) {
+async function runComponentRound(o) {
   const settings = o.settings ?? drawLoopSettings();
   const source = path.resolve(o.source);
   if (!isFile(source)) throw Error(`${o.source} does not exist`);
@@ -528,9 +528,9 @@ export async function runComponentRound(o) {
 // was copied to (relative to the JSON's own directory), else a member of the loop bundle `draw-loop:<path in the loop>`
 // (generation.loop cites the bundle's sha256), else `scratch:<path in the job scratch>`, else (a temp path that is
 // gone) `temp:<file name>`.
-export const LOOP_REF = 'draw-loop:';
-export const SCRATCH_REF = 'scratch:';
-export const TEMP_REF = 'temp:';
+const LOOP_REF = 'draw-loop:';
+const SCRATCH_REF = 'scratch:';
+const TEMP_REF = 'temp:';
 const WIN = process.platform === 'win32';
 const pathKey = (p) => { const r = path.resolve(p); return WIN ? r.toLowerCase() : r; };
 const within = (root, p) => { const rel = path.relative(root, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
@@ -771,7 +771,7 @@ const USAGE = `use:
   node scripts/work/draw-loop.mjs verify --ui <ui-record-dir> --repo <product repo> [--json]
 `;
 
-export async function drawLoopMain(argv) {
+async function drawLoopMain(argv) {
   const [cmd, ...rest] = argv;
   const json = rest.includes('--json');
   const say = (obj, text) => (json ? `${JSON.stringify(obj, null, 2)}\n` : `${text}\n`);

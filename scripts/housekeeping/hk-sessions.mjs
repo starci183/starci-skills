@@ -30,7 +30,7 @@ import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The windows the spec names; allocation.housekeeping.* wins whenever it is set. */
-export const HK_SESSION_DEFAULTS = Object.freeze({
+const HK_SESSION_DEFAULTS = Object.freeze({
   sessionArchiveAfterMs: 3 * DAY_MS,
   archiveMaxAgeMs: 30 * DAY_MS,
 });

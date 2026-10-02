@@ -35,7 +35,7 @@ export function runtimeRevOf() {
 export const SUPERVISOR_ID = 'main';
 /** The seats row of the one Supervisor seat. */
 export const SEAT_ID = 'supervisor';
-export const ENABLED_SCOPE = 'supervisor-enabled';
+const ENABLED_SCOPE = 'supervisor-enabled';
 export const SUPERVISOR_TITLE = `[Supervisor] ${SUPERVISOR_ID}`;
 export const WORKER_TITLE_PREFIX = '[Worker]';
 export const FIX_KIND = 'runtime.fix';
@@ -142,8 +142,8 @@ export function newestEvent(m, kind) {
  * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
  * config (specs, a one-off CLI run).
  */
-export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
-export const DEFAULT_SUPERVISOR_MODE = 'chat';
+const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
+const DEFAULT_SUPERVISOR_MODE = 'chat';
 export function supervisorMode({ env = process.env, config = undefined } = {}) {
   const fromEnv = String(env?.STARCI_SUPERVISOR_MODE ?? '').trim();
   if (SUPERVISOR_MODES.includes(fromEnv)) return fromEnv;

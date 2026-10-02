@@ -20,9 +20,9 @@ import { isMain } from '../lib/is-main.mjs';
 import { runCheckCli } from '../lib/check-cli.mjs';
 import { tokenize as tokenizeSource } from '../hfs/architecture/clones.mjs';
 
-export const CLONE_LINES = 8;
-export const CLONE_TOKENS = 60;
-export const CLONE_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
+const CLONE_LINES = 8;
+const CLONE_TOKENS = 60;
+const CLONE_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 const SOURCE = /\.(mjs|js|ts|tsx)$/;
 const isTest = (rel) => /(^|\/)tests?\//.test(rel) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel) || /\.d\.[cm]?ts$/.test(rel);
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;

@@ -54,7 +54,7 @@ function executableText(rel, text) {
 }
 
 /** The declared entries: `path<TAB>reason` lines of ENTRIES_FILE (`#` lines and blanks skipped). */
-export function parseEntries(text) {
+function parseEntries(text) {
   const entries = new Map();
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim();

@@ -29,13 +29,13 @@ const selfFile = fileURLToPath(import.meta.url);
 const SELF_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 
 /** The ledger files of this host's registry (machine.sqlite `ledgers`) that still exist. */
-export function registeredLedgers({ machine = machineFileFor() } = {}) {
+function registeredLedgers({ machine = machineFileFor() } = {}) {
   if (!fs.existsSync(machine)) return [];
   return readMachine((m) => m.listLedgers().map((l) => l.file).sort(), [], { file: machine }).filter((file) => fs.existsSync(file));
 }
 
 /** The latest accepted leg of `family` per live workflow of one ledger: [{workflowId, jobId, attempt, files[]}]. */
-export function acceptedLegsOf(ledgerFile, family) {
+function acceptedLegsOf(ledgerFile, family) {
   let db;
   try { db = openLedgerReader(ledgerFile); } catch { return []; }
   try {
@@ -100,7 +100,7 @@ export function compareSides(base, head) {
 }
 
 /** Run one side of `tree` in its own node process (this script from `runner`), returning the parsed side or {error}. */
-export function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = null, timeout = 180_000, env = process.env }) {
+function runSide({ runner = SELF_ROOT, tree, family, ledgers = null, gates = null, timeout = 180_000, env = process.env }) {
   const args = [path.join(runner, 'scripts', 'supervisor', 'gate-stability.mjs'), '--family', family, '--tree', tree, '--json', ...(ledgers ?? []).flatMap((l) => ['--ledger', l]),
     ...(gates ?? []).flatMap((g) => ['--gate', `${g.module}#${g.export}`])];
   const r = runNode(args, { cwd: runner, timeout, env, maxBuffer: 64 * 1024 * 1024 });

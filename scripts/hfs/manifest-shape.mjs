@@ -10,9 +10,9 @@ export const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 export const NAME = /^[a-z][a-z0-9-]*$/;
 export const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 /** How a bounded context (a connection) is isolated: its own logical database, or its own schema of a shared one. */
-export const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
+const CONTEXT_ISOLATIONS = Object.freeze(["database", "schema"]);
 /** The app kinds that may own a context: the services, never the migrate or cli apps that only run migrations. */
-export const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
+const CONTEXT_OWNER_KINDS = Object.freeze(["api", "worker"]);
 /**
  * The shape problems of the `connections` of one side: a list of {name, envPrefix, owner, isolation}, the owner an api or worker app
  * of the same side (a connection is a bounded context and one service owns it), isolation `database` or `schema`.
@@ -28,11 +28,11 @@ export function connectionShapeProblems(list, apps) {
   return list.filter((c) => !owns(c)).map((c) => `connections ${c.name} is owned by ${c.owner}, which is not a ${CONTEXT_OWNER_KINDS.join(' or ')} app declared in the same side`);
 }
 export const SLOT_ID = /^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
-export const RUNTIME_SLOT_ID = /^runtime\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+const RUNTIME_SLOT_ID = /^runtime\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 export const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
 export const TRACKED = ['tracked', 'ignored', 'external'];
 /** A runtime manifest adds `generated`: tracked, written only by the slot's generatedBy, judged by drift (RT_GENERATED_DRIFT). */
-export const RUNTIME_TRACKED = [...TRACKED, 'generated'];
+const RUNTIME_TRACKED = [...TRACKED, 'generated'];
 export const TESTS = ['unit-beside', 'e2e', 'none'];
 export const APP_KIND = 'app';
 
@@ -55,7 +55,7 @@ export const RUNTIME_KIND = 'runtime';
 export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 /** The kind of a parsed manifest: `kind`, or app when absent (knowledge/hfs/slots.yaml carries none). */
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
-export const strList = (v) => stringList(v);
+const strList = (v) => stringList(v);
 
 const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */

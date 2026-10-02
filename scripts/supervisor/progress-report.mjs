@@ -178,7 +178,7 @@ const OUTCOME = { done: 'done', partial: 'partially done', failed: 'failed', ask
 const outcomeText = (outcome, tr) => tr(OUTCOME[outcome] ?? outcome);
 
 /** One held settle as a report line: "done, waiting on <peer workflow>/<job>" and how long. */
-export function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
+function holdLine(h, { now = Date.now(), language = 'vi' } = {}) {
   const tr = translator(language);
   const on = h.heldBecause === 'peer-wait'
     ? `${h.peer ? h.peerName ?? displayName(h.peer, null, tr) : tr('another workflow')}${h.peerJob ? `/${h.peerJob}` : ''}`

@@ -18,7 +18,7 @@ import { parseJson } from '../lib/json.mjs';
 import { fail } from '../lib/refuse.mjs';
 import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
-export const FOUNDATION_SCHEMA = 'starci/foundation@1';
+const FOUNDATION_SCHEMA = 'starci/foundation@1';
 export const FOUNDATION_KINDS = ['layout-tree', 'brand', 'grammar', 'module', 'contract', 'baseline', 'scaffold', 'other'];
 // The contract change that introduced foundation planning (modules/kernel/contract-changes.yaml):
 // a workflow created after it must declare before its first leg; an older one is told, not held.

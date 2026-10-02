@@ -54,7 +54,7 @@ const REF_MAX = 500;
 const DEFAULTS = { perJobCap: 2000, dataMaxBytes: 4096 };
 
 /** allocation.logs (modules/models/runtimes.yaml) with its defaults: {perJobCap, dataMaxBytes}. */
-export function logSettings() {
+function logSettings() {
   const raw = allocationSettings()?.logs ?? {};
   const positive = (v, d) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : d);
   return { perJobCap: positive(raw.perJobCap, DEFAULTS.perJobCap), dataMaxBytes: positive(raw.dataMaxBytes, DEFAULTS.dataMaxBytes) };
@@ -128,7 +128,7 @@ export function validateLogData(kind, data) {
 }
 
 /** The level a row gets when its writer names none: failures read as errors or warnings. */
-export function defaultLevel(kind, data = {}) {
+function defaultLevel(kind, data = {}) {
   if (kind === 'error') return 'error';
   if (kind === 'check.result') return data.pass === false ? 'error' : 'info';
   if (kind === 'test.result') return Number(data.failed) > 0 ? 'error' : 'info';
@@ -266,10 +266,10 @@ export function ingestScratchLog(logs, { file, workflowId, jobId, now = Date.now
 }
 
 // ------------------------------------------------------------------------------------ derived rows
-export const DERIVED_EVENT_KINDS = Object.freeze(['op-dispatched', 'dispatch-rejected', 'report-filed', 'checks-recorded', 'op-settled',
+const DERIVED_EVENT_KINDS = Object.freeze(['op-dispatched', 'dispatch-rejected', 'report-filed', 'checks-recorded', 'op-settled',
   'incident-raised', 'incident-resolved', 'incident-auto-resolved', 'worker-failed-no-report', 'job-dropped', 'foundation-landed', 'artifacts-indexed']);
 /** Rows one artifacts-indexed event may derive per family (file.edit, media): a huge draw loop stays readable. */
-export const DERIVED_ARTIFACT_ROWS_MAX = 300;
+const DERIVED_ARTIFACT_ROWS_MAX = 300;
 
 // A check's evidence names a file when it looks like a path (never prose): the cmd.run row refs it.
 const PATHISH = /^(?:[a-z]:)?[\\/]?[\w.@-]+(?:[\\/][\w.@ -]+)+\.[a-z0-9]{1,8}$/i;
@@ -503,7 +503,7 @@ export function typedLogGaps(logs, { jobId, checks = [] }) {
 // ----------------------------------------------------------------------------------------------- read
 const parseJson = (v, d) => { try { return JSON.parse(v) ?? d; } catch { return d; } };
 /** A stored row as the api and ui read it. */
-export const viewOfRow = (r) => ({ seq: r.seq, at: r.at, workflowId: r.workflow_id, jobId: r.job_id, actor: r.actor, nodeId: r.node_id, level: r.level, kind: r.kind,
+const viewOfRow = (r) => ({ seq: r.seq, at: r.at, workflowId: r.workflow_id, jobId: r.job_id, actor: r.actor, nodeId: r.node_id, level: r.level, kind: r.kind,
   msg: r.msg, data: parseJson(r.data_json, {}), refs: parseJson(r.refs_json, []) });
 
 /**

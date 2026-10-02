@@ -26,7 +26,7 @@ import { openapiPath } from './operations.mjs';
 import { readEnv } from '../../../scripts/lib/env.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
-export const STAND_IN = 'stand-in ';
+const STAND_IN = 'stand-in ';
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema-worker.mjs');
 const OPERATIONS_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'operations-worker.mjs');
 

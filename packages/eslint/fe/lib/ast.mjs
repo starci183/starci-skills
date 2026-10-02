@@ -65,18 +65,6 @@ export const staticText = (value) => {
 /** True for a function expression or an arrow function. */
 export const isFunction = (node) => node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression"
 
-/** True when the call is `useEffect(...)` or `useLayoutEffect(...)`, bare or through `React.`. */
-export const isEffectCall = (node) => {
-  const name = calleeName(node.callee)
-  return name === "useEffect" || name === "useLayoutEffect" || name === "React.useEffect" || name === "React.useLayoutEffect"
-}
-
-/** The callback of an effect call when it is written inline, else null. */
-export const effectCallback = (node) => {
-  const first = node.arguments[0]
-  return first && isFunction(first) ? first : null
-}
-
 /**
  * Every node under `root`, depth first, through the visitor keys of the parser in use.
  * `enter` may return `false` to skip a node's children.

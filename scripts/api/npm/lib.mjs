@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 /** The `<tool>-cli.js` (npm or npx) of this node install on Windows, or null (another platform, or a node without its bundled npm). */
-export const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath) => {
+const bundledCli = (tool = 'npm', platform = process.platform, execPath = process.execPath) => {
   if (platform !== 'win32') return null;
   const cli = path.join(path.dirname(execPath), 'node_modules', 'npm', 'bin', `${tool}-cli.js`);
   return fs.existsSync(cli) ? cli : null;

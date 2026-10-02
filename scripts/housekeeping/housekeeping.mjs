@@ -109,7 +109,7 @@ function areaResult(raw) {
 }
 
 /** How many entries `<root>/node_modules` holds (dot entries not counted); 0 when it is absent. */
-export const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { return 0; } };
+const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { return 0; } };
 
 /**
  * One housekeeping run. `only` (area names) restricts the run; `sweeps` replaces the lib modules in specs;

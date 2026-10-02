@@ -12,7 +12,7 @@
 import { pathKey, sameOrUnder } from './path-key.mjs';
 
 /** The terminal states that still hold a worker terminal Orca has not released. */
-export const HELD_TERMINAL_STATES = Object.freeze(['active', 'reclaimable', 'retained', 'release_pending', 'release_unknown']);
+const HELD_TERMINAL_STATES = Object.freeze(['active', 'reclaimable', 'retained', 'release_pending', 'release_unknown']);
 
 const livenessOf = (row) => row?.projection?.liveness?.verdict ?? null;
 const nextActionOf = (row) => row?.projection?.nextAction ?? null;

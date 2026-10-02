@@ -42,14 +42,14 @@ const OWNER = 'reconciler/gc';
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000,
   eventMaxTries: 6, blobSweepEveryMs: 86_400_000 });
 /** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
-export const GRACE_MARGIN_MS = 5_000;
+const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const SETTLED = new Set(SETTLED_JOB_LIST);
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const WOULD = 'reconciler.would';
 
 /** modules/reconciler/gc.yaml over the defaults. */
-export function gcControllerSettings(file = path.join(ROOT, 'modules', 'reconciler', 'gc.yaml')) {
+function gcControllerSettings(file = path.join(ROOT, 'modules', 'reconciler', 'gc.yaml')) {
   let doc = {};
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   const out = { ...DEFAULTS };
@@ -61,7 +61,7 @@ export function gcControllerSettings(file = path.join(ROOT, 'modules', 'reconcil
 
 const clean = (s) => String(s ?? '').trim();
 export const jobKey = (ledgerId, jobId) => (clean(ledgerId) && clean(jobId) ? `gc:job:${clean(ledgerId)}:${clean(jobId)}` : null);
-export const workflowKey = (ledgerId, workflowId) => (clean(ledgerId) && clean(workflowId) ? `gc:workflow:${clean(ledgerId)}:${clean(workflowId)}` : null);
+const workflowKey = (ledgerId, workflowId) => (clean(ledgerId) && clean(workflowId) ? `gc:workflow:${clean(ledgerId)}:${clean(workflowId)}` : null);
 export const landKey = (jobId) => (clean(jobId) ? `gc:land:${clean(jobId)}` : null);
 
 /** A key → {type, ledgerId?, id}. The ledger id never holds ':' (a repo basename or 'supervisor'); ids may. */
@@ -135,7 +135,7 @@ const liveDeps = {
 };
 
 /** One sweep report item as a gc_items row (G4): the action taken and its final outcome. Pure. */
-export function sweepItem(i) {
+function sweepItem(i) {
   const failed = i.ok === false, done = i.ok === true;
   const acted = { 'close-terminal': 'closed', 'kill-tree': 'killed' }[i.action] ?? 'removed';
   const action = i.verdict === 'refuse' ? 'refuse' : i.verdict === 'keep' ? 'keep' : failed ? 'failed' : done ? acted : 'collect';

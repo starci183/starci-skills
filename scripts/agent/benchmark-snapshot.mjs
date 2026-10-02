@@ -26,7 +26,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 
 /** YYYY-MM-DD of `ms` in the host's local time zone (the day the owner reads). */
-export const localDate = localDay;
+const localDate = localDay;
 
 /** The snapshot file name for one date and window. */
 export const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;

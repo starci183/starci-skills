@@ -55,7 +55,7 @@ export function median(values) {
  * Every op job of one ledger (read-only), as flat rows. `sinceMs` limits by created_at.
  * Throws when the ledger file is missing; scorecardFor turns that into a per-repo error.
  */
-export function readLedgerJobs(file, { sinceMs = null } = {}) {
+function readLedgerJobs(file, { sinceMs = null } = {}) {
   if (!fs.existsSync(file)) throw Object.assign(Error(`no ledger at ${file}`), { code: 'ENOENT' });
   const db = openLedgerReader(file);
   try {
@@ -83,7 +83,7 @@ export function readLedgerJobs(file, { sinceMs = null } = {}) {
 }
 
 /** A settled job's duration and where it came from ('events' | 'row'), or null for an unsettled/cancelled one. */
-export function durationOf(job) {
+function durationOf(job) {
   if (!WORKED.has(job.status)) return null;
   if (job.dispatchedAt != null && job.settledAt != null && job.settledAt >= job.dispatchedAt)
     return { ms: job.settledAt - job.dispatchedAt, source: 'events' };
@@ -110,7 +110,7 @@ const finish = (cell, total) => ({
 /**
  * The scorecard over flat job rows (pure).
  */
-export function buildScorecard(jobs, { repos = [], window = { sinceMs: null, label: 'all' }, errors = [] } = {}) {
+function buildScorecard(jobs, { repos = [], window = { sinceMs: null, label: 'all' }, errors = [] } = {}) {
   const pools = new Map();
   const durationSource = { events: 0, row: 0 };
   for (const job of jobs) {

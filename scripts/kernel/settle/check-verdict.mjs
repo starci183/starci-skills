@@ -11,7 +11,7 @@ const PASS = new Set(['ok', 'pass', 'passed', 'green', 'clean', 'success', 'succ
 const RED = new Set(['findings', 'fail', 'failed', 'red', 'new-findings']);
 
 /** The status word a run carries: its own `status`, else its JSON output's `slice.status` or `status`. */
-export function statusWordOf(run) {
+function statusWordOf(run) {
   for (const value of [run?.status, run?.output?.slice?.status, run?.output?.status]) {
     if (typeof value === 'string' && value.trim()) return value.trim().toLowerCase();
   }

@@ -6,7 +6,7 @@ import { staticText } from "./ast.mjs"
 import { isPackageType } from "./types.mjs"
 
 /** The `typeorm` types a call can write through. */
-export const RECEIVER_TYPES = Object.freeze(["EntityManager", "DataSource", "QueryRunner"])
+const RECEIVER_TYPES = Object.freeze(["EntityManager", "DataSource", "QueryRunner"])
 
 /** Statement text that changes rows. */
 export const WRITING_SQL = /(?:^|[\s;(])(?:insert\s+into|update\s+["`\w.]+\s+set|delete\s+from|truncate\b)/i

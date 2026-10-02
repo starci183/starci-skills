@@ -41,14 +41,14 @@ import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admi
 import { resolveIncident } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 
-export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
+const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 const repoMatches = (repoRoot, want) => {
   if (!repoRoot || !want) return false;
   const norm = (p) => path.resolve(String(p)).replace(/[\\/]+$/, '').toLowerCase();
   return path.isAbsolute(want) ? norm(repoRoot) === norm(want) : path.basename(norm(repoRoot)) === String(want).toLowerCase();
 };
 export const UNTIL_FLAGS = Object.freeze(UNTIL_TYPES.map((type) => `until-${type}`));
-export const AUTO_RESOLVED_EVENT = 'incident-auto-resolved';
+const AUTO_RESOLVED_EVENT = 'incident-auto-resolved';
 export const CONDITIONS_ATTACHED_EVENT = 'incident-conditions-attached';
 const JOB_WANTS = ['settled', 'succeeded'];
 // A settled pass or fail meets `settled`; a cancelled job is followed to its replacement.
@@ -66,7 +66,7 @@ const withLineage = (db, row) => (row && 'retry_of' in row && 'resume_of' in row
  * is the next try of the same unit, holds the same cut ordinal, or (uncut) retries the same predecessor. Null while
  * no such job exists.
  */
-export function replacementOf(db, cancelledRow) {
+function replacementOf(db, cancelledRow) {
   const cancelled = withLineage(db, cancelledRow);
   const cut = cutOfRow(cancelled), before = cancelled.retry_of ?? null;
   const later = db.prepare(`SELECT ${JOB_COLS} FROM jobs WHERE workflow_id=? AND op_id IS ? AND job_id<>? AND created_at>=? ORDER BY created_at,job_id`)
@@ -334,7 +334,7 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
 
 const kindOf = (lastProgress) => /^\[([^\]]+)\]/.exec(lastProgress ?? '')?.[1] ?? null;
 
-export const SHARED_BLOCKER_ROUTED = 'shared-blocker-routed';
+const SHARED_BLOCKER_ROUTED = 'shared-blocker-routed';
 // Job ids are op-<op>-<10 hex> (api enqueue).
 const JOB_ID_RE = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 /**

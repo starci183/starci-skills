@@ -17,7 +17,7 @@
 import { ORCA_KINDS } from './worktree-kinds.mjs';
 
 /** The stamp's prefix: the runtime's mark in Orca's worktree comment. */
-export const RUNTIME_STAMP_PREFIX = 'starci';
+const RUNTIME_STAMP_PREFIX = 'starci';
 /**
  * The kinds the runtime stamps are exactly the Orca kinds, whose one home is scripts/lib/worktree-kinds.mjs ORCA_KINDS
  * (workflow, critic, and the [Worker] staging checkout supervisor-staging, owned by a Supervisor job: its `sup` field).

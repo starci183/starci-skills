@@ -89,7 +89,7 @@ function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = process.env
   }
 }
 /** The per-repository land lock: one workflow lands into a repository's main at a time. */
-export const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
+const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 /** One git call (a scripts/api/git call file) in `cwd`: {ok, status, stdout, stderr}. */
@@ -192,7 +192,7 @@ function resetFiles(dir, base, files) {
  * The checkpoint chain: the workflow branch's head must be the last checkpoint (the merge-base with main before the first one) - only
  * checkpointOp commits there. Throws workflow-foreign-commit naming the commits it did not make.
  */
-export function requireCheckpointChain(ctx, rec, workflowId) {
+function requireCheckpointChain(ctx, rec, workflowId) {
   const base = gateBaseOf(ctx, workflowId);
   const head = revParse(rec.path, 'HEAD');
   if (head === base) return base;
@@ -293,7 +293,7 @@ export function rebaseWorkflow(ctx, { workflowId }) {
 }
 
 /** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
-export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
+function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
   const run = runNode([GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
 }

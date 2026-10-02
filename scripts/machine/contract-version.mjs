@@ -47,9 +47,9 @@ import { readEnv } from '../lib/env.mjs';
 import { headShaOf } from '../lib/git-dir.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
-export const CHANGE_REACH = ['new-legs', 'follow-up'];
-export const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
-export const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
+const CHANGE_REACH = ['new-legs', 'follow-up'];
+const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
+const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';
 export const CONTRACT_RELEASE_EVENT = 'contract-release';
 const ABSENT = 'absent';
 const ALWAYS_CITED = ['modules/ops/_common.yaml', 'modules/kernel/verdict-contract.yaml'];

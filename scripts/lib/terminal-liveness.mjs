@@ -110,7 +110,7 @@ export const TRAILING_ROWS = 14;
 export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
 // The glyph set itself is scripts/lib/input-glyph.mjs INPUT_GLYPH.
 /** A draft as one row of at most DRAFT_CLIP_CHARS, for receipts and events. */
-export const DRAFT_CLIP_CHARS = 200;
+const DRAFT_CLIP_CHARS = 200;
 export const clipDraft = (draft) => { const d = squash(draft); return d.length > DRAFT_CLIP_CHARS ? `${d.slice(0, DRAFT_CLIP_CHARS - 1)}…` : d; };
 // A row shorter than this is too generic to call an echo of the sent text.
 const MIN_ECHO_CHARS = 12;
@@ -240,7 +240,7 @@ const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|\\bAsk Cod
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
 // launchEnv): any `;`-separated statement that runs an agent makes it a launch.
 const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
-export const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
+const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
 /**
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
  *  - the LAST non-empty row is a bare prompt ("PS <drive>:\x>");
@@ -472,7 +472,7 @@ export function staleAwareState(state, outputAgeMs, activeStaleMs) {
 // A provider that holds typed text behind a running turn says so: Claude Code
 // "Press up to edit queued messages" / "Press up to select a queued message",
 // Devin "Press Enter to send queued messages".
-export const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
+const QUEUED_MESSAGE_MARKER = /press up to (?:edit|select) (?:a )?queued messages?|press enter to send queued messages|\bmessages? queued\b/i;
 // The wake is found by its opening words; a TUI wraps and indents the rest.
 const WAKE_PROBE_CHARS = 60;
 export const WAKE_PROOF_READS = 3; // a delivery proof reads the screen this many times,

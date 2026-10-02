@@ -110,7 +110,7 @@ export async function replyToOwner({ id, text, to = null }, {
 }
 
 /** The chat session a desktop chat registers and drains as (Claude Code sets CLAUDE_CODE_SESSION_ID), or null. */
-export const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID ?? '').trim() || null;
+const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID ?? '').trim() || null;
 
 /**
  * Why a registration of `id` from `terminal` is refused, or null. The owner's channel 'main' belongs to the

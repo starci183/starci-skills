@@ -51,7 +51,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { insidePath, sameResolvedPath } from '../lib/path-key.mjs';
 
 /** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
-export const WORK_RECORD_PREFIX = '.starciwork/';
+const WORK_RECORD_PREFIX = '.starciwork/';
 const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 const LEASE_PREFIX = 'path:';
@@ -97,7 +97,7 @@ const dropFirst = (value) => value.split('/').slice(1).join('/');
  * without its first segment; a barrel above an owned path counts. A file that cannot be read imports
  * everything - never a peer on a guess.
  */
-export function importsOwned(root, file, owned) {
+function importsOwned(root, file, owned) {
   let body;
   try { body = fs.readFileSync(path.join(root, file), 'utf8'); } catch { return true; }
   const forms = [...new Set(owned.flatMap((p) => [p, dropFirst(p)]).filter(Boolean))];

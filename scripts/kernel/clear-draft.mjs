@@ -27,8 +27,8 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { squash } from '../lib/clip.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
-export const CTRL_U = '\u0015';
-export const CLEAR_DRAFT_ATTEMPTS = 8;
+const CTRL_U = '\u0015';
+const CLEAR_DRAFT_ATTEMPTS = 8;
 // The beat between a Ctrl+U and the re-read (a TUI repaints a beat later) —
 // modules/models/runtimes.yaml allocation.draft.intervalMs.
 export const CLEAR_DRAFT_INTERVAL_MS = allocationMs('draft.intervalMs');

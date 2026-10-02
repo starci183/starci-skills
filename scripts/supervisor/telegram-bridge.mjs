@@ -86,16 +86,16 @@ import { sleep } from '../lib/sleep.mjs';
 import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 import { isSpecRun } from '../lib/env.mjs';
 
-export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
+const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/ask-server.mjs', import.meta.url));
 
 export const BRIDGE_NAME = 'telegram-bridge';
 export const BRIDGE_FILE = fileURLToPath(import.meta.url);
 export const ONLINE_MS = 30 * 60 * 1000;
 export const POLL_TIMEOUT_S = 50;
-export const ALLOWED_UPDATES = ['message', 'callback_query'];
+const ALLOWED_UPDATES = ['message', 'callback_query'];
 const MAX_PENDING = 20;
 // A /creds button: like ASK_CALLBACK, but the ask opens in a new message and the list stays.
-export const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
+const CRED_CALLBACK = /^cred:([0-9a-f]{16})$/;
 
 // The bridge's English sources translate through the i18n catalog (modules/i18n/messages, scripts/lib/i18n.mjs).
 export const bridgeText = (language) => {
@@ -145,7 +145,7 @@ const CHANNEL_PREFIX = 'supervisor-channel:';
 const channelRow = (id) => `${CHANNEL_PREFIX}${needSupervisorId(id)}`;
 
 /** A live bridge: its connectors row names a live process of this boot, or a bridge holds the lock. */
-export const bridgeAlive = (env = process.env) => {
+const bridgeAlive = (env = process.env) => {
   const state = bridgeState(env);
   return recordAlive(state) ? state : lockHolder(BRIDGE_NAME, env);
 };
@@ -680,7 +680,7 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
  * MB-11: a new runtime HEAD reloads the bridge only when it changed a file under these (the bridge re-exec'd on every
  * land: 198 takeovers, 8-12 an hour). Its own files below reload it by mtime as before.
  */
-export const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'engine/']);
+const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/ask-server.mjs', 'engine/']);
 
 /** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
 export const bridgeReloadFiles = (root = configRoot) => [

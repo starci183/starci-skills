@@ -27,10 +27,10 @@ import { fileURLToPath } from 'node:url';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const AGENTS_DIR = path.join(skillRoot, 'modules', 'models', 'agents');
 export const QUOTA_FAILURE_KIND = 'quota';
-export const CAPACITY_FAILURE_KIND = 'capacity';
+const CAPACITY_FAILURE_KIND = 'capacity';
 /** The card keys that classify an outage, and the circuit failureKind each opens. */
 export const OUTAGE_KEYS = Object.freeze({ quotaExhausted: QUOTA_FAILURE_KIND, capacityExhausted: CAPACITY_FAILURE_KIND });
-export const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
+const DEFAULT_QUOTA_PROBE_EVERY_MS = 3600000;
 
 const compile = (source, flags) => { try { return new RegExp(source, flags); } catch { return null; } };
 const cardFor = (provider, card) => (card === undefined ? agentCardOf(provider) : card);

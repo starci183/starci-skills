@@ -28,10 +28,10 @@ import { readJsonFile } from '../../lib/json.mjs';
 import { alphaOver } from '../../lib/color.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
+const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
 export const FAMILIES = { starci: 'core', nivo: 'nivo' };
 export const DEFAULT_VIEWPORT = { width: 390, height: 844 };
-export const PROMPT_WIDTHS = [390, 1280];
+const PROMPT_WIDTHS = [390, 1280];
 const ROOT_FONT_PX = 16;
 const PRUNE = new Set(['node_modules', '.next', 'dist', 'build', 'out', 'coverage', 'storybook-static', '.git', '.turbo', 'reference-renders', '.starciwork', '.claude', 'captures']);
 
@@ -57,7 +57,7 @@ function matchClose(s, i, open, close) {
 }
 
 /** Split on top-level commas (outside parentheses, brackets and strings). */
-export function splitTop(text, sep = ',') {
+function splitTop(text, sep = ',') {
   const out = [];
   let depth = 0, start = 0;
   for (let i = 0; i < text.length; i++) {
@@ -402,7 +402,7 @@ const semverDesc = (a, b) => {
 };
 
 /** Installed copies of `name` at the repo root and its workspace members, highest version first. */
-export function installedPackages(repo, name) {
+function installedPackages(repo, name) {
   const bases = [repo];
   for (const group of ['apps', 'packages']) {
     try { for (const e of fs.readdirSync(path.join(repo, group), { withFileTypes: true })) if (e.isDirectory()) bases.push(path.join(repo, group, e.name)); } catch { /* no workspace group */ }
@@ -417,7 +417,7 @@ export function installedPackages(repo, name) {
 }
 
 /** Every css file of the repo's own source (build output and installed packages pruned). */
-export function repoCssFiles(repo, maxDepth = 8) {
+function repoCssFiles(repo, maxDepth = 8) {
   return walkFiles(repo, {maxDepth, ignoreReadErrors: true,
     exclude: (name, _full, entry) => entry.isDirectory() && (PRUNE.has(name) || name.startsWith('.')),
     filter: name => name.endsWith('.css')}).sort();
@@ -428,7 +428,7 @@ const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch
 const scopesFamily = (file, id) => { const t = readText(file); return familyScopeRe(id).test(t) && /--[\w-]+\s*:/.test(t); };
 
 /** The directory of package `name` as node resolves it from `fromDir` (nearest node_modules upward). */
-export function packageDirFrom(fromDir, name) {
+function packageDirFrom(fromDir, name) {
   let dir = path.resolve(fromDir);
   for (;;) {
     const candidate = path.join(dir, 'node_modules', ...name.split('/'));
@@ -442,7 +442,7 @@ export function packageDirFrom(fromDir, name) {
 const splitSpecifier = (spec) => { const parts = spec.split('/'); const n = spec.startsWith('@') ? 2 : 1; return { name: parts.slice(0, n).join('/'), subpath: parts.slice(n).join('/') }; };
 
 /** A package subpath through its `exports` map (style, then default, then import), else the plain path. */
-export function exportTarget(pkgDir, subpath) {
+function exportTarget(pkgDir, subpath) {
   let exp = null;
   try { exp = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).exports ?? null; } catch { exp = null; }
   const key = subpath ? `./${subpath}` : '.';
@@ -577,7 +577,7 @@ export const geometryChains = (familyId) => {
 const BUTTON_VARIANTS = ['primary', 'secondary', 'tertiary', 'outline', 'ghost', 'danger'];
 
 /** A resolver over one product's sheet: `element(chain).get(prop)` gives {value, px, trace, source}. */
-export function createResolver(sources) {
+function createResolver(sources) {
   const family = sources.familyFile ? path.resolve(sources.familyFile) : null;
   const sheet = loadSheet(sources.load, { resolveBare: sources.resolveBare, sourceOf: (file, source) => (file === family ? 'family' : source) });
   const cache = new Map();
@@ -621,7 +621,7 @@ function heightOf(el) {
 }
 
 /** Every custom property the family sheet declares that no var() of the loaded cascade and no source file of the app reads. */
-export function unboundFamilyTokens(sources, sheet) {
+function unboundFamilyTokens(sources, sheet) {
   if (!sources.familyFile) return [];
   const declared = new Map();
   for (const r of sheet.rules.filter((x) => x.source === 'family')) for (const d of r.decls) if (d.prop.startsWith('--') && !declared.has(d.prop)) declared.set(d.prop, d.value);
@@ -780,7 +780,7 @@ export function geometryPrompt(g) {
   return `${lines.join('\n')}\n`;
 }
 
-export const isTransparentValue = (v) => /^(transparent|#0000|#00000000|rgba?\([^)]*[,/]\s*0\s*\))$/i.test(String(v).trim());
+const isTransparentValue = (v) => /^(transparent|#0000|#00000000|rgba?\([^)]*[,/]\s*0\s*\))$/i.test(String(v).trim());
 
 export function normalizeShadowText(value) {
   if (value == null) return 'unset';
@@ -806,7 +806,7 @@ export async function loadChromium(repo) {
 }
 
 /** The html files a --check or --score target names: the file itself, or every .html of a capture dir. */
-export function htmlTargets(target) {
+function htmlTargets(target) {
   const abs = path.resolve(target);
   if (!fs.existsSync(abs)) return [];
   if (fs.statSync(abs).isFile()) return /\.html?$/i.test(abs) ? [abs] : [];

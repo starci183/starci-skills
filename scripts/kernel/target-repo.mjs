@@ -68,7 +68,7 @@ export function bindingRepo(binding, id) {
 // Ops delivered on the frontend side: every modules/models/kinds.yaml lane
 // whose steps name the op matches only role: frontend nodes. The binding role
 // of that side is `fe`.
-export const FRONTEND_OPS = (() => {
+const FRONTEND_OPS = (() => {
   let doc;
   try { doc = readModuleJson('modules', 'models', 'kinds.yaml'); } catch { return new Set(); }
   const sides = new Map();
@@ -90,7 +90,7 @@ const slashed = (p) => String(p).replace(/\\/g, '/');
 // In a bound app every owned path is app-relative - the ONE form gate.mjs (--root <app> --changed), the knowledge and every
 // finding use: be/<path>, fe/<path>, the Work dir (.starciwork/<path>) or a path of the app root (package.json, hfs.json,
 // scripts/...). The side a path lands in is its first segment: be or fe, null for the Work dir, app for the app root.
-export const sideOfAppPath = (binding, owned) => {
+const sideOfAppPath = (binding, owned) => {
   const head = tidy(slashed(owned)).split('/')[0];
   if (head === (binding?.workDir ?? '.starciwork')) return null;
   return binding?.repos.find((r) => r.role === head)?.role ?? 'app';
@@ -120,7 +120,7 @@ export function appRelativeProblem(binding, owned) {
 // overrides where dispatch placed the worker: payload.repository when set,
 // else the side of a role-specific op. An unresolvable
 // payload.repository is {unresolved}.
-export function jobTargetRepository({ op, payload, binding }) {
+function jobTargetRepository({ op, payload, binding }) {
   const id = typeof payload?.repository === 'string' ? payload.repository.trim() : '';
   if (id) {
     const bound = bindingRepo(binding, id);

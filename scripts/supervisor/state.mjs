@@ -18,7 +18,7 @@ import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings } fr
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
 import { learningState } from '../machine/lessons.mjs';
 
-export const STATE_SCHEMA = 'starci/supervisor-state@1';
+const STATE_SCHEMA = 'starci/supervisor-state@1';
 const txt = (v, n = 600) => clip(redactText(squash(v)), n);
 const orNull = (v, n) => (v == null || v === '' ? null : txt(v, n));
 const num = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);

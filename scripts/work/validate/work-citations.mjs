@@ -16,7 +16,7 @@ import { parseYaml } from '../../../engine/yaml.mjs';
 import { citeBlob } from '../../../engine/db/ledger.mjs';
 
 export const CITATION_UNRESOLVED = 'CITATION_UNRESOLVED';
-export const CITATION_ROLES = Object.freeze(['direction', 'capture', 'uat-screen', 'uat-video', 'uat-result', 'render', 'layout-capture']);
+const CITATION_ROLES = Object.freeze(['direction', 'capture', 'uat-screen', 'uat-video', 'uat-result', 'render', 'layout-capture']);
 const SHA = /^[a-f0-9]{64}$/;
 const slash = (p) => String(p).replace(/\\/g, '/');
 
@@ -25,7 +25,7 @@ const slash = (p) => String(p).replace(/\\/g, '/');
  * 64-hex `sha256` and either an `artifact` id or no `path` (an object with `path` + `sha256` is a code digest, not a
  * citation of agent output).
  */
-export function citationsOf(doc) {
+function citationsOf(doc) {
   const out = [];
   const visit = (node, field) => {
     if (Array.isArray(node)) { node.forEach((v, i) => visit(v, `${field}[${i}]`)); return; }
@@ -42,7 +42,7 @@ export function citationsOf(doc) {
 }
 
 /** The citations the ledger cannot back: [{field, sha256, artifactId, code, reason}]. */
-export function resolveCitations(db, citations) {
+function resolveCitations(db, citations) {
   const blob = db.prepare('SELECT 1 FROM blobs WHERE sha256=?');
   const artifact = db.prepare('SELECT sha256 FROM job_artifacts WHERE artifact_id=?');
   const out = [];

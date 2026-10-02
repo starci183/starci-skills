@@ -32,7 +32,7 @@ export const parentOf = (p, byPid) => {
 };
 
 /** {node, git, all} process counts. */
-export const processCounts = (procs) => ({
+const processCounts = (procs) => ({
   all: procs.length,
   node: procs.filter((p) => String(p.name).toLowerCase() === 'node.exe').length,
   git: procs.filter((p) => String(p.name).toLowerCase() === 'git.exe').length,

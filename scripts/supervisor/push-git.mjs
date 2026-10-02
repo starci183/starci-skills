@@ -44,9 +44,9 @@ const key = (p) => foldCase(realPath(p));
 const samePath = (a, b) => key(a) === key(b);
 
 /** Generous per-step ceilings: a full suite is the point of this flow. */
-export const STEP_TIMEOUT_MS = Object.freeze({ runtime: 60 * 60_000, product: 40 * 60_000 });
-export const MAX_ITEMS_PER_GROUP = 12;
-export const MAX_GROUPS = 60;
+const STEP_TIMEOUT_MS = Object.freeze({ runtime: 60 * 60_000, product: 40 * 60_000 });
+const MAX_ITEMS_PER_GROUP = 12;
+const MAX_GROUPS = 60;
 
 /* ------------------------------------------------------------ pure pieces */
 
@@ -63,7 +63,7 @@ export function mainState(repo, { run = git } = {}) {
 }
 
 /** Is this checkout the runtime itself? */
-export const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runtimeRoot);
+const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runtimeRoot);
 
 const readPackage = (repo) => readJsonFile(path.join(repo, 'package.json'));
 

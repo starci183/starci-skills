@@ -66,7 +66,7 @@ function jsonText(value) {
  * The apps a new app starts with: on the be side the `core` api app and the `cli` app over one `primary` connection, two Next apps
  * (landing, app) on the fe side, which read the be contracts for their codegen.
  */
-export const STARTER_SIDES = Object.freeze({
+const STARTER_SIDES = Object.freeze({
   be: Object.freeze({ apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }], kinds: ['api', 'cli'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] }),
   // fe: the landing and the product app, over the shared ui and i18n packages (both opt-in slots, enabled here).
   fe: Object.freeze({ apps: [{ name: 'landing', kind: 'next' }, { name: 'app', kind: 'next' }], reads: ['be/contracts/'], optionalSlots: ['fe.package.ui', 'fe.package.i18n'] }),
@@ -118,7 +118,7 @@ const FE_PACKAGES = Object.freeze({
 const PACKAGE_WORKSPACE_SCRIPTS = Object.freeze({ build: 'tsc -p tsconfig.build.json', lint: WORKSPACE_LINT, typecheck: 'tsc --noEmit -p tsconfig.json' });
 
 /** The app hfs.json of a new app called `name`. */
-export const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
+const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
 
 /** A dependency section at the canon pins (a null range takes the pin, which must exist). */
 function pinnedSection(entries, pins) {

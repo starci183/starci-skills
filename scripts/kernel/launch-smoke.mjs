@@ -82,7 +82,7 @@ export const ROLES = Object.freeze({
   opFail: { depth: 2, parent: 'kernel', title: '[Op] launch smoke be fail', side: 'be', fails: true, by: 'smoke' },
   critic: { depth: 3, parent: 'op', title: '[Critic] launch smoke' },
 });
-export const PATHS = Object.freeze({
+const PATHS = Object.freeze({
   'supervisor-worker': ['supervisor', 'worker'],
   'op-critic': ['kernel', 'op', 'critic'],
   'workflow-worktree': ['kernel', 'op', 'opFe', 'opFail'],
@@ -153,7 +153,7 @@ const agentFile = (state, role) => path.join(dirs(state).agents, `${role}.json`)
 const stageFile = (state, role) => path.join(dirs(state).stages, `${role}.json`);
 const resultFile = (state, role) => path.join(dirs(state).results, `${role}.txt`);
 const planFile = (state) => path.join(state, 'plan.json');
-export const planOf = (state) => readJson(planFile(state));
+const planOf = (state) => readJson(planFile(state));
 export const agentOf = (state, role) => readJson(agentFile(state, role));
 const settle = bestEffortCall;
 const settleAsync = bestEffortCallAsync;
@@ -176,7 +176,7 @@ export const ownedTextOf = (role, workflowId) => (ROLES[role].side === 'be'
   ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role }, null, 2)}\n`
   : `${SMOKE_SCHEMA} ${workflowId} ${role}\n`);
 /** The op record the dispatcher judges (sideOf, canDispatchConcurrently): its owned paths, app-relative. */
-export const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });
+const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });
 
 /** worker-start's worktree arguments (['--worktree', x, '--repo', y, ...]) as startAgent's named options. */
 export function worktreeParamsOf(args = []) {
@@ -235,7 +235,7 @@ export function noopSpec({ role, script = SCRIPT }) {
  * recorded in the state directory the moment Orca names them (onCreated), the full receipt after attestation. The Kernel
  * is started with the workflow worktree spec (Orca creates the worktree); an op role on the workflow worktree.
  */
-export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRIPT }) {
+function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script = SCRIPT }) {
   const plan = planOf(state);
   const noop = plan.noop;
   const prompt = noopSpec({ role, script });

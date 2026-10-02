@@ -37,14 +37,14 @@ import { projectBinding } from './target-repo.mjs';
 import { workflowRecordOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { isInside } from '../lib/walk.mjs';
 
-export const WORKFLOW_WORKTREE_KIND = 'workflow';
+const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
 export const WORKFLOW_SIDE_BUSY = 'workflow-side-busy';
 /** The typed refusal of an op whose workflow has no worktree, never a silent run outside it: {reason: 'workflow-worktree-missing'} (modules/kernel/failure-codes.yaml). */
 export const WORKFLOW_WORKTREE_MISSING = 'workflow-worktree-missing';
 const SIDES = Object.freeze(['be', 'fe']);
 /** The side of an op that writes only the workflow's Work records (app-relative .starciwork/...). */
-export const WORK_SIDE = 'work';
+const WORK_SIDE = 'work';
 const WORK_DIR = '.starciwork';
 
 const posix = (p) => String(p).replace(/\\/g, '/');

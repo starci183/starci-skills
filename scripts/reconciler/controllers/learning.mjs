@@ -17,12 +17,12 @@ import { clipLine } from '../../lib/clip.mjs';
 import { translator } from '../../lib/i18n.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const LEARNING_FILE = path.join(ROOT, 'modules', 'reconciler', 'learning.yaml');
+const LEARNING_FILE = path.join(ROOT, 'modules', 'reconciler', 'learning.yaml');
 export const KEY = 'learning:tick';
 // resyncMs is the tick cadence (30 min); a runtime-invariant-violated event runs the pass at once. It is idempotent.
 export const DEFAULTS = Object.freeze({ resyncMs: 1_800_000, concurrency: 1, windowMs: 86_400_000, decisionDueMs: 3_600_000 });
 
-export function learningControllerSettings(file = LEARNING_FILE) {
+function learningControllerSettings(file = LEARNING_FILE) {
   return yamlNumberSettings(file, DEFAULTS);
 }
 

@@ -89,7 +89,7 @@ const RUN_ONLY = /^(the )?run\b|\bthe run (reaches|is driven|completes|submits|p
 const flatText = (v) => (v == null ? '' : typeof v === 'string' ? v : Array.isArray(v) ? v.map(flatText).join('\n') : typeof v === 'object' ? Object.entries(v).map(([k, x]) => `${k}: ${flatText(x)}`).join('\n') : String(v));
 
 /** The ui record file for a path (the index.yaml itself or its directory). */
-export function surfaceFile(p) {
+function surfaceFile(p) {
   const abs = path.resolve(p);
   if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) return path.join(abs, 'index.yaml');
   return abs;
@@ -455,7 +455,7 @@ function hairlines(v, card) {
 }
 
 /** The page box a top-level card sits in and the card's inline inset from it (see spacingChecks page-inset). */
-export function pageInsetOf(v, card, width) {
+function pageInsetOf(v, card, width) {
   const anc = v.ancestors(card);
   const padded = anc.filter((a) => a.style.padding[1] > 0.5 || a.style.padding[3] > 0.5);
   const page = anc.find((a) => a.comp === 'PageContainer') ?? padded[padded.length - 1] ?? null;
@@ -470,7 +470,7 @@ export function pageInsetOf(v, card, width) {
 }
 
 /** Full-width disclosure triggers of a card: a <details> root's <summary>, or a Grammar accordion trigger. */
-export function disclosureTriggers(v, card) {
+function disclosureTriggers(v, card) {
   const isTrigger = (e) => e.tag === 'summary' || /(?:^|\s)starci-core-accordion-trigger(?:\s|$)/.test(e.cls ?? '');
   const full = (e) => e.visible && isTrigger(e) && e.rect.w >= card.rect.w - 1.5 && v.ancestors(e).some((a) => a.i === card.i);
   const all = v.els.filter(full);
@@ -827,7 +827,7 @@ export async function scoreRender(brief, html, { repo = null, viewport = DEFAULT
   return { schema: 'starci/ui-proof-score@1', ok: summary.fail === 0, file: html, htmlSha256, viewport, summary, cases: results, spacing: ctx.spacing };
 }
 
-export function scoreText(s) {
+function scoreText(s) {
   const lines = [`UI PROOF SCORE - ${s.file} at ${s.viewport.width}x${s.viewport.height}: ${s.summary.pass} pass, ${s.summary.fail} fail, ${s.summary.unmeasurable} unmeasurable.`, '', 'SPACING / PADDING'];
   for (const r of s.spacing) lines.push(`  ${r.status.toUpperCase().padEnd(12)} ${r.id}: ${typeof r.got === 'number' ? `${r.got}px` : r.got} (want ${typeof r.exp === 'number' ? `${r.exp}px` : r.exp}) - ${r.source}${r.evidence ? ` - ${r.evidence}` : ''}`);
   lines.push('', 'CASES');

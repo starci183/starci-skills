@@ -31,14 +31,14 @@ export const orcaAppExe = (cli = ORCA) => {
   return fs.existsSync(exe) ? exe : null;
 };
 
-export const ORCA_PREFIX_ARGS = (() => {
+const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(readEnv('STARCI_ORCA_ARGS') || '[]'); } catch { return []; }
 })();
 
 // A read can answer more than spawnSync's 1 MB default (a worker-read
 // transcript page, a terminal scrollback, a worker-list page of 100 rows), and
 // a clipped stdout is a lost receipt (ENOBUFS, inc-13ab4be5059f). Reads get 64 MB.
-export const READ_MAX_BUFFER = 64 * 1024 * 1024;
+const READ_MAX_BUFFER = 64 * 1024 * 1024;
 
 export function orcaRun(args, { timeout = 120000, maxBuffer } = {}) {
   const r = spawnSync(ORCA, [...ORCA_PREFIX_ARGS, ...args], { encoding: 'utf8', timeout, windowsHide: true, ...(maxBuffer ? { maxBuffer } : {}) });
@@ -55,7 +55,7 @@ export function orcaRun(args, { timeout = 120000, maxBuffer } = {}) {
 // but the watchdogs read both answers as dead kernels: six workflows lost their
 // kernel seat and one got a second kernel. A host-unavailable answer is never
 // evidence about a terminal - callers wait and re-verify once Orca answers.
-export const HOST_UNAVAILABLE_CODES = new Set(['runtime_unavailable']);
+const HOST_UNAVAILABLE_CODES = new Set(['runtime_unavailable']);
 const HOST_DOWN_TEXT = /could not read orca runtime metadata|start the orca app first/i;
 
 /**
@@ -186,7 +186,7 @@ const driftEnvelope = (verb, entry, missing) => ({
  * stderr saw an empty error: nivo's dispatches were rejected at task-create
  * with error "" for a whole restart (inc-5c0ff394e676).
  */
-export function receiptErrorText(receipt) {
+function receiptErrorText(receipt) {
   const e = receipt?.error;
   if (e == null || e === false) return null;
   if (typeof e === 'string') return e || null;
@@ -217,7 +217,7 @@ const envelopeError = (r, receipt) => r.error || receiptErrorText(receipt) || r.
 //            request-show and one replay under the same id. Orca answers a
 //            replay with the recorded outcome instead of a second effect, also
 //            after a process restart that re-derives the same id.
-export const REPLAY_MODES = Object.freeze(['none', 'reissue', 'request']);
+const REPLAY_MODES = Object.freeze(['none', 'reissue', 'request']);
 const RETRY_FLAG = CALLS.idempotency?.flag ?? 'retry-request';
 
 const canonical = (v) => Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
@@ -253,7 +253,7 @@ export function orcaRequestIdOf(verb, identity) {
 }
 
 /** The process timed out, or Orca answered without a JSON receipt: the effect is unknown, not refused. */
-export const receiptLost = (r, receipt) => r.spawnError === 'ETIMEDOUT' || (r.status !== null && r.status !== undefined && !r.spawnError && receipt === null);
+const receiptLost = (r, receipt) => r.spawnError === 'ETIMEDOUT' || (r.status !== null && r.status !== undefined && !r.spawnError && receipt === null);
 
 function issue(verb, entry, argv, timeout) {
   const r = orcaRun(argv, { timeout: timeout ?? entry.timeoutMs ?? CALLS.defaults?.timeoutMs ?? 30000,

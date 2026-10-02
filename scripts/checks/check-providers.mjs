@@ -30,7 +30,7 @@ const yamlFilesIn=dir=>fs.existsSync(dir)
 const readYamlFile=file=>parseYaml(fs.readFileSync(file,'utf8'));
 
 /** Validate the provider contract tree before an operation launch is planned. */
-export function validateProviderContracts({root=skillRoot}={}){
+function validateProviderContracts({root=skillRoot}={}){
   const errors=[];
   const AGENTS_DIR=agentsDir(root),HOSTS_DIR=hostsDir(root),PROFILES_DIR=profilesDir(root),REGISTRY_FILE=registryFile(root);
 
@@ -176,7 +176,7 @@ export function validateCallContract(docs){
  * Compare every calls.yaml entry against the live `orca agent-context --json`
  * signature. Returns one drift row per entry the binary cannot satisfy.
  */
-export function compareCallsToLiveSchema({root=skillRoot,listing}={}){
+function compareCallsToLiveSchema({root=skillRoot,listing}={}){
   const docs=readCallContract(root);
   if(!docs?.calls)return {ok:false,drift:[{call:null,reason:'no modules/host/orca/calls.yaml to compare'}]};
   const live=listing===undefined?agentContext().listing:listing;
@@ -193,7 +193,7 @@ export function compareCallsToLiveSchema({root=skillRoot,listing}={}){
 }
 
 /** Checks entry: `node scripts/checks/check-providers.mjs` prints the validation report as JSON. */
-export function providersMain(argv=[]){
+function providersMain(argv=[]){
   if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/providers-check-help@1',help:'Usage: node scripts/checks/check-providers.mjs [--live] [--root <dir>]\n\nValidates the provider contract tree (modules/models/agents/*.yaml agent cards, modules/host/<provider>/*.yaml host documents, the Orca call contract in modules/host/orca/calls.yaml, and the adapter references in modules/models/profiles/*.yaml and registry.yaml). Static by default - no process is run. --live additionally compares every calls.yaml command and flag against the live `orca agent-context --json` signature and exits 1 with the diff. --root checks another StarCi tree. Prints deterministic JSON. Exit 0 is valid, 1 reports contract errors.'}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;

@@ -48,7 +48,7 @@ const readCandidate = (file) => {
 const contextFor = (repo, graph) => workGraphContext(repo, (graph?.domains ?? []).map((d) => d.id));
 
 /** The op's graphPolicy.workGraph permission, or null. */
-export function graphPermissionOf(op) {
+function graphPermissionOf(op) {
   try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))?.graphPolicy?.workGraph ?? null; }
   catch { return null; }
 }

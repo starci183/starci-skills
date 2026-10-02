@@ -78,7 +78,7 @@ export function parseExampleArgs(argv) {
 }
 
 /** Setter entries the record-scoped op CLIs share: `--op`, `--records` (csv, accumulated), `--state`, `--json`, `--help`/`-h` (calls `help`). */
-export const opRecordSpec = (help) => ({
+const opRecordSpec = (help) => ({
   '--op': (o, take) => { o.op = take(); },
   '--records': (o, take) => { o.records = [...(o.records ?? []), ...take().split(',')]; },
   '--state': (o, take) => { o.state = take(); },
@@ -87,7 +87,7 @@ export const opRecordSpec = (help) => ({
 });
 
 /** The final value of an accumulated `--records` list: trimmed, blanks dropped, deduplicated. */
-export const recordsList = (args) => [...new Set((args.records ?? []).map((s) => s.trim()).filter(Boolean))];
+const recordsList = (args) => [...new Set((args.records ?? []).map((s) => s.trim()).filter(Boolean))];
 
 /**
  * The `usage` + `parseArgs` pair the record-scoped op CLIs share: `usage` prints `usageText` to stderr and exits

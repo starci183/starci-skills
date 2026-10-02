@@ -17,7 +17,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 
 const CHILD_PROCESS = new Set(['child_process', 'node:child_process']);
-export const SPAWN_FNS = Object.freeze(['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']);
+const SPAWN_FNS = Object.freeze(['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']);
 const SPAWN_SET = new Set(SPAWN_FNS);
 const SHELLS = new Set(['cmd', 'sh', 'bash', 'powershell', 'pwsh']);
 let typescript = null;

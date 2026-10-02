@@ -177,7 +177,7 @@ export function helperOnceFindings({ tracked, read }) {
 /** Shortest function (normalised tokens) the near-copy comparison looks at: below it two functions agree by accident. */
 const NEAR_MIN_TOKENS = 30;
 /** Token 3-gram Dice similarity at or above which two helpers in different files are one helper copied. */
-export const NEAR_COPY_SIMILARITY = 0.8;
+const NEAR_COPY_SIMILARITY = 0.8;
 
 const trigrams = (tokens) => {
   const grams = new Map();
@@ -241,7 +241,7 @@ function nearCopyFindings(parsed, reported) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkHelperOnce(root = skillRoot) {
+function checkHelperOnce(root = skillRoot) {
   const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
   return helperOnceFindings({ tracked, read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') });
 }

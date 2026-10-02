@@ -20,9 +20,9 @@ import { readYamlFile } from './read-yaml.mjs';
 import { normRel, pathsOverlap } from './path-key.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
-export const DISPLAY_NAME_LIMIT = 80;
+const DISPLAY_NAME_LIMIT = 80;
 export const JOB_WHAT_MAX = 40;
-export const NAME_SEPARATOR = ' · ';
+const NAME_SEPARATOR = ' · ';
 
 const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
 let labelsCache = null;
@@ -43,7 +43,7 @@ export function opLabel(op, language = 'vi') {
 
 /** One line, whitespace collapsed; '' for nothing. */
 /** `text` cut at a word boundary to at most `max` characters, ending in an ellipsis when cut. */
-export function clipWords(text, max) {
+function clipWords(text, max) {
   const s = squash(text);
   if (s.length <= max) return s;
   const room = s.slice(0, max - 1);
@@ -97,7 +97,7 @@ export function productName(raw) {
     .map((w) => BRAND_CASE[w.toLowerCase()] ?? (w.length <= 3 && /^[a-z]+$/i.test(w) && w === w.toUpperCase() ? w : `${w[0].toUpperCase()}${w.slice(1)}`)).join(' ');
 }
 /** The first clause of the owner's goal text: up to the first sentence end, line break, colon or dash aside. */
-export function firstClause(text) {
+function firstClause(text) {
   const s = String(text ?? '').split(/\r?\n/).map(squash).find(Boolean) ?? '';
   const clause = s.split(/(?<=[.!?;:])\s|\s[—–-]\s|\s\(/)[0] ?? '';
   return clause.replace(/[\s.!?;:,]+$/, '').trim();
@@ -125,7 +125,7 @@ const BROAD = /^(\.starciwork|\.starciwork\/index\.yaml|\.starciwork\/features|\
 const meets = pathsOverlap;
 
 /** The work-graph node the job covers most specifically (its longest owned path that meets the job's). */
-export function coveredNode(nodes, paths) {
+function coveredNode(nodes, paths) {
   const keys = paths.map(keyOf).filter((k) => k && !BROAD.test(k));
   let best = null, bestLen = -1;
   for (const node of list(nodes)) {
@@ -138,7 +138,7 @@ export function coveredNode(nodes, paths) {
 
 const titleCache = new Map();
 /** The `title:` of the Work record at `<repo>/<p>` (a record folder or its index.yaml), else null. */
-export function recordTitle(repo, p) {
+function recordTitle(repo, p) {
   if (!repo || !p) return null;
   const rel = String(p).replaceAll('\\', '/').replace(/\/+$/, '');
   if (!rel.startsWith('.starciwork/') || BROAD.test(rel.toLowerCase())) return null;

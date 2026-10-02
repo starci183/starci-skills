@@ -14,8 +14,8 @@ import { artifactRoot, blobPath } from '../../engine/db/blob.mjs';
 import { stageBlob, putArtifact } from './evidence-store.mjs';
 import { slash } from '../lib/path-key.mjs';
 
-export const RECEIPT_PREFIX = 'asks/';
-export const receiptNameOf = (dispatchId, at) => `${RECEIPT_PREFIX}${dispatchId}/answer-${at}.json`;
+const RECEIPT_PREFIX = 'asks/';
+const receiptNameOf = (dispatchId, at) => `${RECEIPT_PREFIX}${dispatchId}/answer-${at}.json`;
 const BLOB_REF = /^blob:([a-f0-9]{64})$/;
 
 /** The receipt as a staged blob (outside any transaction). */

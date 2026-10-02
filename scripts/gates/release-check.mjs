@@ -43,7 +43,7 @@ const result = (id, ok, detail, extra = {}) => ({ id, status: ok ? STEP_STATUS.p
 const unrun = (id, detail) => ({ id, status: STEP_STATUS.toolFailed, detail });
 
 /** B1: the plan against the registry has no blocker and nothing left to publish. */
-export function publishPlanProof({ root, registry }) {
+function publishPlanProof({ root, registry }) {
   let plan;
   try { plan = buildPlan({ root, registry }); } catch (error) { return unrun('publish-plan', String(error?.message ?? error)); }
   const pending = plan.toPublish.map((r) => `${r.name}@${r.version}`);
@@ -52,7 +52,7 @@ export function publishPlanProof({ root, registry }) {
 }
 
 /** B4: the clean-install proof of every published package. */
-export function packageCleanProof({ root, node }) {
+function packageCleanProof({ root, node }) {
   const run = node([path.join(root, 'scripts', 'gates', 'package-clean-test.mjs')], { cwd: root });
   const out = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const summary = /package-clean-test: (\d+) green, (\d+) red, (\d+) not run, of (\d+)/.exec(out);
@@ -61,7 +61,7 @@ export function packageCleanProof({ root, node }) {
 }
 
 /** C3: the full spec run; a failing or cancelled test, or a run that printed no summary, is red. */
-export function specsProof({ root, node }) {
+function specsProof({ root, node }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-specs-'));
   const tapFile = path.join(dir, 'specs.tap');
   try {
@@ -79,7 +79,7 @@ export function specsProof({ root, node }) {
 }
 
 /** C6: a clean tracked tree and both node_modules still holding their entries (a removal through a link would empty them). */
-export function checkoutProof({ root, git = { status: (cwd) => porcelainStatus(cwd, { untracked: 'no' }) } }) {
+function checkoutProof({ root, git = { status: (cwd) => porcelainStatus(cwd, { untracked: 'no' }) } }) {
   const status = git.status(root);
   if (!status.ok) return unrun('checkout', `git status failed: ${status.stderr}`);
   const empty = ['node_modules', 'packages/node_modules'].filter((dir) => { try { return fs.readdirSync(path.join(root, dir)).length === 0; } catch { return true; } });
@@ -88,7 +88,7 @@ export function checkoutProof({ root, git = { status: (cwd) => porcelainStatus(c
 }
 
 /** A1, A2, A4 (--final): the version heads a dated CHANGELOG section with no open marker, and the checkout is on main. */
-export function identityProof({ root, branch = (cwd) => revParseQuery(['--abbrev-ref', 'HEAD'], { cwd }) }) {
+function identityProof({ root, branch = (cwd) => revParseQuery(['--abbrev-ref', 'HEAD'], { cwd }) }) {
   const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
   const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const heading = changelog.split(/\r?\n/).find((line) => line.startsWith(`## [${version}]`)) ?? null;

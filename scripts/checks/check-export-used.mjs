@@ -7,20 +7,23 @@
 // strip the `export` (the name is used only here) or delete the declaration (it is used nowhere). A mention is the name as
 // a whole word in any other tracked text file (source, spec, yaml, json, markdown, shell), so a handler a manifest names
 // and a symbol a spec imports both count. The one structural exemption is a package's public entry: the files its
-// package.json names under `main`, `exports`, `bin` and `types` are API for consumers outside the repository. There is no
-// pending list and no allowlist.
+// package.json names under `main`, `exports`, `bin` and `types` are API for consumers outside the repository, and the one call
+// function a scripts/api/<system>/<call>.mjs file exports (named after the file, RT_API_SHAPE: the call's own contract). There
+// is no pending list and no allowlist.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { callFunctionName } from '../hfs/runtime-rules/api-shape.mjs';
 import { boundNames } from '../lib/ast-names.mjs';
 
-export const EXPORT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
+const EXPORT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 const TEXT = /\.(mjs|cjs|js|ts|tsx|json|ya?ml|md|sh|ps1|sql|txt|css|html|hbs|ejs|tpl)$/;
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
 const VENDORED = /(^|\/)(node_modules|dist|reference-renders)\//;
+const API_CALL_FILE = /^scripts\/api\/[^/]+\/(?!lib\.mjs$)([^/]+)\.mjs$/;
 const isSpec = (rel) => /\.(test|spec)\.mjs$/.test(rel) || /(^|\/)tests?\//.test(rel);
 const MAX_TEXT_BYTES = 3_000_000;
 
@@ -76,6 +79,7 @@ export function exportUsedFindings(files) {
   for (const { rel, text } of files) {
     if (!rel.endsWith('.mjs') || isSpec(rel) || entries.has(rel) || !EXPORT_ROOTS.some((r) => rel.startsWith(`${r}/`))) continue;
     for (const { name, line } of exportedNames(text)) {
+      if (name === callFunctionName(rel.match(API_CALL_FILE)?.[1] ?? '')) continue;
       const where = mentions.get(name);
       if (where && [...where].some((other) => other !== rel)) continue;
       findings.push({ code: 'RT_EXPORT_UNUSED', path: rel, line, name,
@@ -86,7 +90,7 @@ export function exportUsedFindings(files) {
 }
 
 /** Every tracked text file of the runtime at `root` (generated copies and vendored trees excluded). */
-export function readTracked(root = skillRoot) {
+function readTracked(root = skillRoot) {
   const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
   const files = [];
   for (const rel of tracked) {

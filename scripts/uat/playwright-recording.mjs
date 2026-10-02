@@ -12,13 +12,13 @@ const CONFIG_NAMES = ['playwright.config.ts', 'playwright.config.mts', 'playwrig
 const CONFIG_FLAGS = new Set(['--config', '-c']);
 
 /** True when `command` runs the Playwright test runner. */
-export const isPlaywrightTest = (command) => {
+const isPlaywrightTest = (command) => {
   const joined = command.join(' ').toLowerCase();
   return /playwright/.test(joined) && /(^|\s)test(\s|$)/.test(joined);
 };
 
 /** The project config a Playwright command names (--config / -c / --config=), else the default one in `cwd`. */
-export function projectConfigOf(command, cwd) {
+function projectConfigOf(command, cwd) {
   for (let i = 0; i < command.length; i++) {
     const arg = String(command[i]);
     if (CONFIG_FLAGS.has(arg) && command[i + 1]) return path.resolve(cwd, command[i + 1]);
@@ -31,7 +31,7 @@ export function projectConfigOf(command, cwd) {
 const specifier = (file) => file.replace(/\\/g, '/').replace(/\.(ts|mts|cts)$/, '');
 
 /** The wrapper config's source: the project config with recording on. */
-export function recordingConfigSource({ projectConfig, cwd, outputDir }) {
+function recordingConfigSource({ projectConfig, cwd, outputDir }) {
   const dir = projectConfig ? path.dirname(projectConfig) : cwd;
   return [
     "import path from 'node:path';",
@@ -83,7 +83,7 @@ export const recordingDirUnder = (root, now = new Date()) => path.join(root, `pl
  * job's folder at settle and indexes its video, trace.zip and screenshots as the job's proof.
  */
 export const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
-export const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(os.tmpdir(), 'starci-uat-recordings');
+const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(os.tmpdir(), 'starci-uat-recordings');
 export const recordingsRootOf = (jobId, env = process.env) => path.join(recordingsBaseOf(env), String(jobId).replace(/[^a-z0-9._-]/gi, '_'));
 /** The default record directory of a run: the op's own folder when an op runs it, else the shared root. */
 export const defaultRecordRoot = (env = process.env, context = opContextOf({ env })) => (context?.jobId ? recordingsRootOf(context.jobId, env) : recordingsBaseOf(env));

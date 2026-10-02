@@ -37,17 +37,17 @@ const WRITER = 'reconciler/resource';
 const WOULD = 'reconciler.would';
 export const HOST_KEY = 'resource:host';
 export const POOLS_KEY = 'resource:pools';
-export const RATE_LIMITED_EVENT = 'provider-rate-limited';
-export const quotaKey = (ledgerId) => `resource:quota:${ledgerId}`;
+const RATE_LIMITED_EVENT = 'provider-rate-limited';
+const quotaKey = (ledgerId) => `resource:quota:${ledgerId}`;
 export const DEFAULTS = Object.freeze({ resyncMs: 30_000, concurrency: 2, footprintEveryMs: 300_000, quotaProbeEveryMs: 300_000,
   capStarvedMs: 900_000, ramCriticalSlaMs: 600_000, diskLowSlaMs: 3_600_000, quotaProbeTimeoutMs: 120_000,
   backoffFloor: 2, backoffDecreaseCooldownMs: 120_000, backoffIncreaseAfterMs: 900_000, backoffIncreaseStepMs: 300_000,
   backoffStaleMs: 600_000, backoffPersistMs: 900_000 });
 /** Non-numeric settings of resource.yaml. */
-export const TEXT_DEFAULTS = Object.freeze({ backoffCircuitKind: 'quota' });
+const TEXT_DEFAULTS = Object.freeze({ backoffCircuitKind: 'quota' });
 
 /** modules/reconciler/resource.yaml over the defaults. */
-export function resourceControllerSettings(file = path.join(ROOT, 'modules', 'reconciler', 'resource.yaml')) {
+function resourceControllerSettings(file = path.join(ROOT, 'modules', 'reconciler', 'resource.yaml')) {
   let doc = {};
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   const out = { ...DEFAULTS };

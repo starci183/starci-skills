@@ -69,7 +69,7 @@ export const poolRowOf = (pool, entry, { now, staleMs = DEFAULTS.staleMs }) => (
     lastIncreaseAt: entry.lastIncreaseAt ?? null, floorSince: entry.floorSince ?? null, provider: entry.provider ?? null, reason: entry.reason ?? null }) });
 
 /** The AIMD entry of one pool_backoff row (halvings from strikes, the rest from reason); null when unreadable. Pure. */
-export function entryOfRow(row) {
+function entryOfRow(row) {
   let e = null;
   try { e = JSON.parse(row?.reason ?? 'null'); } catch { e = null; }
   if (!e || typeof e !== 'object' || !Number.isFinite(Number(e.cap))) return null;

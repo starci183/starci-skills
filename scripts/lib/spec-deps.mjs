@@ -20,7 +20,7 @@ const EXTENSIONS = ['', '.mjs', '.js', '.cjs', '.ts', '.mts', '.cts', '.json', '
 const posix = (p) => p.split(path.sep).join('/');
 
 /** Repository-relative paths of the files `file` (absolute) imports relatively, resolved to existing files. */
-export function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf8')) {
+function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(f, 'utf8')) {
   let text;
   try { text = readFile(file); } catch { return []; }
   const info = ts().preProcessFile(text, true, true);
@@ -41,7 +41,7 @@ export function relativeImportsOf(root, file, readFile = (f) => fs.readFileSync(
 
 const ENTRY_ROOTS = '(?:scripts|engine|bin)';
 /** Repository-relative runtime .mjs paths `text` names as a string ('scripts/a/b.mjs') or as path segments ('scripts', 'a', 'b.mjs'). */
-export function spawnedEntriesOf(text) {
+function spawnedEntriesOf(text) {
   const out = new Set();
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS}/[\\w./-]+\\.mjs)['"\`]`, 'g'))) out.add(m[1]);
   for (const m of text.matchAll(new RegExp(`['"\`](${ENTRY_ROOTS})['"\`]((?:\\s*,\\s*['"\`][\\w.-]+['"\`])+)`, 'g'))) {

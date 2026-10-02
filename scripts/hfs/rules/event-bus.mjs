@@ -13,8 +13,8 @@ import { loadTypescript } from '../../lib/package-at.mjs';
 import { literalText } from '../../lib/ts-ast.mjs';
 import { found, readJson, readText } from './read.mjs';
 
-export const EVENT_CLASS_CONTRACT = 'BE_EVENT_CLASS_CONTRACT';
-export const PATTERN_SPEC_MISSING = 'BE_PATTERN_SPEC_MISSING';
+const EVENT_CLASS_CONTRACT = 'BE_EVENT_CLASS_CONTRACT';
+const PATTERN_SPEC_MISSING = 'BE_PATTERN_SPEC_MISSING';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EVENT_FILE_PREFIX = 'be/src/modules/events/';

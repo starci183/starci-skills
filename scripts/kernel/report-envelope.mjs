@@ -8,7 +8,7 @@ import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { claimsProblems } from './proof-integrity.mjs';
 import { normPath } from '../lib/path-key.mjs';
 
-export const OP_REPORT_SCHEMA = 'starci/op-report@1';
+const OP_REPORT_SCHEMA = 'starci/op-report@1';
 export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'];
 // modules/models/kinds.yaml `vocabularies.blockers` is the one authority: the route table
 // that dispatches on a blocker kind and the envelope that accepts one read the

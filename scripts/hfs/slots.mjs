@@ -776,10 +776,10 @@ export function openHfs({ root = skillRoot, repoRoot, declaration, side = null, 
 
 // ------------------------------------------------------------------------------------------ rule catalog
 
-export const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
-export const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
-export const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
-export const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
+const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
+const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar', 'runtime']);
+const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar', 'runtime']);
+const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
 const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar', 'runtime'];

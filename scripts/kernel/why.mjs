@@ -22,7 +22,6 @@ import { clipLine } from '../lib/clip.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WHY_SCHEMA = 'starci/why@1';
-export const WHY_STATES = Object.freeze(['failed', 'blocked', 'awaiting-owner', 'dispatch-rejected', 'requeued', 'worker-dead', 'cancelled', 'waiting-settle']);
 const CATALOG_PATH = path.join(root, 'modules', 'kernel', 'failure-codes.yaml');
 
 let catalogCache = null;

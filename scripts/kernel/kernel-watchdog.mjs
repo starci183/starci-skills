@@ -78,7 +78,7 @@ const runNodeJson = (file, args) => {
   };
 };
 
-export const classifyKernelScreen = classifyAgentScreen;
+const classifyKernelScreen = classifyAgentScreen;
 
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
@@ -224,9 +224,9 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
-export const WAKE_IDLE_REPLACE = 3;
+const WAKE_IDLE_REPLACE = 3;
 export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
-export const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
+const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
 // Kernel-authored job moves: reset the wakes and the idle-replaced streak.
 const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
 // Progress the Kernel did not author, and the Kernel's own records: reset the wakes only.
@@ -286,7 +286,7 @@ const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, output
 
 
 
-export async function watchdogTick() {
+async function watchdogTick() {
   return statusTick();
 }
 

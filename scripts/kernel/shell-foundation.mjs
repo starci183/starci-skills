@@ -34,7 +34,7 @@ const DEFAULT_STALL_MS = 2 * 60 * 60 * 1000;
  * nodes above that route that are not settled. A record that does not exist yet, declares no route, or names a route
  * the tree does not hold and no existing routeParent is `unknown` - the draw and its proof hold those.
  */
-export function layoutChainVerdicts(repo, bindings) {
+function layoutChainVerdicts(repo, bindings) {
   const verdicts = [];
   for (const { record, parts, workParts } of boundRecordPaths(bindings, 'ui')) {
     try {

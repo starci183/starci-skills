@@ -53,14 +53,6 @@ const HEROICON_PACKAGES = new Set([
 ])
 
 /**
- * Product reactions are attributed artwork rather than glyph-library imports.
- *
- * Their leaf owns this closed vocabulary and maps it to checked-in Fluent Emoji Flat SVGs under
- * `public/reactions/`; callers pass identities, never Unicode pictographs or asset paths.
- */
-export const REACTION_ASSET_NAMES = new Set(["like", "love", "haha", "wow", "sad", "angry"])
-
-/**
  * True when the file is the entry (slot role `entry`) of the component owner named `owner` in the layer `kind`.
  * The slot says which layer and which role; the owner's own folder name is the one fact it cannot say, so it is compared.
  */

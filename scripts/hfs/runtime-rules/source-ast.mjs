@@ -15,10 +15,10 @@ export const ts = () => (typescript ??= createRequire(import.meta.url)('typescri
 const FS_MODULES = new Set(['fs', 'node:fs', 'fs/promises', 'node:fs/promises']);
 
 /** `node` is a string literal naming an fs module specifier ('fs', 'node:fs', 'fs/promises', 'node:fs/promises'). */
-export const fsSpecifier = (t, node) => Boolean(node && t.isStringLiteralLike(node) && FS_MODULES.has(node.text));
+const fsSpecifier = (t, node) => Boolean(node && t.isStringLiteralLike(node) && FS_MODULES.has(node.text));
 
 /** `node` is a `require('fs' | 'node:fs' | 'fs/promises' | 'node:fs/promises')` call. */
-export const fsRequireCall = (t, node) => node && t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'require' && fsSpecifier(t, node.arguments[0]);
+const fsRequireCall = (t, node) => node && t.isCallExpression(node) && t.isIdentifier(node.expression) && node.expression.text === 'require' && fsSpecifier(t, node.arguments[0]);
 
 /**
  * The fs bindings a parsed source declares: `{ namespaces, members }`. `namespaces` holds the local names bound to

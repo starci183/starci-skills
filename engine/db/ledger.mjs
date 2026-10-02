@@ -46,7 +46,7 @@ export const JOB_STATUSES=Object.freeze({
 });
 export const SETTLED_JOB_STATUSES=JOB_STATUSES.settled;
 export const UNIT_STATES=Object.freeze(['planned','queued','running','reported','deciding','done','failed','dropped']);
-export const DEFAULT_TRY_BUDGET=5;
+const DEFAULT_TRY_BUDGET=5;
 export const JOB_ARTIFACT_KINDS=Object.freeze(['diff','patch','image','video','report','log','trace','file']);
 export const JOB_ARTIFACT_SUBKINDS=Object.freeze(['draw-render','asset-gen','app-capture','e2e-capture','uat-capture','uat-video','e2e-video',
   'playwright-trace','patch','patch-json','diff','report','log','critique','metrics','grammar-proposal','asset-request','terminal-transcript','cli-transcript']);
@@ -83,7 +83,7 @@ export const projectsRootFor=(env=process.env)=>{
   return root;
 };
 /** The normalized identity of a repository root: resolved, realpath when it exists, forward slashes, lower case. */
-export const repoRootKey=repoRoot=>{let root=path.resolve(repoRoot);try{root=fs.realpathSync.native(root);}catch{}return normDir(root);};
+const repoRootKey=repoRoot=>{let root=path.resolve(repoRoot);try{root=fs.realpathSync.native(root);}catch{}return normDir(root);};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /**
  * The ledger id of a repository root until the machine registry (a3-2 machine.ledgers) resolves it: a name-based
@@ -128,7 +128,7 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const INIT_SQL_SHA=sha256(INIT_SQL);
-export const LEDGER_BUSY_TIMEOUT_MS=15000;
+const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
  * the reconciler engine): SQLite 3.50.4 (node:sqlite of Node 25.2.1) sits in the WAL-reset bug range 3.7.0–3.51.2 when two
@@ -136,7 +136,7 @@ export const LEDGER_BUSY_TIMEOUT_MS=15000;
  */
 export const LEDGER_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON',temp_store:'MEMORY',cache_size:-16000,
   journal_size_limit:67108864,trusted_schema:'OFF',wal_autocheckpoint:0});
-export const CHECKPOINTER_AUTOCHECKPOINT=8000;
+const CHECKPOINTER_AUTOCHECKPOINT=8000;
 const READ_PRAGMAS=Object.freeze({query_only:'ON',temp_store:'MEMORY',cache_size:-16000,trusted_schema:'OFF'});
 const applyPragmas=(db,pragmas)=>db.exec(Object.entries(pragmas).map(([k,v])=>`PRAGMA ${k}=${v};`).join(' '));
 /** BEGIN IMMEDIATE: spin for `spinMs` without the busy handler's 15 ms sleeps, then wait with the connection's busy_timeout. */
@@ -487,7 +487,7 @@ export function setInboxStatusByKey(db,{workflowId,kind,key=null,onlyStatus=null
   let n=0;for(const r of db.prepare(sql).all(...args))if(setInboxStatus(db,{inboxId:r.inbox_id,status,disposition,at}))n++;
   return n;
 }
-export function recordGoalInput(db,{workflowId,key,goalRevision,sha256:sha,origin,createdAt=nowMs()}){
+function recordGoalInput(db,{workflowId,key,goalRevision,sha256:sha,origin,createdAt=nowMs()}){
   insertRow(db,'goal_inputs',{workflowId,key,goalRevision,sha256:sha,origin,createdAt});
 }
 
@@ -707,7 +707,7 @@ export function releaseLeases(db,{jobId}){return db.prepare('DELETE FROM leases 
 
 // --- api_requests (idempotency) ----------------------------------------------------------------------------------
 /** request_id = --request-id, or sha(verb + dispatch_id + args). */
-export const requestIdOf=({verb,dispatchId=null,args=null})=>sha256(`${verb}\n${dispatchId??''}\n${json(args)??''}`);
+const requestIdOf=({verb,dispatchId=null,args=null})=>sha256(`${verb}\n${dispatchId??''}\n${json(args)??''}`);
 /**
  * Run `fn(db)` once per request id inside the caller's transaction: a replay returns {replayed:true,result} from the
  * stored row; the same id with other args throws. `fn`'s return value is the stored result.
@@ -728,7 +728,7 @@ export function idempotent(db,{requestId=null,verb,caller=null,workflowId=null,a
   return {replayed:false,requestId:id,result};
 }
 /** Record a failed request outside the rolled-back transaction (a replay reruns it). */
-export function recordFailedRequest(db,{requestId,verb,caller=null,workflowId=null,attemptId=null,args=null,error,at=nowMs()}){
+function recordFailedRequest(db,{requestId,verb,caller=null,workflowId=null,attemptId=null,args=null,error,at=nowMs()}){
   db.prepare("INSERT INTO api_requests(request_id,verb,caller,workflow_id,attempt_id,args_sha,status,result_json,created_at,finished_at) VALUES(?,?,?,?,?,?,'failed',?,?,?) ON CONFLICT(request_id) DO UPDATE SET status='failed',result_json=excluded.result_json,finished_at=excluded.finished_at")
     .run(requestId,verb,caller,workflowId,attemptId,sha256(json(args)??''),json({error:String(error?.message??error)}),at,nowMs());
 }
@@ -884,12 +884,12 @@ export function setCondition(db,{workflowId,entityType,entityId,type,status,reas
   if(moved)appendEvent(db,{workflowId,entityType,entityId:String(entityId),kind:'condition-changed',payload:{type,from:prior?.status??null,to:status,reason},createdAt:at});
   return moved;
 }
-export const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask','credential-missing','safety-block','runtime-defect','evidence-missing','scope-change','partial-effect','other']);
+const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask','credential-missing','safety-block','runtime-defect','evidence-missing','scope-change','partial-effect','other']);
 /**
  * The runtime's free incident kinds (api incident --kind, the '[kind] detail' prefix of last_progress) mapped onto the
  * incidents.kind enum and the owner who must clear it. An enum value maps to itself.
  */
-export function incidentClassOf(freeKind){
+function incidentClassOf(freeKind){
   const k=String(freeKind??'').toLowerCase();
   if(INCIDENT_KINDS.includes(k))return {kind:k,owner:['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)?'owner':['runtime-defect','config-defect'].includes(k)?'supervisor':'kernel'};
   if(/owner|handover|approval/.test(k))return {kind:'owner-ask',owner:'owner'};
@@ -979,18 +979,18 @@ export function queueSettleTail(db,{attemptId,dueAt=null,at=nowMs()}){
   const a=db.prepare('SELECT workflow_id FROM op_attempts WHERE attempt_id=?').get(attemptId);need(a,`attempt ${attemptId} not found`);
   insertRow(db,'settle_tails',{attemptId,workflowId:a.workflow_id,state:'queued',dueAt,queuedAt:at},{orIgnore:true});
 }
-export function updateSettleTail(db,{attemptId,state,lastError=undefined,dueAt=undefined,at=nowMs()}){
+function updateSettleTail(db,{attemptId,state,lastError=undefined,dueAt=undefined,at=nowMs()}){
   const fields={state};if(lastError!==undefined)fields.lastError=lastError;if(dueAt!==undefined)fields.dueAt=dueAt;
   if(state==='running'){fields.startedAt=at;db.prepare('UPDATE settle_tails SET tries=tries+1 WHERE attempt_id=?').run(attemptId);}
   if(state==='done')fields.doneAt=at;
   return updateRow(db,'settle_tails',{attemptId},fields).changes>0;
 }
-export function recordProductLand(db,{workflowId,repoRoot,wfBranch,result='queued',spanId=newSpanId(),startedAt=nowMs(),...fields}){
+function recordProductLand(db,{workflowId,repoRoot,wfBranch,result='queued',spanId=newSpanId(),startedAt=nowMs(),...fields}){
   const {lastInsertRowid}=insertRow(db,'product_lands',{workflowId,spanId,repoRoot,wfBranch,result,startedAt,...fields});
   appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,spanId,kind:'product-land',payload:{landId:Number(lastInsertRowid),result},createdAt:startedAt});
   return Number(lastInsertRowid);
 }
-export function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
+function finishProductLand(db,{landId,result,at=nowMs(),...fields}){
   const row=db.prepare('SELECT * FROM product_lands WHERE land_id=?').get(landId);need(row,`product land ${landId} not found`);
   updateRow(db,'product_lands',{landId},{result,finishedAt:at,...fields});
   appendEvent(db,{workflowId:row.workflow_id,entityType:'workflow',entityId:row.workflow_id,spanId:row.span_id,kind:'product-land',payload:{landId,result},createdAt:at});
@@ -1070,7 +1070,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 }
 
 /** Every typed write, for the handle's `write` namespace. */
-export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
+const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,

@@ -69,7 +69,7 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
     detail: broken ? `check-canon-pins produced no JSON (${broken.label})` : unbound ? 'no code-pattern profile is bound to its canon content digest' : red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ') };
 }
 
-export function mergeGuardStep({ repo, base, main = null }) {
+function mergeGuardStep({ repo, base, main = null }) {
   try {
     const from = resolveGateBase(repo, base);
     const guard = mergeGuard(repo, { base: from, mainTip: mainTipOf(repo, main) });
@@ -95,7 +95,7 @@ export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRo
     exit: ok ? 0 : steps.some((s) => s.status === STEP_STATUS.toolFailed) ? 2 : 1 };
 }
 
-export function parseReleaseArgs(argv) {
+function parseReleaseArgs(argv) {
   const opts = { repo: null, base: null, main: null, out: null, ...valueFlags(argv, ['--repo', '--base', '--main', '--out'], USAGE) };
   if (!opts.repo || !opts.base) throw new Error(`--repo and --base are required; ${USAGE}`);
   return opts;

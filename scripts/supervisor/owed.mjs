@@ -78,10 +78,10 @@ import { shortHash } from '../lib/hash.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const CLASSES = Object.freeze({ owner: 'owner', peer: 'peer', kernel: 'kernel', progress: 'in-progress', supervisor: 'supervisor' });
-export const RETRY_LOOP_MIN = 4;
-export const REROUTE_MIN = 4;
-export const WORKER_DIED_WINDOW_MS = 6 * 60 * 60_000;
-export const REJECT_WINDOW_MS = 2 * 60 * 60_000;
+const RETRY_LOOP_MIN = 4;
+const REROUTE_MIN = 4;
+const WORKER_DIED_WINDOW_MS = 6 * 60 * 60_000;
+const REJECT_WINDOW_MS = 2 * 60 * 60_000;
 // A reserve refusal whose every reason is a path lease another job holds (the overlap itself, or the
 // capacity-1 path row it fills) is a wait, not a launcher failure; repeat-reject never counts it.
 const LEASE_OVERLAP_REASON = /^resource path:.+? (?:overlaps durable lease path:.+ held by \S+|capacity \d+ has \d+ used and needs \d+)$/;
@@ -91,7 +91,7 @@ export const isLeaseOverlapRefusal = (payload) => {
   return reasons.length > 0 && reasons.some((r) => /overlaps durable lease/.test(r)) && reasons.every((r) => LEASE_OVERLAP_REASON.test(r));
 };
 /** A failed retry chain older than this is history, not a pattern. */
-export const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
+const CHAIN_WINDOW_MS = 24 * 60 * 60_000;
 const OPEN_JOB = ['queued', 'leased', 'running', 'answering'];
 
 const parse = parseJsonOr;
@@ -105,9 +105,9 @@ const bodyOf = (lastProgress) => String(lastProgress ?? '').replace(/^(?:\[[^\]]
  * nothing (only owner-gate and peer-wait kinds hold jobs), so they are their Kernel's to resolve
  * when done - unless the note addresses the supervisor (SUPERVISOR_ADDRESSED), which makes it OWED.
  */
-export const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
+const NOTE_KIND = /^(?:plan|plan-note|replan-note|scope-decision|owner-ruling|owner-directed-leg|grammar-bump-planned|stall-explanation|cut-decomposition|spec-consistency-followup|kernel-gate|experiment-note|owner-deferred(?:-[a-z0-9-]+)?)$|-note$|-decomposition$|-refinement$/;
 /** Text that addresses or waits on the supervisor, the runtime monitor, Source or the file owner. */
-export const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
+const SUPERVISOR_ADDRESSED = /\b(?:for|to|ask(?:s|ing)?|needs?|awaiting|awaits?|waits? (?:on|for))\s+(?:the\s+)?(?:supervisor|runtime monitor|source|file owner)\b|\b(?:cho|cần|chờ|đợi|phản hồi(?: của)?|hỏi)\s+supervisor\b|\bsupervisor\s*(?:\/|hoặc|or)\s*(?:chủ sở hữu|owner)|(?:chủ sở hữu|owner)\s*(?:hoặc|or|\/)\s*supervisor\b|\bruntime monitor\b|\boutside (?:my |the kernel'?s |kernel |its )?authority\b|ngoài thẩm quyền/i;
 /** An owner-gate condition only the owner can meet (owner, 2026-09-24: everything else is the supervisor's). */
 export const OWNER_ONLY = /\bcredentials?\b|\bcreds\b|\bsecrets?\b|\bpasswords?\b|\bapi[- ]?keys?\b|\boauth\b|\bconsent\b|\bpayments?\b|\bbilling\b|\blegal\b|\bpush(?:ing)? to (?:a |the )?remote\b|\bpublish(?:ing)?\b|\bhandover\b|bàn giao|mật khẩu|thanh toán/i;
 /** Peer-dependency wording on an owner gate (the retired stall-alert.mjs PEER_DEPENDENCY): a misfiled peer-wait. */
@@ -237,7 +237,7 @@ let gitMemo = null;
  * The .claude commits since `since` (ms): [{sha, at, subject, message, lower}], newest first. One
  * `git log` per minute per root; an unreadable repository is [].
  */
-export function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_000, now = Date.now() } = {}) {
+function gitCommits({ root = SKILL_ROOT, since = 0, log = logSince, memoMs = 60_000, now = Date.now() } = {}) {
   if (gitMemo && gitMemo.root === root && gitMemo.since <= since && now - gitMemo.at < memoMs && log === logSince) return gitMemo.commits.filter((c) => c.at >= since);
   const r = log(root, new Date(Math.max(0, since - 60_000)).toISOString(), '%H%x1f%ct%x1f%s%x1f%b%x1e');
   if (!r.ok) return [];
@@ -357,7 +357,7 @@ const lastFailureOf = (db, wf, jobs) => {
  * op), or an open owner ask filed by it or by a job its --after chain reaches (or a gate holding one of
  * those). Only a job still waiting to run counts (queued, or answering its own ask).
  */
-export function ownerHoldOf(db, wf, tail, { byId = new Map(), gates = null, askJobs = null } = {}) {
+function ownerHoldOf(db, wf, tail, { byId = new Map(), gates = null, askJobs = null } = {}) {
   if (!tail || !['queued', 'answering'].includes(tail.status)) return null;
   const openGates = gates ?? ownerGates(db, wf);
   const asks = askJobs ?? openAskJobs(db, wf);
@@ -558,7 +558,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
 
 /* ------------------------------------------------------------ the whole projection */
 
-export const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m ${i.fixedBy ? `fixed-by ${i.fixedBy.sha.slice(0, 9)}?` : 'open'}${i.ackReopened ? ` ack-reopened (acked ${new Date(i.ackReopened.at).toISOString()})` : ''}: ${i.summary}`;
+const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [${i.kind ?? '-'}] age=${i.ageMin}m ${i.fixedBy ? `fixed-by ${i.fixedBy.sha.slice(0, 9)}?` : 'open'}${i.ackReopened ? ` ack-reopened (acked ${new Date(i.ackReopened.at).toISOString()})` : ''}: ${i.summary}`;
 
 /* ------------------------------------------------------------ the supervisor's disposition: ack */
 
@@ -566,7 +566,7 @@ export const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [$
  * When an item last got worse: a pattern's newest failure on its lineage (lastFailureAt), an incident's
  * last update, else when it was raised. A value newer than an ack re-opens the item.
  */
-export const lastWorseAt = (item) => item.lastFailureAt ?? item.updatedAt ?? item.raisedAt ?? 0;
+const lastWorseAt = (item) => item.lastFailureAt ?? item.updatedAt ?? item.raisedAt ?? 0;
 /** True while ack still holds item quiet: nothing on its lineage got worse after the ack. */
 export const ackHolds = (item, ack) => Boolean(ack) && lastWorseAt(item) <= ack.at;
 
@@ -659,7 +659,7 @@ function collect(repos, { wanted = new Set(), now = Date.now(), acks = undefined
 }
 
 /** Full shas of `list` in the runtime's git, or {bad} naming one that is no commit. */
-export function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
+function resolveCommits(list, { root = SKILL_ROOT, resolve = revParse } = {}) {
   const out = [];
   for (const sha of list) {
     const full = String(resolve(root, sha) ?? '');

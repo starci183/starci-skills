@@ -9,7 +9,7 @@ import { openMachine, openMachineReader, providerHealth, setProviderHealth } fro
 import { parseJsonOr } from '../lib/json.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
 
-export const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
+const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
 const STATUS_OF = { unavailable: 'unavailable', recovered: 'recovered', healthy: 'healthy', striking: 'striking' };
 
 /** The stored circuit of `provider` as {value, at, expiresAt}, or null. */

@@ -45,7 +45,7 @@ export function foreignPathsOf({ git = 'git', cwd, oldSha, newSha, owned }) {
   return { checked: true, foreign: [...foreign] };
 }
 
-export function verifyCommit(oldSha, newSha, guard, { cwd = process.cwd() } = {}) {
+function verifyCommit(oldSha, newSha, guard, { cwd = process.cwd() } = {}) {
   if (!guard?.owned?.length) return 0;
   let result;
   try { result = foreignPathsOf({ cwd, oldSha, newSha, owned: guard.owned }); }

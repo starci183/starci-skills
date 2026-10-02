@@ -12,7 +12,7 @@ import { isOrcaDepthRefusal } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { MAX_WORKER_DEPTH_CEILING } from '../../engine/orca-config.mjs';
 
-export const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no command, edit no file, start no worker. Wait to be released.';
+const PROBE_PROMPT = 'You are a StarCi worker-depth probe. Do nothing: run no command, edit no file, start no worker. Wait to be released.';
 
 /**
  * probeWorkerDepth({entry, worktree, agent}) -> {ok, measured, refusedAt, depths, released, error}. ok only when Orca

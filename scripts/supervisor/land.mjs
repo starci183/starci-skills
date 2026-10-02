@@ -87,9 +87,9 @@ import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs';
 
-export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
+const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
-export const MAX_MAIN_RETRIES = 3;
+const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
 export const specConcurrency = () => { const n = Number(allocationSettings()?.landGate?.specConcurrency); if (!Number.isInteger(n) || n < 1) throw Error('modules/models/runtimes.yaml allocation.landGate.specConcurrency must be a positive integer'); return n; };
@@ -144,7 +144,7 @@ export const invariantRootsOf = (text) => {
   return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1]).replace(/\/+$/, '')) : [];
 };
 /** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
-export const specsInvariant = (changed, { specs }) => {
+const specsInvariant = (changed, { specs }) => {
   const files = changed.map(normPath);
   return specs.filter(({ file, text }) => file && invariantRootsOf(text).some((r) => files.some((f) => f.startsWith(`${r}/`)))).map((s) => s.file);
 };
@@ -162,7 +162,7 @@ export function specsTouching(changed, { specs, root = null }) {
 
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
  *  (refused unless specs.harness is true or the push-git flow asks); `direct` = the specs that can see the change (hub files narrowed to the exports reached); `none` = no spec (needs an explicit --reason). */
-export const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
+const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
 /**
  * The gate's spec plan (owner rule 2026-09-29). The default mode is `touching`: the named specs (--specs csv, a job's) plus
  * every spec touching the change; red refuses. `all` needs `fullAllowed` (config.yaml `specs.harness: true`) or `fullByPushGit`,
@@ -202,7 +202,7 @@ export function conflictHunks(text) {
 }
 
 /** What a lane does about a conflict: one instruction, never a blind retry. */
-export const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
+const conflictHint = (conflicts, commit = null) => `rebase the lane onto current main (git rebase main in its worktree), resolve ${conflicts.map((c) => c.file).join(', ') || 'the conflicting files'}${commit ? ` in ${String(commit).slice(0, 9)}` : ''}, run its specs, then land the new sha; the same sha on the same main conflicts again`;
 
 /**
  * Lock-free preflight: apply `commits` in order onto `onto` with `git merge-tree --write-tree` (no worktree, no
@@ -282,7 +282,7 @@ export function gitHealth({ root = SKILL_ROOT } = {}) {
   const why = /\btrue$/.test(bare) ? `core.bare=true (${bare.replace(/\s+true$/, '')})` : (inside.stderr || inside.error || `is-inside-work-tree: ${inside.stdout || 'unreadable'}`).slice(0, 200);
   return { ok: false, detail: why, bare: /\btrue$/.test(bare), hint: /\btrue$/.test(bare) ? `something set core.bare=true on ${root}; run \`git -C ${root} config core.bare false\` (the gate never edits the live repo config), then land again` : `git cannot run a work-tree operation in ${root}; fix that first, then land again` };
 }
-export const GIT_HEALTH_WAIT_MS = 20_000;
+const GIT_HEALTH_WAIT_MS = 20_000;
 /** gitHealth, retried for a transient value: {ok} or {ok:false, detail, hint, waitedMs}. Seams: check, sleep, now. */
 export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
   const start = now();
@@ -389,7 +389,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
  * Rerun `files` once in a scratch worktree of `root` at `base`: {ok:true, failures, ran} or {ok:false, error} when the
  * base run cannot run (no base tree, no scratch, a crash or timeout, a red run naming no failed test).
  */
-export function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
+function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
   if (!root) return { ok: false, error: 'no base tree to rerun the failing specs at base' };
   let scratch;
   try { scratch = makeScratch({ root, base, env }); } catch (e) { return { ok: false, error: `base scratch failed: ${String(e?.message ?? e).slice(0, 300)}` }; }
@@ -465,7 +465,7 @@ export function mirrorDriftCheck({ dir, changed, baseline = null }) {
 }
 
 export const PACKAGE_PROOF = 'scripts/gates/package-clean-test.mjs';
-export const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
+const PACKAGE_PROOF_TIMEOUT_MS = 3_600_000;
 /**
  * The clean-install proof of every published package the land changes: package-clean-test.mjs --base <base> in the scratch
  * (each changed package copied to a temp dir, installed from its own manifest and lock, its own tests run there). Red (1)
@@ -599,7 +599,7 @@ function spawnGateStability({ runner, base, head, family }) {
 }
 
 /** Refresh untracked dist only after main has advanced. Knowledge snapshots are tracked contract files, so drift is owed to a lane. */
-export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
+function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
   if (!changed.map(normPath).some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) return null;
   const packageRoot = path.join(root, 'packages', 'grammar');
   const fail = (step, detail) => ({ ok: false, step, detail, owed: ['grammar-dist-rebuild'] });
@@ -720,7 +720,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
 }
 
 /** Push live main after a secret scan of origin/main..main. */
-export function pushLive({ root = SKILL_ROOT } = {}) {
+function pushLive({ root = SKILL_ROOT } = {}) {
   const hasRemote = git(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'], { cwd: root }).ok;
   if (!hasRemote) return { pushed: false, skipped: 'no origin/main' };
   const scan = scanRange({ cwd: root, from: 'origin/main', to: 'main' });
@@ -766,7 +766,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
 
 const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable'].includes(r.reason) ? 'refused' : 'failed');
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
-export const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
+const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**
  * The core record of one land as ONE idempotent write (machine-db recordLandOutcome, keyed on spanId): the push row, the
  * land_runs row (full result as the stdout blob), the lane head and the log line. Plain data, so a refused write can wait
@@ -922,7 +922,7 @@ export function landStatus({ env = process.env } = {}) {
 }
 
 /** The "specs red on main (k)" advisory of a land result, or null. */
-export const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
+const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
 
 export function describe(r, { jobId = null } = {}) {
   const inherited = specsRedOnMainOf(r);

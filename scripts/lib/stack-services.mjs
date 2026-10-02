@@ -15,11 +15,11 @@ import { words } from './dockerfile.mjs';
  * service and is returned as `proxy`.
  */
 export const STACKS_DIRECTORY = '.starcistacks';
-export const STACKS_FILE = 'application-stacks.yaml';
+const STACKS_FILE = 'application-stacks.yaml';
 export const DEFAULT_ENVIRONMENT = 'dev';
 
 /** Test-only value the `*_FILE` secret variables of a compose service become (the file variable is replaced by the plain variable of the same name). Never a real secret: the test stack listens on loopback only. */
-export const TEST_SECRET_VALUE = 'starci-test-secret';
+const TEST_SECRET_VALUE = 'starci-test-secret';
 
 const NOT_RUN_ROLES = new Set(['service', 'observability']);
 const NOT_RUN_PROFILES = new Set(['app']);
@@ -59,14 +59,14 @@ const KNOWN_IMAGES = Object.freeze({
 export const STATEFUL_KINDS = Object.freeze(new Set(['database', 'cache', 'identity', 'storage', 'mail', 'queue', 'search']));
 
 /** The repository name of an image reference: `quay.io/keycloak/keycloak:26.0` -> `keycloak`. */
-export const repositoryOf = image => {
+const repositoryOf = image => {
   const withoutDigest = image.split('@')[0];
   const lastSegment = withoutDigest.split('/').at(-1) ?? withoutDigest;
   return lastSegment.split(':')[0];
 };
 
 /** The repository path of an image reference without its tag: `quay.io/keycloak/keycloak:26.0` -> `quay.io/keycloak/keycloak`. */
-export const imagePathOf = image => {
+const imagePathOf = image => {
   const withoutDigest = image.split('@')[0];
   const lastSlash = withoutDigest.lastIndexOf('/');
   const colon = withoutDigest.indexOf(':', lastSlash + 1);
@@ -74,7 +74,7 @@ export const imagePathOf = image => {
 };
 
 /** True when the image reference carries a tag or digest (an external image, not a placeholder of the repository's own build). */
-export const isTagged = image => image.includes('@') || image.slice(image.lastIndexOf('/') + 1).includes(':');
+const isTagged = image => image.includes('@') || image.slice(image.lastIndexOf('/') + 1).includes(':');
 
 const asList = value => (Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]);
 

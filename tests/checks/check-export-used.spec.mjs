@@ -44,3 +44,10 @@ test('specs and files outside the runtime roots are not judged; destructured exp
   ]), []);
   assert.deepEqual(exportedNames('export const { a, b: [c] } = source;\nexport class K {}\nexport default 1;\nexport * from "./x.mjs";\n').map((e) => e.name), ['a', 'c', 'K']);
 });
+
+test('the one call function an api call file exports (named after the file) is its contract, not dead surface', () => {
+  assert.deepEqual(names([
+    { rel: 'scripts/api/process/hide-child-windows.mjs', text: 'export function hideChildWindows() {}\nexport const extra = 1;\n' },
+    { rel: 'scripts/api/process/lib.mjs', text: 'export const spare = 1;\n' },
+  ]), [['RT_EXPORT_UNUSED', 'scripts/api/process/hide-child-windows.mjs', 'extra'], ['RT_EXPORT_UNUSED', 'scripts/api/process/lib.mjs', 'spare']]);
+});

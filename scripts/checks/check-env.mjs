@@ -27,7 +27,7 @@ import { lineOf, parseSource, ts } from '../hfs/runtime-rules/source-ast.mjs';
 
 export const CATALOG_FILE = 'modules/schemas/env.yaml';
 const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
-export const ENV_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
+const ENV_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext', 'ui', 'packages']);
 export const KINDS = Object.freeze(['config', 'seam', 'handoff', 'host']);
 const TEST_RUNNER_VARIABLE = 'NODE_TEST_CONTEXT';
 const GENERATED = /^packages\/[^/]+(\/[^/]+)?\/runtime\//;
@@ -120,7 +120,7 @@ export function envFindings(files, catalog, failureCodes = new Set()) {
 }
 
 /** Run the check on the runtime at `root`. */
-export function checkEnv(root = skillRoot) {
+function checkEnv(root = skillRoot) {
   const files = trackedTextFiles(root, (rel) => rel.endsWith('.mjs') && !GENERATED.test(rel) && !VENDORED.test(rel));
   const failureCodes = new Set(Object.keys(parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {}));
   return envFindings(files, parseCatalog(fs.readFileSync(path.join(root, CATALOG_FILE), 'utf8')), failureCodes);

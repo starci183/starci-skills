@@ -17,7 +17,7 @@ const pathsOf = (list) => (Array.isArray(list) ? list : []).map((p) => (typeof p
 const safeIntersect = (a, b) => { try { return ownedPathsIntersect(a, b); } catch { return a === b; } };
 
 /** Every try of one unit, oldest first, each with the settle result retryDisposition reads (result_json). */
-export function unitTriesOf(db, workflowId, unitId) {
+function unitTriesOf(db, workflowId, unitId) {
   if (!unitId) return [];
   return db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND unit_id=? AND kind='op' ORDER BY try_no").all(workflowId, unitId)
     .map((row) => ({ ...row, result_json: JSON.stringify(jobResult(db, row.job_id) ?? {}) }));

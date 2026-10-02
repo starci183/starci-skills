@@ -35,17 +35,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_ENDPOINT = 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus';
+const DEFAULT_ENDPOINT = 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus';
 const DEFAULT_CACHE_MS = 5 * 60 * 1000;
 const DEFAULT_TIMEOUT_MS = 15000;
 // The devin CLI release the request shape was verified against; sent as
 // ideVersion/extensionVersion unless the caller passes another version string.
-export const DEVIN_CLI_VERSION = '3000.10.27';
+const DEVIN_CLI_VERSION = '3000.10.27';
 const VERSION_RE = /^\d+\.\d+\.\d+/;
 const version = (v) => (typeof v === 'string' && VERSION_RE.test(v) ? v : DEVIN_CLI_VERSION);
 
 /** True for DEFAULT_ENDPOINT or an http(s) URL on localhost / 127.0.0.0/8 / [::1]. */
-export function allowedEndpoint(url) {
+function allowedEndpoint(url) {
   if (url === DEFAULT_ENDPOINT) return true;
   let u;
   try { u = new URL(url); } catch { return false; }
@@ -59,7 +59,7 @@ export function allowedEndpoint(url) {
 const SEAT_QUOTA_FILE = fileURLToPath(new URL('../../api/windsurf/seat-quota.mjs', import.meta.url));
 
 /** Where the Devin desktop app keeps its CLI credentials. */
-export const devinCredentialsFile = (env = process.env) =>
+const devinCredentialsFile = (env = process.env) =>
   path.join(env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'devin', 'credentials.toml');
 
 /**

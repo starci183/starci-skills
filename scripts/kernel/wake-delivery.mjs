@@ -61,7 +61,7 @@ import { kernelRevWakeLine } from './runtime-rev.mjs';
 
 const PROVEN = new Set(['delivered', 'queued']);
 const WAITING_FOR_ENTER = new Set(['staged-input', 'queued-input']);
-export const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
+const SPLIT_OUTCOMES = Object.freeze({ delivered: 'delivered-after-split', unstaged: 'unstaged', unsubmitted: 'unsubmitted' });
 
 const sendCodeOf = (sent) => sent?.errorCode ?? sent?.enterRetry?.after ?? null;
 
@@ -299,8 +299,8 @@ function submitDraft({ terminal, draft, stagedPattern, sentText, reads, interval
 // lastOutputAt is older than activeStaleMs) the watchdog never types into it again - the terminal
 // is closed directly (a typed quit and an Orca interrupt are refused the same way) and
 // start-workflow replaces the seat.
-export const KERNEL_WAKE_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
-export const KERNEL_WAKE_NOT_WRITABLE = 'terminal_not_writable';
+const KERNEL_WAKE_UNWRITABLE_EVENT = 'kernel-wake-unwritable';
+const KERNEL_WAKE_NOT_WRITABLE = 'terminal_not_writable';
 // A wake send Orca refused terminal_not_writable: the refusal is read off the receipt's error code,
 // its typed error, or the proof's sendErrorCode.
 export const wakeSendRefused = (proof) => [proof?.sendErrorCode, proof?.sent?.errorCode, proof?.sent?.error]

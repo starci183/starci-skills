@@ -46,8 +46,8 @@ import { isMain } from '../lib/is-main.mjs';
 import { bestEffortCall } from '../agent/best-effort-call.mjs';
 
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
-export const INBOX_REWAKE_MS = 10 * 60_000;
-export const WAKE_TAG = '[Supervisor watchdog]';
+const INBOX_REWAKE_MS = 10 * 60_000;
+const WAKE_TAG = '[Supervisor watchdog]';
 
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
 const recentWakes = (m) => m.supEvents({ kind: 'supervisor-wake', limit: 50 }).map((e) => ({ at: e.created_at, payload: e.payload ?? {} }));
@@ -68,7 +68,7 @@ const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_r
  * split-send path (Escape first when the input row targets a subagent), and a frame still frozen after
  * the wake restarts the seat through the replace path.
  */
-export const SUBAGENT_ROW = /^\s*(?:❯\s*)?[●◯◐◑◒◓]\s+(?!main\s*$)[\w.@-]+\s{2,}\S.*?\b\d+m(?:\s*\d+s)?\s*·/mu;
+const SUBAGENT_ROW = /^\s*(?:❯\s*)?[●◯◐◑◒◓]\s+(?!main\s*$)[\w.@-]+\s{2,}\S.*?\b\d+m(?:\s*\d+s)?\s*·/mu;
 export const busyScreen = (screen) => SUBAGENT_ROW.test(String(screen ?? ''));
 
 /**
@@ -87,10 +87,10 @@ export const SUBAGENT_INPUT = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}[^\\n]*@[\\w@
 const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);
 
 /** The sup_signals scope that keeps the last busy-frame signature per terminal ({signature, since, reads}). */
-export const BUSY_SCOPE = 'supervisor-busy';
+const BUSY_SCOPE = 'supervisor-busy';
 
 /** The stored busy-frame state of one terminal, or null. */
-export const busyFrameOf = (m, terminal) => {
+const busyFrameOf = (m, terminal) => {
   const value = m.supSignal(BUSY_SCOPE, terminal)?.value;
   return typeof value?.signature === 'string' ? value : null;
 };
@@ -354,14 +354,14 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
 
 /** MB-05: this many refused inputs in a row replace the seat (DBTREE v_deaf_seats: input_failures_consecutive >= 3). */
 export const SEAT_DEAF_MAX = 3;
-export const SUPERVISOR_SEAT_ID = 'supervisor';
+const SUPERVISOR_SEAT_ID = 'supervisor';
 
 /**
  * Count one wake outcome of the Supervisor seat in machine.sqlite (machine-db recordSeatInput: one deliveries row, the
  * seat's input_failures_consecutive kept by its trigger; a refused input adds one, a delivered wake resets, busy leaves
  * it; a new terminal starts from zero). Returns {failures, since, replace}. Never throws.
  */
-export function noteInputOutcome(terminal, action, { env = process.env } = {}) {
+function noteInputOutcome(terminal, action, { env = process.env } = {}) {
   try { return withMachine((m) => m.recordSeatInput({ seatId: SUPERVISOR_SEAT_ID, terminal, action, role: 'supervisor', max: SEAT_DEAF_MAX }), { env }); }
   catch (error) { return { failures: 0, since: null, replace: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }

@@ -21,11 +21,11 @@ import { propertyText } from '../../lib/ts-ast.mjs';
 import { folded, readEventClasses, snapshotText } from '../../lib/event-contract.mjs';
 import { found, readText } from './read.mjs';
 
-export const SERVICE_PLACEMENT = 'HFS_SERVICE_PLACEMENT';
-export const IMAGE_UNPINNED = 'HFS_IMAGE_UNPINNED';
-export const SERVICE_STACK_DECLARATION = 'HFS_SERVICE_STACK_DECLARATION';
-export const EVENT_CONTRACT = 'HFS_EVENT_CONTRACT';
-export const ASYNC_SPEC_MISSING = 'BE_ASYNC_SPEC_MISSING';
+const SERVICE_PLACEMENT = 'HFS_SERVICE_PLACEMENT';
+const IMAGE_UNPINNED = 'HFS_IMAGE_UNPINNED';
+const SERVICE_STACK_DECLARATION = 'HFS_SERVICE_STACK_DECLARATION';
+const EVENT_CONTRACT = 'HFS_EVENT_CONTRACT';
+const ASYNC_SPEC_MISSING = 'BE_ASYNC_SPEC_MISSING';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_KINDS = new Set(['api', 'worker']);
@@ -49,7 +49,7 @@ const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 // ------------------------------------------------------------------------------------------------ R163 placement
 
 /** Findings of R163: a service root outside `be/apps/<service>/`. */
-export function servicePlacementFindings({ files }) {
+function servicePlacementFindings({ files }) {
   const findings = [];
   for (const file of files) {
     if (file.startsWith('.starciwork/') || file.startsWith('.starcistacks/') || file.includes('node_modules/')) continue;
@@ -73,7 +73,7 @@ function resolvedImage(image) {
 }
 
 /** Why an image is not pinned, or null when it is: a digest, or an exact version tag. */
-export function unpinnedReason(image) {
+function unpinnedReason(image) {
   const resolved = resolvedImage(image);
   if (resolved === null) return 'its reference is an environment variable with no default';
   if (DIGEST.test(resolved)) return null;
@@ -85,7 +85,7 @@ export function unpinnedReason(image) {
 }
 
 /** Findings of R164 over a multi-service product's stack declaration. */
-export function imagePinFindings({ repoRoot, repo }) {
+function imagePinFindings({ repoRoot, repo }) {
   if (servicesOf(repo).length < 2) return [];
   const declaration = findStackDeclaration(repoRoot);
   const components = declaration.doc?.components;
@@ -104,7 +104,7 @@ export function imagePinFindings({ repoRoot, repo }) {
 // ------------------------------------------------------------------------------------------------ R165 stack declaration
 
 /** Findings of R165: each service app of a multi-service product is a `role: service` component. */
-export function serviceStackFindings({ repoRoot, repo }) {
+function serviceStackFindings({ repoRoot, repo }) {
   const services = servicesOf(repo);
   if (services.length < 2) return [];
   const declaration = findStackDeclaration(repoRoot);
@@ -136,7 +136,7 @@ function eventClassesOf({ repoRoot, files, ts }) {
 }
 
 /** Findings of R166: each service's event classes are the one source of its vendored `events.json`, and a compensating event names a declared event. */
-export function eventContractFindings({ repoRoot, files }) {
+function eventContractFindings({ repoRoot, files }) {
   const classFiles = files.filter((file) => EVENT_CLASS_FILE.test(file));
   const snapshots = files.filter((file) => SNAPSHOT.test(file));
   if (classFiles.length === 0 && snapshots.length === 0) return [];
@@ -183,7 +183,7 @@ function consumedEvents({ repoRoot, files, ts }) {
 }
 
 /** Findings of R167: every consumed event has an e2e spec through the world; a saga step's spec also names the event it compensates. */
-export function asyncSpecFindings({ repoRoot, files }) {
+function asyncSpecFindings({ repoRoot, files }) {
   const ts = typescriptFor(repoRoot);
   if (ts === null) return [];
   const consumed = consumedEvents({ repoRoot, files, ts });

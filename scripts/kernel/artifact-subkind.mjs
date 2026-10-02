@@ -30,7 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { resolvedKey } from '../lib/path-key.mjs';
-export const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
+const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);
 const E2E_OPS = new Set(['e2e.verify']);
@@ -130,7 +130,7 @@ export function manifestToolOf(repo, rel) {
 
 const drawRecordCache = new Map();
 /** True when `<stem>.json` beside the image is a starci/draw-render@1 record (scripts/work/draw-render.mjs captureHtml). */
-export function hasDrawRenderRecord(abs) {
+function hasDrawRenderRecord(abs) {
   const json = abs.replace(/\.[^./\\]+$/, '.json');
   if (!drawRecordCache.has(json)) {
     let ok = false;

@@ -88,14 +88,14 @@ import { readProperties } from '../lib/properties.mjs';
  * base) the op fixes itself, 2 blocked (server down, custody missing, invalid token, usage).
  */
 export const SCHEMA='starci/sonar-local@1';
-export const SCAN_SCHEMA='starci/sonar-local-scan@3';
-export const DEFAULT_HOST='http://localhost:9010';
-export const PUBLIC_HOST='https://sonar.starci.org';
-export const CONTAINER='starci-sonarqube';
-export const ADMIN_TOKEN='sonarqube-admin-token.key';
-export const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
+const SCAN_SCHEMA='starci/sonar-local-scan@3';
+const DEFAULT_HOST='http://localhost:9010';
+const PUBLIC_HOST='https://sonar.starci.org';
+const CONTAINER='starci-sonarqube';
+const ADMIN_TOKEN='sonarqube-admin-token.key';
+const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
 /** The Supervisor audit event (sup_events) a re-mint of a token the server rejected records. */
-export const REMINT_EVENT='sonar-token-reminted';
+const REMINT_EVENT='sonar-token-reminted';
 const MASTER_IDENTITY=path.join(os.homedir(),'.starci','master.identity');
 const LOG_CAP=4*1024*1024;
 
@@ -264,7 +264,7 @@ export function resolveConfig(options={},env=process.env){
  * Read one custody member into memory. Returns {present, value?, via?, reason?}; `value` is for a child
  * env or a header only. The .enc member decrypted by sops wins; the materialized sibling is the fallback.
  */
-export function readCustody(cfg,ref){
+function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
   // resolved from its repository root) must still sit inside a custody tree - a repository's
   // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
@@ -342,7 +342,7 @@ function writeCustody(cfg,ref,value){
  * Does the server accept this token? true, false (401/403, or validate answering valid:false) or null when
  * the server could not be asked (unreachable, another status) - an unknown answer never discards a token.
  */
-export async function tokenAccepted(cfg,value){
+async function tokenAccepted(cfg,value){
   const check=await call(cfg,'GET','/api/authentication/validate',{token:value});
   if(check.status===200)return check.json?.valid===true;
   if(check.status===401||check.status===403)return false;
@@ -409,7 +409,7 @@ async function firstAccepted(cfg,refs){
  * The generic analysis token (cfg.analysisToken). One the server rejects is re-minted as a
  * GLOBAL_ANALYSIS_TOKEN over the same member when a valid admin token is at hand.
  */
-export async function genericToken(cfg,{admin=null}={}){
+async function genericToken(cfg,{admin=null}={}){
   const {entry,misses,stale}=await firstAccepted(cfg,[cfg.analysisToken]);
   if(entry)return entry;
   if(stale&&admin?.present&&inStack(cfg,stale.name)){
@@ -431,7 +431,7 @@ export async function genericToken(cfg,{admin=null}={}){
  * sonar-token-reminted event) or at projectTokenRef(key) when none existed. The source stack's generic
  * analysis token is the last resort - on this server it is itself scoped to one project.
  */
-export async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
+async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
   const refs=[tokenRef,cfg.declaredTokenRef,key?projectTokenRef(key):null].filter(Boolean);
   const {entry,misses,stale}=await firstAccepted(cfg,refs);
   if(entry)return entry;
@@ -456,7 +456,7 @@ export async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
 }
 
 /** The env a Sonar child process gets: local host plus the project's (or generic) analysis token. */
-export async function sonarEnv(cfg,{key,base=process.env,mint=false}={}){
+async function sonarEnv(cfg,{key,base=process.env,mint=false}={}){
   const admin=mint?readCustody(cfg,cfg.adminToken):null;
   const token=key?await projectToken(cfg,{key,admin,mint}):await genericToken(cfg,{admin});
   if(!token.present)return {ok:false,custody:custodyView(token)};
@@ -523,7 +523,7 @@ export async function status(cfg){
 
 const KEY_PATTERN=/^(?=.*[A-Za-z_.:-])[A-Za-z0-9_.:-]{1,400}$/;
 
-export async function ensureProject(cfg,{key,name}={}){
+async function ensureProject(cfg,{key,name}={}){
   const base={schema:SCHEMA,command:'ensure-project',host:cfg.host,projectKey:key,...(cfg.declaration?{declaration:cfg.declaration}:{})};
   if(!key||!KEY_PATTERN.test(key))return {...base,outcome:'blocked',message:`invalid project key ${JSON.stringify(key??null)}: letters, digits, - _ . : and at least one non-digit`};
   const admin=readCustody(cfg,cfg.adminToken);
@@ -549,7 +549,7 @@ export async function ensureProject(cfg,{key,name}={}){
  * here is reported on the summary (`qualityGate.outcome`) and never changes the slice verdict, which is judged
  * from the same file; the server gate is what the dashboard and CI show.
  */
-export async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
+async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
   const name=gate.gate.name;
   const base={name,projectKey:key,conditions:serverConditions(gate).length};
   if(!admin?.present)return {...base,outcome:'skipped',message:'admin token not in custody'};
@@ -654,7 +654,7 @@ export function parseDiffNewLines(patch){
   return files.filter(f=>f.path&&!f.deleted).map(({path:file,added,ranges})=>({path:file,added,ranges}));
 }
 
-export const inRanges=(ranges,from,to=from)=>ranges.some(([a,b])=>from<=b&&to>=a);
+const inRanges=(ranges,from,to=from)=>ranges.some(([a,b])=>from<=b&&to>=a);
 
 const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v??'').split(',')).map(v=>v.trim()).filter(Boolean);
 
@@ -741,7 +741,7 @@ async function readAll(cfg,tokens,pathname,listKey){
  * sonar-project.properties, the same order the scanner applies. issues/search answers HTTP 400 when one
  * component list mixes qualifiers (inc-0fee2b8fb296), so the slice's keys are grouped by it.
  */
-export function fileQualifier(props={},pkg=null){
+function fileQualifier(props={},pkg=null){
   const defined=Object.fromEntries(String(pkg?.scripts?.['sonar:check']??'').matchAll(/-D([\w.]+)=([^\s"']+)/g).map(m=>[m[1],m[2]]));
   const setting=name=>splitList(defined[name]??props[name]);
   const roots=setting('sonar.tests').map(root=>posixPath(root).replace(/\/+$/,'')).filter(Boolean);
@@ -774,7 +774,7 @@ async function sliceIssues(cfg,tokens,keys){
 }
 
 /** The lines of `fileKey` that lie in a duplicated block, from an api/duplications/show answer. */
-export function duplicatedLinesOf(doc,fileKey){
+function duplicatedLinesOf(doc,fileKey){
   const refs=Object.entries(doc?.files??{}).filter(([,file])=>file?.key===fileKey).map(([ref])=>String(ref));
   const lines=new Set();
   for(const duplication of doc?.duplications??[])for(const block of duplication?.blocks??[]){
@@ -790,7 +790,7 @@ export function duplicatedLinesOf(doc,fileKey){
  * specs related to `files` and coverage collected from `files` only, so the per-file threshold and the report name exactly
  * the services the slice touched. Returns {exitCode, error}.
  */
-export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
+function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
   let bin;
   try{bin=createRequire(path.join(jestCwd,'package.json')).resolve('jest/bin/jest.js');}
   catch{return {exitCode:null,error:`jest is not installed under ${posixPath(jestCwd)}`};}
@@ -807,7 +807,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
  * runs and the slice's coverage is not judged (`judged` false). Returns {judged, targets, lcov, exitCode?, written?, error?, note?}.
  */
 /** What a slice summary says while the owner's specs.unit is off: its coverage is not measured, never read as green. */
-export const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
+const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
 
 export function prepareSliceCoverage(cfg,{cwd,props,slice}){
   const scope=coverageScopeOf(props);
@@ -1146,7 +1146,7 @@ export async function scan(cfg,options={}){
 }
 
 /** The dashboard metrics of a project: the issue types, the hotspots and the coverage of knowledge/sonar-gate.yaml `overall`. */
-export const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'security_hotspots',gate.overall.hotspots.metric,gate.overall.coverage.metric];
+const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'security_hotspots',gate.overall.hotspots.metric,gate.overall.coverage.metric];
 
 /**
  * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and

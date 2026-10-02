@@ -16,7 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { decrypt as sopsDecrypt } from '../api/sops/decrypt.mjs';
 import { seal as sopsSeal } from '../api/sops/seal.mjs';
 
-export class SecretError extends Error {}
+class SecretError extends Error {}
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/u;
 const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
@@ -55,7 +55,7 @@ export function plaintextOf(format, map) {
 }
 
 /** The directory of the sealed secrets of the app at `repoRoot` for `env`; the one env that has secrets when none is named. */
-export function secretsDirectory(repoRoot, env) {
+function secretsDirectory(repoRoot, env) {
   const stacks = path.join(repoRoot, '.starcistacks');
   if (!fs.existsSync(stacks)) throw new SecretError('this app has no .starcistacks; run hfs secret at the app root, or pass --repo');
   if (env) {
@@ -73,7 +73,7 @@ const fileOf = (directory, slug) => {
 };
 
 /** The default sops seam: the runtime's sops api, which finds the binary on this machine. */
-export function defaultSops(env = process.env) {
+function defaultSops(env = process.env) {
   const refuse = (what, result) => {
     if (result.error?.code === 'SOPS_MISSING') return new SecretError(result.error.message);
     return new SecretError(`sops could not ${what} (exit ${String(result.status)})`);

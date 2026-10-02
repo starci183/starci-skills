@@ -8,7 +8,7 @@ import path from 'node:path';
 import { SyncError } from './index.mjs';
 
 export const FORMAT = 'HFS_FORMAT';
-export const IGNORE_FILE = '.prettierignore';
+const IGNORE_FILE = '.prettierignore';
 /** Lockfiles are written by npm, not by people: they are never formatted. */
 const LOCKFILES = new Set(['package-lock.json']);
 

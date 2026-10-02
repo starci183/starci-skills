@@ -68,7 +68,7 @@ export function kindRoute(kind, runtimes) {
 // The fan-out order (runtimes.yaml allocation.preference.scaffold): every cut
 // slice of hands-on work walks it, whatever its kind - small bounded work, Devin
 // first (owner decision 2026-09-25).
-export const FAN_OUT_ORDER = 'scaffold';
+const FAN_OUT_ORDER = 'scaffold';
 // A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
 export const isFanOutSlice = (payload) => Boolean(payload?.cut && Number(payload.cut.total) >= 2);
 // Orders a cut slice never leaves: the drawing (draw) and the image tool (asset), the review order,
@@ -107,7 +107,7 @@ export function kindOrder({ kind, role, difficulty, fanOut = false, runtimes, mo
 // The pools an order takes only when no other pool of it is eligible, under
 // either policy (runtimes.yaml allocation.overflowByOrder; the review order's
 // Opus and Sol, owner decision 2026-09-25 review-hands).
-export function orderOverflowOf(runtimes, orderKey) {
+function orderOverflowOf(runtimes, orderKey) {
   const list = runtimes?.allocation?.overflowByOrder?.[orderKey];
   return Array.isArray(list) ? list : [];
 }
@@ -183,7 +183,7 @@ export function chainFor({ role, difficulty, runtimes, modelsDir } = {}) {
 // {prefer:[pools], avoid:[pools]} — prefer hoists to the front preserving the
 // chain's relative order; avoid removes. Pure permutation/filter of the chain:
 // eligibility is evaluated afterwards and is untouched by bias.
-export function applyBias(chain, bias) {
+function applyBias(chain, bias) {
   const prefer = new Set((bias?.prefer ?? []).filter(Boolean));
   const avoid = new Set((bias?.avoid ?? []).filter(Boolean));
   const kept = (chain ?? []).filter(p => !avoid.has(p));
@@ -309,7 +309,7 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
 // audit rule. The pools of runtimes.yaml allocation.frontier (the think order
 // when it is absent) and allocation.hands have one: Opus and Sol, and Devin
 // (owner decision 2026-09-25 review-hands).
-export function auditFamilyOf(rt, target) {
+function auditFamilyOf(rt, target) {
   const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
   const hands = Array.isArray(rt?.allocation?.hands) ? rt.allocation.hands : [];
   if (!frontier.includes(target) && !hands.includes(target)) return null;

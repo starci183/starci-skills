@@ -46,7 +46,7 @@ import { list } from '../lib/list.mjs';
 import { pathsOverlap } from '../lib/path-key.mjs';
 import { clipLine } from '../lib/clip.mjs';
 
-export const BRIDGE_SCOPE = 'supervisor-bridge';
+const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
 export const FINDING_KINDS = Object.freeze(['circular-wait', 'unowned-need', 'hub-blocker', 'duplicate-work']);
 export const RECORD_CHANGE_REFUSED = 'record-change-refused';
@@ -87,7 +87,7 @@ export const writeTransfer = (db, record, now = Date.now()) => recordPathTransfe
   toWorkflow: record.to ?? null, bridgeId: record.bridgeId ?? null, state: 'applied', detail: record, at: now });
 
 /** One bridge record as a status/peers row. */
-export const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),
+const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),
   ...(b.workflowId ? { workflowId: b.workflowId } : {}), ...(b.foundation ? { foundation: b.foundation } : {}), ...(b.blocker ? { blocker: b.blocker } : {}),
   ...(b.dependents ? { dependents: b.dependents } : {}), ...(b.owner ? { owner: b.owner } : {}), ...(b.waiter ? { waiter: b.waiter } : {}),
   ...(b.to ? { to: b.to } : {}), ...(b.from ? { from: b.from } : {}), ...(b.target ? { target: b.target } : {}), at: b.at ?? null });

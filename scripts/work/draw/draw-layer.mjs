@@ -32,21 +32,21 @@ export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
 export const FORM_MEASURE_CAP_PX = 768;
 
 /** Grammar form controls whose HeroUI v3 anatomy has the layer variant (primary | secondary). */
-export const VARIANT_CONTROLS = Object.freeze(['Input', 'Textarea', 'Select', 'ComboBox', 'SearchField', 'NumberField', 'DateField', 'TimeField',
+const VARIANT_CONTROLS = Object.freeze(['Input', 'Textarea', 'Select', 'ComboBox', 'SearchField', 'NumberField', 'DateField', 'TimeField',
   'DatePicker', 'DateRangePicker', 'Checkbox', 'CheckboxGroup', 'RadioGroup', 'OtpInput']);
 /** Every grammar field control (the variant ones plus those without a vendor variant): what makes a region a form. */
-export const FIELD_CONTROLS = Object.freeze([...VARIANT_CONTROLS, 'Switch', 'Slider', 'PressableField', 'FileDropzone']);
+const FIELD_CONTROLS = Object.freeze([...VARIANT_CONTROLS, 'Switch', 'Slider', 'PressableField', 'FileDropzone']);
 /** Components that paint a surface of their own. */
-export const SURFACE_COMPONENTS = Object.freeze(['SurfaceCard', 'SurfaceListCard', 'SurfaceAccordionCard', 'Dialog', 'Drawer', 'AlertDialog', 'Popover']);
+const SURFACE_COMPONENTS = Object.freeze(['SurfaceCard', 'SurfaceListCard', 'SurfaceAccordionCard', 'Dialog', 'Drawer', 'AlertDialog', 'Popover']);
 /** The vendor class prefixes that carry the layer variant (`<prefix>--primary|secondary`). */
-export const VARIANT_CLASS_PREFIXES = Object.freeze(['input', 'input-group', 'textfield', 'textarea', 'select', 'combo-box', 'search-field', 'number-field',
+const VARIANT_CLASS_PREFIXES = Object.freeze(['input', 'input-group', 'textfield', 'textarea', 'select', 'combo-box', 'search-field', 'number-field',
   'date-input-group', 'date-field', 'time-field', 'date-picker', 'checkbox', 'checkbox-group', 'radio-group', 'input-otp']);
 
 const VARIANT_CLASS = new RegExp(`^(?:${VARIANT_CLASS_PREFIXES.join('|')})--(primary|secondary)$`);
 const componentOf = (attrs) => attrs?.['data-component'] ?? attrs?.['data-grammar-component'] ?? null;
 
 /** Whether one parsed/DOM element paints a surface: a bounded grammar surface, a vendor card/surface, a dialog. */
-export function isSurface({ component, attrs, classes }) {
+function isSurface({ component, attrs, classes }) {
   if (attrs['data-grammar-frame'] === 'frameless') return false;
   if (SURFACE_COMPONENTS.includes(component)) return true;
   if (attrs['data-grammar-surface-depth'] != null) return true;
@@ -172,7 +172,7 @@ export const LAYER_PROBE = Object.freeze({
 const readJsonFile = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 /** Every drawn part (png with a draw-render record) under the paths, skipping node_modules and capture outputs. */
-export function partsUnder(paths) {
+function partsUnder(paths) {
   const out = [];
   const visit = (p) => {
     let st = null;

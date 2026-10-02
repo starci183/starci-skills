@@ -23,10 +23,10 @@ import { JOB_ROW, latestKernelJobOf } from '../../../machine/job-row.mjs';
 import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf, verbWorkflow } from './rows.mjs';
 
 export const WORKER_QUESTION = 'worker-question';
-export const ORCHESTRATION_MESSAGE = 'orchestration-message';
+const ORCHESTRATION_MESSAGE = 'orchestration-message';
 export const ORCHESTRATION_DELIVERY = 'orchestration-delivery-bridged';
 /** One drain acknowledges at most this many Deliveries (50 messages each); the next drain continues. */
-export const MAX_DELIVERIES_PER_DRAIN = 40;
+const MAX_DELIVERIES_PER_DRAIN = 40;
 const ANSWERABLE_MESSAGE_TYPES = new Set(['question', 'escalation']);
 const COUNTED_ONLY_TYPES = new Set(['heartbeat']);
 const BODY_MAX = 4000;
@@ -36,7 +36,7 @@ export const OWNER_ROUTED_REPLY = [
   'file it with api report exactly as your contract says, and end your turn.',
   'The Kernel serves the question to the owner (serve-ask) and re-enqueues this operation with the answer bound.',
 ].join(' ');
-export const workflowRunIdsOf = (db, workflowId) => {
+const workflowRunIdsOf = (db, workflowId) => {
   const ids = new Set();
   for (const row of db.prepare('SELECT payload_json FROM jobs WHERE workflow_id=?').all(workflowId)) {
     const payload = jobPayloadOf(row);
@@ -44,7 +44,7 @@ export const workflowRunIdsOf = (db, workflowId) => {
   }
   return ids;
 };
-export const jobDispatchIdsOf = (db, job) => {
+const jobDispatchIdsOf = (db, job) => {
   const payload = jobPayloadOf(job);
   return new Set([payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, contractDispatchIdOf(db, job)].filter(Boolean));
 };
@@ -82,7 +82,7 @@ const questionPayloadOf = (r) => ({ messageId: r.messageId, type: r.type, runId:
  * Write every message of one Delivery into the ledger (call inside a transaction). Already written ids are skipped.
  * {questions, messages, heartbeats, types}.
  */
-export function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
+function bridgeDelivery(ledger, { workflowId, runId, deliveryId, messages }) {
   const db = ledger.db, jobs = operationJobsOf(db, workflowId), now = Date.now();
   const counts = { questions: 0, messages: 0, heartbeats: 0, types: {} };
   const questionKnown = db.prepare('SELECT 1 FROM inbox WHERE workflow_id=? AND kind=? AND key=?');
@@ -152,7 +152,7 @@ export const workerQuestionsOf = (db, workflowId) => {
 };
 
 /** Close every pending question nobody waits on any more (its job settled or reported, a reply in Orca, no job). The count. */
-export const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
+const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
   let closed = 0;
   for (const item of workerQuestionsOf(db, workflowId).questions.filter((q) => ['job-settled', 'replied-elsewhere', 'dispatch-inactive', 'unmatched'].includes(q.state))) {
     closed += setInboxStatusByKey(db, { workflowId, kind: WORKER_QUESTION, key: item.messageId, onlyStatus: 'pending', status: 'done', disposition: { reason: item.state }, at });

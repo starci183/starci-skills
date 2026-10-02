@@ -23,13 +23,13 @@ import { recordAction } from './actions.mjs';
 import { actionRow, supLog } from '../machine/sup-log.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const NOTICE_TAG = '[supervisor]';
+const NOTICE_TAG = '[supervisor]';
 
 // One tag, even when the caller's text already carries it (seen: "[supervisor] [supervisor] ...").
 export const noticeText = (text) => `${NOTICE_TAG} ${String(text ?? '').replace(/\s+/g, ' ').trim().replace(/^(?:\[supervisor\]\s*)+/i, '')}`;
 
 /** The doorbell over the product ledger. */
-export function ringKernel({ repo, workflowId, wake = wakeKernel }) {
+function ringKernel({ repo, workflowId, wake = wakeKernel }) {
   const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
   try { return ringDoorbellWith({ ledger, workflowId, wake }); } finally { ledger.close(); }
 }

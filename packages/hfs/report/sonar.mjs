@@ -13,9 +13,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const HFS_ENGINE = 'starci-hfs';
-export const ESLINT_ENGINE = 'eslint';
-export const STYLELINT_ENGINE = 'stylelint';
+const HFS_ENGINE = 'starci-hfs';
+const ESLINT_ENGINE = 'eslint';
+const STYLELINT_ENGINE = 'stylelint';
 /** Every imported issue is a maintainability defect of the highest impact: the gate holds the count at zero. */
 const IMPACT = Object.freeze([Object.freeze({ softwareQuality: 'MAINTAINABILITY', severity: 'HIGH' })]);
 const CLEAN_CODE_ATTRIBUTE = 'CONVENTIONAL';

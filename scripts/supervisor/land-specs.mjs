@@ -15,7 +15,7 @@
 //      `touching` where the answer is not known; the report says which files were narrowed.
 import path from 'node:path';
 
-export const HUB_IMPORTERS = 40;
+const HUB_IMPORTERS = 40;
 const DECL = /^(export\s+)?(default\s+)?(async\s+)?(function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/;
 const stemOf = (file) => path.posix.basename(file).replace(/\.[^.]+$/, '');
 const needleOf = (file) => file.split('/').slice(-2).join('/');
@@ -33,7 +33,7 @@ export function codeOf(text) {
 }
 
 /** The top-level declarations of a JS module: [{name, exported, start, end, text}] (1-based inclusive lines). */
-export function topLevelBlocks(source) {
+function topLevelBlocks(source) {
   const lines = String(source ?? '').split(/\r?\n/);
   const heads = [];
   lines.forEach((line, i) => { const m = DECL.exec(line); if (m) heads.push({ name: m[5], exported: Boolean(m[1]), start: i + 1 }); });

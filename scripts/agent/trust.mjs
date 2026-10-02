@@ -144,7 +144,7 @@ export function codexKeyForms(dir, platform = process.platform) {
 }
 
 /** Paths Codex keys trust by: the cwd, its git toplevel and the main worktree root. */
-export function codexTrustPaths(cwd) {
+function codexTrustPaths(cwd) {
   const out = [path.resolve(cwd)];
   const git = (...args) => {
     try {
@@ -172,7 +172,7 @@ const readText = (file) => { try { return fs.readFileSync(file, 'utf8'); } catch
  * rename and drops the change, is a lost update: retried up to `attempts`.
  * hooks.beforeRename / hooks.afterRename let specs simulate that writer.
  */
-export function atomicUpdate(file, transform, verify, { attempts = ATTEMPTS, hooks = {} } = {}) {
+function atomicUpdate(file, transform, verify, { attempts = ATTEMPTS, hooks = {} } = {}) {
   const trail = [];
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const before = readText(file);
@@ -560,7 +560,7 @@ export function trustCodexToolGuard({ home, cwd, command, appServer = codexAppSe
 /* ------------------------------------------------------------------ launch */
 
 /** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
-export function launchDirectory(worktree) {
+function launchDirectory(worktree) {
   if (typeof worktree !== 'string' || !worktree.trim()) return null;
   const p = worktree.startsWith('path:') ? worktree.slice(5) : worktree;
   try { return fs.statSync(p).isDirectory() ? path.resolve(p) : null; } catch { return null; }

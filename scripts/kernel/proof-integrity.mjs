@@ -45,15 +45,15 @@ function wholeEventPayload(row) {
   try { return JSON.parse(getBlob(row.payload_sha).toString('utf8')) ?? {}; } catch { return inline ?? {}; }
 }
 
-export const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
+const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
 /** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes.yaml, reach new-legs). */
 export const PROOF_INTEGRITY_CHANGE = 'proof-integrity';
-export const PROOF_VERIFY_SCHEMA = 'starci/proof-verify@1';
-export const CLAIM_KINDS = ['frs', 'cases', 'shapes', 'specs'];
-export const COVERAGE_STATUSES = ['proven', 'stale', 'missing'];
-export const FR_ID = /^fr\.[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
-export const SHAPE_ID = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const CASE_ID = /^[A-Z][A-Z0-9]*-\d+ case-\d+$/;
+const PROOF_VERIFY_SCHEMA = 'starci/proof-verify@1';
+const CLAIM_KINDS = ['frs', 'cases', 'shapes', 'specs'];
+const COVERAGE_STATUSES = ['proven', 'stale', 'missing'];
+const FR_ID = /^fr\.[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+const SHAPE_ID = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const CASE_ID = /^[A-Z][A-Z0-9]*-\d+ case-\d+$/;
 const CASE_IN_TEXT = /\b[A-Z][A-Z0-9]*-\d+ case-\d+\b/g;
 const FR_IN_TEXT = /\bfr\.[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/g;
 const SPEC_IN_TEXT = /[\w@./-]+\.(?:e2e-spec|spec|test|e2e)\.[cm]?[jt]sx?\b/g;
@@ -91,7 +91,7 @@ const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8'
 const recordAt = (repo, rel) => readYaml(path.join(repo, slashed(rel).replace(/\/index\.yaml$/, ''), 'index.yaml'));
 
 /** Every FR record of the product: [{id, dir, required[], commands[]}], read once per call. */
-export function frRecordsOf(repo) {
+function frRecordsOf(repo) {
   const root = path.join(repo, '.starciwork', 'features');
   const out = [];
   let features = [];
@@ -121,7 +121,7 @@ const specMatches = (command, spec) => specsIn(command).some((s) => s === spec |
  * views {artifactId, name, kind, label, abs (the blob file)}. Report-derived claims count only on a
  * done|partial report and a check with exitCode 0; a label or a score file speaks for itself.
  */
-export function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRecords = null }) {
+function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRecords = null }) {
   const proven = PROVEN_OUTCOMES.includes(envelope?.outcome);
   const passing = proven ? list(envelope?.checks).filter((c) => c?.exitCode === 0) : [];
   const fromChecks = {
@@ -173,7 +173,7 @@ const gitHead = (repo) => { try { return gitOutputOf(revParseQuery(['HEAD'], { d
 const codeDigester = (repo) => createDigester(repo, { skip: CODE_SKIP_DIRS });
 
 /** The paths a job's proofs depend on: {code[], work[]}, relative to the ledger repository. */
-export function dependencyPathsOf({ db, job, payload = {}, claims = emptyClaims() }) {
+function dependencyPathsOf({ db, job, payload = {}, claims = emptyClaims() }) {
   const owned = list(payload.owned_paths).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string').map(slashed);
   const graph = db ? latestVersion(db, job.workflow_id)?.graph : null;
   const nodes = list(graph?.nodes).filter((n) => list(n.frs).some((id) => claims.frs.includes(id)) || list(n.shapes).some((id) => claims.shapes.includes(id)));
@@ -208,7 +208,7 @@ export function recordArtifactProofs(db, { repo, job, payload = {}, envelope = n
  * jobStatus, name, kind, sha256, codeSha, claims, state: fresh|stale|unbaselined, changed[]}]. An artifact without an
  * artifact_proofs row is `unbaselined`: it counts as evidence but can never be judged stale.
  */
-export function proofArtifactsOf(db, workflowId, { repo }) {
+function proofArtifactsOf(db, workflowId, { repo }) {
   const rows = db.prepare(`SELECT a.artifact_id,a.job_id,a.op_id,a.attempt_id,a.name,a.kind,a.sha256,a.label,j.try_no,j.status AS job_status,j.updated_at AS job_at,
       p.claims_json,p.code_sha,p.deps_json
     FROM job_artifacts a LEFT JOIN jobs j ON j.job_id=a.job_id LEFT JOIN artifact_proofs p ON p.artifact_id=a.artifact_id
@@ -266,7 +266,7 @@ export function staleProofsOf(db, workflowId, { repo, artifacts = proofArtifacts
 }
 
 /** The workflow's scope: FR ids, XBase#state shapes and ui record dirs, from its work graph and the records its jobs bound. */
-export function scopeOf(db, workflowId) {
+function scopeOf(db, workflowId) {
   const graph = latestVersion(db, workflowId)?.graph ?? null;
   const records = db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId)
     .flatMap((r) => { const p = parseJson(r.payload_json, {}) ?? {}; return [...list(p.records), ...list(p.owned_paths).map((o) => (typeof o === 'string' ? o : o?.path))]; })

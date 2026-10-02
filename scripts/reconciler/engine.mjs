@@ -57,19 +57,19 @@ import { readEnv } from '../lib/env.mjs';
 import { positiveNumber } from '../lib/number.mjs';
 import { valueAfter } from '../lib/cli-arg.mjs';
 
-export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
+const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
-export const LOCK_NAME = 'reconciler';
-export const SLA_PASS_MS = 30_000;
+const LOCK_NAME = 'reconciler';
+const SLA_PASS_MS = 30_000;
 /** The Decision Item SLA ladder (scripts/machine/decisions.mjs escalateDue) runs this often; applied only when active. */
-export const ESCALATE_MS = 60_000;
-export const CONFIG_REFRESH_MS = 10_000;
-export const RELOAD_CHECK_MS = 60_000;
+const ESCALATE_MS = 60_000;
+const CONFIG_REFRESH_MS = 10_000;
+const RELOAD_CHECK_MS = 60_000;
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, timeoutMs: 300_000 });
 /** An intent/running action older than this, from an earlier epoch, is `unknown` (DESIGN §7.6). */
-export const STALE_ACTION_MS = 150_000;
+const STALE_ACTION_MS = 150_000;
 /** The engine's connection checkpoints machine.sqlite's WAL this often (PASSIVE; it is the one checkpointer). */
-export const CHECKPOINT_MS = 60_000;
+const CHECKPOINT_MS = 60_000;
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -554,7 +554,7 @@ export class Engine {
 }
 
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
-export const reloadWatchedFiles = (root = SKILL_ROOT) => [
+const reloadWatchedFiles = (root = SKILL_ROOT) => [
   'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
   'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/machine/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
@@ -564,7 +564,7 @@ export const reloadWatchedFiles = (root = SKILL_ROOT) => [
  * a new runtime HEAD reloads the engine only when it changed a file under these (MB-01: every land of docs or ops
  * contracts re-exec'd the engine about every 6 minutes). Children (cli.mjs, push-mains.mjs, ...) start fresh anyway.
  */
-export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/machine/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
+const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/machine/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
   'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
 
 /**

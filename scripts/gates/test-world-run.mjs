@@ -29,7 +29,7 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { opGateRules } from '../lib/op-gate.mjs';
 
 export const TEST_WORLD_RUN_SCHEMA = 'starci/test-world-run@1';
-export const WORLD_PROJECTS = Object.freeze({
+const WORLD_PROJECTS = Object.freeze({
   e2e: { dir: 'be/src/tests/e2e', suffix: '.e2e-spec.ts', mode: 'apps' },
   integration: { dir: 'be/src/tests/integration', suffix: '.integration-spec.ts', mode: 'modules' },
   contract: { dir: 'be/src/tests/contract', suffix: '.contract-spec.ts', mode: 'sandbox' },
@@ -45,7 +45,7 @@ export function testWorldRules(runtime = runtimeRoot) {
 }
 
 /** The harness of the app: {jestConfig, preset, declaration, defineTestWorld}. */
-export function harnessOf(root) {
+function harnessOf(root) {
   const jestConfig = JEST_CONFIGS.find((rel) => fs.existsSync(path.join(root, rel))) ?? null;
   const text = jestConfig ? fs.readFileSync(path.join(root, jestConfig), 'utf8') : '';
   const declared = fs.existsSync(path.join(root, DECLARATION)) ? fs.readFileSync(path.join(root, DECLARATION), 'utf8') : null;
@@ -103,7 +103,7 @@ export function reduceJest(report) {
 }
 
 /** Run the managed `npm run test:<project>` with jest's JSON report; {command, exit, ...reduceJest, error}. */
-export function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
+function runWorldProject(root, project, tests = null, { npm = runNpm } = {}) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-world-run-'));
   const outFile = path.join(outDir, 'jest.json');
   const args = ['run', `test:${project}`, '--', '--json', `--outputFile=${outFile}`, ...(tests ? ['--testPathPattern', tests] : [])];
@@ -146,7 +146,7 @@ export function buildTestWorldRun({ root, project, tests = null, rules = testWor
   return summary;
 }
 
-export function parseTestWorldArgs(argv) {
+function parseTestWorldArgs(argv) {
   const opts = { root: null, project: null, tests: null, out: null, ...valueFlags(argv, ['--root', '--project', '--tests', '--out'], USAGE) };
   if (!opts.project) throw new Error(`--project is required; ${USAGE}`);
   return opts;

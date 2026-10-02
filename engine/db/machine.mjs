@@ -46,9 +46,9 @@ const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
 export const MACHINE_VERSION = 1;
-export const MACHINE_BUSY_TIMEOUT_MS = 15000;
+const MACHINE_BUSY_TIMEOUT_MS = 15000;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
-export const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
+const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
 export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning']);
 
@@ -124,7 +124,7 @@ export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) retur
  * STARCI_SLEEP_SCALE), then STARCI_MACHINE_BUSY. Only an attempt that changed nothing is retried: a BEGIN IMMEDIATE that
  * was refused, or one autocommit statement outside a transaction.
  */
-export const BUSY_RETRY_DELAYS_MS = Object.freeze([100, 300, 900, 2000]);
+const BUSY_RETRY_DELAYS_MS = Object.freeze([100, 300, 900, 2000]);
 export const MACHINE_BUSY_CODE = 'STARCI_MACHINE_BUSY';
 export const isMachineBusy = (error) => error?.code === MACHINE_BUSY_CODE;
 const busyError = (file, error, { retries, where }) => Object.assign(Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
@@ -137,10 +137,10 @@ export const isBusyError = (error) => error?.errcode === 5 || error?.errcode ===
 // "database disk image is malformed"; minutes later integrity_check was ok). Retry after a reopen, bounded; then an incident.
 // ---------------------------------------------------------------------------------------------------------------------
 /** The waits before each reopen-and-retry (3 retries after the first failure, ~0.8 s in all). */
-export const CORRUPT_RETRY_DELAYS_MS = Object.freeze([25, 150, 600]);
-export const MACHINE_CORRUPT_CODE = 'STARCI_MACHINE_CORRUPT';
+const CORRUPT_RETRY_DELAYS_MS = Object.freeze([25, 150, 600]);
+const MACHINE_CORRUPT_CODE = 'STARCI_MACHINE_CORRUPT';
 /** SQLITE_CORRUPT (11, and its extended codes) or SQLITE_NOTADB (26). */
-export const isCorruptError = (error) => {
+const isCorruptError = (error) => {
   if (!error) return false;
   if (error.code === MACHINE_CORRUPT_CODE) return true;
   const code = Number(error.errcode);
@@ -249,7 +249,7 @@ export function runtimeRev() {
   return readEnv('STARCI_RUNTIME_REV') ? String(readEnv('STARCI_RUNTIME_REV')) : 'unknown';
 }
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
-export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
+const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
 /** An old or foreign store: refuse it; a fresh store is created by openMachine on first use. */
 function refuseOld(file, why) {
@@ -886,7 +886,7 @@ function finishSchedule(m, { controller, duty, result = 'done', digest = null, n
 const schedules = (m) => m.db.prepare('SELECT * FROM schedules ORDER BY controller, duty').all();
 
 /** Deterministic action id = sha(controller, key, verb, epoch, observed_generation). */
-export const actionIdOf = ({ controller, key = '', verb = '', epoch = 0, observedGeneration = 0 }) => sha256([controller, key, verb, epoch, observedGeneration].join('\u0000')).slice(0, 32);
+const actionIdOf = ({ controller, key = '', verb = '', epoch = 0, observedGeneration = 0 }) => sha256([controller, key, verb, epoch, observedGeneration].join('\u0000')).slice(0, 32);
 /** Record an action intent (idempotent on id). */
 function actionIntent(m, { id = null, controller, duty = null, key = null, verb = null, argvDigest = null, epoch = null, observedGeneration = null, spanId = newSpanId(), traceId = null,
   mode = null, ledgerId = null, workflowId = null, jobId = null, attemptId = null }) {
@@ -1382,11 +1382,11 @@ const meta = (m) => Object.fromEntries(m.db.prepare('SELECT key, value FROM mach
 // write, appendFileSync = one write call), owned by this module, holds only DEFERRABLE (idempotent) writes, and is empty
 // in the normal case; flushOutbox renames it before applying, so appends during a flush start a fresh file.
 // ---------------------------------------------------------------------------------------------------------------------
-export const outboxFileFor = (machineFile) => `${path.resolve(machineFile)}.outbox.jsonl`;
+const outboxFileFor = (machineFile) => `${path.resolve(machineFile)}.outbox.jsonl`;
 /** The writes that may wait in the outbox: each is idempotent (recordLandOutcome on spanId, log on src). */
 const DEFERRABLE = Object.freeze({ recordLandOutcome, log });
 /** Append one deferred write; returns its id. */
-export function deferWrite({ op, args = [], file = null, env = process.env, error = null }) {
+function deferWrite({ op, args = [], file = null, env = process.env, error = null }) {
   need(Object.hasOwn(DEFERRABLE, op), `machine-db: ${op} is not a deferrable write (${Object.keys(DEFERRABLE).join(', ')})`);
   const id = `ob-${Date.now().toString(36)}-${hex(4)}`;
   const list = op === 'log' ? args.map((a, i) => (i === 0 ? (Array.isArray(a) ? a : [a]).map((r) => ({ ...r, src: r.src ?? `outbox:${id}` })) : a)) : args;
@@ -1472,9 +1472,7 @@ const API = {
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
-export {
-  putMachineBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
-};
+export { putMachineBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, ackOwed, upsertLearning, recordSupMessage, supMessages, setSupSignal, supSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, actionOf, actions, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, seatTranscriptSnapshot, upsertTerminal, closeTerminal, acquireHostLock, renewHostLock, releaseHostLock, hostLock, claimResource, releaseClaim, throttleState, setThrottle, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, setBudget, budgets, startGcRun, finishGcRun, recordGcItem, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, connectorOf, upsertAsk, log, logs, recordMetrics, recordArchive };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;
 
