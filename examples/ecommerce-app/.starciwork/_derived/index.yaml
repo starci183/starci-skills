@@ -183,9 +183,6 @@ records:
     feature: checkout
     state: done
     effectiveState: done
-    usedBy:
-      blockedBy:
-        - journey.checkout.first-purchase
   gap.checkout.second-example-gates:
     schema: work/gap@1
     feature: checkout
@@ -252,11 +249,6 @@ records:
     feature: checkout
     state: todo
     effectiveState: todo
-    blockers:
-      - id: gap.checkout.live-proof
-        rootKind: gap
-        cyclic: false
-        because: The journey needs the live uat run that gap.checkout.live-proof still owes.
   nfr.checkout.place-order-idempotent:
     schema: work/non-functional-requirement@1
     feature: checkout

@@ -110,14 +110,6 @@ findings:
     because: br.checkout.place-order is used 8 time(s) (top decile of fan-in); it is owned by checkout
       and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
-  - id: designed-todo:journey.checkout.first-purchase
-    kind: designed-todo
-    severity: info
-    records:
-      - journey.checkout.first-purchase
-      - gap.checkout.live-proof
-    because: journey.checkout.first-purchase is todo, blocked on gap.checkout.live-proof - a real
-      product question, not missing code; it moves once that is settled.
   - id: stale-evidence-bulk-edit:br.checkout.place-order
     kind: stale-evidence-bulk-edit
     severity: warn
