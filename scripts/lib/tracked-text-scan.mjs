@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { lsFiles } from '../api/git/ls-files.mjs';
 import { gitOutputOf } from './git.mjs';
 
 /** The trimmed source line containing `at`, capped for diagnostic output. */
@@ -27,9 +26,9 @@ export const sentenceTextAt = (ranges, at, text) => ranges.find((range) => at >=
   ?? lineTextAt(text, at);
 
 /** Repo-relative tracked paths, normalised to forward slashes. */
-export const readTrackedTextFiles = (root, { onGitError = null } = {}) => {
+export const readTrackedTextFiles = (root, { listFiles, onGitError = null } = {}) => {
   try {
-    return gitOutputOf(lsFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
+    return gitOutputOf(listFiles(['-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z')
       .split('\0').filter(Boolean).map((file) => String(file).replace(/\\/g, '/'));
   } catch (error) {
     if (onGitError) return onGitError(error);

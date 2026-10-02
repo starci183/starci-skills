@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
@@ -186,7 +187,7 @@ export function scanCliOnlyEntry(root = DEFAULT_ROOT, { files = null, read = nul
     parsedInternal = internal ?? loadInternalRegistry(root);
   } catch (error) { throw new CliOnlyEntryInputError(error.message); }
   let tracked;
-  try { tracked = files ?? readTrackedTextFiles(root); } catch (error) { throw new CliOnlyEntryInputError(error.message); }
+  try { tracked = files ?? readTrackedTextFiles(root, { listFiles: lsFiles }); } catch (error) { throw new CliOnlyEntryInputError(error.message); }
   const routes = entryRoutes(parsedCatalog);
   const internalPaths = new Set(parsedInternal.map((item) => posix(item.path)));
   const scripts = new Set([...routes.keys(), ...internalPaths]);

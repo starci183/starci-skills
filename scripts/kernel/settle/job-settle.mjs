@@ -1,31 +1,23 @@
 #!/usr/bin/env node
-// job-settle.mjs — SETTLE as a deterministic runtime service (owner ruling settle-runtime-service, 2026-09-28): the
-// first controller of the reconciler architecture (one loop engine, idempotent controllers per concern, LLMs as
-// deciders only). The watchdog loop only CALLS it (scripts/kernel/kernel-watchdog.mjs), so it can move into the engine as is.
+// job-settle.mjs — SETTLE as a deterministic runtime service: the first reconciler controller (one loop engine,
+// idempotent controllers per concern, LLMs as deciders only), called by the watchdog and movable into the engine as is.
 //
-// Internal entry: spawned by scripts/reconciler/services.mjs; not invoked directly.
-// Args: --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json]
-//       --all [--dry-run] [--json]          every config.yaml supervisor.repos ledger
-//       --invariant [--repo <r>] [--json]  read-only report of reported jobs past invariantMaxAgeMs
+// Internal args: --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant.
 //
 // reconcileJobSettle({repo, workflowId?, jobId?}) drives each job whose worker filed a report through explicit states,
 // one typed ledger event per transition:
 //
 //   reported --(outcome done + declared checks re-verify green)--> settled   event job-settle-settled
-//   reported --(the report or a raw re-run decides it: failed|partial, blocked|ask, a red re-run)--> settled fail|blocked
-//                                                                          event job-settle-settled (H1: no Kernel needed)
-//   reported --(a checker that could not run)---------------------> stays reported, retried; after tail.maxAttempts
-//                                                                    one runtime-defect Decision Item (H7: never red)
+//   reported --(failed|partial, blocked|ask, or a red raw re-run)--> settled fail|blocked (H1: no Kernel needed)
+//   reported --(checker unavailable)--> stays reported; after tail.maxAttempts one runtime-defect DI (H7: never red)
 //   reported --(judgment: not re-verifiable, owner act, refusal)--> kernel    event job-settle-needs-kernel
 //   settled  --(managed worker release proven)--> released  event job-settle-released
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
-// path as the Kernel's: `starci kernel record-checks --checks-file` (the re-run results) then `starci kernel settle --verdict pass`, so every
-// refusal of settle (landed proof, cut checks, draw acceptance, handover approval ...) still holds; a refusal hands the
+// path as `starci kernel record-checks` then `starci kernel settle`; every refusal still holds, and hands the
 // job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
-// partial report fails, a blocked or ask report settles blocked, a done report whose RAW re-run is red fails (claim
-// overruled, the failure routes then run). It never passes on a worker-declared exit code (H8): every verdict is the
+// partial report fails, blocked/ask settles blocked, and a done report whose RAW re-run is red fails. It never passes on a worker-declared exit code (H8): every verdict is the
 // raw exit the runtime observed. It never settles an op whose pass is an owner act, nor a done report nothing re-verifies.
 //
 // Idempotent: a settled job is not due; a needs-kernel handover is recorded once per dispatch and reason; a release is
@@ -35,10 +27,9 @@
 //   - a checks row the Kernel already recorded for the attempt: green -> settle; red -> kernel;
 //   - else every check the report declares must claim exit 0 (a *-before/baseline measurement is evidence, not a
 //     verdict, and is skipped), and every one that is a check (not a git/read action)
-//     must be a runtime check the settler can re-run without a shell: starci runtime validate ...,
-//     node <runtime>/packages/cli/bin/starci.mjs runtime validate ...,
-//     node <runtime>/scripts/checks/<x>.mjs ... (never --fix/--write/--apply), starci work graph
-//     validate|show|diff ...; each re-run (argv, no shell, cwd = the ledger repo) must exit 0;
+//     must be a runtime check the settler can re-run without a shell: starci runtime validate ..., the package CLI,
+//     scripts/checks/<x>.mjs (never --fix/--write/--apply), or starci work graph validate|show|diff; each re-run
+//     (argv, no shell, cwd = the ledger repo) must exit 0;
 //   - a cut slice (payload.cut) records the two cut checks settle demands: a canon slice (params.canonFamilies) re-runs
 //     canon-scan in-process over its owned paths (cut-slice-postcondition, paths never on a command line) and the
 //     declared re-runs are its cut-regression-inventory; any other cut, and the set-closing pass (full-regression-final),

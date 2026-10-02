@@ -139,8 +139,7 @@ const argOf = (cmd, name) => {
 const RUNTIME_LOOP = /(?:[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)|(?:^|\s)starci\s+workflow\s+(start)(?=\s|$))/i;
 
 /**
- * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs process or its public
- * `starci workflow start` entry whose --repo no managed ledger owns, whose workflow no managed ledger runs, older than
+ * Orphan runtime loops: watchdog.mjs / start-workflow.mjs / serve-ask.mjs or `starci workflow start`, whose --repo no managed ledger owns and whose workflow no managed ledger runs, older than
  * minAgeMs. A process with no --repo (the
  * Supervisor's watchdog) and a listed repo are never orphans. Pure.
  */

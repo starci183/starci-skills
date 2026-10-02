@@ -82,12 +82,9 @@ export function parseGateArgs(argv) {
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--main', '--tests', '--out', '--tree'].includes(arg)) {
+    } else if (['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope'].includes(arg)) {
       if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
-    } else if (arg === '--scope') {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts.profile = argv[++i];
+      opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
   if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--scope must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);

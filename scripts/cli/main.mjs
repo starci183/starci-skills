@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
-import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
-import { splitCommand, validateArgs } from '../../packages/cli/src/validate-args.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { importModule } from '../api/node/import-module.mjs';
 import { runScript } from '../api/node/run-script.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const cliModule = (file) => importModule(pathToFileURL(path.join(runtimeRoot, 'packages', 'cli', 'src', file)).href);
+const [{ CATALOG }, { splitCommand, validateArgs }] = await Promise.all([cliModule('catalog.generated.mjs'), cliModule('validate-args.mjs')]);
 
 const writeTo = (target, text) => {
   if (typeof target === 'function') target(text);

@@ -29,9 +29,7 @@
 //     controller may keep per-ctx memory; a thrown error with retryAfterMs is requeued after that delay.
 // A controller module that fails to load is logged and skipped.
 //
-// Internal entry: spawned by scripts/reconciler/boot.mjs; not invoked directly.
-// Args: [--safe]                           the long-lived engine (boot.mjs starts it)
-//       --once [--controller x] [--key k] [--apply] [--json].
+// Internal args (spawned by boot.mjs): [--safe] | --once [--controller x] [--key k] [--apply] [--json].
 //        one pass: every non-off controller (or the named one) lists and reconciles its keys once; shadow unless
 //        --apply, which first takes the lead (refused while another leader is live).
 import '../api/process/hide-child-windows.mjs';

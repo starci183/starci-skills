@@ -17,11 +17,7 @@
 //   ladder    escalateDue: a Kernel DI past dueAt is escalated once (a reminder, still the Kernel's); past dueAt x2
 //             it is marked escalated and becomes a Supervisor DI in machine.sqlite.
 //
-//   starci machine decisions ring --repo <r> --workflow <wf> [--json]
-//   starci machine decisions escalate-due [--apply] [--json]          (default: plan only, shadow)
-//   starci machine decisions supervisor --list [--all] [--json]
-//   starci machine decisions supervisor --claim <id> --by <actor> | --resolve <id> --by <actor> --verb <text> [--decision <id>]
-//   starci machine decisions supervisor --ring [--json]
+//   starci machine decisions ring|escalate-due|supervisor ... (the catalog defines the public arguments).
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';

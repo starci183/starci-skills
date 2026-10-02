@@ -27,8 +27,7 @@
 // Every act goes through ctx (ctx.api / ctx.run / ctx.openDecision carry the shadow gate). The pure planner planJob
 // holds every decision, so specs read it without a ledger.
 //
-// Internal entry: spawned by scripts/reconciler/engine.mjs; not invoked directly.
-// Args: --dry [--repo <path>] [--workflow <id>] [--json].
+// Internal args (spawned by the reconciler engine): --dry [--repo <path>] [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints each job's plan (step + clocks); writes nothing.
 import fs from 'node:fs';
 import path from 'node:path';

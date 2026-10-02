@@ -5,10 +5,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { spawnNode } from '../scripts/api/node/spawn-node.mjs';
 import { tunnelRun } from '../scripts/api/cloudflared/tunnel-run.mjs';
+import { openBrowser } from '../scripts/api/process/open-browser.mjs';
 import { processList } from '../scripts/api/process/process-list.mjs';
 import { killTree } from '../scripts/api/process/kill-tree.mjs';
 import { starciLocalRoot } from '../engine/db/machine.mjs';
@@ -139,18 +139,7 @@ export async function harnessStatus({ probe = null, url = null } = {}) {
   } catch (error) { return { ok: false, running: false, url: target, error: String(error?.message ?? error) }; }
 }
 
-const openDefault = (url, { platform = process.platform, run = spawn } = {}) => {
-  const [command, args] = platform === 'win32'
-    ? ['rundll32.exe', ['url.dll,FileProtocolHandler', url]]
-    : platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
-  try {
-    const child = run(command, args, { detached: true, stdio: 'ignore', windowsHide: true });
-    child.unref?.();
-    return { ok: true, url };
-  } catch (error) { return { ok: false, url, error: String(error?.message ?? error) }; }
-};
-
-export async function openHarness({ url = null, open = openDefault } = {}) {
+export async function openHarness({ url = null, open = openBrowser } = {}) {
   const target = url ?? await harnessUrl();
   return open(target);
 }

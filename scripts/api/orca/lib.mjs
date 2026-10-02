@@ -14,7 +14,7 @@ import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { dotGet } from '../../lib/dot-path.mjs';
 
-export const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
+const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
 export const ORCA = (() => {
   if (readEnv('STARCI_ORCA_COMMAND')) return readEnv('STARCI_ORCA_COMMAND');

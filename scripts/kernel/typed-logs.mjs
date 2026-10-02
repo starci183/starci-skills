@@ -27,8 +27,7 @@
 // (scripts/lib/secret-patterns.mjs, shared with scripts/supervisor/push-mains.mjs) plus OTPs, bearer tokens and
 // secret-named keys. A value is blanked, its key kept.
 //
-// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
-// Args: sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json].
+// Internal args (spawned by scripts/kernel/cli.mjs): sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json].
 //       derive rows from the ledger's events; a dry run (the default) counts
 //       what it would insert and writes nothing. --rederive derives from every event again (seq 0), so a new
 //       derivation reaches old events; rows already stored are duplicates by src and are not written twice.

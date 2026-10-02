@@ -18,10 +18,8 @@
 // `restart` events: no restarts_json), every probe to `service_probes`. The same table also holds the Host
 // controller's seat rows (`seat:...`) and ledger rows (`ledger:<id>`), so `boot.mjs --status` shows everything the Host owns.
 //
-// Internal entry: spawned by scripts/reconciler/controllers/host.mjs; not invoked directly.
-// Args: --list [--json]            the rows of the services table
-//       --probe <name> [--json]    one read-only probe
-//       --start <name> [--json]    the actuator (run by ctx.run in active mode only)
+// Internal args (spawned by the host controller): --list [--json] for the rows of the services table
+//       --probe|--start <name> [--json]    read-only probe or active-mode actuator
 //       --reopen <name> [--json]   a quarantined service/seat back to `declared`
 //       --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
 //       --processes                the process table (host-health listProcesses) as JSON

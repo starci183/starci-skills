@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { lineTextAt, readTrackedTextFiles, runTrackedTextCheckCli, sentenceRanges, sentenceTextAt } from '../lib/tracked-text-scan.mjs';
@@ -188,7 +189,7 @@ export function scanRetiredCli(root = DEFAULT_ROOT, { files = null, read = null,
   let parsed;
   try { parsed = catalog ?? loadCatalog(root); } catch (error) { throw new RetiredCliInputError(error.message); }
   let tracked;
-  try { tracked = files ?? readTrackedTextFiles(root); } catch (error) { throw new RetiredCliInputError(error.message); }
+  try { tracked = files ?? readTrackedTextFiles(root, { listFiles: lsFiles }); } catch (error) { throw new RetiredCliInputError(error.message); }
   const matchers = retiredMatchers(parsed);
   const findings = [];
   let checked = 0;

@@ -32,19 +32,9 @@ import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
 import { recordLaunchedTerminal } from './launched-terminals.mjs';
+import { addStarciShimToPath } from './starci-shim.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
-
-/** Put the per-user starci shim first for Orca and every agent process it launches. */
-function addStarciShimToPath({ env = process.env, home = os.homedir(), platform = process.platform } = {}) {
-  const key = Object.keys(env).find((name) => name.toLowerCase() === 'path') ?? (platform === 'win32' ? 'Path' : 'PATH');
-  const shim = path.join(home, '.starci', 'bin');
-  const entries = String(env[key] ?? '').split(path.delimiter).filter(Boolean);
-  const comparable = (entry) => platform === 'win32' ? path.resolve(entry).toLowerCase() : path.resolve(entry);
-  const wanted = comparable(shim);
-  env[key] = [shim, ...entries.filter((entry) => comparable(entry) !== wanted)].join(path.delimiter);
-  return env[key];
-}
 
 export function loadAdapter(provider) {
   const file = path.join(skillRoot, 'modules', 'models', 'agents', `${provider}.yaml`);
@@ -386,10 +376,8 @@ function sendPrompt(handle, text, adapter, io) {
 // left an effect is reconciled before the failure returns, so no caller ever owns a half launch.
 // `onCreated(handle, dispatchId)` runs the moment the agent terminal is known (before attestation when the start
 // receipt names it): the caller records it durably (nivo inc-e523617a3c31).
-// Depth preflight (contract change worker-depth-limit): `parentDispatch` is the Dispatch of the runtime-launched worker
-// this one nests under (an op under its Kernel, the critic under its op), none under the owner's chat. Its depth
-// (worker-show) + 1 deeper than config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused at step 'depth'
-// with worker-depth-exceeded before anything is trusted or started (effectState none). An unreadable parent depth
+// Depth preflight: `parentDispatch` is the Dispatch this worker nests under (an op under its Kernel or critic under its op), none under the owner's chat.
+// worker-show depth + 1 beyond config.yaml orca.maxWorkerDepth (`maxDepth` overrides it) is refused before anything starts (effectState none). An unreadable parent depth
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {

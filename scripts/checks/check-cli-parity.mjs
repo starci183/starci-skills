@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readTrackedTextFiles } from '../lib/tracked-text-scan.mjs';
 import { loadCatalog } from '../cli/catalog.mjs';
@@ -225,7 +226,7 @@ export function checkCliParity(root = DEFAULT_ROOT, { files = null } = {}) {
   }
 
   const knownPublic = new Set([...routedEntries, ...ENTRY_EXEMPT]);
-  for (const file of files ?? readTrackedTextFiles(root, { onGitError: () => fallbackFiles(root) })) {
+  for (const file of files ?? readTrackedTextFiles(root, { listFiles: lsFiles, onGitError: () => fallbackFiles(root) })) {
     const rel = posix(file);
     if (!entryCandidate(rel) || knownPublic.has(rel) || rel.startsWith('packages/cli/src/') || internalPaths.has(rel)) continue;
     const absolute = path.join(root, ...rel.split('/'));
