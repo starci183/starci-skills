@@ -14154,6 +14154,17 @@ RT_PROSE_RESTATES_SLOTS:
   owner: supervisor
   kind: check-finding
 
+CI_UPLOAD_NOT_SILENT:
+  title: "Coverage upload can skip or fail silently"
+  title_vi: "Bước tải coverage có thể bị bỏ qua hoặc lỗi mà không báo"
+  meaning_vi: "Một bước codecov/codecov-action trong workflow CI (gốc, ví dụ hoặc template của packages/hfs) không xác thực bằng OIDC (use_oidc: true cùng permissions id-token: write), không đặt fail_ci_if_error: true, có continue-on-error: true, hoặc bị chặn bởi điều kiện đọc một secret hay CODECOV_TOKEN. Khi đó thiếu secret hay tải lỗi chỉ làm bước bị bỏ qua và job vẫn xanh, coverage thôi được báo mà không ai hay."
+  causes_vi:
+    - "Dùng token trong repository secret và đặt điều kiện if theo secret đó"
+    - "Để continue-on-error hoặc quên fail_ci_if_error cho bước tải"
+  nextStep_vi: "Người giám sát đặt use_oidc: true và fail_ci_if_error: true cho bước, cấp permissions id-token: write cho job, bỏ continue-on-error và điều kiện theo secret, rồi render lại workflow bằng hfs sync --write."
+  owner: supervisor
+  kind: check-finding
+
 EXAMPLES_CI_IMAGES_NOT_DERIVED:
   title: "The examples workflow does not build every image from a derived matrix"
   title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
