@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings, databaseFiles, entityFiles } from '../helpers/hfs-arch-be-fixture.mjs';
+import { appDeclaration } from '../helpers/hfs-arch-fixture.mjs';
 import { analyzeSql, tokenizeSql } from '../../scripts/hfs/architecture/sql-tokens.mjs';
 
 // R86 sql-owner (BE_SQL_TABLE_OWNER): the SQL of `<name>.sql.ts` writes only its own capability's tables, reads only tables of
@@ -83,6 +84,63 @@ export const dynamic = (column: string) => sql\`SELECT id FROM purchases WHERE i
   assert.equal(report.coverage.hfsMachine.sqlOwner.entities, 2);
   assert.equal(report.coverage.hfsMachine.sqlOwner.templates, 7);
   assert.ok(report.coverage.checkedRuleIds.includes('BE_SQL_TABLE_OWNER'));
+});
+
+test("BE lite: generated Supabase tables replace entities without weakening ownership or bounded reads", t => {
+  const declaration = {
+    ...appDeclaration('be', {
+      apps: [{ name: 'core', kind: 'api' }],
+      connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'schema', provider: 'supabase' }],
+      reads: ['supabase/types/'],
+    }),
+    edition: 'lite',
+  };
+  const databaseTypes = `export type Database = {
+  "public": {
+    Tables: {
+      orders: { Row: { id: string } }
+      "audit_events": { Row: { id: string } }
+    }
+  }
+}
+`;
+  const root = archFixture(t, {
+    files: {
+      '../hfs.json': `${JSON.stringify(declaration, null, 2)}\n`,
+      '../supabase/types/database.types.ts': databaseTypes,
+      ...databaseFiles,
+      // This TypeORM entity must not prove a table when Supabase is the schema authority.
+      ...entityFiles('orders', 'entity_only'),
+      [`${capability('audit-events')}/index.ts`]: 'export const auditEvents = 1;\n',
+      [`${capability('audit-events')}/persistence/audit-events.sql.ts`]: `import { sql } from '../../../platform/database';
+export const FIND_AUDIT = sql\`SELECT id FROM public.audit_events LIMIT 1\`;
+`,
+      [`${capability('orders')}/persistence/orders.sql.ts`]: `import { sql } from '../../../platform/database';
+export const FIND_ONE = sql\`SELECT id FROM public.orders LIMIT 1\`;
+export const MARK = sql\`UPDATE public.orders SET id = $1 WHERE id = $2\`;
+export const READ_AUDIT = sql\`SELECT id FROM public.audit_events LIMIT 1\`;
+export const STEAL = sql\`UPDATE public.audit_events SET id = $1 WHERE id = $2\`;
+export const ENTITY_ONLY = sql\`SELECT id FROM public.entity_only LIMIT 1\`;
+export const ALL = sql\`SELECT id FROM public.orders\`;
+`,
+      [`${capability('inbox', 'platform')}/index.ts`]: 'export const inbox = 1;\n',
+      [`${capability('inbox', 'platform')}/persistence/inbox.sql.ts`]: `import { sql } from '../../database';
+export const PEEK = sql\`SELECT id FROM public.orders LIMIT 1\`;
+`,
+    },
+  });
+  const report = runArch(root);
+  const hits = findings(report, 'BE_SQL_TABLE_OWNER');
+  const by = text => hits.filter(item => item.message.includes(text));
+  assert.equal(by('writes table audit_events').length, 1, JSON.stringify(hits, null, 1));
+  assert.equal(by("reads table entity_only, which Database['public']['Tables'] does not declare").length, 1);
+  assert.equal(by('SELECT on orders has no LIMIT').length, 1);
+  const platform = hits.filter(item => item.path === 'src/modules/platform/inbox/persistence/inbox.sql.ts');
+  assert.equal(platform.length, 1);
+  assert.equal(platform[0].reason, 'tierDirection');
+  assert.equal(hits.length, 4, JSON.stringify(hits.map(item => item.message), null, 1));
+  assert.equal(report.coverage.hfsMachine.sqlOwner.entities, 0);
+  assert.equal(report.coverage.hfsMachine.sqlOwner.supabaseTables, 2);
 });
 
 test('BE: a write to another owner, an unknown table, an unbounded SELECT and a platform reading a domain are each a finding', t => {

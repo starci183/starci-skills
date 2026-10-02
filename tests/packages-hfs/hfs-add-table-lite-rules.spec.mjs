@@ -187,27 +187,7 @@ test("add table --fe stays database- and architecture-clean for every accepted t
         paths,
         fast: true,
       });
-      const problems = problemsOf(report);
-      // Known pending T8: sql-owner must use the Supabase migration/type schema when schemaAuthority is supabase.
-      const schemaAuthorityGap = problems.filter(
-        (problem) =>
-          problem.ruleId === "BE_SQL_TABLE_OWNER" &&
-          problem.check === "sqlOwner" &&
-          /no @Entity declares/.test(problem.message),
-      );
-      assert.deepEqual(
-        problems.filter((problem) => !schemaAuthorityGap.includes(problem)),
-        [],
-      );
-      if (schemaAuthorityGap.length) {
-        assert.deepEqual(
-          [...new Set(schemaAuthorityGap.map((problem) => problem.table))].sort(),
-          CASES.map((item) => item.table).sort(),
-        );
-        subtest.skip(
-          "BE_SQL_TABLE_OWNER does not yet honor lite schemaAuthority=supabase, which forbids TypeORM entities; reported to the rule owner",
-        );
-      }
+      assert.deepEqual(problemsOf(report), []);
     });
   }
 });

@@ -322,33 +322,6 @@ test("sql-owner: bounded reads, own writes and reads of an importable owner pass
     })
 })
 
-test("sql-owner: generated Supabase table keys prove lite ownership while a table absent from the generated types remains a finding", (t) => {
-    const files = {
-        ...databaseFiles,
-        "src/modules/domain/purchase/index.ts": "export const purchase = 1;\n",
-        "src/modules/domain/purchase/persistence/purchase.sql.ts": "import { sql } from '../../../platform/database';\nexport const FIND = sql`SELECT id FROM purchases WHERE id = $1`;\n",
-        "src/modules/domain/purchase/persistence/ghost.sql.ts": "import { sql } from '../../../platform/database';\nexport const FIND = sql`SELECT id FROM ghosts WHERE id = $1`;\n",
-    }
-    const databaseTypes = `export type Database = {
-  public: {
-    Tables: {
-      purchases: { Row: { id: string } }
-    }
-    Views: Record<string, never>
-    Functions: Record<string, never>
-    Enums: Record<string, never>
-    CompositeTypes: Record<string, never>
-  }
-}
-`
-    const f = projectFixture({ edition: "lite", files, rootFiles: { "supabase/types/database.types.ts": databaseTypes } })
-    t.after(f.cleanup)
-    f.tester.run("sql-owner", rules["sql-owner"], {
-        valid: valid(f, files, ["src/modules/domain/purchase/persistence/purchase.sql.ts"]),
-        invalid: [...invalid(f, files, { "src/modules/domain/purchase/persistence/ghost.sql.ts": [2] })],
-    })
-})
-
 // ---------------------------------------------------------------------------------------------------------------------
 // public-contract-form (BE_PUBLIC_CONTRACT_FORM), readonly-boundary (BE_READONLY_BOUNDARY), source-names (BE_SOURCE_FORM)
 // Framework packages are stubbed in the fixture's node_modules: the machine recognises a decorator by the package it comes from.
