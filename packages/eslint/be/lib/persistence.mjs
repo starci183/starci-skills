@@ -74,17 +74,6 @@ export const inDatabaseCapability = (hfs, file) => {
 export const inMigrateApp = (hfs, file) => hfs.slotOf(file) === "be.app.migrate"
 
 /**
- * Whether a file is the test world: slot `be.tests.world` (`src/tests/world/**`), the one test location that owns
- * the shared infrastructure (containers, apps/migrate bootstrap, teardown) and so may build and hold a `DataSource`.
- * Specs (unit and e2e) take `world.db.<connection>` instead (owner ruling on R83/R47, 2026-09-30).
- *
- * @param {object} hfs - The HFS view of the repository.
- * @param {string} file - A file path.
- * @returns {boolean} True for `be.tests.world` files.
- */
-export const inTestBootstrap = (hfs, file) => hfs.slotOf(file) === "be.tests.world"
-
-/**
  * Whether a file is a migration: a `be.persistence` file below its `migrations/` folder.
  *
  * @param {object} hfs - The HFS view of the repository.

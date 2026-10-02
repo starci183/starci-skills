@@ -113,6 +113,8 @@ test("R84: a connection is registered once, in the platform database capability 
             { filename: MIGRATE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             // the test world (slot be.tests.world) builds the DataSource
             { filename: E2E_WORLD, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
+            // the world's kit sub-slot is part of the same test composition root
+            { filename: at("src/tests/world/kit/source.ts"), code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             // the same words on a class that is not typeorm's
             { filename: OTHER, code: "class DataSource {}\nconst source = new DataSource()\nconst TypeOrmModule = { forRoot() {} }\nTypeOrmModule.forRoot()" },
         ],

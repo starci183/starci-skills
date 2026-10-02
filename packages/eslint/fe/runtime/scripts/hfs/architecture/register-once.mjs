@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
+import { isTestWorldSlot } from '../test-world-slot.mjs';
 
 /**
  * R45 `register-once` (BE_MODULE_SHAPE), the module graph read from the app roots (owner rule of 2026-09-30, the
@@ -29,7 +30,7 @@ export function checkRegisterOnce(input) {
   const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
   // The test world (slot be.tests.world) is the test composition root: useTestWorld registers capability modules with
   // `isGlobal: true` the way an app root does. A spec (integration, contract, e2e) is not a composition root.
-  const isWorld = file => file.slot === 'be.tests.world';
+  const isWorld = file => isTestWorldSlot(file.slot);
   const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
 
   // Every @Module class of the program.

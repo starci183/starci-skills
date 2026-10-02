@@ -26,12 +26,12 @@
 import ts from "typescript"
 import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
 import { isOwnedBy, isOwnedType, originsOf } from "./lib/declared.mjs"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
 import { moduleOf, originsOfType, typed } from "./lib/types.mjs"
 
 /** The test composition root (slot `be.tests.world`): it composes app options like `main.ts` and hands run state to jest workers through the environment. */
-const isTestWorld = (hfs, file) => hfs.slotOf(file) === "be.tests.world"
+const isTestWorld = inTestWorld
 
 const PROCESS_MODULES = new Set(["process", "node:process"])
 

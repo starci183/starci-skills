@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
+import { isTestWorldSlot } from '../test-world-slot.mjs';
 
 /**
  * R33 `entrypoint-only-in-apps` (BE_ENTRYPOINT_ONLY_IN_APPS). A process starts in `apps/<app>/src/main.ts` only:
@@ -34,7 +35,7 @@ export function checkEntrypoints(input) {
     }
   };
   for (const file of graph.files.values()) {
-    const isMain = (Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'main.ts') || file.slot === 'be.tests.world';
+    const isMain = (Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'main.ts') || isTestWorldSlot(file.slot);
     const checker = kit.checkerOf(file.sourceFile);
     const report = (node, message) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message });
     kit.walk(file.sourceFile, node => {

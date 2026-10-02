@@ -18,13 +18,13 @@
  * to the HFS slot view.
  */
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import {
     baseNameOf,
     connectionFileOf,
     connectionsOf,
     inDatabaseCapability,
-    inMigrateApp, inTestBootstrap,
+    inMigrateApp,
     infraTypeOf,
     injectionSites,
     injectorNameOf,
@@ -42,7 +42,7 @@ const FUNCTION_LIKE = new Set(["ArrowFunctionExpression", "FunctionExpression", 
 const mayBuildConnections = (hfs, file) => inDatabaseCapability(hfs, file) || inMigrateApp(hfs, file)
 
 /** `new DataSource(` also in the test world (`src/tests/world`), which owns the shared test infrastructure (owner ruling 2026-09-30). */
-const mayConstructDataSource = (hfs, file) => mayBuildConnections(hfs, file) || inTestBootstrap(hfs, file)
+const mayConstructDataSource = (hfs, file) => mayBuildConnections(hfs, file) || inTestWorld(hfs, file)
 
 /** The connection whose name a string literal spells, or undefined. */
 const connectionNamed = (hfs, node) =>
