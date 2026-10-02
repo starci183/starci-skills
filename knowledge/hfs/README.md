@@ -132,7 +132,9 @@ zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailab
 
 **Editions.** `edition` (`full` when absent, or `lite`) is the one optional field that picks the size of the standard; it is never a profile (a
 profile is a side: app, be, fe). Lite is the SAME manifest, rules and engine filtered: slots that name `editions` or `litePresence` and rules that
-name `editions` in the catalog are the whole difference, so an app cannot opt out of a rule, it can only pick an edition (R16, R17). A lite app has
+name `editions` in the catalog are the whole difference, so an app cannot opt out of a rule, it can only pick an edition (R16, R17). The complete
+edition-aware slot vocabulary is `editions`, `litePresence`, `lite`, `liteManagedBy`, `entries` and `outcomeHome`; rules R212 to R220 are the
+complete lite-specific law. A lite app has
 no test world and no event machinery (a spec, a test script or dependency, a worker app, an event, queue, job, projection or saga is R212), keeps the
 whole lint, grammar, security and Docker canon, and keeps its schema in `supabase/migrations` (R213 to R216: shape, row level security as static
 code, safe definer functions and buckets, a checked config and generated types) behind one door per side (R217), typed and handled results (R218),

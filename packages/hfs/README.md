@@ -9,17 +9,48 @@ Every command runs at the app root. A side is judged with its folder as the root
 
 ```sh
 npx hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]   # THE lint entry (`npm run lint`): ESLint over be/ with the BE canon and over fe/ with the FE canon, stylelint over fe/, the hfs checks; exit 0 clean, 1 findings, 2 a tool could not run
-npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]   # the repository pass alone (what `hfs lint` runs for the findings that have no TypeScript file); exit 1 on any error-level finding
-npx hfs scaffold app <name> [--into <dir>]   # a new app <dir>/<name>/: the root, be/ and fe/ skeletons and the app hfs.json; refuses an existing directory
-npx hfs emit-contracts [--repo <dir>]         # write be/contracts/<app>/schema.graphql of every api app that serves GraphQL and be/contracts/<app>/openapi.json of every api app with a typed operation table (the managed script contract:emit)
+npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--edition full] [--db-types]   # the repository pass alone; --edition full judges a lite app as full without writing it, and --db-types compares freshly emitted Supabase types
+npx hfs scaffold app <name> [--into <dir>] [--edition full|lite]   # a new app; lite writes the single-app Supabase shape and refuses an existing directory
+npx hfs emit-contracts [--repo <dir>]         # write the enabled back-end contract snapshots and, for a Supabase app, the app.supabase.types artifact (the managed script contract:emit)
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard: staged .starciwork / .starcistacks paths, and the secrets guard over every staged file (read from the index)
 npx hfs add <api|job|reactor|queue|projection|webhook|realtime> <name> [--event <event> --from <service> --service <Class>=<module>] [--connection <name>] [--repo <dir>]   # exactly that kind's file tree, generated from the pattern knowledge, plus the platform capabilities it needs and the hfs.json registration
+npx hfs add table <name> [--fe] [--no-types] [--repo <dir>]   # add one Supabase table and back-end capability; --fe adds the typed front-end accessors and --no-types skips regeneration
+npx hfs add app <name> [--repo <dir>]                         # add a Next workspace in full; lite refuses because it has one front-end app
+npx hfs add cli <group> [--repo <dir>]                        # add a command group; the first lite use also bootstraps its optional cli app
+npx hfs upgrade --edition full [--plan] [--repo <dir>]        # additions-only lite-to-full upgrade; --plan writes nothing
 npx hfs secret list|show|set|gen ...              # the sealed secrets of .starcistacks/<env>/secrets (sops through the runtime's api): list names the keys, show decrypts one value, set seals the value read from stdin, gen seals a random one; --env, --key, --age, --bytes, --repo
 npx hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]   # a back-end service and its unit spec skeleton
 npx hfs new spec <file>.service.ts [--repo <dir>]                                                              # the spec skeleton of an existing service
 ```
+
+## Lite edition
+
+Lite is the smaller edition of the same HFS standard, not another profile or engine. The declaration sets `edition` to `lite`;
+the same slot manifest, rule catalog, lint canons, grammar, security rules and Docker rules apply, while edition fields filter
+out the test world and event machinery.
+
+`hfs scaffold app <name> --edition lite` creates the minimum single-api, single-Next-app Supabase product. It generates the
+`app.supabase.types` artifact from the app's local Supabase stack; if that generation cannot run, scaffolding fails and removes
+the app it began instead of leaving a partial tree.
+
+The lite additions are deliberately narrow:
+
+- `hfs add table <name> [--fe] [--no-types]` adds the migration and matching back-end capability. `--fe` also adds typed readers
+  and writers through the front-end database owner; types regenerate by default, while `--no-types` is the explicit opt-out.
+- `hfs add cli <group>` creates the optional cli app on first use, including its built-in migration and seed groups, then adds
+  the requested group without full-edition specs.
+- `hfs add app <name>` refuses in lite because lite has exactly one front-end app. Upgrade before adding another.
+- An `add` or `new` whose target slot is unavailable in lite stops before writing with `<verb> <noun>: full edition only`.
+
+`hfs emit-contracts` continues to emit the enabled back-end snapshots and also writes `supabase/types/database.types.ts` when
+the `app.supabase.types` slot is enabled. The local Supabase stack must be running for generation.
+
+Plan the transition with `hfs upgrade --edition full --plan`, then use `hfs check --edition full [--db-types]` to judge the
+unchanged lite tree through the full-edition view. The check is read-only; `--db-types` includes a fresh generated-types
+comparison when the local stack is available. Applying `hfs upgrade --edition full` adds the full-only managed configuration,
+test layers and cli requirements without rewriting product code. Downgrade to lite is not supported.
 
 ## Creating a service
 
