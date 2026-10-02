@@ -16,9 +16,9 @@ const TWO_SERVICES = {
   apps: [
     { name: "order", kind: "api" },
     { name: "billing", kind: "worker" },
-    { name: "migrate", kind: "migrate" },
+    { name: "cli", kind: "cli" },
   ],
-  connections: [{ name: "primary", envPrefix: "PRIMARY_DB" }],
+  connections: [{ name: "primary", envPrefix: "PRIMARY_DB", owner: "order", isolation: "database" }],
 }
 const tester = typedTester({ declaration: TWO_SERVICES })
 
