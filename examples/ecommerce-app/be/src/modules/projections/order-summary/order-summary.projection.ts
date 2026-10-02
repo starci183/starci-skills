@@ -78,7 +78,7 @@ export class OrderSummaryProjection {
     }
 
     /** Reads the facts of one order, or of the next `limit` orders after the cursor. */
-    private async loadFacts(orderId: string | null, cursor: string | null, limit: number): Promise<ReadonlyArray<OrderSummaryFactsRow>> {
+    private loadFacts(orderId: string | null, cursor: string | null, limit: number): Promise<ReadonlyArray<OrderSummaryFactsRow>> {
         return this.entityManager.query(LOAD_ORDER_SUMMARY_FACTS, [orderId, cursor, limit])
     }
 

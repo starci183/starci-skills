@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_PIPE } from "@nestjs/core"
 import { ThrottlerModule } from "@nestjs/throttler"
+import { WEBHOOK_SIGNATURE } from "./http-security.decorators"
 import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } from "./http-security.module-definition"
 import { throttlerOptionsOf } from "./rate-limit.guard"
 import { RequestValidationService } from "./request-validation.service"
@@ -20,8 +21,9 @@ export class HttpSecurityModule extends ConfigurableModuleClass {
                 ...(base.providers ?? []),
                 { provide: APP_PIPE, useClass: RequestValidationService },
                 WebhookSignatureService,
+                { provide: WEBHOOK_SIGNATURE, useExisting: WebhookSignatureService },
             ],
-            exports: [MODULE_OPTIONS_TOKEN, WebhookSignatureService],
+            exports: [MODULE_OPTIONS_TOKEN, WebhookSignatureService, WEBHOOK_SIGNATURE],
         }
     }
 }

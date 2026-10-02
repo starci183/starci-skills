@@ -1,2 +1,6 @@
+export { OrderExpiredEvent } from "./order-expired.event"
+export type { OrderExpiredPayload } from "./order-expired.event"
+export { OrderPaidEvent } from "./order-paid.event"
+export type { OrderPaidPayload } from "./order-paid.event"
 export { OrderPlacedEvent } from "./order-placed.event"
 export type { OrderPlacedPayload } from "./order-placed.event"

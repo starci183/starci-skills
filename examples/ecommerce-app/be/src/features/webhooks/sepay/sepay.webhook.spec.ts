@@ -1,7 +1,8 @@
 import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { PaymentService } from "@modules/domain/payment"
-import { HttpSecurityError, HttpSecurityErrorCode, WebhookSignatureService } from "@modules/platform/http-security"
+import { HttpSecurityError, HttpSecurityErrorCode, WEBHOOK_SIGNATURE } from "@modules/platform/http-security"
+import type { WebhookSignatureService } from "@modules/platform/http-security"
 import { SepayTransferRequest } from "./dto/sepay-transfer.request"
 import { SepayWebhook } from "./sepay.webhook"
 
@@ -31,7 +32,7 @@ const build = async (signature: WebhookSignatureService, payments: PaymentServic
     const moduleRef = await Test.createTestingModule({
         controllers: [SepayWebhook],
         providers: [
-            { provide: WebhookSignatureService, useValue: signature },
+            { provide: WEBHOOK_SIGNATURE, useValue: signature },
             { provide: PaymentService, useValue: payments },
         ],
     }).compile()

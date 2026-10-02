@@ -62,7 +62,7 @@ export class OrderPaymentService {
     }
 
     /** Expires the pending orders placed at or before the cutoff and announces each one; answers how many it expired. */
-    async expireOverdue(params: ExpireOverdueOrdersParams): Promise<ExpireOverdueOrdersResult> {
+    expireOverdue(params: ExpireOverdueOrdersParams): Promise<ExpireOverdueOrdersResult> {
         return this.entityManager.transaction(async (manager) => {
             const expired: Array<ExpiredOrderRow> = await manager.query(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [
                 params.placedBefore,

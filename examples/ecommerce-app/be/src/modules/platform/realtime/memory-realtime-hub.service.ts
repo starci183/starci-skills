@@ -52,12 +52,12 @@ export class MemoryRealtimeHubService implements RealtimeHub {
                 const frame = waiting.shift()
                 return frame === undefined ? { done: true, value: undefined } : { done: false, value: frame }
             },
-            return: async () => {
+            return: () => {
                 closed = true
                 open.delete(subscription)
                 if (open.size === 0) this.subscriptions.delete(topic.name)
                 wake?.()
-                return { done: true, value: undefined }
+                return Promise.resolve({ done: true, value: undefined })
             },
         }
     }

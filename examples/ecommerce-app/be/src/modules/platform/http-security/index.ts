@@ -7,5 +7,6 @@ export type { HttpSecurityOptions, WebhookProviderOptions } from "./http-securit
 export { HTTP_SECURITY_MESSAGES } from "./messages/http-security.messages"
 export { OriginGuard } from "./origin.guard"
 export { RateLimit, RateLimitGuard, RateTier } from "./rate-limit.guard"
+export { InjectWebhookSignature, WEBHOOK_SIGNATURE } from "./http-security.decorators"
 export { WebhookSignatureService } from "./webhook-signature.service"
 export type { WebhookDelivery } from "./webhook-signature.service"
