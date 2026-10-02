@@ -26,8 +26,8 @@ import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
 const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
-/** The one coverage scope of an app: the services of the be side, nothing else. */
-const COVERAGE_SCOPE = ['be/src/**/*.service.ts'];
+/** The one coverage scope of an app: the unit-tested roles of ruleParams.be.unitRoles (the services and the cli commands), from the preset. */
+const COVERAGE_SCOPE = jestPreset.COVERAGE_SOURCES.map((glob) => `be/${glob}`);
 const LCOV = 'be/coverage/lcov.info';
 const installs = runtimeInstalls();
 const missing = missingFrom(installs);
@@ -65,21 +65,44 @@ async function lint(app) {
   return { code, report: JSON.parse(out) };
 }
 
+/** The fe workspaces of the app (the root package.json workspaces fe/apps/* and fe/packages/*) that hold a package.json, app-relative. */
+function workspacesOf(app) {
+  const patterns = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).workspaces ?? [];
+  return patterns.flatMap((pattern) => {
+    const base = path.join(app, ...pattern.replace(/\/\*$/, '').split('/'));
+    if (!fs.existsSync(base)) return [];
+    return fs.readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory() && fs.existsSync(path.join(base, entry.name, 'package.json')))
+      .map((entry) => `${pattern.replace(/\/\*$/, '')}/${entry.name}`);
+  }).sort();
+}
+
 /**
  * The scaffold's own root `typecheck` script, step by step: `npm run <script>` runs that root script's command, `tsc <args>` the app's
- * TypeScript (always --noEmit: a spec writes no build output). Returns the compiler's error lines.
+ * TypeScript (always --noEmit: a spec writes no build output), and `turbo run typecheck` the `typecheck` script of every fe workspace
+ * from its own folder (the task graph runs exactly those; the linked install holds no turbo binary). Returns the compiler's error lines.
  */
 function typecheck(app) {
   const scripts = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts;
   const tsc = path.join(app, 'node_modules', 'typescript', 'bin', 'tsc');
   const errors = [];
-  const step = (command) => {
+  const step = (command, cwd = app) => {
     const [tool, ...args] = command.trim().split(/\s+/);
     if (tool === 'npm' && args[0] === 'run') return step(scripts[args[1]]);
-    if (tool === 'node') { execFileSync(process.execPath, args, { cwd: app, stdio: 'pipe' }); return; }
-    assert.equal(tool, 'tsc', `the typecheck script runs only codegen and tsc, not ${command}`);
-    const run = spawnSync(process.execPath, [tsc, ...args.filter((arg) => arg !== '--noEmit'), '--noEmit', '--pretty', 'false'], { cwd: app, encoding: 'utf8' });
-    errors.push(...`${run.stdout}${run.stderr}`.split(/\r?\n/).filter((line) => /error TS\d+/.test(line)));
+    if (tool === 'node') { execFileSync(process.execPath, args, { cwd, stdio: 'pipe' }); return; }
+    if (tool === 'turbo') {
+      assert.deepEqual(args, ['run', 'typecheck'], `the typecheck script runs the typecheck task of every workspace, not ${command}`);
+      for (const workspace of workspacesOf(app)) {
+        const own = JSON.parse(fs.readFileSync(path.join(app, workspace, 'package.json'), 'utf8')).scripts?.typecheck;
+        assert.equal(typeof own, 'string', `${workspace} has a typecheck script`);
+        step(own, path.join(app, workspace));
+      }
+      return;
+    }
+    assert.equal(tool, 'tsc', `the typecheck script runs only codegen, tsc and the workspaces' typecheck, not ${command}`);
+    const run = spawnSync(process.execPath, [tsc, ...args.filter((arg) => arg !== '--noEmit'), '--noEmit', '--pretty', 'false'], { cwd, encoding: 'utf8' });
+    // A workspace's compiler names its files from the workspace folder: the line is made app-relative like the root's.
+    const prefix = cwd === app ? '' : `${path.relative(app, cwd).split(path.sep).join('/')}/`;
+    errors.push(...`${run.stdout}${run.stderr}`.split(/\r?\n/).filter((line) => /error TS\d+/.test(line)).map((line) => `${prefix}${line}`));
   };
   for (const command of scripts.typecheck.split('&&')) step(command);
   return errors;
@@ -135,7 +158,7 @@ function assertCoverageContract(app) {
   assert.ok(sonar['sonar.coverage.exclusions'].split(',').includes('fe/**') && !/\.service\.ts/.test(sonar['sonar.coverage.exclusions']), 'fe/ is out, the services are in');
   const codecov = parseYaml(fs.readFileSync(path.join(app, 'codecov.yml'), 'utf8'));
   for (const kind of ['project', 'patch']) {
-    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the services at 100`);
+    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the unit-tested roles at 100`);
   }
   assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
@@ -243,13 +266,13 @@ test('hfs scaffold app writes the app shape and hfs lint at its root finds nothi
 
   // One violation per side: a public door with no closed-list reason (BE canon), a raw heading (FE canon), and an alias of a
   // declaration whose message names its file.
-  edit(app, 'be/src/features/system-health/transport/http/live.controller.ts', '@Public({ reason: PublicReason.Health })', '@Public({ reason: "health" })');
+  edit(app, 'be/src/features/api/system-health/transport/http/live.controller.ts', '@Public({ reason: PublicReason.Health })', '@Public({ reason: "health" })');
   edit(app, 'fe/apps/web/src/features/pages/HomePage/component.tsx', '<Heading level={1}>{props.props.title}</Heading>', '<h1>{props.props.title}</h1>');
   fs.writeFileSync(path.join(app, 'fe', 'apps', 'web', 'src', 'modules', 'config', 'alias.ts'), 'import { siteUrl } from "./index"\n\nexport const origin = siteUrl\n');
   const planted = await lint(app);
   assert.equal(planted.code, 1);
   const eslint = planted.report.findings.filter((f) => f.engine === 'eslint');
-  assert.ok(eslint.some((f) => f.rule === 'starci-be/public-needs-reason' && f.path === 'be/src/features/system-health/transport/http/live.controller.ts'), 'the BE canon judged be/');
+  assert.ok(eslint.some((f) => f.rule === 'starci-be/public-needs-reason' && f.path === 'be/src/features/api/system-health/transport/http/live.controller.ts'), 'the BE canon judged be/');
   assert.ok(eslint.some((f) => f.rule.startsWith('starci-fe/') && f.path === 'fe/apps/web/src/features/pages/HomePage/component.tsx'), 'the FE canon judged fe/');
   const alias = eslint.find((f) => f.rule === 'starci-fe/alias-reexport' && f.path === 'fe/apps/web/src/modules/config/alias.ts');
   assert.ok(alias, 'the alias is reported on its app-relative path');
@@ -351,11 +374,13 @@ test('the scaffolded fe builds with the root build:fe script: next-intl finds it
   const toRuntime = path.relative(path.join(app, 'fe', 'apps', 'web'), RUNTIME).split(path.sep).join('/');
   edit(app, 'fe/apps/web/next.config.ts', '"..", "..", "..")', `${JSON.stringify(toRuntime)})`);
 
-  // The root `build:fe` script as npm runs it, step by step: the codegen script, then `(cd <app dir> && next build)` per Next app.
+  // The root `build:fe` script as npm runs it, step by step: the codegen script, then the turbo build of every fe app workspace,
+  // which runs that workspace's `build` script (`next build`) from its folder (the linked install holds no turbo binary).
   const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['build:fe'];
   const next = path.join(app, 'node_modules', 'next', 'dist', 'bin', 'next');
-  const dirs = [...script.matchAll(/\(cd (\S+) && next build\)/g)].map((match) => match[1]);
-  assert.equal(script.replace(/\(cd \S+ && next build\)/g, '').replace(/[\s&]/g, ''), 'npmruncodegen--silent', `build:fe runs only codegen and one (cd <app dir> && next build) per app: ${script}`);
+  assert.equal(script, 'npm run codegen --silent && turbo run build --filter=./fe/apps/*', `build:fe runs codegen and the turbo build of the fe app workspaces: ${script}`);
+  const dirs = workspacesOf(app).filter((workspace) => workspace.startsWith('fe/apps/'));
+  for (const dir of dirs) assert.equal(JSON.parse(fs.readFileSync(path.join(app, dir, 'package.json'), 'utf8')).scripts.build, 'next build', `${dir} builds with next build`);
   execFileSync(process.execPath, ['scripts/codegen.mjs'], { cwd: app, stdio: 'pipe' });
   let built = 0;
   for (const dir of dirs) {

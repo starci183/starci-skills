@@ -1,7 +1,0 @@
-query NotificationPreferences {
-    notificationPreferences(input: {}) {
-        channel
-        unsubscribed
-        digestWindowMinutes
-    }
-}

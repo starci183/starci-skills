@@ -26,7 +26,7 @@ rules:
     requirement: |
       `.starcistacks/` is `application-stacks.yaml` plus one folder per environment (`dev/`, `vps/`, ...), each holding only
       `README.md`, `environment.json` where the schema asks for it, `infra/{compose,k8s,terraform}/`, `runtime/{config,env}/`,
-      `secrets/<slug>.enc` and `seeds/`. `runtime/env/KEYS.md` lists slug names and never values. There is no `runtime/files/`.
+      `secrets/<slug>.enc` and `seeds/` (the environment's seed data, loaded only by a cli seed command). `runtime/env/KEYS.md` lists slug names and never values. There is no `runtime/files/`.
       A `DESIGN.md`, `deployment.json` or `k8s/` at its root does not exist; design notes go to `be/docs/` and Kubernetes
       manifests to `<env>/infra/k8s/`.
     rationale: |
@@ -72,8 +72,9 @@ rules:
     requirement: |
       Placement, package profile, endpoint contexts, ports and persistent-data custody are declared per application component
       (knowledge/application-stacks.yaml). A declaration proves neither startup nor recovery, and installing this standard
-      neither converts nor deploys an existing app. The migrate step of the back end (be/apps/migrate) runs first and once per
-      connection in every profile.
+      neither converts nor deploys an existing app. The migrate step of the back end (the cli image run as `cli migrate run`)
+      runs first and once per connection in every profile; seed data is loaded only by a cli seed command (`cli seed <name>`),
+      never by a migration, an api app or a stack hook.
     rationale: |
       Declarations stay reviewable, and a deploy effect always has separate evidence.
     cases: []

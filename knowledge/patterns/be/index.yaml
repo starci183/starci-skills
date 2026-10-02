@@ -3,9 +3,10 @@ id: be.index
 title: Backend code patterns
 purpose: |-
   Read knowledge/hfs/README.md (HFS) and docs/backend-source-pattern.md first. The standard defines ownership, the
-  tier direction, one schema authority, one connection per database, injected infrastructure, CQRS application layer,
-  default-deny, per-capability configuration and background work as a transport, then the concrete Nest and TypeScript
-  code forms below. It is the owner-locked BE convention of 2026-09-30. Each rule cites the HFS rule ids it implements
+  tier direction, features grouped by trigger kind (api features with a CQRS application layer, the cli feature root of
+  one-off actions), one schema authority, one connection per database, injected infrastructure, default-deny,
+  per-capability configuration and background work as a transport, then the concrete Nest and TypeScript code forms
+  below. It is the owner-locked BE convention of 2026-09-30. Each rule cites the HFS rule ids it implements
   (hfsRules) and the finding codes that judge it (verification.automated); the one rule catalog is knowledge/hfs/rules.yaml.
 appliesTo:
   - backend
@@ -29,11 +30,16 @@ topics:
     path: architecture-check.yaml
     decides: Tier direction matrix, acyclic owners, thin application composition roots, the one module shape (one representative module per capability, registered once per app), public owner surface, composed features
     rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-5
-  - id: be.cqrs
-    title: CQRS application layer
-    path: cqrs.yaml
-    decides: Command and Query messages with ExecuteParams, handlers extending ICQRSHandler, direct bus dispatch, no use cases, forwarders or in-process events
-    rules: BE-CQRS-1 … BE-CQRS-4
+  - id: be.api
+    title: Api feature
+    path: api.yaml
+    decides: The api feature shape under src/features/api/<feature>/, Command and Query messages with ExecuteParams, handlers extending ICQRSHandler, direct bus dispatch, no use cases, forwarders or in-process events, synchronous work inside one context and events only across contexts or for async work
+    rules: BE-CQRS-1 … BE-CQRS-4, BE-API-1, BE-API-2
+  - id: be.cli
+    title: Cli
+    path: cli.yaml
+    decides: The one cli app on nest-commander, commands as groups and sub-commands under src/features/cli/, commands as unit-tested action runners, no other command-line parsing, migrations and seeds as cli commands
+    rules: BE-CLI-1 … BE-CLI-5
   - id: be.injection
     title: Dependency injection
     path: injection.yaml
@@ -42,7 +48,7 @@ topics:
   - id: be.transport
     title: Transport
     path: transport.yaml
-    decides: GraphQL as the default door, bus-only injection, no envelope, REST, WebSocket, schedule, message and CLI shapes
+    decides: GraphQL as the default door, bus-only injection, no envelope, REST, WebSocket, schedule and message shapes
     rules: BE-TRANSPORT-1 … BE-TRANSPORT-4
   - id: be.infra
     title: Infrastructure ownership
@@ -52,7 +58,7 @@ topics:
   - id: be.folder
     title: Folder
     path: folder.yaml
-    decides: Composition, feature application and transport, reusable capabilities, persistence, errors and test ownership, closed folder vocabulary
+    decides: Composition, features grouped by trigger kind, reusable capabilities, persistence, errors and test ownership, closed folder vocabulary
     rules: BE-FOLDER-1 … BE-FOLDER-7
   - id: be.naming
     title: Naming
@@ -87,7 +93,7 @@ topics:
   - id: be.test
     title: Test
     path: test.yaml
-    decides: Unit and e2e placement, the jest topology, service-only unit specs built on the testing module with kit doubles, the thin-transport prerequisite, per-file 100 service coverage, real-app e2e, what an assertion proves
+    decides: Unit and e2e placement, the jest topology, unit specs for services and cli commands only built on the testing module with kit doubles, the thin-transport prerequisite, per-file 100 coverage of those roles, real-app e2e, what an assertion proves
     rules: BE-TEST-1 … BE-TEST-7
   - id: be.api-auth
     title: API authentication and input bounds
@@ -107,12 +113,12 @@ topics:
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, be/apps/migrate, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
+    decides: Migrations as the only schema authority, the cli migrate command as the only runner, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
     rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-10
   - id: be.background
     title: Background work
     path: background.yaml
-    decides: Jobs and consumers as transports, worker apps, runners for every sweep, typed queues and the outbox, lease and fencing
+    decides: Jobs and consumers as transports composed by the owning api app or a worker app, runners for every sweep, typed queues and the outbox, lease and fencing
     rules: BE-BACKGROUND-1 … BE-BACKGROUND-5
   - id: be.messages
     title: Messages catalog and locale

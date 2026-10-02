@@ -25,8 +25,8 @@ test('scoped architecture matches full findings while building only selected pro
   put('../hfs.json', appDeclarationText('be', { apps: [{ name: 'b', kind: 'api' }] }));
   put('tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
   put('apps/b/tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
-  put('src/modules/domain/order/index.ts', 'import { feature } from "../../../features/thing"; export const order = feature;\n');
-  put('src/features/thing/index.ts', 'export const feature = 1;\n');
+  put('src/modules/domain/order/index.ts', 'import { feature } from "../../../features/api/thing"; export const order = feature;\n');
+  put('src/features/api/thing/index.ts', 'export const feature = 1;\n');
   put('apps/b/src/main.ts', 'export const other = 2;\n');
   const args = { repositoryRoot: root, injectedTypeScript: ts };
   const orderFile = 'src/modules/domain/order/index.ts';
@@ -37,7 +37,7 @@ test('scoped architecture matches full findings while building only selected pro
   assert.deepEqual(scoped.violations, selected(full.violations));
   assert.deepEqual(scoped.errors, selected(full.errors));
   assert.deepEqual(scoped.compiler.projects, ['tsconfig.json']);
-  assert.deepEqual(scoped.coverage.sourceFiles, ['src/features/thing/index.ts', orderFile]);
+  assert.deepEqual(scoped.coverage.sourceFiles, ['src/features/api/thing/index.ts', orderFile]);
   fs.mkdirSync(path.join(root, '..', 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, '..', 'node_modules/typescript'), 'junction');
   const cli = path.resolve(import.meta.dirname, '..', '..', 'scripts', 'gates', 'canon-scan.mjs');

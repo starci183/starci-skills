@@ -28,7 +28,7 @@ import { hfsOf } from "./lib/hfs.mjs"
 import {
     declaredInjectorNames,
     inDatabaseCapability,
-    inMigrateApp, inTestBootstrap,
+    inCli, inTestBootstrap,
     implementsMigration,
     infraTypeOf,
     injectionSites,
@@ -90,7 +90,7 @@ export const namedEntityManagerOnly = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename) || inTestBootstrap(hfs, filename) || isMigrationFile(hfs, filename)
+        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inCli(hfs, filename) || inTestBootstrap(hfs, filename) || isMigrationFile(hfs, filename)
         const CONNECTION_TYPES = new Set(["DataSource", "QueryRunner"])
         /** The connection type (DataSource / QueryRunner) a value or written type is declared as, else null. */
         const connectionTypeOf = (node) => {

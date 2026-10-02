@@ -73,7 +73,7 @@ export const userCopyThroughCatalog = {
         if (isDeclarationFile(filename)) return {}
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(filename) ?? ""
-        const inTransport = slot.startsWith("be.transport.") || slot === "be.feature.transport.cli"
+        const inTransport = slot.startsWith("be.transport.")
         const { program, checker, toTs } = typed(context)
         const isOutboundCall = (node) =>
             node?.type === "CallExpression" && node.callee.type === "MemberExpression" && !node.callee.computed && isOutboundPort(context, hfs, node.callee.object)

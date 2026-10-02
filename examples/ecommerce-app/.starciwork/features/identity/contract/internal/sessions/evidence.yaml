@@ -7,125 +7,125 @@ recordDigest: d60b3e19d1ee262eb967c79788187ae8dba0204b0f45af08078f8808ddcce956
 codeDigest:
   algorithm: sha256
   files:
-    - path: src/features/checkout/checkout.module.ts
+    - path: src/features/api/checkout/checkout.module.ts
       sha256: 8d7a2288790bbf892ec9e7c845dbad3db20c838119622bda3f51976772b7c7c0
-    - path: src/features/checkout/transport/graphql/graphql.module.ts
+    - path: src/features/api/checkout/transport/graphql/graphql.module.ts
       sha256: 093395be4ff7dc771c19ac135dab344209fd00af65bc829e63a9dc0150f4cb40
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.module-definition.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.module.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.module.ts
       sha256: 8df18a2f30d43bbd8dc9d4e76f22aa37dab5027dc6d85ca1f0cdc466e925f07d
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver.spec.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver.spec.ts
       sha256: 583099cf5f1962299b829b0e542aae6d051102c9160e8b65b634fd71e125d3cb
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver.ts
       sha256: 04dc764e1f7b2e7037943816b106a420661767cb4a27f287073fef12aee3ef3c
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/graphql-types/input.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/graphql-types/input.ts
       sha256: e5ca9672311a3cfdca488ce920bea280982196134e92c46574c51631823b42c1
-    - path: src/features/checkout/transport/graphql/mutations/cart/add-cart-item/graphql-types/response.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/add-cart-item/graphql-types/response.ts
       sha256: b33a5404780070b26dedfaa1c3fd5449cb6f83d18228300ec14cbbb326b931ef
-    - path: src/features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.module-definition.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.module.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.module.ts
       sha256: b72929fe3b832e0258d7fbd1c0e6d80fea40410acad51c57e687fa9c044d8ee3
-    - path: src/features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver.spec.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver.spec.ts
       sha256: 2913319dd170a519fc92d02683280a2fe0723bc48b0fdd5122076b515e183ef3
-    - path: src/features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver.ts
       sha256: 2dceff61bdcb1ced776fa7834a6af52f02fb3aaefdfdaaa31e6704b2edf57c31
-    - path: src/features/checkout/transport/graphql/mutations/cart/clear-cart/graphql-types/response.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/cart/clear-cart/graphql-types/response.ts
       sha256: 4d78764f325933d2756242ee83668163901c00160bfae0263a480992ba61abc9
-    - path: src/features/checkout/transport/graphql/mutations/index.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/index.ts
       sha256: 7a6f433086fbc426ec5f8531472ef68b00771337ee1e3e9fe41a65d61aa787cb
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/graphql-types/input.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/graphql-types/input.ts
       sha256: cf142f9538d5d730c6f81e70670e973fbe963abde76e06db5efa653817c8cb93
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/graphql-types/response.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/graphql-types/response.ts
       sha256: b46deb72edfc023b983eadd0b3a4ad1de2f1445637bdfe66a5e3a06b51457f01
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/place-order.module-definition.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/place-order.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/place-order.module.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/place-order.module.ts
       sha256: 24a294a0c869c4d783d41720423cdf5d72530203d1ed21f4049fd5a2a2729dfa
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/place-order.resolver.spec.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/place-order.resolver.spec.ts
       sha256: 6736cdd3db5c1c02cf8a3d5c39d06e523ee43810c9e8d2c971ebe01d67d425b8
-    - path: src/features/checkout/transport/graphql/mutations/order/place-order/place-order.resolver.ts
+    - path: src/features/api/checkout/transport/graphql/mutations/order/place-order/place-order.resolver.ts
       sha256: ded826822ac9f60c020e48148bd888e497842d8c6734034da6a41c4a3630ddd8
-    - path: src/features/checkout/transport/graphql/queries/cart/cart/cart.module-definition.ts
+    - path: src/features/api/checkout/transport/graphql/queries/cart/cart/cart.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/checkout/transport/graphql/queries/cart/cart/cart.module.ts
+    - path: src/features/api/checkout/transport/graphql/queries/cart/cart/cart.module.ts
       sha256: 596aa67349b219acec0d36124b6959a09553723f0b1811788f40b4e16cbf37f1
-    - path: src/features/checkout/transport/graphql/queries/cart/cart/cart.resolver.spec.ts
+    - path: src/features/api/checkout/transport/graphql/queries/cart/cart/cart.resolver.spec.ts
       sha256: ab9926372d004d2bc3012bedc619e318edf99c2a2013abc7a5ea741fe0c483ec
-    - path: src/features/checkout/transport/graphql/queries/cart/cart/cart.resolver.ts
+    - path: src/features/api/checkout/transport/graphql/queries/cart/cart/cart.resolver.ts
       sha256: a946be11fecf69fa11dbe669dbd4fabda75d7f38c53d8bf8a23ae4ed6d5572b5
-    - path: src/features/checkout/transport/graphql/queries/cart/cart/graphql-types/response.ts
+    - path: src/features/api/checkout/transport/graphql/queries/cart/cart/graphql-types/response.ts
       sha256: b4c5b0015aad8e9f49ce7851a817dd9f01c04493e8000b65d92b2f93be7fbe28
-    - path: src/features/checkout/transport/graphql/queries/index.ts
+    - path: src/features/api/checkout/transport/graphql/queries/index.ts
       sha256: ef95f72b7bdbc4c94f6bddcfd229edb4395cd52bf9ff91dfeed5ccfe29f7e76a
-    - path: src/features/checkout/transport/graphql/session-actor.decorator.ts
+    - path: src/features/api/checkout/transport/graphql/session-actor.decorator.ts
       sha256: fd7ff7f1a046f9fd1351cddb0547118c5a9f44152af37fd4a24395ecb1e1196d
-    - path: src/features/checkout/transport/graphql/session-guard.wiring.spec.ts
+    - path: src/features/api/checkout/transport/graphql/session-guard.wiring.spec.ts
       sha256: 290cad66b5162f923f52a0c695bad1b76d89c031c5d94f04199a854e4171d7be
-    - path: src/features/checkout/transport/graphql/session.guard.spec.ts
+    - path: src/features/api/checkout/transport/graphql/session.guard.spec.ts
       sha256: c1dacdbea5205b22a3a6a574f090e367a000c7457d7d25241178c07491f0503e
-    - path: src/features/checkout/transport/graphql/session.guard.ts
+    - path: src/features/api/checkout/transport/graphql/session.guard.ts
       sha256: 4b0d8c4417f6688467cdd276072b52b3c1a5b9f427cc7b165f1710c84813f471
-    - path: src/features/checkout/transport/http/buyer.controller.spec.ts
+    - path: src/features/api/checkout/transport/http/buyer.controller.spec.ts
       sha256: ba005198c403596b35824a9329e5fceac7c4ba14b1c67e5ca8c605bd6480c40e
-    - path: src/features/checkout/transport/http/buyer.controller.ts
+    - path: src/features/api/checkout/transport/http/buyer.controller.ts
       sha256: 1a51ebb2db519366297c2b1e8a7c93d61c4dc627932833cfa70d5a5e4158db79
-    - path: src/features/checkout/transport/http/health.controller.spec.ts
+    - path: src/features/api/checkout/transport/http/health.controller.spec.ts
       sha256: d1c3f90059a51e048af4fc770467adb116ab042fb40c685d96772a8a87377245
-    - path: src/features/checkout/transport/http/health.controller.ts
+    - path: src/features/api/checkout/transport/http/health.controller.ts
       sha256: 411c646c4a742c00d495169c41059401bc7ec921ea652449f608a37bfd2673a4
-    - path: src/features/identity/transport/graphql/graphql.module.ts
+    - path: src/features/api/identity/transport/graphql/graphql.module.ts
       sha256: 90297149a55764307cb121084391afc0dd528a49d5b836bedecae8868f273a60
-    - path: src/features/identity/transport/graphql/mutations/index.ts
+    - path: src/features/api/identity/transport/graphql/mutations/index.ts
       sha256: 1e7742943473c6a5fabf1348127fdc6ed8b9ba15f1e7eb125a6e77d9ecc64eff
-    - path: src/features/identity/transport/graphql/mutations/session/register/graphql-types/input.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/graphql-types/input.ts
       sha256: cd114efc4b2b2485fce2dc33111a0df4174cd19c954720549895585cce6685db
-    - path: src/features/identity/transport/graphql/mutations/session/register/graphql-types/response.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/graphql-types/response.ts
       sha256: 65dc2ca018cc331f86419fbd0b12f5b817638d0c6a37747a3f44767aba1bd452
-    - path: src/features/identity/transport/graphql/mutations/session/register/register.module-definition.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/register.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/identity/transport/graphql/mutations/session/register/register.module.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/register.module.ts
       sha256: bd7c3a65a58c95e619d082f87d35106b079694a17a9a80130ccee2be894176ad
-    - path: src/features/identity/transport/graphql/mutations/session/register/register.resolver.spec.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/register.resolver.spec.ts
       sha256: 2bfe3cbf27f524f6bfc1e937403a2cefd274f9c7641c6df5199aba5855fdc8be
-    - path: src/features/identity/transport/graphql/mutations/session/register/register.resolver.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/register/register.resolver.ts
       sha256: 8c0ff3795a067002e8632467e3913f96df18ecf2f2f48aee554f27788c1f6186
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/graphql-types/input.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/graphql-types/input.ts
       sha256: 75cb0f82523c905c550a565435c1ddf5244aaa22a24f23b13954d4133e46497c
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/graphql-types/response.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/graphql-types/response.ts
       sha256: bebf721bb472e81709522648e57f0598aef13ae4e449f92664fa326c554c9a8e
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/sign-in.module-definition.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/sign-in.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/sign-in.module.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/sign-in.module.ts
       sha256: 480b42e10b5cadac459b996043db3336bfbf882fffa9386a4ee8a039c437d769
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver.spec.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver.spec.ts
       sha256: a4cf248e94cf77867e6476c9d33abd70bdd924703db8b0556cd96c16d82f4941
-    - path: src/features/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver.ts
+    - path: src/features/api/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver.ts
       sha256: 749b647213d098d17e47b581586adf6b610b946f6e966ff6876cd355b8be4e88
-    - path: src/features/identity/transport/graphql/queries/account/account/account.module-definition.ts
+    - path: src/features/api/identity/transport/graphql/queries/account/account/account.module-definition.ts
       sha256: 88d0ad933add9afcccac426a7d9a14f44c81c3e6c85f34abdd2f0eaea202ac70
-    - path: src/features/identity/transport/graphql/queries/account/account/account.module.ts
+    - path: src/features/api/identity/transport/graphql/queries/account/account/account.module.ts
       sha256: 3816abbfcbba7996f39368343b5e2a21028ef70af8a4fb3d0f174f285034e5f3
-    - path: src/features/identity/transport/graphql/queries/account/account/account.resolver.spec.ts
+    - path: src/features/api/identity/transport/graphql/queries/account/account/account.resolver.spec.ts
       sha256: 3f59be81c3bc16e16a2ea10a918aaf8b3e50864d2d3730563c3d2d76c0ac715a
-    - path: src/features/identity/transport/graphql/queries/account/account/account.resolver.ts
+    - path: src/features/api/identity/transport/graphql/queries/account/account/account.resolver.ts
       sha256: 3e5c082ccb3ce1e0154b111a24be5899b24c5ccaf1496310f89a7a5d9aaec46f
-    - path: src/features/identity/transport/graphql/queries/account/account/graphql-types/response.ts
+    - path: src/features/api/identity/transport/graphql/queries/account/account/graphql-types/response.ts
       sha256: 3b148bb422baf5769a1e6e3aeffe200153e94609bcd85aece11434e72c459c38
-    - path: src/features/identity/transport/graphql/queries/index.ts
+    - path: src/features/api/identity/transport/graphql/queries/index.ts
       sha256: 1b0514df9e37e6ebfecc90657589c3aed58a6b86dfbdf19ff4e76b210ae915c5
-    - path: src/features/identity/identity.module.ts
+    - path: src/features/api/identity/identity.module.ts
       sha256: 2fbd6f5ce8d02a5899505ababadc758d6909c378447fa57c68789efcf3fc2dd7
-    - path: src/features/identity/transport/http/business-code.filter.ts
+    - path: src/features/api/identity/transport/http/business-code.filter.ts
       sha256: ec9fd1abdbc6072dd2cea18019bbdf64a140c4f351ec57047e3ee9c0823484b0
-    - path: src/features/identity/transport/http/health.controller.spec.ts
+    - path: src/features/api/identity/transport/http/health.controller.spec.ts
       sha256: 57b6a6db1cfabb7e9129f3f7e531a0416d71613de931310ac7a45c6bfb820d25
-    - path: src/features/identity/transport/http/health.controller.ts
+    - path: src/features/api/identity/transport/http/health.controller.ts
       sha256: c3e33db331d50b80b640c9f17a2dcefce0139f88fd91fab91b22a0b642d925fb
-    - path: src/features/identity/transport/http/session.controller.spec.ts
+    - path: src/features/api/identity/transport/http/session.controller.spec.ts
       sha256: 2b034596809e11c385695bb83658ff8d65b467f4dd55169e0a2e8be1d7c8ff04
-    - path: src/features/identity/transport/http/session.controller.ts
+    - path: src/features/api/identity/transport/http/session.controller.ts
       sha256: f99ef0289ddec5bc8bf9cfeba671cbceb1725f243e6e7d37a13c0e1fe058a7ab
     - path: src/modules/domain/account/account.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e

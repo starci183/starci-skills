@@ -12,8 +12,8 @@ import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { operationContractDecidable, operationRouteDrivenByTable, recommended, rules } from "./operations.mjs"
 
 const tester = typedTester()
-const TABLE = at("src/features/plan/plan.operations.ts")
-const CONTROLLER = at("src/features/plan/transport/http/plan-operations.controller.ts")
+const TABLE = at("src/features/api/plan/plan.operations.ts")
+const CONTROLLER = at("src/features/api/plan/transport/http/plan-operations.controller.ts")
 const CANON = at("src/modules/platform/operations/operation-bounds.ts")
 const OPS = `import { defineOperations, mutation, query } from "@modules/platform/operations"\n`
 const TYPES = `export interface PlanAsk { readonly planId: string }\nexport interface PlanView { readonly revision: number; readonly items: ReadonlyArray<{ readonly name: string }> }\n`

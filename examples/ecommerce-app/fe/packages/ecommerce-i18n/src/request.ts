@@ -2,7 +2,7 @@ import { hasLocale } from "next-intl"
 import { DEFAULT_LOCALE, LOCALES, PRODUCT_TIME_ZONE } from "./index"
 
 /** The apps of the product. */
-type AppName = "landing" | "shop"
+type AppName = "landing" | "app"
 
 /** Loads one app's own catalogue for a served locale. */
 type LoadMessages = (locale: string) => Promise<Record<string, unknown>>

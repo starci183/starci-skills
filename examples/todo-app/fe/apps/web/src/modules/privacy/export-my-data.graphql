@@ -1,7 +1,0 @@
-query ExportMyData {
-    exportMyData {
-        at
-        action
-        target
-    }
-}

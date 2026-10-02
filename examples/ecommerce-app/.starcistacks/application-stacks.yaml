@@ -47,7 +47,7 @@ environments:
         port: 6070
     runbook: README.md
     # The local Postgres runs with trust auth; the secret material is Keycloak's (its bootstrap admin password and the secret
-    # of the identity-admin client) and MinIO's root password, sealed with SOPS+age as the todo-app example does.
+    # of the identity-admin client) and MinIO's root password, sealed with SOPS+age.
     secrets:
       - name: keycloak-env
         where: secrets/keycloak-env

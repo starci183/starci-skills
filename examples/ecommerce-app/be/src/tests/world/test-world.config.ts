@@ -10,7 +10,8 @@ import { EnvSource } from "@modules/platform/config"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
-import * as migrateMain from "../../../apps/migrate/src/main"
+import { parseCliAppOptions } from "../../../apps/cli/src/cli.options"
+import { migrateConnections, openConnection } from "@features/cli"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
     IDENTITY_ENTITIES,
@@ -53,7 +54,8 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         order: { module: OrderApp, operations: ECOMMERCE_OPERATIONS, options: orderOptions },
     },
     migrate: {
-        module: migrateMain,
+        // the one migration runner: the cli migrate command's, over the cli app's connections
+        module: (env: EnvSource) => migrateConnections(parseCliAppOptions(env).connections, openConnection),
         options: (w) => new EnvSource({ IDENTITY_DB_URL: w.db.identity.url, ORDER_DB_URL: w.db.order.url }),
     },
     identity: {

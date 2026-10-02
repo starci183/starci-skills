@@ -1,6 +1,0 @@
-mutation RevokeCollaborator($input: RevokeCollaboratorInput!) {
-    revokeCollaborator(input: $input) {
-        invitationId
-        status
-    }
-}

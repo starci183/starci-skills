@@ -7,7 +7,7 @@
 //   FE_WIRE_GENERATED (R52)     wire types come from the be contract snapshots the fe side reads in place (its declared reads,
 //                               `be/contracts/`): the root package.json declares the `codegen` script, and each fe app's generated
 //                               types on disk (`modules/api/__generated__/`, never tracked) are not older than any snapshot
-//   FE_I18N_PLACEMENT (R59)     `next-intl` is a dependency of the root package.json or of a shared i18n package under fe/packages/
+//   FE_I18N_PLACEMENT (R59)     `next-intl` is a dependency of an fe workspace (an fe app manifest, or a shared i18n package under fe/packages/)
 // The files each app must hold (routing.ts, navigation.ts, request.ts, messages/, the [locale] layout) are the slot manifest's requires
 // (HFS_SLOT_REQUIRED_MISSING); which source may hold display text and how copy resolves is eslint-fe's.
 import fs from 'node:fs';
@@ -66,11 +66,11 @@ function wireFindings({ repoRoot, files, apps, reads }) {
   return findings;
 }
 
-/** R59 over the app: next-intl is a dependency of the one package.json or of a shared fe/packages/* manifest. */
+/** R59 over the app: next-intl is a dependency of an fe workspace manifest (fe/apps/<app> or fe/packages/<pkg>; the workspace that imports it declares it, R131). */
 function intlDependencyFindings({ repoRoot, files }) {
   const declares = (file) => { const pkg = readJson(repoRoot, file); return pkg ? ['dependencies', 'devDependencies'].some((section) => pkg[section]?.['next-intl'] !== undefined) : false; };
-  const shared = files.filter((file) => /^fe\/packages\/[^/]+\/package\.json$/.test(file));
-  return ['package.json', ...shared].some(declares) ? [] : [found(I18N_PLACEMENT, 'package.json', 'the app does not depend on next-intl (nor does a shared fe package); every fe app uses next-intl with the [locale] segment')];
+  const workspaces = files.filter((file) => /^fe\/(?:apps|packages)\/[^/]+\/package\.json$/.test(file));
+  return workspaces.some(declares) ? [] : [found(I18N_PLACEMENT, 'package.json', 'no fe workspace depends on next-intl (an fe app or a shared fe package declares it); every fe app uses next-intl with the [locale] segment')];
 }
 
 function placementFindings({ repoRoot, app, tracked }) {

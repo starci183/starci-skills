@@ -5,9 +5,13 @@ of `.claude` itself and of every example under `examples/`. This file is the can
 document disagrees with it, this file wins and the other document is wrong; where this file disagrees with an enforcer
 (`slots.yaml`, `rules.yaml`, a check, a canon rule), the enforcer wins and this file is fixed.
 
-A product is ONE app repository, `<app>/`. Its root holds the one `package.json`, the one `package-lock.json`, the one
-`node_modules`, the one `hfs.json` (kind `app`), the CI, the hooks, the formatter, the Sonar configuration, `scripts/` and
-`.starciwork`. Its two sides are `be/` (the back end) and `fe/` (the front end); each side holds everything a standalone
+A product is ONE app repository, `<app>/`, and it is ALWAYS a monorepo, even with one service, so every app has the same
+shape (R128 to R131). Its root holds the one `package.json`, the one `package-lock.json`, the one `node_modules`, the
+managed `turbo.json`, the one `hfs.json` (kind `app`), the CI, the hooks, the formatter, the Sonar configuration,
+`scripts/` and `.starciwork`. The root `package.json` declares the npm workspaces `fe/apps/*` and `fe/packages/*`: each fe app
+(`@<project>/<app>`) and each fe package is a workspace with its own `package.json` and dependencies, and turbo runs their
+build, dev, lint and typecheck (a workspace lints with `hfs lint --workspace .`, the one lint scoped to it). The back end has
+no `package.json`: it is a Nest monorepo of `be/apps/<app>` (nest-cli `projects`), even for one service. Its two sides are `be/` (the back end) and `fe/` (the front end); each side holds everything a standalone
 back-end or front-end repository root used to hold, except `package.json`, the lockfile and the other files the root
 owns. Every path in this file is relative to the app root: a back-end path starts with `be/`, a front-end path with
 `fe/`. The only cross-side reach is the front end reading `be/contracts/` (its codegen input), declared in `hfs.json`
@@ -44,8 +48,8 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 `tier`, `requires`, `allows`, `forbids`, `tests`, `budget`, `managedBy`, `rules` and lifecycle fields.
 
 - `profiles`: `app` (a slot of the app root, `app.*`) or `be`, `fe` or both (a slot of a side: `be.*`, `fe.*`,
-  `repo.*`). A side slot's path is relative to its side folder: `src/features/<feature>/` of profile `be` is
-  `be/src/features/<feature>/` of the app. `hfs check` judges the root slots once and each side's slots under its folder
+  `repo.*`). A side slot's path is relative to its side folder: `src/features/api/<feature>/` of profile `be` is
+  `be/src/features/api/<feature>/` of the app. `hfs check` judges the root slots once and each side's slots under its folder
   (the side view of `scripts/hfs/slots.mjs`); every finding path is app-relative.
 - `presence`: `required`, `optional`, `opt-in` (legal only when `hfs.json` lists the slot or declares an app of its
   kind) or `forbidden`.
@@ -71,18 +75,18 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 
 | To add | Do | Bump |
 | --- | --- | --- |
-| Helper or type used by one feature only | `be/src/features/<feature>/application/support/<name>.ts` (`be.feature.application.support`, optional); another feature cannot import it, a second user moves it to a `domain` capability | minor |
-| Command line entry | `transport/cli/<name>.cli.ts` in the feature plus a back-end app of kind `cli` (`be.feature.transport.cli`, opt-in); it dispatches one command or query | minor |
-| Queue consumer | `transport/message/` in the feature plus a back-end app of kind `worker` | none, declared in `hfs.json` |
-| Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts` | none |
-| Another api app or a cli | `be/apps/<name>` plus its kind in `hfs.json` `sides.be.apps` | none |
+| Helper or type used by one feature only | `be/src/features/api/<feature>/application/support/<name>.<role>.ts` (`be.feature.application.support`, optional); another feature cannot import it, a second user moves it to a `domain` capability | minor |
+| One-off action (migrate, seed, sync, backup, operator command) | a sub-command `be/src/features/cli/<group>/subs/<name>.cli.ts` with its `<name>.cli.spec.ts` in the cli feature root (`be.cli`), compiled into the one app `be/apps/cli` (`be.app.cli`, kind `cli`), run as `cli <group> <command>` | none |
+| Queue consumer | `transport/message/` in the api feature, composed by the api app that owns it (or a `worker` app scaled apart) | none, declared in `hfs.json` |
+| Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts`, composed the same way | none |
+| Another api app, or a worker app to scale background work apart | `be/apps/<name>` plus its kind in `hfs.json` `sides.be.apps` | none |
 | Another Next app | `fe/apps/<name>` plus kind `next` in `hfs.json` `sides.fe.apps` | none |
 | New app kind or protocol | new slot `be.app.<kind>` or `be.transport.<protocol>` | minor |
 | Integration (payment, LLM) | `be/src/modules/integrations/<provider>/` | none |
 | Model code | client in `integrations`, training code in a new slot, weights in an object store | minor |
 | Human documentation | `be/docs/{adr,runbooks,guides}/` or `fe/docs/{adr,runbooks,guides}/` (`repo.docs`, opt-in) | none |
 | Infrastructure | `.starcistacks/<env>/infra/{compose,k8s,terraform}/` | none |
-| Mobile app | new slot `fe.app.expo` | minor |
+| Mobile app | a new app-kind slot (an Expo app) | minor |
 | Shared package | `be/packages/<pkg>` or `fe/packages/<pkg>` (`repo.packages`, opt-in, built to `dist`, an npm workspace of the root `package.json`) | none |
 
 ## 3. The app declaration: `hfs.json`
@@ -100,8 +104,7 @@ reads and (back end only) the database connections.
     "be": {
       "apps": [
         { "name": "core", "kind": "api" },
-        { "name": "worker", "kind": "worker" },
-        { "name": "migrate", "kind": "migrate" }
+        { "name": "cli", "kind": "cli" }
       ],
       "optionalSlots": ["be.transport.message", "be.transport.schedule", "be.contract.graphql", "repo.docs"],
       "connections": [
@@ -110,14 +113,15 @@ reads and (back end only) the database connections.
       ]
     },
     "fe": {
-      "apps": [{ "name": "web", "kind": "next" }],
+      "apps": [{ "name": "landing", "kind": "next" }, { "name": "app", "kind": "next" }],
+      "optionalSlots": ["fe.package.ui", "fe.package.i18n"],
       "reads": ["be/contracts/"]
     }
   }
 }
 ```
 
-`sides.be.apps` lists every `be/apps/<name>` with its kind (`api`, `worker`, `migrate`, `cli`); `sides.fe.apps` every
+`sides.be.apps` lists every `be/apps/<name>` with its kind (`api`, `worker`, `cli`; at most one cli app, named `cli`, required once a connection is declared, R132); `sides.fe.apps` every
 `fe/apps/<name>` (`next`). App names are unique across both sides. `connections` (back end only) lists every physical
 database as `{ name, envPrefix }`: the logical name (never the engine) and the prefix of its `<PREFIX>_*` environment
 keys. `reads` is a subset of the manifest's `sides.<side>.reads`. A missing `hfs.json`, or a machine run that analysed
@@ -128,7 +132,8 @@ zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailab
 
 | Content | State | Slot |
 | --- | --- | --- |
-| `hfs.json`, `README.md`, `package.json`, `package-lock.json`, `.gitignore`, `.gitattributes` | app root, required, tracked; the `scripts` block of `package.json` is generated and compared as parsed JSON | `app.declaration`, `app.readme`, `app.package-manifest`, `app.lockfile`, `app.git-meta` |
+| `hfs.json`, `README.md`, `package.json`, `package-lock.json`, `.gitignore`, `.gitattributes` | app root, required, tracked; the `scripts` block of `package.json` is generated and compared as parsed JSON; `workspaces` are exactly `fe/apps/*` and `fe/packages/*` (R128) | `app.declaration`, `app.readme`, `app.package-manifest`, `app.lockfile`, `app.git-meta` |
+| `turbo.json` | app root, required, generated by `hfs sync`: the task graph of the fe workspaces (build, dev, lint, typecheck) | `app.task-graph` |
 | `.editorconfig`, `.nvmrc`, `.npmrc` (optional) | app root, tracked, the app's own dotfiles | `app.tool-config`, `app.tool-config-optional` |
 | `.prettierrc`, `.prettierignore` | app root, generated by `hfs sync` | `app.format-config` |
 | `sonar-project.properties` | app root, generated by `hfs sync` | `app.quality-config` |
@@ -140,12 +145,12 @@ zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailab
 | `package.json`, lockfile, `hfs.json`, `README.md`, git, CI, hook, formatter or Sonar files, `scripts/` or `.starciwork/` inside a side | forbidden: the root owns them | `repo.side-root-forbidden` |
 | `be/{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js}`, `be/nest-cli.json` | required, generated by `hfs sync` and hash-checked (`nest-cli.json` is the scaffold's); no other tool config may exist | `be.tool-config`, `be.nest-cli`, `be.tool-config-local` |
 | `fe/{tsconfig.json,eslint.config.mjs,stylelint.config.mjs}` | required, generated by `hfs sync` and hash-checked; a front end has no test configuration at all (R97) | `fe.tool-config`, `fe.tool-config-local` |
-| `fe/turbo.json` | optional, tracked; the front end's own task graph, which no preset can render | `fe.tool-config-repo` |
-| `be/apps/<app>/src/` | required, tracked | `be.app.*` |
-| `be/src/{features,modules,tests}` | required, tracked | `be.*` |
+| `be/apps/<app>/src/` | required, tracked; kind `api` (at least one), `worker` (opt-in, background scaled apart) or `cli` (the one app of one-off actions, with its `be/apps/cli/Dockerfile`) | `be.app.api`, `be.app.worker`, `be.app.cli` |
+| `be/src/features/api/<feature>/`, `be/src/features/cli/` | features grouped by trigger kind: api features (required) and the cli feature root (opt-in) | `be.feature`, `be.feature.*`, `be.transport.*`, `be.cli` |
+| `be/src/{modules,tests}` | required, tracked | `be.*` |
 | `be/contracts/<app>/{schema.graphql,openapi.json}` | opt-in, tracked, the committed machine-emitted contracts; the front end reads them in place | `be.contract.*` |
 | `.starcistacks/`, `.sops.yaml` (app root) | required, tracked, secrets only as `*.enc`; never under a side (`HFS_STACKS_IN_SIDE`) | `app.starcistacks`, `app.sops` |
-| `fe/apps/<app>/{next.config.ts,tsconfig.json,postcss.config.mjs}`, `fe/apps/<app>/src/` | required, tracked; an FE app has no `package.json` of its own | `fe.app.next`, `fe.route`, `fe.feature`, ... |
+| `fe/apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}`, `fe/apps/<app>/src/` | required, tracked; each FE app is the npm workspace `@<project>/<app>` with its own `package.json` (R129, R131) | `fe.app.next`, `fe.route`, `fe.feature`, ... |
 | `be/packages/<pkg>/`, `fe/packages/<pkg>/` | opt-in, tracked, must build; an npm workspace of the root `package.json` | `repo.packages`, `fe.package.*` |
 | `be/apps/<app>/Dockerfile`, `fe/apps/<app>/Dockerfile`, a side's `.dockerignore` | optional, tracked | `repo.app-image`, `repo.dockerignore` |
 | `be/docs/{adr,runbooks,guides}/`, `fe/docs/{adr,runbooks,guides}/` | opt-in, tracked, images at most 500 KB | `repo.docs`, `repo.docs-media` |
@@ -169,11 +174,15 @@ catalog in section 12; the pattern files in `knowledge/patterns/be/` cite them a
 ### 5.1 Source tree
 
 ```text
-be/apps/<app>/src/                       kind api | worker | migrate | cli, declared in hfs.json sides.be.apps
+be/apps/<app>/src/                       kind api | worker | cli, declared in hfs.json sides.be.apps
   main.ts                                at most 80 lines: build EnvSource once, parse options, bootstrap, handle startup failure
   app.module.ts                          at most 250 lines: AppModule.register(options), each capability once with isGlobal true, transports
   <app>.options.ts                       the options type of the app
-be/src/features/<feature>/
+be/apps/cli/                             the one app of every one-off action (R132); its image be/apps/cli/Dockerfile runs as `cli <group> <command>`
+  src/main.ts                            CommandFactory.run(AppModule, logger) of nest-commander; never serves (R133)
+  src/app.module.ts                      the platform modules and the cli feature root module
+  src/cli.options.ts                     what the cli reads from the environment, the connections it migrates among them
+be/src/features/api/<feature>/           an api feature (features are grouped by trigger kind; no kind imports another)
   index.ts                               module class and the contract an app needs; no export *
   <feature>.module.ts                    application module (handlers)
   application/                           <action>.command.ts | <action>.query.ts, <action>.handler.ts, <action>.contracts.ts; no spec
@@ -181,10 +190,13 @@ be/src/features/<feature>/
   transport/graphql/                     <feature>-graphql.module.ts, <action>.resolver.ts, <action>.mapper.ts, dto/
   transport/http/                        opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (webhooks, OAuth, health, byte streams)
   transport/websocket/                   opt-in: <feature>-websocket.module.ts, <channel>.gateway.ts
-  transport/message/                     opt-in: <feature>-message.module.ts, <event>.consumer.ts
-  transport/schedule/                    opt-in: <feature>-schedule.module.ts, <job>.job.ts
-  transport/cli/                         opt-in: <feature>-cli.module.ts, <name>.cli.ts; composed only by an app of kind cli
+  transport/message/                     opt-in: <feature>-message.module.ts, <event>.consumer.ts; composed by the owning api app or a worker app
+  transport/schedule/                    opt-in: <feature>-schedule.module.ts, <job>.job.ts; composed by the owning api app or a worker app
   messages/                              opt-in: <feature>.messages.ts (vi and en copy)
+be/src/features/cli/                     the cli feature root, compiled only into apps/cli (R134, R135)
+  index.ts, cli.module.ts, cli.module-definition.ts
+  <group>/                               <group>.cli.ts (@Command with subCommands), <group>.module.ts, <group>.module-definition.ts
+  <group>/subs/                          <name>.cli.ts (@SubCommand extending CommandRunner) and <name>.cli.spec.ts beside it
 be/src/modules/domain/<capability>/      index.ts, module, module-definition, options, config, decorators, log-events, errors/, persistence/, messages/, services
 be/src/modules/platform/<capability>/    composition, config, errors, primitives, logging, clock, cqrs are required; database, http, retry, inbox, outbox, ... by need
 be/src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
@@ -198,7 +210,8 @@ be/contracts/<app>/schema.graphql        opt-in committed contract (and openapi.
 
 Nothing else exists at `be/src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or
 `exceptions` folder exists under `be/src/modules` or `be/src/features` (R01, R89). The unit specs are the
-`<name>.service.spec.ts` files beside their services (section 7). Files carry a role suffix from the closed
+`<name>.service.spec.ts` files beside their services and the `<name>.cli.spec.ts` files beside their cli commands
+(section 7). Files carry a role suffix from the closed
 list of the slot manifest (`module`, `command`, `handler`, `decorators`, `sql`, `rows`, ...); `use-case`, `repository`,
 `store`, `worker`, `scheduler` and `dto` are not among them (R89).
 
@@ -220,8 +233,9 @@ down to platform or are passed as options. Only these three module tiers exist.
 
 Schema changes only by migration. `synchronize` is the literal `false` everywhere, including e2e databases (e2e runs the
 real migrations). There is no runtime DDL, no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE|ALTER|DROP TABLE`
-outside `persistence/migrations/**`, no entity or migration glob. `be/apps/migrate` is the only process that runs migrations,
-once per connection, before api and worker start. Entities and migrations live in `persistence/{entities,migrations}/` of
+outside `persistence/migrations/**`, no entity or migration glob. The cli migrate command (`cli migrate run`, the root
+script `npm run migrate`) is the only runner of migrations, once per connection, before api and worker start; the test
+world runs them over the same connection list. Seed data is a cli seed command, never a migration. Entities and migrations live in `persistence/{entities,migrations}/` of
 the capability that owns the table; the owner's `index.ts` exports `<c>Entities` and `<c>Migrations` and the app composes
 them per connection. Migrations are `<epochMs13>-<kebab-name>.ts`.
 
@@ -229,7 +243,7 @@ One physical database is one connection (`hfs.json` `sides.be.connections`), one
 one injector `Inject<Conn>EntityManager()` in `platform/database` (R84). The database is reached through that shared
 `EntityManager`, injected with the named injector and called directly: `getRepository`, `@InjectRepository`,
 `Repository<T>`, repository or store classes, QueryBuilder, a `DataSource` or `QueryRunner` outside `platform/database`,
-`be/apps/migrate` and the test world `be/src/tests/world` do not exist; specs use the world's `world.db.<connection>` `EntityManager` (R83). A handler opens the transaction with
+the cli (`be/apps/cli`, `be/src/features/cli/`) and the test world `be/src/tests/world` do not exist; specs use the world's `world.db.<connection>` `EntityManager` (R83). A handler opens the transaction with
 `this.entityManager.transaction(async (manager) => ...)` and only `manager` is used inside it.
 
 Raw SQL is a `sql`-tagged `SqlText` constant in `persistence/<name>.sql.ts` of the owning capability; `.query()` accepts
@@ -278,18 +292,22 @@ with `src` or `.starcistacks`.
 Background work is a transport. `transport/schedule/<job>.job.ts` (a `ScheduledJob` with `run(at)`) and
 `transport/message/<event>.consumer.ts` dispatch one command exactly as a resolver does. Mechanisms live in
 `platform/scheduling` and `platform/messaging` (adapters over the queue and stream libraries, with lease and fencing).
-Only an app of kind `worker` composes them; an api app never runs cron. A method named `sweep*`, `deliver*`,
+The api app of the service that owns the feature composes them (the lease of `platform/scheduling` lets one replica run
+a tick); a `worker` app composes them instead only when the background load must scale apart (R46). A method named `sweep*`, `deliver*`,
 `reconcile*`, `retry*` or `relay*` that no job or consumer calls is a failure. Producers publish through typed queues, and
 a publish that must be atomic with a write goes through the outbox inside the transaction.
 
 ### 5.8 Modules, features and injection (R29 to R33, R45, R85, R87, R88)
 
-A feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
-`messages/` only. `application/` holds commands, queries, handlers and contracts: each message is a typed
+Features are grouped by trigger kind: `features/api/<feature>/` and `features/cli/`; a kind imports only `modules/*`, never
+another kind, and only `be/apps/*` composes features. An api feature root holds `index.ts`, `<feature>.module.ts`,
+`application/`, `transport/<protocol>/` and, when it has copy, `messages/` only. Inside one bounded context the handler
+calls that context's domain service in one transaction, with no event; an event (through the outbox) only crosses
+contexts or carries async work (`knowledge/patterns/be/api.yaml`). `application/` holds commands, queries, handlers and contracts: each message is a typed
 `Command<R>`/`Query<R>` carrying one `params` (`ExecuteParams<T>` or `PublicExecuteParams<T>`), each handler
 `extends ICQRSHandler` and overrides `process` as one call of an injected service; there is no use-case class, forwarder service or in-process event (R87).
 A transport injects only the command or query bus, dispatches exactly one message, holds no logic, returns no envelope and takes no
-`GraphQLJSON` (R88). Each transport has exactly one Nest module `<feature>-<protocol>.module.ts`, plus one application
+`GraphQLJSON` (R88); a cli command is an action runner, not a transport, and has its own unit spec (R134). Each transport has exactly one Nest module `<feature>-<protocol>.module.ts`, plus one application
 module; never one module per operation.
 
 A capability module is `@Module` extending `ConfigurableModuleClass` from a typed `ConfigurableModuleBuilder<Options>`, and
@@ -410,7 +428,7 @@ no contract copy under `fe/`.
 
 ## 7. Tests
 
-- Backend, four kinds by folder and suffix (R47): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested); integration
+- Backend, four kinds by folder and suffix (R47): unit `<name>.service.spec.ts` beside its `<name>.service.ts` and `<name>.cli.spec.ts` beside its `<name>.cli.ts` (only the unit-tested roles of `ruleParams.be.unitRoles`, services and cli commands, are unit-tested); integration
   `be/src/tests/integration/<capability>/*.integration-spec.ts` (`useTestWorld({ modules })`, real database, no HTTP); e2e
   `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`useTestWorld({ apps })`); contract `be/src/tests/contract/<provider>/*.contract-spec.ts`
   (provider sandboxes, skipped without sandbox config).
@@ -434,12 +452,12 @@ no contract copy under `fe/`.
   and `contract`; ts-jest `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs
   and fixtures included) at pre-push and CI and by `typecheck:tests` (`be/src/tests/tsconfig.json`) for the world,
   integration, e2e and contract trees. `test:integration`, `test:e2e` and `test:contract` are each
-  `npm run typecheck:tests && cd be && jest --selectProjects <name>`; `test` is `cd be && jest --selectProjects unit --coverage` (per-file 100 on `be/src/**/*.service.ts`). Every script runs from the app root.
+  `npm run typecheck:tests && cd be && jest --selectProjects <name>`; `test` is `cd be && jest --selectProjects unit --coverage` (per-file 100 on `be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts`). Every script runs from the app root.
 - A backend e2e boots the real apps through the world; it never hand-assembles a lane module. Fixtures are typed
   builders and doubles, not `as never` or `as unknown as`; they never import a feature. No `testing/` folder in
   `be/src/modules`. A spec does not read source code with `fs` (R48).
 - Frontend: no tests by standard (R97): no spec, no e2e, no test runner, test script or test dependency under `fe/`, and no exception.
-- Write or update the spec of the service you change; the op gate (`gate.mjs --tests`) and the hooks run only the affected unit specs. The whole suite runs only at push.
+- Write or update the spec of the service or cli command you change; the op gate (`gate.mjs --tests`) and the hooks run only the affected unit specs. The whole suite runs only at push.
 
 ## 8. `.starciwork`, `.starcistacks`, secrets
 
@@ -499,7 +517,7 @@ no contract copy under `fe/`.
 | OS op settle | the op gate `scripts/gates/gate.mjs` over the op's changed files, forced every round of the op loop: the merge guard, `hfs lint --changed`, `codegen` and package builds, `tsc` per owning tsconfig, the slice's specs; only findings new against the base block (the workflow's previous checkpoint); `api settle` re-reads the attached gate JSON and READ digest and refuses a red `done` | per op | every file-level and owner-level rule in scope |
 | LG land | the workflow's finish, the only time main is touched: `gate.mjs` over the whole workflow branch against its merge-base with main (merge guard included), `review.verify` of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed; a green op before it is only a checkpoint on `wf-<workflowId>` | per workflow | as OS, over the whole branch, against the newest main |
 | CI GitHub | `npm ci`, `npm run lint -- --sonar reports/lint.sonar.json` (the pinned `hfs lint`), `format:check`, `typecheck`, `npm test` (unit with the per-file coverage threshold), `build:be`, `build:fe`, the Sonar scan and gate | | every rule |
-| SQ Sonar | the imported lint findings, duplication, cognitive complexity and coverage 100 on `be/src/**/*.service.ts` (overall, new code and per file; the be unit run's lcov, the same per-file 100 the unit project enforces) | | R20, R21 (second gate) |
+| SQ Sonar | the imported lint findings, duplication, cognitive complexity and coverage 100 on `be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts` (overall, new code and per file; the be unit run's lcov, the same per-file 100 the unit project enforces) | | R20, R21 (second gate) |
 
 A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manifest, not an app.
 
@@ -559,7 +577,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature, transport module and capability module is composed by an app. |
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; an app is proven by the e2e world (`useTestWorld({ apps })`), never by a unit spec. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `be/apps/*/src`. |
-| R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority; `synchronize` is `false`. |
+| R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority, run only by the cli migrate command and the test world; `synchronize` is `false`. |
 | R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias). |
 | R36 | `BE_SQL_OUTSIDE_PERSISTENCE` | Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder. |
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
@@ -571,8 +589,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once. |
-| R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
-| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs are `<name>.service.spec.ts` beside a `<name>.service.ts` and nowhere else (every service has exactly one; any other `*.spec.ts` outside `be/src/tests/{world,integration,e2e,contract}` is a finding, including specs in apps), and the unit project collects coverage from `be/src/**/*.service.ts` only with a per-file threshold of 100 on lines, branches, functions and statements (`test` runs `--coverage`; `importHelpers` and `tslib`); `be/src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the app's own stack (`.starcistacks/<env>`, named by `stack` in `test-world.config.ts`, the declaration of the test-world library in its one named form `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (a default export is not read): every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `be/apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), whose `stacks` entry in `test-world.config.ts` declares `{ fakedBy: <fake>, reason }` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `be/src/tests` overrides a provider or DI token; `be/src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, with the real peer apps its client calls beside them as `apps`; real infrastructure, no HTTP door of ours), `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; an integration or e2e spec passes `useTestWorld` one object literal with plain keys (no variable, spread or computed key) and calls it; the contract layer skips only through the test-world library's `useSandbox(...)` when the sandbox config is absent (`sandbox.describe(...)`), and every `fakes/<provider>/` that serves payload fixtures (`payloads/*.json`) has a `contract/<provider>/*.contract-spec.ts` that references those fixtures and asserts `shapeOf(real)` equals `shapeOf(fixture)` (the helper `shapeOf` is named by `ruleParams.be.contractShape` of the slot manifest; fakes the test-world library provides are guarded by the library); no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `be/src/tests/e2e/world`. |
+| R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer composed by an app: the service that owns it (an api app) or a worker app scaled apart. |
+| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs are the unit-tested roles of `ruleParams.be.unitRoles` (`<name>.service.spec.ts` beside a `<name>.service.ts`, `<name>.cli.spec.ts` beside a cli command `<name>.cli.ts` of `src/features/cli`) and nowhere else (every unit-tested subject has exactly one; any other `*.spec.ts` outside `be/src/tests/{world,integration,e2e,contract}` is a finding, including specs in apps), and the unit project collects coverage from the unit-tested roles only (`be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts`) with a per-file threshold of 100 on lines, branches, functions and statements (`test` runs `--coverage`; `importHelpers` and `tslib`); `be/src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the app's own stack (`.starcistacks/<env>`, named by `stack` in `test-world.config.ts`, the declaration of the test-world library in its one named form `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (a default export is not read): every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs the migrations once over the cli app's connections (the runner of the cli migrate command); `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), whose `stacks` entry in `test-world.config.ts` declares `{ fakedBy: <fake>, reason }` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `be/src/tests` overrides a provider or DI token; `be/src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, with the real peer apps its client calls beside them as `apps`; real infrastructure, no HTTP door of ours), `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; an integration or e2e spec passes `useTestWorld` one object literal with plain keys (no variable, spread or computed key) and calls it; the contract layer skips only through the test-world library's `useSandbox(...)` when the sandbox config is absent (`sandbox.describe(...)`), and every `fakes/<provider>/` that serves payload fixtures (`payloads/*.json`) has a `contract/<provider>/*.contract-spec.ts` that references those fixtures and asserts `shapeOf(real)` equals `shapeOf(fixture)` (the helper `shapeOf` is named by `ruleParams.be.contractShape` of the slot manifest; fakes the test-world library provides are guarded by the library); no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `be/src/tests/e2e/world`. |
 | R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72), no return-only generic (`<T>(value: unknown): T`), `unknown` handed back as a concrete type, `JSON.parse(JSON.stringify(x))` or `Object.assign(new X(), y)` returned as another type in a spec or a test fixture, and no `Date.now()`, argless `new Date()` or `process.env` (R79, R43); a unit spec (`<name>.service.spec.ts`) builds its subject with `Test.createTestingModule({ providers: [...] }).compile()` and `moduleRef.get(Subject)`: no `new` of the service, no `imports` key, no `override*` call, and no `jest.mock`, `jest.doMock`, `jest.unstable_mockModule` or `jest.requireMock` of an own module or a third-party library; it provides each infrastructure token from its `@starci/jest-preset` double (`mockEntityManager(...)` for an EntityManager token, `new FakeClock(...)`, `recordingOutbox()`, `fakeCache(...)`, `fakeLock(...)`, `fakeIds()`, `builder(...)(...)` or a plain literal of real values for an options token, `mock<T>()` for everything else; the token table is `ruleParams.be.specDoubles` of the slot manifest) and takes its EntityManager only from the kit's `mockEntityManager()` or `fakeTransaction()`, never an ad-hoc `jest.fn` object, and asserts exact values: ids from `fakeIds()` and dates from `FakeClock` are compared as themselves, never `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)`; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider. Test data is arranged by builders, which R98 to R101 hold. No spec of any layer skips, focuses or marks a test todo (`skip`, `skipIf`, `runIf`, `todo`, `only`, `xit`, `xdescribe`, `xtest`) and none selects its runner conditionally, and no file of the test tree (world, fixtures, kit) writes one either; the only skip is the test-world library's `useSandbox(...)` (`@starci/test-world`), which skips a contract spec when the sandbox config is absent. |
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
@@ -589,12 +607,12 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R80 | `BE_INBOX_DEDUPE_MISSING` | Every service method that takes a delivery (a public method of a `*.service.ts` whose first parameter has an `eventId`) makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`; consumers and `SignedWebhook` controllers stay thin doors (R88) and dispatch to the handler whose service claims. |
 | R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
 | R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
-| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `be/apps/migrate` and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object. |
+| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, the cli (`be/apps/cli`, `be/src/features/cli`) and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object. |
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface. |
 | R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
 | R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events (`EventBus`, `EventEmitter`, an RxJS `Subject`, a stored listener list); a message and an injected dependency are `readonly`. |
-| R88 | `BE_TRANSPORT_SHAPE` | A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`. |
+| R88 | `BE_TRANSPORT_SHAPE` | A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R134) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`. |
 | R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source. |
 | R90 | `BE_INFRA_OWNER` | Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability, and the `HttpClient` port of `platform/http` is called only by an `integrations` capability. |
 
@@ -630,7 +648,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R99 | `BE_TEST_ROW_BY_BUILDER` | A unit, integration or e2e spec never hand-builds rows: no raw INSERT/UPDATE/DELETE text, no `save`, `insert`, `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner, and no persistence entity built as an object literal more than once in the spec; rows come from the area's builder. |
 | R100 | `BE_TEST_CONSTRAINTS_ON` | Nothing under `be/src/tests` disables or drops a database constraint: no `session_replication_role`, `SET CONSTRAINTS ... DEFERRED`, `DEFERRABLE INITIALLY DEFERRED`, `ALTER TABLE ... DISABLE`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, and no `dropForeignKey(s)`, `dropCheckConstraint(s)` or `dropUniqueConstraint(s)` on a QueryRunner; a builder creates the parent chain instead. |
 | R101 | `BE_TEST_BUILDER_ARRANGES` | A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `jest`, `@jest/globals`) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`). |
-| R102 | `BE_SPEC_PLACEMENT` | A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec `<name>.service.spec.ts` beside its service, or an integration, e2e or contract spec under `be/src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding. |
+| R102 | `BE_SPEC_PLACEMENT` | A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec of a unit-tested role (`ruleParams.be.unitRoles`: `<name>.service.spec.ts` beside its service, `<name>.cli.spec.ts` beside its cli command), or an integration, e2e or contract spec under `be/src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding. |
 | R103 | `HFS_REPO_LOCAL_CHECK` | A repository keeps no check, lint rule or lint plugin of its own: no `check-*` file in `scripts/` or `tools/`, no `eslint-local-rules*` or local eslint plugin, no script that runs one; every check lives in the `.claude` runtime and the canons. |
 | R104 | `HFS_LINT_SUPPRESSION_FILE` | A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code. |
 | R105 | `HFS_PROOF_COMMAND_FILE_MISSING` | A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists. |
@@ -661,3 +679,11 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R125 | `RT_NODE_MODULES_LINK` | No runtime source creates a junction or a symlink for a node_modules folder, through node:fs (symlink, symlinkSync, directly or through a local wrapper) or a spawned link command (mklink /J or /D, New-Item -ItemType Junction or SymbolicLink, ln -s): every checkout installs its own dependencies with a real npm ci from the cache. |
 | R126 | `RT_CONTROL_CHARACTER` | Tracked text source of the runtime (*.mjs, *.cjs, *.js, *.ts, *.tsx, *.yaml, *.yml, *.md, *.json outside the generated copies) holds no raw control character (U+0000 to U+001F except tab, LF and CR, and U+007F); the character is written as its escape. |
 | R127 | `RT_ABSOLUTE_PATH` | No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text. A real path-parsing test vector goes to the pending list with a reason. |
+| R128 | `HFS_MONO_WORKSPACES` | Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `["fe/apps/*", "fe/packages/*"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs). |
+| R129 | `HFS_MONO_FE_WORKSPACE` | Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script. |
+| R130 | `HFS_MONO_NEST_PROJECTS` | The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `"monorepo": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{"type": "application", "root": "apps/<app>", "sourceRoot": "apps/<app>/src"}`. |
+| R131 | `HFS_MONO_WORKSPACE_DEP` | An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `"*"`; the app root `package.json` never declares a workspace package. |
+| R132 | `BE_CLI_REQUIRED` | Every one-off action of a back end lives in ONE app, `be/apps/cli` (kind cli, named cli): a back end that declares a connection (its migrations run as `cli migrate run`) or tracks a command under `src/features/cli/` declares exactly that app, and tracks its image `be/apps/cli/Dockerfile` (one image, run as `cli <group> <command>`). |
+| R133 | `BE_CLI_BOOTSTRAP` | The cli app boots in its `main.ts` with `CommandFactory.run(...)` of nest-commander and never serves: `NestFactory.create*` of `@nestjs/core`, a `.listen()`, a microservice connection, an `@nestjs/platform-*` adapter or `@nestjs/microservices` in the cli app is refused (by the import that binds each name). |
+| R134 | `BE_CLI_COMMAND_SHAPE` | A nest-commander command (`@Command` or `@SubCommand`, by the import that binds the decorator) is declared only in the cli feature root `src/features/cli/`: a group `@Command` in `<group>/<group>.cli.ts`, a `@SubCommand` extending `CommandRunner` in `<group>/subs/<name>.cli.ts`, one command per file, and every sub-command has its unit spec `<name>.cli.spec.ts` beside it (a command is an action runner, not a thin transport: R88 does not apply to it). `.cli.ts`, because `.command.ts` is the CQRS message. |
+| R135 | `BE_CLI_OWNER` | `nest-commander` is imported only by the cli app and the cli feature root, and no back-end source parses command-line arguments itself: `process.argv` and the parsers commander, yargs and minimist are refused everywhere; a one-off action anywhere but a cli command is a door the rule closes. |

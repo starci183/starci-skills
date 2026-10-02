@@ -28,6 +28,4 @@ flag_management:
     - name: ecommerce-app
       paths:
         - "examples/ecommerce-app/be/src/**/*.service.ts"
-    - name: todo-app
-      paths:
-        - "examples/todo-app/be/src/**/*.service.ts"
+        - "examples/ecommerce-app/be/src/features/cli/**/*.cli.ts"

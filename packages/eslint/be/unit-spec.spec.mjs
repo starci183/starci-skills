@@ -22,7 +22,7 @@ import {
 
 const tester = typedTester()
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
-const HANDLER_SPEC = at("src/features/checkout/application/start-checkout.handler.spec.ts")
+const HANDLER_SPEC = at("src/features/api/checkout/application/start-checkout.handler.spec.ts")
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const FIXTURE = at("src/tests/fixtures/orders.ts")
 const E2E = at("src/tests/e2e/checkout/course-enroll.e2e-spec.ts")

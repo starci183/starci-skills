@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { SystemHealthHttpModule } from "@features/system-health"
+import { SystemHealthHttpModule } from "@features/api/system-health"
 import { AuthGuard, IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, IdentityModule } from "@modules/domain/identity"
 import { LivenessModule } from "@modules/domain/liveness"
 import { ClockModule } from "@modules/platform/clock"

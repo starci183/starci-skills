@@ -29,6 +29,7 @@
 //   HFS_PEER_INTEGRATION_MISSING  (R111, hfs-rules/peer-integrations.mjs) the app root package.json lacks the runtime peer a driver integration needs
 //   BE_INTEGRATION_SPEC_MISSING   (R112, hfs-rules/integration-specs.mjs) an integration with no integration spec that registers its module, maps its refusals and drives an outage
 //   FE_GRAPHQL_CONTRACT           (R113, hfs-rules/fe-contract-documents.mjs) a front-end GraphQL document the back end's contract snapshot does not serve
+//   HFS_MONO_* (R128-R131, rules/monorepo.mjs) the monorepo shape; BE_CLI_REQUIRED (R132, rules/cli.mjs) the one cli app
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
@@ -60,21 +61,15 @@ import { gitOutputOf } from '../lib/git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './tree.mjs';
 import { contractFindings } from './rules/contract.mjs';
-import { depFindings } from './rules/deps.mjs';
-import { appFrontendFindings, frontendFindings } from './rules/frontend-tree.mjs';
-import { feContractFindings } from './rules/fe-contract-documents.mjs';
-import { integrationSpecFindings } from './rules/integration-specs.mjs';
+import { appRootFindings } from './rules/app-root.mjs';
+import { frontendFindings } from './rules/frontend-tree.mjs';
 import { lintSuppressionFindings } from './rules/lint-suppression.mjs';
-import { peerIntegrationFindings } from './rules/peer-integrations.mjs';
-import { pipelineFindings } from './rules/pipeline.mjs';
-import { proofCommandFindings } from './rules/proof-commands.mjs';
 import { repoLocalCheckFindings } from './rules/repo-local-checks.mjs';
 import { readJson } from './rules/read.mjs';
 import { secretFindings } from './rules/secrets.mjs';
 import { pathFindings } from './path-findings.mjs';
 import { onLintSurface } from './architecture/surface.mjs';
 import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
-import { stacksFindings } from './rules/stacks.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 
@@ -94,7 +89,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
-  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -275,15 +270,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
   );
   if (isRoot) {
     findings.push(
-      ...depFindings({ repoRoot, files: all }),
-      ...peerIntegrationFindings({ repoRoot, files: all }),
-      ...integrationSpecFindings({ repoRoot, files: all }),
-      ...feContractFindings({ repoRoot, files: all }),
-      ...pipelineFindings({ repoRoot, files, pins }),
-      ...testTopologyFindings({ repoRoot, files }),
-      ...proofCommandFindings({ repoRoot, files: all, resolver, sides: Object.keys(repo.sides ?? {}) }),
-      ...appFrontendFindings({ repoRoot, files: all, repo }),
-      ...stacksFindings({ repoRoot, files, resolver }),
+      ...appRootFindings({ repoRoot, files, all, repo, resolver, pins }),
       // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );

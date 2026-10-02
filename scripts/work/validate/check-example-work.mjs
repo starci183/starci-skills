@@ -15,8 +15,8 @@ import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMai
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
- * something checks it: renaming `impl/todo-app` to `impl/todo-app-backend` left thirteen records whose id
- * still said `todo-app`, and the YAML gate accepted every one of them because each file parsed. A record
+ * something checks it: renaming `impl/shop` to `impl/shop-backend` left thirteen records whose id
+ * still said `shop`, and the YAML gate accepted every one of them because each file parsed. A record
  * whose id does not match its place is the mismatch the layout forbids, and a ref to an id no record owns
  * is a dangling edge that reads as a satisfied dependency.
  *

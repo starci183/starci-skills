@@ -34,7 +34,7 @@ test("every rule this law declares is exported under its published name", () => 
 })
 
 test("operational E2E preserves the production transport boundary", () => {
-  const HANDLER = "import { StartCheckoutHandler } from '../../../features/checkout/application/start-checkout.handler'\n"
+  const HANDLER = "import { StartCheckoutHandler } from '../../../features/api/checkout/application/start-checkout.handler'\n"
   tester.run("e2e-uses-production-transport", e2eUsesProductionTransport, {
     valid: [
       { filename: FLOW, code: "declare const request: (app: object) => { post(path: string): { send(body: object): Promise<void> } }\ndeclare const app: object\nawait request(app).post('/graphql').send({})" },

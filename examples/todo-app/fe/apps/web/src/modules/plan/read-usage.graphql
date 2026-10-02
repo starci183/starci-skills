@@ -1,7 +1,0 @@
-query PlanUsage {
-    planUsage {
-        plan
-        cap
-        activeCount
-    }
-}

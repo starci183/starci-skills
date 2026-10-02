@@ -10,8 +10,8 @@ const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path
 const names = (report, ruleId) => findings(report, ruleId).map(item => item.name).sort();
 
 const composed = {
-  'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
-  'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\n",
+  'apps/core/src/app.module.ts': "import { a } from '../../../src/features/api/a';\nexport const AppModule = [a];\n",
+  'src/features/api/a/index.ts': "import { used } from '../../../modules/domain/x';\nexport const a = [used];\n",
 };
 
 // ---- HFS_UNUSED_EXPORT on the backend owner entries (R25 a) -------------------------------------------------------
@@ -19,21 +19,21 @@ const composed = {
 test('R25: a backend feature and a backend domain entry both report an export nobody outside imports', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import { a, b } from '../../../src/features/a';\nexport const AppModule = [a, b];\n",
-      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\nexport const b = 1;\nexport const dead = 2;\n",
+      'apps/core/src/app.module.ts': "import { a, b } from '../../../src/features/api/a';\nexport const AppModule = [a, b];\n",
+      'src/features/api/a/index.ts': "import { used } from '../../../modules/domain/x';\nexport const a = [used];\nexport const b = 1;\nexport const dead = 2;\n",
       'src/modules/domain/x/index.ts': 'export const used = 1;\nexport const unused = 2;\n',
     },
   });
   const report = runArch(root);
   const dead = findings(report, 'HFS_UNUSED_EXPORT').map(item => `${item.path}:${item.name}`).sort();
-  assert.deepEqual(dead, ['src/features/a/index.ts:dead', 'src/modules/domain/x/index.ts:unused']);
+  assert.deepEqual(dead, ['src/features/api/a/index.ts:dead', 'src/modules/domain/x/index.ts:unused']);
 });
 
 test('R25: a backend tree whose exports are all used reports no dead export', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
-      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\n",
+      'apps/core/src/app.module.ts': "import { a } from '../../../src/features/api/a';\nexport const AppModule = [a];\n",
+      'src/features/api/a/index.ts': "import { used } from '../../../modules/domain/x';\nexport const a = [used];\n",
       'src/modules/domain/x/index.ts': 'export const used = 1;\n',
     },
   });

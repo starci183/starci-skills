@@ -15,7 +15,7 @@
  * - `query-needs-limit` (R69 `BE_QUERY_UNBOUNDED`) - `find`, `findBy` and `findAndCount` on an `EntityManager` carry `take`.
  * - `no-query-in-loop` (R77 `BE_QUERY_IN_LOOP`) - an `EntityManager` read does not run once per element of a loop.
  *
- * A migration is hand-written DDL run once by `apps/migrate`; its `queryRunner.query(...)` takes plain text.
+ * A migration is hand-written DDL run once by the cli migrate command; its `queryRunner.query(...)` takes plain text.
  */
 import { keyName } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"

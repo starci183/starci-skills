@@ -21,7 +21,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'secondary', envPrefix: 'SECONDARY_DB' }] };
+const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'secondary', envPrefix: 'SECONDARY_DB' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
 const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'my-app', sides: { be, fe }, ...rest });
 const APP = app();
@@ -105,14 +105,16 @@ test('a declaration is checked against the manifest, per side', () => {
   const manifest = loadSlotManifest();
   const be = (fields) => app({ be: { ...BE_SIDE, ...fields } });
   refusal(() => resolveRepoDeclaration(manifest, be({ apps: [...BE_SIDE.apps, { name: 'game', kind: 'unity' }] })), 'HFS_DECLARATION_INVALID');
-  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }, { name: 'cli', kind: 'cli' }] })), 'HFS_DECLARATION_INVALID');
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.feature'] })), 'HFS_DECLARATION_INVALID');          // required, not opt-in
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.app.worker'] })), 'HFS_DECLARATION_INVALID');       // implied by an app of its kind
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['fe.package.ui'] })), 'HFS_DECLARATION_INVALID');       // the other side's
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['app.ci-e2e'] })), 'HFS_DECLARATION_INVALID');          // the root's
   refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.made.up'] })), 'HFS_DECLARATION_INVALID');
-  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');   // no api app
-  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }] })), 'HFS_DECLARATION_INVALID');   // connections declared, no migrate app
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'worker' }, { name: 'cli', kind: 'cli' }] })), 'HFS_DECLARATION_INVALID');   // no api app
+  // connections declared and no cli app: the declaration stands; BE_CLI_REQUIRED (hfs check) names the missing cli app
+  assert.doesNotThrow(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }] })));
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');   // the migrate kind is gone: a cli command migrates
   assert.doesNotThrow(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }], connections: [] })));
   refusal(() => resolveRepoDeclaration(manifest, app({ fe: { ...FE_SIDE, apps: [] } })), 'HFS_DECLARATION_INVALID');
   refusal(() => resolveRepoDeclaration(manifest, app({ fe: { ...FE_SIDE, reads: ['be/src/'] } })), 'HFS_DECLARATION_INVALID');  // only the manifest's reads
@@ -175,9 +177,9 @@ test('the app root: its own slots, a side path through the side, and the files o
   assert.equal(owner('tsconfig.json'), 'forbidden:app.tool-config-local');                       // a tool config belongs to a side
   assert.equal(owner('node_modules/x/index.js'), 'owned:app.build-output');
   // a side path answers through its side, with the side named and the path kept app-relative
-  const feature = whole.classifyPath('be/src/features/orders/index.ts');
-  assert.deepEqual([feature.status, feature.slot, feature.side, feature.path], ['owned', 'be.feature', 'be', 'be/src/features/orders/index.ts']);
-  assert.equal(whole.ownerOf('be/src/features/orders/application/place.handler.ts').root, 'be/src/features/orders');
+  const feature = whole.classifyPath('be/src/features/api/orders/index.ts');
+  assert.deepEqual([feature.status, feature.slot, feature.side, feature.path], ['owned', 'be.feature', 'be', 'be/src/features/api/orders/index.ts']);
+  assert.equal(whole.ownerOf('be/src/features/api/orders/application/place.handler.ts').root, 'be/src/features/api/orders');
   assert.equal(whole.classifyPath('fe/apps/web/src/modules/cart/index.ts').slot, 'fe.modules');
   assert.equal(whole.sideOf('fe/apps/web/next.config.ts'), 'fe');
   assert.equal(whole.sideOf('README.md'), null);
@@ -192,10 +194,10 @@ test('the app root: its own slots, a side path through the side, and the files o
     assert.equal(paths.includes(p), true, `required path missing: ${p}`);
   // nothing crosses sides except the declared reads
   const ok = (a, b) => whole.importAllowed(a, b);
-  assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/orders/index.ts').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/orders/index.ts').reason], [false, 'crossSide']);
+  assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/api/orders/index.ts').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/api/orders/index.ts').reason], [false, 'crossSide']);
   assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/contracts/core/schema.graphql').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/contracts/core/schema.graphql').reason], [true, 'sideRead']);
-  assert.equal(ok('be/src/features/orders/index.ts', 'fe/apps/web/src/modules/api/index.ts').reason, 'crossSide');
-  assert.equal(ok('be/src/features/orders/application/a.ts', 'be/src/modules/domain/stock/index.ts').allowed, true, 'inside a side, the side decides');
+  assert.equal(ok('be/src/features/api/orders/index.ts', 'fe/apps/web/src/modules/api/index.ts').reason, 'crossSide');
+  assert.equal(ok('be/src/features/api/orders/application/a.ts', 'be/src/modules/domain/stock/index.ts').allowed, true, 'inside a side, the side decides');
 });
 
 test('BE side: which slot owns a path', () => {
@@ -204,15 +206,18 @@ test('BE side: which slot owns a path', () => {
   assert.equal(owner('README.md'), 'forbidden:repo.side-root-forbidden');
   assert.equal(owner('apps/core/src/main.ts'), 'owned:be.app.api');
   assert.equal(owner('apps/worker/src/app.module.ts'), 'owned:be.app.worker');
-  assert.equal(owner('apps/migrate/src/main.ts'), 'owned:be.app.migrate');
-  assert.equal(owner('src/features/orders/index.ts'), 'owned:be.feature');
-  assert.equal(owner('src/features/orders/application/place.handler.ts'), 'owned:be.feature.application');
-  assert.equal(owner('src/features/orders/application/support/price-lines.ts'), 'owned:be.feature.application.support');
-  assert.equal(owner('src/features/orders/application/support/price-lines.spec.ts'), 'owned:be.feature.application.support');
-  assert.equal(owner('src/features/orders/transport/http/place.controller.ts'), 'owned:be.transport.http');
-  assert.equal(owner('src/features/orders/transport/schedule/sweep.job.ts'), 'owned:be.transport.schedule');
-  assert.equal(owner('src/features/orders/transport/cli/import.command.ts'), 'not-enabled:be.feature.transport.cli');     // opt-in, not declared
-  assert.equal(owner('src/features/orders/transport/message/paid.consumer.ts'), 'not-enabled:be.transport.message');     // opt-in, not declared
+  assert.equal(owner('apps/cli/src/main.ts'), 'owned:be.app.cli');
+  assert.equal(owner('src/features/cli/migrate/subs/run.cli.ts'), 'owned:be.cli');
+  assert.equal(owner('src/features/cli/migrate/subs/run.cli.spec.ts'), 'owned:be.cli');
+  assert.equal(owner('src/features/orders/index.ts').startsWith('owned:'), false, 'a feature lives under its trigger kind: src/features/api/<feature>');
+  assert.equal(owner('src/features/api/orders/index.ts'), 'owned:be.feature');
+  assert.equal(owner('src/features/api/orders/application/place.handler.ts'), 'owned:be.feature.application');
+  assert.equal(owner('src/features/api/orders/application/support/price-lines.ts'), 'owned:be.feature.application.support');
+  assert.equal(owner('src/features/api/orders/application/support/price-lines.spec.ts'), 'owned:be.feature.application.support');
+  assert.equal(owner('src/features/api/orders/transport/http/place.controller.ts'), 'owned:be.transport.http');
+  assert.equal(owner('src/features/api/orders/transport/schedule/sweep.job.ts'), 'owned:be.transport.schedule');
+  assert.equal(owner('src/features/cli/migrate/subs/run.cli.ts'), 'owned:be.cli');
+  assert.equal(owner('src/features/api/orders/transport/message/paid.consumer.ts'), 'not-enabled:be.transport.message');     // opt-in, not declared
   assert.equal(owner('src/modules/domain/orders/orders.service.ts'), 'owned:be.domain');
   assert.equal(owner('src/modules/domain/orders/errors/orders.error.ts'), 'owned:be.errors');
   assert.equal(owner('src/modules/integrations/stripe/errors/stripe.error.ts'), 'owned:be.errors');
@@ -229,15 +234,15 @@ test('BE side: which slot owns a path', () => {
   assert.equal(owner('node_modules/x/index.js'), 'owned:repo.build-output');
   assert.equal(owner('apps/core/src/.next/x'), 'owned:be.app.api');   // the deeper slot: app source owns its subtree
   // a Windows spelling and a directory spelling reach the same slot
-  assert.equal(owner('src\\features\\orders\\index.ts'), 'owned:be.feature');
-  assert.equal(owner('src/features/orders/'), 'owned:be.feature');
-  assert.equal(be.ownerOf('src/features/orders/application/place.handler.ts').root, 'src/features/orders');
+  assert.equal(owner('src\\features\\api\\orders\\index.ts'), 'owned:be.feature');
+  assert.equal(owner('src/features/api/orders/'), 'owned:be.feature');
+  assert.equal(be.ownerOf('src/features/api/orders/application/place.handler.ts').root, 'src/features/api/orders');
   assert.equal(be.classifyPath('e2e/probe.spec.ts').goesTo.startsWith('src/tests/e2e/'), true);
 });
 
 test('BE side: tracked, tier, required files', () => {
   const be = sideOf(APP, 'be');
-  assert.equal(be.isTracked('src/features/orders/index.ts'), true);
+  assert.equal(be.isTracked('src/features/api/orders/index.ts'), true);
   assert.equal(be.trackingOf('apps/core/dist/main.js'), 'ignored');
   assert.equal(be.isTracked('apps/core/dist/main.js'), false);
   assert.equal(be.trackingOf('.eslintcache'), 'external');
@@ -248,8 +253,8 @@ test('BE side: tracked, tier, required files', () => {
   assert.equal(be.tierOf('src/modules/domain/orders/persistence/orders.repository.ts'), 'domain');       // inherits the owner's tier
   assert.equal(be.tierOf('src/modules/platform/database/persistence/x.ts'), 'platform');
   assert.equal(be.tierOf('tsconfig.json'), 'none');
-  assert.deepEqual(be.requiredFiles('src/features/orders/index.ts'), ['src/features/orders/index.ts', 'src/features/orders/orders.module.ts', 'src/features/orders/application/']);
-  assert.deepEqual(be.requiredFiles('src/features/orders/transport/http/a.controller.ts'), ['src/features/orders/transport/http/orders-http.module.ts']);
+  assert.deepEqual(be.requiredFiles('src/features/api/orders/index.ts'), ['src/features/api/orders/index.ts', 'src/features/api/orders/orders.module.ts', 'src/features/api/orders/application/']);
+  assert.deepEqual(be.requiredFiles('src/features/api/orders/transport/http/a.controller.ts'), ['src/features/api/orders/transport/http/orders-http.module.ts']);
   assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts']);
   assert.deepEqual(be.requiredFiles('src/modules/domain/orders/persistence/x.ts'), ['src/modules/domain/orders/persistence/connection.ts']);
   const { paths, minimums } = be.requiredPaths();
@@ -261,31 +266,31 @@ test('BE side: tracked, tier, required files', () => {
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
   assert.equal(has('jest.config.e2e.js'), false);
   assert.deepEqual(minimums.map((m) => m.slot).sort(), ['be.app.api', 'be.feature']);
-  // no connection declared: no migrate app is required, and its paths are not
+  // the cli app is required by BE_CLI_REQUIRED (hfs check), not by the slot: with or without a connection, no cli path is a slot requirement of an app that declares none
   const noDb = sideOf(app({ be: { ...BE_SIDE, apps: [{ name: 'core', kind: 'api' }], connections: [] } }), 'be');
-  assert.equal(noDb.requiredPaths().paths.some((e) => e.slot === 'be.app.migrate'), false);
+  assert.equal(noDb.requiredPaths().paths.some((e) => e.slot === 'be.app.cli'), false);
 });
 
 test('BE side: import direction', () => {
   const be = sideOf(APP, 'be');
   const ok = (a, b) => be.importAllowed(a, b);
-  assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/modules/domain/stock/index.ts').allowed, true);
-  assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/features/orders/orders.module.ts').reason, 'sameOwner');
-  assert.deepEqual([ok('src/features/orders/application/a.ts', 'src/features/billing/index.ts').allowed, ok('src/features/orders/application/a.ts', 'src/features/billing/index.ts').reason], [false, 'tierDirection']);   // feature never imports feature
-  assert.equal(ok('src/features/orders/application/a.ts', 'src/modules/domain/stock/stock.service.ts').reason, 'notPublicEntry');          // cross-owner targets index.ts
+  assert.equal(ok('src/features/api/orders/application/place.handler.ts', 'src/modules/domain/stock/index.ts').allowed, true);
+  assert.equal(ok('src/features/api/orders/application/place.handler.ts', 'src/features/api/orders/orders.module.ts').reason, 'sameOwner');
+  assert.deepEqual([ok('src/features/api/orders/application/a.ts', 'src/features/api/billing/index.ts').allowed, ok('src/features/api/orders/application/a.ts', 'src/features/api/billing/index.ts').reason], [false, 'tierDirection']);   // feature never imports feature
+  assert.equal(ok('src/features/api/orders/application/a.ts', 'src/modules/domain/stock/stock.service.ts').reason, 'notPublicEntry');          // cross-owner targets index.ts
   assert.equal(ok('src/modules/platform/config/index.ts', 'src/modules/domain/stock/index.ts').reason, 'tierDirection');                   // platform never imports domain
   assert.equal(ok('src/modules/domain/stock/index.ts', 'src/modules/domain/pricing/index.ts').allowed, true);                              // domain may (acyclic is a graph rule)
   assert.equal(ok('src/modules/integrations/stripe/index.ts', 'src/modules/domain/stock/index.ts').reason, 'tierDirection');
-  assert.equal(ok('apps/core/src/app.module.ts', 'src/features/orders/index.ts').allowed, true);
+  assert.equal(ok('apps/core/src/app.module.ts', 'src/features/api/orders/index.ts').allowed, true);
   assert.equal(ok('apps/core/src/app.module.ts', 'apps/worker/src/app.module.ts').reason, 'crossApp');                                     // apps never import each other
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'src/tests/world/use-test-world.ts').allowed, true);
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/app.module.ts').allowed, true);                                  // an app's public entry is app.module.ts
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/main.ts').reason, 'notPublicEntry');
-  assert.equal(ok('src/tests/fixtures/orders.ts', 'src/features/orders/index.ts').reason, 'tierDirection');                                // fixtures never import a feature
-  assert.equal(ok('src/features/orders/index.ts', 'tsconfig.json').reason, 'untiered');
-  const unknown = ok('src/features/orders/index.ts', 'src/whatever/x.ts');
+  assert.equal(ok('src/tests/fixtures/orders.ts', 'src/features/api/orders/index.ts').reason, 'tierDirection');                                // fixtures never import a feature
+  assert.equal(ok('src/features/api/orders/index.ts', 'tsconfig.json').reason, 'untiered');
+  const unknown = ok('src/features/api/orders/index.ts', 'src/whatever/x.ts');
   assert.deepEqual([unknown.allowed, unknown.reason, unknown.code], [false, 'unowned', 'HFS_SLOT_UNDECLARED']);
-  assert.equal(ok('src/features/orders/transport/message/a.ts', 'src/features/orders/index.ts').reason, 'slotNotEnabled');
+  assert.equal(ok('src/features/api/orders/transport/message/a.ts', 'src/features/api/orders/index.ts').reason, 'slotNotEnabled');
 });
 
 test('FE side with two apps', () => {
@@ -293,7 +298,7 @@ test('FE side with two apps', () => {
   const owner = (p) => fe.classifyPath(p).slot;
   assert.equal(owner('apps/web/next.config.ts'), 'fe.app.next');
   assert.equal(owner('apps/web/tsconfig.json'), 'fe.app.next');
-  assert.equal(fe.classifyPath('apps/admin/package.json').status === 'owned' && owner('apps/admin/package.json') === 'fe.app.next', false, 'an fe app has no package.json of its own');
+  assert.equal(owner('apps/admin/package.json'), 'fe.app.next', 'each fe app is an npm workspace with its own package.json');
   assert.equal(owner('apps/web/public/logo.svg'), 'fe.app-optional');
   assert.equal(fe.classifyPath('apps/web/vitest.config.ts').status, 'no-slot', 'the fe side has no test configuration slot: FE_NO_TESTS owns the path');
   assert.equal(owner('apps/web/src/app/[locale]/page.tsx'), 'fe.route');
@@ -315,16 +320,15 @@ test('FE side with two apps', () => {
   assert.equal(fe.classifyPath('apps/admin/src/modules/cart/index.ts').bindings.app, 'admin');
   // required paths are expanded per declared app
   const paths = fe.requiredPaths().paths.map((e) => e.path);
-  for (const name of ['web', 'admin']) for (const p of [`apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
+  for (const name of ['web', 'admin']) for (const p of [`apps/${name}/package.json`, `apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
     assert.equal(paths.includes(p), true, `missing ${p}`);
   assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
   assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no managed file');
-  // the tool configuration of the fe side: managed files, the side's own turbo.json, and the forbidden ones
+  // the tool configuration of the fe side: managed files and the forbidden ones (a turbo.json is the app root's task graph, app.task-graph)
   for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(owner(file), 'fe.tool-config', file);
   for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(paths.includes(file), true, `${file} is required`);
   for (const file of ['vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts']) assert.equal(fe.classifyPath(file).status, 'no-slot', file);
-  assert.equal(owner('turbo.json'), 'fe.tool-config-repo');
-  for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
+  for (const file of ['turbo.json', '.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
   for (const file of ['package.json', 'package-lock.json', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'repo.side-root-forbidden', `${file} is the app root's`);
   assert.equal(fe.slot('fe.tool-config-local').presence, 'forbidden');
   assert.equal(fe.slot('fe.tool-config').managedBy, 'tool-config');
@@ -417,35 +421,39 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
   assert.ok(slot, 'the support slot exists');
-  assert.equal(slot.path, 'src/features/<feature>/application/support/');
+  assert.equal(slot.path, 'src/features/api/<feature>/application/support/');
   assert.equal(slot.presence, 'optional');
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.tests, 'none');
   assert.equal(slot.owner, undefined, 'support is not an owner: it belongs to the enclosing feature');
   const be = sideOf(APP, 'be');
-  assert.equal(be.classifyPath('src/features/orders/application/place.handler.ts').slot, 'be.feature.application');
-  assert.equal(be.classifyPath('src/features/orders/application/support/price-lines.ts').slot, 'be.feature.application.support');
+  assert.equal(be.classifyPath('src/features/api/orders/application/place.handler.ts').slot, 'be.feature.application');
+  assert.equal(be.classifyPath('src/features/api/orders/application/support/price-lines.ts').slot, 'be.feature.application.support');
 });
 
-test('be.feature.transport.cli is an opt-in feature-tier transport slot, owned once an app of kind cli is declared', () => {
+test('be.cli is the cli feature root: a feature-tier owner at src/features/cli/, its specs beside its commands; no feature transport is a command line', () => {
   const manifest = loadSlotManifest();
-  const slot = manifest.slots.find((s) => s.id === 'be.feature.transport.cli');
-  assert.ok(slot, 'the cli transport slot exists');
-  assert.equal(slot.path, 'src/features/<feature>/transport/cli/');
-  assert.equal(slot.presence, 'opt-in');
+  const slot = manifest.slots.find((s) => s.id === 'be.cli');
+  assert.ok(slot, 'the cli feature root slot exists');
+  assert.equal(slot.path, 'src/features/cli/');
   assert.equal(slot.tier, 'feature');
-  assert.deepEqual(slot.requires, ['<feature>-cli.module.ts']);
+  assert.equal(slot.owner, true);
+  assert.equal(slot.tests, 'unit-beside');
+  assert.deepEqual(slot.requires, ['index.ts', 'cli.module.ts', 'cli.module-definition.ts']);
   assert.ok(manifest.appKinds.be.includes('cli'), 'the cli app kind exists');
-  const cli = sideOf(app({ be: { ...BE_SIDE, apps: [...BE_SIDE.apps, { name: 'ops', kind: 'cli' }], optionalSlots: [...BE_SIDE.optionalSlots, 'be.feature.transport.cli'] } }), 'be');
-  assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').slot, 'be.feature.transport.cli');
-  assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').status, 'owned');
+  assert.equal(manifest.appKinds.be.includes('migrate'), false, 'the migrate kind is gone: the cli migrate command migrates');
+  assert.equal(manifest.slots.some((s) => s.id === 'be.feature.transport.cli'), false, 'no feature transport is a command line');
+  const cli = sideOf(APP, 'be');
+  assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').slot, 'be.cli');
+  assert.equal(cli.classifyPath('src/features/cli/migrate/subs/run.cli.ts').status, 'owned');
+  assert.equal(cli.classifyPath('src/features/api/orders/transport/cli/import.cli.ts').slot === 'be.cli', false);
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
   const grown = loadSlotManifest({ text: manifestText.replace('version: 2.0.0', 'version: 2.1.0').replace('\n# Checks that read this manifest', `
   - id: be.transport.grpc
     profiles: [be]
-    path: "src/features/<feature>/transport/grpc/"
+    path: "src/features/api/<feature>/transport/grpc/"
     presence: opt-in
     tracked: tracked
     tier: feature
@@ -456,11 +464,11 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
   assert.equal(grown.minor, 1);
   const before = sideOf(APP, 'be');
   const after = sideOf(app({ be: { ...BE_SIDE, optionalSlots: [...BE_SIDE.optionalSlots, 'be.transport.grpc'] } }), 'be', { manifest: grown });
-  for (const p of ['src/features/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'tsconfig.json', '.env'])
+  for (const p of ['src/features/api/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'tsconfig.json', '.env'])
     assert.equal(after.classifyPath(p).slot, before.classifyPath(p).slot);
-  assert.equal(after.classifyPath('src/features/orders/transport/grpc/a.ts').status, 'owned');
-  assert.equal(before.classifyPath('src/features/orders/transport/grpc/a.ts').status, 'owned', 'the feature slot owns the subtree until the new slot is declared');
-  assert.equal(after.classifyPath('src/features/orders/transport/grpc/a.ts').slot, 'be.transport.grpc');
+  assert.equal(after.classifyPath('src/features/api/orders/transport/grpc/a.ts').status, 'owned');
+  assert.equal(before.classifyPath('src/features/api/orders/transport/grpc/a.ts').status, 'owned', 'the feature slot owns the subtree until the new slot is declared');
+  assert.equal(after.classifyPath('src/features/api/orders/transport/grpc/a.ts').slot, 'be.transport.grpc');
 
   // every variant of every slot, filled with sample names, is owned by that slot and never ambiguous: the root's and each side's
   const manifest = loadSlotManifest();

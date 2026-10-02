@@ -16,10 +16,12 @@
 //                                            runs on those owners without clones and dead exports. No merge-base is a refusal
 //                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding. The root checks run once and
 //                                            the side checks and the machine once per side, the side folder as their root; every path is app-relative.
-//   hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
+//   hfs lint    [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 //                                            the ONE lint entry (npm run lint): ESLint per side with that side's canon config (per-file rules and
 //                                            the project-graph rules), this check's findings, and stylelint over the fe side, as one starci/lint@1
 //                                            report; --sonar writes the one Sonar import file. Exit 0 clean, 1 findings, 2 a tool could not run (lint/run.mjs).
+//                                            --workspace <dir> (from the current directory) scopes the same lint to one fe workspace: the
+//                                            `lint` script of fe/apps/<app> and fe/packages/<pkg>, run by the turbo lint task.
 //   hfs scaffold app <name> [--into <dir>]  a new app <dir>/<name>/: the root (hfs.json, package.json, managed files, .starciwork) and the
 //                                            be/ and fe/ skeletons (scaffold/app.mjs). Refuses an existing directory.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
@@ -36,11 +38,12 @@
 //   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 // Every finding names a why code and carries its Vietnamese text. check, lint and explain read the app, never write to it. Exit codes:
 // 0 clean, 1 error findings, 2 a refusal or bad usage.
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../runtime/scripts/lib/is-main.mjs';
 import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
-import { HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
+import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError, loadPresets } from '../sync/index.mjs';
@@ -53,7 +56,7 @@ import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
-hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
+hfs lint [--repo <dir>] [--changed <file>...] [--workspace <dir>] [--fix] [--format text|json] [--sonar <file>]
 hfs scaffold app <name> [--into <dir>]
 hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
@@ -146,10 +149,22 @@ async function runCheck({ repoRoot, fast = false, base, only, presets, prettier 
   return result;
 }
 
+/** The nearest folder at or above `dir` that holds hfs.json (the app root of a workspace), or `dir` itself when none does (the lint then refuses it). */
+export function appRootAbove(dir) {
+  for (let at = dir; ; at = path.dirname(at)) {
+    if (fs.existsSync(path.join(at, HFS_DECLARATION_FILE))) return at;
+    if (path.dirname(at) === at) return dir;
+  }
+}
+
 /** `hfs lint`: ESLint per side, the app checks and stylelint over the fe side as one report; see lint/run.mjs. */
 async function lintMain(argv, { stdout, presets, prettier }) {
   const opts = parseLintArgs(argv);
-  const repoRoot = path.resolve(opts.repo ?? process.cwd());
+  // --workspace names a folder from the current directory (`hfs lint --workspace .` is the lint script of an fe workspace); the app
+  // root is then the nearest folder above it that holds hfs.json, and the workspace is passed on app-relative.
+  const workspaceDir = opts.workspace === undefined ? null : path.resolve(opts.workspace);
+  const repoRoot = path.resolve(opts.repo ?? (workspaceDir ? appRootAbove(workspaceDir) : process.cwd()));
+  if (workspaceDir) opts.workspace = path.relative(repoRoot, workspaceDir).split(path.sep).join('/');
   const { report, sonar, exit } = await lintRepository({
     repoRoot, opts, trackedFiles,
     hfsCheck: (root) => runCheck({ repoRoot: root, only: opts.changed ?? undefined, presets, prettier }),

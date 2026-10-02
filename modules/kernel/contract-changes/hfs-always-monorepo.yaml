@@ -1,0 +1,30 @@
+id: hfs-always-monorepo
+effectiveAt: '2026-10-02T09:00:00+07:00'
+summary: >-
+  Lane MONO (lead C0), owner decision: every product is ALWAYS a monorepo, even a single app, in the style of nivo's Next.js
+  monorepo. The app root package.json declares the npm workspaces fe/apps/* and fe/packages/*, packageManager npm@<exact>
+  and turbo (canon pin 2.11.6); the app root holds the managed turbo.json (new slot app.task-graph, template
+  templates/app/task-graph/turbo.json: build depends on ^build and caches .next and dist, dev, lint, typecheck); fe/turbo.json
+  and the slot fe.tool-config-repo are deleted. Each fe app is the workspace @<project>/<app> with its own package.json
+  (required by fe.app.next) and the fixed scripts build, dev, lint (`hfs lint --workspace .`), start and typecheck. New
+  `hfs lint --workspace <dir>` scopes the one lint of the app to one fe workspace. The managed root scripts run the fe side
+  through turbo (build:fe, typecheck, dev:fe) and npm -w (start). New rules R128 HFS_MONO_WORKSPACES, R129
+  HFS_MONO_FE_WORKSPACE, R130 HFS_MONO_NEST_PROJECTS and R131 HFS_MONO_WORKSPACE_DEP (hfs enforcer
+  scripts/hfs/rules/monorepo.mjs; ids provisional, renumbered to the next free ids at land). R59 reads next-intl from the fe
+  workspace manifests.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-always-monorepo.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/hfs/rules/monorepo.mjs
+  - scripts/hfs/rules/frontend-tree.mjs
+  - scripts/hfs/check.mjs
+  - packages/hfs/lint/run.mjs
+  - packages/hfs/bin/hfs.mjs
+  - packages/hfs/sync/index.mjs
+  - packages/hfs/templates/app/task-graph/turbo.json
+  - packages/hfs/README.md

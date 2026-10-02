@@ -14,7 +14,7 @@ Open unbuilt-module gaps: 0.
 - fr.checkout.cart.clear — Clear the cart
 - fr.checkout.cart.list — Read the cart
 - fr.checkout.download-receipt — Download the receipt of an order
-- gap.checkout.second-example-gates — No host port-registry entry exists for this second example yet
+- gap.checkout.second-example-gates — No host port-registry entry exists for this example yet
 - integration.checkout.minio — MinIO archives the receipts of placed orders
 - integration.checkout.postgres — PostgreSQL holds the catalog, cart, order and payment rows
 - integration.checkout.redis — Redis is the identity service's session store

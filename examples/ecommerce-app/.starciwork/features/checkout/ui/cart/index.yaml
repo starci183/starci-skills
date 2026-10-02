@@ -117,12 +117,12 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/cart/assets/cart.initial.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/cart/assets/cart.initial.png
       mode: edit-with-anatomy-references
     provenance:
@@ -150,11 +150,11 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       mode: generate-with-anatomy-references
     provenance:
       stage: initial
@@ -181,12 +181,12 @@ ui:
       - knowledge/ui/proof/anatomy-source.yaml
       - examples/ecommerce-app/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
       - examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/cart/assets/cart.anatomy.png
       referencedImages:
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      - examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       - examples/ecommerce-app/.starciwork/features/checkout/ui/cart/assets/cart.anatomy.png
       mode: edit-with-anatomy-references
     provenance:
@@ -203,10 +203,10 @@ ui:
       sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
       rev: 1
     anatomyReferences:
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png
       sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
       role: actual-installed-grammar-render; read-only reuse
-    - path: examples/todo-app/.starciwork/brand/assets/grammar-reference/primitives.png
+    - path: examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png
       sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
       role: actual-installed-grammar-render; read-only reuse
     grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not reinstalled or recaptured
@@ -233,13 +233,13 @@ ui:
     - path: examples/ecommerce-app/.starciwork/features/checkout/fr/place-order/index.yaml
       sha256: 652c16c914e566da909b400864f7e769c24702c18c204283026691cfddd4c632
     frontendContext:
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/cart/page.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/cart/page.tsx
       sha256: de4734951c338d3c832ed6b65350c272b6aae7b93ed349a029f9eb90ceb12475
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/checkout/page.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/checkout/page.tsx
       sha256: 2d96f2c4a42f521845e763c8a4b0c52421e9ada0bb559201502741e8183ff52f
-    - path: examples/ecommerce-app/fe/apps/shop/src/components/AppNav.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/components/AppNav.tsx
       sha256: ac7d46b5f513b087ee36baeb25bb69475218430fc48173161eb81671e8781917
-    - path: examples/ecommerce-app/fe/apps/shop/src/app/layout.tsx
+    - path: examples/ecommerce-app/fe/apps/app/src/app/layout.tsx
       sha256: 5c4d20f851083a183b0fe9eee2481b2834f89254ecffd6e1da29a3abcb417f0d
   review:
     status: agent-reviewed-proposal; owner acceptance not claimed
@@ -271,7 +271,7 @@ ui:
   - Current cart route is an empty scaffold and explicitly defers persistence. Populated state, quantity mutations and Remove
     controls are proposals.
 change:
-  rev: 1
+  rev: 2
   kind: clarifying
   at: '2026-09-19T15:30:00.000Z'
   reason: 'v9-7 wired the cart surface to the real cart query/mutations and the walk exercised it (runs/20260919T152927Z-5c10a673):

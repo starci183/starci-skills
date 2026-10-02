@@ -340,15 +340,15 @@ test('the finish merges to main and leaves the worktree release-pending; the con
   assert.ok(names.lastIndexOf('worker-release') < fake.calls.findLastIndex((c) => c[0] === 'worktree-list'), 'every agent is released before the finish removes the worktree');
 });
 
-test("the smoke's no-op files sit in slots a real app owns: the hfs repository check over the todo example finds nothing new", (t) => {
+test("the smoke's no-op files sit in slots a real app owns: the hfs repository check over the ecommerce example finds nothing new", (t) => {
   // The finish gate lints the whole branch; a file in an invented folder (HFS_SLOT_UNDECLARED) would refuse the finish and
-  // hide a real finish failure. Measured on a copy of examples/todo-app (its tracked files, never a node_modules), with the
+  // hide a real finish failure. Measured on a copy of examples/ecommerce-app (its tracked files, never a node_modules), with the
   // repository check hfs lint runs (scripts/hfs/check.mjs checkRepository; the preset and formatter passes need an
   // installed app and are not this question).
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-slots-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const source = path.join(SPEC_DIR, '..', '..', 'examples', 'todo-app');
-  const app = path.join(tmp, 'todo-app');
+  const source = path.join(SPEC_DIR, '..', '..', 'examples', 'ecommerce-app');
+  const app = path.join(tmp, 'ecommerce-app');
   for (const rel of git(source, 'ls-files', '-z', '.').split('\0').filter(Boolean)) {
     fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true });
     fs.copyFileSync(path.join(source, rel), path.join(app, rel));
@@ -356,11 +356,11 @@ test("the smoke's no-op files sit in slots a real app owns: the hfs repository c
   git(tmp, 'init', '-q', '-b', 'main', app);
   git(app, 'config', 'core.autocrlf', 'false');
   git(app, 'add', '-A');
-  git(app, 'commit', '-q', '-m', 'todo example');
+  git(app, 'commit', '-q', '-m', 'ecommerce example');
   const codes = () => checkRepository({ repoRoot: app, fast: true }).findings.map((f) => `${f.code} ${f.path}`).sort();
   const base = codes();
   const feApp = feAppOf(app);
-  assert.equal(feApp, 'web');
+  assert.equal(feApp, 'landing');
   const files = ['op', 'opFe', 'opFail'].map((role) => [ownedFileOf(role, 'smoke-t', feApp), ownedTextOf(role, 'smoke-t')]);
   for (const [rel, text] of files) { fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true }); fs.writeFileSync(path.join(app, rel), text); }
   git(app, 'add', '-A');

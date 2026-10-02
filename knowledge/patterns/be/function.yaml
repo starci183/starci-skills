@@ -3,7 +3,7 @@ id: be.function
 title: Backend function
 purpose: |-
   Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS responsibility pattern. Read
-  docs/backend-source-pattern.md for the coherent layout, code forms and verification limits, and cqrs.yaml for the message
+  docs/backend-source-pattern.md for the coherent layout, code forms and verification limits, and api.yaml for the message
   and handler shapes.
 appliesTo:
   - backend
@@ -28,7 +28,7 @@ rules:
     requirement: |-
       Each operation has one command or query and one handler in `application/` that owns the scenario: it authorizes the
       resource, opens the transaction, calls the domain services and returns the declared result. There is no second forwarding
-      service and no use-case class; a transport dispatches the bus directly (cqrs.yaml).
+      service and no use-case class; a transport dispatches the bus directly (api.yaml).
     rationale: |-
       One owner avoids duplicated orchestration and boilerplate without behavior.
     cases:

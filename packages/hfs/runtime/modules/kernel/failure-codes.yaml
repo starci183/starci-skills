@@ -262,6 +262,16 @@ BE_BACKGROUND_UNOWNED:
   owner: op-retry
   kind: check-finding
 
+BE_CLI_REQUIRED:
+  title: "The back end has no cli app, or no cli image"
+  title_vi: "Back end thiếu app cli hoặc image của nó"
+  meaning_vi: "Mọi hành động chạy một lần của back end (migrate, seed, sync, backup, lệnh vận hành) nằm trong MỘT app `be/apps/cli` (kind cli, tên cli) chạy trên nest-commander. Back end có connection (migration chạy bằng `cli migrate run`) hoặc có lệnh dưới `src/features/cli/` thì phải khai báo đúng app đó và có `be/apps/cli/Dockerfile`."
+  causes_vi:
+    - "Vi phạm luật R132: không có app cli thì migration và các hành động một lần không có chỗ chạy chuẩn; thiếu Dockerfile thì không có image `cli` để chạy `cli <group> <command>`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai báo { \"name\": \"cli\", \"kind\": \"cli\" } trong `sides.be.apps` của `hfs.json`, dựng `be/apps/cli` với `CommandFactory.run` và thêm `be/apps/cli/Dockerfile`; đổi tên app cli khác thành `cli`."
+  owner: op-retry
+  kind: check-finding
+
 BE_CONNECTION_DUPLICATE:
   title: "One database reached through more than one connection or injector"
   title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
@@ -306,7 +316,7 @@ BE_ENTRYPOINT_ONLY_IN_APPS:
   title_vi: "Entrypoint nằm ngoài apps"
   meaning_vi: "`<file>` là một entrypoint tiến trình nằm ngoài `apps/`."
   causes_vi:
-    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là `apps/migrate`."
+    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là lệnh `cli migrate run` của `apps/cli`."
     - "NestFactory.create* hoặc lời gọi bootstrap() cấp cao nhất nằm ngoài apps/<app>/src/main.ts"
     - "Chỉ `src/tests/world/` (gốc ghép của test, slot be.tests.world) được gọi NestFactory ngoài main.ts; một spec (integration, contract, e2e) không được ghép: nó chỉ gọi useTestWorld(...)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -1226,6 +1236,46 @@ HFS_MODULE_TIER_INVALID:
     - "Sai chính tả tên tầng"
   nextStep_vi: "Op backend.implement chuyển module về một trong ba tầng hợp lệ."
   owner: other-op:backend.implement
+  kind: check-finding
+
+HFS_MONO_FE_WORKSPACE:
+  title: "An fe workspace manifest breaks the workspace shape"
+  title_vi: "Manifest của một workspace fe sai hình dạng"
+  meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`hfs lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
+  causes_vi:
+    - "Vi phạm luật R129: turbo chạy các task theo script của từng workspace; tên, script hoặc cờ private sai khiến build, lint hoặc typecheck của app bị bỏ qua hoặc chạy khác chuẩn."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt tên `@<project>/<app>`, `\"private\": true` và đúng bộ script trong `package.json` của workspace đó."
+  owner: op-retry
+  kind: check-finding
+
+HFS_MONO_NEST_PROJECTS:
+  title: "be/nest-cli.json does not match the declared be apps"
+  title_vi: "be/nest-cli.json không khớp các app be đã khai báo"
+  meaning_vi: "`be/nest-cli.json` phải là `\"monorepo\": true`, project mặc định là một app api, và `projects` đúng bằng các app be mà `hfs.json` khai báo, mỗi project có `root` là `apps/<app>` và `sourceRoot` là `apps/<app>/src`."
+  causes_vi:
+    - "Vi phạm luật R130: back end luôn là monorepo Nest của `be/apps/<app>`, kể cả khi chỉ có một service; một project thừa hoặc thiếu nghĩa là app đó không được build hoặc chạy theo khai báo."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa `be/nest-cli.json` cho khớp đúng các app be trong `hfs.json`."
+  owner: op-retry
+  kind: check-finding
+
+HFS_MONO_WORKSPACES:
+  title: "The app root is not the monorepo root"
+  title_vi: "Gốc app không phải gốc monorepo"
+  meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do hfs sync sinh ra."
+  causes_vi:
+    - "Vi phạm luật R128: mọi sản phẩm luôn là monorepo, kể cả khi chỉ có một service, nên hình dạng hfs đồng nhất; thiếu workspaces hoặc turbo thì các app fe không được build qua turbo."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx hfs sync --write` để sinh `turbo.json`."
+  owner: op-retry
+  kind: check-finding
+
+HFS_MONO_WORKSPACE_DEP:
+  title: "An fe workspace imports a package it does not declare"
+  title_vi: "Một workspace fe import gói mà nó không khai báo"
+  meaning_vi: "Mọi gói mà các tệp của một workspace fe import phải được khai báo trong `package.json` của chính workspace đó (gói workspace anh em ghi `\"*\"`); `package.json` ở gốc không bao giờ khai báo một gói workspace."
+  causes_vi:
+    - "Vi phạm luật R131: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
+  owner: op-retry
   kind: check-finding
 
 HFS_PACKAGE_MANAGER_MIXED:

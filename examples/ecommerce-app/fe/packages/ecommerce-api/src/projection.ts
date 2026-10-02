@@ -26,7 +26,7 @@ export interface ProjectedOrigins {
     readonly identityApi: string
     readonly orderApi: string
     readonly landing: string
-    readonly shop: string
+    readonly app: string
 }
 
 /** The metadata file: the injected path when there is one, else the projection of the nearest app root. */
@@ -70,9 +70,9 @@ export const readProjectedOrigins = (injected: string | undefined): ProjectedOri
     const identityApi = originOf(ports, "identityApi")
     const orderApi = originOf(ports, "orderApi")
     const landing = originOf(ports, "landing")
-    const shop = originOf(ports, "shop")
-    if (identityApi === null || orderApi === null || landing === null || shop === null) {
+    const app = originOf(ports, "app")
+    if (identityApi === null || orderApi === null || landing === null || app === null) {
         throw new Error(`${file} does not carry the resolved ports this app reads.`)
     }
-    return { identityApi, orderApi, landing, shop }
+    return { identityApi, orderApi, landing, app }
 }

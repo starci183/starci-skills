@@ -165,7 +165,6 @@ api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli
 - [Host contracts and agent cards](docs/host-contract.md)
 - [CLI and script reference](docs/cli.md)
 - [Build, test, package and release](docs/releasing.md)
-- [The todo-app standard example](docs/examples/todo-app-standard.md)
 
 Agent-facing instructions live in [CONTEXT.md](CONTEXT.md); humans only need this page and `docs/`.
 

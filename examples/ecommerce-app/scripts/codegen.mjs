@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url"
  */
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const APPS = [{ dir: "fe/apps/shop", output: "src/modules/services/__generated__/documents.ts" }]
+const APPS = [{ dir: "fe/apps/app", output: "src/modules/services/__generated__/documents.ts" }]
 const OPERATION = /^\s*(?:query|mutation)\s+([A-Za-z_][A-Za-z0-9_]*)/m
 
 /** Every `.graphql` file under a directory, in a stable order. */

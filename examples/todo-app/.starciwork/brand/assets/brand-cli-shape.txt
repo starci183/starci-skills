@@ -1,1 +1,0 @@
-A brand record must be a work/node@1 node of kind brand.

@@ -24,8 +24,8 @@ findings:
       - ui.checkout.shop-browse
       - ui.checkout.stock-refused
     because: A breaking change to br.checkout.place-order sends 16 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      stale 11 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
       be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,
@@ -50,8 +50,8 @@ findings:
       - uat.identity.sign-in
       - ui.identity.sign-in
     because: A breaking change to br.identity.sign-in sends 13 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 14 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      9 evidence file(s), and touches 14 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/domain/session,
       be/src/modules/integrations/identity-api, be/src/modules/integrations/keycloak,
@@ -73,8 +73,8 @@ findings:
       - integration.checkout.redis
       - sds.checkout.order-flow
     because: A breaking change to br.identity.account sends 9 other record(s) back to todo, would stale
-      5 evidence file(s), and touches 13 code path(s) (be/src/features/checkout,
-      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      5 evidence file(s), and touches 13 code path(s) (be/src/features/api/checkout,
+      be/src/features/api/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
       be/src/modules/domain/catalog, be/src/modules/domain/identity, be/src/modules/domain/order,
       be/src/modules/domain/payment, be/src/modules/integrations/identity-api,
       be/src/modules/integrations/keycloak, be/src/modules/integrations/keycloak-admin,

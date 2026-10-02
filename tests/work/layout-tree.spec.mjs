@@ -174,11 +174,11 @@ test('the CLI scans read-only by default and writes the record only with --write
   assert.equal(layoutTreeMain(['bogus']).exitCode, 2);
 });
 
-test('the todo example carries an honestly unsettled layout tree', () => {
-  const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/todo-app/.starciwork/shell/index.yaml'), 'utf8'));
+test('the ecommerce example carries an honestly unsettled layout tree', () => {
+  const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/ecommerce-app/.starciwork/shell/index.yaml'), 'utf8'));
   assert.equal(validateTree(example), true, JSON.stringify(validateTree.errors));
   assert.equal(example.state, 'todo');
-  // appDir names the App Router directory relative to the app root: the example's fe app web lives in fe/apps/web.
-  assert.equal(example.apps[0].appDir, 'fe/apps/web/src/app');
-  assert.ok(nodeById(treeOf(example, 'web'), '/[locale]/tasks'), 'the scan holds the example frontend routes');
+  // appDir names the App Router directory relative to the app root: the example's first fe app, landing, lives in fe/apps/landing.
+  assert.equal(example.apps[0].appDir, 'fe/apps/landing/src/app');
+  assert.ok(nodeById(treeOf(example, 'shop'), '/[locale]/cart'), 'the scan holds the example frontend routes');
 });

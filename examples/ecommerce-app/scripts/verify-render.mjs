@@ -19,8 +19,7 @@ import { defaultGrammarRoot } from "../../../scripts/checks/brand.mjs"
  * only for `work/implementation@1` records: it returns no problems for any other schema, and this product's
  * Work tree authors no frontend implementation node at all (its two `impl/*` records are both
  * `repository: be`, the be side, and neither names a ui-screen in `proves`). So the ecommerce
- * captures have no gate-side proof path, and `scripts/checks/render.mjs` has to be called directly — the same thing
- * todo-app/scripts/verify-captures.mjs does for the todo app, for the same stated reason.
+ * captures have no gate-side proof path, and `scripts/checks/render.mjs` has to be called directly.
  *
  * Three modes, one per claim a ui record makes about its own render:
  *

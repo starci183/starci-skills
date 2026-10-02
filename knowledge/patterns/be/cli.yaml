@@ -1,0 +1,220 @@
+schema: starci/knowledge-source@1
+id: be.cli
+title: Backend cli
+purpose: |-
+  Given a one-off action (migrate, seed, sync, backup, an operator command), where does it live and how is it written? Every
+  one-off action is a nest-commander command of the cli feature root `be/src/features/cli/`, compiled into the one cli app
+  `be/apps/cli` and shipped as one image run as `cli <group> <command>`. A command is an action runner, not a thin
+  transport: it is unit-tested and counted in coverage like a service.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner decision 2026-10-02 (one cli app on nest-commander; features grouped by trigger kind)
+    - https://docs.nestjs.com/recipes/nest-commander
+  limitations: |-
+    Static checks prove where a command is declared, how the cli app boots, that every command has its spec beside it and
+    that nothing else parses the command line. They do not prove that a migration or a seed is right for live data, that a
+    deploy runs the migrate command first and once, or that an operator command is safe to re-run; the command's spec, the
+    test world's migration run and the deploy review prove those.
+rules:
+  - id: BE-CLI-1
+    title: One cli app boots nest-commander and never serves
+    kind: mandatory
+    hfsRules: [R132, R133]
+    requirement: |-
+      Every one-off action of a back end runs in ONE app, `be/apps/cli` (slot `be.app.cli`, kind `cli`, named `cli`). It is
+      required as soon as the back end declares a connection in `hfs.json` `sides.be.connections` (its migrations run as
+      `cli migrate run`) or tracks a command under `src/features/cli/`, and it tracks its image `be/apps/cli/Dockerfile`: one
+      image, run as `cli <group> <command>`. `apps/cli/src/main.ts` boots with `CommandFactory.run(AppModule, logger)` of
+      nest-commander and never serves: no `NestFactory.create*`, no `.listen()`, no microservice connection, no
+      `@nestjs/platform-*` adapter and no `@nestjs/microservices`. `apps/cli/src/app.module.ts` composes the platform modules
+      the commands need and the cli feature root module `CliModule`; `apps/cli/src/cli.options.ts` carries what the cli reads
+      from the environment, the connections it migrates among them.
+    rationale: |-
+      One image for every operator action gives one place to find, deploy and audit them, and a process that never listens
+      cannot become a second, unguarded door into the application.
+    cases:
+      - id: case-1
+        when: The cli entry
+        write: |-
+          // be/apps/cli/src/main.ts
+          async function bootstrap(): Promise<void> {
+              await CommandFactory.run(AppModule.register(parseCliOptions(EnvSource.fromProcess())), new JsonLinesLogger())
+          }
+          void bootstrap()
+      - id: case-2
+        when: The cli app calls `NestFactory.createApplicationContext` or `app.listen()`
+        write: 'Refused (BE_CLI_BOOTSTRAP): the cli app boots only through CommandFactory.run.'
+      - id: case-3
+        when: A back end declares a connection and has no apps/cli
+        write: 'Refused (BE_CLI_REQUIRED): add be/apps/cli with main.ts, app.module.ts, cli.options.ts and its Dockerfile, declared as { "name": "cli", "kind": "cli" } in hfs.json sides.be.apps.'
+    verification:
+      automated:
+        - BE_CLI_REQUIRED
+        - BE_CLI_BOOTSTRAP
+      manual:
+        - Confirm the deploy runs the cli image as a job and never as a long-running service.
+    relatedExamples: []
+  - id: BE-CLI-2
+    title: Commands live in the cli feature root as groups and sub-commands
+    kind: mandatory
+    hfsRules: [R134]
+    requirement: |-
+      A nest-commander command (`@Command` or `@SubCommand`) is declared only in the cli feature root `src/features/cli/`
+      (slot `be.cli`). The root holds `index.ts`, `cli.module.ts` and `cli.module-definition.ts` (the module-definition
+      pattern) and one folder per group: `<group>/<group>.cli.ts` (the group `@Command` with its `subCommands`),
+      `<group>/<group>.module.ts`, `<group>/<group>.module-definition.ts` and `<group>/subs/<name>.cli.ts` (a `@SubCommand`
+      class extending `CommandRunner`), one command per file. `CliModule` imports each group module. The suffix is `.cli.ts`,
+      because `.command.ts` is the CQRS message (api.yaml).
+    rationale: |-
+      A fixed group and sub-command layout maps the command line `cli <group> <command>` to one file path, so an operator
+      command and its spec are found from the name alone.
+    cases:
+      - id: case-1
+        when: The migrate group
+        write: |-
+          // be/src/features/cli/migrate/migrate.cli.ts
+          @Command({ name: "migrate", subCommands: [RunMigrationsCli], description: "Schema migrations of every connection" })
+          /** The migrate group; runs nothing itself. */
+          export class MigrateCli extends CommandRunner {
+              async run(): Promise<void> {}
+          }
+      - id: case-2
+        when: A `@SubCommand` declared in src/modules/platform/database/reindex.cli.ts or in features/api/
+        write: 'Refused (BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER): move it to src/features/cli/<group>/subs/reindex.cli.ts and register it in the group module.'
+    verification:
+      automated:
+        - BE_CLI_COMMAND_SHAPE
+        - cli-command-shape
+      manual: []
+    relatedExamples: []
+  - id: BE-CLI-3
+    title: A command is an action runner with its own unit spec
+    kind: mandatory
+    hfsRules: [R134, R47]
+    requirement: |-
+      A cli command is not a thin transport, so the thin-door rule (R88) does not apply to it: its `run` carries the action
+      (it may branch, loop and call the domain or platform services the action needs). Every `.cli.ts` therefore has its unit
+      spec `<name>.cli.spec.ts` beside it, built like a service spec (test.yaml BE-TEST-2), and the unit run measures
+      `src/features/cli/**/*.cli.ts` at per-file 100 (the `cli` entry of `ruleParams.be.unitRoles` of the slot manifest). A
+      command never imports an api feature: what it shares with a request lives in a domain capability (folder.yaml
+      BE-FOLDER-2).
+    rationale: |-
+      An operator action runs against production data, often once; its branches have no request path that an e2e run
+      exercises, so the unit spec is the only automatic proof.
+    cases:
+      - id: case-1
+        when: A seed command
+        write: 'features/cli/seed/subs/demo.cli.ts (`@SubCommand({ name: "demo" })`, `DemoSeedCli extends CommandRunner`) opens one transaction and calls CatalogService.createProduct for each demo product, skipping one that exists; demo.cli.spec.ts beside it asserts both paths.'
+      - id: case-2
+        when: A command with no spec
+        write: 'Refused (BE_CLI_COMMAND_SHAPE, unit-test-colocated): features/cli/db/subs/backup.cli.ts without backup.cli.spec.ts beside it.'
+    verification:
+      automated:
+        - BE_CLI_COMMAND_SHAPE
+        - unit-test-colocated
+        - BE_TEST_TOPOLOGY
+      manual:
+        - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
+    relatedExamples: []
+  - id: BE-CLI-4
+    title: Only the cli parses the command line
+    kind: mandatory
+    hfsRules: [R135]
+    requirement: |-
+      `nest-commander` is imported only by `be/apps/cli` and `src/features/cli/`. No back-end source parses command-line
+      arguments itself: `process.argv` and the parsers `commander`, `yargs` and `minimist` are refused everywhere, the cli
+      included. A one-off action anywhere but a cli command is a door this rule closes.
+    rationale: |-
+      A flag read in an api app's main.ts or a script beside the source is an operator door no review sees and no spec
+      covers.
+    cases:
+      - id: case-1
+        when: An api main.ts reads `process.argv.includes("--seed")` to seed before listening
+        write: 'Refused (BE_CLI_OWNER): the seed is `cli seed demo`, run as its own job.'
+    verification:
+      automated:
+        - BE_CLI_OWNER
+      manual: []
+    relatedExamples: []
+  - id: BE-CLI-5
+    title: Migrations and seeds run only as cli commands
+    kind: mandatory
+    hfsRules: [R34, R132]
+    requirement: |-
+      Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`) and through
+      the test world over the same connection list (`cli.options.ts`). Seed data never sits in a
+      migration: it is a sub-command of the `seed` group. Api and worker apps neither migrate nor seed (persistence.yaml
+      BE-PERSISTENCE-2).
+    rationale: |-
+      One runner per connection removes the race of two processes migrating, and one list shared with the test world makes
+      the tested schema the deployed one.
+    cases:
+      - id: case-1
+        when: The migrate command
+        write: 'features/cli/migrate/subs/run.cli.ts (`@SubCommand({ name: "run" })`, `RunMigrationsCli extends CommandRunner`) runs the migrations of every connection of CliOptions in order and fails the process on the first error; run.cli.spec.ts beside it.'
+      - id: case-2
+        when: A module runs `dataSource.runMigrations()` at boot of an api app
+        write: 'Refused (BE_SCHEMA_AUTHORITY): only the cli and the test world run migrations.'
+    verification:
+      automated:
+        - BE_SCHEMA_AUTHORITY
+        - BE_CLI_REQUIRED
+      manual:
+        - Confirm the deploy runs `cli migrate run` to completion before the api and worker apps start.
+    relatedExamples: []
+files:
+  root: be/
+  tree: |-
+    be/
+    |-- apps/
+    |   `-- cli/
+    |       |-- Dockerfile
+    |       `-- src/
+    |           |-- main.ts
+    |           |-- app.module.ts
+    |           `-- cli.options.ts
+    `-- src/
+        `-- features/
+            `-- cli/
+                |-- index.ts
+                |-- cli.module.ts
+                |-- cli.module-definition.ts
+                |-- migrate/
+                |   |-- migrate.cli.ts
+                |   |-- migrate.cli.spec.ts
+                |   |-- migrate.module.ts
+                |   |-- migrate.module-definition.ts
+                |   `-- subs/
+                |       |-- run.cli.ts
+                |       `-- run.cli.spec.ts
+                `-- seed/
+                    |-- seed.cli.ts
+                    |-- seed.cli.spec.ts
+                    |-- seed.module.ts
+                    |-- seed.module-definition.ts
+                    `-- subs/
+                        |-- demo.cli.ts
+                        `-- demo.cli.spec.ts
+  entries:
+    - {path: apps/cli/Dockerfile, slot: repo.app-image, role: entry, rules: [R132], spec: none, why: 'the one cli image, run as `cli <group> <command>`'}
+    - {path: apps/cli/src/main.ts, slot: be.app.cli, role: entry, rules: [R133, R33], spec: none, why: 'CommandFactory.run(AppModule, logger); never serves'}
+    - {path: apps/cli/src/app.module.ts, slot: be.app.cli, role: module, rules: [R32, R133], spec: none, why: 'composes the platform modules and CliModule; no business code'}
+    - {path: apps/cli/src/cli.options.ts, slot: be.app.cli, role: options, rules: [R132, R34], spec: none, why: 'what the cli reads from the environment, the connection list it migrates among them'}
+    - {path: src/features/cli/index.ts, slot: be.cli, role: entry, rules: [R30], spec: none, why: 'exports CliModule to the cli app'}
+    - {path: src/features/cli/cli.module.ts, slot: be.cli, role: module, rules: [R134, R45], spec: none, why: 'the cli feature root module; imports each group module'}
+    - {path: src/features/cli/cli.module-definition.ts, slot: be.cli, role: module-definition, rules: [R134, R45], spec: none, why: 'the configurable module builder of the root module'}
+    - {path: src/features/cli/migrate/migrate.cli.ts, slot: be.cli, role: cli, rules: [R134, R135], spec: required, why: 'the migrate group @Command and its subCommands'}
+    - {path: src/features/cli/migrate/migrate.module.ts, slot: be.cli, role: module, rules: [R134, R45], spec: none, why: 'registers the migrate group and its sub-commands'}
+    - {path: src/features/cli/migrate/migrate.module-definition.ts, slot: be.cli, role: module-definition, rules: [R134, R45], spec: none, why: 'the configurable module builder of the group'}
+    - {path: src/features/cli/migrate/subs/run.cli.ts, slot: be.cli, role: cli, rules: [R134, R34], spec: required, why: '`cli migrate run`: runs the migrations of every connection; the only migration runner'}
+    - {path: src/features/cli/seed/seed.cli.ts, slot: be.cli, role: cli, rules: [R134, R135], spec: required, why: 'the seed group @Command and its subCommands'}
+    - {path: src/features/cli/seed/seed.module.ts, slot: be.cli, role: module, rules: [R134, R45], spec: none, why: 'registers the seed group and its sub-commands'}
+    - {path: src/features/cli/seed/seed.module-definition.ts, slot: be.cli, role: module-definition, rules: [R134, R45], spec: none, why: 'the configurable module builder of the group'}
+    - {path: src/features/cli/seed/subs/demo.cli.ts, slot: be.cli, role: cli, rules: [R134], spec: required, why: '`cli seed demo`: writes the demo rows through the domain services'}

@@ -12,7 +12,7 @@ test('a dead export is flagged with its line and owner, a used export is not', t
   const root = archFixture(t, {
     files: {
       [X]: 'export const used = 1;\nexport const unused = 2;\nexport function alsoUnused() { return 3; }\n',
-      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = used;\n",
+      'src/features/api/a/index.ts': "import { used } from '../../../modules/domain/x';\nexport const a = used;\n",
     },
   });
   const report = runArch(root);
@@ -30,7 +30,7 @@ test('an aliased import uses the exported name, and a same-owner import does not
     files: {
       [X]: "import { inner } from './inner';\nexport { inner as renamed };\nexport const local = 1;\n",
       'src/modules/domain/x/inner.ts': "import { local } from './index';\nexport const inner = local;\n",
-      'src/features/a/index.ts': "import { renamed as r } from '../../modules/domain/x';\nexport const a = r;\n",
+      'src/features/api/a/index.ts': "import { renamed as r } from '../../../modules/domain/x';\nexport const a = r;\n",
     },
   });
   assert.deepEqual(dead(runArch(root), X), ['local']);
@@ -40,7 +40,7 @@ test('a namespace import uses every export', t => {
   const root = archFixture(t, {
     files: {
       [X]: 'export const one = 1;\nexport const two = 2;\n',
-      'src/features/a/index.ts': "import * as x from '../../modules/domain/x';\nexport const a = x;\n",
+      'src/features/api/a/index.ts': "import * as x from '../../../modules/domain/x';\nexport const a = x;\n",
     },
   });
   assert.deepEqual(dead(runArch(root), X), []);
@@ -50,7 +50,7 @@ test('a dynamic import uses every export', t => {
   const root = archFixture(t, {
     files: {
       [X]: 'export const one = 1;\nexport const two = 2;\n',
-      'src/features/a/index.ts': "export const a = () => import('../../modules/domain/x');\n",
+      'src/features/api/a/index.ts': "export const a = () => import('../../../modules/domain/x');\n",
     },
   });
   assert.deepEqual(dead(runArch(root), X), []);
@@ -60,7 +60,7 @@ test('a type-only import uses the export', t => {
   const root = archFixture(t, {
     files: {
       [X]: 'export type Shape = { a: number };\nexport type Other = string;\n',
-      'src/features/a/index.ts': "import type { Shape } from '../../modules/domain/x';\nexport const a: Shape = { a: 1 };\n",
+      'src/features/api/a/index.ts': "import type { Shape } from '../../../modules/domain/x';\nexport const a: Shape = { a: 1 };\n",
     },
   });
   assert.deepEqual(dead(runArch(root), X), ['Other']);
@@ -70,14 +70,14 @@ test('default export: used by a default import, otherwise dead', t => {
   const usedRoot = archFixture(t, {
     files: {
       [X]: 'export default 1;\n',
-      'src/features/a/index.ts': "import one from '../../modules/domain/x';\nexport const a = one;\n",
+      'src/features/api/a/index.ts': "import one from '../../../modules/domain/x';\nexport const a = one;\n",
     },
   });
   assert.deepEqual(dead(runArch(usedRoot), X), []);
   const deadRoot = archFixture(t, {
     files: {
       [X]: 'export default 1;\nexport const named = 2;\n',
-      'src/features/a/index.ts': "import { named } from '../../modules/domain/x';\nexport const a = named;\n",
+      'src/features/api/a/index.ts': "import { named } from '../../../modules/domain/x';\nexport const a = named;\n",
     },
   });
   assert.deepEqual(dead(runArch(deadRoot), X), ['default']);
@@ -89,7 +89,7 @@ test('a re-export by another owner counts only when the re-exported name is used
     files: {
       [X]: 'export const helper = 1;\nexport const other = 2;\n',
       [Y]: "export { helper } from '../x';\nexport { other } from '../x';\n",
-      'src/features/a/index.ts': "import { helper } from '../../modules/domain/y';\nexport const a = helper;\n",
+      'src/features/api/a/index.ts': "import { helper } from '../../../modules/domain/y';\nexport const a = helper;\n",
     },
   });
   const report = runArch(root);
@@ -121,8 +121,8 @@ test('an export used only by a spec is dead', t => {
   const root = archFixture(t, {
     files: {
       [X]: 'export const onlySpec = 1;\n',
-      'src/features/a/index.ts': 'export const a = 1;\n',
-      'src/features/a/a.spec.ts': "import { onlySpec } from '../../modules/domain/x';\nvoid onlySpec;\n",
+      'src/features/api/a/index.ts': 'export const a = 1;\n',
+      'src/features/api/a/a.spec.ts': "import { onlySpec } from '../../../modules/domain/x';\nvoid onlySpec;\n",
     },
   });
   assert.deepEqual(dead(runArch(root), X), ['onlySpec']);
@@ -131,7 +131,7 @@ test('an export used only by a spec is dead', t => {
 // Exception: a service unit spec and a fixture builder count as consumers (a spec can only provide a token the entry exports).
 const CONSUMER_FILES = {
   [X]: 'export const TOKEN = 1;\nexport type Params = { a: number };\nexport const nobody = 2;\nexport const onlyE2e = 3;\n',
-  'src/features/a/a.service.spec.ts': "import { TOKEN } from '../../modules/domain/x';\nit('uses', () => { expect(TOKEN).toBe(1); });\n",
+  'src/features/api/a/a.service.spec.ts': "import { TOKEN } from '../../../modules/domain/x';\nit('uses', () => { expect(TOKEN).toBe(1); });\n",
   'src/tests/fixtures/builders/x.builder.ts': "import type { Params } from '../../../modules/domain/x';\nexport const build = (): Params => ({ a: 1 });\n",
   'src/tests/e2e/x/x.e2e-spec.ts': "import { onlyE2e } from '../../../modules/domain/x';\nit('uses', () => { expect(onlyE2e).toBe(3); });\n",
 };
@@ -142,6 +142,6 @@ test('HFS_UNUSED_EXPORT: an export used only by a service spec or a fixture buil
 });
 
 test('HFS_UNUSED_EXPORT: a spec of another kind does not count as a consumer', t => {
-  const files = { ...CONSUMER_FILES, 'src/features/a/a.handler.spec.ts': "import { nobody } from '../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n" };
+  const files = { ...CONSUMER_FILES, 'src/features/api/a/a.handler.spec.ts': "import { nobody } from '../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n" };
   assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['nobody', 'onlyE2e']);
 });

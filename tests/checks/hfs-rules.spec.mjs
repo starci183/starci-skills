@@ -66,7 +66,7 @@ test('rules() and openHfs().rules() give the same frozen catalog', () => {
   assert.equal(list.length, loadRuleCatalog().rules.length);
   assert.ok(Object.isFrozen(list) && Object.isFrozen(list[0]) && Object.isFrozen(list[0].enforcers));
   const app = { hfs: 2, kind: 'app', project: 'nivo', sides: {
-    be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] },
+    be: { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] },
     fe: { apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] },
   } };
   assert.equal(openHfs({ declaration: app }).rules().rules.length, list.length);

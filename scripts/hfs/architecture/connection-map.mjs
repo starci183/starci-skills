@@ -133,8 +133,8 @@ export function checkConnectionMap(input) {
             if (perDecorators.get(value) > 1) report(file.rel, `${home} resolves connection ${value} more than once; one connection has one injector.`, { ...kit.at(file.rel, file.sourceFile, node), connection: value });
           }
         } else if (binding?.module === TYPEORM && SOURCE_CALLS.has(binding.name)) {
-          const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || slotIs('be.app.migrate') || slotIs('be.tests.fixtures');
-          if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the migrate app; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
+          const allowed = file.rel.startsWith(`${DATABASE_DIR}/`) || slotIs('be.app.cli') || slotIs('be.cli') || slotIs('be.tests.fixtures');
+          if (!allowed) report(file.rel, `${binding.name}() reaches the DataSource outside platform/database and the cli; inject the shared EntityManager of the connection instead.`, kit.at(file.rel, file.sourceFile, node));
         }
       }
       const exportedName = (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ts.isVariableStatement(node.parent?.parent) && kit.isExported(node.parent.parent)) ? node.name.text

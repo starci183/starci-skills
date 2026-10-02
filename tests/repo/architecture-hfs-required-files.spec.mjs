@@ -11,9 +11,9 @@ const platformFiles = (skip = []) => Object.fromEntries(PLATFORM.filter(name => 
   .map(name => [`src/modules/platform/${name}/index.ts`, 'export const value = 1;\n']));
 const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path).sort();
 const FEATURE = {
-  'src/features/a/index.ts': 'export const a = 1;\n',
-  'src/features/a/a.module.ts': 'export const AModule = 1;\n',
-  'src/features/a/application/run.use-case.ts': 'export const run = 1;\n',
+  'src/features/api/a/index.ts': 'export const a = 1;\n',
+  'src/features/api/a/a.module.ts': 'export const AModule = 1;\n',
+  'src/features/api/a/application/run.use-case.ts': 'export const run = 1;\n',
 };
 
 test('BE: a complete platform set, app module and feature raise nothing', t => {
@@ -45,18 +45,18 @@ test('BE: a feature missing index.ts and application/ is flagged, a domain witho
   const root = archFixture(t, {
     files: {
       ...platformFiles(),
-      'src/features/a/a.module.ts': 'export const AModule = 1;\n',
+      'src/features/api/a/a.module.ts': 'export const AModule = 1;\n',
       'src/modules/domain/x/x.service.ts': 'export const s = 1;\n',
     },
   });
-  assert.deepEqual(paths(runArch(root), 'BE_REQUIRED_MODULE_MISSING'), ['src/features/a/application', 'src/features/a/index.ts', 'src/modules/domain/x/index.ts']);
+  assert.deepEqual(paths(runArch(root), 'BE_REQUIRED_MODULE_MISSING'), ['src/features/api/a/application', 'src/features/api/a/index.ts', 'src/modules/domain/x/index.ts']);
 });
 
 test('BE: a feature folder without its <feature>.module.ts is flagged', t => {
   const root = archFixture(t, {
-    files: { ...platformFiles(), 'src/features/a/index.ts': 'export const a = 1;\n', 'src/features/a/application/run.use-case.ts': 'export const run = 1;\n' },
+    files: { ...platformFiles(), 'src/features/api/a/index.ts': 'export const a = 1;\n', 'src/features/api/a/application/run.use-case.ts': 'export const run = 1;\n' },
   });
-  assert.deepEqual(paths(runArch(root), 'BE_REQUIRED_MODULE_MISSING'), ['src/features/a/a.module.ts']);
+  assert.deepEqual(paths(runArch(root), 'BE_REQUIRED_MODULE_MISSING'), ['src/features/api/a/a.module.ts']);
 });
 
 test('BE: minInstances - no feature at all is one finding at hfs.json', t => {

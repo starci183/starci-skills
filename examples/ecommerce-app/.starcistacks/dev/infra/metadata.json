@@ -9,7 +9,7 @@
         "keycloak": 8149,
         "minio": 9069,
         "landing": 3069,
-        "shop": 4069
+        "app": 4069
     },
     "portServices": {
         "identityApi": {
@@ -47,9 +47,9 @@
             "appSlot": 0,
             "ownedBy": "the fe side (fe/apps; declared here so its apps read the same projection)"
         },
-        "shop": {
+        "app": {
             "scope": "application",
-            "application": "shop",
+            "application": "app",
             "basePort": 3000,
             "appSlot": 1,
             "ownedBy": "the fe side (fe/apps; declared here so its apps read the same projection)"

@@ -1,4 +1,0 @@
-Baseline refusals: 4
-Final refusals: 4
-New refusals: 0
-The same four pre-existing refusals remain; selected brand/UI records add none.

@@ -23,7 +23,7 @@ const rootRun = (t, files) => checkHfsWithoutConfig(path.dirname(archFixture(t, 
 const ids = (report, id) => findings(report, id).map(item => item.path).sort();
 
 test('HFS_APPS_REQUIRED: a side with no apps/ directory is a finding; one application under apps/ is not', t => {
-  const none = run(t, 'fe', { 'apps/web/src/app/.keep': null, 'src/.keep': '' });
+  const none = run(t, 'fe', { 'apps/web/src/app/.keep': null, 'apps/web/package.json': null, 'src/.keep': '' });
   assert.deepEqual(ids(none, 'HFS_APPS_REQUIRED'), ['apps']);
   assert.deepEqual(ids(run(t, 'fe', { ...ROOT_FE, ...APP_FE }), 'HFS_APPS_REQUIRED'), []);
 });
@@ -58,11 +58,11 @@ test('HFS_ROOT_SRC_FORBIDDEN_FE: an fe side with a src/ tree is a finding; the b
 });
 
 test('HFS_SRC_LAYOUT_INVALID: a back-end src/ child other than features, modules and tests, and a tests/ child other than world, fixtures, integration, e2e and contract, are findings', t => {
-  const bad = run(t, 'be', { ...ROOT_BE, 'src/utils/x.ts': 'export const a = 1;\n', 'src/tests/helpers/y.ts': 'export const b = 1;\n', 'src/features/f/.keep': '', 'src/modules/domain/.keep': '' });
+  const bad = run(t, 'be', { ...ROOT_BE, 'src/utils/x.ts': 'export const a = 1;\n', 'src/tests/helpers/y.ts': 'export const b = 1;\n', 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '' });
   assert.deepEqual(ids(bad, 'HFS_SRC_LAYOUT_INVALID'), ['src/tests/helpers', 'src/utils']);
-  const good = run(t, 'be', { ...ROOT_BE, 'src/features/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/world/.keep': '', 'src/tests/integration/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/contract/.keep': '', 'src/tests/fixtures/.keep': '', 'src/tests/tsconfig.json': '{}\n' });
+  const good = run(t, 'be', { ...ROOT_BE, 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/world/.keep': '', 'src/tests/integration/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/contract/.keep': '', 'src/tests/fixtures/.keep': '', 'src/tests/tsconfig.json': '{}\n' });
   assert.deepEqual(ids(good, 'HFS_SRC_LAYOUT_INVALID'), [], 'src/tests/tsconfig.json is the file be.tool-config owns there');
-  const stray = run(t, 'be', { ...ROOT_BE, 'src/features/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/jest.json': '{}\n' });
+  const stray = run(t, 'be', { ...ROOT_BE, 'src/features/api/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/jest.json': '{}\n' });
   assert.deepEqual(ids(stray, 'HFS_SRC_LAYOUT_INVALID'), ['src/tests/jest.json']);
 });
 
@@ -83,18 +83,17 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: an app-root Markdown file other than README.m
 });
 
 // The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
-const MIGRATE_APPS = [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }];
+const CLI_APPS = [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }];
 const CORE_FILES = {};
-const withMigrate = (t, files) => runArch(archFixture(t, { profile: 'be', apps: MIGRATE_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
+const withCli = (t, files) => runArch(archFixture(t, { profile: 'be', apps: CLI_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
 
-test('HFS_APP_LAYOUT_INVALID: a migrate app needs only main.ts (no app.module.ts); an api app still needs app.module.ts', t => {
-  const migrate = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n' });
-  assert.deepEqual(ids(migrate, 'HFS_APP_LAYOUT_INVALID'), []);
-  const incomplete = withMigrate(t, { 'apps/migrate/src/migrate.options.ts': 'export {};\n' });
-  assert.deepEqual(ids(incomplete, 'HFS_APP_LAYOUT_INVALID'), ['apps/migrate']);
-  assert.match(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /main\.ts/);
-  assert.doesNotMatch(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
-  const api = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/core/src/app.module.ts': null });
+test('HFS_APP_LAYOUT_INVALID: the cli app needs main.ts and app.module.ts, like an api app', t => {
+  const cli = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n' });
+  assert.deepEqual(ids(cli, 'HFS_APP_LAYOUT_INVALID'), []);
+  const incomplete = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n' });
+  assert.deepEqual(ids(incomplete, 'HFS_APP_LAYOUT_INVALID'), ['apps/cli']);
+  assert.match(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
+  const api = withCli(t, { 'apps/cli/src/main.ts': 'void 0;\n', 'apps/cli/src/app.module.ts': 'export {};\n', 'apps/core/src/app.module.ts': null });
   assert.deepEqual(ids(api, 'HFS_APP_LAYOUT_INVALID'), ['apps/core']);
   assert.match(findings(api, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
 });

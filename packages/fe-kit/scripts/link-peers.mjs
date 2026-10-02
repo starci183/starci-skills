@@ -13,14 +13,14 @@
  * copy an app bundle actually links.
  *
  * Usage: node scripts/link-peers.mjs [consumer]
- *   consumer defaults to "todo-app" (any example app root under ../examples; the app root holds the one install).
+ *   consumer defaults to "ecommerce-app" (any example app root under ../examples; the app root holds the one install).
  */
 import { existsSync, mkdirSync, symlinkSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const KIT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
-const consumer = process.argv[2] ?? "todo-app"
+const consumer = process.argv[2] ?? "ecommerce-app"
 const consumerNodeModules = resolve(KIT_ROOT, "..", "..", "examples", consumer, "node_modules")
 
 const PEERS = [

@@ -40,7 +40,7 @@ test("the process environment is read only by the file that declares EnvSource i
         ],
         invalid: [
             { filename: at("src/tests/e2e/plan.e2e-spec.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
-            { filename: at("src/features/plan/application/plan.handler.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
+            { filename: at("src/features/api/plan/application/plan.handler.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
@@ -156,7 +156,7 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
         valid: [
             { filename: MAIN, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
             { filename: MAIN, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
-            { filename: at("apps/migrate/src/main.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
+            { filename: at("apps/cli/src/main.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
             // the config file calls its own parser (its real content, so the fixture project keeps one truth)
             { filename: PLATFORM_CONFIG_FILE, code: readFileSync(PLATFORM_CONFIG_FILE, "utf8") },
             { filename: CONFIG_SPEC, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },

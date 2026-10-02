@@ -21,29 +21,29 @@ const nestTypes = {
 
 test("an import goes only to a tier the slot matrix allows", () => {
     const files = {
-        "apps/core/src/app.module.ts": "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
-        "src/features/a/index.ts": "import { x } from '../../modules/domain/x';\nimport { p } from '../../modules/platform/config';\nimport { i } from '../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const a = [x, p, i, inner];\n",
-        "src/features/a/application/inner.ts": "export const inner = 1;\n",
-        "src/features/c/index.ts": "import { b } from '../b';\nexport const c = b;\n",
-        "src/features/b/index.ts": "export const b = 1;\n",
-        "src/modules/domain/x/index.ts": "import { a } from '../../../features/a';\nexport const x = a;\n",
+        "apps/core/src/app.module.ts": "import { a } from '../../../src/features/api/a';\nexport const AppModule = [a];\n",
+        "src/features/api/a/index.ts": "import { x } from '../../../modules/domain/x';\nimport { p } from '../../../modules/platform/config';\nimport { i } from '../../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const a = [x, p, i, inner];\n",
+        "src/features/api/a/application/inner.ts": "export const inner = 1;\n",
+        "src/features/api/c/index.ts": "import { b } from '../b';\nexport const c = b;\n",
+        "src/features/api/b/index.ts": "export const b = 1;\n",
+        "src/modules/domain/x/index.ts": "import { a } from '../../../features/api/a';\nexport const x = a;\n",
         "src/modules/platform/config/index.ts": "import { x } from '../../domain/x';\nexport const p = x;\n",
         "src/modules/integrations/mail/index.ts": "import { p } from '../../platform/config';\nimport { x } from '../../domain/x';\nexport const i = [p, x];\n",
-        "src/features/orders/contract.ts": "export type FeatureContract = string\n",
-        "src/features/orders/load.ts": "export const feature = 1\n",
-        "src/modules/platform/shared/barrel.ts": 'export type { FeatureContract } from "../../../features/orders/contract"\n',
-        "src/modules/domain/catalog/load.ts": 'export const load = () => import("../../../features/orders/load", { with: { type: "json" } })\n',
-        "src/modules/domain/catalog/import-type.ts": 'export type Hidden = import("../../../features/orders/contract").FeatureContract\n',
-        "src/features/http/app-link.ts": 'export * from "../../../apps/core/src/app.module"\n',
+        "src/features/api/orders/contract.ts": "export type FeatureContract = string\n",
+        "src/features/api/orders/load.ts": "export const feature = 1\n",
+        "src/modules/platform/shared/barrel.ts": 'export type { FeatureContract } from "../../../features/api/orders/contract"\n',
+        "src/modules/domain/catalog/load.ts": 'export const load = () => import("../../../features/api/orders/load", { with: { type: "json" } })\n',
+        "src/modules/domain/catalog/import-type.ts": 'export type Hidden = import("../../../features/api/orders/contract").FeatureContract\n',
+        "src/features/api/http/app-link.ts": 'export * from "../../../../apps/core/src/app.module"\n',
     }
     const f = projectFixture({ files })
     f.tester.run("tier-direction", rules["tier-direction"], {
         valid: [...ok(f, files, [
             "apps/core/src/app.module.ts",
-            "src/features/a/index.ts",
-            "src/features/a/application/inner.ts",
-            "src/features/c/index.ts",
-            "src/features/b/index.ts",
+            "src/features/api/a/index.ts",
+            "src/features/api/a/application/inner.ts",
+            "src/features/api/c/index.ts",
+            "src/features/api/b/index.ts",
         ])],
         invalid: [...bad(f, files, {
             "src/modules/domain/x/index.ts": [1],
@@ -52,7 +52,7 @@ test("an import goes only to a tier the slot matrix allows", () => {
             "src/modules/platform/shared/barrel.ts": [1],
             "src/modules/domain/catalog/load.ts": [1],
             "src/modules/domain/catalog/import-type.ts": [1],
-            "src/features/http/app-link.ts": [1],
+            "src/features/api/http/app-link.ts": [1],
         })],
     })
     f.cleanup()
@@ -82,12 +82,12 @@ test("owners never import each other in a cycle", () => {
 
 test("a feature never imports another feature, type-only imports included", () => {
     const files = {
-        "src/features/a/index.ts": "import { b } from '../b';\nexport const a = b + 1;\n",
-        "src/features/b/index.ts": "export const b = 1;\n",
-        "src/features/c/index.ts": "import type { D } from '../d';\nexport type C = D;\n",
-        "src/features/d/index.ts": "export type D = string;\n",
-        "src/features/e/index.ts": "import { x } from '../../modules/domain/x';\nimport { p } from '../../modules/platform/config';\nimport { i } from '../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const e = [x, p, i, inner];\n",
-        "src/features/e/application/inner.ts": "export const inner = 1;\n",
+        "src/features/api/a/index.ts": "import { b } from '../b';\nexport const a = b + 1;\n",
+        "src/features/api/b/index.ts": "export const b = 1;\n",
+        "src/features/api/c/index.ts": "import type { D } from '../d';\nexport type C = D;\n",
+        "src/features/api/d/index.ts": "export type D = string;\n",
+        "src/features/api/e/index.ts": "import { x } from '../../../modules/domain/x';\nimport { p } from '../../../modules/platform/config';\nimport { i } from '../../../modules/integrations/mail';\nimport { inner } from './application/inner';\nexport const e = [x, p, i, inner];\n",
+        "src/features/api/e/application/inner.ts": "export const inner = 1;\n",
         "src/modules/domain/x/index.ts": "export const x = 1;\n",
         "src/modules/platform/config/index.ts": "export const p = 1;\n",
         "src/modules/integrations/mail/index.ts": "export const i = 1;\n",
@@ -95,15 +95,15 @@ test("a feature never imports another feature, type-only imports included", () =
     const f = projectFixture({ files })
     f.tester.run("feature-imports-feature", rules["feature-imports-feature"], {
         valid: [...ok(f, files, [
-            "src/features/b/index.ts",
-            "src/features/d/index.ts",
-            "src/features/e/index.ts",
-            "src/features/e/application/inner.ts",
+            "src/features/api/b/index.ts",
+            "src/features/api/d/index.ts",
+            "src/features/api/e/index.ts",
+            "src/features/api/e/application/inner.ts",
             "src/modules/domain/x/index.ts",
         ])],
         invalid: [...bad(f, files, {
-            "src/features/a/index.ts": [1],
-            "src/features/c/index.ts": [1],
+            "src/features/api/a/index.ts": [1],
+            "src/features/api/c/index.ts": [1],
         })],
     })
     f.cleanup()
@@ -112,36 +112,36 @@ test("a feature never imports another feature, type-only imports included", () =
 test("a feature file sits in the folder its role names", () => {
     const files = {
         ...nestTypes,
-        "src/features/orders/index.ts": 'export { CreateOrderHandler } from "./application/create-order.handler";\n',
-        "src/features/orders/orders.module.ts": "export class OrdersModule {}\n",
-        "src/features/orders/application/create-order.contracts.ts": "export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n",
-        "src/features/orders/application/create-order.handler.ts": 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
-        "src/features/orders/transport/graphql/dto/create-order.request.ts": 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderRequest { itemId!:string }\n',
-        "src/features/orders/transport/graphql/create-order.resolver.ts": 'import { Args,Mutation } from "@nestjs/graphql"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @Mutation(()=>String,{name:"createOrder"}) create(@Args("input") request:CreateOrderRequest){return request.itemId} }\n',
+        "src/features/api/orders/index.ts": 'export { CreateOrderHandler } from "./application/create-order.handler";\n',
+        "src/features/api/orders/orders.module.ts": "export class OrdersModule {}\n",
+        "src/features/api/orders/application/create-order.contracts.ts": "export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n",
+        "src/features/api/orders/application/create-order.handler.ts": 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
+        "src/features/api/orders/transport/graphql/dto/create-order.request.ts": 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderRequest { itemId!:string }\n',
+        "src/features/api/orders/transport/graphql/create-order.resolver.ts": 'import { Args,Mutation } from "@nestjs/graphql"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @Mutation(()=>String,{name:"createOrder"}) create(@Args("input") request:CreateOrderRequest){return request.itemId} }\n',
         "src/modules/platform/database/entities/order.entity.ts": 'import { Entity } from "typeorm"; @Entity() export class OrderEntity {}\n',
-        "src/features/billing/application/create-invoice.request.ts": "export class CreateInvoiceRequest {}\n",
-        "src/features/billing/transport/graphql/dto/invoice.entity.ts": 'import { Entity } from "typeorm"; @Entity() export class InvoiceEntity {}\n',
-        "src/features/billing/migrations/1790000000000-CreateInvoices.ts": "export class CreateInvoices { up(){} down(){} }\n",
-        "src/features/billing/transport/graphql/invoice-view.mapper.ts": 'import { ViewEntity } from "typeorm"; @ViewEntity() export class InvoiceViewMapper {}\n',
-        "src/features/billing/application/invoice-schema.handler.ts": 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"invoice"}); export const schema=make();\n',
+        "src/features/api/billing/application/create-invoice.request.ts": "export class CreateInvoiceRequest {}\n",
+        "src/features/api/billing/transport/graphql/dto/invoice.entity.ts": 'import { Entity } from "typeorm"; @Entity() export class InvoiceEntity {}\n',
+        "src/features/api/billing/migrations/1790000000000-CreateInvoices.ts": "export class CreateInvoices { up(){} down(){} }\n",
+        "src/features/api/billing/transport/graphql/invoice-view.mapper.ts": 'import { ViewEntity } from "typeorm"; @ViewEntity() export class InvoiceViewMapper {}\n',
+        "src/features/api/billing/application/invoice-schema.handler.ts": 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"invoice"}); export const schema=make();\n',
     }
     const f = projectFixture({ files })
     f.tester.run("feature-layout", rules["feature-layout"], {
         valid: [...ok(f, files, [
-            "src/features/orders/index.ts",
-            "src/features/orders/orders.module.ts",
-            "src/features/orders/application/create-order.contracts.ts",
-            "src/features/orders/application/create-order.handler.ts",
-            "src/features/orders/transport/graphql/dto/create-order.request.ts",
-            "src/features/orders/transport/graphql/create-order.resolver.ts",
+            "src/features/api/orders/index.ts",
+            "src/features/api/orders/orders.module.ts",
+            "src/features/api/orders/application/create-order.contracts.ts",
+            "src/features/api/orders/application/create-order.handler.ts",
+            "src/features/api/orders/transport/graphql/dto/create-order.request.ts",
+            "src/features/api/orders/transport/graphql/create-order.resolver.ts",
             "src/modules/platform/database/entities/order.entity.ts",
         ])],
         invalid: [...bad(f, files, {
-            "src/features/billing/application/create-invoice.request.ts": [1, 1],
-            "src/features/billing/transport/graphql/dto/invoice.entity.ts": [1, 1],
-            "src/features/billing/migrations/1790000000000-CreateInvoices.ts": [1],
-            "src/features/billing/transport/graphql/invoice-view.mapper.ts": [1],
-            "src/features/billing/application/invoice-schema.handler.ts": [1, 1],
+            "src/features/api/billing/application/create-invoice.request.ts": [1, 1],
+            "src/features/api/billing/transport/graphql/dto/invoice.entity.ts": [1, 1],
+            "src/features/api/billing/migrations/1790000000000-CreateInvoices.ts": [1],
+            "src/features/api/billing/transport/graphql/invoice-view.mapper.ts": [1],
+            "src/features/api/billing/application/invoice-schema.handler.ts": [1, 1],
         })],
     })
     f.cleanup()
@@ -151,34 +151,34 @@ test("application code never imports transport code, directly or through a chain
     const files = {
         ...nestTypes,
         "src/modules/domain/orders/service.ts": "export class OrdersService { create(input: {name:string}) { return input } }\n",
-        "src/features/orders/application/valid.use-case.ts": 'import * as Nest from "@nestjs/common"; import { OrdersService } from "../../../modules/domain/orders/service"; interface ValidParams {name:string} interface ValidResult {name:string} @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:ValidParams):ValidResult { return this.orders.create(input) } }\n',
-        "src/features/orders/application/valid-cjs.use-case.ts": 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
-        "src/features/orders/application/valid-shadow-es.use-case.ts": 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-        "src/features/orders/shared/capability.ts": "export const execute = (value: unknown) => value\n",
-        "src/features/orders/application/valid-shared.use-case.ts": 'import { execute } from "../shared/capability"; export class ValidSharedUseCase { execute(value:unknown){ return execute(value) } }\n',
-        "src/features/orders/transport/graphql/create.input.ts": "export class CreateInput { name!: string }\n",
-        "src/features/orders/transport/index.ts": 'export type { CreateInput } from "./graphql/create.input"\n',
-        "src/features/orders/shared/transport-types.ts": 'export type { CreateInput } from "../transport"\n',
-        "src/features/orders/application/invalid.use-case.ts": 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
-        "src/features/orders/application/invalid-cjs.use-case.ts": 'import Nest = require("@nestjs/common"); export class InvalidCjsUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
-        "src/features/orders/application/invalid-destructured.use-case.ts": 'import * as Nest from "@nestjs/common"; const { Body } = Nest; export class InvalidDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
-        "src/features/orders/shared/protocol.ts": 'export { Body } from "@nestjs/common"; export { ArgsType as Input } from "@nestjs/graphql"\n',
-        "src/features/orders/application/invalid-protocol.use-case.ts": 'import { Body, Input } from "../shared/protocol"; @Input() export class InvalidProtocolUseCase { execute(@Body() input:unknown){ return input } }\n',
+        "src/features/api/orders/application/valid.use-case.ts": 'import * as Nest from "@nestjs/common"; import { OrdersService } from "../../../../modules/domain/orders/service"; interface ValidParams {name:string} interface ValidResult {name:string} @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:ValidParams):ValidResult { return this.orders.create(input) } }\n',
+        "src/features/api/orders/application/valid-cjs.use-case.ts": 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
+        "src/features/api/orders/application/valid-shadow-es.use-case.ts": 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+        "src/features/api/orders/shared/capability.ts": "export const execute = (value: unknown) => value\n",
+        "src/features/api/orders/application/valid-shared.use-case.ts": 'import { execute } from "../shared/capability"; export class ValidSharedUseCase { execute(value:unknown){ return execute(value) } }\n',
+        "src/features/api/orders/transport/graphql/create.input.ts": "export class CreateInput { name!: string }\n",
+        "src/features/api/orders/transport/index.ts": 'export type { CreateInput } from "./graphql/create.input"\n',
+        "src/features/api/orders/shared/transport-types.ts": 'export type { CreateInput } from "../transport"\n',
+        "src/features/api/orders/application/invalid.use-case.ts": 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
+        "src/features/api/orders/application/invalid-cjs.use-case.ts": 'import Nest = require("@nestjs/common"); export class InvalidCjsUseCase { execute(@Nest.Body() input:unknown){ return input } }\n',
+        "src/features/api/orders/application/invalid-destructured.use-case.ts": 'import * as Nest from "@nestjs/common"; const { Body } = Nest; export class InvalidDestructuredUseCase { execute(@Body() input:unknown){ return input } }\n',
+        "src/features/api/orders/shared/protocol.ts": 'export { Body } from "@nestjs/common"; export { ArgsType as Input } from "@nestjs/graphql"\n',
+        "src/features/api/orders/application/invalid-protocol.use-case.ts": 'import { Body, Input } from "../shared/protocol"; @Input() export class InvalidProtocolUseCase { execute(@Body() input:unknown){ return input } }\n',
     }
     const f = projectFixture({ files })
     f.tester.run("application-never-imports-transport", rules["application-never-imports-transport"], {
         valid: [...ok(f, files, [
-            "src/features/orders/application/valid.use-case.ts",
-            "src/features/orders/application/valid-cjs.use-case.ts",
-            "src/features/orders/application/valid-shadow-es.use-case.ts",
-            "src/features/orders/application/valid-shared.use-case.ts",
-            "src/features/orders/transport/graphql/create.input.ts",
+            "src/features/api/orders/application/valid.use-case.ts",
+            "src/features/api/orders/application/valid-cjs.use-case.ts",
+            "src/features/api/orders/application/valid-shadow-es.use-case.ts",
+            "src/features/api/orders/application/valid-shared.use-case.ts",
+            "src/features/api/orders/transport/graphql/create.input.ts",
         ])],
         invalid: [...bad(f, files, {
-            "src/features/orders/application/invalid.use-case.ts": [1, 1, 1],
-            "src/features/orders/application/invalid-cjs.use-case.ts": [1],
-            "src/features/orders/application/invalid-destructured.use-case.ts": [1],
-            "src/features/orders/application/invalid-protocol.use-case.ts": [1],
+            "src/features/api/orders/application/invalid.use-case.ts": [1, 1, 1],
+            "src/features/api/orders/application/invalid-cjs.use-case.ts": [1],
+            "src/features/api/orders/application/invalid-destructured.use-case.ts": [1],
+            "src/features/api/orders/application/invalid-protocol.use-case.ts": [1],
         })],
     })
     f.cleanup()
@@ -186,35 +186,35 @@ test("application code never imports transport code, directly or through a chain
 
 test("another owner is imported only through its index entry, and an entry never uses export star", () => {
     const files = {
-        "src/features/orders/index.ts": 'export * from "./public"\n',
-        "src/features/orders/public.ts": "export const publicOrder = 1\n",
-        "src/features/orders/private.ts": "export const secretOrder = 2\n",
-        "src/features/orders/internal.ts": 'import { secretOrder } from "./private"; export const internal = secretOrder\n',
-        "src/features/catalog/valid.ts": 'import { publicOrder } from "../orders"; export const valid = publicOrder\n',
-        "src/features/catalog/invalid.ts": 'import { secretOrder } from "../orders/private"; export const invalid = secretOrder\n',
-        "src/modules/platform/orders/barrel.ts": 'export { secretOrder } from "../../../features/orders/private"\n',
-        "src/features/catalog/indirect.ts": 'import { secretOrder } from "../../modules/platform/orders/barrel"; export const indirect = secretOrder\n',
+        "src/features/api/orders/index.ts": 'export * from "./public"\n',
+        "src/features/api/orders/public.ts": "export const publicOrder = 1\n",
+        "src/features/api/orders/private.ts": "export const secretOrder = 2\n",
+        "src/features/api/orders/internal.ts": 'import { secretOrder } from "./private"; export const internal = secretOrder\n',
+        "src/features/api/catalog/valid.ts": 'import { publicOrder } from "../orders"; export const valid = publicOrder\n',
+        "src/features/api/catalog/invalid.ts": 'import { secretOrder } from "../orders/private"; export const invalid = secretOrder\n',
+        "src/modules/platform/orders/barrel.ts": 'export { secretOrder } from "../../../features/api/orders/private"\n',
+        "src/features/api/catalog/indirect.ts": 'import { secretOrder } from "../../../modules/platform/orders/barrel"; export const indirect = secretOrder\n',
         "src/modules/domain/x/index.ts": "export const x = 1;\n",
         "src/modules/domain/x/persistence/entities/x.entity.ts": "export class XEntity {}\n",
         "src/tests/fixtures/builders/x.builder.ts": "import { XEntity } from '../../../modules/domain/x/persistence/entities/x.entity';\nexport const rows = [XEntity];\n",
         "src/tests/fixtures/other.contracts.ts": "import { XEntity } from '../../modules/domain/x/persistence/entities/x.entity';\nexport const rows = [XEntity];\n",
-        "src/features/a/index.ts": "import { XEntity } from '../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
+        "src/features/api/a/index.ts": "import { XEntity } from '../../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
     }
     const f = projectFixture({ files })
     f.tester.run("owner-export-bypass", rules["owner-export-bypass"], {
         valid: [...ok(f, files, [
-            "src/features/orders/public.ts",
-            "src/features/orders/internal.ts",
-            "src/features/catalog/valid.ts",
+            "src/features/api/orders/public.ts",
+            "src/features/api/orders/internal.ts",
+            "src/features/api/catalog/valid.ts",
             "src/modules/domain/x/index.ts",
             "src/tests/fixtures/builders/x.builder.ts",
         ])],
         invalid: [...bad(f, files, {
-            "src/features/orders/index.ts": [1],
-            "src/features/catalog/invalid.ts": [1],
-            "src/features/catalog/indirect.ts": [1],
+            "src/features/api/orders/index.ts": [1],
+            "src/features/api/catalog/invalid.ts": [1],
+            "src/features/api/catalog/indirect.ts": [1],
             "src/tests/fixtures/other.contracts.ts": [1],
-            "src/features/a/index.ts": [1],
+            "src/features/api/a/index.ts": [1],
         })],
     })
     f.cleanup()
@@ -222,13 +222,13 @@ test("another owner is imported only through its index entry, and an entry never
 
 test("every feature owner is composed into an app by a runtime import", () => {
     const files = {
-        "apps/core/src/app.module.ts": "import { FooModule } from '../../../src/features/foo';\nimport type { BarModule } from '../../../src/features/bar';\nexport const AppModule: [typeof FooModule, BarModule | null] = [FooModule, null];\n",
-        "src/features/foo/index.ts": "export { FooModule } from './foo.module';\n",
-        "src/features/foo/foo.module.ts": "import { BillingModule } from '../../modules/domain/billing';\nexport class FooModule { static imports = [BillingModule]; }\n",
-        "src/features/bar/index.ts": "export { BarModule } from './bar.module';\n",
-        "src/features/bar/bar.module.ts": "export class BarModule {}\n",
-        "src/features/orphan/index.ts": "export { OrphanModule } from './orphan.module';\n",
-        "src/features/orphan/orphan.module.ts": "export class OrphanModule {}\n",
+        "apps/core/src/app.module.ts": "import { FooModule } from '../../../src/features/api/foo';\nimport type { BarModule } from '../../../src/features/api/bar';\nexport const AppModule: [typeof FooModule, BarModule | null] = [FooModule, null];\n",
+        "src/features/api/foo/index.ts": "export { FooModule } from './foo.module';\n",
+        "src/features/api/foo/foo.module.ts": "import { BillingModule } from '../../../modules/domain/billing';\nexport class FooModule { static imports = [BillingModule]; }\n",
+        "src/features/api/bar/index.ts": "export { BarModule } from './bar.module';\n",
+        "src/features/api/bar/bar.module.ts": "export class BarModule {}\n",
+        "src/features/api/orphan/index.ts": "export { OrphanModule } from './orphan.module';\n",
+        "src/features/api/orphan/orphan.module.ts": "export class OrphanModule {}\n",
         "src/modules/domain/billing/index.ts": "export { BillingModule } from './billing.module';\n",
         "src/modules/domain/billing/billing.module.ts": "import { mail } from '../../integrations/mail';\nexport class BillingModule { static mail = mail; }\n",
         "src/modules/integrations/mail/index.ts": "export const mail = 1;\n",
@@ -238,13 +238,13 @@ test("every feature owner is composed into an app by a runtime import", () => {
     f.tester.run("feature-not-composed", rules["feature-not-composed"], {
         valid: [...ok(f, files, [
             "apps/core/src/app.module.ts",
-            "src/features/foo/index.ts",
+            "src/features/api/foo/index.ts",
             "src/modules/domain/billing/index.ts",
             "src/modules/integrations/mail/index.ts",
         ])],
         invalid: [...bad(f, files, {
-            "src/features/bar/index.ts": [1],
-            "src/features/orphan/index.ts": [1],
+            "src/features/api/bar/index.ts": [1],
+            "src/features/api/orphan/index.ts": [1],
             "src/modules/integrations/unused/index.ts": [1],
         })],
     })
@@ -310,24 +310,24 @@ test("a package is imported only through its declared exports", () => {
 test("every owner export and every production file is reached by a root", () => {
     const files = {
         "tsconfig.json": tsconfig({}),
-        "apps/core/src/app.module.ts": "import { a } from '../../../src/features/a';\nimport { b } from '../../../src/features/b';\nexport const AppModule = [a, b];\nexport const extra = 2;\n",
+        "apps/core/src/app.module.ts": "import { a } from '../../../src/features/api/a';\nimport { b } from '../../../src/features/api/b';\nexport const AppModule = [a, b];\nexport const extra = 2;\n",
         "apps/core/src/main.ts": "import { boot } from './boot';\nboot();\n",
         "apps/core/src/boot.ts": "export const boot = () => 1;\n",
         "apps/core/src/stray.ts": "export const stray = 1;\n",
-        "src/features/a/index.ts": [
-            "import { used } from '../../modules/domain/x';",
-            "import * as ns from '../../modules/domain/ns';",
-            "import { renamed as r } from '../../modules/domain/alias';",
-            "import type { Shape } from '../../modules/domain/shape';",
-            "import { named } from '../../modules/domain/def';",
-            "import { helper } from '../../modules/domain/ry';",
-            "import { keep } from '../../modules/domain/sp';",
-            "import { usedCons } from '../../modules/domain/cons';",
-            "export const a = [used, ns, r, named, helper, keep, usedCons, (): Shape => ({ a: 1 }), () => import('../../modules/domain/dyn')];",
+        "src/features/api/a/index.ts": [
+            "import { used } from '../../../modules/domain/x';",
+            "import * as ns from '../../../modules/domain/ns';",
+            "import { renamed as r } from '../../../modules/domain/alias';",
+            "import type { Shape } from '../../../modules/domain/shape';",
+            "import { named } from '../../../modules/domain/def';",
+            "import { helper } from '../../../modules/domain/ry';",
+            "import { keep } from '../../../modules/domain/sp';",
+            "import { usedCons } from '../../../modules/domain/cons';",
+            "export const a = [used, ns, r, named, helper, keep, usedCons, (): Shape => ({ a: 1 }), () => import('../../../modules/domain/dyn')];",
             "",
         ].join("\n"),
-        "src/features/a/a.spec.ts": "import { onlySpec } from '../../modules/domain/sp';\nvoid onlySpec;\n",
-        "src/features/a/a.service.spec.ts": "import { TOKEN } from '../../modules/domain/cons';\nit('uses', () => { expect(TOKEN).toBe(1); });\n",
+        "src/features/api/a/a.spec.ts": "import { onlySpec } from '../../../modules/domain/sp';\nvoid onlySpec;\n",
+        "src/features/api/a/a.service.spec.ts": "import { TOKEN } from '../../../modules/domain/cons';\nit('uses', () => { expect(TOKEN).toBe(1); });\n",
         "src/modules/domain/x/index.ts": "export const used = 1;\nexport const unused = 2;\nexport function alsoUnused() { return 3; }\n",
         "src/modules/domain/ns/index.ts": "export const one = 1;\nexport const two = 2;\n",
         "src/modules/domain/dyn/index.ts": "export const one = 1;\nexport const two = 2;\n",
@@ -347,7 +347,7 @@ test("every owner export and every production file is reached by a root", () => 
         "src/modules/domain/used/orphan.ts": "export const orphan = 1;\n",
         "src/modules/domain/used/spec-only.ts": "export const specOnly = 1;\n",
         "src/modules/domain/used/spec-only.spec.ts": "import { specOnly } from './spec-only';\nvoid specOnly;\n",
-        "src/features/b/index.ts": "import { used } from '../../modules/domain/used';\nexport const b = used;\n",
+        "src/features/api/b/index.ts": "import { used } from '../../../modules/domain/used';\nexport const b = used;\n",
         "packages/shared/package.json": JSON.stringify({ name: "@fixture/shared", private: true }),
         "packages/shared/src/index.ts": "export { shared } from './shared';\n",
         "packages/shared/src/shared.ts": "export const shared = 1;\n",
@@ -359,7 +359,7 @@ test("every owner export and every production file is reached by a root", () => 
             "apps/core/src/app.module.ts",
             "apps/core/src/main.ts",
             "apps/core/src/boot.ts",
-            "src/features/a/index.ts",
+            "src/features/api/a/index.ts",
             "src/modules/domain/ns/index.ts",
             "src/modules/domain/dyn/index.ts",
             "src/modules/domain/alias/inner.ts",
@@ -457,8 +457,8 @@ test("uniform entry files are not compared, the same bodies in other files are a
     const files = {
         "apps/core/src/main.ts": helper("boot", 26),
         "apps/other/src/main.ts": helper("start", 26, { variable: "item" }),
-        "src/features/a/transport/graphql/a.resolver.ts": helper("resolveA", 26),
-        "src/features/b/transport/graphql/b.resolver.ts": helper("resolveB", 26, { variable: "item" }),
+        "src/features/api/a/transport/graphql/a.resolver.ts": helper("resolveA", 26),
+        "src/features/api/b/transport/graphql/b.resolver.ts": helper("resolveB", 26, { variable: "item" }),
         "apps/core/src/app.module.ts": helper("composeCore", 26, { literal: 5 }),
         "apps/other/src/app.module.ts": helper("composeOther", 26, { literal: 5, variable: "item" }),
     }
@@ -467,8 +467,8 @@ test("uniform entry files are not compared, the same bodies in other files are a
         valid: [...ok(f, files, [
             "apps/core/src/main.ts",
             "apps/other/src/main.ts",
-            "src/features/a/transport/graphql/a.resolver.ts",
-            "src/features/b/transport/graphql/b.resolver.ts",
+            "src/features/api/a/transport/graphql/a.resolver.ts",
+            "src/features/api/b/transport/graphql/b.resolver.ts",
         ])],
         invalid: [...bad(f, files, { "apps/core/src/app.module.ts": [1] })],
     })
@@ -476,8 +476,8 @@ test("uniform entry files are not compared, the same bodies in other files are a
 })
 
 const composed = {
-    "apps/core/src/app.module.ts": "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
-    "src/features/a/index.ts": "import { used } from '../../modules/domain/x';\nexport const a = [used];\n",
+    "apps/core/src/app.module.ts": "import { a } from '../../../src/features/api/a';\nexport const AppModule = [a];\n",
+    "src/features/api/a/index.ts": "import { used } from '../../../modules/domain/x';\nexport const a = [used];\n",
 }
 
 test("a symbol name is declared once across the production source", () => {

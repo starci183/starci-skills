@@ -30,7 +30,7 @@ const SERVICE = at("src/modules/domain/order/order.consumer.ts")
 /** A spec beside it. */
 const SPEC = at("src/modules/domain/order/order.consumer.spec.ts")
 /** A handler of a feature (a different owner from every module). */
-const HANDLER = at("src/features/shop/application/open.handler.ts")
+const HANDLER = at("src/features/api/shop/application/open.handler.ts")
 /** The decorators file of the `platform/clock` owner, at its owner root. */
 const DECORATORS = at("src/modules/platform/clock/probe.decorators.ts")
 /** A decorators-named file one folder below the owner root. */

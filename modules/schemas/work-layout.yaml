@@ -499,8 +499,8 @@ rules:
 example:
   _resources/:
     - environments/dev/resource.yaml
-    - identities/todo-app-demo/resource.yaml
-    - fixtures/todo-app-seed/resource.yaml
+    - identities/ecommerce-app-demo/resource.yaml
+    - fixtures/ecommerce-app-seed/resource.yaml
   brand/:
     - index.yaml
     - assets/mascot/rest.png

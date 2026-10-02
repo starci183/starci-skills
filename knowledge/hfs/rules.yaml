@@ -346,7 +346,7 @@ rules:
       - {kind: eslint-be, id: entrypoint-only-in-apps}
   - id: R34
     code: "BE_SCHEMA_AUTHORITY"
-    law: "Migrations are the only schema authority; `synchronize` is `false`."
+    law: "Migrations are the only schema authority, run only by the cli migrate command and the test world; `synchronize` is `false`."
     kinds: [lint, codemod, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SCHEMA_AUTHORITY"]
@@ -467,7 +467,7 @@ rules:
       - {kind: eslint-be, id: module-registration}
   - id: R46
     code: "BE_BACKGROUND_UNOWNED"
-    law: "Every sweep, outbox or retry has a job or consumer run by a worker app."
+    law: "Every sweep, outbox or retry has a job or consumer composed by an app: the service that owns it (an api app) or a worker app scaled apart."
     kinds: [lint, design]
     gates: [land, ci]
     failureCodes: ["BE_BACKGROUND_UNOWNED"]
@@ -475,7 +475,7 @@ rules:
       - {kind: eslint-be, id: background-unowned}
   - id: R47
     code: "BE_TEST_TOPOLOGY"
-    law: "One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs are `<name>.service.spec.ts` beside a `<name>.service.ts` and nowhere else (every service has exactly one; any other `*.spec.ts` outside `be/src/tests/{world,integration,e2e,contract}` is a finding, including specs in apps), and the unit project collects coverage from `be/src/**/*.service.ts` only with a per-file threshold of 100 on lines, branches, functions and statements (`test` runs `--coverage`; `importHelpers` and `tslib`); `be/src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the app's own stack (`.starcistacks/<env>`, named by `stack` in `test-world.config.ts`, the declaration of the test-world library in its one named form `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (a default export is not read): every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `be/apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), whose `stacks` entry in `test-world.config.ts` declares `{ fakedBy: <fake>, reason }` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `be/src/tests` overrides a provider or DI token; `be/src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, with the real peer apps its client calls beside them as `apps`; real infrastructure, no HTTP door of ours), `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; an integration or e2e spec passes `useTestWorld` one object literal with plain keys (no variable, spread or computed key) and calls it; the contract layer skips only through the test-world library's `useSandbox(...)` when the sandbox config is absent (`sandbox.describe(...)`), and every `fakes/<provider>/` that serves payload fixtures (`payloads/*.json`) has a `contract/<provider>/*.contract-spec.ts` that references those fixtures and asserts `shapeOf(real)` equals `shapeOf(fixture)` (the helper `shapeOf` is named by `ruleParams.be.contractShape` of the slot manifest; fakes the test-world library provides are guarded by the library); no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `be/src/tests/e2e/world`."
+    law: "One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs are the unit-tested roles of `ruleParams.be.unitRoles` (`<name>.service.spec.ts` beside a `<name>.service.ts`, `<name>.cli.spec.ts` beside a cli command `<name>.cli.ts` of `src/features/cli`) and nowhere else (every unit-tested subject has exactly one; any other `*.spec.ts` outside `be/src/tests/{world,integration,e2e,contract}` is a finding, including specs in apps), and the unit project collects coverage from the unit-tested roles only (`be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts`) with a per-file threshold of 100 on lines, branches, functions and statements (`test` runs `--coverage`; `importHelpers` and `tslib`); `be/src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the app's own stack (`.starcistacks/<env>`, named by `stack` in `test-world.config.ts`, the declaration of the test-world library in its one named form `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (a default export is not read): every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs the migrations once over the cli app's connections (the runner of the cli migrate command); `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), whose `stacks` entry in `test-world.config.ts` declares `{ fakedBy: <fake>, reason }` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `be/src/tests` overrides a provider or DI token; `be/src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, with the real peer apps its client calls beside them as `apps`; real infrastructure, no HTTP door of ours), `be/src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; an integration or e2e spec passes `useTestWorld` one object literal with plain keys (no variable, spread or computed key) and calls it; the contract layer skips only through the test-world library's `useSandbox(...)` when the sandbox config is absent (`sandbox.describe(...)`), and every `fakes/<provider>/` that serves payload fixtures (`payloads/*.json`) has a `contract/<provider>/*.contract-spec.ts` that references those fixtures and asserts `shapeOf(real)` equals `shapeOf(fixture)` (the helper `shapeOf` is named by `ruleParams.be.contractShape` of the slot manifest; fakes the test-world library provides are guarded by the library); no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `be/src/tests/e2e/world`."
     kinds: [check, codemod, lint]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY", "HFS_TEST_KIND_RETIRED", "BE_CONTRACT_UNGUARDED"]
@@ -836,7 +836,7 @@ rules:
       - {kind: eslint-be, id: no-external-call-in-transaction}
   - id: R83
     code: "BE_UNNAMED_DATA_ACCESS"
-    law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `be/apps/migrate` and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object."
+    law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, the cli (`be/apps/cli`, `be/src/features/cli`) and the test world `be/src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_UNNAMED_DATA_ACCESS"]
@@ -898,7 +898,7 @@ rules:
       - {kind: eslint-be, id: readonly-boundary}
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
-    law: "A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
+    law: "A transport handler (a controller, resolver, gateway, consumer or job; a cli command is an action runner, R134) maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_TRANSPORT_SHAPE"]
@@ -1073,7 +1073,7 @@ rules:
       - {kind: eslint-be, id: builder-arranges-only}
   - id: R102
     code: "BE_SPEC_PLACEMENT"
-    law: "A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec `<name>.service.spec.ts` beside its service, or an integration, e2e or contract spec under `be/src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding."
+    law: "A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec of a unit-tested role (`ruleParams.be.unitRoles`: `<name>.service.spec.ts` beside its service, `<name>.cli.spec.ts` beside its cli command), or an integration, e2e or contract spec under `be/src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding."
     kinds: [check, lint]
     gates: [land, ci]
     failureCodes: ["BE_SPEC_PLACEMENT"]
@@ -1280,3 +1280,68 @@ rules:
     failureCodes: ["RT_ABSOLUTE_PATH"]
     enforcers:
       - {kind: runtime, id: absolute-path, at: scripts/hfs/runtime-rules/absolute-path.mjs}
+  - id: R128
+    code: "HFS_MONO_WORKSPACES"
+    law: "Every app is a monorepo, even with one service: the app root package.json declares `workspaces` exactly `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` as `npm@<exact version>` and `turbo` in its devDependencies (at the canon pin), and the app root holds the managed `turbo.json` (app.task-graph: build, dev, lint and typecheck, build depending on `^build` with cached `.next` and `dist` outputs)."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_WORKSPACES"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R129
+    code: "HFS_MONO_FE_WORKSPACE"
+    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_FE_WORKSPACE"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R130
+    code: "HFS_MONO_NEST_PROJECTS"
+    law: "The back end is a Nest monorepo of `be/apps/<app>`, even with one service: `be/nest-cli.json` is `\"monorepo\": true`, its default project (`root`, `sourceRoot`) is an api app, and its `projects` are exactly the be apps hfs.json declares, each `{\"type\": \"application\", \"root\": \"apps/<app>\", \"sourceRoot\": \"apps/<app>/src\"}`."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_NEST_PROJECTS"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R131
+    code: "HFS_MONO_WORKSPACE_DEP"
+    law: "An fe workspace declares every package its files import (read with TypeScript's import pre-processor, its tsconfig path aliases excluded) in its own `package.json`, a sibling workspace package at `\"*\"`; the app root `package.json` never declares a workspace package."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_MONO_WORKSPACE_DEP"]
+    enforcers:
+      - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
+  - id: R132
+    code: "BE_CLI_REQUIRED"
+    law: "Every one-off action of a back end lives in ONE app, `be/apps/cli` (kind cli, named cli): a back end that declares a connection (its migrations run as `cli migrate run`) or tracks a command under `src/features/cli/` declares exactly that app, and tracks its image `be/apps/cli/Dockerfile` (one image, run as `cli <group> <command>`)."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_CLI_REQUIRED"]
+    enforcers:
+      - {kind: hfs, id: cli, at: scripts/hfs/rules/cli.mjs}
+  - id: R133
+    code: "BE_CLI_BOOTSTRAP"
+    law: "The cli app boots in its `main.ts` with `CommandFactory.run(...)` of nest-commander and never serves: `NestFactory.create*` of `@nestjs/core`, a `.listen()`, a microservice connection, an `@nestjs/platform-*` adapter or `@nestjs/microservices` in the cli app is refused (by the import that binds each name)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CLI_BOOTSTRAP"]
+    enforcers:
+      - {kind: eslint-be, id: cli-bootstrap}
+  - id: R134
+    code: "BE_CLI_COMMAND_SHAPE"
+    law: "A nest-commander command (`@Command` or `@SubCommand`, by the import that binds the decorator) is declared only in the cli feature root `src/features/cli/`: a group `@Command` in `<group>/<group>.cli.ts`, a `@SubCommand` extending `CommandRunner` in `<group>/subs/<name>.cli.ts`, one command per file, and every sub-command has its unit spec `<name>.cli.spec.ts` beside it (a command is an action runner, not a thin transport: R88 does not apply to it). `.cli.ts`, because `.command.ts` is the CQRS message."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CLI_COMMAND_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: cli-command-shape}
+      - {kind: eslint-be, id: unit-test-colocated}
+  - id: R135
+    code: "BE_CLI_OWNER"
+    law: "`nest-commander` is imported only by the cli app and the cli feature root, and no back-end source parses command-line arguments itself: `process.argv` and the parsers commander, yargs and minimist are refused everywhere; a one-off action anywhere but a cli command is a door the rule closes."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CLI_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: cli-owner}

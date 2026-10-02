@@ -120,9 +120,10 @@ function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side =
         }
         candidates = next;
       }
-      if (!candidates.length) throw Error(`Workspace pattern matched no package directories: ${normalized}.`);
       // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
-      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve.
+      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve. A `*`
+      // pattern may match nothing: every app declares the same workspaces (fe/apps/*, fe/packages/*, HFS_MONO_WORKSPACES) whether
+      // or not it has a package yet, and the root patterns are held to that fixed list by the rule, not here.
       const wildcard = segments.includes('*');
       for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, !wildcard);
     }
@@ -262,13 +263,13 @@ const GRAMMAR_PACKAGE = '@starci/grammar';
 function derivedGrammar(root, packageRoot, workspaces, apps = []) {
   const styleSources = apps.map(app => `apps/${app.name}/src/app/globals.css`).filter(relative => existingRegularFile(root, relative));
   if (!styleSources.length) return null;
-  // The apps have no package.json of their own: the app root's one manifest declares their dependencies, and it is a consumer
-  // when it declares the Grammar package; so is every workspace package that does.
+  // Every fe app and package is an npm workspace that declares what it imports (HFS_MONO_WORKSPACE_DEP): each workspace that
+  // declares the Grammar package is a consumer, and so is the app root's manifest when it does.
   const declaresGrammar = (pkg) => Boolean(pkg && [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies].some(section => section && Object.hasOwn(section, GRAMMAR_PACKAGE)));
   const appManifest = slash(path.relative(root, path.join(packageRoot, 'package.json')));
   const consumerManifests = declaresGrammar(readJson(path.join(packageRoot, 'package.json'))) ? [appManifest] : [];
   for (const workspace of workspaces) {
-    if (!workspace.startsWith('packages/')) continue;
+    if (!workspace.startsWith('packages/') && !workspace.startsWith('apps/')) continue;
     const manifest = `${workspace}/package.json`;
     const pkg = readJson(path.join(root, ...manifest.split('/')));
     if (declaresGrammar(pkg)) consumerManifests.push(manifest);
@@ -298,7 +299,9 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
   const backend = {
     modules: ['src/modules'],
-    features: ['src/features'],
+    // The layered feature root is the api kind (src/features/api/<feature>/: application/ and transport/<protocol>/); the cli
+    // feature root (src/features/cli/) has its own shape, held by its slot and the cli rules.
+    features: ['src/features/api'],
     apps: ['apps'],
     moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: [...DECLARED_HANDLER_DECORATORS] },
   };

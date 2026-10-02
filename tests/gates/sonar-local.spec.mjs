@@ -1039,13 +1039,13 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
 
 test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', () => {
   const root=path.resolve(import.meta.dirname,'..', '..');
-  const file=path.join(root,'examples','todo-app','.starcistacks','application-stacks.yaml');
+  const file=path.join(root,'examples','ecommerce-app','.starcistacks','application-stacks.yaml');
   const declared=readSonarDeclaration(file);
   // The admin credential's custody entry names the runtime host: the file is this tree's ext/.
   assert.equal(declared.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
   assert.equal(declared.stackDir,path.join(root,'ext','sonar'));
   assert.ok(!declared.admin.includes(`${path.sep}examples${path.sep}ecommerce-app`),'never under the app folder');
-  const cfg=resolveConfig({cwd:path.join(root,'examples','todo-app')},{});
+  const cfg=resolveConfig({cwd:path.join(root,'examples','ecommerce-app')},{});
   assert.equal(cfg.adminToken,declared.admin);
   assert.ok(fs.existsSync(`${declared.admin}.enc`),'the encrypted member the declaration names exists at the resolved path');
 });
@@ -1069,7 +1069,7 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
 test('a project token is the declared credential that names the project, else the one declared credential whose purpose is analysis', t => {
   const root=path.resolve(import.meta.dirname,'..', '..');
   // The examples declare their own analysis credential, sealed in the host's ext/sonar custody: no --token-ref is needed.
-  for(const [app,key] of [['todo-app','starci-todo-app'],['ecommerce-app','starci-ecommerce-app']]){
+  for(const [app,key] of [['ecommerce-app','starci-ecommerce-app']]){
     const declared=readSonarDeclaration(path.join(root,'examples',app,'.starcistacks','application-stacks.yaml'));
     assert.equal(declared.projects.find(p=>p.key===key).tokenRef,path.join(root,'ext','sonar','secrets',`sonarqube-${key}-token.key`));
     assert.ok(fs.existsSync(`${declared.projects[0].tokenRef}.enc`),`${app}: the analysis credential is sealed`);

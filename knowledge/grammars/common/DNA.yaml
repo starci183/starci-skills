@@ -29,11 +29,6 @@ provenance:
     runs the same comparison under `npm test`, so the snapshot cannot silently fall behind the package
     again. Line positions (`source`), use counts (`uses`, `alsoReadBy`) and `digests` are pointers that
     `--write` refreshes; they are not compared.
-  installedCopy: |
-    The todo-app example still installs @starci/grammar@0.4.13 (its brand record, rev 3, cites that
-    installed `dist/common/styles.css`). This snapshot describes 0.5.0 source and therefore no longer
-    describes that installed copy: the 53 renderers added in 0.5.0 and the three component sheets are
-    absent from it.
   method: |
     Every table below is a measurement of the Common entry's own source, taken by
     `scripts/work/ui/grammar-knowledge.mjs` (static reads only; nothing built or rendered). `digests` is

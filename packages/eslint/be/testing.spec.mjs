@@ -31,8 +31,8 @@ const tester = new RuleTester({
 /** The one rule that reads types: the default project holds at most eight virtual files, so it has its own tester. */
 const typed = typedTester()
 
-const UNIT = at("src/features/checkout/application/add-to-cart.handler.spec.ts")
-const SRC = at("src/features/checkout/application/add-to-cart.handler.ts")
+const UNIT = at("src/features/api/checkout/application/add-to-cart.handler.spec.ts")
+const SRC = at("src/features/api/checkout/application/add-to-cart.handler.ts")
 const E2E = at("src/tests/e2e/checkout/course-enroll.e2e-spec.ts")
 const LIVE = at("src/tests/contract/anthropic/answer.contract-spec.ts")
 
@@ -83,10 +83,13 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/covered.service.ts"), code: "export class CoveredService {}" },
       // the real spec beside its real service
       { filename: at("src/modules/domain/order/covered.service.spec.ts"), code: "export {}" },
+      // a cli command of the cli feature root is a unit-tested role (ruleParams.be.unitRoles): its spec sits beside it, and the spec beside its command
+      { filename: at("src/features/cli/migrate/subs/run.cli.ts"), code: "export class RunCli {}" },
+      { filename: at("src/features/cli/migrate/subs/run.cli.spec.ts"), code: "export {}" },
       // a file that is not a service needs no spec: handlers, guards, mappers, policies, clients are covered through services
-      { filename: at("src/features/checkout/application/start-checkout.handler.ts"), code: "export class StartCheckoutHandler {}" },
-      { filename: at("src/features/checkout/transport/http/session.guard.ts"), code: "export class SessionGuard {}" },
-      { filename: at("src/features/checkout/transport/graphql/order.mapper.ts"), code: "export const toType = () => 1" },
+      { filename: at("src/features/api/checkout/application/start-checkout.handler.ts"), code: "export class StartCheckoutHandler {}" },
+      { filename: at("src/features/api/checkout/transport/http/session.guard.ts"), code: "export class SessionGuard {}" },
+      { filename: at("src/features/api/checkout/transport/graphql/order.mapper.ts"), code: "export const toType = () => 1" },
       { filename: at("src/modules/domain/order/policies/refund.policy.ts"), code: "export class RefundPolicy {}" },
       { filename: at("src/modules/integrations/payos/payos.client.ts"), code: "export class PayosClient {}" },
       { filename: at("src/modules/domain/order/order.contracts.ts"), code: "export interface Order {}" },
@@ -105,12 +108,12 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/order.service.ts"), code: "export class OrderService {}", errors: [{ messageId: "missing" }] },
       { filename: at("src/modules/platform/cache/cache.service.ts"), code: "export class CacheService {}", errors: [{ messageId: "missing" }] },
       // a unit spec of anything else is a finding, whatever it is named after
-      { filename: at("src/features/checkout/application/start-checkout.handler.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/features/checkout/transport/graphql/order.resolver.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/features/checkout/transport/http/order.controller.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/features/checkout/transport/message/paid.consumer.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/features/checkout/transport/graphql/order.mapper.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/features/checkout/transport/http/session.guard.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/application/start-checkout.handler.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/transport/graphql/order.resolver.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/transport/http/order.controller.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/transport/message/paid.consumer.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/transport/graphql/order.mapper.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/api/checkout/transport/http/session.guard.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order.module.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/persistence/entities/order.entity.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/policies/refund.policy.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
@@ -118,7 +121,12 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/order.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // a composition spec in an app is not a unit kind
       { filename: at("apps/api/src/api.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("apps/migrate/src/migrate.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("apps/cli/src/cli.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      // a cli command with no spec beside it, and a cli spec with no command beside it
+      { filename: at("src/features/cli/migrate/subs/seed.cli.ts"), code: "export class SeedCli {}", errors: [{ messageId: "missing" }] },
+      { filename: at("src/features/cli/migrate/subs/gone.cli.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      // a cli spec outside the cli feature root is no unit-tested role
+      { filename: at("src/modules/domain/order/order.cli.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // a service spec with no service beside it
       { filename: at("src/modules/domain/order/nothing-here.service.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds

@@ -2,11 +2,12 @@ import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R46 `background-unowned` (BE_BACKGROUND_UNOWNED, BE-CONVENTION 1.6 and 1.13). Background work is a transport that only
- * a worker app runs:
+ * R46 `background-unowned` (BE_BACKGROUND_UNOWNED, BE-CONVENTION 1.6 and 1.13). Background work is a transport an app composes:
+ * the service that owns it (an app of kind `api`) or a worker app scaled apart (kind `worker`), the composers the transport slots
+ * name (`composedBy` of be.transport.schedule and be.transport.message):
  *
- *   - every job (`*.job.ts`) and consumer (`*.consumer.ts`) is composed by an app of kind `worker`: the file is reachable,
- *     through runtime imports, from the root module of some worker app declared in hfs.json; one no worker reaches never runs;
+ *   - every job (`*.job.ts`) and consumer (`*.consumer.ts`) is composed by such an app: the file is reachable, through runtime
+ *     imports, from the root module of some api or worker app declared in hfs.json; one no app reaches never runs;
  *   - no scheduler outside `platform/scheduling`: a `@Cron`, `@Interval` or `@Timeout` decorator of `@nestjs/schedule` and a
  *     `setInterval` call are refused everywhere else (platform/scheduling owns the lease, the fencing and the overlap guard);
  *   - a method whose name is one of the words the law names (`sweep`, `deliver`, `reconcile`, `retry`, alone or as the
@@ -52,14 +53,16 @@ export function checkBackgroundUnowned(input) {
     return seen;
   };
 
-  const workerRoots = resolver.repo.apps.filter(app => app.kind === 'worker').map(app => `apps/${app.name}/src/app.module.ts`).filter(rel => graph.files.has(rel));
+  // The app kinds that compose background transports are the composedBy of the schedule and message slots (api and worker).
+  const composers = new Set(['be.transport.schedule', 'be.transport.message'].flatMap(id => resolver.slot(id)?.composedBy ?? []));
+  const workerRoots = resolver.repo.apps.filter(app => composers.has(app.kind)).map(app => `apps/${app.name}/src/app.module.ts`).filter(rel => graph.files.has(rel));
   const composed = closure(workerRoots);
   const background = [...graph.files.values()].filter(file => roleOf(file.rel) && file.tier === 'feature');
   const running = background.filter(file => composed.has(file.rel));
   for (const file of background) {
     if (composed.has(file.rel)) continue;
     const role = roleOf(file.rel);
-    report(file, file.sourceFile, `${file.rel} is a ${role} that no worker app composes${workerRoots.length ? '' : ' (hfs.json declares no worker app)'}; a ${role} runs only when the ${role === 'job' ? 'schedule' : 'message'} module of its feature is imported by the root module of an app of kind worker.`, { role });
+    report(file, file.sourceFile, `${file.rel} is a ${role} that no app composes${workerRoots.length ? '' : ' (hfs.json declares no api or worker app)'}; a ${role} runs only when the ${role === 'job' ? 'schedule' : 'message'} module of its feature is imported by the root module of the api app that owns it or of a worker app.`, { role });
   }
 
   // Everything a composed job or consumer can reach: its imports, and the files of its own feature (command handlers).
@@ -81,7 +84,7 @@ export function checkBackgroundUnowned(input) {
         const call = ts.isCallExpression(node.expression) ? node.expression.expression : node.expression;
         const binding = kit.importBinding(checker, call);
         if (binding && binding.module === SCHEDULER_PACKAGE && SCHEDULER_DECORATORS.includes(binding.name)) {
-          report(file, node, `@${binding.name} schedules work inside a class outside platform/scheduling. Write a job in transport/schedule/<job>.job.ts that dispatches one command or query, and let platform/scheduling and a worker app run it.`, { scheduler: binding.name });
+          report(file, node, `@${binding.name} schedules work inside a class outside platform/scheduling. Write a job in transport/schedule/<job>.job.ts that dispatches one command or query, and let platform/scheduling and the app that composes it run it.`, { scheduler: binding.name });
         }
       }
       if (!inScheduling && ts.isCallExpression(node)) {
@@ -89,7 +92,7 @@ export function checkBackgroundUnowned(input) {
         const bare = ts.isIdentifier(callee) && callee.text === 'setInterval' && kit.declarationsOf(checker, callee).every(declaration => declaration.getSourceFile().isDeclarationFile);
         const member = ts.isPropertyAccessExpression(callee) && callee.name.text === 'setInterval' && ts.isIdentifier(callee.expression) && ['globalThis', 'window', 'global'].includes(callee.expression.text);
         const global = bare || member;
-        if (global) report(file, node, 'setInterval starts a scheduler outside platform/scheduling. Write a job in transport/schedule/<job>.job.ts and let platform/scheduling and a worker app run it.', { scheduler: 'setInterval' });
+        if (global) report(file, node, 'setInterval starts a scheduler outside platform/scheduling. Write a job in transport/schedule/<job>.job.ts and let platform/scheduling and the app that composes it run it.', { scheduler: 'setInterval' });
       }
       if (!mechanism && ts.isClassDeclaration(node)) {
         for (const member of node.members) {
@@ -97,7 +100,7 @@ export function checkBackgroundUnowned(input) {
           const name = kit.propertyNameText(member.name);
           if (!name || !isBackgroundName(name)) continue;
           methods += 1;
-          if (!reachable.has(file.rel)) report(file, member.name, `${name} is background work (a ${BACKGROUND_WORDS.join(', ')} method) that no job or consumer composed by a worker app can reach. Add a job in transport/schedule or a consumer in transport/message of a feature that runs it, and compose that transport module in a worker app.`, { method: name });
+          if (!reachable.has(file.rel)) report(file, member.name, `${name} is background work (a ${BACKGROUND_WORDS.join(', ')} method) that no job or consumer composed by an api or worker app can reach. Add a job in transport/schedule or a consumer in transport/message of a feature that runs it, and compose that transport module in the api app that owns it or in a worker app.`, { method: name });
         }
       }
       return true;

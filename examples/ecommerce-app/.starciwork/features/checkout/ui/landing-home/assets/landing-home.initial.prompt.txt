@@ -3,7 +3,7 @@ Generate a polished flat product UI screenshot, 1536x1024, light theme, straight
 SUBJECT: landing home of "Northwind Supply", the ecommerce welcome surface at http://localhost:3069/.
 
 FIXED ANATOMY (must not change):
-- Anatomy reference images only, not edit targets: Image 1 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png; Image 2 is examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png. Preserve their surface and control silhouettes, not their blue brand or todo content.
+- Anatomy reference images only, not edit targets: Image 1 is examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/tasks-screen.png; Image 2 is examples/ecommerce-app/.starciwork/brand/assets/grammar-reference/primitives.png. Preserve their surface and control silhouettes, not their blue brand or todo content.
 - White top navigation: "Northwind Supply" wordmark left; "Catalogue", "About", and an outlined "Enter shop" pill on the right. No mascot in the navigation.
 - Below the navigation, an app-owned welcome hero sits directly ON THE PAGE BACKGROUND, OUTSIDE any card. On its left: heading "Everyday objects, built to be kept.", supporting copy "A small catalogue of things you reach for daily.", a solid teal "Start shopping" pill and a neutral "See the picks" pill. On its right: one friendly cream duck with a small teal scarf, as a flat illustration, floating in generous whitespace. This is an explicitly app-owned welcome illustration, not a grammar component.
 - Below the hero, "This season's picks" sits ON THE PAGE BACKGROUND, OUTSIDE the three product cards. Three equal-width cards in one row.

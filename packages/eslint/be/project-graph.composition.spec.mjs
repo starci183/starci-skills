@@ -29,11 +29,11 @@ test("app-composition-only: an app holds composition files only", (t) => {
             "apps/core/src/other.options.ts": "export interface OtherOptions { readonly port: number }\n",
             "apps/core/src/pricing.ts": "export const price = (n: number) => n * 2;\n",
             "apps/core/src/leaky.service.ts": "export class LeakyService { run() { return 1 } }\n",
-            "src/features/a/index.ts": "export const a = 1;\n",
+            "src/features/api/a/index.ts": "export const a = 1;\n",
         },
     })
     f.tester.run("app-composition-only", rules["app-composition-only"], {
-        valid: ok(f, ["apps/core/src/main.ts", "apps/core/src/app.module.ts", "apps/core/src/core.options.ts", "src/features/a/index.ts"]),
+        valid: ok(f, ["apps/core/src/main.ts", "apps/core/src/app.module.ts", "apps/core/src/core.options.ts", "src/features/api/a/index.ts"]),
         invalid: [...bad(f, [
             ["apps/core/src/pricing.ts", [1, /BE_APP_COMPOSITION_ONLY/]],
             ["apps/core/src/other.options.ts", [1, /BE_APP_COMPOSITION_ONLY/]],
@@ -49,31 +49,31 @@ test("entrypoint-only-in-apps: NestFactory and bootstrap() live in an app main f
         files: {
             "apps/core/src/main.ts": "import { NestFactory } from '@nestjs/core';\nimport { AppModule } from './app.module';\nasync function bootstrap() { const app = await NestFactory.create(AppModule); await app.listen(3000); }\nvoid bootstrap();\n",
             "apps/core/src/app.module.ts": "export class AppModule {}\n",
-            "src/features/a/index.ts": "import { NestFactory } from '@nestjs/core';\nexport const start = (module: unknown) => NestFactory.createApplicationContext(module);\n",
+            "src/features/api/a/index.ts": "import { NestFactory } from '@nestjs/core';\nexport const start = (module: unknown) => NestFactory.createApplicationContext(module);\n",
             "src/tests/fixtures/boot.ts": "import * as nest from '@nestjs/core';\nexport const boot = (module: unknown) => nest.NestFactory.create(module);\n",
             "apps/core/src/other.ts": "import { NestFactory as Factory } from '@nestjs/core';\nexport const other = (module: unknown) => Factory.createMicroservice(module);\n",
-            "src/features/a/one.ts": "declare function bootstrap(): Promise<void>;\nbootstrap();\n",
-            "src/features/a/two.ts": "declare function bootstrap(): Promise<void>;\nvoid bootstrap();\n",
-            "src/features/a/three.ts": "declare function bootstrap(): Promise<void>;\nbootstrap().catch(() => undefined);\n",
-            "src/features/b/index.ts": "const NestFactory = { create: (module: unknown) => module };\nexport const fake = NestFactory.create(1);\n",
-            "src/features/c/index.ts": "export const fine = (): void => { const bootstrap = (): void => undefined; bootstrap(); };\n",
+            "src/features/api/a/one.ts": "declare function bootstrap(): Promise<void>;\nbootstrap();\n",
+            "src/features/api/a/two.ts": "declare function bootstrap(): Promise<void>;\nvoid bootstrap();\n",
+            "src/features/api/a/three.ts": "declare function bootstrap(): Promise<void>;\nbootstrap().catch(() => undefined);\n",
+            "src/features/api/b/index.ts": "const NestFactory = { create: (module: unknown) => module };\nexport const fake = NestFactory.create(1);\n",
+            "src/features/api/c/index.ts": "export const fine = (): void => { const bootstrap = (): void => undefined; bootstrap(); };\n",
             "src/tests/world/use-test-world.ts": boot,
         },
     })
     f.tester.run("entrypoint-only-in-apps", rules["entrypoint-only-in-apps"], {
         valid: ok(f, [
             "apps/core/src/main.ts",
-            "src/features/b/index.ts",
-            "src/features/c/index.ts",
+            "src/features/api/b/index.ts",
+            "src/features/api/c/index.ts",
             "src/tests/world/use-test-world.ts",
         ]),
         invalid: [...bad(f, [
-            ["src/features/a/index.ts", 2],
+            ["src/features/api/a/index.ts", 2],
             ["src/tests/fixtures/boot.ts", 2],
             ["apps/core/src/other.ts", 2],
-            ["src/features/a/one.ts", 2],
-            ["src/features/a/two.ts", 2],
-            ["src/features/a/three.ts", 2],
+            ["src/features/api/a/one.ts", 2],
+            ["src/features/api/a/two.ts", 2],
+            ["src/features/api/a/three.ts", 2],
         ])],
     })
 })
@@ -267,16 +267,16 @@ const SCHEMA_GOOD = {
 }
 const schemaRepo = (t, files) => repo(t, {
     declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY" }, { name: "agentos", envPrefix: "AGENTOS" }] },
-    apps: [{ name: "core", kind: "api" }, { name: "migrate", kind: "migrate" }],
-    files: { ...SCHEMA_GOOD, "apps/migrate/src/main.ts": "void 0;\n", ...files },
+    apps: [{ name: "core", kind: "api" }, { name: "cli", kind: "cli" }],
+    files: { ...SCHEMA_GOOD, "apps/cli/src/main.ts": "void 0;\n", ...files },
 })
 const OWNER_FILES = [`${BILLING}/index.ts`, `${BILLING}/persistence/connection.ts`, `${BILLING}/persistence/entities/invoice.entity.ts`, `${BILLING}/persistence/migrations/1789800000000-create-invoices.ts`]
 
 test("schema-owner: entities and migrations sit in the persistence folders of the owner, migrations are named by the rule", (t) => {
     const f = schemaRepo(t, {
-        "src/features/a/index.ts": "export const a = 1;\n",
-        "src/features/a/application/order.entity.ts": ENTITY("OrderEntity", "orders"),
-        "src/features/a/migrations/1789800000001-orders.ts": MIGRATION("Orders1789800000001"),
+        "src/features/api/a/index.ts": "export const a = 1;\n",
+        "src/features/api/a/application/order.entity.ts": ENTITY("OrderEntity", "orders"),
+        "src/features/api/a/migrations/1789800000001-orders.ts": MIGRATION("Orders1789800000001"),
         "src/modules/integrations/payos/index.ts": "export const p = 1;\n",
         "src/modules/integrations/payos/persistence/entities/token.entity.ts": ENTITY("TokenEntity", "tokens"),
         [`${BILLING}/persistence/migrations/1789800000002-swap.ts`]: ENTITY("SwapEntity", "swaps"),
@@ -289,8 +289,8 @@ test("schema-owner: entities and migrations sit in the persistence folders of th
     f.tester.run("schema-owner", rules["schema-owner"], {
         valid: ok(f, [...OWNER_FILES, CORE_APP]),
         invalid: [...bad(f, [
-            ["src/features/a/application/order.entity.ts", [3, /Entity OrderEntity is declared outside persistence\/entities\//]],
-            ["src/features/a/migrations/1789800000001-orders.ts", [1, /migrations\/ folder outside the persistence/], [2, /Migration Orders1789800000001 is declared outside/]],
+            ["src/features/api/a/application/order.entity.ts", [3, /Entity OrderEntity is declared outside persistence\/entities\//]],
+            ["src/features/api/a/migrations/1789800000001-orders.ts", [1, /migrations\/ folder outside the persistence/], [2, /Migration Orders1789800000001 is declared outside/]],
             ["src/modules/integrations/payos/persistence/entities/token.entity.ts", [1, /entities\/ folder outside the persistence/], [3, /Entity TokenEntity is declared outside/]],
             [`${BILLING}/persistence/migrations/1789800000002-swap.ts`, [3, /Entity SwapEntity is declared outside persistence\/entities\//]],
             [`${BILLING}/persistence/entities/late.entity.ts`, [2, /Migration Late1789800000003 is declared outside persistence\/migrations\//]],
@@ -330,12 +330,12 @@ test("schema-owner: the same connection in two apps, through a spread options pr
     const f = schemaRepo(t, {
         "apps/core/src/core.options.ts": 'export interface Options { database: { name: string } }\nexport const options: Options = { database: { name: "primary" } };\n',
         [CORE_APP]: REGISTER("{ ...options.database, entities: billingEntities, migrations: billingMigrations }", "import { options } from './core.options';"),
-        "apps/migrate/src/main.ts": REGISTER(PRIMARY_ENTRY),
+        "apps/cli/src/main.ts": REGISTER(PRIMARY_ENTRY),
         [`${BILLING}/invoice.writer.ts`]: "import { InjectPrimaryEntityManager } from '../../platform/database/primary.decorators';\nexport const write = () => InjectPrimaryEntityManager();\n",
         [`${BILLING}/invoice.reader.ts`]: "import { InjectAgentosEntityManager } from '../../platform/database/agentos.decorators';\nexport const read = () => InjectAgentosEntityManager();\n",
     })
     f.tester.run("schema-owner", rules["schema-owner"], {
-        valid: ok(f, [CORE_APP, "apps/migrate/src/main.ts", `${BILLING}/invoice.writer.ts`]),
+        valid: ok(f, [CORE_APP, "apps/cli/src/main.ts", `${BILLING}/invoice.writer.ts`]),
         invalid: [...bad(f, [[`${BILLING}/invoice.reader.ts`, [2, /injects the entity manager of connection agentos, but the billing capability/]]])],
     })
 })
@@ -376,21 +376,21 @@ const REPRESENTATIVES = {
     "src/modules/domain/billing/invoice.module.ts": MODULE("InvoiceModule"),
 }
 const FEATURE_A = {
-    "src/features/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AHttpModule } from './transport/http/a-http.module';\n",
-    "src/features/a/a.module.ts": "import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
-    "src/features/a/transport/graphql/a-graphql.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
-    "src/features/a/transport/http/a-http.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
+    "src/features/api/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AHttpModule } from './transport/http/a-http.module';\n",
+    "src/features/api/a/a.module.ts": "import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
+    "src/features/api/a/transport/graphql/a-graphql.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
+    "src/features/api/a/transport/http/a-http.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
 }
 const ROOT_APP = (imports) => `import { Module } from '@nestjs/common';
 import { ConfigModule } from '../../../src/modules/platform/config';
 import { BillingModule } from '../../../src/modules/domain/billing';
-import { AGraphqlModule, AHttpModule } from '../../../src/features/a';
+import { AGraphqlModule, AHttpModule } from '../../../src/features/api/a';
 @Module({ imports: [${imports.join(", ")}] })
 export class AppModule {}
 `
 const ROOT_GOOD = ["ConfigModule.register({ isGlobal: true })", "BillingModule.register({ isGlobal: true })", "AGraphqlModule", "AHttpModule"]
 const COMPOSE = "import { ConfigModule } from '../../modules/platform/config';\nimport { BillingModule } from '../../modules/domain/billing';\nexport const modules = [ConfigModule.register({ isGlobal: true }), BillingModule.register({ isGlobal: true })];\nexport const own = { imports: [BillingModule], isGlobal: true };\n"
-const CLEAN_TREE = ["src/modules/platform/config/config.module.ts", "src/modules/domain/billing/billing.module.ts", "src/modules/domain/billing/invoice.module.ts", "src/features/a/a.module.ts", "src/features/a/transport/graphql/a-graphql.module.ts", "src/features/a/transport/http/a-http.module.ts", "apps/core/src/app.module.ts"]
+const CLEAN_TREE = ["src/modules/platform/config/config.module.ts", "src/modules/domain/billing/billing.module.ts", "src/modules/domain/billing/invoice.module.ts", "src/features/api/a/a.module.ts", "src/features/api/a/transport/graphql/a-graphql.module.ts", "src/features/api/a/transport/http/a-http.module.ts", "apps/core/src/app.module.ts"]
 const rootRepo = (t, files, apps) => repo(t, { apps, files: { ...REPRESENTATIVES, ...FEATURE_A, "apps/core/src/app.module.ts": ROOT_APP(ROOT_GOOD), ...files } })
 const onceRepo = (t, files) => rootRepo(t, files)
 
@@ -401,14 +401,14 @@ test("register-once: representatives registered once with isGlobal true, a sub-m
         "src/modules/platform/config/config.options.ts": "export const off = { isGlobal: false };\nexport const own = { isGlobal: true };\n",
         "src/tests/world/use-test-world.ts": COMPOSE,
         "src/tests/fixtures/compose.ts": COMPOSE,
-        "src/features/a/compose.ts": COMPOSE,
+        "src/features/api/a/compose.ts": COMPOSE.replaceAll("'../../modules/", "'../../../modules/"),
     }, [{ name: "core", kind: "api" }, { name: "jobs", kind: "worker" }])
     f.tester.run("register-once", rules["register-once"], {
         valid: ok(f, [...CLEAN_TREE, "apps/jobs/src/app.module.ts", "src/tests/world/use-test-world.ts"]),
         invalid: [...bad(f, [
             ["src/modules/platform/config/config.options.ts", [2, /`isGlobal: true` appears only in the app root/]],
             ["src/tests/fixtures/compose.ts", [3, /isGlobal: true/], [3, /isGlobal: true/], [4, /BillingModule is registered in the root of app core, jobs/], [4, /isGlobal: true/]],
-            ["src/features/a/compose.ts", [3, /isGlobal: true/], [3, /isGlobal: true/], [4, /BillingModule is registered in the root of app core, jobs/], [4, /isGlobal: true/]],
+            ["src/features/api/a/compose.ts", [3, /isGlobal: true/], [3, /isGlobal: true/], [4, /BillingModule is registered in the root of app core, jobs/], [4, /isGlobal: true/]],
         ])],
     })
 })
@@ -471,7 +471,7 @@ test("register-once: a sub-module imported by two modules, or also listed in an 
         "apps/core/src/app.module.ts": ROOT_APP([...ROOT_GOOD, "InvoiceModule"]).replace("import { BillingModule }", "import { InvoiceModule } from '../../../src/modules/domain/billing/invoice.module';\nimport { BillingModule }"),
     })
     listed.tester.run("register-once", rules["register-once"], {
-        valid: ok(listed, ["src/modules/platform/config/config.module.ts", "src/features/a/a.module.ts"]),
+        valid: ok(listed, ["src/modules/platform/config/config.module.ts", "src/features/api/a/a.module.ts"]),
         invalid: [...bad(listed, [
             ["apps/core/src/app.module.ts", [6, /InvoiceModule is listed in imports as a bare class/]],
             ["src/modules/domain/billing/billing.module.ts", [3, /InvoiceModule is registered in the root of app core/]],
@@ -481,14 +481,14 @@ test("register-once: a sub-module imported by two modules, or also listed in an 
 
 test("register-once: the feature case is bounded to the feature owner: another feature importing the application module is a second importer", (t) => {
     const f = onceRepo(t, {
-        "src/features/b/index.ts": "export { BModule } from './b.module';\n",
-        "src/features/b/b.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../a/a.module';\n@Module({ imports: [AModule] })\nexport class BModule {}\n",
+        "src/features/api/b/index.ts": "export { BModule } from './b.module';\n",
+        "src/features/api/b/b.module.ts": "import { Module } from '@nestjs/common';\nimport { AModule } from '../a/a.module';\n@Module({ imports: [AModule] })\nexport class BModule {}\n",
     })
     f.tester.run("register-once", rules["register-once"], {
         valid: ok(f, CLEAN_TREE.slice(0, 3)),
         invalid: [...bad(f, [
-            ["src/features/a/transport/http/a-http.module.ts", [3, /AModule is imported by 3 modules/]],
-            ["src/features/b/b.module.ts", [3, /AModule is imported by 3 modules/]],
+            ["src/features/api/a/transport/http/a-http.module.ts", [3, /AModule is imported by 3 modules/]],
+            ["src/features/api/b/b.module.ts", [3, /AModule is imported by 3 modules/]],
         ])],
     })
 })
@@ -496,31 +496,31 @@ test("register-once: the feature case is bounded to the feature owner: another f
 // module-per-transport ------------------------------------------------------------------------------------------------------
 const TRANSPORT_MODULE = (name, imports = "", importLine = "") => `import { Module } from '@nestjs/common';\n${importLine}@Module({ imports: [${imports}] })\nexport class ${name} {}\n`
 const TRANSPORT_FEATURE = {
-    "src/features/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AScheduleModule } from './transport/schedule/a-schedule.module';\nexport { AModule } from './a.module';\n",
-    "src/features/a/a.module.ts": TRANSPORT_MODULE("AModule"),
-    "src/features/a/transport/graphql/a-graphql.module.ts": TRANSPORT_MODULE("AGraphqlModule", "AModule", "import { AModule } from '../../a.module';\n"),
-    "src/features/a/transport/schedule/a-schedule.module.ts": TRANSPORT_MODULE("AScheduleModule", "AModule", "import { AModule } from '../../a.module';\n"),
+    "src/features/api/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AScheduleModule } from './transport/schedule/a-schedule.module';\nexport { AModule } from './a.module';\n",
+    "src/features/api/a/a.module.ts": TRANSPORT_MODULE("AModule"),
+    "src/features/api/a/transport/graphql/a-graphql.module.ts": TRANSPORT_MODULE("AGraphqlModule", "AModule", "import { AModule } from '../../a.module';\n"),
+    "src/features/api/a/transport/schedule/a-schedule.module.ts": TRANSPORT_MODULE("AScheduleModule", "AModule", "import { AModule } from '../../a.module';\n"),
 }
-const TRANSPORT_APP = (imports, names = imports) => `import { Module } from '@nestjs/common';\nimport { ${names} } from '../../../src/features/a';\n@Module({ imports: [${imports}] })\nexport class AppModule {}\n`
+const TRANSPORT_APP = (imports, names = imports) => `import { Module } from '@nestjs/common';\nimport { ${names} } from '../../../src/features/api/a';\n@Module({ imports: [${imports}] })\nexport class AppModule {}\n`
 const TRANSPORT_APPS = [{ name: "core", kind: "api" }, { name: "jobs", kind: "worker" }]
 const transportRepo = (t, files) => repo(t, {
     apps: TRANSPORT_APPS,
     files: { ...TRANSPORT_FEATURE, "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule"), "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": TRANSPORT_APP("AScheduleModule"), ...files },
 })
-const TRANSPORT_CLEAN = ["src/features/a/transport/graphql/a-graphql.module.ts", "src/features/a/transport/schedule/a-schedule.module.ts", "apps/core/src/app.module.ts", "apps/jobs/src/app.module.ts"]
+const TRANSPORT_CLEAN = ["src/features/api/a/transport/graphql/a-graphql.module.ts", "src/features/api/a/transport/schedule/a-schedule.module.ts", "apps/core/src/app.module.ts", "apps/jobs/src/app.module.ts"]
 
 test("module-per-transport: one module per transport folder, none per operation, no module-definition in a feature", (t) => {
     const f = transportRepo(t, {
-        "src/features/a/transport/graphql/run.module.ts": TRANSPORT_MODULE("RunModule"),
-        "src/features/a/application/run.handler.ts": TRANSPORT_MODULE("RunHandlerModule"),
-        "src/features/a/a.module-definition.ts": "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
+        "src/features/api/a/transport/graphql/run.module.ts": TRANSPORT_MODULE("RunModule"),
+        "src/features/api/a/application/run.handler.ts": TRANSPORT_MODULE("RunHandlerModule"),
+        "src/features/api/a/a.module-definition.ts": "import { ConfigurableModuleBuilder } from '@nestjs/common';\nexport const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<{ x: number }>().build();\n",
     })
     f.tester.run("module-per-transport", rules["module-per-transport"], {
         valid: ok(f, TRANSPORT_CLEAN),
         invalid: [...bad(f, [
-            ["src/features/a/transport/graphql/run.module.ts", [1, /second module of the graphql transport/], [3, /RunModule is a Nest module declared in/]],
-            ["src/features/a/application/run.handler.ts", [3, /RunHandlerModule is a Nest module declared in/]],
-            ["src/features/a/a.module-definition.ts", [1, /module-definition inside feature a/], [2, /ConfigurableModuleBuilder/]],
+            ["src/features/api/a/transport/graphql/run.module.ts", [1, /second module of the graphql transport/], [3, /RunModule is a Nest module declared in/]],
+            ["src/features/api/a/application/run.handler.ts", [3, /RunHandlerModule is a Nest module declared in/]],
+            ["src/features/api/a/a.module-definition.ts", [1, /module-definition inside feature a/], [2, /ConfigurableModuleBuilder/]],
         ])],
     })
 })
@@ -531,9 +531,9 @@ test("module-per-transport: an app imports only the transport modules its kind c
         "apps/jobs/src/app.module.ts": TRANSPORT_APP("AScheduleModule, AGraphqlModule"),
     })
     wrongKind.tester.run("module-per-transport", rules["module-per-transport"], {
-        valid: ok(wrongKind, TRANSPORT_CLEAN.slice(0, 2)),
+        // an api app composes the background transports of the service that owns them (a worker app is for separate scaling)
+        valid: ok(wrongKind, [...TRANSPORT_CLEAN.slice(0, 2), "apps/core/src/app.module.ts"]),
         invalid: [...bad(wrongKind, [
-            ["apps/core/src/app.module.ts", [3, /composes graphql, http, websocket transports only/]],
             ["apps/jobs/src/app.module.ts", [3, /composes message, schedule transports only/]],
         ])],
     })
@@ -557,17 +557,17 @@ test("module-registration: a provider registered twice and a handler no module r
             ...NEST_TYPES,
             "src/modules/domain/catalog/catalog.service.ts": "export class CatalogService {}\n",
             "src/modules/domain/catalog/catalog.module.ts": 'import { Module } from "@nestjs/common"; import { CatalogService } from "./catalog.service"; @Module({providers:[CatalogService,CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
-            "src/features/orders/create.command.ts": "export class CreateOrderCommand {}\n",
-            "src/features/orders/create.handler.ts": 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
-            "src/features/orders/orders.module.ts": 'import { Module } from "@nestjs/common"; import { CatalogService } from "../../modules/domain/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
+            "src/features/api/orders/create.command.ts": "export class CreateOrderCommand {}\n",
+            "src/features/api/orders/create.handler.ts": 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+            "src/features/api/orders/orders.module.ts": 'import { Module } from "@nestjs/common"; import { CatalogService } from "../../../modules/domain/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
         },
     })
     f.tester.run("module-registration", rules["module-registration"], {
-        valid: ok(f, ["src/modules/domain/catalog/catalog.service.ts", "src/features/orders/create.command.ts"]),
+        valid: ok(f, ["src/modules/domain/catalog/catalog.service.ts", "src/features/api/orders/create.command.ts"]),
         invalid: [...bad(f, [
             ["src/modules/domain/catalog/catalog.module.ts", [1, /registered again by CatalogModule/]],
-            ["src/features/orders/orders.module.ts", [1, /registered again by OrdersModule/]],
-            ["src/features/orders/create.handler.ts", [1, /CreateOrderHandler has multiple direct module registrations/]],
+            ["src/features/api/orders/orders.module.ts", [1, /registered again by OrdersModule/]],
+            ["src/features/api/orders/create.handler.ts", [1, /CreateOrderHandler has multiple direct module registrations/]],
         ])],
     })
 })
@@ -579,43 +579,43 @@ test("module-registration: a handler registered by one module, a provider by its
             "src/modules/platform/framework/index.ts": 'export { Module as NestModule } from "@nestjs/common"; export { CommandHandler as HandlesCommand } from "@nestjs/cqrs";\n',
             "src/modules/domain/catalog/catalog.service.ts": "export class CatalogService {}\n",
             "src/modules/domain/catalog/catalog.module.ts": 'import { NestModule } from "../../platform/framework"; import { CatalogService } from "./catalog.service"; const StaticModule=NestModule; @StaticModule({providers:[CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
-            "src/features/orders/application/create.command.ts": "export class CreateOrderCommand {}\n",
-            "src/features/orders/application/create.handler.ts": 'import { HandlesCommand } from "../../../modules/platform/framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
-            "src/features/orders/orders.module.ts": 'import { NestModule } from "../../modules/platform/framework"; import { CatalogModule } from "../../modules/domain/catalog/catalog.module"; import { CatalogService } from "../../modules/domain/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
+            "src/features/api/orders/application/create.command.ts": "export class CreateOrderCommand {}\n",
+            "src/features/api/orders/application/create.handler.ts": 'import { HandlesCommand } from "../../../../modules/platform/framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+            "src/features/api/orders/orders.module.ts": 'import { NestModule } from "../../../modules/platform/framework"; import { CatalogModule } from "../../../modules/domain/catalog/catalog.module"; import { CatalogService } from "../../../modules/domain/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
             "src/modules/domain/plain/plain.module.ts": 'import { Module } from "@nestjs/common"; @Module({}) export class PlainModule {}\n',
-            "src/features/orders/application/stray.command.ts": "export class StrayCommand {}\n",
-            "src/features/orders/application/stray.handler.ts": 'import { CommandHandler } from "@nestjs/cqrs"; import { StrayCommand } from "./stray.command"; @CommandHandler(StrayCommand) export class StrayHandler {}\n',
+            "src/features/api/orders/application/stray.command.ts": "export class StrayCommand {}\n",
+            "src/features/api/orders/application/stray.handler.ts": 'import { CommandHandler } from "@nestjs/cqrs"; import { StrayCommand } from "./stray.command"; @CommandHandler(StrayCommand) export class StrayHandler {}\n',
         },
     })
     f.tester.run("module-registration", rules["module-registration"], {
         valid: ok(f, [
             "src/modules/domain/catalog/catalog.module.ts",
-            "src/features/orders/orders.module.ts",
-            "src/features/orders/application/create.handler.ts",
+            "src/features/api/orders/orders.module.ts",
+            "src/features/api/orders/application/create.handler.ts",
             "src/modules/domain/plain/plain.module.ts",
         ]),
-        invalid: [...bad(f, [["src/features/orders/application/stray.handler.ts", [1, /StrayHandler is not registered as a direct class-token provider/]]])],
+        invalid: [...bad(f, [["src/features/api/orders/application/stray.handler.ts", [1, /StrayHandler is not registered as a direct class-token provider/]]])],
     })
 })
 
 // background-unowned --------------------------------------------------------------------------------------------------------
 const JOB = "export class SweepJob {\n  readonly name = 'sweep';\n  run(): Promise<void> { return Promise.resolve(); }\n}\n"
 const SCHEDULE_MODULE = "import { Module } from '@nestjs/common';\nimport { SweepJob } from './sweep.job';\n@Module({ providers: [SweepJob] })\nexport class AScheduleModule {}\n"
-const WORKER_APP = "import { Module } from '@nestjs/common';\nimport { AScheduleModule } from '../../../src/features/a';\n@Module({ imports: [AScheduleModule] })\nexport class AppModule {}\n"
+const WORKER_APP = "import { Module } from '@nestjs/common';\nimport { AScheduleModule } from '../../../src/features/api/a';\n@Module({ imports: [AScheduleModule] })\nexport class AppModule {}\n"
 const BILLING_SERVICE = {
     "src/modules/domain/billing/index.ts": "export { BillingService } from './billing.service';\n",
     "src/modules/domain/billing/billing.service.ts": "export class BillingService {\n  async sweepExpired(): Promise<number> { return 0; }\n}\n",
 }
 const JOB_FEATURE = {
-    "src/features/a/index.ts": "export { AScheduleModule } from './transport/schedule/a-schedule.module';\n",
-    "src/features/a/a.module.ts": "export class AModule {}\n",
-    "src/features/a/application/purge.handler.ts": "import { BillingService } from '../../../modules/domain/billing';\nexport class PurgeHandler {\n  constructor(private readonly billing: BillingService) {}\n  purge(): Promise<number> { return this.billing.sweepExpired(); }\n}\n",
-    "src/features/a/transport/schedule/sweep.job.ts": JOB,
-    "src/features/a/transport/schedule/a-schedule.module.ts": SCHEDULE_MODULE,
+    "src/features/api/a/index.ts": "export { AScheduleModule } from './transport/schedule/a-schedule.module';\n",
+    "src/features/api/a/a.module.ts": "export class AModule {}\n",
+    "src/features/api/a/application/purge.handler.ts": "import { BillingService } from '../../../../modules/domain/billing';\nexport class PurgeHandler {\n  constructor(private readonly billing: BillingService) {}\n  purge(): Promise<number> { return this.billing.sweepExpired(); }\n}\n",
+    "src/features/api/a/transport/schedule/sweep.job.ts": JOB,
+    "src/features/api/a/transport/schedule/a-schedule.module.ts": SCHEDULE_MODULE,
 }
 const BACKGROUND_APPS = [{ name: "core", kind: "api" }, { name: "jobs", kind: "worker" }]
 const backgroundRepo = (t, files, apps = BACKGROUND_APPS) => repo(t, { apps, files: { ...BILLING_SERVICE, ...JOB_FEATURE, "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": WORKER_APP, ...files } })
-const JOB_CLEAN = ["src/features/a/transport/schedule/sweep.job.ts", "src/features/a/transport/schedule/a-schedule.module.ts", "src/modules/domain/billing/billing.service.ts", "apps/jobs/src/app.module.ts"]
+const JOB_CLEAN = ["src/features/api/a/transport/schedule/sweep.job.ts", "src/features/api/a/transport/schedule/a-schedule.module.ts", "src/modules/domain/billing/billing.service.ts", "apps/jobs/src/app.module.ts"]
 
 test("background-unowned: a job a worker app composes, and a background method it reaches, are owned; a stray scheduler and an unreached method are not", (t) => {
     const f = backgroundRepo(t, {
@@ -635,26 +635,26 @@ test("background-unowned: a job a worker app composes, and a background method i
     })
 })
 
-test("background-unowned: a job and a consumer no worker app composes are refused", (t) => {
+test("background-unowned: a job and a consumer no app composes are refused", (t) => {
     const f = backgroundRepo(t, {
         "apps/jobs/src/app.module.ts": "import { Module } from '@nestjs/common';\n@Module({})\nexport class AppModule {}\n",
-        "src/features/b/index.ts": "export const b = 1;\n",
-        "src/features/b/transport/message/paid.consumer.ts": "export class PaidConsumer {}\n",
+        "src/features/api/b/index.ts": "export const b = 1;\n",
+        "src/features/api/b/transport/message/paid.consumer.ts": "export class PaidConsumer {}\n",
     })
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/a/a.module.ts", "src/features/b/index.ts"]),
+        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/api/a/a.module.ts", "src/features/api/b/index.ts"]),
         invalid: [...bad(f, [
-            ["src/features/a/transport/schedule/sweep.job.ts", [1, /is a job that no worker app composes/]],
-            ["src/features/b/transport/message/paid.consumer.ts", [1, /is a consumer that no worker app composes/]],
+            ["src/features/api/a/transport/schedule/sweep.job.ts", [1, /is a job that no app composes/]],
+            ["src/features/api/b/transport/message/paid.consumer.ts", [1, /is a consumer that no app composes/]],
             ["src/modules/domain/billing/billing.service.ts", [2, /sweepExpired is background work/]],
         ])],
     })
 })
 
-test("background-unowned: a job with no worker app declared is refused", (t) => {
+test("background-unowned: a job the one api app does not compose is refused, with no worker app declared", (t) => {
     const f = backgroundRepo(t, { "apps/jobs/src/app.module.ts": null, "apps/jobs/src/main.ts": null }, [{ name: "core", kind: "api" }])
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/a/a.module.ts"]),
-        invalid: [...bad(f, [["src/features/a/transport/schedule/sweep.job.ts", [1, /declares no worker app/]]])],
+        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/api/a/a.module.ts"]),
+        invalid: [...bad(f, [["src/features/api/a/transport/schedule/sweep.job.ts", [1, /is a job that no app composes/]]])],
     })
 })

@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url"
 
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_METADATA"
 const PROJECTION_REL = [".starcistacks", "dev", "infra", "metadata.json"]
-const REQUIRED_PORT_KEYS = ["identityApi", "orderApi", "landing", "shop"]
+const REQUIRED_PORT_KEYS = ["identityApi", "orderApi", "landing", "app"]
 
 const repoRoot = () => resolve(dirname(fileURLToPath(import.meta.url)), "..")
 

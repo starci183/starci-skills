@@ -12,13 +12,15 @@
 // preset the app installs for its be side. `--check` compares the sha256 of the rendered content with the
 // file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
-// only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, npm workspaces of fe/packages/*) is the app's.
+// only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, the npm workspaces fe/apps/* and fe/packages/*,
+// HFS_MONO_WORKSPACES) is the app's. The fe side runs through turbo (turbo.json, app.task-graph): each fe app and package is a workspace.
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { APP_SCOPE, SIDES, loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
+import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
@@ -168,26 +170,37 @@ export function coverageExclusions(presets, manifest = loadSlotManifest()) {
 }
 
 /**
- * The script lines the apps add to the root package.json, each ending with a comma (the template puts them mid-object). Every
- * script runs a side from the app root: a be script from be/ (`cd be && ...`, the folder its tsconfig and jest configuration
- * are relative to), an fe script from fe/. be: `dev:be` runs the one api app from source and restarts it on change (`dev:be:<app>`
- * each, with several), `start:<app>` runs a built api, worker or cli app, `migrate` the migrate app (`migrate:<app>` with several).
- * fe: `dev:fe` runs the one Next app in development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
+ * The script lines the apps add to the root package.json, each ending with a comma (the template puts them mid-object). A be
+ * script runs from be/ (`cd be && ...`, the folder its tsconfig and jest configuration are relative to) or runs the built app; an
+ * fe script runs the fe app's workspace (@<project>/<app>): through turbo for dev (so the packages it imports are built first) and
+ * through npm `-w` for start. be: `dev:be` runs the one api app from source and restarts it on change (`dev:be:<app>` each, with
+ * several), `start:<app>` runs a built api or worker app, `cli` the built cli app (`npm run cli -- <group> <command>`) and, when the
+ * back end declares a connection, `migrate` its migrate command (`cli migrate run`). fe: `dev:fe` runs the one Next app in
+ * development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
  */
 export function appScripts(app) {
   const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
   const be = app.sides.be.apps;
   const fe = app.sides.fe.apps;
   const apis = be.filter(entry => entry.kind === 'api');
-  const migrates = be.filter(entry => entry.kind === 'migrate');
+  const connections = app.sides.be.connections ?? [];
   const watch = entry => `cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/${entry.name}/src/main.ts`;
+  const built = entry => `node be/dist/apps/${entry.name}/src/main.js`;
+  const workspace = entry => feAppPackageName(app.project, entry.name);
+  const dev = entry => `npm run codegen --silent && turbo run dev --filter=${workspace(entry)}`;
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
-    ...(fe.length === 1 ? [line('dev:fe', `npm run codegen --silent && cd fe/apps/${fe[0].name} && next dev`)] : fe.map(entry => line(`dev:fe:${entry.name}`, `npm run codegen --silent && cd fe/apps/${entry.name} && next dev`))),
-    ...be.map(entry => line(entry.kind === 'migrate' ? (migrates.length === 1 ? 'migrate' : `migrate:${entry.name}`) : `start:${entry.name}`, `node be/dist/apps/${entry.name}/src/main.js`)),
-    ...fe.map(entry => line(`start:${entry.name}`, `cd fe/apps/${entry.name} && next start`)),
+    ...(fe.length === 1 ? [line('dev:fe', dev(fe[0]))] : fe.map(entry => line(`dev:fe:${entry.name}`, dev(entry)))),
+    ...be.flatMap(entry => {
+      if (entry.kind !== 'cli') return [line(`start:${entry.name}`, built(entry))];
+      return [line('cli', built(entry)), ...(connections.length ? [line('migrate', `${built(entry)} ${MIGRATE_COMMAND}`)] : [])];
+    }),
+    ...fe.map(entry => line(`start:${entry.name}`, `npm run start -w ${workspace(entry)}`)),
   ].join('\n    ');
 }
+
+/** The cli command that migrates every connection (src/features/cli/migrate/subs/run.cli.ts). */
+export const MIGRATE_COMMAND = 'migrate run';
 
 /** True when the fe side opts into a workspace package (repo.packages or any fe.package.* slot): the sources then include fe/packages/. */
 export const opensPackages = side => (side.optionalSlots ?? []).some(id => id === 'repo.packages' || String(id).startsWith('fe.package.'));
@@ -199,14 +212,13 @@ export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest()) {
   const fe = app.sides.fe;
   const packages = opensPackages(fe);
-  const feApps = fe.apps.map(entry => `fe/apps/${entry.name}`);
-  const feTsconfigs = [...feApps.map(dir => `${dir}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])];
   return {
     header: HEADER(scope),
     appScripts: appScripts(app),
-    buildFe: ['npm run codegen --silent', ...(packages ? ['npm run build --workspaces --if-present'] : []), fe.apps.map(entry => `(cd fe/apps/${entry.name} && next build)`).join(' && ')].join(' && '),
-    // The fe apps import the workspace packages from their dist/, so the packages are built before the apps are type-checked.
-    typecheck: ['npm run codegen --silent', 'tsc -p be/tsconfig.json', ...(packages ? ['npm run build --workspaces --if-present'] : []), ...feTsconfigs.filter(file => !file.includes('*')).map(file => `tsc -p ${file} --noEmit`), ...(packages ? ['npm run typecheck --workspaces --if-present'] : [])].join(' && '),
+    // turbo builds every fe app workspace; ^build (turbo.json) builds the packages each app imports first, and caches both.
+    buildFe: 'npm run codegen --silent && turbo run build --filter=./fe/apps/*',
+    // The be side with its tsc; every fe workspace with its own typecheck script through turbo (the packages are built first: ^build).
+    typecheck: 'npm run codegen --silent && tsc -p be/tsconfig.json && turbo run typecheck',
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? app.project,
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**'].filter(Boolean).join(','),
@@ -214,7 +226,7 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     lcovReport: LCOV_REPORT,
     coverageExclusions: scope === APP_SCOPE ? coverageExclusions(presets, manifest).join(',') : '',
     codecovPaths: scope === APP_SCOPE ? coverageScope(presets).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
-    tsconfigPaths: ['be/tsconfig.json', ...feTsconfigs].join(','),
+    tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
   };
 }

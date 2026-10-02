@@ -57,12 +57,13 @@ configuration (`app.tool-config-local`).
 be/
 ├── tsconfig.json, tsconfig.build.json, eslint.config.mjs, jest.config.js   # managed by hfs sync
 ├── nest-cli.json
-├── apps/<app>/src/                  # composition only (kind api | worker | migrate | cli)
+├── apps/<app>/src/                  # composition only (kind api | worker | cli; the one cli app runs every one-off action)
 │   ├── main.ts                      # reads EnvSource once, parses options, bootstraps
 │   ├── app.module.ts                # AppModule.register(options): transport and capability modules
 │   └── <app>.options.ts             # optional options type
 ├── src/
-│   ├── features/<feature>/          # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule,...}/
+│   ├── features/api/<feature>/      # index.ts, <feature>.module.ts, application/, transport/{http,graphql,message,schedule,...}/
+│   ├── features/cli/                # the cli feature root: <group>/<group>.cli.ts, <group>/subs/<name>.cli.ts with its spec
 │   ├── modules/
 │   │   ├── domain/<capability>/     # business invariants, owned state, errors/, persistence/
 │   │   ├── platform/<capability>/   # config, logging, errors, primitives (required), database, scheduling, messaging, ...
@@ -99,7 +100,7 @@ integrations; integrations to platform; platform to platform; a feature never im
 no cycles, `import type` included.
 
 **Tests: unit automatic, the rest by hand.** The back end's unit specs (only
-`<name>.service.spec.ts` beside each `*.service.ts`) are the only tests an automatic gate runs; the
+`<name>.service.spec.ts` beside each `*.service.ts` and `<name>.cli.spec.ts` beside each `*.cli.ts`) are the only tests an automatic gate runs; the
 front end has no tests at all (R97). The back end also has integration
 (`be/src/tests/integration/<capability>/*.integration-spec.ts`), e2e
 (`be/src/tests/e2e/<area>/*.e2e-spec.ts`) and contract

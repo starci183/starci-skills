@@ -1,5 +1,0 @@
-mutation SignOut($input: SignOutInput!) {
-    signOut(input: $input) {
-        signedOut
-    }
-}

@@ -35,8 +35,8 @@ import {
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
-import { HealthHttpModule } from "@features/health"
-import { IdentityGraphqlModule } from "@features/identity"
+import { HealthHttpModule } from "@features/api/health"
+import { IdentityGraphqlModule } from "@features/api/identity"
 import type { IdentityAppOptions } from "./identity.options"
 
 @Module({})
