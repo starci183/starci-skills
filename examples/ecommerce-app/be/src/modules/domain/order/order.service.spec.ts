@@ -174,6 +174,35 @@ describe("OrderService", () => {
             expect(tx.em.findOneBy).not.toHaveBeenCalled()
         })
 
+        it("treats a blank replay key as no key and claims none", async () => {
+            const tx = fakeTransaction(
+                mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-8" }]], insert: [OrderLineEntity, {}] }),
+            )
+            const { orders, cart, catalog } = await build(tx.em)
+            cart.list.mockResolvedValue([{ productId: "sku-2", quantity: 4 }])
+            catalog.byIds.mockResolvedValue({ "sku-2": mug })
+            catalog.reserveStock.mockResolvedValue(true)
+
+            expect(await orders.placeOrder({ personId: "p-1", idempotencyKey: "   " })).toSucceedWith(
+                placedOrder({ orderId: "o-8", totalMinorUnits: 1000 }),
+            )
+
+            expect(tx.em.query).toHaveBeenCalledWith(INSERT_ORDER_IF_NEW, ["p-1", 1000, "USD", null])
+            expect(tx.em.findOneBy).not.toHaveBeenCalled()
+        })
+
+        it("trims a padded replay key before claiming and replaying it", async () => {
+            const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ idempotencyKey: "key-1" })] })
+            const { orders, cart } = await build(em)
+
+            expect(await orders.placeOrder({ personId: "p-1", idempotencyKey: "  key-1  " })).toSucceedWith(
+                placedOrder({ replayed: true }),
+            )
+
+            expect(em.findOneBy).toHaveBeenCalledWith(OrderEntity, { personId: "p-1", idempotencyKey: "key-1" })
+            expect(cart.list).not.toHaveBeenCalled()
+        })
+
         it("rolls back with no committed write when the stock was taken by a concurrent checkout", async () => {
             const tx = fakeTransaction(mockEntityManager({ query: [INSERT_ORDER_IF_NEW, [{ id: "o-9" }]] }))
             const { orders, cart, catalog } = await build(tx.em)

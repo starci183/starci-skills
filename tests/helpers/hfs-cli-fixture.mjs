@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
-import { imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { appSource, imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../../scripts/hfs/rules/monorepo.mjs';
 import { loadSonarGate } from '../../scripts/gates/sonar-gate.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -12,7 +12,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
 const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
 /** What `hfs sync` would load from the jest preset an app installs for its be side: the Sonar exclusions and the coverage sources. */
-export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
 /** An app declaration: the be side of `be` and the fe side of `fe` (hfs.json sides.<side>). */
 export const appOf = ({ be = { apps: [{ name: 'core', kind: 'api' }] }, fe = { apps: [{ name: 'web', kind: 'next' }] }, project = 'demo' } = {}) => ({ hfs: 2, kind: 'app', project, sides: { be: { kinds: ['api'], ...be }, fe } });
@@ -100,6 +100,8 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
   write('README.md', readmeOf(path.basename(dir)));
   if (declare) write('hfs.json', `${JSON.stringify(declaration, null, 2)}\n`);
   else fs.rmSync(path.join(dir, 'hfs.json'), { force: true });
+  // The Codecov components read the source the app now has: render the managed files once more over it, as `hfs sync` does after a capability is added.
+  writeTargets(dir, renderTargets(declaration, PRESETS, { source: appSource(dir) }));
   return dir;
 }
 

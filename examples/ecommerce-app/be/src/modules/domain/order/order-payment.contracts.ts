@@ -6,12 +6,10 @@ export interface RecordOrderPaymentParams {
     readonly orderId: string
 }
 
-/** What expiring the overdue orders takes. */
+/** What expiring the overdue orders takes: the raw payload of the expire-orders job tick. */
 export interface ExpireOverdueOrdersParams {
-    /** Orders that have been pending for at least this long, in milliseconds, expire. */
-    readonly olderThanMs: number
-    /** The most orders one run expires, so a long backlog is worked off in bounded transactions. */
-    readonly limit: number
+    /** The payload the scheduler wrote on the job; an `olderThanMs` number on it is the payment window, anything else gets the default. */
+    readonly payload: object
 }
 
 /** How many orders one expiry run expired. */

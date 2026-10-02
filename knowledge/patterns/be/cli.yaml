@@ -4,8 +4,10 @@ title: Backend cli
 purpose: |-
   Given a one-off action (migrate, seed, sync, backup, an operator command), where does it live and how is it written? Every
   one-off action is a nest-commander command of the cli feature root `be/src/features/cli/`, compiled into the one cli app
-  `be/apps/cli` and shipped as one image run as `cli <group> <command>`. A command is an action runner, not a thin
-  transport: it is unit-tested and counted in coverage like a service.
+  `be/apps/cli` and shipped as one image run as `cli <group> <command>`. A command is an action runner: thin (R203
+  `BE_FEATURE_THIN`) like every other feature file — it maps the command line and makes one delegating call into the
+  modules — and it still owes its unit spec beside it (the `cli` role of `ruleParams.be.unitRoles`). Its slot is
+  `coverage: none`, so a command is never a coverage target.
 appliesTo:
   - backend
 family: be
@@ -73,9 +75,9 @@ rules:
       group `@Command` with its `subCommands`), `<group>/<group>.module.ts` and `<group>/subs/<name>.cli.ts` (a `@SubCommand`
       class extending `CommandRunner`), one command per file. The cli feature root is a feature, so every module of it is a
       static `@Module({ imports, providers })` with no module definition, no options file and no `register`: `CliModule`
-      imports each group module and a group module provides its commands. A command takes its inputs from a platform
-      capability (the connections through `InjectDatabaseOptions()` and their opener through `InjectConnectionSource()` of
-      `platform/database`) or from a nest-commander `@Option` of its own (`cli seed run --env <name>`). The suffix is
+      imports each group module and a group module provides its commands. A command makes its one delegating call on an
+      injected runner service of the modules (the migrate and seed runners of `platform/database`) and takes its options
+      from a nest-commander `@Option` of its own (`cli seed run --env <name>`). The suffix is
       `.cli.ts`, because `.command.ts` is the CQRS message (api.yaml).
     rationale: |-
       A fixed group and sub-command layout maps the command line `cli <group> <command>` to one file path, so an operator
@@ -85,10 +87,10 @@ rules:
         when: The migrate group
         write: |-
           // be/src/features/cli/migrate/migrate.cli.ts
-          @Command({ name: "migrate", subCommands: [RunMigrationsCli], description: "Schema migrations of every connection" })
-          /** The migrate group; runs nothing itself. */
+          @Command({ name: "migrate", subCommands: [RunCli], description: "Schema migrations of every connection" })
+          /** The migrate group; without a sub-command it shows its help. */
           export class MigrateCli extends CommandRunner {
-              async run(): Promise<void> {}
+              async run(): Promise<void> { this.command.help() }
           }
       - id: case-2
         when: A `@SubCommand` declared in src/modules/platform/database/reindex.cli.ts or in features/api/
@@ -101,21 +103,22 @@ rules:
   - id: BE-CLI-3
     title: A command is an action runner with its own unit spec
     kind: mandatory
-    hfsRules: [R149, R47, R102]
+    hfsRules: [R149, R47, R102, R203]
     requirement: |-
-      A cli command is not a thin transport, so the thin-door rule (R88) does not apply to it: its `run` carries the action
-      (it may branch, loop and call the domain or platform services the action needs). Every `.cli.ts` therefore has its unit
-      spec `<name>.cli.spec.ts` beside it, built like a service spec (test.yaml BE-TEST-2), and the unit run measures
-      `src/features/cli/**/*.cli.ts` at per-file 100 (the `cli` entry of `ruleParams.be.unitRoles` of the slot manifest). A
-      command never imports an api feature: what it shares with a request lives in a domain capability (folder.yaml
-      BE-FOLDER-2).
+      A cli command is thin (R203 `BE_FEATURE_THIN`) like every other file of a feature-tier slot: `run` maps the command
+      line and makes one delegating call into the modules (a service, a platform capability or a modules function), with no
+      branch, loop, `try`, `throw` or computation. As an action runner it is exempt from the transport-shape law R88 (the
+      `exempt` of the `cli` entry of `ruleParams.be.unitRoles`), and it still owes its unit spec `<name>.cli.spec.ts` beside
+      it, built like a service spec (test.yaml BE-TEST-2), which asserts the delegation. The slot `be.cli` is
+      `coverage: none`, so a command is never a coverage target. A command never imports an api feature: what it shares
+      with a request lives in a domain capability (folder.yaml BE-FOLDER-2).
     rationale: |-
-      An operator action runs against production data, often once; its branches have no request path that an e2e run
-      exercises, so the unit spec is the only automatic proof.
+      An operator action runs against production data, often once; its delegation has no request path that an e2e run
+      exercises, so the unit spec is the only automatic proof that the command hands its inputs to the right module.
     cases:
       - id: case-1
         when: A seed command
-        write: 'features/cli/seed/subs/demo.cli.ts (`@SubCommand({ name: "demo" })`, `DemoSeedCli extends CommandRunner`) opens one transaction and calls CatalogService.createProduct for each demo product, skipping one that exists; demo.cli.spec.ts beside it asserts both paths.'
+        write: 'features/cli/seed/subs/demo.cli.ts (`@SubCommand({ name: "demo" })`, `DemoSeedCli extends CommandRunner`) reads its options and calls the seed runner of a platform or domain capability; demo.cli.spec.ts beside it asserts the delegation.'
       - id: case-2
         when: A command with no spec
         write: 'Refused (BE_CLI_COMMAND_SHAPE, unit-test-colocated): features/cli/db/subs/backup.cli.ts without backup.cli.spec.ts beside it.'
@@ -125,6 +128,7 @@ rules:
         - BE_TEST_TOPOLOGY
         - BE_CONTRACT_UNGUARDED
         - BE_SPEC_PLACEMENT
+        - BE_FEATURE_THIN
       manual:
         - Confirm a command that writes is safe to re-run or refuses a second run explicitly.
     relatedExamples: []
@@ -163,7 +167,7 @@ rules:
     cases:
       - id: case-1
         when: The migrate command
-        write: 'features/cli/migrate/subs/run.cli.ts (`@SubCommand({ name: "run" })`, `RunMigrationsCli extends CommandRunner`) runs the migrations of every connection of CliOptions in order and fails the process on the first error; run.cli.spec.ts beside it.'
+        write: 'features/cli/migrate/subs/run.cli.ts (`@SubCommand({ name: "run" })`, `RunCli extends CommandRunner`) makes one call on `MigrationRunnerService` of `platform/database`, which migrates every connection in order and fails the process on the first error; run.cli.spec.ts beside it.'
       - id: case-2
         when: A module runs `dataSource.runMigrations()` at boot of an api app
         write: 'Refused (BE_SCHEMA_AUTHORITY): only the cli and the test world run migrations.'
@@ -233,7 +237,7 @@ files:
   - path: src/features/cli/migrate/subs/run.cli.ts
     slot: be.cli
     optional: true
-    role: "`cli migrate run`: runs the migrations of every connection; the only migration runner"
+    role: "`cli migrate run`: one delegating call on the migration runner of `platform/database`, the one runner of the schema"
     rules:
       - BE_CLI_COMMAND_SHAPE
       - BE_SCHEMA_AUTHORITY
@@ -256,7 +260,7 @@ files:
   - path: src/features/cli/seed/subs/run.cli.ts
     slot: be.cli
     optional: true
-    role: "`cli seed run [--env <name>]`: runs the seed files of .starcistacks/<env>/seeds on the connection each names"
+    role: "`cli seed run [--env <name>]`: one delegating call on the seed runner of `platform/database`"
     rules:
       - BE_CLI_COMMAND_SHAPE
     spec: src/features/cli/seed/subs/run.cli.spec.ts
@@ -280,7 +284,7 @@ files:
       - BE_MODULE_SHAPE
   - path: src/features/cli/<group>/subs/run.cli.ts
     slot: be.cli
-    role: the first sub-command of the group; it calls the domain service
+    role: the first sub-command of the group; one delegating call on the injected runner service
     template: cli/sub.run.cli.ts.tpl
     rules:
       - BE_CLI_COMMAND_SHAPE

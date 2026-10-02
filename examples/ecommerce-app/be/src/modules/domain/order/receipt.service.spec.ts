@@ -4,8 +4,9 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { RECEIPT_STORAGE } from "@modules/integrations/receipt-storage"
 import type { ReceiptStorage } from "@modules/integrations/receipt-storage"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { isRunKey } from "@modules/platform/jobs"
 import { orderRow } from "@tests/fixtures/builders/order.builder"
-import { OrderErrorCode } from "./errors/order.error"
+import { OrderError, OrderErrorCode } from "./errors/order.error"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { ReceiptService } from "./receipt.service"
@@ -16,6 +17,9 @@ const LINES = [
     { id: "l-2", orderId: "o-1", productId: "sku-2", quantity: 1, unitPriceMinorUnits: 250 },
 ]
 const KEY = "receipts/o-1.json"
+const RUN_KEY_TEXT = "job-1:store:7"
+if (!isRunKey(RUN_KEY_TEXT)) throw new OrderError({ code: OrderErrorCode.PlacementFailed })
+const RUN_KEY = RUN_KEY_TEXT
 const LINK = {
     url: "http://minio.test/receipts/receipts/o-1.json?X-Amz-Signature=s",
     expiresAt: new Date("2026-01-01T00:05:00.000Z"),
@@ -60,6 +64,45 @@ describe("ReceiptService", () => {
             const { receipts } = await build(mockEntityManager({ findOneBy: [OrderEntity, null] }))
 
             expect(await receipts.prepareReceipt("o-9")).toBeNull()
+        })
+    })
+
+    describe("archiveReceipt", () => {
+        it("stores the receipt of the paid order under the run key and remembers the key it was stored under", async () => {
+            const em = mockEntityManager({
+                findOneBy: [OrderEntity, ORDER],
+                find: [OrderLineEntity, LINES],
+                update: [OrderEntity, {}],
+            })
+            const { receipts, storage } = await build(em)
+
+            await receipts.archiveReceipt({ orderId: "o-1" }, RUN_KEY)
+
+            expect(storage.store).toHaveBeenCalledWith(
+                { key: KEY, content: Buffer.from(JSON.stringify(DOCUMENT)) },
+                RUN_KEY,
+            )
+            expect(em.update).toHaveBeenCalledWith(OrderEntity, { id: "o-1" }, { receiptKey: KEY })
+        })
+
+        it("does nothing for a payload that is not a send-receipt payload", async () => {
+            const em = mockEntityManager()
+            const { receipts, storage } = await build(em)
+
+            await receipts.archiveReceipt({ reason: "billing-sync" }, RUN_KEY)
+
+            expect(em.findOneBy).not.toHaveBeenCalled()
+            expect(storage.store).not.toHaveBeenCalled()
+        })
+
+        it("stores nothing when the order has no receipt to prepare, and remembers no key", async () => {
+            const em = mockEntityManager({ findOneBy: [OrderEntity, null] })
+            const { receipts, storage } = await build(em)
+
+            await receipts.archiveReceipt({ orderId: "o-9" }, RUN_KEY)
+
+            expect(storage.store).not.toHaveBeenCalled()
+            expect(em.update).not.toHaveBeenCalled()
         })
     })
 

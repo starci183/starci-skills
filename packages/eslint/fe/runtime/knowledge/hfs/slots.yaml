@@ -45,7 +45,12 @@ versioning:
 #   requiredWhen       connections: required only when hfs.json declares a database connection.
 #   allows / forbids   names inside the instance; the loader exposes them, slot-check enforces them.
 #   tests       unit-beside | e2e | none.
-#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules); on an
+#   coverage    required | none, on every tracked slot of profile be. A required slot's subtree is measured at 100 per file on every
+#               ruleParams.be.logicRoles file (lines, branches, functions, statements); a none slot's subtree is never measured and
+#               is excluded from Sonar's coverage. scripts/hfs/coverage-scope.mjs derives the jest per-file thresholds, Sonar's
+#               sonar.coverage.exclusions and the Codecov paths and components from this field and nowhere else (R204).
+#               Orthogonal to the lite `editions`: an edition never changes what a slot measures.
+#   composedBy the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules); on an
 #               owner slot (be.cli) the app kinds that list its root module, every folder of the root holding one static module.
 #   budget      size budgets (lines per file, files per slot, exports).
 #   trigger     the trigger kind (triggerKinds) of a feature-tier slot: api, webhooks, realtime, saga, reactors, jobs or cli. A feature of one kind
@@ -191,15 +196,26 @@ ruleParams:
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
-    # THE list of unit-tested roles of a back end (the ONE source every consumer reads: the eslint unit-test rules, hfs
-    # spec-placement and the cli spec check, the architecture machine's unit-spec checks, the unit-run gate, the jest preset's
-    # coverage sources, held equal by spec, and the Sonar and Codecov coverage scope rendered from them). A role's subject is
-    # `<name>.<role>.ts` (inside `slot` when one is named), its unit spec `<name>.<spec>.ts` beside it, and `coverage` the be-relative
-    # glob the unit run measures at 100 per file. `thin` lists the thin-door rules the role is exempt from: a cli command is an
-    # action runner, not a thin transport (R149). A lane that adds a unit-tested role adds its entry here and nowhere else.
+    # THE list of unit-tested roles of a back end whose spec is REQUIRED (the ONE source every consumer reads: the eslint unit-test rules, hfs
+    # spec-placement and the cli spec check, the architecture machine's unit-spec checks and the unit-run gate). A role's subject is
+    # `<name>.<role>.ts` (inside `slot` when one is named) and its unit spec `<name>.<spec>.ts` beside it. What the unit run MEASURES is not
+    # listed here: it is `logicRoles` over the slots whose `coverage` is required (scripts/hfs/coverage-scope.mjs). `exempt` lists the rules
+    # the role is exempt from: a cli command is an action runner, not a thin transport (R149). A lane that adds a spec-required role adds
+    # its entry here and nowhere else.
     unitRoles:
-      - {role: service, spec: service.spec, coverage: "src/**/*.service.ts"}
-      - {role: cli, spec: cli.spec, slot: be.cli, coverage: "src/features/cli/**/*.cli.ts", exempt: [BE_TRANSPORT_SHAPE]}
+      - {role: service, spec: service.spec}
+      - {role: cli, spec: cli.spec, slot: be.cli, exempt: [BE_TRANSPORT_SHAPE]}
+    # R204 HFS_COVERAGE_SCOPE_DRIFT. THE roles that carry logic: a file `<name>.<role>.ts` of one of these roles
+    # inside a slot whose `coverage` is required is measured at 100 per file on lines, branches, functions and statements (the three
+    # generated consumers: jest thresholds, sonar.coverage.exclusions, codecov.yml). A role that is not listed here (module, module-definition,
+    # options, config, command, query, contracts, port, event, queue, entity, sql, rows, messages, log-events, error, decorators, cache-keys,
+    # projection-entity, connection, and every file with no role: index.ts, main.ts, migrations) is declaration or composition and is never measured.
+    # A unit spec beside such a file (`<name>.<role>.spec.ts`) is legal but not required: the file owes 100, not a spec of its own.
+    logicRoles: [service, policy, projection, guard, mapper, client, filter, interceptor, processor, step, saga, saga-step, compensation, consumer, webhook]
+    # R203 BE_FEATURE_THIN. THE roles a feature-tier file is judged thin by: a file `<name>.<role>.ts` of one of these roles inside a slot of tier
+    # feature maps parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no
+    # branch, loop, ternary, try or throw, no computation; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*.
+    thinRoles: [handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, service]
     # BE_PATTERN_SPEC_MISSING: a declared pattern (hfs.json sides.be.patterns) is proven on the test world. Each id below needs a test titled
     # "<pattern>/<id>: ..." in an e2e or integration spec (be/src/tests/e2e, be/src/tests/integration).
     patternScenarios:
@@ -527,6 +543,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     managedBy: tool-config
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
   - id: be.nest-cli
@@ -537,6 +554,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_MONO_NEST_PROJECTS]
   - id: be.tool-config-local
     profiles: [be]
@@ -578,6 +596,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_ROOT_MARKDOWN_FORBIDDEN]
   - id: repo.docs-media
     profiles: [be, fe]
@@ -586,6 +605,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     budget: {bytes: 512000}
   - id: repo.packages
     profiles: [be, fe]
@@ -596,6 +616,7 @@ slots:
     owner: true
     requires: [package.json, src/index.ts, tsconfig.json]
     tests: unit-beside
+    coverage: none
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: repo.app-image
     profiles: [be, fe]
@@ -607,6 +628,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     rules: [HFS_DOCKER_BUILD_CONTEXT, HFS_DOCKER_STAGES, HFS_DOCKER_ENTRY, HFS_DOCKER_BASE_PIN, HFS_DOCKER_SECRETS]
 
   # ----- never tracked: build output the tools need in place ---------------------------------------------
@@ -678,6 +700,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand); CI fails when the emitted file differs (a contract, not a build artefact)
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.openapi
@@ -687,6 +710,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.events
@@ -696,6 +720,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
@@ -705,6 +730,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    coverage: none
     why: the previously published event contract of a service, the same format as its events.json (copied over when the contract is published, never edited); the current events.json may only extend it additively, a breaking change is a new `<event>.v2` key (R177 BE_CONTRACT_BREAKING)
     rules: [BE_CONTRACT_BREAKING]
 
@@ -721,6 +747,7 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    coverage: none
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED, BE_CONTEXT_OWNER]
   - id: be.app.worker
@@ -734,6 +761,7 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    coverage: none
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED, BE_CONTEXT_OWNER]
   - id: be.app.cli
     profiles: [be]
@@ -751,6 +779,7 @@ slots:
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts"]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
+    coverage: none
     rules: [BE_CLI_REQUIRED, BE_CLI_BOOTSTRAP, BE_CLI_OWNER, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: features ------------------------------------------------------------------------------------
@@ -769,6 +798,7 @@ slots:
     requires: [index.ts, "<feature>.module.ts", application/]
     allows: [index.ts, "<feature>.module.ts", application/, transport/, messages/]   # nothing else at feature root
     tests: none
+    coverage: none
     budget: {files: 250, indexExports: 60}   # a feature above 250 source files must be split by product capability
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
@@ -780,6 +810,7 @@ slots:
     allows: ["<action>.{command,query,handler,contracts}.ts"]
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: none
+    coverage: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.saga
     profiles: [be]
@@ -793,6 +824,7 @@ slots:
     requires: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga-state.ts", steps/, compensations/, transport/]
     allows: [index.ts, "<saga>.module.ts", "<saga>.saga.service.ts", "<saga>.saga.service.spec.ts", "<saga>.saga-state.ts", "<saga>.saga.log-events.ts", application/, steps/, compensations/, transport/]   # the orchestrator is a `*.service.ts` because a handler injects only services; unit-tested beside it
     tests: unit-beside            # <saga>.saga.service.spec.ts beside the orchestrator; the state machine and its fence are platform/saga's service; each compensation path has an e2e spec
+    coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED, BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.saga.steps
     profiles: [be]
@@ -803,6 +835,7 @@ slots:
     tier: feature
     allows: ["<step>.saga-step.ts"]    # one step of the flow: its name and the event it puts on the wire (the contract); its work is done by the domain, not by the step
     tests: none
+    coverage: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT]
   - id: be.feature.saga.compensations
     profiles: [be]
@@ -813,6 +846,7 @@ slots:
     tier: feature
     allows: ["<step>.compensation.ts"]   # REQUIRED for every step: the command that undoes it, naming the failure event that triggers it
     tests: none
+    coverage: none
     rules: [BE_SAGA_STEP_COMPENSATION, BE_SAGA_EVENT_CONTRACT, BE_SAGA_E2E_MISSING]
   - id: be.feature.application.support
     profiles: [be]
@@ -823,6 +857,7 @@ slots:
     allows: ["<name>.<role>.ts"]     # <role> from ruleParams.be.suffixes; no <name>.types.ts
     forbids: [graphql/, http/, message/, schedule/, transport/]
     tests: none
+    coverage: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
     since: 1.0.0
   - id: be.transport.http
@@ -834,6 +869,7 @@ slots:
     requires: ["<feature>-http.module.ts"]
     allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts"]
     tests: none
+    coverage: none
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
@@ -845,6 +881,7 @@ slots:
     requires: ["<feature>-graphql.module.ts"]
     allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts"]
     tests: none
+    coverage: none
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
@@ -857,6 +894,7 @@ slots:
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
+    coverage: none
     composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED, BE_SAGA_CONSUMER_DEDUPE]
   # ----- BE: feature kinds that are not an api: a webhook door and a realtime door. Each kind is a folder of src/features/ named by
@@ -875,6 +913,7 @@ slots:
     requires: [index.ts, transport/]
     allows: [index.ts, transport/]
     tests: none
+    coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
   - id: be.feature.webhooks.http
@@ -887,6 +926,7 @@ slots:
     requires: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts"]
     allows: ["<provider>-http.module.ts", "<provider>.webhook.ts", "<provider>.webhook.spec.ts", dto/]
     tests: unit-beside            # the door's own spec (<provider>.webhook.spec.ts) beside the door: the one non-service unit spec of this kind
+    coverage: none
     composedBy: [api]
     rules: [BE_WEBHOOK_SHAPE, BE_WEBHOOK_UNVERIFIED, BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
     since: 1.0.0
@@ -899,6 +939,7 @@ slots:
     tier: feature
     allows: ["<event>.request.ts"]   # the typed provider payload, validated and bounded (BE_INPUT_BOUNDED)
     tests: none
+    coverage: none
     composedBy: [api]
     rules: [BE_INPUT_BOUNDED]
     since: 1.0.0
@@ -914,6 +955,7 @@ slots:
     requires: [index.ts, transport/]
     allows: [index.ts, transport/]
     tests: none
+    coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
     since: 1.0.0
   - id: be.feature.realtime.graphql
@@ -926,6 +968,7 @@ slots:
     requires: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts"]
     allows: ["<channel>-graphql.module.ts", "<channel>.subscription.ts", "<channel>.subscription.spec.ts", dto/]
     tests: unit-beside            # the door's own spec beside the door (a subscription has no service of its own)
+    coverage: none
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
@@ -938,6 +981,7 @@ slots:
     tier: feature
     allows: ["<name>.{input,type,args}.ts"]
     tests: none
+    coverage: none
     composedBy: [api]
     rules: [BE_INPUT_BOUNDED]
     since: 1.0.0
@@ -951,6 +995,7 @@ slots:
     requires: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     allows: ["<channel>-websocket.module.ts", "<channel>.gateway.ts", "<channel>.gateway.spec.ts"]
     tests: unit-beside            # the door's own spec beside the door (a gateway has no service of its own)
+    coverage: none
     composedBy: [api]
     rules: [BE_REALTIME_SHAPE, BE_REALTIME_WRITES, BE_REALTIME_TOPIC_SCOPE, BE_DEFAULT_DENY]
     since: 1.0.0
@@ -974,6 +1019,7 @@ slots:
     composedBy: [cli]
     allows: [index.ts, cli.module.ts, "<group>/<group>.cli.ts", "<group>/<group>.cli.spec.ts", "<group>/<group>.module.ts", "<group>/subs/<name>.cli.ts", "<group>/subs/<name>.cli.spec.ts"]
     tests: unit-beside
+    coverage: none
     rules: [BE_CLI_COMMAND_SHAPE, BE_CLI_OWNER, BE_CLI_REQUIRED, BE_MODULE_SHAPE, BE_SCHEMA_AUTHORITY]
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
@@ -988,6 +1034,7 @@ slots:
     allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts"]
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER, BE_CONTEXT_COUPLING, BE_CONTEXT_TRANSACTION]
   - id: be.errors
@@ -998,6 +1045,7 @@ slots:
     tier: inherit
     allows: ["<capability>.error.ts", "<name>.error.ts"]   # one family per capability, extends platform/errors DomainError
     tests: none
+    coverage: none
     rules: [BE_ERROR_HOME]
   - id: be.domain.messages
     profiles: [be]
@@ -1007,6 +1055,7 @@ slots:
     tier: inherit
     allows: ["<capability>.messages.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
     tests: none
+    coverage: none
     rules: [BE_USER_COPY_LITERAL]
     since: 1.0.0
   - id: be.feature.messages
@@ -1017,6 +1066,7 @@ slots:
     tier: feature
     allows: ["<feature>.messages.ts"]   # one keyed catalog per feature, vi and en, read through the platform/i18n MessageCatalog port
     tests: none
+    coverage: none
     rules: [BE_USER_COPY_LITERAL]
     since: 1.0.0
   - id: be.persistence
@@ -1032,6 +1082,7 @@ slots:
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
     tests: none
+    coverage: none
     rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE, BE_SQL_TABLE_OWNER, BE_SQL_RETURNING_SHAPE, BE_CONTEXT_COUPLING, BE_CONTEXT_PLATFORM_TABLES]
   - id: be.platform
     profiles: [be]
@@ -1051,6 +1102,7 @@ slots:
     requires: [index.ts]
     forbids: [common/, utils/, shared/, testing/]   # primitives live in platform/primitives
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   # ----- BE: pattern slots (opt-in; enabled by hfs.json sides.be.patterns). A path under one is HFS_SLOT_NOT_ENABLED unless its pattern is declared.
@@ -1064,6 +1116,7 @@ slots:
     owner: true
     requires: [index.ts, event-bus.module.ts, event-bus.port.ts, event-bus.contracts.ts, event-bus.service.ts, event-bus.service.spec.ts]
     tests: unit-beside
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
   - id: be.platform.queue
@@ -1076,6 +1129,7 @@ slots:
     owner: true
     requires: [index.ts, queue.module.ts, queue.port.ts, queue.contracts.ts, queue-outbox.service.ts, queue-outbox.service.spec.ts]
     tests: unit-beside
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_INFRA_OWNER]
   - id: be.events
@@ -1089,6 +1143,7 @@ slots:
     requires: [index.ts]
     allows: ["<event>.event.ts", index.ts]
     tests: none
+    coverage: none
     rules: [BE_EVENT_CLASS_CONTRACT, BE_TIER_DIRECTION]
   - id: be.queues
     profiles: [be]
@@ -1101,6 +1156,7 @@ slots:
     requires: [index.ts, "<queue>.queue.ts"]   # the module exists when a domain module imports the producer; a scheduler-only queue has none
     allows: ["<queue>.queue.ts", "<queue>.module.ts", "<queue>.contracts.ts", index.ts]
     tests: none
+    coverage: none
     rules: [BE_OUTBOX_WRITE_TX, BE_TIER_DIRECTION]
   - id: be.feature.reactors
     profiles: [be]
@@ -1114,6 +1170,7 @@ slots:
     requires: [index.ts, "<reactor>.module.ts", transport/]
     allows: [index.ts, "<reactor>.module.ts", application/, transport/]
     tests: none
+    coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs
     profiles: [be]
@@ -1127,6 +1184,7 @@ slots:
     requires: [index.ts, "<job>.module.ts", steps/, transport/]
     allows: [index.ts, "<job>.module.ts", application/, steps/, transport/]
     tests: none
+    coverage: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.jobs.queue
     profiles: [be]
@@ -1138,6 +1196,7 @@ slots:
     requires: ["<job>-queue.module.ts", "<job>.processor.ts"]
     allows: ["<job>-queue.module.ts", "<job>.processor.ts"]
     tests: none
+    coverage: none
     composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.jobs.steps
@@ -1149,6 +1208,7 @@ slots:
     tier: feature
     allows: ["<step>.step.ts"]
     tests: none
+    coverage: none
     rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
   - id: be.platform.jobs
     profiles: [be]
@@ -1160,6 +1220,7 @@ slots:
     owner: true
     requires: [index.ts, jobs.module.ts, jobs.port.ts, jobs.contracts.ts, job-claim.service.ts, job-claim.service.spec.ts, fenced.processor.ts]
     tests: unit-beside
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
   - id: be.projections
@@ -1172,7 +1233,8 @@ slots:
     owner: true
     requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
     allows: [index.ts, "<name>.module.ts", "<name>.module-definition.ts", "<name>.options.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
-    tests: none
+    tests: unit-beside            # a measured slot: <name>.projection.spec.ts beside its projection is legal (the file owes 100 per file; a spec of its own is optional)
+    coverage: required
     rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION, BE_CONTEXT_COUPLING]
   - id: be.integrations
     profiles: [be]
@@ -1183,6 +1245,7 @@ slots:
     owner: true
     requires: [index.ts, "<provider>.config.ts"]
     tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts; plus src/tests/integration/<provider>/ (R112)
+    coverage: required
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT, BE_INTEGRATION_SPEC_MISSING]
   - id: be.integrations.model
@@ -1192,6 +1255,7 @@ slots:
     tracked: tracked
     tier: integrations
     tests: none
+    coverage: required
     why: an ML or LLM model client is an integration; weights and datasets are never in git
 
   # ----- BE: tests (owner test layout 2026-09-30). Unit specs are <name>.service.spec.ts beside their service and nothing else; everything else
@@ -1205,6 +1269,7 @@ slots:
     tier: e2e
     allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, "fakes/<provider>/server.ts", fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); fakes/<provider>/server.ts is the fake server of a provider, a literal file name BE_SOURCE_FORM reads as its role; plus root files with a role suffix (test-world-files, R47)
     tests: none
+    coverage: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
       infrastructure (containers) and runs the migrations once over the cli app's connections; use-test-world.ts exports
@@ -1222,6 +1287,7 @@ slots:
     tier: e2e
     allows: ["<name>.ts"]    # plain kebab names, like platform/primitives (BE-CONVENTION 1.11 names primitives/time.ts): the world's inlined test helpers (poll, free-ports)
     tests: none
+    coverage: none
     why: the helpers the test world needs (polling, free ports, transports), inlined so the world imports no other repository; a bare <name>.ts entry in allows is what admits a plain name in BE_SOURCE_FORM
   - id: be.tests.fixtures
     profiles: [be]
@@ -1231,6 +1297,7 @@ slots:
     tier: fixtures
     allows: [i18n/]   # i18n/ is the one folder that may carry localized text
     tests: none
+    coverage: none
     why: payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); the test data builders live in its builders/ slot; importable by unit specs, integration and e2e; never imports a feature
   - id: be.tests.fixtures.builders
     profiles: [be]
@@ -1239,6 +1306,7 @@ slots:
     tracked: tracked
     tier: fixtures
     tests: none
+    coverage: none
     why: >-
       the ONLY home of test data builders, one <area>.builder.ts per area, shared by every spec of that area: pure object builders
       (commissionRow(overrides), accrueInput(overrides)) for unit specs and persisting builders (orderBuilder(world.db.primary).pending().build(overrides))
@@ -1253,6 +1321,7 @@ slots:
     tier: fixtures
     allows: ["<name>.<role>.ts"]   # data files that deliberately carry localized text (a real Vietnamese string a parser or formatter must accept); no specs here
     tests: none
+    coverage: none
     why: the ONLY test-fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
   - id: be.tests.integration
     profiles: [be]
@@ -1261,6 +1330,7 @@ slots:
     tracked: tracked
     tier: e2e
     tests: e2e
+    coverage: none
     why: one capability module through useTestWorld({ modules }), no HTTP door of ours (SQL, transactions, concurrency, inbox claims on the real database; and every integration client, `<capability>` being its provider folder, against our real infra, a real peer app or the library fake at the network edge, with its success, its ErrorCode refusal mapping and an outage through the world, R112); run by test:integration
     rules: [BE_TEST_TOPOLOGY, BE_INTEGRATION_SPEC_MISSING]
   - id: be.tests.e2e
@@ -1270,6 +1340,7 @@ slots:
     tracked: tracked
     tier: e2e
     tests: e2e
+    coverage: none
     why: flow e2e through useTestWorld({ apps }); external services are the world's network fakes; run by test:e2e
     rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
   - id: be.tests.contract
@@ -1279,6 +1350,7 @@ slots:
     tracked: tracked
     tier: e2e
     tests: e2e
+    coverage: none
     why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
     rules: [BE_TEST_TOPOLOGY]
   - id: be.tests.e2e-world-retired

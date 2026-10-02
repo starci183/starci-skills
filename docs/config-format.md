@@ -186,7 +186,7 @@ windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
 Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default on)
-covers the back end's unit tests in workflows (jest and its per-file coverage threshold, and the services' coverage Sonar
+covers the back end's unit tests in workflows (jest and its per-file coverage threshold, and the coverage Sonar
 judges; the front end has no tests): while on, an op that writes code also writes or updates the specs of that code and runs only
 those - the specs of the changed or added source and the specs that import it - through the op gate (`gate.mjs --tests`),
 never the app's whole unit suite; `unit.verify` is the op that runs the whole unit suite (`npm test`), dispatched only when the goal

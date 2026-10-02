@@ -18,11 +18,11 @@ gate:
   # window keeps "new code" the recent work on main, so the server gate is passable on a healthy main.
   newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
 newCode:
-  # Coverage of the unit-tested roles only (services and cli commands). The be unit run writes coverage/lcov.info (@starci/jest-preset coverageReporters lcov) and the
+  # Coverage of the measured logic files only (the `ruleParams.be.logicRoles` roles of the `coverage: required` slots). The be unit run writes coverage/lcov.info (@starci/jest-preset coverageReporters lcov) and the
   # managed sonar-project.properties imports it (sonar.javascript.lcov.reportPaths=be/coverage/lcov.info) with
-  # sonar.coverage.exclusions = the complement of be/src/**/*.service.ts and be/src/features/cli/**/*.cli.ts (SonarQube has no coverage inclusions), rendered by hfs sync from the preset's COVERAGE_SOURCES and the slot manifest (codecov.yml
-  # is rendered from the same constant). A handler, resolver, controller, module, config file or test is not a coverage target and
-  # fe/ is outside coverage entirely, so coverage on these conditions is the coverage of the services and cli commands alone.
+  # sonar.coverage.exclusions = the complement of the measured files (SonarQube has no coverage inclusions), rendered by hfs sync from the one derivation scripts/hfs/coverage-scope.mjs (be/jest.config.js and codecov.yml
+  # are rendered from it too; a hand edit of any of them is R204 HFS_COVERAGE_SCOPE_DRIFT). The feature tier, declaration files, tests and
+  # fe/ are never coverage targets, so coverage on these conditions is the coverage of the modules' logic alone.
   coverage:
     metric: new_coverage
     minPercent: 100
@@ -63,9 +63,9 @@ overall:
   hotspots:
     metric: security_hotspots_reviewed
     minReviewedPercent: 100
-  # The services' coverage (see newCode.coverage), overall and per file: with the inclusions in place each `*.service.ts` is its
-  # own measure, so one service below 100 fails the slice verdict (sonar-local evaluateSlice) and the dashboard verdict
-  # (sonar-local dashboard) although the project average may round to 100. A file outside the inclusions is never read.
+  # The measured files' coverage (see newCode.coverage), overall and per file: with the exclusions in place each measured file is its
+  # own measure, so one measured file below 100 fails the slice verdict (sonar-local evaluateSlice) and the dashboard verdict
+  # (sonar-local dashboard) although the project average may round to 100. A file outside the scope is never read.
   coverage:
     metric: coverage
     minPercent: 100
@@ -91,10 +91,10 @@ enforcedOps: [backend.implement, interface.implement, code.refactor]
 reasoning: |
   Chosen against the four projects the local server holds on 2026-09-29 (whole-project duplicated lines
   1.6 / 2.1 / 1.7 / 0.0 percent), so new code that meets them is at or below what main already carries.
-  coverage 100 on services and cli commands, overall and new code (owner 2026-10-01): the unit project already fails below its per-file
-  100 threshold on `*.service.ts` and `src/features/cli/**/*.cli.ts`; Sonar imports the same run's lcov with the same scope, so the dashboard, the slice
-  verdict and the server gate show the number the runner enforces, file by file. Only services and cli commands count: business logic
-  and operator actions live there, the thin layers are covered through them, and the front end has no unit tests.
+  coverage 100 on the measured logic files, overall and new code (owner 2026-10-01): the unit project already fails below its per-file
+  100 threshold on the `ruleParams.be.logicRoles` files of the `coverage: required` slots; Sonar imports the same run's lcov with the same scope, so the dashboard, the slice
+  verdict and the server gate show the number the runner enforces, file by file. Only the modules' logic counts: business logic
+  lives there, the feature tier is thin (R203) and proven by integration and e2e, and the front end has no unit tests.
   duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
   passes ordinary work.
   blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds

@@ -34,21 +34,42 @@ export const TRACKED = ['tracked', 'ignored', 'external'];
 /** A runtime manifest adds `generated`: tracked, written only by the slot's generatedBy, judged by drift (RT_GENERATED_DRIFT). */
 const RUNTIME_TRACKED = [...TRACKED, 'generated'];
 export const TESTS = ['unit-beside', 'e2e', 'none'];
+/** The coverage mode of a tracked slot of the be profile (scripts/hfs/coverage-scope.mjs derives the three coverage consumers from it). */
+export const COVERAGE = ['required', 'none'];
 export const APP_KIND = 'app';
 
 /**
- * The unit-tested roles of a back end (ruleParams.be.unitRoles of the slot manifest): [{ role, spec, coverage, slot?, exempt? }].
- * THE one list: every check that asks "is this file unit-tested, and where is its spec" asks it here.
+ * The unit-tested roles of a back end whose spec is required (ruleParams.be.unitRoles of the slot manifest): [{ role, spec, slot?, exempt? }].
+ * THE one list: every check that asks "is this file unit-tested, and where is its spec" asks it here. What the unit run MEASURES is
+ * logicRoles over the coverage-required slots (coverage-scope.mjs), not this list.
  */
 export const unitRolesOf = (manifest) => manifest.ruleParams.be.unitRoles;
 
-/** Shape problems of ruleParams.be.unitRoles: unique roles of the suffix vocabulary, each spec `<role>.spec` and coverage `<glob>/*.<role>.ts`. */
+/** The roles that carry logic (ruleParams.be.logicRoles): measured at 100 per file inside a coverage-required slot. */
+export const logicRolesOf = (manifest) => manifest.ruleParams.be.logicRoles;
+
+/** The roles a feature-tier file is judged thin by (ruleParams.be.thinRoles, R203 BE_FEATURE_THIN). */
+export const thinRolesOf = (manifest) => manifest.ruleParams.be.thinRoles;
+
+/** Shape problems of ruleParams.be.unitRoles: unique roles of the suffix vocabulary, each spec `<role>.spec`. */
 export function unitRolesProblems(be) {
   const roles = be.unitRoles;
-  const roleOk = (r) => r !== null && typeof r === 'object' && !Array.isArray(r) && Object.keys(r).every((k) => ['role', 'spec', 'slot', 'coverage', 'exempt'].includes(k)) && NAME.test(String(r.role)) && String(r.spec) === `${r.role}.spec` && typeof r.coverage === 'string' && r.coverage.endsWith(`/*.${r.role}.ts`) && (r.slot === undefined || /^be\.[a-z0-9.-]+$/.test(String(r.slot))) && (r.exempt === undefined || (Array.isArray(r.exempt) && r.exempt.every((c) => /^[A-Z][A-Z0-9_]+$/.test(String(c)))));
-  if (!Array.isArray(roles) || !roles.length || !roles.every(roleOk) || new Set(roles.map((r) => r.role)).size !== roles.length) return ['ruleParams.be.unitRoles must be a non-empty list of unique {role, spec: <role>.spec, coverage: <be glob ending /*.<role>.ts>, slot?, exempt?: [rule codes]}'];
+  const roleOk = (r) => r !== null && typeof r === 'object' && !Array.isArray(r) && Object.keys(r).every((k) => ['role', 'spec', 'slot', 'exempt'].includes(k)) && NAME.test(String(r.role)) && String(r.spec) === `${r.role}.spec` && (r.slot === undefined || /^be.[a-z0-9.-]+$/.test(String(r.slot))) && (r.exempt === undefined || (Array.isArray(r.exempt) && r.exempt.every((c) => /^[A-Z][A-Z0-9_]+$/.test(String(c)))));
+  if (!Array.isArray(roles) || !roles.length || !roles.every(roleOk) || new Set(roles.map((r) => r.role)).size !== roles.length) return ['ruleParams.be.unitRoles must be a non-empty list of unique {role, spec: <role>.spec, slot?, exempt?: [rule codes]}'];
   if (Array.isArray(be.suffixes) && roles.some((r) => !be.suffixes.includes(r.role))) return ['ruleParams.be.unitRoles names a role that is not in ruleParams.be.suffixes'];
   return [];
+}
+
+/** Shape problems of ruleParams.be.logicRoles and thinRoles: each a non-empty list of unique roles of the suffix vocabulary; every unit role is a logic role. */
+export function roleListProblems(be) {
+  const bad = [];
+  for (const key of ['logicRoles', 'thinRoles']) {
+    const list = be[key];
+    if (!strList(list) || !list.length || new Set(list).size !== list.length || !list.every((role) => NAME.test(role))) bad.push(`ruleParams.be.${key} must be a non-empty list of unique kebab-case roles`);
+    else if (Array.isArray(be.suffixes) && list.some((role) => !be.suffixes.includes(role))) bad.push(`ruleParams.be.${key} names a role that is not in ruleParams.be.suffixes`);
+  }
+  if (strList(be.logicRoles) && Array.isArray(be.unitRoles) && be.unitRoles.some((r) => r?.slot === undefined && !be.logicRoles.includes(r?.role))) bad.push('every ruleParams.be.unitRoles role that is not tied to a slot is a logic role (ruleParams.be.logicRoles)');
+  return bad;
 }
 /** The kind of a manifest and of a declaration that describes the StarCi runtime repository; also its one profile. */
 export const RUNTIME_KIND = 'runtime';
@@ -57,7 +78,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'coverage'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy'];
 
@@ -86,6 +107,11 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (!NAME.test(String(slot.tier))) bad.push(`${at}: tier must be a tier name, none or inherit`);
   if (!TESTS.includes(slot.tests)) bad.push(`${at}: tests must be one of ${TESTS.join(', ')}`);
   if (slot.owner !== undefined && typeof slot.owner !== 'boolean') bad.push(`${at}: owner must be a boolean`);
+  if (!runtime) {
+    const measured = Array.isArray(slot.profiles) && slot.profiles.includes('be') && slot.tracked === 'tracked';
+    if (measured && !COVERAGE.includes(slot.coverage)) bad.push(`${at}: coverage must be one of ${COVERAGE.join(', ')} (every tracked slot of the be profile declares it)`);
+    if (!measured && slot.coverage !== undefined) bad.push(`${at}: coverage belongs to a tracked slot of the be profile only`);
+  }
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.trigger !== undefined && !NAME.test(String(slot.trigger))) bad.push(`${at}: trigger must be a trigger kind name`);
   if (slot.pattern !== undefined && !NAME.test(String(slot.pattern))) bad.push(`${at}: pattern must be a pattern name`);

@@ -163,6 +163,9 @@ files:
     slot: be.platform
     role: "The one relay loop the event bus and the queues share: read, deliver and mark in one transaction."
     template: outbox/platform/outbox-relay.policy.ts.tpl
+  - path: src/modules/platform/outbox/outbox-relay.policy.spec.ts
+    slot: be.platform
+    template: outbox/platform/outbox-relay.policy.spec.ts.tpl
   - path: src/modules/platform/event-bus/errors/event-bus.error.ts
     slot: be.platform.event-bus
     template: event-bus/platform/errors/event-bus.error.ts.tpl
@@ -200,6 +203,9 @@ files:
   - path: src/modules/platform/event-bus/event-envelope.policy.ts
     slot: be.platform.event-bus
     template: event-bus/platform/event-envelope.policy.ts.tpl
+  - path: src/modules/platform/event-bus/event-envelope.policy.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event-envelope.policy.spec.ts.tpl
   - path: src/modules/platform/event-bus/event-relay.service.spec.ts
     slot: be.platform.event-bus
     template: event-bus/platform/event-relay.service.spec.ts.tpl
@@ -221,6 +227,9 @@ files:
     slot: be.platform.event-bus
     role: "Topics, attempts and backoff."
     template: event-bus/platform/event.policy.ts.tpl
+  - path: src/modules/platform/event-bus/event.policy.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/event.policy.spec.ts.tpl
   - path: src/modules/platform/event-bus/index.ts
     slot: be.platform.event-bus
     template: event-bus/platform/index.ts.tpl
@@ -228,6 +237,9 @@ files:
     slot: be.platform.event-bus
     role: "The one kafkajs importer."
     template: event-bus/platform/kafka-event-transport.client.ts.tpl
+  - path: src/modules/platform/event-bus/kafka-event-transport.client.spec.ts
+    slot: be.platform.event-bus
+    template: event-bus/platform/kafka-event-transport.client.spec.ts.tpl
   - path: src/modules/platform/event-bus/messages/event-bus.messages.ts
     slot: be.domain.messages
     template: event-bus/platform/messages/event-bus.messages.ts.tpl

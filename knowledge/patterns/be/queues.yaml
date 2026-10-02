@@ -119,6 +119,9 @@ files:
     slot: be.platform
     role: "The one relay loop the event bus and the queues share: read, deliver and mark in one transaction."
     template: outbox/platform/outbox-relay.policy.ts.tpl
+  - path: src/modules/platform/outbox/outbox-relay.policy.spec.ts
+    slot: be.platform
+    template: outbox/platform/outbox-relay.policy.spec.ts.tpl
   - path: src/modules/platform/queue/index.ts
     slot: be.platform.queue
     role: "Public surface of the capability (ports, config, module, entity arrays)."
@@ -157,6 +160,9 @@ files:
     slot: be.platform.queue
     role: "Attempts, backoff and retention of BullMQ jobs."
     template: queues/platform/queue.policy.ts.tpl
+  - path: src/modules/platform/queue/queue.policy.spec.ts
+    slot: be.platform.queue
+    template: queues/platform/queue.policy.spec.ts.tpl
   - path: src/modules/platform/queue/queue.log-events.ts
     slot: be.platform.queue
     template: queues/platform/queue.log-events.ts.tpl
@@ -164,6 +170,9 @@ files:
     slot: be.platform.queue
     role: "The one bullmq importer."
     template: queues/platform/bullmq-queue-transport.client.ts.tpl
+  - path: src/modules/platform/queue/bullmq-queue-transport.client.spec.ts
+    slot: be.platform.queue
+    template: queues/platform/bullmq-queue-transport.client.spec.ts.tpl
   - path: src/modules/platform/queue/queue-outbox.service.ts
     slot: be.platform.queue
     role: "Writes a job row through the caller's tx."

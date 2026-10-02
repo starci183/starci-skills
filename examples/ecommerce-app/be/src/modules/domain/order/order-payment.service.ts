@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import { OrderExpiredEvent, OrderPaidEvent } from "@modules/events/order"
+import { ORDER_PAYMENT_WINDOW_MS, isExpireOrdersPayload } from "@modules/queues/order-expiry"
 import { ReceiptQueue } from "@modules/queues/receipt"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
@@ -21,6 +22,9 @@ import { EXPIRE_PENDING_ORDERS_PLACED_BEFORE, MARK_ORDER_PAID_IF_PENDING } from 
 
 /** The inbox source of the payment confirmations this service consumes from billing. */
 const BILLING_SOURCE = "billing-payment-confirmed"
+
+/** The most orders one sweep expires; a longer backlog is worked off by the next ticks. */
+const EXPIRY_BATCH = 100
 
 /** What the payment update answers: the buyer and the total of the order it moved to paid. */
 interface PaidOrderRow {
@@ -63,13 +67,17 @@ export class OrderPaymentService {
         }
     }
 
-    /** Expires the orders pending for at least `olderThanMs` and announces each one; answers how many it expired. */
+    /**
+     * Expires the orders pending past the payment window and announces each one; answers how many it expired. The window is
+     * the `olderThanMs` an expire-orders payload carries, else the default payment window; one run expires at most EXPIRY_BATCH.
+     */
     expireOverdue(params: ExpireOverdueOrdersParams): Promise<ExpireOverdueOrdersResult> {
+        const olderThanMs = isExpireOrdersPayload(params.payload) ? params.payload.olderThanMs : ORDER_PAYMENT_WINDOW_MS
         return this.entityManager.transaction(async (manager) => {
             const now = this.clock.now()
             const expired: Array<ExpiredOrderRow> = await manager.query(EXPIRE_PENDING_ORDERS_PLACED_BEFORE, [
-                new Date(now.getTime() - params.olderThanMs),
-                params.limit,
+                new Date(now.getTime() - olderThanMs),
+                EXPIRY_BATCH,
             ])
             const at = now.toISOString()
             for (const row of expired) {

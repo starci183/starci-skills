@@ -1,4 +1,4 @@
-// The per-service coverage law, proven by running jest itself: every `*.service.ts` must reach 100 on lines, branches,
+// The per-file coverage law, proven by running jest itself: every file of a measured logic role (a service, a guard) must reach 100 on lines, branches,
 // functions and statements ON ITS OWN. A large fully covered service cannot carry a small one that misses a single branch,
 // however high the average is. The fixture app lives in a temporary folder inside this package (so jest, ts-jest and
 // typescript resolve from this package's own devDependencies; no link is ever made) and is removed afterwards.
@@ -32,13 +32,13 @@ function runFixture(t, missBranch) {
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true }); fs.writeFileSync(path.join(app, rel), text); };
   write('package.json', JSON.stringify({ name: 'coverage-fixture', private: true }));
   write('tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', strict: true, esModuleInterop: true, isolatedModules: true } }));
-  write('jest.config.cjs', `const preset = require(${JSON.stringify(path.join(here, 'index.cjs'))})\nmodule.exports = preset.starciJestConfig()\n`);
+  write('jest.config.cjs', `const preset = require(${JSON.stringify(path.join(here, 'index.cjs'))})\nmodule.exports = preset.starciJestConfig({ coverage: { roots: ['src/modules/*/'], roles: ['service', 'guard'], excludes: ['src/modules/*/persistence/**'] } })\n`);
   fs.mkdirSync(path.join(app, 'apps'), { recursive: true });
   // A large service, fully covered, and a small one: together the average is far above 99.
-  write('src/big.service.ts', service('BigService', 40, false));
-  write('src/big.service.spec.ts', spec('BigService', 'big.service', 40, false));
-  write('src/small.service.ts', service('SmallService', 1, missBranch));
-  write('src/small.service.spec.ts', spec('SmallService', 'small.service', 1, missBranch));
+  write('src/modules/big/big.service.ts', service('BigService', 40, false));
+  write('src/modules/big/big.service.spec.ts', spec('BigService', 'big.service', 40, false));
+  write('src/modules/big/small.service.ts', service('SmallService', 1, missBranch));
+  write('src/modules/big/small.service.spec.ts', spec('SmallService', 'small.service', 1, missBranch));
   return spawnSync(process.execPath, [jestBin, '--selectProjects', 'unit', '--coverage', '--ci', '--coverageReporters=text-summary'], { cwd: app, encoding: 'utf8', timeout: 300_000 });
 }
 
@@ -51,4 +51,25 @@ test('one service below 100 fails the run although the average across services i
 test('every service at 100 passes', (t) => {
   const r = runFixture(t, false);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+});
+
+test('a guard (a logic role other than service) below 100 fails the run, and a none directory inside a root is never measured', (t) => {
+  const app = fs.mkdtempSync(path.join(here, '.coverage-fixture-'));
+  t.after(() => fs.rmSync(app, { recursive: true, force: true }));
+  const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(app, rel)), { recursive: true }); fs.writeFileSync(path.join(app, rel), text); };
+  write('package.json', JSON.stringify({ name: 'coverage-fixture', private: true }));
+  write('tsconfig.json', JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', strict: true, esModuleInterop: true, isolatedModules: true } }));
+  write('jest.config.cjs', `const preset = require(${JSON.stringify(path.join(here, 'index.cjs'))})\nmodule.exports = preset.starciJestConfig({ coverage: { roots: ['src/modules/*/'], roles: ['service', 'guard'], excludes: ['src/modules/*/persistence/**'] } })\n`);
+  fs.mkdirSync(path.join(app, 'apps'), { recursive: true });
+  write('src/modules/a/a.guard.ts', 'export class AGuard {\n  pick(flag: boolean): string {\n    if (flag) return "yes"\n    return "no"\n  }\n}\n');
+  write('src/modules/a/a.guard.spec.ts', 'import { AGuard } from "./a.guard"\n\ndescribe("AGuard", () => {\n  it("works", () => {\n    expect(new AGuard().pick(false)).toBe("no")\n  })\n})\n');
+  write('src/modules/a/persistence/p.service.ts', 'export class PService {\n  unused(): number {\n    return 1\n  }\n}\n');
+  const run = () => spawnSync(process.execPath, [jestBin, '--selectProjects', 'unit', '--coverage', '--ci', '--coverageReporters=text-summary'], { cwd: app, encoding: 'utf8', timeout: 300_000 });
+  const failed = run();
+  assert.notEqual(failed.status, 0, `jest must fail: ${failed.stdout}\n${failed.stderr}`);
+  assert.match(`${failed.stdout}\n${failed.stderr}`, /a\.guard\.ts/, 'the failure names the guard');
+  assert.doesNotMatch(`${failed.stdout}\n${failed.stderr}`, /p\.service\.ts/, 'the none directory is not measured');
+  write('src/modules/a/a.guard.spec.ts', 'import { AGuard } from "./a.guard"\n\ndescribe("AGuard", () => {\n  it("takes both paths", () => {\n    expect(new AGuard().pick(false)).toBe("no")\n    expect(new AGuard().pick(true)).toBe("yes")\n  })\n})\n');
+  const passed = run();
+  assert.equal(passed.status, 0, `${passed.stdout}\n${passed.stderr}`);
 });

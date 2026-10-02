@@ -1,9 +1,7 @@
 import { Module } from "@nestjs/common"
 import { SeedCli } from "./seed.cli"
-import { READ_SEED_FILES, RunSeedsCli, readSeedFiles } from "./subs/run.cli"
+import { RunSeedsCli } from "./subs/run.cli"
 
-@Module({
-    providers: [SeedCli, RunSeedsCli, { provide: READ_SEED_FILES, useValue: readSeedFiles }],
-})
-/** The seed group: its command, its sub-commands and the seed file reader; the connections come from the database capability. */
+@Module({ providers: [SeedCli, RunSeedsCli] })
+/** The seed group: its command and its sub-commands; the connections and the seed file reader come from the database capability. */
 export class SeedModule {}

@@ -3,7 +3,7 @@ import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventBus, EventConsumerRegistry } from "./event-bus.port"
-import type { EventTransport } from "./event-transport.port"
+import type { EventTransport, KafkaFactory } from "./event-transport.port"
 
 /** Token of the options of the event bus, exported so a spec can provide it. */
 export const EVENT_BUS_OPTIONS: unique symbol = Symbol("platform.event-bus.options")
@@ -19,6 +19,9 @@ export const EVENT_TRANSPORT: unique symbol = Symbol("platform.event-bus.transpo
 
 /** Token of the entity managers of the connections whose outbox the relay reads, in the order the options name them. */
 export const EVENT_RELAY_MANAGERS: unique symbol = Symbol("platform.event-bus.relay-managers")
+
+/** Token of the factory that builds the Kafka driver, exported so a spec can provide it. */
+export const KAFKA_FACTORY: unique symbol = Symbol("platform.event-bus.kafka-factory")
 
 /** Injects the options of the event bus. Parameter type: EventBusOptions. */
 export const InjectEventBusOptions = (): TypedParameterDecorator<EventBusOptions> =>
@@ -38,3 +41,6 @@ export const InjectEventTransport = (): TypedParameterDecorator<EventTransport> 
 /** Injects the entity managers the relay reads the outbox of. Parameter type: ReadonlyArray<EntityManager>. */
 export const InjectEventRelayManagers = (): TypedParameterDecorator<ReadonlyArray<EntityManager>> =>
     injector<ReadonlyArray<EntityManager>>(EVENT_RELAY_MANAGERS)
+
+/** Injects the factory that builds the Kafka driver. Parameter type: KafkaFactory. */
+export const InjectKafkaFactory = (): TypedParameterDecorator<KafkaFactory> => injector<KafkaFactory>(KAFKA_FACTORY)
