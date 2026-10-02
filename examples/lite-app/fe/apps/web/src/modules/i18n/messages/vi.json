@@ -6,7 +6,23 @@
     },
     "home": {
       "title": "Home",
-      "signedIn": "Signed in"
+      "signedIn": "Signed in",
+      "resources": "Resources: {count}",
+      "bookings": "Bookings: {count}",
+      "unavailable": "unavailable"
+    },
+    "booking": {
+      "title": "Booking workspace",
+      "resource": "Resource id",
+      "booking": "Booking id",
+      "addResource": "Add resource",
+      "addBooking": "Add booking",
+      "working": "Saving",
+      "created": "Saved",
+      "refused": "Sign in before changing bookings.",
+      "not-found": "The requested record was not found.",
+      "invalid": "Use a non-empty id that has not already been registered.",
+      "unavailable": "The booking service is unavailable."
     },
     "signIn": {
       "title": "Sign in",
@@ -18,6 +34,14 @@
       "not-found": "The credentials were refused.",
       "invalid": "Enter a valid email and password.",
       "unavailable": "Sign-in is unavailable. Try again shortly."
+    },
+    "signOut": {
+      "submit": "Sign out",
+      "working": "Signing out",
+      "refused": "The session has already ended.",
+      "not-found": "The session has already ended.",
+      "invalid": "The session could not be ended.",
+      "unavailable": "Sign-out is unavailable. Try again shortly."
     },
     "loading": {
       "message": "Loading"

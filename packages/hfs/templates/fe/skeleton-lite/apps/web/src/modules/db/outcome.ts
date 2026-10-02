@@ -1,11 +1,20 @@
-import { outcomeFailure, outcomeOk } from "@/modules/api/outcome"
-import type { Outcome, OutcomeFailure, OutcomeFailureKind, OutcomeOk } from "@/modules/api/outcome"
-
 /** Failure kinds exposed by the database boundary. */
-export type DbFailureKind = OutcomeFailureKind
+export type DbFailureKind = "refused" | "not-found" | "invalid" | "unavailable"
 
-/** The app outcome specialized for a database or Auth operation. */
-export type DbOutcome<T> = Outcome<T>
+/** A successful database or Auth operation. */
+export interface DbOk<T> {
+    readonly kind: "ok"
+    readonly value: T
+}
+
+/** An expected database or Auth failure. */
+export interface DbFailure {
+    readonly kind: DbFailureKind
+    readonly code: string
+}
+
+/** The app's one result vocabulary, owned by the lite database transport. */
+export type DbOutcome<T> = DbOk<T> | DbFailure
 
 /** The structural part of a Supabase error this boundary interprets. */
 interface SupabaseFailure {
@@ -21,12 +30,12 @@ export interface SupabaseResult {
 }
 
 /** The non-null data carried by one concrete SDK result. */
-type SupabaseData<T extends SupabaseResult> = NonNullable<T["data"]>
+export type SupabaseData<T extends SupabaseResult> = NonNullable<T["data"]>
 
 /** Wraps a value as a successful outcome. */
-export const dbOk = <T>(value: T): OutcomeOk<T> => outcomeOk(value)
+export const dbOk = <T>(value: T): DbOk<T> => ({ kind: "ok", value })
 /** Builds a refusal without throwing across a Server Action boundary. */
-export const dbFailure = (kind: DbFailureKind, code: string): OutcomeFailure => outcomeFailure(kind, code)
+export const dbFailure = (kind: DbFailureKind, code: string): DbFailure => ({ kind, code })
 
 const hasSignal = (error: SupabaseFailure, signals: ReadonlyArray<string>): boolean => {
     const values = [error.code, error.status === undefined ? undefined : String(error.status)]

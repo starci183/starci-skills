@@ -5,7 +5,10 @@ import { SiteShell } from "@/components/composites/SiteShell"
 import { siteUrl } from "@/modules/config"
 import { APP_ROUTES } from "@/modules/routes"
 
-type AppLayoutProps = { readonly content: ReactNode }
+type AppLayoutProps = {
+    readonly locale: string
+    readonly content: ReactNode
+}
 
 /** The document title and absolute metadata base for the requested locale. */
 export const appLayoutMetadata = async (locale: string): Promise<Metadata> => {
@@ -14,4 +17,15 @@ export const appLayoutMetadata = async (locale: string): Promise<Metadata> => {
 }
 
 /** The server-resolved app chrome around the routed body. */
-{{> fe/common/app-layout.tsx.partial}}
+export const AppLayout = async (props: AppLayoutProps) => {
+    const t = await getTranslations("app.shell")
+    return (
+        <html lang={props.locale}>
+            <body>
+                <SiteShell brand={t("brand")} homeHref={APP_ROUTES.home}>
+                    {props.content}
+                </SiteShell>
+            </body>
+        </html>
+    )
+}

@@ -1,3 +1,5 @@
+import "server-only"
+
 import { cache } from "react"
 import { createServerDbClient } from "./server"
 import { dbFailure, dbOk, toOutcome } from "./outcome"

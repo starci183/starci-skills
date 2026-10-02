@@ -1,9 +1,12 @@
+import { hasLocale } from "next-intl"
+import { getMessages, setRequestLocale } from "next-intl/server"
+import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import { AppLayout, appLayoutMetadata } from "@/features/layouts/AppLayout"
-import { readLocaleSegment } from "@/modules/i18n/request"
+import { PRODUCT_TIME_ZONE, routing } from "@/modules/i18n"
 import { Providers } from "./providers"
 import "../globals.css"
-import "../../modules/brand/brand.css"
+import "@/modules/brand"
 
 type LayoutProps = {
     readonly children: ReactNode
@@ -15,15 +18,19 @@ export const generateMetadata = async (props: LayoutProps) => appLayoutMetadata(
 
 /** The locale segment's document, providers and app chrome. */
 const Layout = async (props: LayoutProps) => {
-    const locale = await readLocaleSegment(props.params)
+    const { locale } = await props.params
+    if (!hasLocale(routing.locales, locale)) notFound()
+    setRequestLocale(locale)
+    const messages = await getMessages()
     return (
-        <html lang={locale.locale}>
-            <body>
-                <Providers {...locale}>
-                    <AppLayout content={props.children} />
+        <AppLayout
+            locale={locale}
+            content={
+                <Providers locale={locale} messages={messages} timeZone={PRODUCT_TIME_ZONE}>
+                    {props.children}
                 </Providers>
-            </body>
-        </html>
+            }
+        />
     )
 }
 

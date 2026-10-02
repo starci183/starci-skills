@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
-import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { acceptRowDelivery, findRowIdentity, InjectPrimaryEntityManager } from "@modules/platform/database"
 import type { {{Name}}Row } from "./persistence/{{name}}.rows"
 import { FIND_{{upper}} } from "./persistence/{{name}}.sql"
 
@@ -18,13 +18,12 @@ export class {{Name}}Service {
     constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
     /** Answers the requested row identity without exposing persistence types to the feature. */
-    async {{nameCamel}}(request: {{Name}}Request): Promise<{{Name}}Result> {
-        const rows: Array<Pick<{{Name}}Row, "id">> = await this.entityManager.query(FIND_{{upper}}, [request.id])
-        return { id: rows[0]?.id ?? request.id }
+    {{nameCamel}}(request: {{Name}}Request): Promise<{{Name}}Result> {
+        return findRowIdentity<{{Name}}Row>(this.entityManager, FIND_{{upper}}, request.id)
     }
 
     /** Accepts one {{singular}} delivery idempotently at the database boundary. */
     async accept{{Singular}}Delivery(delivery: {{Name}}Request): Promise<void> {
-        await this.entityManager.query(FIND_{{upper}}, [delivery.id])
+        await acceptRowDelivery(this.entityManager, FIND_{{upper}}, delivery.id)
     }
 }

@@ -1,6 +1,5 @@
-export { createBrowserDbClient } from "./browser"
-export { getPrincipal } from "./principal"
-export type { Principal } from "./principal"
-export { createServerDbClient } from "./server"
-export { toOutcome } from "./outcome"
-export type { DbFailureKind, DbOutcome } from "./outcome"
+import "server-only"
+
+export { exchangeAuthCode, readSession, refreshSession } from "./auth/read-session"
+export { readBookings } from "./bookings/read-bookings"
+export { readResources } from "./resources/read-resources"

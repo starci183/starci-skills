@@ -1,6 +1,8 @@
+import "server-only"
+
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
-import { exchangeAuthCode } from "@/modules/db/auth/read-session"
+import { exchangeAuthCode } from "@/modules/db"
 import { APP_ROUTES } from "@/modules/routes"
 
 const destinationOf = (request: NextRequest): URL => {

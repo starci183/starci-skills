@@ -25,16 +25,13 @@
           "provider": "supabase"
         }
       ],
+      "reads": ["supabase/types/"],
       "patterns": ["webhooks"]
     },
     "fe": {
       "apps": [
         {
           "name": "web",
-          "kind": "next"
-        },
-        {
-          "name": "landing",
           "kind": "next"
         }
       ],

@@ -2,7 +2,7 @@ import createMiddleware from "next-intl/middleware"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { sessionCookieOptions } from "@/modules/config"
-import { refreshSession } from "@/modules/db/auth/read-session"
+import { refreshSession } from "@/modules/db"
 import { routing } from "@/modules/i18n"
 import { APP_ROUTES } from "@/modules/routes"
 

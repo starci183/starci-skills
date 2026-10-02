@@ -3,4 +3,4 @@ import { BookingsHandler } from "./application/bookings.handler"
 
 @Module({ providers: [BookingsHandler] })
 /** The bookings feature: the handlers of its application. */
-export class BookingsModule {}
+export class BookingsApiModule {}

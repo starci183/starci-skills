@@ -10,8 +10,11 @@ export interface DatabaseConnectionConfig {
     readonly url: Secret
 }
 
-/** A runtime connection has no entity or migration registry in lite. */
-export type DatabaseConnectionOptions = DatabaseConnectionConfig
+/** Runtime connection options add only the isolated PostgreSQL schema; lite has no entity or migration registry. */
+export interface DatabaseConnectionOptions extends DatabaseConnectionConfig {
+    /** The schema named by the `hfs.json` isolation contract. */
+    readonly schema?: string
+}
 
 /** Options of the database capability. */
 export interface DatabaseOptions {

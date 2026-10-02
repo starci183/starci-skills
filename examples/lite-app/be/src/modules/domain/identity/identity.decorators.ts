@@ -1,8 +1,9 @@
 import { SetMetadata, createParamDecorator } from "@nestjs/common"
 import type { ExecutionContext } from "@nestjs/common"
 import { requestOf } from "@modules/platform/http-security"
+import type { Principal } from "@modules/platform/cqrs"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
-import type { Principal, PublicMetadata } from "./identity.contracts"
+import type { PublicMetadata } from "./identity.contracts"
 
 /** Metadata key of `@Public`. */
 export const PUBLIC_KEY = "domain.identity.public"

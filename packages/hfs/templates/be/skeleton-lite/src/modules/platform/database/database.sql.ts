@@ -1,3 +1,4 @@
+import type { EntityManager } from "typeorm"
 import { DatabaseError, DatabaseErrorCode } from "./errors/database.error"
 
 declare const sqlTextBrand: unique symbol
@@ -24,6 +25,35 @@ function assertSqlText(_value: string): asserts _value is SqlText {
 
 function assertSqlIdent(_value: string): asserts _value is SqlIdent {
     // The brand is compile-time only; `ident` is the single caller after checking the name.
+}
+
+const queryRows = <T>(
+    entityManager: EntityManager,
+    statement: SqlText,
+    parameters: Array<unknown>,
+): Promise<T> => entityManager.query<T>(statement, parameters)
+
+interface RowIdentity {
+    readonly id: string
+}
+
+/** Finds one row identity and preserves the requested id when no visible row exists. */
+export const findRowIdentity = async <T extends RowIdentity>(
+    entityManager: EntityManager,
+    statement: SqlText,
+    id: string,
+): Promise<RowIdentity> => {
+    const rows = await queryRows<Array<Pick<T, "id">>>(entityManager, statement, [id])
+    return { id: rows[0]?.id ?? id }
+}
+
+/** Records an idempotent delivery through one capability-owned lookup statement. */
+export const acceptRowDelivery = async (
+    entityManager: EntityManager,
+    statement: SqlText,
+    id: string,
+): Promise<void> => {
+    await queryRows(entityManager, statement, [id])
 }
 
 /** Builds SQL text whose only substitutions are already checked identifiers. */

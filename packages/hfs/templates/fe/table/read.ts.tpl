@@ -7,7 +7,7 @@ import { toOutcome } from "../outcome"
 import type { DbOutcome } from "../outcome"
 
 /** One {{table}} row from the generated database contract. */
-export type {{Name}}Row = Database["public"]["Tables"]["{{table}}"]["Row"]
+type {{Name}}Row = Database["public"]["Tables"]["{{table}}"]["Row"]
 
 /** Reads a bounded page of {{table}} rows visible to the current RLS principal. */
 export const read{{Name}} = cache(async (): Promise<DbOutcome<ReadonlyArray<{{Name}}Row>>> => {

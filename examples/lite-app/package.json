@@ -17,12 +17,12 @@
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
     "jose": "6.2.12",
+    "nest-commander": "3.21.0",
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "tslib": "^2.8.1",
-    "typeorm": "^0.3.20",
-    "nest-commander": "3.21.0"
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@starci/eslint-canon-be": "3.0.9",
@@ -53,13 +53,11 @@
   "scripts": {
     "prepare": "husky",
     "dev:be": "cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/api/src/main.ts",
-    "dev:fe:web": "turbo run dev --filter=@lite-app/web",
-    "dev:fe:landing": "turbo run dev --filter=@lite-app/landing",
+    "dev:fe": "turbo run dev --filter=@lite-app/web",
     "start:api": "node be/dist/apps/api/src/main.js",
     "cli": "node be/dist/apps/cli/src/main.js",
     "migrate": "node be/dist/apps/cli/src/main.js migrate run",
     "start:web": "npm run start -w @lite-app/web",
-    "start:landing": "npm run start -w @lite-app/landing",
     "docker:build": "npm run docker:build:api && npm run docker:build:cli",
     "docker:build:api": "docker build -f be/apps/api/Dockerfile -t lite-app/api:dev .",
     "docker:build:cli": "docker build -f be/apps/cli/Dockerfile -t lite-app/cli:dev .",

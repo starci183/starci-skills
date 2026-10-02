@@ -2,8 +2,9 @@ import { Injectable } from "@nestjs/common"
 import type { CanActivate, ExecutionContext } from "@nestjs/common"
 import type { Reflector } from "@nestjs/core"
 import { InjectSupabaseAccessTokenVerifier } from "@modules/integrations/supabase"
-import type { SupabasePrincipal, VerifySupabaseAccessToken } from "@modules/integrations/supabase"
+import type { VerifySupabaseAccessToken } from "@modules/integrations/supabase"
 import { InjectReflector } from "@modules/platform/composition"
+import type { Principal } from "@modules/platform/cqrs"
 import { requestOf } from "@modules/platform/http-security"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import { admit } from "./admission.policy"
@@ -31,7 +32,7 @@ export class AuthGuard implements CanActivate {
             context.getHandler(),
             context.getClass(),
         ])
-        let principal: SupabasePrincipal | undefined
+        let principal: Principal | undefined
         if (metadata === undefined) {
             const request = requestOf(context)
             const token = bearerToken(request.headers.authorization)

@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsString, MaxLength } from "class-validator"
 
 /** The bounded HTTP request of bookings. */
-export class BookingsRequestDto {
+export class BookingsRequest {
     /** The id of the subject. */
     @IsString()
     @IsNotEmpty()

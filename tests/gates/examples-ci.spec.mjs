@@ -87,7 +87,7 @@ test('the root codecov.yml holds one component per service app of each example p
   const ids = root.component_management.individual_components.map((component) => component.component_id);
   assert.deepEqual(ids.filter((id) => id.startsWith('ecommerce-app-')), ['ecommerce-app-identity', 'ecommerce-app-order', 'ecommerce-app-billing', 'ecommerce-app-platform']);
   assert.deepEqual(ids.filter((id) => id.startsWith('shape-slot-')), ['shape-slot-core', 'shape-slot-platform']);
-  for (const app of exampleApps(ROOT)) {
+  for (const app of coverageExampleApps(ROOT)) {
     const own = parseYaml(fs.readFileSync(path.join(ROOT, 'examples', app, 'codecov.yml'), 'utf8')).component_management.individual_components;
     const mine = root.component_management.individual_components.filter((component) => component.component_id.startsWith(`${app}-`));
     assert.deepEqual(mine.map((component) => component.paths), own.map((component) => component.paths.map((glob) => `examples/${app}/${glob}`)), `${app}: root components = the app's own`);

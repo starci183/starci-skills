@@ -1,4 +1,5 @@
 "use server"
+import "server-only"
 
 import { getPrincipal } from "../principal"
 import { createServerDbClient } from "../server"
