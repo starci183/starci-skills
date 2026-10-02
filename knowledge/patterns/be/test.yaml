@@ -38,7 +38,8 @@ rules:
       Four test kinds exist and the folder and the file suffix always agree. Unit covers exactly the unit-tested roles that
       `ruleParams.be.unitRoles` of knowledge/hfs/slots.yaml lists: `<name>.service.spec.ts` beside its `<name>.service.ts`, and
       `<name>.cli.spec.ts` beside its `<name>.cli.ts` under `src/features/cli/` (a cli command is an action runner, cli.yaml).
-      No other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `be/src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
+      No other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside the `be.tests.e2e`, `be.tests.integration`,
+      `be.tests.contract` and `be.tests.world` slots is a finding, including specs in apps.
       Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (capability modules on the real infrastructure,
       no HTTP door of ours, through `useTestWorld({ modules })`; real peer apps the client calls join as `apps`; every integration
       of `src/modules/integrations/<provider>/` has one, R112). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
@@ -50,12 +51,12 @@ rules:
       library behind toxiproxy, with images and versions read from the stack at run time; `be/src/tests/fixtures/` holds typed
       doubles and builders. There is no `live/` folder and no `be/src/tests/e2e/world`. One `be/jest.config.js` uses the
       preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit
-      project maps no module into `be/src/tests/{world,integration,e2e,contract}`. Scripts are `test` (unit), `test:integration`,
+      project maps no module into the `be.tests.world`, `be.tests.integration`, `be.tests.e2e` or `be.tests.contract` slots. Scripts are `test` (unit), `test:integration`,
       `test:e2e` and `test:contract`, each of the last three `npm run typecheck:tests && jest --selectProjects <name>`;
       `test:contract` is never part of `test` or `test:e2e`. Integration, e2e and contract run by hand: none of their specs,
       code or dependencies enters husky, lint-staged, the default typecheck, coverage, or an automatic CI
-      trigger; a kept e2e workflow is `workflow_dispatch` only. `be/tsconfig.json` excludes `be/src/tests/world`,
-      `be/src/tests/integration`, `be/src/tests/e2e` and `be/src/tests/contract`, `be/src/tests/tsconfig.json` backs `typecheck:tests`,
+      trigger; a kept e2e workflow is `workflow_dispatch` only. `be/tsconfig.json` excludes the trees of `be.tests.world`,
+      `be.tests.integration`, `be.tests.e2e` and `be.tests.contract`, `be/src/tests/tsconfig.json` backs `typecheck:tests`,
       and coverage and `test` read the unit project only (BE-TEST-13).
     rationale: |-
       One placement rule makes discovery mechanical, and keeping integration, e2e and contract out of the automatic gates keeps the routine

@@ -73,7 +73,7 @@ rules:
     cases:
       - id: case-1
         when: A screen of the console app
-        write: 'a ui-screen record with `app: console` whose implementation cites fe/apps/console.'
+        write: 'a ui-screen record with `app: <app>` whose implementation cites fe/apps/<app>.'
     verification:
       automated:
         - FE_APP_ISOLATION

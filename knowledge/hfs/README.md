@@ -84,7 +84,7 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 | New app kind or protocol | new slot `be.app.<kind>` or `be.transport.<protocol>` | minor |
 | Integration (payment, LLM) | `be/src/modules/integrations/<provider>/` | none |
 | Model code | client in `integrations`, training code in a new slot, weights in an object store | minor |
-| Human documentation | `be/docs/{adr,runbooks,guides}/` or `fe/docs/{adr,runbooks,guides}/` (`repo.docs`, opt-in) | none |
+| Human documentation | slot `repo.docs` (opt-in) | none |
 | Infrastructure | `.starcistacks/<env>/infra/{compose,k8s,terraform}/` | none |
 | Mobile app | a new app-kind slot (an Expo app) | minor |
 | Shared package | `be/packages/<pkg>` or `fe/packages/<pkg>` (`repo.packages`, opt-in, built to `dist`, an npm workspace of the root `package.json`) | none |
@@ -268,64 +268,64 @@ catalog in section 12; the pattern files in `knowledge/patterns/be/` cite them a
 
 <!-- hfs:generated be-tree -->
 ```text
-be/{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js}                                                      required  be.tool-config
-be/nest-cli.json                                                                                                                                     required  be.nest-cli
-be/docs/{adr,runbooks,guides}/**/*.md                                                                                                                opt-in    repo.docs
-be/docs/**/*.{png,svg,webp}                                                                                                                          opt-in    repo.docs-media
-be/packages/<pkg>/                                                                                                                                   opt-in    repo.packages
-be/apps/<app>/Dockerfile                                                                                                                             required  repo.app-image
-be/{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,**/next-env.d.ts,**/*.tsbuildinfo}    optional  repo.build-output
-be/{**/__generated__/,apps/*/src/schema.gql}                                                                                                         optional  repo.generated
-be/contracts/<app>/schema.graphql                                                                                                                    opt-in    be.contract.graphql
-be/contracts/<app>/openapi.json                                                                                                                      opt-in    be.contract.openapi
-be/contracts/<app>/events.json                                                                                                                       opt-in    be.contract.events
-be/contracts/<app>/events.pin.json                                                                                                                   opt-in    be.contract.events.pin
-be/apps/<app>/src/                                                                                                                                   required  be.app.api
-be/apps/<app>/src/                                                                                                                                   opt-in    be.app.worker
-be/apps/<app>/src/                                                                                                                                   opt-in    be.app.cli
-be/src/features/api/<feature>/                                                                                                                       required  be.feature
-be/src/features/{api/,jobs/,reactors/,saga/}<feature>/application/                                                                                   required  be.feature.application
-be/src/features/saga/<saga>/                                                                                                                         opt-in    be.feature.saga
-be/src/features/saga/<saga>/steps/                                                                                                                   opt-in    be.feature.saga.steps
-be/src/features/saga/<saga>/compensations/                                                                                                           opt-in    be.feature.saga.compensations
-be/src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/                                                                           optional  be.feature.application.support
-be/src/features/api/<feature>/transport/http/                                                                                                        optional  be.transport.http
-be/src/features/api/<feature>/transport/graphql/                                                                                                     optional  be.transport.graphql
-be/src/features/{api/,reactors/,saga/}<feature>/transport/message/                                                                                   opt-in    be.transport.message
-be/src/features/webhooks/<provider>/                                                                                                                 opt-in    be.feature.webhooks
-be/src/features/webhooks/<provider>/transport/http/                                                                                                  opt-in    be.feature.webhooks.http
-be/src/features/webhooks/<provider>/transport/http/dto/                                                                                              opt-in    be.feature.webhooks.dto
-be/src/features/realtime/<channel>/                                                                                                                  opt-in    be.feature.realtime
-be/src/features/realtime/<channel>/transport/graphql/                                                                                                opt-in    be.feature.realtime.graphql
-be/src/features/realtime/<channel>/transport/graphql/dto/                                                                                            opt-in    be.feature.realtime.dto
-be/src/features/realtime/<channel>/transport/websocket/                                                                                              opt-in    be.feature.realtime.websocket
-be/src/features/cli/                                                                                                                                 optional  be.cli
-be/src/modules/domain/<capability>/                                                                                                                  optional  be.domain
-be/src/modules/{domain,integrations}/<capability>/errors/                                                                                            optional  be.errors
-be/src/modules/{domain,platform,integrations}/<capability>/messages/                                                                                 optional  be.domain.messages
-be/src/features/api/<feature>/messages/                                                                                                              optional  be.feature.messages
-be/src/modules/{domain,platform,projections}/<capability>/persistence/                                                                               optional  be.persistence
-be/src/modules/platform/<capability>/                                                                                                                required  be.platform
-be/src/modules/platform/event-bus/                                                                                                                   opt-in    be.platform.event-bus
-be/src/modules/platform/queue/                                                                                                                       opt-in    be.platform.queue
-be/src/modules/events/<service>/                                                                                                                     opt-in    be.events
-be/src/modules/queues/<queue>/                                                                                                                       opt-in    be.queues
-be/src/features/reactors/<reactor>/                                                                                                                  opt-in    be.feature.reactors
-be/src/features/jobs/<job>/                                                                                                                          opt-in    be.feature.jobs
-be/src/features/jobs/<job>/transport/queue/                                                                                                          opt-in    be.feature.jobs.queue
-be/src/features/jobs/<job>/steps/                                                                                                                    opt-in    be.jobs.steps
-be/src/modules/platform/jobs/                                                                                                                        opt-in    be.platform.jobs
-be/src/modules/projections/<name>/                                                                                                                   opt-in    be.projections
-be/src/modules/integrations/<provider>/                                                                                                              optional  be.integrations
-be/src/modules/integrations/<provider>/model/                                                                                                        opt-in    be.integrations.model
-be/src/tests/world/                                                                                                                                  optional  be.tests.world
-be/src/tests/world/kit/                                                                                                                              optional  be.tests.world.kit
-be/src/tests/fixtures/                                                                                                                               optional  be.tests.fixtures
-be/src/tests/fixtures/builders/*.builder.ts                                                                                                          optional  be.tests.fixtures.builders
-be/src/tests/fixtures/i18n/                                                                                                                          optional  be.tests.fixtures.i18n
-be/src/tests/integration/<capability>/*.integration-spec.ts                                                                                          optional  be.tests.integration
-be/src/tests/e2e/<area>/*.e2e-spec.ts                                                                                                                optional  be.tests.e2e
-be/src/tests/contract/<provider>/*.contract-spec.ts                                                                                                  optional  be.tests.contract
+be/{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js}                                                    required  be.tool-config
+be/nest-cli.json                                                                                                                                   required  be.nest-cli
+be/docs/{adr,runbooks,guides}/**/*.md                                                                                                              opt-in    repo.docs
+be/docs/**/*.{png,svg,webp}                                                                                                                        opt-in    repo.docs-media
+be/packages/<pkg>/                                                                                                                                 opt-in    repo.packages
+be/apps/<app>/Dockerfile                                                                                                                           required  repo.app-image
+be/{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,**/next-env.d.ts,**/*.tsbuildinfo}  optional  repo.build-output
+be/{**/__generated__/,apps/*/src/schema.gql}                                                                                                       optional  repo.generated
+be/contracts/<app>/schema.graphql                                                                                                                  opt-in    be.contract.graphql
+be/contracts/<app>/openapi.json                                                                                                                    opt-in    be.contract.openapi
+be/contracts/<app>/events.json                                                                                                                     opt-in    be.contract.events
+be/contracts/<app>/events.pin.json                                                                                                                 opt-in    be.contract.events.pin
+be/apps/<app>/src/                                                                                                                                 required  be.app.api
+be/apps/<app>/src/                                                                                                                                 opt-in    be.app.worker
+be/apps/<app>/src/                                                                                                                                 opt-in    be.app.cli
+be/src/features/api/<feature>/                                                                                                                     required  be.feature
+be/src/features/{api/,jobs/,reactors/,saga/}<feature>/application/                                                                                 required  be.feature.application
+be/src/features/saga/<saga>/                                                                                                                       opt-in    be.feature.saga
+be/src/features/saga/<saga>/steps/                                                                                                                 opt-in    be.feature.saga.steps
+be/src/features/saga/<saga>/compensations/                                                                                                         opt-in    be.feature.saga.compensations
+be/src/features/{api/,jobs/,reactors/,saga/}<feature>/application/support/                                                                         optional  be.feature.application.support
+be/src/features/api/<feature>/transport/http/                                                                                                      optional  be.transport.http
+be/src/features/api/<feature>/transport/graphql/                                                                                                   optional  be.transport.graphql
+be/src/features/{api/,reactors/,saga/}<feature>/transport/message/                                                                                 opt-in    be.transport.message
+be/src/features/webhooks/<provider>/                                                                                                               opt-in    be.feature.webhooks
+be/src/features/webhooks/<provider>/transport/http/                                                                                                opt-in    be.feature.webhooks.http
+be/src/features/webhooks/<provider>/transport/http/dto/                                                                                            opt-in    be.feature.webhooks.dto
+be/src/features/realtime/<channel>/                                                                                                                opt-in    be.feature.realtime
+be/src/features/realtime/<channel>/transport/graphql/                                                                                              opt-in    be.feature.realtime.graphql
+be/src/features/realtime/<channel>/transport/graphql/dto/                                                                                          opt-in    be.feature.realtime.dto
+be/src/features/realtime/<channel>/transport/websocket/                                                                                            opt-in    be.feature.realtime.websocket
+be/src/features/cli/                                                                                                                               optional  be.cli
+be/src/modules/domain/<capability>/                                                                                                                optional  be.domain
+be/src/modules/{domain,integrations}/<capability>/errors/                                                                                          optional  be.errors
+be/src/modules/{domain,platform,integrations}/<capability>/messages/                                                                               optional  be.domain.messages
+be/src/features/api/<feature>/messages/                                                                                                            optional  be.feature.messages
+be/src/modules/{domain,platform,projections}/<capability>/persistence/                                                                             optional  be.persistence
+be/src/modules/platform/<capability>/                                                                                                              required  be.platform
+be/src/modules/platform/event-bus/                                                                                                                 opt-in    be.platform.event-bus
+be/src/modules/platform/queue/                                                                                                                     opt-in    be.platform.queue
+be/src/modules/events/<service>/                                                                                                                   opt-in    be.events
+be/src/modules/queues/<queue>/                                                                                                                     opt-in    be.queues
+be/src/features/reactors/<reactor>/                                                                                                                opt-in    be.feature.reactors
+be/src/features/jobs/<job>/                                                                                                                        opt-in    be.feature.jobs
+be/src/features/jobs/<job>/transport/queue/                                                                                                        opt-in    be.feature.jobs.queue
+be/src/features/jobs/<job>/steps/                                                                                                                  opt-in    be.jobs.steps
+be/src/modules/platform/jobs/                                                                                                                      opt-in    be.platform.jobs
+be/src/modules/projections/<name>/                                                                                                                 opt-in    be.projections
+be/src/modules/integrations/<provider>/                                                                                                            optional  be.integrations
+be/src/modules/integrations/<provider>/model/                                                                                                      opt-in    be.integrations.model
+be/src/tests/world/                                                                                                                                optional  be.tests.world
+be/src/tests/world/kit/                                                                                                                            optional  be.tests.world.kit
+be/src/tests/fixtures/                                                                                                                             optional  be.tests.fixtures
+be/src/tests/fixtures/builders/*.builder.ts                                                                                                        optional  be.tests.fixtures.builders
+be/src/tests/fixtures/i18n/                                                                                                                        optional  be.tests.fixtures.i18n
+be/src/tests/integration/<capability>/*.integration-spec.ts                                                                                        optional  be.tests.integration
+be/src/tests/e2e/<area>/*.e2e-spec.ts                                                                                                              optional  be.tests.e2e
+be/src/tests/contract/<provider>/*.contract-spec.ts                                                                                                optional  be.tests.contract
 ```
 <!-- hfs:generated-end be-tree -->
 
@@ -372,7 +372,7 @@ One physical database is one connection (`hfs.json` `sides.be.connections`), one
 one injector `Inject<Conn>EntityManager()` in `platform/database` (R84). The database is reached through that shared
 `EntityManager`, injected with the named injector and called directly: `getRepository`, `@InjectRepository`,
 `Repository<T>`, repository or store classes, QueryBuilder, a `DataSource` or `QueryRunner` outside `platform/database`,
-the cli (`be/apps/cli`, `be/src/features/cli/`) and the test world `be/src/tests/world` do not exist; specs use the world's `world.db.<connection>` `EntityManager` (R83). A handler opens the transaction with
+the cli (slots `be.app.cli`, `be.cli`) and the test world (slot `be.tests.world`) do not exist; specs use the world's `world.db.<connection>` `EntityManager` (R83). A handler opens the transaction with
 `this.entityManager.transaction(async (manager) => ...)` and only `manager` is used inside it.
 
 Raw SQL is a `sql`-tagged `SqlText` constant in `persistence/<name>.sql.ts` of the owning capability; `.query()` accepts
@@ -506,26 +506,38 @@ compensation for every step (R169 to R173; `knowledge/patterns/be/saga.yaml`). S
 
 ### 6.1 Source tree
 
+<!-- hfs:generated fe-tree -->
 ```text
-fe/apps/<app>/
-  next.config.ts, tsconfig.json, postcss.config.mjs, Dockerfile?, public/   package.json (slot fe.app.next)
-  src/app/                            global-error.tsx, [locale]/{layout,error,not-found,loading}.tsx, [locale]/**/page.tsx, globals.css
-  src/proxy.ts | instrumentation*.ts  framework-pinned root files; middleware.ts is refused (Next 16 uses proxy.ts)
-  src/features/{pages,layouts,overlays}/<Name>/
-  src/components/{blocks,composites,branches,leaves}/<Name>/
-  src/hooks/<domain>/                 use<Name>.ts and one <domain>.shared.ts
-  src/modules/api/                    index.ts, <domain>/read-*.ts, <domain>/*.graphql, <domain>/<domain>.mapper.ts, __generated__/;
-                                      client.ts + outcome.ts only in a one-app front end
-  src/modules/config/                 the only reader of the environment
-  src/modules/i18n/                   index.ts (calls the i18n package factory) and messages/<locale>.json; the whole
-                                      next-intl stack (routing, navigation, request) only in a one-app front end
-  src/modules/routes/                 every href builder
-  src/modules/brand/brand.css         the only app file holding colour values
-fe/packages/<family>-ui/              opt-in, built to dist; grammar tiers composites/branches/leaves under src/
-fe/packages/<family>-api/             opt-in: src/client.ts (the one fetch) and src/outcome.ts (the one Outcome) of every app
-fe/packages/<family>-i18n/            opt-in: the next-intl stack once, exported as createAppI18n
-fe/packages/<pkg>/                    any other code two apps share (FE_CROSS_APP_DUPLICATE: an app never keeps a copy)
+fe/{tsconfig.json,eslint.config.mjs,stylelint.config.mjs}                                                                                          required  fe.tool-config
+fe/docs/{adr,runbooks,guides}/**/*.md                                                                                                              opt-in    repo.docs
+fe/docs/**/*.{png,svg,webp}                                                                                                                        opt-in    repo.docs-media
+fe/packages/<pkg>/                                                                                                                                 opt-in    repo.packages
+fe/apps/<app>/Dockerfile                                                                                                                           required  repo.app-image
+fe/{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,**/next-env.d.ts,**/*.tsbuildinfo}  optional  repo.build-output
+fe/{**/__generated__/,apps/*/src/schema.gql}                                                                                                       optional  repo.generated
+fe/apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}                                                                       required  fe.app.next
+fe/apps/<app>/public/                                                                                                                              optional  fe.app-optional
+fe/apps/<app>/src/app/                                                                                                                             required  fe.route
+fe/apps/<app>/src/{proxy.ts,instrumentation.ts,instrumentation-client.ts}                                                                          optional  fe.source-root-pinned
+fe/apps/<app>/src/features/{pages,layouts,overlays}/<name>/                                                                                        required  fe.feature
+fe/apps/<app>/src/components/{blocks,composites,branches,leaves}/<name>/                                                                           optional  fe.components
+fe/apps/<app>/src/hooks/<domain>/                                                                                                                  optional  fe.hooks
+fe/apps/<app>/src/modules/<capability>/                                                                                                            required  fe.modules
+fe/apps/<app>/src/modules/api/                                                                                                                     optional  fe.modules.api
+fe/apps/<app>/src/modules/api/client.ts                                                                                                            optional  fe.transport.client
+fe/apps/<app>/src/modules/api/outcome.ts                                                                                                           optional  fe.transport.outcome
+fe/apps/<app>/src/modules/config/                                                                                                                  required  fe.modules.config
+fe/apps/<app>/src/modules/i18n/                                                                                                                    required  fe.modules.i18n
+fe/apps/<app>/src/modules/brand/brand.css                                                                                                          optional  fe.modules.brand
+fe/apps/<app>/src/modules/routes/                                                                                                                  required  fe.modules.routes
+fe/apps/<app>/src/modules/types/                                                                                                                   optional  fe.modules.types
+fe/packages/<family>-ui/                                                                                                                           opt-in    fe.package.ui
+fe/packages/<family>-api/                                                                                                                          opt-in    fe.package.api
+fe/packages/<family>-api/src/client.ts                                                                                                             optional  fe.package.api.client
+fe/packages/<family>-api/src/outcome.ts                                                                                                            optional  fe.package.api.outcome
+fe/packages/<family>-i18n/                                                                                                                         opt-in    fe.package.i18n
 ```
+<!-- hfs:generated-end fe-tree -->
 
 The front end's contract input is the back end's committed `be/contracts/<app>/` read in place (`hfs.json`
 `sides.fe.reads`); the root `codegen` script (`scripts/codegen.mjs`) writes the ignored `__generated__/` from it. There is
@@ -632,16 +644,9 @@ no contract copy under `fe/`.
 - Every config is a thin call into a `.claude` package: `starciBeConfig({ hfs })`, `starciFeConfig({ hfs })`,
   `@starci/tsconfig/{be,next}.json`, `@starci/prettier-config`, `@starci/jest-preset` (back end),
   `@starci/stylelint-canon` (front end), and the `@starci/hfs` CLI (`lint`, `check`, `sync`, `emit-contracts`, `explain`,
-  `scaffold app`). Every managed file is generated by `hfs sync` at the app root and hash-checked (R05). The root's: the
-  `scripts` block of `package.json`, `.prettierrc`, `.prettierignore`, the `.husky` hooks, the CI workflows, the Sonar file
-  and the `.gitignore` block. The back end's: `be/tsconfig.json` (the preset and the three aliases),
-  `be/tsconfig.build.json`, `be/src/tests/tsconfig.json` (the config of the world, integration, e2e and contract trees,
-  found by typed lint and `typecheck:tests`), the one-line `be/eslint.config.mjs` and `be/jest.config.js`. The front end's:
-  `fe/tsconfig.json` (the `next.json` preset and nothing else), the one-line `fe/eslint.config.mjs` and the one-line
-  `fe/stylelint.config.mjs` (`appTokens` derived from the `globals.css` files by `loadAppTokens`). `lint` (`hfs lint`:
+  `scaffold app`). Every managed file is generated by `hfs sync` at the app root and hash-checked (R05). The managed files are the slots whose `managedBy` is set in `slots.yaml`: at the app root `app.package-manifest`, `app.format-config`, `app.hooks`, `app.ci`, `app.quality-config` and the git files; per side `be.tool-config` and `fe.tool-config` (`appTokens` of the stylelint config derived from the `globals.css` files by `loadAppTokens`). `lint` (`hfs lint`:
   ESLint over `be/` with the BE canon and over `fe/` with the FE canon, the app check, stylelint over `fe/`) is the one lint
-  gate and `lint:fix` its `--fix`; there is no front-end test script. The list of managed files is the `managedBy` slots
-  of `slots.yaml`. An app defines and disables no rule (R16, R17). `noInlineConfig: true`: no `eslint-disable`, no
+  gate and `lint:fix` its `--fix`; there is no front-end test script. An app defines and disables no rule (R16, R17). `noInlineConfig: true`: no `eslint-disable`, no
   `@ts-ignore`, no `@ts-expect-error` (R18). Every `@starci/*` package is installed from the npm registry at the exact
   version of `canon-pins.yaml` (`packages/README.md`).
 - **Formatter.** Prettier only: `printWidth` 120, `tabWidth` 4, `semi` false, `singleQuote` false, `trailingComma`
@@ -861,10 +866,12 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R186 | `BE_REALTIME_TOPIC_SCOPE` | The topic a realtime handler passes to `RealtimeHub.subscribe` is built from the handler's `@CurrentPrincipal()` parameter of `domain/identity`, so a client can only listen to channels its principal owns. |
 | R187 | `HFS_DOCKER_BUILD_CONTEXT` | Every app image is built from the app root: the header comment of an app's Dockerfile states `docker build -f <be\|fe>/apps/<app>/Dockerfile -t <image> .` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path). |
 | R188 | `HFS_DOCKER_STAGES` | An app Dockerfile is multi-stage: a stage named `build` and a last stage named `runtime`; the runtime stage ends as `USER node` and runs no build (`npm run build*`, tsc, next, turbo, nest); every install is `npm ci`, never `npm install`; a back-end runtime runs `npm ci --omit=dev --ignore-scripts` and a front-end runtime installs nothing. |
-| R189 | `HFS_DOCKER_ENTRY` | The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node fe/apps/<app>/server.js`); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: "standalone"`. |
+| R189 | `HFS_DOCKER_ENTRY` | The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node` on the standalone `server.js` of the app); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: "standalone"`. |
 | R190 | `HFS_DOCKER_BASE_PIN` | Every FROM of an app Dockerfile is a prior stage, the one node base image of the canon (an exact node version on an exact alpine release, `NODE_IMAGE` in scripts/hfs/rules/docker.mjs), or an image pinned by `@sha256` digest; never a moving tag, never an unresolved build argument. |
 | R191 | `HFS_DOCKER_SECRETS` | No secret enters an image: no COPY or ADD of an `.env*` file (except `.env.example`) or of a path under `.starcistacks`, `.secrets`, `.volume`, a key, certificate or kubeconfig; no ADD of a URL; no ARG or ENV whose name is a credential (PASSWORD, SECRET, TOKEN, KEY, CREDENTIAL, PRIVATE), `NEXT_PUBLIC_*` excepted because it is published by design. |
 | R192 | `RT_FACT_FALSE` | Every claim of knowledge/hfs/facts.yaml holds against knowledge/hfs/slots.yaml (the one source of the product shape), and no prose of knowledge/**, docs/** or a README states the opposite of a fact (for example that an fe app lacks its own package.json, which fe.app.next requires); prose quotes a fact id or a slot id and never restates the claim. |
 | R193 | `RT_RULE_ID_UNKNOWN` | Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read. |
-| R194 | `RT_GENERATED_BLOCK_STALE` | The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand. |
+| R194 | `RT_GENERATED_BLOCK_STALE` | The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand. |
+| R195 | `RT_PROSE_PATH_NO_SLOT` | Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one the examples or the starter declare, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths. |
+| R196 | `RT_PROSE_RESTATES_SLOTS` | Knowledge, docs and READMEs never restate knowledge/hfs/slots.yaml: no fenced block or line names three or more product paths a slot owns, and no sentence lists three or more of the root or side file names the slots declare; a slot is referenced by its id, and the only allowed copy is a generated block between hfs:generated markers. The slot and rule catalogs, the example READMEs and the templates are sources or snapshots, not prose. |
 <!-- hfs:generated-end rules -->

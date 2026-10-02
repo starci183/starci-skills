@@ -13964,10 +13964,32 @@ RT_RULE_ID_GAP:
 RT_GENERATED_BLOCK_STALE:
   title: "A generated README block differs from its source"
   title_vi: "Khối README sinh tự động khác nguồn của nó"
-  meaning_vi: "Một khối giữa các dấu hfs:generated của knowledge/hfs/README.md (bản đồ ứng dụng, cây mã backend, ma trận tầng, danh mục luật) không bằng từng byte với bản dựng từ knowledge/hfs/slots.yaml và rules.yaml. Sửa tay một khối hoặc đổi slot mà không dựng lại làm README nói khác nguồn."
+  meaning_vi: "Một khối giữa các dấu hfs:generated của knowledge/hfs/README.md (bản đồ ứng dụng, cây mã backend, ma trận tầng, cây mã frontend, danh mục luật) không bằng từng byte với bản dựng từ knowledge/hfs/slots.yaml và rules.yaml. Sửa tay một khối hoặc đổi slot mà không dựng lại làm README nói khác nguồn."
   causes_vi:
     - "Sửa slots.yaml hoặc rules.yaml mà không chạy lại readme-blocks.mjs --write"
     - "Sửa tay nội dung bên trong một khối sinh tự động"
   nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write rồi commit README, qua một lane đã land; không sửa tay bên trong khối."
+  owner: supervisor
+  kind: check-finding
+
+RT_PROSE_PATH_NO_SLOT:
+  title: "A path in prose that no slot owns"
+  title_vi: "Đường dẫn trong văn bản không thuộc slot nào"
+  meaning_vi: "Một đường dẫn sản phẩm (be/... hoặc fe/...) trong knowledge, docs hoặc README không được slot nào của knowledge/hfs/slots.yaml sở hữu và cũng không phải thư mục cha của một slot. Văn bản đã tự nghĩ ra một chỗ không có, hoặc giữ lại một chỗ mà slot không còn. Tên ứng dụng là tự do: tên ghi cứng phải là ứng dụng của ví dụ hoặc của starter, còn <tên> giữ chỗ thay cho mọi ứng dụng."
+  causes_vi:
+    - "Đổi hoặc xóa một slot mà văn bản vẫn nêu đường dẫn cũ"
+    - "Ghi tên ứng dụng theo vai trò (api, web) thay vì giữ chỗ"
+  nextStep_vi: "Người giám sát thay đường dẫn bằng mã slot, bằng <giữ chỗ> hoặc bằng tên ứng dụng của ví dụ, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_PROSE_RESTATES_SLOTS:
+  title: "Prose restates the slots"
+  title_vi: "Văn bản chép lại các slot"
+  meaning_vi: "Một khối mã hoặc một dòng trong knowledge, docs hoặc README nêu từ ba đường dẫn sản phẩm mà slot sở hữu trở lên, hoặc một câu liệt kê từ ba tên tệp gốc hay tệp của phía mà các slot khai báo. Bản chép lại cũ đi so với slots.yaml; chỉ khối sinh tự động giữa các dấu hfs:generated mới được phép sao chép."
+  causes_vi:
+    - "Chép cây thư mục hoặc danh sách tệp của slots.yaml vào văn bản"
+    - "Liệt kê các tệp cấu hình của gốc ứng dụng trong một câu"
+  nextStep_vi: "Người giám sát thay bản chép bằng mã slot (slot app.format-config...) hoặc bằng một khối sinh tự động, qua một lane đã land."
   owner: supervisor
   kind: check-finding

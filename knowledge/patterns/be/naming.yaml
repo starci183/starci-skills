@@ -28,8 +28,9 @@ rules:
       `module-definition`, `decorators`, `options`, `config`, `connection`, `service`, `command`, `query`, `handler`,
       `contracts`, `port`, `resolver`, `controller`, `gateway`, `consumer`, `job`, `cli`, `input`, `type`, `args`, `request`,
       `response`, `mapper`, `policy`, `entity`, `sql`, `rows`, `error`, `messages`, `log-events`, `cache-keys`, `guard`,
-      `interceptor`, `filter`, `client`, `spec`, `e2e-spec`, `global-setup`; plus `index.ts`, `main.ts`, `app.module.ts` and
-      migrations. These suffixes are banned: `use-case`, `repository`, `store`, `worker`, `scheduler`, `cron`, `listener`,
+      `interceptor`, `filter`, `client`, `spec`, `e2e-spec`, `global-setup`; plus the names outside the role vocabulary that
+      `ruleParams.be.suffixes` of slots.yaml records — the owner `index.ts` entries, the `be.app.*` root files and the
+      `be.persistence` migrations. These suffixes are banned: `use-case`, `repository`, `store`, `worker`, `scheduler`, `cron`, `listener`,
       `dto`, `util`, `utils`, `helper`, `helpers`, `rules`, `types`, `constants`, `int-spec`, `harness-spec`, `test`. The slot
       manifest lists which suffixes each slot allows.
     rationale: |-

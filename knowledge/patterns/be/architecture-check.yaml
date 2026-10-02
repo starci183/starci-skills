@@ -89,7 +89,7 @@ rules:
         write: 'app.module.ts lists ClockModule.register({ isGlobal: true }), PurchaseModule.register({ isGlobal: true, ...options.purchase }), CheckoutGraphqlModule and the APP_GUARD and APP_FILTER providers.'
       - id: case-3
         when: A second process kind is needed
-        write: Add `be/apps/worker` (background scaled apart) and declare its kind in hfs.json sides.be.apps; a one-off action is a command of the one `be/apps/cli`; never grow the api app with either.
+        write: Add a `be.app.worker` app (background scaled apart) and declare its kind in hfs.json sides.be.apps; a one-off action is a command of the one `be/apps/cli`; never grow the api app with either.
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY
@@ -104,7 +104,7 @@ rules:
     kind: mandatory
     hfsRules: [R30, R45]
     requirement: |-
-      Every capability module (`be/src/modules/{domain,platform,integrations}/<c>/<c>.module.ts`) is
+      Every capability module (the `<c>.module.ts` of a `be.domain`, `be.platform` or `be.integrations` owner) is
       `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
       `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal })).build()`.
       The generic `XOptions` is required; a capability without options declares `export type XOptions = Record<string, never>` in

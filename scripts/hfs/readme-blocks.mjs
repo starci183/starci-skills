@@ -1,5 +1,5 @@
 // readme-blocks.mjs - the generated blocks of knowledge/hfs/README.md (RT_GENERATED_BLOCK_STALE, rule R194).
-// The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2) and the rule catalog (12) are rendered from
+// The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) are rendered from
 // knowledge/hfs/slots.yaml and knowledge/hfs/rules.yaml between the markers
 //   <!-- hfs:generated NAME -->  ...  <!-- hfs:generated-end NAME -->
 // and compared byte for byte; the README never restates them by hand. `node scripts/hfs/readme-blocks.mjs --write` rewrites the
@@ -11,7 +11,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 
 export const README = 'knowledge/hfs/README.md';
-export const BLOCKS = Object.freeze(['app-map', 'be-tree', 'be-tiers', 'rules']);
+export const BLOCKS = Object.freeze(['app-map', 'be-tree', 'be-tiers', 'fe-tree', 'rules']);
 const open = (name) => `<!-- hfs:generated ${name} -->`;
 const close = (name) => `<!-- hfs:generated-end ${name} -->`;
 const PROFILE_ORDER = ['app', 'be', 'fe', 'repo'];
@@ -34,13 +34,13 @@ function appMap(manifest) {
   return rows.join('\n');
 }
 
-/** The back-end source tree: the paths of the be slots (and the slots of both sides) with their presence, one line each. */
-function beTree(manifest) {
-  const slots = manifest.slots.filter((slot) => slot.profiles.includes('be') && slot.presence !== 'forbidden');
-  const width = Math.max(...slots.map((slot) => slot.path.length)) + 4;
-  const lines = slots.map((slot) => `be/${slot.path}`.padEnd(width + 3) + `${slot.presence.padEnd(9)} ${slot.id}`);
+/** The source tree of one side: the paths of its slots with their presence and slot id, one line each. */
+const tree = (side) => (manifest) => {
+  const slots = manifest.slots.filter((slot) => slot.profiles.includes(side) && slot.presence !== 'forbidden');
+  const width = Math.max(...slots.map((slot) => slot.path.length + side.length + 1)) + 2;
+  const lines = slots.map((slot) => `${side}/${slot.path}`.padEnd(width) + `${slot.presence.padEnd(9)} ${slot.id}`);
   return ['```text', ...lines, '```'].join('\n');
-}
+};
 
 /** The tier matrix of the back end: from (row) to (column) — `yes`, `yes, acyclic` inside the tier, `no`. */
 function beTiers(manifest) {
@@ -58,7 +58,7 @@ function rules(_manifest, catalog) {
   return ['| Id | Code | Law |', '| --- | --- | --- |', ...catalog.rules.map((rule) => `| ${rule.id} | \`${rule.code}\` | ${cell(rule.law)} |`)].join('\n');
 }
 
-const RENDER = { 'app-map': appMap, 'be-tree': beTree, 'be-tiers': beTiers, rules };
+const RENDER = { 'app-map': appMap, 'be-tree': tree('be'), 'be-tiers': beTiers, 'fe-tree': tree('fe'), rules };
 
 /** The rendered text of one block. */
 export const renderBlock = (name, manifest, catalog) => RENDER[name](manifest, catalog);

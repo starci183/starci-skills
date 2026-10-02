@@ -83,7 +83,7 @@ rules:
           fe/apps/<app>/src/modules/api/ or fe/apps/<app>/src/modules/session/ with one explicit public index.ts entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
-        write: "fe/apps/<app>/src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
+        write: "an owner folder of slot `fe.components` under the layer it belongs to — for example fe/apps/<app>/src/components/leaves/<Name>/index.tsx"
       - id: case-4
         when: "A React hook"
         write: "fe/apps/<app>/src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
@@ -95,7 +95,7 @@ rules:
           fe/apps/<app>/src/modules/i18n/ and the adapter imports it; the names the framework mandates there
           (frameworkPinnedRootExports, for example export const config = { matcher }) keep their framework spelling
       - id: case-6
-        when: "Any other file or folder directly under the source root (fe/apps/<app>/src/i18n/request.ts, fe/apps/<app>/src/config.ts), and an fe/src/"
+        when: "Any other file or folder directly under the source root (an `i18n/request.ts` or a `config.ts` there), and an fe/src/"
         write: >
           Move it to its owner, for example fe/apps/<app>/src/modules/i18n/request.ts, and point framework configuration
           (fe/apps/<app>/next.config.ts) at the new path
