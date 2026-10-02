@@ -98,6 +98,9 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/features/api/checkout/transport/graphql/order.mapper.ts"), code: "export const toType = () => 1" },
       { filename: at("src/modules/domain/order/policies/refund.policy.ts"), code: "export class RefundPolicy {}" },
       { filename: at("src/modules/integrations/payos/payos.client.ts"), code: "export class PayosClient {}" },
+      // a logic role of the measured modules (coverage required) may carry its own spec beside it: the file owes 100 per file, a spec of its own is optional
+      { filename: at("src/modules/domain/order/order.pause.policy.spec.ts"), code: "export {}" },
+      { filename: at("src/modules/domain/order/http.client.spec.ts"), code: "export {}" },
       { filename: at("src/modules/domain/order/order.contracts.ts"), code: "export interface Order {}" },
       { filename: at("src/modules/domain/order/index.ts"), code: "export {}" },
       // a service suffix inside the test tree is a fixture, not a subject
@@ -122,7 +125,10 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/features/api/checkout/transport/http/session.guard.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order.module.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/persistence/entities/order.entity.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      { filename: at("src/modules/domain/order/policies/refund.policy.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      // a logic role (policy) inside the measured modules may have its spec, but only beside its subject
+      { filename: at("src/modules/domain/order/policies/refund.policy.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      // a role that is not a logic role has no unit spec anywhere
+      { filename: at("src/modules/domain/order/order.options.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order-math.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // a composition spec in an app is not a unit kind

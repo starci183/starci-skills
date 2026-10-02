@@ -7,7 +7,7 @@ name: examples
 #
 # Two triggers, one workflow (owner ruling: e2e runs manually only):
 #   push / pull_request   per app: install, typecheck (tsc over be, then turbo over the fe workspaces), hfs lint (with the Sonar import file),
-#                         the unit project with coverage (per-file 100 on the services; it writes be/coverage/lcov.info), the Codecov
+#                         the unit project with coverage (per-file 100 on the logic of be/src/modules/**; it writes be/coverage/lcov.info), the Codecov
 #                         upload under the app's flag, the be build (tsc and tsc-alias) and the fe build (turbo, the packages first, then
 #                         every Next app), and the Sonar scan and quality gate where a server is configured
 #                         (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN; otherwise the job notes the skip). A second job, `images`, builds the
@@ -131,7 +131,7 @@ jobs:
       - name: hfs lint
         working-directory: .
         run: node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
-      - name: Unit tests with coverage (per-file 100 on the services; writes be/coverage/lcov.info)
+      - name: Unit tests with coverage (per-file 100 on the logic of be/src/modules/**; writes be/coverage/lcov.info)
         if: ${{ !cancelled() }}
         run: npm test -- --ci
       - name: Coverage upload (Codecov, flag ${{ matrix.app }})

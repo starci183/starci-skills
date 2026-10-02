@@ -14,6 +14,9 @@ const jestTypeRoot = () => path.dirname(path.dirname(require.resolve('@types/jes
 
 // The config is read from a repository root (jest runs there): the default one below has a test world, so all four
 // projects exist; `withoutWorld` is a repository whose world is not written yet.
+// The coverage scope the managed jest.config.js passes (hfs sync renders it from the slot manifest): roots, the logic roles measured in them, the none directories inside a root.
+const SCOPE = { roots: ['src/modules/domain/*/', 'src/modules/platform/*/'], roles: ['service', 'guard'], excludes: ['src/modules/domain/*/persistence/**'] };
+const OPTIONS = { coverage: SCOPE };
 const withWorld = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-world-'));
 fs.mkdirSync(path.join(withWorld, 'src', 'tests', 'world'), { recursive: true });
 fs.writeFileSync(path.join(withWorld, 'src', 'tests', 'world', 'global-setup.ts'), 'export default async () => {}\n');
@@ -25,11 +28,11 @@ test.after(() => { process.chdir(home); fs.rmSync(withWorld, { recursive: true, 
 test('a repository without its test world gets the unit project only, so unit specs run with the managed config', () => {
   process.chdir(withoutWorld);
   try {
-    assert.deepEqual(preset.starciJestConfig().projects.map((p) => p.displayName), ['unit']);
+    assert.deepEqual(preset.starciJestConfig(OPTIONS).projects.map((p) => p.displayName), ['unit']);
   } finally {
     process.chdir(withWorld);
   }
-  assert.deepEqual(preset.starciJestConfig().projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
+  assert.deepEqual(preset.starciJestConfig(OPTIONS).projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
 });
 const { createMock } = require('./mock.cjs');
 
@@ -91,7 +94,7 @@ test('the default mock needs the jest runtime and says so outside it', () => {
 });
 
 test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnostics false (K20), isolatedModules from the tsconfig', () => {
-  const config = preset.starciJestConfig();
+  const config = preset.starciJestConfig(OPTIONS);
   assert.deepEqual(config.projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
   for (const project of config.projects) {
     const [name, options] = project.transform[String.raw`^.+\.ts$`];
@@ -108,25 +111,28 @@ test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnost
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.tsx'), false);
 });
 
-test('starciJestConfig takes no option: the managed jest.config.js has nothing to tune, and every call is a fresh, equal value', () => {
-  assert.equal(preset.starciJestConfig.length, 0);
-  const tuned = preset.starciJestConfig({ moduleNameMapper: { '^@x/(.*)$': '<rootDir>/x/$1' }, e2e: { globalSetup: 'x' }, unit: { setupFiles: ['x'] } });
-  assert.deepEqual(tuned, preset.starciJestConfig(), 'an argument changes nothing');
-  assert.notEqual(preset.starciJestConfig().projects[0].moduleNameMapper, preset.starciJestConfig().projects[0].moduleNameMapper);
+test('starciJestConfig takes ONE option, the coverage scope hfs sync renders: it refuses to run without it, and any other option changes nothing', () => {
+  assert.equal(preset.starciJestConfig.length, 1);
+  assert.throws(() => preset.starciJestConfig(), /needs the coverage scope hfs sync renders/);
+  assert.throws(() => preset.starciJestConfig({ coverage: { roots: ['src/'], roles: [], excludes: [] } }), /needs the coverage scope/, 'a scope that measures no role is refused');
+  assert.throws(() => preset.starciJestConfig({ coverage: { roots: 'src/', roles: ['service'], excludes: [] } }), /needs the coverage scope/);
+  const tuned = preset.starciJestConfig({ coverage: SCOPE, moduleNameMapper: { '^@x/(.*)$': '<rootDir>/x/$1' }, e2e: { globalSetup: 'x' }, unit: { setupFiles: ['x'] } });
+  assert.deepEqual(tuned, preset.starciJestConfig(OPTIONS), 'an argument other than the scope changes nothing');
+  assert.notEqual(preset.starciJestConfig(OPTIONS).projects[0].moduleNameMapper, preset.starciJestConfig(OPTIONS).projects[0].moduleNameMapper);
 });
 
 test('every project maps exactly the three aliases the managed tsconfig.json declares', () => {
   const expected = { '^@features/(.*)$': '<rootDir>/src/features/$1', '^@modules/(.*)$': '<rootDir>/src/modules/$1', '^@tests/(.*)$': '<rootDir>/src/tests/$1' };
   assert.deepEqual(preset.MODULE_NAME_MAPPER, expected);
-  for (const project of preset.starciJestConfig().projects) assert.deepEqual(project.moduleNameMapper, expected);
+  for (const project of preset.starciJestConfig(OPTIONS).projects) assert.deepEqual(project.moduleNameMapper, expected);
 });
 
 test('coverage is measured by v8, not istanbul', () => {
-  assert.equal(preset.starciJestConfig().coverageProvider, 'v8');
+  assert.equal(preset.starciJestConfig(OPTIONS).coverageProvider, 'v8');
 });
 
 test('the unit project matches *.spec.ts only and never a file of src/tests/{world,integration,e2e,contract}', () => {
-  const [unit] = preset.starciJestConfig().projects;
+  const [unit] = preset.starciJestConfig(OPTIONS).projects;
   assert.deepEqual(unit.testMatch, ['**/*.spec.ts']);
   const ignored = (file) => unit.testPathIgnorePatterns.some((pattern) => new RegExp(pattern).test(file));
   for (const folder of ['world', 'integration', 'e2e', 'contract']) {
@@ -138,7 +144,7 @@ test('the unit project matches *.spec.ts only and never a file of src/tests/{wor
 });
 
 test('each test kind is its own project, matched by folder and suffix together; contract is never unit or e2e', () => {
-  const byName = Object.fromEntries(preset.starciJestConfig().projects.map((p) => [p.displayName, p]));
+  const byName = Object.fromEntries(preset.starciJestConfig(OPTIONS).projects.map((p) => [p.displayName, p]));
   assert.deepEqual(byName.integration.testMatch, ['<rootDir>/src/tests/integration/**/*.integration-spec.ts']);
   assert.deepEqual(byName.e2e.testMatch, ['<rootDir>/src/tests/e2e/**/*.e2e-spec.ts']);
   assert.deepEqual(byName.contract.testMatch, ['<rootDir>/src/tests/contract/**/*.contract-spec.ts']);
@@ -157,18 +163,20 @@ test('each test kind is its own project, matched by folder and suffix together; 
   assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });
 
-test('coverage is measured on the services and the cli commands only, with a per-file threshold of 100', () => {
-  const globs = preset.collectCoverageFrom();
-  assert.deepEqual(globs.filter((g) => !g.startsWith('!')), ['src/**/*.service.ts', 'src/features/cli/**/*.cli.ts']);
-  for (const excluded of ['src/tests/**', '**/dist/**', '**/coverage/**']) {
+test('coverage is measured on the logic roles of the rendered roots only, with a per-file threshold of 100', () => {
+  const globs = preset.collectCoverageFrom(SCOPE);
+  assert.deepEqual(globs.filter((g) => !g.startsWith('!')), ['src/modules/domain/*/**/*.{service,guard}.ts', 'src/modules/platform/*/**/*.{service,guard}.ts']);
+  for (const excluded of ['src/modules/domain/*/persistence/**', '**/dist/**', '**/coverage/**']) {
     assert.ok(globs.includes(`!${excluded}`), `${excluded} is outside the denominator`);
   }
-  const { coverageThreshold } = preset.starciJestConfig();
-  assert.ok(Object.keys(coverageThreshold).every((key) => preset.COVERAGE_SOURCES.map((glob) => `./${glob}`).includes(key)));
+  assert.equal(preset.rootGlob('src/', ['service']), 'src/**/*.service.ts', 'one role needs no braces');
+  const { coverageThreshold } = preset.starciJestConfig(OPTIONS);
+  const expected = new Set(SCOPE.roots.map((root) => `./${preset.rootGlob(root, SCOPE.roles)}`));
+  assert.ok(Object.keys(coverageThreshold).every((key) => expected.has(key)));
   for (const glob of Object.keys(coverageThreshold)) assert.deepEqual(coverageThreshold[glob], { lines: 100, branches: 100, functions: 100, statements: 100 });
 });
 
-test('a coverage source with no file in the repository gets no threshold key (jest refuses a key that matches nothing); one with files gets it', async () => {
+test('a coverage glob with no file in the repository gets no threshold key (jest refuses a key that matches nothing); one with files gets it', async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
@@ -176,11 +184,15 @@ test('a coverage source with no file in the repository gets no threshold key (je
   try {
     fs.mkdirSync(path.join(root, 'src', 'modules', 'domain', 'a'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src', 'modules', 'domain', 'a', 'a.service.ts'), 'export {};\n');
-    assert.equal(preset.hasCoverageSubjects(root, 'src/**/*.service.ts'), true);
-    assert.equal(preset.hasCoverageSubjects(root, 'src/features/cli/**/*.cli.ts'), false, 'no cli command yet');
-    fs.mkdirSync(path.join(root, 'src', 'features', 'cli', 'migrate', 'subs'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'src', 'features', 'cli', 'migrate', 'subs', 'run.cli.ts'), 'export {};\n');
-    assert.equal(preset.hasCoverageSubjects(root, 'src/features/cli/**/*.cli.ts'), true);
+    assert.equal(preset.hasCoverageSubjects(root, 'src/modules/domain/*/**/*.{service,guard}.ts'), true);
+    assert.equal(preset.hasCoverageSubjects(root, 'src/modules/domain/*/**/*.guard.ts'), false, 'no guard yet');
+    assert.equal(preset.hasCoverageSubjects(root, 'src/modules/platform/*/**/*.{service,guard}.ts'), false, 'no platform capability yet');
+    fs.mkdirSync(path.join(root, 'src', 'modules', 'domain', 'a', 'deep'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'modules', 'domain', 'a', 'deep', 'auth.guard.ts'), 'export {};\n');
+    assert.equal(preset.hasCoverageSubjects(root, 'src/modules/domain/*/**/*.guard.ts'), true, '** spans directories');
+    fs.mkdirSync(path.join(root, 'src', 'modules', 'platform', 'node_modules', 'x'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'src', 'modules', 'platform', 'node_modules', 'x', 'x.service.ts'), 'export {};\n');
+    assert.equal(preset.hasCoverageSubjects(root, 'src/modules/platform/**/*.service.ts'), false, 'dependencies are never subjects');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -189,12 +201,12 @@ test('a coverage source with no file in the repository gets no threshold key (je
 test('the unit run writes the lcov Sonar imports, keeps the text summary, and renders no coverage exclusion', () => {
   assert.equal(preset.sonarCoverageExclusions, undefined);
   assert.equal(preset.sonarExclusions(), '**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**');
-  const config = preset.starciJestConfig();
+  const config = preset.starciJestConfig(OPTIONS);
   assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
   assert.ok(config.coverageReporters.includes('text-summary'));
   assert.equal(config.coverageDirectory, 'coverage');
-  // The Sonar scope is rendered from COVERAGE_SOURCES (hfs sync prefixes the be side): the services and the cli commands, like jest's.
-  assert.deepEqual(preset.COVERAGE_SOURCES, ['src/**/*.service.ts', 'src/features/cli/**/*.cli.ts']);
+  // The scope is NOT a constant of the preset: hfs sync derives it from the slot manifest (scripts/hfs/coverage-scope.mjs) into the repository's jest.config.js.
+  assert.equal(preset.COVERAGE_SOURCES, undefined);
 });
 
 test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assignable to T, wrong stubs rejected', async () => {
@@ -576,7 +588,7 @@ function isolationRepo({ stockRunner, state = worldState(2) }) {
   put('node_modules/fake-graphql/package.json', JSON.stringify({ name: 'fake-graphql', main: 'index.js' }));
   put('node_modules/fake-graphql/index.js', FAKE_GRAPHQL);
   // The fixture's files are plain JavaScript, so ts-jest is not needed: its preset and transform are dropped, nothing else changes.
-  put('jest.config.js', `const config = require(${JSON.stringify(require.resolve('./index.cjs'))}).starciJestConfig()
+  put('jest.config.js', `const config = require(${JSON.stringify(require.resolve('./index.cjs'))}).starciJestConfig({ coverage: { roots: ['src/modules/*/'], roles: ['service'], excludes: [] } })
 for (const project of config.projects) {
   delete project.preset
   project.transform = {}

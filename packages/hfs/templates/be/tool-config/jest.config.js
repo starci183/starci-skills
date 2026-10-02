@@ -1,1 +1,3 @@
-module.exports = require("@starci/jest-preset").starciJestConfig()
+module.exports = require("@starci/jest-preset").starciJestConfig({
+    coverage: {{jestCoverage}},
+})

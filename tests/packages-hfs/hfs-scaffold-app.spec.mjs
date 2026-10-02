@@ -19,7 +19,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { main } from '../../packages/hfs/bin/hfs.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
-import { coverageExclusions } from '../../packages/hfs/sync/index.mjs';
+import { jestCoverageSource } from '../../packages/hfs/sync/index.mjs';
+import { coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
 import { dockerFindings } from '../../scripts/hfs/rules/docker.mjs';
 import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -27,10 +28,11 @@ import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, 
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../../packages/jest-preset/index.cjs');
-/** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
-const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
-/** The one coverage scope of an app: the unit-tested roles of ruleParams.be.unitRoles (the services and the cli commands), from the preset. */
-const COVERAGE_SCOPE = jestPreset.COVERAGE_SOURCES.map((glob) => `be/${glob}`);
+/** What sync loads from the installed jest preset: the Sonar exclusions. */
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
+/** The one coverage scope of an app: the logic roles of the measured roots, derived from the slot manifest (scripts/hfs/coverage-scope.mjs). */
+const MANIFEST = loadSlotManifest();
+const COVERAGE_SCOPE = coverageScope(MANIFEST).codecovPaths;
 const LCOV = 'be/coverage/lcov.info';
 const installs = runtimeInstalls();
 const missing = missingFrom(installs);
@@ -172,13 +174,13 @@ const propertiesOf = (text) => Object.fromEntries(text.split(/\r?\n/).filter((li
 function assertCoverageContract(app) {
   const sonar = propertiesOf(fs.readFileSync(path.join(app, 'sonar-project.properties'), 'utf8'));
   const coverageKeys = Object.keys(sonar).filter((key) => /coverage|lcov/i.test(key)).sort();
-  assert.deepEqual(coverageKeys, ['sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths'], 'exactly the lcov import and the complement of the services: no other coverage key');
+  assert.deepEqual(coverageKeys, ['sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths'], 'exactly the lcov import and the complement of the measured logic: no other coverage key');
   assert.equal(sonar['sonar.javascript.lcov.reportPaths'], LCOV);
-  assert.deepEqual(sonar['sonar.coverage.exclusions'].split(','), coverageExclusions(PRESETS));
+  assert.deepEqual(sonar['sonar.coverage.exclusions'].split(','), sonarCoverageExclusions(MANIFEST));
   assert.ok(sonar['sonar.coverage.exclusions'].split(',').includes('fe/**') && !/\.service\.ts/.test(sonar['sonar.coverage.exclusions']), 'fe/ is out, the services are in');
   const codecov = parseYaml(fs.readFileSync(path.join(app, 'codecov.yml'), 'utf8'));
   for (const kind of ['project', 'patch']) {
-    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the unit-tested roles at 100`);
+    assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the measured roots at 100`);
   }
   assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
   assert.deepEqual(Object.keys(codecov.coverage.status).sort(), ['patch', 'project']);
@@ -199,7 +201,7 @@ const edit = (app, file, from, to) => {
   fs.writeFileSync(target, text.replace(from, to));
 };
 
-test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly the services as the coverage scope', (t) => {
+test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly the logic of be/src/modules as the coverage scope', (t) => {
   // No install and no registry: the lockfile step is the only part that needs npm, and it is not what this proves.
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-coverage-'));
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
@@ -207,8 +209,8 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   for (const file of ['sonar-project.properties', 'codecov.yml', '.github/workflows/ci.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
   assertCoverageContract(root);
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
-  assert.match(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), /require\("@starci\/jest-preset"\)\.starciJestConfig\(\)/);
-  const config = jestPreset.starciJestConfig();
+  assert.equal(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);
+  const config = jestPreset.starciJestConfig({ coverage: jestCoverage(MANIFEST) });
   assert.ok(config.coverageReporters.includes('lcov'));
   assert.equal(`be/${config.coverageDirectory}/lcov.info`, LCOV);
 });

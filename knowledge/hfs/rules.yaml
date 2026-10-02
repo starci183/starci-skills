@@ -128,7 +128,7 @@ rules:
       - {kind: hfs, id: stacks-shape, at: scripts/hfs/rules/stacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
-    law: "Sonar config is generated, with no host URL, importing the be lcov with the services as the only coverage scope."
+    law: "Sonar config is generated, with no host URL, importing the be lcov with the logic of be/src/modules (the coverage scope derived from the slot manifest) as the only coverage scope."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_SONAR_CONFIG"]
@@ -1731,6 +1731,22 @@ rules:
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
     enforcers:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
+  - id: R203
+    code: "BE_FEATURE_THIN"
+    law: "A feature file (a role of ruleParams.be.thinRoles inside a slot of tier feature: handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/ (a service, the command or query bus, the event bus, a queue producer): no branch, loop, ternary, try or throw and no computation. Business logic lives in modules/**, where every logic file owes 100 per file; orchestration (step order, compensation, claim, fencing, retry) lives in platform/*; the feature layer is proven by integration and e2e."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_FEATURE_THIN"]
+    enforcers:
+      - {kind: eslint-be, id: feature-thin}
+  - id: R204
+    code: "HFS_COVERAGE_SCOPE_DRIFT"
+    law: "What a back end measures at 100 per file is derived once from the slot manifest (the `coverage: required|none` field of every be slot and ruleParams.be.logicRoles, scripts/hfs/coverage-scope.mjs), and the three files that state it are its render: be/jest.config.js (thresholds), the `sonar.coverage.exclusions` line of sonar-project.properties, and codecov.yml (paths and one component per service app plus platform, each at 100). A difference is drift; the scope is never edited by hand."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_COVERAGE_SCOPE_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: coverage-scope-drift, at: packages/hfs/sync/managed.mjs}
 retired:
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}

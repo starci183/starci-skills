@@ -8,8 +8,9 @@ import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { starciworkGitignoreText } from '../../scripts/lib/starciwork-boundary.mjs';
 import {
-  BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, coverageExclusions, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
+  BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, jestCoverageSource, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../../packages/hfs/sync/index.mjs';
+import { coverageComponents, coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
 import { LOCK_STEP, scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { braceVariants } from '../../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
@@ -28,7 +29,9 @@ const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: 
 
 const app = ({ be = { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe = { apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] } } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe } });
 const APP = app();
-const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
+const MANIFEST = loadSlotManifest();
+const SCOPE = coverageScope(MANIFEST);
 const rendered = (hfs = APP) => Object.fromEntries(renderTargets(hfs, PRESETS).map(target => [target.path, target.content]));
 const scriptsOf = (hfs = APP) => renderTargets(hfs, PRESETS).find(target => target.path === 'package.json').scripts;
 
@@ -180,16 +183,17 @@ describe('.gitignore', () => {
 
 describe('sonar-project.properties', () => {
   const properties = text => Object.fromEntries(text.split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-  it('one file for the app: both sides as sources, the be specs as tests, the preset exclusions, one import path and the services\' coverage', () => {
+  it('one file for the app: both sides as sources, the be specs as tests, the preset exclusions, one import path and the logic of be/src/modules as the coverage', () => {
     const app = properties(rendered()['sonar-project.properties']);
     assert.equal(app['sonar.exclusions'], `${jestPreset.sonarExclusions()},**/.next/**,**/node_modules/**,**/src/messages/**`);
     assert.deepEqual(Object.keys(app).filter(key => /coverage|lcov/i.test(key)).sort(), ['sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths'], 'the lcov import and the complement of the services, no other coverage key (Sonar has no coverage inclusions)');
     assert.equal(app['sonar.javascript.lcov.reportPaths'], 'be/coverage/lcov.info');
     const exclusions = app['sonar.coverage.exclusions'].split(',');
-    assert.deepEqual(exclusions, coverageExclusions(PRESETS));
-    for (const glob of ['fe/**', 'be/**/*.resolver.ts', 'be/**/*.module.ts', 'be/**/*.mapper.ts', 'be/**/*.handler.ts', 'be/**/*.controller.ts', 'be/**/*.config.ts', 'be/**/*.error.ts', 'be/**/*.entity.ts', 'be/**/*.spec.ts', 'be/apps/*/src/main.ts', 'be/src/modules/domain/*/persistence/migrations/*-*.ts', 'be/src/tests/world/kit/*.ts'])
+    assert.deepEqual(exclusions, sonarCoverageExclusions(MANIFEST));
+    for (const glob of ['fe/**', 'be/**/*.resolver.ts', 'be/**/*.module.ts', 'be/**/*.handler.ts', 'be/**/*.controller.ts', 'be/**/*.config.ts', 'be/**/*.error.ts', 'be/**/*.entity.ts', 'be/**/*.spec.ts', 'be/apps/*/src/**', 'be/src/modules/domain/*/persistence/**', 'be/src/tests/world/**'])
       assert.ok(exclusions.includes(glob), `${glob} is outside coverage`);
-    assert.ok(!exclusions.some(glob => glob.endsWith('*.service.ts')), 'the services are the one thing left in scope');
+    for (const role of MANIFEST.ruleParams.be.logicRoles) assert.ok(!exclusions.includes(`be/**/*.${role}.ts`), `${role} is a logic role: measured, never excluded`);
+    assert.ok(exclusions.includes('be/src/features/api/*/**'), 'a feature is thin by rule and never measured');
     assert.equal(app['sonar.projectKey'], 'nivo');
     assert.equal(app['sonar.sources'], 'be/apps,be/src,fe/apps');
     assert.equal(app['sonar.tests'], 'be/apps,be/src');
@@ -207,25 +211,40 @@ describe('sonar-project.properties', () => {
     }
     for (const slots of [undefined, [], ['repo.docs']]) assert.equal(of(slots)['sonar.sources'], 'be/apps,be/src,fe/apps', String(slots));
   });
-  it('Sonar and Codecov read ONE coverage scope: both are rendered from the preset\'s COVERAGE_SOURCES and agree', () => {
+  it('jest, Sonar and Codecov read ONE coverage scope, derived from the slot manifest: the three rendered files agree', () => {
     for (const hfs of [APP, app({ fe: { apps: [{ name: 'web', kind: 'next' }], optionalSlots: ['repo.packages'] } })]) {
       const files = rendered(hfs);
       const sonar = properties(files['sonar-project.properties'])['sonar.coverage.exclusions'].split(',');
       const codecov = parseYaml(files['codecov.yml']);
-      const scope = jestPreset.COVERAGE_SOURCES.map(glob => `be/${glob}`);
-      assert.deepEqual(sonar, coverageExclusions(PRESETS), 'Sonar reads the complement of the scope');
-      assert.deepEqual(codecov.coverage.status.project.default.paths, scope, 'the codecov project status reads the scope');
-      assert.deepEqual(codecov.coverage.status.patch.default.paths, scope, 'the codecov patch status reads the scope');
+      const paths = SCOPE.roots.map(root => `be/${root}**`);
+      assert.deepEqual(sonar, SCOPE.sonar, 'Sonar reads the complement of the scope');
+      assert.deepEqual(codecov.coverage.status.project.default.paths, paths, 'the codecov project status reads the measured roots');
+      assert.deepEqual(codecov.coverage.status.patch.default.paths, paths, 'the codecov patch status reads the measured roots');
       assert.deepEqual([codecov.coverage.status.project.default.target, codecov.coverage.status.patch.default.target], ['100%', '100%']);
+      assert.deepEqual(codecov.component_management.default_rules.statuses.map(status => [status.type, status.target]), [['project', '100%'], ['patch', '100%']], 'every component is held at 100');
+      assert.deepEqual(codecov.component_management.individual_components.map(component => component.component_id), ['platform'], 'an app with no module yet has the platform component alone, over its measured roots');
+      assert.deepEqual(codecov.component_management.individual_components[0].paths, paths);
       assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
+      const jest = files['be/jest.config.js'];
+      assert.equal(jest, `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);
+      for (const root of SCOPE.roots) assert.ok(jest.includes(JSON.stringify(root)), `${root} is a measured root of be/jest.config.js`);
     }
-    // A preset with another source list moves both files together: the scope is never written twice.
-    const moved = Object.fromEntries(renderTargets(APP, { ...PRESETS, coverageSources: ['src/**/*.domain.ts'] }).map(target => [target.path, target.content]));
-    const movedExclusions = properties(moved['sonar-project.properties'])['sonar.coverage.exclusions'].split(',');
-    assert.ok(movedExclusions.includes('be/**/*.service.ts') && !movedExclusions.some(glob => glob.endsWith('*.domain.ts')), 'the complement moves with the sources');
-    assert.deepEqual(parseYaml(moved['codecov.yml']).coverage.status.project.default.paths, ['be/src/**/*.domain.ts']);
-    assert.throws(() => renderTargets(APP, { ...PRESETS, coverageSources: ['src/core/**'] }), /HFS_SYNC_COVERAGE_SCOPE/, 'a source whose complement Sonar globs cannot write is refused');
-    assert.throws(() => renderTargets(APP, { sonarExclusions: PRESETS.sonarExclusions }), /HFS_SYNC_PRESET_MISSING/, 'no coverage sources is a refusal, never an empty scope');
+  });
+  it('the Codecov components of an app are one per service app that composes capabilities nothing else composes, then platform', () => {
+    const files = ['apps/api/src/app.module.ts', 'apps/worker/src/app.module.ts', 'apps/cli/src/app.module.ts', 'src/modules/domain/order/order.service.ts', 'src/modules/domain/stock/stock.service.ts',
+      'src/modules/domain/identity/auth.guard.ts', 'src/modules/integrations/mailer/mailer.client.ts', 'src/modules/platform/clock/clock.module.ts'];
+    const text = {
+      'apps/api/src/app.module.ts': 'import { OrderModule } from "@modules/domain/order"\nimport { Auth } from "@modules/domain/identity"\nimport { M } from "@modules/integrations/mailer"',
+      'apps/worker/src/app.module.ts': 'import {\n  Stock\n} from "@modules/domain/stock"\nimport { Auth } from "@modules/domain/identity"\nimport { M } from "@modules/integrations/mailer"',
+      'apps/cli/src/app.module.ts': 'import { O } from "@modules/domain/order"\nimport { S } from "@modules/domain/stock"',
+    };
+    const apps = [{ name: 'api', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'cli', kind: 'cli' }];
+    const components = coverageComponents(MANIFEST, { files, read: file => text[file] ?? '', apps });
+    assert.deepEqual(components, [
+      { id: 'api', name: 'api', paths: ['be/src/modules/domain/order/**'] },
+      { id: 'worker', name: 'worker', paths: ['be/src/modules/domain/stock/**'] },
+      { id: 'platform', name: 'platform', paths: ['be/src/modules/domain/identity/**', 'be/src/modules/integrations/mailer/**', 'be/src/modules/platform/*/**', 'be/src/modules/projections/*/**'] },
+    ], 'the cli app composes everything and owns nothing; a capability two services import (identity, mailer) is shared and belongs to platform; the whole platform tier is platform');
   });
 });
 
@@ -381,8 +400,8 @@ describe('the be side tool configuration', () => {
     assert.deepEqual(JSON.parse(at('tsconfig.build.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/build.json'], compilerOptions: { outDir: './dist' }, exclude: ['node_modules', 'dist', '**/*.spec.ts', 'src/tests'] });
     assert.deepEqual(JSON.parse(at('src/tests/tsconfig.json')), { extends: ['../../tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['./**/*.ts'], exclude: [] });
   });
-  it('jest.config.js is the preset call, the root .prettierrc references the shared config, and neither carries a header comment', () => {
-    assert.equal(at('jest.config.js'), 'module.exports = require("@starci/jest-preset").starciJestConfig()\n');
+  it('jest.config.js is the preset call with the derived coverage scope, the root .prettierrc references the shared config, and neither carries a header comment', () => {
+    assert.equal(at('jest.config.js'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);
     assert.equal(rendered()['.prettierrc'], '"@starci/prettier-config"\n');
   });
   it('the root .prettierignore is the template, headed as generated', () => {
