@@ -4582,6 +4582,48 @@ RT_EXPORT_UNUSED:
   owner: supervisor
   kind: check-finding
 
+RT_ENV_UNCATALOGUED:
+  title: "Environment variable not catalogued"
+  title_vi: "Biến môi trường chưa có trong danh mục"
+  meaning_vi: "Mã nguồn production của runtime đọc một biến môi trường (process.env.X, env.X, process.env['X'], destructuring từ env) hoặc viết tên một biến STARCI_* mà modules/schemas/env.yaml không có; hoặc một mục của danh mục thiếu purpose hoặc kind hợp lệ."
+  causes_vi:
+    - "Thêm một biến môi trường mới mà không ghi vào danh mục"
+    - "Gõ sai tên một biến đã có"
+  nextStep_vi: "Người giám sát thêm biến vào modules/schemas/env.yaml với một câu purpose và kind (config, seam, handoff hoặc host), hoặc sửa tên gõ sai, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_ENV_READ_OUTSIDE_OWNER:
+  title: "Environment variable read outside its owner"
+  title_vi: "Đọc biến môi trường ngoài nơi sở hữu"
+  meaning_vi: "Một tệp production đọc trực tiếp một biến theo tên từ process.env (kể cả tên tính lúc chạy) thay vì qua scripts/lib/env.mjs (readEnv) hoặc một tham số env được truyền vào. Truyền cả process.env cho tiến trình con hoặc làm giá trị mặc định thì không bị tính."
+  causes_vi:
+    - "Đọc process.env.TEN ngay trong logic nghiệp vụ"
+    - "Đọc process.env[ten] với tên tính lúc chạy trong một hàm tiện ích"
+  nextStep_vi: "Người giám sát đổi sang readEnv('TEN') của scripts/lib/env.mjs, hoặc nhận một tham số env và đọc từ đó, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_TEST_ENV_IN_PRODUCTION:
+  title: "Production code branches on the test runner"
+  title_vi: "Mã production rẽ nhánh theo trình chạy test"
+  meaning_vi: "Một tệp production đọc NODE_TEST_CONTEXT để biết mình đang chạy trong spec. Chỉ scripts/lib/env.mjs được quan sát trình chạy test, qua một hàm isSpecRun duy nhất."
+  causes_vi:
+    - "Thêm một nhánh bỏ qua việc chạm trạng thái thật của máy khi chạy spec bằng cách đọc NODE_TEST_CONTEXT trực tiếp"
+  nextStep_vi: "Người giám sát gọi isSpecRun(env) của scripts/lib/env.mjs thay vì đọc NODE_TEST_CONTEXT, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_ENV_STALE_ENTRY:
+  title: "Catalogued environment variable nothing reads"
+  title_vi: "Biến môi trường trong danh mục không ai dùng"
+  meaning_vi: "modules/schemas/env.yaml có một biến mà không tệp production nào đọc hoặc nhắc tên nữa."
+  causes_vi:
+    - "Mã đọc biến đã bị xóa nhưng mục danh mục còn lại"
+  nextStep_vi: "Người giám sát xóa mục khỏi modules/schemas/env.yaml, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RT_EXTERNAL_OWNER:
   title: "External system reached outside its owner"
   title_vi: "Gọi hệ thống bên ngoài ngoài nơi sở hữu nó"

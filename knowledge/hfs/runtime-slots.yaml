@@ -96,7 +96,7 @@ ruleParams:
         cmd: [api/fs, api/process]
     # RT_BASE_IMPURE: the base tier never writes the filesystem; it reads process.env only in these declared seams.
     baseWriteMembers: [writeFileSync, appendFileSync, rmSync, rmdirSync, renameSync, unlinkSync, mkdirSync, copyFileSync, cpSync, symlinkSync, linkSync, truncateSync, writeFile, appendFile, rm, rmdir, rename, unlink, mkdir, copyFile, cp, symlink, link, truncate, mkdtempSync, mkdtemp, createWriteStream]
-    baseEnvSeams: [scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
+    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
     # RT_API_SHAPE: the systems that carry a calls contract; every call file of such a system is a calls id and vice versa.
     apiContracts:
       orca: modules/host/orca/calls.yaml
@@ -141,6 +141,7 @@ ruleParams:
       - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
       - {id: clones, run: scripts/checks/check-clones.mjs}
       - {id: export-used, run: scripts/checks/check-export-used.mjs}
+      - {id: env, run: scripts/checks/check-env.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
