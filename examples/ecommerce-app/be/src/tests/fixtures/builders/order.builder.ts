@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+import type { EntityManager } from "typeorm"
 import type { PlacedOrder } from "@modules/domain/order"
 
 /** The columns of an order row. */
@@ -68,4 +70,23 @@ export const placedOrder = (overrides: Partial<PlacedOrder> = {}): PlacedOrder =
     currency: "USD",
     replayed: false,
     ...overrides,
+})
+
+/** The table the order rows live in. */
+const ORDERS = "orders"
+
+/** The table the order line rows live in. */
+const ORDER_LINES = "order_lines"
+
+/** Arranges orders in a real database, constraints on: an order of a fresh buyer with `lineCount` lines of one unit each. */
+export const orderBuilder = (manager: EntityManager) => ({
+    /** Inserts the order and its lines, and answers the stored order row. */
+    async build(overrides: Partial<OrderRow> = {}, lineCount = 1): Promise<OrderRow> {
+        const row = orderRow({ id: randomUUID(), personId: randomUUID(), ...overrides })
+        await manager.insert(ORDERS, row)
+        for (let index = 1; index <= lineCount; index += 1) {
+            await manager.insert(ORDER_LINES, orderLineRow({ id: randomUUID(), orderId: row.id, productId: `sku-line-${index}` }))
+        }
+        return row
+    },
 })

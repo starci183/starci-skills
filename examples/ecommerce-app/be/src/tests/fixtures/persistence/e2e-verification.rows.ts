@@ -60,6 +60,20 @@ export interface BillingPaymentRow {
     provider_reference: string
 }
 
+/** One row of the order-summary read model, as the verification statements read it. */
+export interface OrderSummaryProjectionRow {
+    /** The order. */
+    order_id: string
+    /** The lifecycle state. */
+    status: string
+    /** The order total in minor units. */
+    total_minor_units: number
+    /** How many lines the order has. */
+    line_count: number
+    /** The loyalty points the order earned. */
+    loyalty_points: number
+}
+
 /** The loyalty points of one order. */
 export interface PointsRow {
     /** The points the order earned; zero when nothing was granted. */
