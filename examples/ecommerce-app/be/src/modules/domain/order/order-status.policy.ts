@@ -2,7 +2,7 @@ import { isRecord } from "@modules/platform/primitives"
 import type { RealtimeTopic } from "@modules/platform/realtime"
 import type { OrderStatus, OrderStatusFrame } from "./order-status.contracts"
 
-const ORDER_STATUSES: ReadonlyArray<string> = ["pending", "confirmed", "paid", "expired"] satisfies ReadonlyArray<OrderStatus>
+const ORDER_STATUSES: ReadonlyArray<string> = ["pending", "paid", "expired", "cancelled"] satisfies ReadonlyArray<OrderStatus>
 
 /** True when a value is a push of the order status channel: an order id, a known state and the instant it changed. */
 export const isOrderStatusFrame = (value: unknown): value is OrderStatusFrame =>

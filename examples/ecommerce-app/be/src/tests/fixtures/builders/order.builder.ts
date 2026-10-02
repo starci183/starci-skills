@@ -7,7 +7,7 @@ export interface OrderRow {
     /** The buyer. */
     personId: string
     /** The lifecycle state. */
-    status: "confirmed" | "cancelled"
+    status: "confirmed" | "pending" | "paid" | "expired" | "cancelled"
     /** The order total in minor units. */
     totalMinorUnits: number
     /** The ISO currency code. */
@@ -18,6 +18,8 @@ export interface OrderRow {
     receiptKey: string | null
     /** When the order was confirmed. */
     createdAt: Date
+    /** When a bank transfer paid the order; null until then. */
+    paidAt: Date | null
 }
 
 /** A confirmed order row with valid defaults and a fixed creation time; the spec overrides only what matters. */
@@ -30,6 +32,7 @@ export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     idempotencyKey: null,
     receiptKey: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    paidAt: null,
     ...overrides,
 })
 

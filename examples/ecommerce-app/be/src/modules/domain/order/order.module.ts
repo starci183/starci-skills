@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { CheckoutService } from "./checkout.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./order.module-definition"
+import { OrderPaymentService } from "./order-payment.service"
+import { OrderStatusService } from "./order-status.service"
 import { OrderService } from "./order.service"
 import { ReceiptService } from "./receipt.service"
 
@@ -13,8 +15,8 @@ export class OrderModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), OrderService, CheckoutService, ReceiptService],
-            exports: [OrderService, CheckoutService, ReceiptService],
+            providers: [...(base.providers ?? []), OrderService, CheckoutService, ReceiptService, OrderPaymentService, OrderStatusService],
+            exports: [OrderService, CheckoutService, ReceiptService, OrderPaymentService, OrderStatusService],
         }
     }
 }
