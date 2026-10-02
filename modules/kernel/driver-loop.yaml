@@ -18,7 +18,7 @@
 #                   `api dispatch --spawn` through an Orca terminal, dies when
 #                   its verdict settles — `api settle` closes the worker
 #                   terminal (scripts/agent/lib.mjs). Terminal title
-#                   `[Op] <op-or-task>` (the fleet naming rule).
+#                   `[Op] <op-or-task>` (the worker naming rule).
 #
 # The kernel agent touches NO state directly: every read/write below is one
 # `node scripts/kernel/cli.mjs <command>` call (modules/kernel/api.yaml); the
@@ -31,7 +31,7 @@ schema: starci/module-kernel-driver-loop@1
 about:
   kind: kernel-driver-loop
   businessQuestion: >-
-    "Given an approved goal and a fleet of ephemeral op agents, what does the
+    "Given an approved goal and a pool of ephemeral op agents, what does the
     kernel do on each tick — which leg goes next, to whom, on which model —
     and which decisions is it never allowed to take alone?"
   businessAnswer: >-
@@ -392,7 +392,7 @@ tick:
       `size.<class>.agents`, `gears`), then bounded by the disjoint partition
       the closure actually holds — `agentsRequested` is what the gear asks
       for and `reason` names what capped it. A gear raises the request only:
-      the pool's maxParallel, the fleet's maxParallelOps and the workflow's
+      the pool's maxParallel, the workers' maxParallelOps and the workflow's
       budgets.maxOps still admit, and a slice refused `max-ops` stays queued
       until one of them frees.
       A cut is not fan-out within an operation: the slices are DISJOINT jobs
@@ -516,7 +516,7 @@ tick:
       decomposed into exact selected migration node/resource/stack slices when
       those slices are derivable. In multi-repository projects each product
       prefix is qualified by its stable repository binding (for example
-      `todo-app-fe/apps/landing`); canonical Work remains `.starciwork/...`.
+      `shop-fe/apps/landing`); canonical Work remains `.starciwork/...`.
 
   drive:
     nextActions: >-
@@ -757,7 +757,7 @@ tick:
         true): the host's free disk on the drive holding %TEMP% and the
         repositories is under runtimes.yaml allocation.resources thresholds,
         or the RAM-aware throttle refuses the op (its `throttle.reason`:
-        fleet-max-ops, priority-reserved, heavy-paused, does-not-fit - api
+        workers-max-ops, priority-reserved, heavy-paused, does-not-fit - api
         status ramThrottle shows the effective cap and why). Light ops keep
         starting while heavy ones wait; running ops are never stopped. A
         typed wait exactly like path-lease:

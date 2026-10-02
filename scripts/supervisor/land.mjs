@@ -19,8 +19,9 @@
 //    Append-only files (.gitattributes merge=union) never conflict.
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
-//      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers, check-worktree-add (red only when red on the candidate and not
-//        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
+//      sync-runtime regenerates the git-ignored runtime copies a scratch worktree lacks, then check-module-yaml,
+//        check-contract-cites, check-api-surface, check-worktree-add (red only when red on the
+//        candidate and not the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
 //      the FULL `starci check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
@@ -89,7 +90,7 @@ import { tailLines } from '../lib/clip.mjs';
 import { withHostLock } from '../machine/host-lock.mjs'; import { isSpecRun } from '../lib/env.mjs';
 import { selfUpgradeBranchContaining, selfUpgradeIdOf, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs';
 const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
-export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
@@ -313,7 +314,7 @@ function treeCheck(dir, script) {
 
 /**
  * The finding lines of a tree check's output: every non-empty trimmed line but the script's own summary lines
- * (`<script>: ...`, which carry counts such as "11 dead cite(s) of 5368 checked"). Each of the four TREE_CHECKS
+ * (`<script>: ...`, which carry counts such as "11 dead cite(s) of 5368 checked"). Each of the check-* TREE_CHECKS
  * prints one line per finding naming a file (path or path:line).
  */
 export function findingLines(script, output) {
@@ -371,10 +372,9 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
     const reporter = path.join(tmpDir, 'failures.mjs');
     const out = path.join(tmpDir, 'failures.jsonl');
     fs.writeFileSync(reporter, FAIL_REPORTER);
-    // The tree's own test preload points the machine registry at a per-run temp file, so no spec it runs enrols a
-    // ledger on this host's registry (a tree from before the preload runs without it).
-    const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
-    const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
+    // The tree's own test preloads run first in every spec child (a tree from before them runs without): isolated-registry
+    // isolates the machine registry, runtime-copies regenerates the git-ignored runtime copies the package sources import.
+    const importArgs = ['isolated-registry.mjs', 'runtime-copies.mjs'].map((name) => path.join(dir, 'tests', 'setup', name)).filter((preload) => fs.existsSync(preload)).flatMap((preload) => ['--import', pathToFileURL(preload).href]);
     const r = node([...importArgs, '--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', '--test-reporter-destination=stdout',
       `--test-reporter=${pathToFileURL(reporter).href}`, `--test-reporter-destination=${out}`, ...files], { cwd: dir, timeout, env: specRunEnv() });
     let failures = null;
@@ -427,7 +427,7 @@ export function specBaselineVerdict({ candidate, base, changed = [] }) {
 
 /** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
 export const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
-export const MIRROR_FIX = 'run node scripts/hfs/sync-runtime.mjs and include the refreshed mirror in the change';
+export const MIRROR_FIX = 'the runtime copies are generated and git-ignored: fix what sync-runtime.mjs mirrors until its run is clean';
 
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
@@ -450,9 +450,9 @@ process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [.
 }
 
 /**
- * The mirror-drift tree check: when the candidate changes a file a sync-runtime bundle mirrors (or a bundle, or the
- * generator), `sync-runtime --check` runs in the scratch and a new drift refuses with the one fix; drift inherited from
- * main (the baseline entry of the mirror check, same findings-based verdict as TREE_CHECKS) is advisory. null when it does not apply.
+ * The mirror-drift check: a candidate changing a file a sync-runtime bundle mirrors (or a bundle, or the generator)
+ * runs `sync-runtime --check` in the already-synced scratch; any drift still reported refuses with the one fix, drift
+ * inherited from main (the baseline entry of the mirror check, same verdict as TREE_CHECKS) is advisory. null when it does not apply.
  */
 export function mirrorDriftCheck({ dir, changed, baseline = null }) {
   if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return null;
@@ -830,7 +830,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
       m.openSupDecision(specsRedOnMainDecision({ redOnMain, root, commits, now: Date.now() }));
     } catch { /* the land_runs row carries the advisory */ }
   }
-  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
+  // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the workers:push duty retries).
   if (pushOwedOf(result)) {
     const why = result.push.refused ?? result.push.error ?? 'push failed';
     try {

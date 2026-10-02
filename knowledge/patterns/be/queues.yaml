@@ -10,6 +10,9 @@ purpose: |-
 appliesTo:
   - backend
 family: be
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [be.feature.jobs, be.queues, be.platform.queue]
 pattern: queue
 provenance:
   reviewedAt: 2026-10-02
@@ -77,7 +80,7 @@ rules:
       `platform/queue` registers at boot; its job is processed by the same `features/jobs/<job>/<job>.processor.ts` as any
       enqueued job. `@nestjs/schedule`, `@Cron`, `@Interval`, `@Timeout` and `setInterval` for work are not used anywhere.
     rationale: |-
-      One scheduler in Redis fires once for the whole fleet, where cron in a replicated process fires once per replica.
+      One scheduler in Redis fires once for the whole deployment, where cron in a replicated process fires once per replica.
     cases:
       - id: case-1
         when: Expire unpaid orders every five minutes

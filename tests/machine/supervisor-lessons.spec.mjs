@@ -40,7 +40,7 @@ test('a signature repeated minRepeats times opens ONE hypothesis with a cause cl
 
 test('guardrails: the propose tier, a checker change without a wrongly-blocked example, and the daily cap refuse the land', () => {
   assert.equal(tierOf([{ path: 'scripts/work/draw/draw-acceptance.mjs', status: 'M' }, { path: 'packages/grammar/src/Card.tsx', status: 'M' }]).tier, 'auto', 'checker fixes and grammar are routine');
-  for (const p of ['modules/kernel/owner-rulings.yaml', 'knowledge/ui/examples/brand-direction.nivo.yaml', 'knowledge/ui/presentation/padding.yaml', 'modules/ops/registry.yaml', 'config.yaml', 'modules/kernel/driver-loop.yaml'])
+  for (const p of ['modules/kernel/owner-rulings.yaml', 'knowledge/ui/examples/brand-direction.example.yaml', 'knowledge/ui/presentation/padding.yaml', 'modules/ops/registry.yaml', 'config.yaml', 'modules/kernel/driver-loop.yaml'])
     assert.equal(tierOf([{ path: p, status: 'M' }]).tier, 'propose', p);
   assert.equal(tierOf([{ path: 'scripts/checks/old-gate.mjs', status: 'D' }]).tier, 'propose', 'removing a gate');
   assert.equal(tierOf([{ path: 'knowledge/grammars/starci/DNA.yaml', status: 'M' }]).tier, 'auto', 'grammar snapshots follow grammar');

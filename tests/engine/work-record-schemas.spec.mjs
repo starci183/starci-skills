@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {addWorkCommon} from '../../scripts/lib/work-schemas.mjs';
 import {isWorkRecordSchema} from '../../scripts/work/record-ownership.mjs';
 
 /**
@@ -25,7 +26,7 @@ const root = path.resolve(import.meta.dirname, '..', '..');
 const schemaDir = path.join(root, 'modules', 'schemas');
 const workRoot = path.join(root, 'examples', 'ecommerce-app', '.starciwork');
 
-const ajv = new Ajv2020({strict: true, allErrors: true});
+const ajv = addWorkCommon(new Ajv2020({strict: true, allErrors: true}));
 
 const readSchema = file => parseYaml(fs.readFileSync(path.join(schemaDir, file), 'utf8'));
 

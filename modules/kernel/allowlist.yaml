@@ -1,0 +1,520 @@
+# allowlist.yaml — the ONE explicit allowlist of the runtime (schema modules/schemas/allowlist.schema.yaml).
+#
+# Every exception a runtime check keeps lives in one named section here, each entry carrying the reason it
+# exists; a reader loads its section through scripts/lib/allowlist.mjs (readAllowlist(kind)) and nothing
+# else. Every section only shrinks: an entry goes when the exception it names is gone, and no second
+# allowlist, baseline, pending or entries file is allowed (scripts/checks/check-one-allowlist.mjs).
+schema: starci/allowlist@1
+
+# Literals that look like finding codes to scripts/checks/check-failure-codes.mjs but are not: constants,
+# env names, schema ids, event kinds, labels. Anything a checker or verb can emit as a reason belongs in
+# modules/kernel/failure-codes.yaml instead.
+not-codes:
+  - literal: APP_FILTER
+    reason: "NestJS framework token name the checker looks for, not a code"
+  - literal: APP_GUARD
+    reason: "NestJS framework token name the checker looks for, not a code"
+  - literal: BAND_TOKEN_NAMES
+    reason: "export name of a token table in the grammar knowledge"
+  - literal: BLOCK_FOLDED
+    reason: "YAML scalar type name, not an error code"
+  - literal: BLOCK_LITERAL
+    reason: "YAML scalar type name, not an error code"
+  - literal: COMMON_GRAMMAR_COMPONENTS
+    reason: "name of a registry constant in the grammar package, not a code"
+  - literal: ENGINE_SCHEMA
+    reason: "constant naming the engine protocol marker (starci/engine@1), not an emitted code"
+  - literal: GLOBAL_ANALYSIS_TOKEN
+    reason: "SonarQube token type label passed when minting a token, not a failure code"
+  - literal: INIT_CWD
+    reason: "the env var npm sets for a lifecycle script; package-clean-test.mjs drops it from the clean install env, not a code"
+  - literal: IO_DRIFT
+    reason: "only named in a comment in kinds.yaml; no emit site found in scripts/engine/modules"
+  - literal: LEDGER_SCHEMA
+    reason: "schema id constant, not a code"
+  - literal: LEDGER_VERSION
+    reason: "schema version constant, not a code"
+  - literal: MACHINE_SCHEMA
+    reason: "schema id constant, not a code"
+  - literal: MACHINE_VERSION
+    reason: "schema version constant, not a code"
+  - literal: PROJECT_ANALYSIS_TOKEN
+    reason: "SonarQube token type label passed when minting a token"
+  - literal: STARCI_API_CHILD
+    reason: "env var name marking api child processes"
+  - literal: STARCI_ENGINE_START_REASON
+    reason: "env var name"
+  - literal: STARCI_GUARDS_ROOT
+    reason: "env var name (relocates the runtime guard directory; scripts/guards/guards-root.mjs)"
+  - literal: STARCI_HOST_RESOURCES_JSON
+    reason: "env var name (resource probe override)"
+  - literal: STARCI_HOST_WAIT_MS
+    reason: "env var name (timing setting)"
+  - literal: STARCI_KERNEL_DEATH_SETTLE_MS
+    reason: "env var name (timing setting)"
+  - literal: STARCI_LOCAL_ROOT
+    reason: "env var name (overrides the whole %LOCALAPPDATA%/StarCi state base)"
+  - literal: STARCI_PROJECTS_ROOT
+    reason: "env var name"
+  - literal: STARCI_RELOADED_AT
+    reason: "env var name"
+  - literal: STARCI_RELOAD_HANDOVER_FROM
+    reason: "env var name"
+  - literal: STARCI_TEST_MACHINE_FILE
+    reason: "env var name for specs"
+  - literal: STARCI_UAT_RECORDINGS_ROOT
+    reason: "env var name"
+  - literal: STRICT_MODE
+    reason: "info label on a strict schema validation count line, not a failure"
+  - literal: artifacts-indexed
+    reason: "ten su kien (event kind) ghi nhan da lap chi muc artifact, khong phai loi"
+  - literal: ask-answered
+    reason: "ten su kien (event kind) chu so huu da tra loi cau hoi, khong phai loi"
+  - literal: brief-gap
+    reason: "nhan nhom nguyen nhan (cause class) cua bai hoc Supervisor, khong phai ma phat ra"
+  - literal: business-decision
+    reason: "ten mot loai cau hoi ask (ASK_KINDS), khong phai ma loi"
+  - literal: canon-wire
+    reason: "nhan ly do (reason) khi tao job noi tiep, khong phai loi"
+  - literal: checks-recorded
+    reason: "ten su kien (event kind) ghi nhan da luu ket qua check, khong phai loi"
+  - literal: contract-churn
+    reason: "nhan nhom nguyen nhan (cause class) cua bai hoc Supervisor, khong phai ma phat ra"
+  - literal: crash-loop
+    reason: "nhan lop thong bao khan (urgent class) cua notifier, khong phai ma refusal"
+  - literal: deferred-settle
+    reason: "wait-kind label of a queued job, not a failure code"
+  - literal: define-goal
+    reason: "workflow creation reason label, not a failure"
+  - literal: directory-gone
+    reason: "GC item label (gc_items.reason) for a registry row whose worktree directory is already gone, not a failure"
+  - literal: dispatch-reconciled
+    reason: "ledger event kind name, not a failure code"
+  - literal: dispatch-rejected
+    reason: "ledger event kind name, not a failure code"
+  - literal: draw-review
+    reason: "ask class label excluded from auto-accept, not a code"
+  - literal: duplicate-session
+    reason: "supervisor terminal cleanup plan label, not a failure code"
+  - literal: finished-early
+    reason: "draw-loop stop reason (benign), not a failure"
+  - literal: first-run
+    reason: "schedule claim reason (benign due-state), not a failure"
+  - literal: follow-up
+    reason: "peer message kind label, not a code"
+  - literal: gate-defect
+    reason: "cause class label for supervisor lessons, not a code"
+  - literal: goal-defined
+    reason: "ledger event kind name marking progress, not a failure"
+  - literal: heads-up
+    reason: "peer message kind label"
+  - literal: held-by-live-job
+    reason: "benign cleanup keep-reason label"
+  - literal: impact-check
+    reason: "next-action kind label"
+  - literal: incident-auto-resolved
+    reason: "ledger event kind, not a failure"
+  - literal: incident-raised
+    reason: "ledger event kind"
+  - literal: incident-resolved
+    reason: "ledger event kind"
+  - literal: irreversible-confirmation
+    reason: "ask kind label"
+  - literal: job-dropped
+    reason: "ledger event kind"
+  - literal: job-enqueued
+    reason: "ledger event kind"
+  - literal: land-scratch
+    reason: "worktree registry kind (machine.sqlite worktrees.kind, scripts/machine/worktrees.mjs WORKTREE_KINDS), not a code"
+  - literal: layout-tree
+    reason: "foundation kind label"
+  - literal: live-worker-reconciled
+    reason: "ledger event kind"
+  - literal: no-open-circuit
+    reason: "benign no-op recover label"
+  - literal: no-quota-probe
+    reason: "benign probe skip label"
+  - literal: no-starci-marker
+    reason: "benign terminal keep-reason label"
+  - literal: not-a-file
+    reason: "benign archive skip label"
+  - literal: not-starci
+    reason: "benign cleanup keep-reason label"
+  - literal: nothing-open
+    reason: "benign doorbell no-op label"
+  - literal: one-off
+    reason: "note class label"
+  - literal: op-dispatched
+    reason: "ledger event kind"
+  - literal: op-settled
+    reason: "ledger event kind"
+  - literal: op-worker-nudged
+    reason: "ledger event kind"
+  - literal: owner-restart
+    reason: "start reason label in PLANNED_START_REASONS, not a failure"
+  - literal: phase-transition
+    reason: "ledger event kind for progress tracking, not a failure code"
+  - literal: plan-derived
+    reason: "ledger event kind for progress tracking, not a failure code"
+  - literal: planned-restart
+    reason: "start reason label in PLANNED_START_REASONS, not a failure"
+  - literal: policy-shared
+    reason: "informational isolation-plan reason (brief opts out of worktree), not a failure"
+  - literal: product-direction
+    reason: "note class label in draw-feedback, not a failure code"
+  - literal: push-scratch
+    reason: "worktree registry kind (machine.sqlite worktrees.kind, scripts/machine/worktrees.mjs WORKTREE_KINDS), not a code"
+  - literal: queued-ready
+    reason: "wait-kind metric label in supervisor op-metrics, not a failure code"
+  - literal: rate-limited
+    reason: "doorbell ring-planning reason (skipped ring), not a failure"
+  - literal: reload-handover
+    reason: "planned engine exit_reason label, not a failure"
+  - literal: report-consumed
+    reason: "ledger event kind, not a failure code"
+  - literal: report-filed
+    reason: "ledger event kind, not a failure code"
+  - literal: retry-cap
+    reason: "wait-kind label (WAIT_KINDS), not a failure code"
+  - literal: root-verify
+    reason: "next-action kind label"
+  - literal: run-created
+    reason: "ledger event kind"
+  - literal: runtime-flow
+    reason: "lesson cause-class label"
+  - literal: runtime-repo
+    reason: "product-isolation skip reason (not a failure)"
+  - literal: self-reload
+    reason: "planned-start reason label"
+  - literal: sessions-db-owned
+    reason: "session archive skip reason (informational)"
+  - literal: shared-system
+    reason: "owner ask class label"
+  - literal: starci-agent-session
+    reason: "terminal dedupe reason (close decision), not a failure"
+  - literal: supervisor-gate
+    reason: "next-action kind label"
+  - literal: supervisor-staging
+    reason: "worktree registry kind (machine.sqlite worktrees.kind, scripts/machine/worktrees.mjs WORKTREE_KINDS), not a code"
+  - literal: test-env-unrooted
+    reason: "session archive skip reason (informational)"
+  - literal: time-budget
+    reason: "GC item label: a bounded worktree GC pass stopped at its time budget and resumes next pass, not a failure"
+  - literal: work-owner-only
+    reason: "product-isolation skip reason (not a failure)"
+  - literal: workflow-ended
+    reason: "incident close reason (success)"
+  - literal: workflow-finished
+    reason: "phase-transition reason (success)"
+  - literal: BYTE_CENSUS
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: CACHE_MANAGER
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: ENV_VAR_OR_CUSTODY_KEY
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: MEMORY_CACHE_MANAGER
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: MISSING_CHAR
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: PHASE_REASON
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: QUOTE_DOUBLE
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: QUOTE_SINGLE
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: REDIS_CACHE_MANAGER
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: TOKEN_TOLERANCE
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: UNEXPECTED_TOKEN
+    reason: "constant, parser token or key name, not an emitted code"
+  - literal: X_FILE
+    reason: "constant, parser token or key name, not an emitted code"
+
+# The JSON files scripts/checks/check-json-exceptions.mjs admits without schema stamps. Exact relative
+# paths (from this skill root), no wildcards: exceptions[] names one file each; directories[] names one
+# exact directory whose direct *.json children are all admitted (an append-only record written one file
+# per entry, a package whose every direct JSON is toolchain config, or a test-world fake's recorded
+# payloads in the third party's own JSON wire format — subdirectories are not admitted, and the directory
+# must exist). Generated runtime mirrors (GENERATED_MIRROR_ROOTS in scripts/checks/check-json-exceptions.mjs)
+# are not authored source and are not listed.
+json-exceptions:
+  directories:
+    - path: benchmark/snapshots
+      reason: >
+        Append-only model-pool snapshots written by scripts/agent/benchmark-snapshot.mjs, one
+        <YYYY-MM-DD>-<N>h.json per date and window in the raw model-scorecard --json shape
+        (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
+    - path: examples/ecommerce-app/be/contracts/billing
+      reason: >
+        The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
+    - path: examples/ecommerce-app/be/contracts/order
+      reason: >
+        The vendored async contract of the order service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
+    - path: examples/ecommerce-app/fe/packages/ecommerce-api
+      reason: >
+        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+    - path: examples/ecommerce-app/fe/packages/ecommerce-i18n
+      reason: >
+        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+    - path: examples/ecommerce-app/fe/packages/ecommerce-ui
+      reason: >
+        npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+    - path: packages/test-world
+      reason: >
+        The @starci/test-world package: its package.json, package-lock.json and tsconfig.json are toolchain config npm and tsc read as JSON.
+    - path: packages/tsconfig
+      reason: >
+        The @starci/tsconfig package: its package.json and the shared presets (base, be, build, e2e, next) that product tsconfig files extend; tsc reads JSON, and a new preset needs no new line here.
+  exceptions:
+    - path: .claude/settings.json
+      reason: >
+        Claude Code project settings for the runtime checkout (the PreToolUse seat-tools guard hook); Claude Code reads JSON.
+    - path: engine/yaml-license.json
+      reason: >
+        License metadata for the bundled yaml runtime in engine/yaml.mjs;
+        authored JSON kept source-side by upstream license form.
+    - path: examples/ecommerce-app/.starcistacks/dev/environment.json
+      reason: >
+        starci/rendered-environment output for the ecommerce-app application stack (be side); JSON by the rendering contract.
+    - path: examples/ecommerce-app/.starcistacks/dev/infra/compose/realm-ecommerce.json
+      reason: >
+        Keycloak realm import for the dev Compose stack of the ecommerce-app back end; the
+        Keycloak container's realm-import feature requires a JSON realm file.
+    - path: examples/ecommerce-app/.starcistacks/dev/infra/metadata.json
+      reason: >
+        Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.
+    - path: examples/ecommerce-app/be/nest-cli.json
+      reason: >
+        Nest CLI monorepo map inside the ecommerce-app back end; the nest toolchain reads JSON.
+    - path: examples/ecommerce-app/be/src/tests/tsconfig.json
+      reason: >
+        TypeScript config for the ecommerce-app back-end test tree (src/tests); tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/be/tsconfig.build.json
+      reason: >
+        TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/be/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/fe/apps/app/package.json
+      reason: >
+        npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
+    - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/en.json
+      reason: >
+        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/ecommerce-app/fe/apps/app/src/modules/i18n/messages/vi.json
+      reason: >
+        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/ecommerce-app/fe/apps/app/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/fe/apps/landing/package.json
+      reason: >
+        npm workspace manifest of the ecommerce-app monorepo; npm requires a JSON package.json.
+    - path: examples/ecommerce-app/fe/apps/landing/src/modules/i18n/messages/en.json
+      reason: >
+        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/ecommerce-app/fe/apps/landing/src/modules/i18n/messages/vi.json
+      reason: >
+        i18n message catalog inside the ecommerce-app front-end source; the app i18n loader consumes JSON.
+    - path: examples/ecommerce-app/fe/apps/landing/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/fe/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the ecommerce-app front end; tsc reads JSON (with comments).
+    - path: examples/ecommerce-app/hfs.json
+      reason: >
+        HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app example; the architecture machine reads hfs.json as JSON.
+    - path: examples/ecommerce-app/package-lock.json
+      reason: >
+        npm lockfile of the ecommerce-app root; npm writes JSON by contract.
+    - path: examples/ecommerce-app/package.json
+      reason: >
+        npm package manifest of the ecommerce-app root; the npm toolchain requires JSON.
+    - path: examples/ecommerce-app/turbo.json
+      reason: >
+        The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+    - path: examples/shape-slot/be/nest-cli.json
+      reason: >
+        Nest CLI monorepo map inside the shape-slot back end; the nest toolchain reads JSON.
+    - path: examples/shape-slot/be/src/tests/tsconfig.json
+      reason: >
+        TypeScript config for the shape-slot back-end test tree (src/tests); tsc reads JSON (with comments).
+    - path: examples/shape-slot/be/tsconfig.build.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot back end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/be/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot back end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/fe/apps/shape-slot/package.json
+      reason: >
+        npm workspace manifest of the shape-slot monorepo; npm requires a JSON package.json.
+    - path: examples/shape-slot/fe/apps/shape-slot/src/modules/i18n/messages/vi.json
+      reason: >
+        i18n message catalog inside the shape-slot front-end source; the app i18n loader consumes JSON.
+    - path: examples/shape-slot/fe/apps/shape-slot/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot front end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/fe/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the shape-slot front end; tsc reads JSON (with comments).
+    - path: examples/shape-slot/hfs.json
+      reason: >
+        HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
+    - path: examples/shape-slot/package-lock.json
+      reason: npm lockfile of the shape-slot root; npm writes JSON by contract.
+    - path: examples/shape-slot/package.json
+      reason: npm package manifest of the shape-slot root; the npm toolchain requires JSON.
+    - path: examples/shape-slot/turbo.json
+      reason: >
+        The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+    - path: hfs.json
+      reason: >
+        HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
+        reads hfs.json as JSON in every repository it judges, so the runtime's own declaration keeps the same form.
+    - path: knowledge/ui/proof/calibration/calibration.json
+      reason: >
+        Explicit calibration dataset exception; all other authored knowledge JSON
+        is rejected.
+    - path: package-lock.json
+      reason: npm lockfile; package managers require JSON filename and syntax.
+    - path: package.json
+      reason: npm package manifest; Node/npm require JSON filename and syntax.
+    - path: packages/eslint/be/fixtures/typed/tsconfig.json
+      reason: >
+        TypeScript project for the typed-lint fixture of @starci/eslint-canon-be; typescript-eslint reads a JSON tsconfig.
+    - path: packages/eslint/be/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/eslint/fe/fixtures/typed/tsconfig.json
+      reason: >
+        TypeScript project for the typed-lint fixture of @starci/eslint-canon-fe; typescript-eslint reads a JSON tsconfig.
+    - path: packages/eslint/fe/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/fe-kit/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/fe-kit/tsconfig.json
+      reason: >
+        TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
+    - path: packages/grammar/.storybook/a11y-allowlist.json
+      reason: >
+        Reviewed a11y-gate waivers for the grammar Storybook; .storybook/a11y-gate.ts imports it as a JSON module through Vite.
+    - path: packages/grammar/package-lock.json
+      reason: >
+        npm lockfile inside the packages workspace project; npm writes JSON by contract.
+    - path: packages/grammar/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/grammar/tsconfig.build.json
+      reason: >
+        TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
+    - path: packages/grammar/tsconfig.stories.json
+      reason: >
+        TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
+    - path: packages/heroicons/package-lock.json
+      reason: >
+        npm lockfile inside the packages workspace project; npm writes JSON by contract.
+    - path: packages/heroicons/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/heroicons/tsconfig.build.json
+      reason: >
+        TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
+    - path: packages/hfs/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/hfs/templates/app/package-scripts/package.json
+      reason: >
+        Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+    - path: packages/hfs/templates/app/task-graph/turbo.json
+      reason: >
+        Managed app-root turbo task graph template @starci/hfs writes into a product repository (slot app.task-graph); turbo reads only turbo.json.
+    - path: packages/hfs/templates/be/tool-config/src/tests/tsconfig.json
+      reason: >
+        TypeScript config template for the back-end test tree (src/tests) @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/be/tool-config/tsconfig.build.json
+      reason: >
+        TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/be/tool-config/tsconfig.json
+      reason: >
+        TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/hfs/templates/fe/skeleton/apps/app/src/modules/i18n/messages/vi.json
+      reason: >
+        next-intl message catalogue template for the scaffolded product app (fe/apps/app); next-intl requires JSON.
+    - path: packages/hfs/templates/fe/skeleton/apps/landing/src/modules/i18n/messages/vi.json
+      reason: >
+        next-intl message catalogue template for the scaffolded landing app (fe/apps/landing); next-intl requires JSON.
+    - path: packages/hfs/templates/fe/tool-config/tsconfig.json
+      reason: >
+        TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+    - path: packages/jest-preset/package-lock.json
+      reason: >
+        The lockfile of @starci/jest-preset (lane PKGT): its clean-install proof runs npm ci from it; npm writes it as JSON.
+    - path: packages/jest-preset/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/package-lock.json
+      reason: >
+        npm lockfile inside the packages workspace project; npm writes JSON by contract.
+    - path: packages/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/prettier-config/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: packages/stylelint/package-lock.json
+      reason: >
+        npm lockfile inside the packages workspace project; npm writes JSON by contract.
+    - path: packages/stylelint/package.json
+      reason: >
+        npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+    - path: ui/components.json
+      reason: shadcn component registry config for the StarCi Status console; the shadcn CLI requires JSON.
+    - path: ui/package-lock.json
+      reason: npm lockfile for the StarCi Status console; the npm toolchain requires JSON.
+    - path: ui/package.json
+      reason: npm package manifest for the StarCi Status console; the npm toolchain requires JSON.
+    - path: ui/tsconfig.json
+      reason: TypeScript config for the StarCi Status console; tsc requires JSON.
+
+# The scripts scripts/checks/check-dead-scripts.mjs keeps despite having no code reader (spec utilities,
+# generated-baseline recorders, deliberate touch points): an undeclared script with no executable reader
+# is a dead script, and an entry whose script is gone or that code now reads is a stale entry, so this
+# list only shrinks. Delete a script that nothing reads rather than declaring it.
+dead-script-entries:
+  - path: scripts/api/orca/task-list.mjs
+    reason: "typed call of modules/host/orca/calls.yaml that only the live smoke spec reads (tests/api-orca/orca-settle-live.spec.mjs, the E3 proof that a worker_done settles its Dispatch); no runtime code lists Tasks"
+  - path: scripts/api/orca/project-setup-delete.mjs
+    reason: "typed call of modules/host/orca/calls.yaml with no code importer; KEEP by owner ruling"
+  - path: scripts/checks/check-entry.mjs
+    reason: "CLI that CONTEXT.md tells an agent to run when an entry path errors (installed-entry sanity); kept because a live instruction names it"
+  - path: scripts/checks/check-example-architecture.mjs
+    reason: "CLI run by the owner (RED14: the examples meet their own standard); a spec reads it"
+  - path: scripts/checks/check-example-derived.mjs
+    reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
+  - path: scripts/example/example-evidence.mjs
+    reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); specs read it"
+  - path: scripts/example/example-verify.mjs
+    reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
+  - path: scripts/gates/repo-presentation.mjs
+    reason: "gate CLI that a product repository runs (docs/repo-presentation.md); no spec"
+  - path: scripts/kernel/launch-smoke.mjs
+    reason: "release smoke run by the owner (docs/releasing.md); specs read it"
+  - path: scripts/route/route-op.mjs
+    reason: "routing CLI named by the op prompts (docs/ops.md); no spec"
+  - path: scripts/uat/assisted-runner.mjs
+    reason: "UAT runner CLI named by the op prompts; specs read it"
+  - path: scripts/work/validate/check-evidence-binding.mjs
+    reason: "validator CLI (docs/verify-proof.md); a spec reads it"
+  - path: scripts/work/validate/work-change.mjs
+    reason: "validator CLI of work records (docs); a spec reads it"
+  - path: scripts/guards/git-hooks.mjs
+    reason: "generated runtime hook installer with no current code importer; the CLI lane's `starci runtime link` verb is its future reader"
+  - path: scripts/guards/release-record.mjs
+    reason: "the L4 record of a release (written by the release cut, read by the pre-push gate of the hooks): the release cut of the GOVERNANCE lane is its future importer"
+
+# Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
+export-used: []

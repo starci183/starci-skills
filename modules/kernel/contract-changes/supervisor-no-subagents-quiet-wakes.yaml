@@ -1,8 +1,0 @@
-id: supervisor-no-subagents-quiet-wakes
-effectiveAt: '2026-09-24T21:00:00+07:00'
-summary: "the [Supervisor] seat launches with its agent's subagent tool denied (claude --disallowedTools 'Agent,Task'; applies from its next start) and diagnoses through [Worker] jobs (worker outcome diagnosed, announced by a [report] wake); its watchdog never wakes it while it is mid-turn or its subagents still run, names what each wake is about (inbox ids, last tick, job ids) and never sends a text identical to one it already attempted. Supervisor-only: adds no op check or finding code"
-paths:
-  - modules/supervisor/supervise.yaml
-  - modules/supervisor/supervisor-prompt.md
-  - modules/supervisor/worker-prompt.md
-reach: new-legs

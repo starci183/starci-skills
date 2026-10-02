@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
+import { controllerContract, fakeCtx } from '../../scripts/reconciler/testing.mjs';
 import learning, { KEY, violationItems, planLearning, reconcileLearning, DEFAULTS } from '../../scripts/reconciler/controllers/learning.mjs';
 import { newHypotheses, measureExperiments } from '../../scripts/machine/lessons.mjs';
 
-// Lane rc-fleet-ui (LANES.md "Lane G", DESIGN.md §8.7): the invariant violations of the window are learning items
+// Lane rc-workers (LANES.md "Lane G", DESIGN.md §8.7): the invariant violations of the window are learning items
 // with signature inv:<code>; two violations of one code open ONE hypothesis DI for the Supervisor, a signature that
 // already has an open hypothesis opens none, and in shadow the recording pass is only a would-row.
 
@@ -13,10 +13,8 @@ const MIN = 60_000;
 const empty = { signatures: {}, experiments: {}, lessons: [], proposals: {} };
 const ls = { minRepeats: 2, measureMs: 86_400_000, successDrop: 0.1 };
 
-test('the controller module follows the shared contract', () => {
-  assert.equal(learning.name, 'learning');
-  assert.deepEqual(learning.concerns, ['learning.tick']);
-  assert.equal(learning.routes['runtime-invariant-violated']({}), KEY);
+test('the learning controller module follows the shared contract', () => {
+  controllerContract(learning, { name: 'learning', concerns: ['learning.tick'], routeKey: 'runtime-invariant-violated', duty: KEY });
 });
 
 test('violations become one item per code, counted inside the window', () => {

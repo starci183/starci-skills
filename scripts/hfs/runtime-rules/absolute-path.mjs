@@ -11,13 +11,12 @@
 // Pure apart from ctx.read.
 import { hostPathHits } from '../../lib/host-path.mjs';
 import { ts } from './source-ast.mjs';
+import { lineOf } from '../../lib/check-scan.mjs';
 
 export const CODE = 'RT_ABSOLUTE_PATH';
 const SOURCE = /\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx)$/;
 const LINE_TEXT = /\.(?:ya?ml|json|md|txt|sh|ps1|cmd|bat|html|css|toml)$/;
 const SKIPPED = /(?:^|\/)(?:package-lock|npm-shrinkwrap)\.json$/;
-
-const lineAt = (text, offset) => { let n = 1; for (let i = 0; i < offset; i += 1) if (text.charCodeAt(i) === 10) n += 1; return n; };
 
 const finding = (file, line, hit) => ({ code: CODE, level: 'error', path: file, line, message: `${file}:${line} holds a hard-coded ${hit.kind} (${hit.sample}): the runtime repository uses relative paths - resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and build spec fixtures from the temp dir` });
 
@@ -27,7 +26,7 @@ export function absolutePathFindings(file, text) {
   if (!SOURCE.test(file) && !LINE_TEXT.test(file)) return [];
   const found = [];
   if (!SOURCE.test(file)) {
-    for (const hit of hostPathHits(text)) found.push(finding(file, lineAt(text, hit.offset), hit));
+    for (const hit of hostPathHits(text)) found.push(finding(file, lineOf(text, hit.offset), hit));
     return found;
   }
   const t = ts();
@@ -36,7 +35,7 @@ export function absolutePathFindings(file, text) {
   const lineOfPos = (pos) => source.getLineAndCharacterOfPosition(pos).line + 1;
   const literal = (node) => {
     const value = node.text;
-    for (const hit of hostPathHits(value)) found.push(finding(file, lineOfPos(node.getStart(source)) + lineAt(value, hit.offset) - 1, hit));
+    for (const hit of hostPathHits(value)) found.push(finding(file, lineOfPos(node.getStart(source)) + lineOf(value, hit.offset) - 1, hit));
   };
   const seenComments = new Set();
   const comments = (pos) => {
@@ -44,7 +43,7 @@ export function absolutePathFindings(file, text) {
       if (seenComments.has(range.pos)) continue;
       seenComments.add(range.pos);
       const body = text.slice(range.pos, range.end);
-      for (const hit of hostPathHits(body)) found.push(finding(file, lineAt(text, range.pos + hit.offset), hit));
+      for (const hit of hostPathHits(body)) found.push(finding(file, lineOf(text, range.pos + hit.offset), hit));
     }
   };
   const visit = (node) => {

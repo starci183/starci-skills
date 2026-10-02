@@ -23,7 +23,7 @@ To prepare the fixture first, run `node ui/fixtures/seed.mjs` from the runtime r
 
 Without `STARCI_MACHINE_DB`, `engine/db/machine.mjs` resolves the host's real `machine.sqlite` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
 
-For source development, `npm run dev` starts Vite and the API preview; see `package.json` for the current script and ports. `npm run build` runs lint, TypeScript and Vite build. The public server defaults to `127.0.0.1:4547` unless `STARCI_STATUS_PORT` is set.
+For source development, `npm run dev` starts Vite and the API preview; see `package.json` for the current script and ports. `npm run build` runs lint, TypeScript and Vite build. The public server defaults to `127.0.0.1:<port>` with `<port>` from `statusApp.port` of `modules/models/runtimes.yaml`, unless `STARCI_STATUS_PORT` is set.
 
 ## Pages
 

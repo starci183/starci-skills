@@ -1,9 +1,0 @@
-id: knowledge-rulings-heroui
-effectiveAt: '2026-09-27T12:30:00+07:00'
-summary: "Owner ruling 2026-09-27 (HeroUI and grammar CSS win; wrong TextAction rules deleted). padding.yaml TextAction choice/route/section keep only the inline padding rule (choice PADDING-2, route and section PADDING-3); the block rules are deleted because the 44px min-block-size floor sets the rendered block inset. componentOwnership rows that carry one rule per side or property name that CSS property after the part (Sidebar item/section label/footer, Tooltip, Rail body, ChatWorkspace, SurfaceAccordionCard body, OtpInput overflow). TASTE-7 case-4 measures box-shaped controls and nested surfaces only; a pill (Button, Badge, Chip, pill tabs) is its own shape. family.yaml drops the deadTokens block: a NIVO card is the bound 1rem. playbook.yaml state-recipes adds unauthorized (401): one sign-in prompt per slot, primary action sign in. ui-proof-brief lists a declared-unread family token with the geometry instead of as a conflict and scores TASTE-7 case-4 without pills. Adds no check or code"
-paths:
-  - knowledge/ui/presentation/padding.yaml
-  - knowledge/ui/presentation/overflow.yaml
-  - knowledge/ui/proof/taste.yaml
-  - knowledge/grammars/starci/family.yaml
-  - knowledge/grammars/starci/playbook.yaml

@@ -15,19 +15,18 @@ required:
 properties:
   schema:
     const: work/feature@1
-    description: Record family discriminator. Every record names its own family so a file can be validated
-      without inferring its meaning from the directory it happens to sit in.
+    $ref: "urn:work:common:1#/$defs/familyDiscriminator"
   id:
-    $ref: "#/$defs/slug"
+    $ref: "urn:work:common:1#/$defs/slugId"
     description: The feature's stable identifier, matching the entry the catalog carries for it. It is the
       second segment of every record id inside this feature, which is what makes an id readable as an
       address.
   title:
-    $ref: "#/$defs/prose"
+    $ref: "urn:work:common:1#/$defs/prose"
     description: What the feature is, written as a statement rather than a label. A title that reads as a
       sentence forces the author to say what the feature does instead of naming a folder.
   description:
-    $ref: "#/$defs/prose"
+    $ref: "urn:work:common:1#/$defs/prose"
     description: What the feature covers and, where it helps, what it deliberately does not. It is the
       orientation a reader needs before opening any leaf.
   extensions:
@@ -63,12 +62,12 @@ $defs:
           goalIdentity: {type: string, minLength: 1}
           goalRevision: {type: integer, minimum: 0}
           source: {type: string, minLength: 1}
-          outcome: {$ref: "#/$defs/prose"}
+          outcome: {$ref: "urn:work:common:1#/$defs/prose"}
           effectCeiling:
             anyOf:
-              - {$ref: "#/$defs/prose"}
-              - {type: array, minItems: 1, items: {$ref: "#/$defs/prose"}}
-          completionCriteria: {type: array, items: {$ref: "#/$defs/prose"}}
+              - {$ref: "urn:work:common:1#/$defs/prose"}
+              - {type: array, minItems: 1, items: {$ref: "urn:work:common:1#/$defs/prose"}}
+          completionCriteria: {type: array, items: {$ref: "urn:work:common:1#/$defs/prose"}}
       nodes:
         type: array
         items:
@@ -79,7 +78,7 @@ $defs:
             id: {type: string, minLength: 1}
             kind: {type: string, minLength: 1}
             path: {type: string, minLength: 1}
-            purpose: {$ref: "#/$defs/prose"}
+            purpose: {$ref: "urn:work:common:1#/$defs/prose"}
             grounding: {type: array, items: {type: string, minLength: 1}}
             dependsOn: {type: array, items: {type: string}}
       deps:
@@ -91,7 +90,7 @@ $defs:
           properties:
             from: {type: string, minLength: 1}
             to: {type: string, minLength: 1}
-            reason: {$ref: "#/$defs/prose"}
+            reason: {$ref: "urn:work:common:1#/$defs/prose"}
       exclusions:
         type: array
         items:
@@ -101,27 +100,17 @@ $defs:
           properties:
             subject: {type: string, minLength: 1}
             path: {type: string, minLength: 1}
-            reason: {$ref: "#/$defs/prose"}
+            reason: {$ref: "urn:work:common:1#/$defs/prose"}
       openQuestions:
         type: array
         items:
           anyOf:
-            - {$ref: "#/$defs/prose"}
+            - {$ref: "urn:work:common:1#/$defs/prose"}
             - type: object
               additionalProperties: false
               required: [question]
               properties:
                 id: {type: string, minLength: 1}
-                question: {$ref: "#/$defs/prose"}
+                question: {$ref: "urn:work:common:1#/$defs/prose"}
                 status: {type: string, minLength: 1}
-                resolution: {$ref: "#/$defs/prose"}
-  prose:
-    type: string
-    minLength: 1
-    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
-      a written one, so it is refused at the type.
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
-      written twice by two authors is the same string.
+                resolution: {$ref: "urn:work:common:1#/$defs/prose"}

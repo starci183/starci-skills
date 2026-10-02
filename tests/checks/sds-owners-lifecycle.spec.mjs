@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { addWorkCommon } from '../../scripts/lib/work-schemas.mjs';
 import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 
 // mia inc-96ff77d86a77: architecture.decide listed `owners` as an SDS field while forbidding repository
@@ -63,7 +64,7 @@ test('after a done implementation proves it, the reconciliation owes owners: don
 test('the schema admits a component without owners, and the ops agree on who writes them', () => {
   const schema = readYaml('modules/schemas/work-sds-component.schema.yaml');
   assert.ok(!schema.required.includes('owners'));
-  const validate = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(schema);
+  const validate = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false })).compile(schema);
   assert.equal(validate(parseYaml(sds('todo'))), true, JSON.stringify(validate.errors));
   const decide = readYaml('modules/ops/ops/architecture.decide.yaml');
   const designWrite = decide.writes.find((w) => /sds\/\*\*\/index\.yaml/.test(w.path));

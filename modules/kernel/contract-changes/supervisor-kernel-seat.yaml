@@ -1,8 +1,0 @@
-id: supervisor-kernel-seat
-effectiveAt: '2026-09-24T20:30:00+07:00'
-summary: "the supervisor is ONE [Supervisor] kernel (scripts/supervisor/start-supervisor.mjs, singleton by lock + seat signal + dedupe, kept alive by scripts/supervisor/watchdog.mjs and resume-all/restart-all), not a chat: it ticks (tick.mjs: poll digest, OWED clustered by root cause, push of main), rules, notifies Kernels (notify.mjs), spawns [Worker] fix agents on demand (workers.mjs: one per cluster, balanced across claude/codex/devin/qwen, adaptive cap <= 10, ephemeral staging worktrees with file leases) and lands every runtime change through one serialized land gate (land.mjs: cherry-pick in a scratch worktree, node --check, YAML parse, tree checks, specs, contract-changes paths, compare-and-swap fast-forward, push). Chat relays only: channel 'main' registers from the Supervisor's terminal; tell.mjs for the desktop; /status adds the Supervisor block. Guardrail chat-only-debug-mode is replaced by one-supervisor-seat. Kernels are unaffected: adds no check or finding code for any op"
-paths:
-  - modules/supervisor/supervise.yaml
-  - modules/supervisor/supervisor-prompt.md
-  - modules/supervisor/worker-prompt.md
-reach: new-legs

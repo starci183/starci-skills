@@ -1,6 +1,6 @@
 # The contract of `api dispatch-ready` (scripts/kernel/verbs/dispatch-ready.mjs): the parallelism push.
 purpose: >-
-  Route and dispatch this workflow's queued-ready units up to api status progress.allowedParallel (the fleet
+  Route and dispatch this workflow's queued-ready units up to api status progress.allowedParallel (the worker
   RAM cap, the pools, the workflow's priority reserve) in one call, through the ordinary api route + api
   dispatch --spawn (every admission refusal holds). A unit whose shape already failed for a shape cause is
   skipped. Without --foreground it runs detached and answers with its result file.

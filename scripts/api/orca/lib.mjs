@@ -183,7 +183,7 @@ const driftEnvelope = (verb, entry, missing) => ({
  * The error text an Orca receipt carries: `<code>: <message>` from
  * {error:{code,message}}, the string of {error:'...'}, or null. Orca writes its
  * refusal as JSON on stdout with an empty stderr, so a caller that read only
- * stderr saw an empty error: nivo's dispatches were rejected at task-create
+ * stderr saw an empty error: the host's dispatches were rejected at task-create
  * with error "" for a whole restart (inc-5c0ff394e676).
  */
 function receiptErrorText(receipt) {

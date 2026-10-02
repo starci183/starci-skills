@@ -220,7 +220,7 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
 // IDLE_REPLACED_WINDOW_MS goes to the owner as one Decision Item (progress-stall, decider owner) instead of another
 // replace. Only a Kernel-authored job move clears that streak: op-dispatched/op-settled come from the dispatch path and
 // the settle tail, and the Kernel's own records (it is responding, e.g. holding behind an ask it cannot serve) reset the
-// wakes only. On 2026-09-29 the nivo-auth Kernel was replaced 5 times while it wrote kernel-decision/kernel-proposal
+// wakes only. On 2026-09-29 a product's auth Kernel was replaced 5 times while it wrote kernel-decision/kernel-proposal
 // records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
@@ -473,7 +473,7 @@ const print = result => {
 
 if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
-    console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
+    console.error('use: kernel-watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
   const result = await watchdogTick();

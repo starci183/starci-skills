@@ -5,7 +5,7 @@
  * gate needs the catalogue's sentence instead: the finding code (a key of `modules/kernel/failure-codes.yaml`), an
  * English headline (`en`) with `<file>` / `<what>` placeholders the reader fills from the stylelint location, and one
  * sentence "what do I do now" (`fix`). The owner reads both in Vietnamese through the declared message catalog: the
- * `en` and `fix` strings are the keys of `modules/i18n/messages/v4.yaml` (`translator('vi')(entry.en)` hands back the
+ * `en` and `fix` strings are the keys of `modules/i18n/messages/canon.yaml` (`translator('vi')(entry.en)` hands back the
  * Vietnamese of the same sentence). Every rule has an entry; the twin test refuses a rule with none and an entry for
  * a rule that does not exist.
  */

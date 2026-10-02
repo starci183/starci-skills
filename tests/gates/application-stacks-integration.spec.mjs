@@ -24,7 +24,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     }
   }
   for(const file of ['scripts/gates/stacks-gate.mjs','modules/schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
-    'docs/application-stacks.md','docs/application-stacks-vps.md',
+    'docs/application-stacks.md',
     ...['.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml','.sops.yaml']
       .map(name=>'examples/ecommerce-app/'+name)])assert.ok(files.has(file),file);

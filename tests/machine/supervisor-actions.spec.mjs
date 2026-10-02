@@ -126,7 +126,7 @@ test('the owner digest preview includes actions and waits but never sends', asyn
 test('the retired digest send flag is refused before any delivery', () => {
   const r = spawnSync(process.execPath, [fileURLToPath(new URL('../../scripts/supervisor/actions.mjs', import.meta.url)), 'digest', '--send'], { encoding: 'utf8', windowsHide: true });
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /Fleet Notifier/);
+  assert.match(r.stderr, /Owner Notifier/);
 });
 
 test('supervise.yaml carries the mission: the loop, every action class, the SLA and the owner-digest rule', () => {

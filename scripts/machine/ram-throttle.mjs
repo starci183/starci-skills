@@ -10,7 +10,7 @@
 //   effectiveCap = min(maxParallelOps, running + ops that still fit in free RAM above the hard floor)
 //
 // and admits one candidate op (admitOp) in this order:
-//   1. fleet: the ops holding a slot on every product ledger of the host (the machine registry) never reach
+//   1. workers: the ops holding a slot on every product ledger of the host (the machine registry) never reach
 //      maxParallelOps - the owner's 20 is never exceeded, whatever the RAM says;
 //   2. priority slots: a workflow below the top priority weight leaves the prioritized workflows' reserved slots
 //      free (min(reserve, their queued + running) - their running);
@@ -187,7 +187,7 @@ export const weightOf = (wf, priorities) => priorities?.[wf]?.weight ?? 1;
 
 /**
  * What the workflows ranked above `wf` that have ops open (queued or running) still claim: {slots, mb, above: [{workflowId, weight, reserve, running,
- * queued, pending}]}. `ops`: the fleet census [{op, workflowId, status}] (queued rows included). A workflow's
+ * queued, pending}]}. `ops`: the worker census [{op, workflowId, status}] (queued rows included). A workflow's
  * pending claim is min(reserve || queued + running, queued + running) - running, its queued kinds' estimates sized.
  */
 export function priorityClaim(wf, ops, priorities, estimates) {
@@ -219,7 +219,7 @@ const ramMbOf = (host) => {
 
 /**
  * The effective cap over one host sample: {maxParallelOps, running, mode, headroomMb, reserveMb, effectiveCap,
- * heavyCap, lightCap, why}. `running` is the fleet's slot-holding op count; `estimates` the opRamEstimates. The
+ * heavyCap, lightCap, why}. `running` is the workers' slot-holding op count; `estimates` the opRamEstimates. The
  * cap counts how many ops of each class could run given what already runs, never above maxParallelOps. heavyCap is
  * what a workflow below the top priority may reach; the prioritized one keeps starting heavy ops that fit until
  * critical.
@@ -248,7 +248,7 @@ export function effectiveCapOf({ maxParallelOps = null, running = 0, host, mode,
 
 /**
  * Admission of one candidate op of workflow `workflowId`: {ok, reason, detail, op, class, estimateMb, priority,
- * ...cap}. reason is null, 'fleet-max-ops', 'priority-reserved' (a slot or the RAM a higher-priority workflow still
+ * ...cap}. reason is null, 'workers-max-ops', 'priority-reserved' (a slot or the RAM a higher-priority workflow still
  * claims), 'heavy-paused' or 'does-not-fit'.
  */
 export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null, host, mode, modeWhy = '', estimates, priorities = {}, thresholds = throttleThresholds() }) {
@@ -261,7 +261,7 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
     priority: { weight: claim.weight, top, claimSlots: claim.slots, claimMb: claim.mb, above: claim.above } };
   const refuse = (reason, detail) => ({ ...base, ok: false, reason, detail });
   if (cap.maxParallelOps != null && running >= cap.maxParallelOps)
-    return refuse('fleet-max-ops', `${running} op(s) already hold a slot across the host's ledgers at maxParallelOps ${cap.maxParallelOps}`);
+    return refuse('workers-max-ops', `${running} op(s) already hold a slot across the host's ledgers at maxParallelOps ${cap.maxParallelOps}`);
   if (cap.maxParallelOps != null && claim.slots > 0 && running + 1 + claim.slots > cap.maxParallelOps)
     return refuse('priority-reserved', `${running} running + ${claim.slots} slot(s) reserved for ${claim.above.filter((a) => a.pending).map((a) => `${a.workflowId} (weight ${a.weight})`).join(', ')} leave no slot under maxParallelOps ${cap.maxParallelOps} for ${workflowId ?? 'this workflow'} (weight ${claim.weight})`);
   if (est.class === 'heavy' && mode === 'critical')
@@ -363,11 +363,11 @@ const CENSUS_SQL = `SELECT workflow_id workflowId, op_id op, status, json_extrac
 const KERNELS_SQL = `SELECT count(*) n FROM jobs WHERE kind='kernel' AND status IN (${SLOT_STATUSES.map(() => '?').join(',')})`;
 
 /**
- * The fleet census: {ops: [{op, workflowId, status, pool, ledger}] (queued and slot-holding), kernels} over `db`
+ * The worker census: {ops: [{op, workflowId, status, pool, ledger}] (queued and slot-holding), kernels} over `db`
  * (the open repo ledger, its file excluded from the machine scan) and every other product ledger the machine
  * registry names.
  */
-export function fleetCensus({ db = null, ledgerFile = null, env = process.env } = {}) {
+export function workersCensus({ db = null, ledgerFile = null, env = process.env } = {}) {
   const ops = [];
   let kernels = 0;
   const read = (handle, name) => {
@@ -393,7 +393,7 @@ const overrideOf = (env) => {
 /**
  * The throttle verdict for the host now: {host, cpuBusy, mode, ramMode, cpuHot, modeWhy, since, running,
  * runningByKind, queued, estimates, priorities, cap, admission (when `op` is named), thresholds, throttled}.
- * Reads the mode the Resource controller published (it alone keeps the hysteresis state). `load()` returns {cpuBusy}; `census()` the fleet census; `footprints()` the
+ * Reads the mode the Resource controller published (it alone keeps the hysteresis state). `load()` returns {cpuBusy}; `census()` the worker census; `footprints()` the
  * op-ram-footprint samples; each has a live default. Inside a node --test tree with no override the verdict is
  * computed but never refuses and nothing is written (as hostResourcesFor).
  */
@@ -408,9 +408,9 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const cpuBusy = override ? (override.cpuBusy != null ? num(override.cpuBusy) : null)
     : testContext && !load ? null
     : (() => { try { return (load ?? (() => machineLoad({ sampleMs: 200 })))()?.cpuBusy ?? null; } catch { return null; } })();
-  const fleet = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
-    : (census ?? (() => fleetCensus({ db, ledgerFile, env })))();
-  const ops = fleet.ops ?? [];
+  const workers = Array.isArray(override?.ops) ? { ops: override.ops.map((o) => ({ status: 'running', ...o })), kernels: num(override.kernels) }
+    : (census ?? (() => workersCensus({ db, ledgerFile, env })))();
+  const ops = workers.ops ?? [];
   const samples = Array.isArray(override?.footprints) ? override.footprints
     : override ? [] : (() => { try { return (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { return []; } })();
   const estimates = opRamEstimates(table, samples, thresholds);
@@ -432,7 +432,7 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const changed = prev.mode !== m.mode;
   const since = changed ? new Date(now).toISOString() : prev.since ?? null;
   return { host, cpuBusy, mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, modeWhy: m.why, since, running: running.length,
-    runningByKind: countByKind(running), queued: ops.length - running.length, kernels: num(fleet.kernels), estimates, priorities, cap, admission,
+    runningByKind: countByKind(running), queued: ops.length - running.length, kernels: num(workers.kernels), estimates, priorities, cap, admission,
     thresholds, throttled: prev.throttled ?? null, modeWriter: RECONCILER_WRITER, modePublished: published, ...(testContext ? { testContext: true } : {}) };
 }
 
@@ -457,7 +457,7 @@ export function throttleLine(t) {
 
 /**
  * One op-ram-footprint sample out of a process table grouped by owner (scripts/supervisor/host-health.mjs
- * groupByOwner with no limit) and the fleet census: {opAgentRamMb, agentRamMb:{agent:mb}, kernels, running:{kind:n},
+ * groupByOwner with no limit) and the worker census: {opAgentRamMb, agentRamMb:{agent:mb}, kernels, running:{kind:n},
  * runningByPool:{pool:n}, freeRamPct}. Every agent:* and op:* group counts as op agents; the kernels are subtracted
  * (kernelMb each) when a kind's estimate is read.
  */

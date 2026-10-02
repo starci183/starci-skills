@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest"
 import { Heading, type HeadingLevel, type HeadingScale } from "./index.js"
 
 /**
- * The scale of `knowledge/ui/presentation/font.md`, in the pixels a 16px root resolves it to.
+ * The scale of `knowledge/ui/presentation/font.yaml`, in the pixels a 16px root resolves it to.
  *
  * The rule ID is the ordinal position on the closed type scale, so the row a stamp names is the
  * render that stamp promises: FONT-1 `text-xs`/`leading-4`, FONT-2 `text-sm`/`leading-5`, FONT-3

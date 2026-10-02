@@ -87,7 +87,7 @@ export const placeDepthFinding = (shown, want) => {
  * The layout tree names, on each planned visible layout, the surface-layout ui record that will draw it
  * (`layout.design`, written by brand.decide through `layout-tree.mjs plan --design` before any frontend
  * exists). interface.draw creates that record afterwards under exactly that id, so until then the pointer is
- * a plan, not a dangling edge (mia inc-fc946155a081). Only a node that is still origin planned and whose
+ * a plan, not a dangling edge (inc-fc946155a081). Only a node that is still origin planned and whose
  * layout is not done may point ahead; a settled layout or a scanned (repository) node must resolve.
  */
 export const plannedDesignPointers = (record) => {
@@ -582,7 +582,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     // A design component's read-scope boundary is a module boundary, but architecture.decide writes the
     // component with no repository roles or paths: `owners` stays absent until an implementation leg has
     // run, and review.verify's final reconciliation writes the module roots the done implementation records
-    // proving the component own (mia inc-96ff77d86a77). So a missing `owners` is refused only once a done
+    // proving the component own (inc-96ff77d86a77). So a missing `owners` is refused only once a done
     // work/implementation@1 proves the component and the component itself is done; before that it is
     // pending (info), and a todo component an implementation already proved is warned (reconciliation owes
     // it). Named owners are checked for existence by the OWNER_PATH_MISSING rule above.
@@ -600,7 +600,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
 
     // ---- trust concept 8: implementation is held until its ui direction is drawn ----
-    // docs/kinds.md's `implementation/frontend` lane is "held until the feature's ui node is done" -
+    // modules/models/kinds.yaml's `implementation/frontend` lane is "held until the feature's ui node is done" -
     // drawing precedes implementing. A done work/implementation@1 that names a work/ui-screen@1 in its own
     // `proves`, or whose `repository` is the workspace's frontend repository, is refused
     // (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen is itself done: the ones it explicitly
@@ -620,7 +620,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         }
         const notDone = relevantUi.filter(uid => recOf(uid)?.state !== 'done');
         if (relevantUi.length && notDone.length) {
-          problems.push(`${rec.shown}: state is done but its ui direction is not - ${notDone.join(', ')} ${notDone.length > 1 ? 'are' : 'is'} not done yet (docs/kinds.md's implementation/frontend lane is held until the feature's ui node is done) [IMPL_BEFORE_DIRECTION]`);
+          problems.push(`${rec.shown}: state is done but its ui direction is not - ${notDone.join(', ')} ${notDone.length > 1 ? 'are' : 'is'} not done yet (modules/models/kinds.yaml's implementation/frontend lane is held until the feature's ui node is done) [IMPL_BEFORE_DIRECTION]`);
         }
       }
     }

@@ -15,7 +15,7 @@ import { defaultGrammarRoot } from "../../../scripts/work/brand/brand.mjs"
 /**
  * Running-page render proof for the ecommerce-app front end, per ui-screen record.
  *
- * `scripts/example/example-render-proof.mjs` is the gate's own composition of the canon checks, but it is defined
+ * `scripts/work/render-proof.mjs` is the gate's own composition of the canon checks, but it is defined
  * only for `work/implementation@1` records: it returns no problems for any other schema, and this product's
  * Work tree authors no frontend implementation node at all (its two `impl/*` records are both
  * `repository: be`, the be side, and neither names a ui-screen in `proves`). So the ecommerce
@@ -30,9 +30,9 @@ import { defaultGrammarRoot } from "../../../scripts/work/brand/brand.mjs"
  *             capture.mjs writes. `captures/` is gitignored agent output, regenerate-on-demand.
  *   render    the canon checks (palette-off-brand, primary-absent, entity-list-in-card, mascot-slot-missing)
  *             run over those pairs against the Work tree's brand record, refusing a `skip` on a core check
- *             exactly as example-render-proof.mjs does, because an uncheckable claim is not a pass.
+ *             exactly as scripts/work/render-proof.mjs does, because an uncheckable claim is not a pass.
  *
- * Usage: node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>
+ * Usage: node examples/ecommerce-app/scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>
  * Exits 0 when the named claim holds, 1 when any part of it does not — with the reason printed.
  */
 
@@ -169,7 +169,7 @@ if (args.mode === "custody") {
         say(
             "fail",
             "RENDER_BRAND_MISSING: the Work tree's brand/index.yaml carries no `brand:` specification block " +
-                `(its top-level keys are ${Object.keys(brandDoc).join(", ")}), so scripts/example/example-render-proof.mjs's ` +
+                `(its top-level keys are ${Object.keys(brandDoc).join(", ")}), so scripts/work/render-proof.mjs's ` +
                 "readExampleBrand refuses before any check runs and brandColours() reads no colour at all — the record " +
                 "authors a human-readable `colour:` map instead of the `color.tokens`/`color.scales` shape scripts/work/ui/render.mjs parses.",
         )

@@ -37,7 +37,7 @@ test('the checker refuses an emitted code missing from the catalog, and a retire
   fs.writeFileSync(path.join(base,'knowledge/hfs/rules.yaml'),'rules: []\n');
   fs.writeFileSync(path.join(base,'modules/models/kinds.yaml'),'vocabularies:\n  blockers: []\n');
   fs.writeFileSync(path.join(base,'engine/db/migrations/runtime/0001-init.sql'),'-- none\n');
-  fs.writeFileSync(path.join(base,'modules/kernel/failure-codes.not-codes'),'# none\n');
+  fs.writeFileSync(path.join(base,'modules/kernel/allowlist.yaml'),'schema: starci/allowlist@1\nnot-codes: []\n');
   fs.writeFileSync(path.join(base,'modules/kernel/failure-codes.yaml'),'GONE_CODE:\n  title: "x"\n  title_vi: "x"\n  meaning_vi: "x"\n  causes_vi:\n    - "x"\n  nextStep_vi: "x"\n  owner: other-op:no.such.op\n  kind: blocker\n');
   const p=catalogProblems(base);
   assert.deepEqual(p.missing.map(m=>m.code).sort(),['BRAND_NEW_FINDING','brand-new-refusal']);

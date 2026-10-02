@@ -1,6 +1,7 @@
+Owner: modules/schemas/work-layout.yaml
 # Business requirements: the fr, br, nfr, data, journey and decision families
 
-Business defines observable product behavior. Its records are a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. They are independent of source code. Architecture (the `sds` family, see [architecture-sds.md](architecture-sds.md)) maps that behavior to a target technical design; Implementation later proves whether actual code conforms.
+Business defines observable product behavior. Its records are a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. They are independent of source code. Architecture (the `sds` family, see [architecture](architecture.md)) maps that behavior to a target technical design; Implementation later proves whether actual code conforms.
 
 ## Progressive authoring
 

@@ -8,15 +8,14 @@ completionProfile: operations
 sideEffects: []
 graphPolicy:
   mode: read-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: shared
   prerequisiteState: done
   dispatch: never
 reads:
   - id: request
-    path: current user request, supplied files/references and existing task authorization
+    path: shared
     purpose:
-      en: Start without presumed business, architecture or product context. Identify the intended result,
-        concrete inputs, permitted effects and observable completion criteria from the request.
+      en: shared
   - id: catalog
     path: modules/goal/archetypes.yaml + modules/ops/registry.yaml canonical op list +
       modules/models/kinds.yaml
@@ -146,8 +145,8 @@ blockers:
       en: A declared prerequisite is not effectively done, or a required declared input is missing. Report
         node/resource IDs; never run predecessors or invent the input.
 placeholders:
-  app: The bound app checkout (its root); every path written <app>/<path> is app-relative - be/..., fe/..., .starciwork/... or a path of the app root
-  bound-paths: Inspected source read set
+  app: shared
+  bound-paths: shared
 layoutPolicy:
   checks: [starci-validate]
 policy:

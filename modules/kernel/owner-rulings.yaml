@@ -1,6 +1,6 @@
 # owner-rulings.yaml — the owner's standing rulings, by stable id, so evidence can cite them.
 #
-# A drawing's rationale.json (scripts/checks/draw-rationale.mjs) cites an owner ruling as `owner:<id>`; the id must
+# A drawing's rationale.json (scripts/work/draw/draw-rationale.mjs) cites an owner ruling as `owner:<id>`; the id must
 # resolve here, to a contract change id (modules/kernel/contract-changes/<id>.yaml), to a note of the ui record's
 # ui.review.feedback, to a brand.direction.learned id, or to an answer receipt. An entry is what the owner ruled, in
 # one sentence, with the date and where it is enforced; it is never a runtime opinion. Add an entry in the commit that
@@ -11,23 +11,23 @@ rulings:
   - id: draw-shapes-only
     date: '2026-09-27'
     ruling: interface.draw draws SHAPES only - one image per XBase#state; data statuses (loading, empty, error, forbidden, 401/403/404) render by recipe through SlotView and are never drawn.
-    enforcedBy: [scripts/checks/ui-shapes.mjs, scripts/checks/draw-quality.mjs]
+    enforcedBy: [scripts/work/ui/ui-shapes.mjs, scripts/work/draw/draw-quality.mjs]
   - id: draw-content-region-only
     date: '2026-09-27'
     ruling: A drawing is the XBase content region only, never the full page with its layout chrome.
-    enforcedBy: [scripts/checks/draw-quality.mjs]
+    enforcedBy: [scripts/work/draw/draw-quality.mjs]
   - id: draw-token-render
     date: '2026-09-27'
     ruling: Drawing is token-render HTML/CSS in the Grammar's tokens captured by Playwright; the brief loads all of knowledge/ui and the grammars with values resolved to numbers carrying rule ids.
-    enforcedBy: [scripts/work/draw-render.mjs, scripts/checks/ui-proof-brief.mjs]
+    enforcedBy: [scripts/work/draw-render.mjs, scripts/work/ui/ui-proof-brief.mjs]
   - id: heroui-defaults-first
     date: '2026-09-27'
     ruling: HeroUI and Grammar defaults come first; the canvas stays the HeroUI grey and brand tweaks come later, by owner ruling only.
-    enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [knowledge/ui/examples/brand-direction.example.yaml]
   - id: draw-dna-only
     date: '2026-09-27'
     ruling: Compose only the Grammar's DNA components - a notice is Alert, a ratio is Meter; anything DNA lacks is a grammar proposal, never an inline invention.
-    enforcedBy: [scripts/checks/draw-dna.mjs]
+    enforcedBy: [scripts/work/draw/draw-dna.mjs]
   - id: icon-tile-neutral
     date: '2026-09-27'
     ruling: Identity IconTiles are neutral, never accent-tinted.
@@ -35,7 +35,7 @@ rulings:
   - id: alert-white-surface
     date: '2026-09-27'
     ruling: The Alert has a white surface with a small tone indicator beside a tone-coloured title - no tone-filled background, no IconTile inside; its action is the grammar's standard Button variant secondary.
-    enforcedBy: [scripts/checks/draw-dna.mjs]
+    enforcedBy: [scripts/work/draw/draw-dna.mjs]
   - id: meter-segments-h1
     date: '2026-09-27'
     ruling: The segmented capability Meter is the grammar's Meter segments on a full-width h-1 (4px) track with N equal segments.
@@ -47,11 +47,11 @@ rulings:
   - id: card-radius-bound
     date: '2026-09-27'
     ruling: A card's radius is what the HeroUI and Grammar CSS actually bind (1rem in the Nivo render).
-    enforcedBy: [scripts/checks/grammar-geometry.mjs]
+    enforcedBy: [scripts/work/ui/grammar-geometry.mjs]
   - id: grammar-gaps-0.6.0
     date: '2026-09-27'
     ruling: "add them all - add every grammar gap the real-component prototype found: the ink artwork band with the orbit motif, the unlabelled Divider, the DescriptionList stat strip, the Alert action icon, asset-slot props on Image/MediaFrame, the SectionHeader count and source meta, the off TagGroup chip, the quiet (ghost) IconButton, the PinnedActionBar, and data-component on every grammar root (@starci/grammar 0.6.0)."
-    enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.example.yaml]
   - id: secondary-input-contrast-accepted
     date: '2026-09-27'
     ruling: The low contrast of a secondary input's fill is accepted (COLOR-3 case-6).
@@ -59,11 +59,11 @@ rulings:
   - id: status-tones-follow-heroui
     date: '2026-09-30'
     ruling: Status tones follow HeroUI - a solid pair and a soft pair per tone. The soft foreground on its soft tint is accepted (about 3:1, not extreme contrast) and a bare status glyph takes the soft foreground instead of a darkened solid tone; body and interactive text keep 4.5:1.
-    enforcedBy: [scripts/checks/brand.mjs, knowledge/ui/proof/contrast.yaml, packages/grammar/src/__test__/contrast.ts]
+    enforcedBy: [scripts/work/brand/brand.mjs, knowledge/ui/proof/contrast.yaml, packages/grammar/src/__test__/contrast.ts]
   - id: nivo-main-colour-ink
     date: '2026-09-27'
     ruling: The Nivo main colour is ink black #040d1c, not red; red is for artwork and danger only.
-    enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
+    enforcedBy: [knowledge/ui/examples/brand-direction.example.yaml]
     confirmed: '2026-09-27 - owner answered "settled" in the desktop chat; pendingRulings main-colour is ruled'
   - id: one-version-owner-review
     date: '2026-09-27'
@@ -76,48 +76,48 @@ rulings:
   - id: draw-rationale-evidence
     date: '2026-09-27'
     ruling: Every drawn shape ships evidence for every decision - rationale.json (element, layout, every gap, padding, type and radius with its rule id and FR/content reason) and an annotated redline render; the owner critiques from evidence, never taste.
-    enforcedBy: [scripts/checks/draw-rationale.mjs, scripts/work/draw-render.mjs]
+    enforcedBy: [scripts/work/draw/draw-rationale.mjs, scripts/work/draw-render.mjs]
   - id: supervisor-mission
     date: '2026-09-28'
     ruling: "The [Supervisor] monitors, manages, messages and adjusts every workflow to the finish on autopilot ('monitor, manage, send messages to, adjust'): it acts on every stuck item itself (resolve --by supervisor, lane fixes, notices, re-plan dispositions, archive), and asks the owner nothing but the final credentials step and the handover; the owner gets only a periodic digest."
-    enforcedBy: [modules/supervisor/supervise.yaml, modules/supervisor/supervisor-prompt.md, scripts/supervisor/actions.mjs, scripts/supervisor/tick.mjs]
+    enforcedBy: [modules/supervisor/supervise.yaml, modules/supervisor/supervisor-prompt.md, scripts/supervisor/actions.mjs, modules/reconciler/reconciler.yaml]
   - id: supervisor-self-learning
     date: '2026-09-28'
     ruling: "The Supervisor upgrades .claude by trial and error and records everything in the self-learning ledger, owner feedback included as lessons weighted above its own. Routine fixes it lands itself (bug fixes in checkers/scripts/runtime, checker calibration with a wrongly-blocked example spec, grammar additions/fixes and their npm publish (auto-approved by the owner 2026-09-28), brief/prompt improvements, throughput tuning within owner caps); only IMPORTANT upgrades (owner rulings, brand direction, knowledge rule meaning, removing or weakening a gate class, op-graph/kernel-contract architecture, budget/cap increases, anything external or irreversible) go to the owner first as a concise proposal that blocks nothing else. Never relax a check without a wrongly-blocked example; revert on measured regression; a daily cap on autonomous landings; full audit."
-    enforcedBy: [scripts/supervisor/lessons.mjs, modules/supervisor/supervise.yaml, modules/models/runtimes.yaml]
+    enforcedBy: [scripts/machine/lessons.mjs, modules/supervisor/supervise.yaml, modules/models/runtimes.yaml]
   - id: supervisor-machine-log
     date: '2026-09-28'
     ruling: "The Supervisor writes the machine's root log: every observation, decision, action, message and experiment as a typed log row in the supervisor ledger, served read-only to the ui."
-    enforcedBy: [scripts/machine/sup-log.mjs, ui/supervisor.mjs, ui/CONTRACT.md]
+    enforcedBy: [scripts/machine/sup-log.mjs, ui/api/routes/system.mjs, ui/CONTRACT.md]
   - id: ram-aware-concurrency
     date: '2026-09-28'
     ruling: 'Parallelism follows real RAM ("Parallelism ceiling follows real RAM"): below 10% free RAM fewer ops run in parallel - no new heavy op below the top priority (resume above 15%), below 2.5% no new heavy op at all (resume above 5%), fit floor 2.5% (lowered 2026-09-28: "15→10, 10→2.5") - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
-    enforcedBy: [scripts/lib/ram-throttle.mjs, scripts/kernel/api.mjs, scripts/supervisor/land.mjs, modules/models/runtimes.yaml]
+    enforcedBy: [scripts/machine/ram-throttle.mjs, scripts/kernel/cli.mjs, scripts/supervisor/land.mjs, modules/models/runtimes.yaml]
   - id: fe-canon-first
     date: '2026-09-28'
     ruling: The FE refactor workflow (nivo wf-nivo-fe-canon-mujek980) runs up to 15 parallel code.refactor slices first; the other workflows ramp up in what is left, and their heavy ops are delayed before the prioritized workflow's under the RAM throttle.
-    enforcedBy: [modules/models/runtimes.yaml, scripts/lib/ram-throttle.mjs, scripts/supervisor/ram-cap.mjs]
+    enforcedBy: [modules/models/runtimes.yaml, scripts/machine/ram-throttle.mjs, scripts/supervisor/ram-cap.mjs]
   - id: autopilot-run-to-finish
     date: '2026-09-28'
     ruling: "Run to the finish in one go; don't stop to ask the owner - not even UX/UI review. Machine-gated drawings and directions are accepted provisionally (by autopilot, never golden), runtime/process gates and retry caps go to the Supervisor, credentials/real money/shared external systems are deferred to handover on sandbox/stub paths with ONE end-of-flow credential checklist (\"limit provision asks\"), and the owner reviews everything once at handover; ugly UX/UI is re-run in one batch."
-    enforcedBy: [scripts/kernel/autopilot.mjs, modules/models/runtimes.yaml, scripts/kernel/api.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/checks/brand.mjs]
+    enforcedBy: [scripts/kernel/autopilot-run.mjs, modules/models/runtimes.yaml, scripts/kernel/cli.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/work/brand/brand.mjs]
   - id: grammar-publish-auto-approve
     date: '2026-09-28'
     ruling: "Publishing @starci/grammar to npm needs no owner approval (\"next time do not ask for approval any more ... auto approve\"): after a grammar change lands, bump the semver (additive → minor, fix → patch), date the CHANGELOG entry, land, build and publish, then tell the owner in the digest. Credentials stay the owner's: publishing uses the npm login the owner already holds; never create, enter or rotate a token."
-    enforcedBy: [packages/grammar/package.json, packages/grammar/CHANGELOG.md, scripts/supervisor/lessons.mjs]
+    enforcedBy: [packages/grammar/package.json, packages/grammar/CHANGELOG.md, scripts/machine/lessons.mjs]
   - id: settle-runtime-service
     date: '2026-09-28'
     ruling: "SETTLE is a deterministic runtime service, never a step the Kernel must remember (approved in chat 2026-09-28, \"ok\"): the runtime settler settles every done report whose declared checks re-verify green through the same api check + api settle path, from each workflow watchdog loop about every minute and right after api report, and proves the worker released; it never settles a non-green outcome - those go to the Kernel as needs-kernel-decision items it decides first. Settle is a light synchronous core with an async retried tail, consumed-but-unsettled cannot persist, and the Supervisor tick asserts no reported job stays unhandled past 3 minutes."
-    enforcedBy: [scripts/reconcile/job-settle.mjs, scripts/kernel/watchdog.mjs, scripts/kernel/api-verbs/settle-tail.mjs, scripts/kernel/kernel-authority.mjs, scripts/supervisor/tick.mjs]
+    enforcedBy: [scripts/kernel/settle/job-settle.mjs, scripts/kernel/kernel-watchdog.mjs, scripts/kernel/verbs/settle-tail.mjs, scripts/kernel/kernel-authority.mjs, modules/reconciler/reconciler.yaml]
   - id: push-scan-test-secrets-encrypted
     date: '2026-09-28'
-    ruling: "Test credentials follow the product repository's .starcistacks + sops convention and a plaintext password is never pushed (\"do not block passing tests\", \"encrypt test secrets into enc\"): a disposable credential is generated per run; one that must stay stable lives at .starcistacks/<stack>/secrets/test/<name>, plaintext git-ignored, stored with the repo's own stack-secret.mjs set so only the sops .enc twin is committed, and read with testSecret() (scripts/lib/test-secrets.mjs). The push secret scan stays strict - a plaintext test password still refuses the push, naming that path and command - passes a .enc only when it is a sops envelope, and refuses any plaintext under .starcistacks/<stack>/secrets/; a literal already committed is let through once by a push-scan-allow entry pinned to its file, pattern and historical range."
-    enforcedBy: [scripts/lib/test-secrets.mjs, scripts/lib/secret-patterns.mjs, scripts/supervisor/push-mains.mjs, modules/ops/_common.yaml]
+    ruling: "Test credentials follow the product repository's .starcistacks + sops convention and a plaintext password is never pushed (\"do not block passing tests\", \"encrypt test secrets into enc\"): a disposable credential is generated per run; one that must stay stable lives at .starcistacks/<stack>/secrets/test/<name>, plaintext git-ignored, stored with the repo's own stack-secret.mjs set so only the sops .enc twin is committed, and read with testSecret() (scripts/uat/test-secret.mjs). The push secret scan stays strict - a plaintext test password still refuses the push, naming that path and command - passes a .enc only when it is a sops envelope, and refuses any plaintext under .starcistacks/<stack>/secrets/; a literal already committed is let through once by a push-scan-allow entry pinned to its file, pattern and historical range."
+    enforcedBy: [scripts/uat/test-secret.mjs, scripts/lib/sops-envelope.mjs, scripts/api/sops/lib.mjs, scripts/lib/secret-patterns.mjs, scripts/supervisor/push-mains.mjs, modules/ops/_common.yaml]
   - id: evidence-in-db-and-blobs
     date: '2026-09-28'
-    ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Start the final canonical schema fresh after verified archival of old stores; no legacy data migration or read fallback. The host machine.sqlite owns machine and fleet state; no third DB is added."
+    ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Start the final canonical schema fresh after verified archival of old stores; no legacy data migration or read fallback. The host machine.sqlite owns machine and worker state; no third DB is added."
     confirmed: '2026-09-28 owner chat: "ok do it, 10 agent sol"; owner final storage principle and CLEAN-SLATE ruling in <tmp>/evidence-db'
-    enforcedBy: [modules/schemas/work-layout.yaml, modules/kernel/contract-changes/evidence-db-blobs.yaml, engine/evidence.sql, scripts/lib/artifact-store.mjs]
+    enforcedBy: [modules/schemas/work-layout.yaml, engine/db/migrations/runtime/0001-init.sql, engine/db/ledger.mjs, engine/db/blob.mjs]
   - id: provider-qwen-removed
     date: '2026-09-29'
     ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"remove qwen, it is far too lame!! not buying it any more, devin codex claude are enough\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen has been removed; use claude, codex or devin\"."

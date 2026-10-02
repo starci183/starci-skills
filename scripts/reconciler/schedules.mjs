@@ -1,6 +1,6 @@
 // scripts/reconciler/schedules.mjs — the durable cadence of every periodic duty of the engine (MB-01).
 //
-// A controller's "last run / next due" lived in process memory (gc.mjs `memory`, fleet.mjs a WeakMap per ctx), so
+// A controller's "last run / next due" lived in process memory (gc.mjs `memory`, controllers/workers.mjs a WeakMap per ctx), so
 // every engine restart or self-reload ran every duty again as a "first run": on 2026-09-28 the daily housekeeping ran
 // 32 times in 3.5 h and the 30-min push 28 times in 3 h. The cadence now lives in machine.sqlite `schedules`
 // (DBTREE.sql B2), one row per (controller, duty), written only through engine/db/machine.mjs
@@ -20,7 +20,7 @@
 // file) makes nothing due: a duty never runs on a guess.
 import { withMachine, readMachine, pidAlive } from '../../engine/db/machine.mjs';
 
-const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning', 'sla']);
+const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'workers', 'learning', 'sla']);
 const SCHEDULE_RESULTS = Object.freeze(['done', 'failed', 'unknown', 'skipped']);
 
 const memories = new WeakMap();

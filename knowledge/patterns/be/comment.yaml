@@ -182,7 +182,7 @@ rules:
   - id: BE-COMMENT-7
     title: What a comment never contains
     kind: mandatory
-    hfsRules: [R18, R89]
+    hfsRules: [R18, R89, R96]
     requirement: |-
       Comments stay ASCII with no emoji or AI symbols. There is no inline suppression of any kind: no `eslint-disable`,
       no `@ts-ignore`, no `@ts-expect-error`, no escape annotation. A rule that is wrong is changed in `.claude`, never
@@ -202,5 +202,6 @@ rules:
         - HFS_INLINE_SUPPRESSION
         - BE_SOURCE_FORM
         - BE_PUBLIC_CONTRACT_FORM
+        - HFS_DOC_NOT_ENGLISH
       manual: []
     relatedExamples: []

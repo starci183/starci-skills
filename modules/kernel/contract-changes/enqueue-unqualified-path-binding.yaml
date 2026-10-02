@@ -1,6 +1,0 @@
-id: enqueue-unqualified-path-binding
-effectiveAt: '2026-09-28T09:37:12+07:00'
-summary: "Bind a bare owned path in a multi-repository project to its existing repository, or to its cut sibling's repository. Refuse missing and ambiguous paths with named repository roles; recheck queued jobs at dispatch. Fixes nivo fe-canon owned-path guards."
-reach: new-legs
-paths:
-  - modules/kernel/contract-changes/enqueue-unqualified-path-binding.yaml

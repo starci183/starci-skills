@@ -11,6 +11,9 @@ appliesTo:
   - backend
   - frontend
 family: repo
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [repo.docs, repo.side-root-forbidden]
 provenance:
   reviewedAt: 2026-10-01
   sources:
@@ -18,7 +21,7 @@ provenance:
     - knowledge/hfs/slots.yaml
     - modules/schemas/hfs-repo.schema.yaml
     - packages/hfs/README.md
-    - docs/source-layout.md
+    - docs/architecture.md
   limitations: |
     The tree law governs entries and top-level placement only; it does not certify an app's contents, behavior or
     deployment. Record shape inside .starciwork stays with modules/schemas/work-layout.yaml; stack declaration shape stays

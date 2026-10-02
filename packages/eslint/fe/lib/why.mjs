@@ -8,7 +8,7 @@
  * contract: `code` is the finding code, `en` the English source of the headline with `<file>` /
  * `<what>` placeholders the reader fills from the ESLint location, `fix` the one sentence "what do I
  * do now". The owner reads both in Vietnamese through the declared message catalog: the `en` and
- * `fix` strings are the keys of `modules/i18n/messages/v4.yaml`, so `translator('vi')(entry.en)` and
+ * `fix` strings are the keys of `modules/i18n/messages/canon.yaml`, so `translator('vi')(entry.en)` and
  * `translator('vi')(entry.fix)` hand back the Vietnamese of the same sentence.
  *
  * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65) has an entry;

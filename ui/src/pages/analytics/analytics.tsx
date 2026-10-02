@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApiQuery } from '../../api/query';
-import type { AttemptRow, Envelope, FleetViewV2 } from '../../contract';
+import type { AttemptRow, Envelope, WorkersViewV2 } from '../../contract';
 import type { Concept } from '../../components/concept';
 import { Advanced, Ticker } from '../../components/motion';
 import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
@@ -93,9 +93,9 @@ export default function AnalyticsPage() {
 
   const attempts = useAllAttempts(project, retryKey);
   const metricsUrl = `/api/metrics/ops?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
-  const metrics = useApiQuery<OpsMetric[]>(metricsUrl, { topics: ['fleet'], intervalMs: 30_000 });
-  const fleet = useApiQuery<FleetViewV2>('/api/fleet', { topics: ['fleet'], intervalMs: 30_000 });
-  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['fleet'], intervalMs: 60_000 });
+  const metrics = useApiQuery<OpsMetric[]>(metricsUrl, { topics: ['workers'], intervalMs: 30_000 });
+  const workers = useApiQuery<WorkersViewV2>('/api/workers', { topics: ['workers'], intervalMs: 30_000 });
+  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['workers'], intervalMs: 60_000 });
 
   const since = now - (win === '24h' ? DAY : 7 * DAY);
   const rows = useMemo(() => (attempts.rows ?? []).filter(r => (r.dispatchedAt ?? 0) >= since), [attempts.rows, since]);
@@ -132,14 +132,14 @@ export default function AnalyticsPage() {
     {loading ? <PageSkeleton label={t('Loading…')} /> : <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
       <OpOutcomes rows={rows} />
       <Throughput rows={rows} since={since} now={now} />
-      <WorkflowProgress fleet={fleet.data} project={project} />
+      <WorkflowProgress workers={workers.data} project={project} />
     </div>}
     <Advanced variant="card" title={t('Detailed analytics')} summary={t('Rates by model, durations, retries, tokens and cost')}>
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <ModelRates rows={rows} />
         <DurationPlot rows={rows} now={now} />
         <Retries rows={rows} />
-        <UsagePanel metrics={metrics.data} window={win} summary={fleet.data?.summary ?? null} />
+        <UsagePanel metrics={metrics.data} window={win} summary={workers.data?.summary ?? null} />
       </div>
     </Advanced>
   </main>;

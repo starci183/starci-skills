@@ -1,3 +1,4 @@
+Owner: modules/host/
 # Orca boundary: what the runtime keeps, wraps and reads by Dispatch
 
 This page records where the runtime stops and Orca's standard API begins, for Orca 1.4.209. The source is the
@@ -96,7 +97,7 @@ is), so such a worker reads unverified, never dead.
 | `kernel/verbs/settle.mjs` (connected after close) | PTY state | T3 | done (alpha.5, lane ORCA): a worker's close is `worker-release` followed by the runtime's terminal close and process-tree proof (`scripts/machine/worker-close.mjs`, the one close path); the command-terminal path is deleted |
 | `kernel/cli.mjs` `quitWorkerTerminal`, the quit input, the tab close, the process reaper, `closeDeadWorkerTerminal` | PTY state | T3, T4, D2 | done (alpha.5, lane ORCA): the quit input and the name-matching process reaper are deleted; the one close path (`scripts/machine/worker-close.mjs`) releases, closes the terminal and proves no process of that terminal's shell tree remains. `custody` is the release receipt's state, with one terminal READ-back (disconnected or gone proves release) when Orca answers retained for a dead worker |
 | `kernel/cli.mjs` status liveness and prefetch; `reconciler/controllers/job.mjs` worker-health; `reconciler/services.mjs` seat turn; `supervisor/poll.mjs` `kernelState`; `supervisor/stall.mjs` `kernelTurnState` | frame classification | T2 | WRAP: the frame stays for turn-idle and rate-limit; the death verdict moves to `worker-list` |
-| `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/watchdog.mjs`; `supervisor/watchdog.mjs`; `kernel/cli.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
+| `kernel/host-outage.mjs` `kernelTerminalVerdict`; `kernel/kernel-watchdog.mjs`; `supervisor/supervisor-watchdog.mjs`; `kernel/cli.mjs` Kernel seat gone check | seat liveness | W7, T2 | WRAP: the death proof moves to `worker-list` `exited`; the seat state machine stays |
 | `kernel/close-op-terminal.mjs` `closeExitedTerminal` | exited-shell proof | T2, T3 | WRAP until lane SETTLED moves worker closes to `worker-release` |
 | `kernel/terminal-dedupe.mjs`; `supervisor/start-supervisor.mjs` seat dedupe | restored-tab frames | T5 | WRAP |
 | `kernel/wake-delivery.mjs`; `kernel/clear-draft.mjs`; `agent/lib.mjs` prompt delivery | frame and draft as proof of a turn | T6 | KEEP |

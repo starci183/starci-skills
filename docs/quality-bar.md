@@ -1,3 +1,4 @@
+Task: judge whether a workflow is done
 # QUALITY BAR — what ".claude produces a high-quality project" means
 
 > **Status: DRAFT** — aspiration list. An item is only real once a check, an op
@@ -28,9 +29,8 @@ how it is *proven* — declaration never counts, evidence does.
 - [ ] Real copy and real data shapes — no lorem, no `Item 1`
 - [ ] All breakpoints: mobile / tablet / desktop shots as evidence
 - [ ] Dark + light where the system supports both
-- [ ] Composition quality reviewed against reference renders
-      (`packages/grammar/reference-renders/`) — not "it rendered", but "it looks
-      right"
+- [ ] Composition quality reviewed against reference renders — not "it
+      rendered", but "it looks right"
 - [ ] Density, rhythm, alignment pass — no orphaned labels, clipped text,
       misaligned grids
 
@@ -93,5 +93,5 @@ which refuses a `done` leaf resting on `verificationSource: authored-claim`.
       deterministic, cited
 - [ ] Wrong business flow → re-run from owning Business/SRS boundary with fresh
       evidence — never relabeled as debt
-- [ ] `practices/` entry written after each fleet wave — what was practiced,
+- [ ] `practices/` entry written after each wave — what was practiced,
       observed, derived

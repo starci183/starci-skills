@@ -40,7 +40,7 @@ guidance:
       (`brand.direction.archetypes.<name>.status: accepted`, checked by scripts/work/brand/brand.mjs `direction`).
       It applies the owner's nine-step UX/UI discipline - [Taste composition](composition/taste.yaml),
       HIERARCHY-6, ACCENT-6 and the [Taste proof](proof/taste.yaml) cases - and never overrides these rules
-      or the grammar DNA. [The Nivo example](examples/brand-direction.nivo.yaml) is a proposed direction
+      or the grammar DNA. [The worked example](examples/brand-direction.example.yaml) is a proposed direction
       showing the shape, not an accepted one.
   - id: binding-criteria
     requirement: |-

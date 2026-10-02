@@ -143,7 +143,7 @@ export interface AppDeclaration<TModule extends RegisterableModule<never> = Regi
 export interface MigrateDeclaration<TOptions = never, TWiring = WorldWiring> {
     /** The migrate entry: a module namespace that exports `bootstrap`, a bare bootstrap function, or a Nest `AppModule` with `register`. */
     readonly module: MigrateEntry<TOptions>
-    /** The typed options of the migrate app, from the wiring (databases of the run). */
+    /** The typed options of the cli app, from the wiring (databases of the run). */
     readonly options: (wiring: TWiring) => TOptions
 }
 
@@ -236,7 +236,7 @@ export interface TestWorldConfig<
     readonly fakes?: TFakes
     /** The real apps a spec may boot by name. */
     readonly apps: { readonly [K in keyof TApps]: AppDeclaration<TApps[K], WiringOf<TApps, TFakes, TSiblings, TStacks>> }
-    /** The migrate app, run once per run. */
+    /** The cli app, run once per run. */
     readonly migrate: MigrateDeclaration<TMigrate, WiringOf<TApps, TFakes, TSiblings, TStacks>>
     /** How persons register and sign in. */
     readonly identity?: IdentityDeclaration

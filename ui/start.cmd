@@ -5,5 +5,5 @@ if not exist node_modules\vite\bin\vite.js (
   call npm install
   if errorlevel 1 exit /b 1
 )
-start "" http://127.0.0.1:4545/
+for /f "delims=" %%u in ('node ports.mjs') do start "" %%u
 call npm run dev

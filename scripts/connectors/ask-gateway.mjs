@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { pidAlive } from '../../engine/db/machine.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const GATEWAY_FILE = fileURLToPath(import.meta.url);
@@ -133,7 +133,7 @@ async function run(args) {
     // notifies from its own repo).
     resolve: ledgerResolver({ repos: () => askRepos(live(), { extra: [...extra, ...notifiedRepos()] }) }),
     exposeCredentialAsks: () => live()?.telegram?.exposeCredentialAsks === true,
-    language: () => ownerConfig()?.language ?? 'en',
+    language: () => ownerLanguage(),
   });
   server.on('error', (error) => { console.error(JSON.stringify({ ok: false, error: `gateway cannot listen on 127.0.0.1:${port}: ${error.code ?? error.message}` })); process.exit(1); });
   server.listen(port, '127.0.0.1', () => {

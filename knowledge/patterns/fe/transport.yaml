@@ -7,6 +7,9 @@ purpose: |-
 appliesTo:
   - frontend
 family: fe
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [fe.hooks, fe.modules.api, fe.transport, fe.package.api]
 provenance:
   reviewedAt: 2026-09-29
   sources:
@@ -83,7 +86,7 @@ rules:
     requirement: |-
       The back end commits `be/contracts/<app>/schema.graphql` (or `openapi.json`), written by `hfs emit-contracts`
       (`npm run contract:emit`). The front end reads it in place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no
-      copy. The root `codegen` script (`scripts/codegen.mjs`) writes the ignored `modules/api/__generated__/` from it; `lint`,
+      copy. The root `codegen` script (`<repo>/scripts/codegen.mjs`) writes the ignored `modules/api/__generated__/` from it; `lint`,
       `typecheck`, `build:fe` and the op gate run `codegen` first. GraphQL documents live in `.graphql` files. A handwritten
       wire type, `as GraphqlResult<T>` and an enum typed as `string` are forbidden.
     rationale: |-

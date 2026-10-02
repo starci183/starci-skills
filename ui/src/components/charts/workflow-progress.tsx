@@ -2,7 +2,7 @@ import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import { motion } from 'motion/react';
 import { EASE } from '../motion';
-import type { FleetViewV2, PipelineView, WorkflowRowV2 } from '../../contract';
+import type { WorkersViewV2, PipelineView, WorkflowRowV2 } from '../../contract';
 import { useApiQuery } from '../../api/query';
 import { statusLabels, statusTone, type Status } from '../status';
 import { ChartCard } from './chart-card';
@@ -26,8 +26,8 @@ function Row({ row }: { row: WorkflowRowV2 }) {
   </li>;
 }
 
-export function WorkflowProgress({ fleet, project }: { fleet: FleetViewV2 | null; project: string }) {
-  const rows = (fleet?.workflows ?? []).filter(w => !project || w.project === project);
+export function WorkflowProgress({ workers, project }: { workers: WorkersViewV2 | null; project: string }) {
+  const rows = (workers?.workflows ?? []).filter(w => !project || w.project === project);
   return <ChartCard title={t('Workflow progress')} hint={t('One row per workflow; each cell is a leg of the chain, x/y is legs passed over total.')}
     legend={[{ tone: 'success', label: t('Passed') }, { tone: 'running', label: t('Running') }, { tone: 'queued', label: t('Waiting / not reached') }, { tone: 'failed', label: t('Failed/blocked') }, { tone: 'warning', label: t('Waiting to retry') }, { tone: 'skipped', label: t('Deferred / external') }]}
     empty={!rows.length && t('No workflows yet.')} className="lg:col-span-2">

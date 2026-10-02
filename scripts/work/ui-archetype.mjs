@@ -24,6 +24,7 @@
 // list/detail surface waited on a proposed archetype the owner had not answered (prerequisite-unmet, awaiting-owner).
 import { DIRECTION_ARCHETYPES, checkDirection, defaultGrammarRoot, readBrandRecord } from './brand/brand.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { altOf } from '../lib/source-phrases.mjs';
 
 /**
  * Whether autopilot runs `workflowId` (modules/models/runtimes.yaml allocation.autopilot: enabled, with
@@ -45,6 +46,12 @@ export const DIRECTION_EXEMPT = Object.freeze(['layout']);
 const text = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' ? Object.values(v).map(text).join(' ') : '');
 const surfaces = (s) => (typeof s === 'string' ? [s] : s && typeof s === 'object' ? Object.values(s).map(String) : []);
 
+// The title/intent/route words that derive an archetype (the record's words are lower-cased first); the Vietnamese
+// lists are lexicon data (modules/goal/source-phrases.yaml uiArchetype).
+const WIZARD_WORDS = new RegExp(`\\b(?:wizard|onboarding|setup|step|steps|checkout)\\b|${altOf('uiArchetype.wizard')}`);
+const FORM_WORDS = new RegExp(`\\b(?:edit|create|new|settings|configure|sign[- ]?in|login|register|form)\\b|${altOf('uiArchetype.form')}`);
+const DASHBOARD_WORDS = new RegExp(`\\b(?:overview|dashboard|home)\\b|${altOf('uiArchetype.dashboard')}`);
+
 /** {archetype, derived:boolean, why} for a work/ui-screen@1 record. */
 export function archetypeOf(record) {
   const explicit = record?.ui?.archetype;
@@ -53,13 +60,13 @@ export function archetypeOf(record) {
   const route = String(record?.route ?? record?.routeParent ?? '');
   const words = `${record?.title ?? ''} ${text(record?.ui?.intent)} ${route}`.toLowerCase();
   if (surf.includes('layout')) return { archetype: 'layout', derived: true, why: 'surface layout' };
-  if (/\b(wizard|onboarding|setup|step|steps|checkout)\b|thiết lập|các bước/.test(words)) return { archetype: 'wizard', derived: true, why: 'a stepped task' };
-  if (surf.some((s) => s === 'modal' || s === 'drawer') || /\b(edit|create|new|settings|configure|sign[- ]?in|login|register|form)\b|chỉnh sửa|tạo mới|cài đặt|đăng nhập/.test(words)) {
+  if (WIZARD_WORDS.test(words)) return { archetype: 'wizard', derived: true, why: 'a stepped task' };
+  if (surf.some((s) => s === 'modal' || s === 'drawer') || FORM_WORDS.test(words)) {
     return { archetype: 'form', derived: true, why: surf.some((s) => s === 'modal' || s === 'drawer') ? `surface ${surf.join('/')}` : 'an editing task' };
   }
   const last = route.split('/').filter(Boolean).pop() ?? '';
   if (/^\[[^\]]+\]$/.test(last) && !/^\[\[?\.\.\./.test(last) && !/locale|lang/i.test(last)) return { archetype: 'detail', derived: true, why: `dynamic route segment ${last}` };
-  if (/\b(overview|dashboard|home)\b|tổng quan|trang chủ/.test(words)) return { archetype: 'dashboard', derived: true, why: 'an overview' };
+  if (DASHBOARD_WORDS.test(words)) return { archetype: 'dashboard', derived: true, why: 'an overview' };
   return { archetype: 'list', derived: true, why: 'the default: a collection of peers' };
 }
 

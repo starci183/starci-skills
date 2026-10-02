@@ -1,3 +1,4 @@
+Owner: knowledge/patterns/repo/folder.yaml
 # Repository presentation checklist
 
 The HFS root law is [repo.folder](../knowledge/patterns/repo/folder.yaml). Apply this checklist

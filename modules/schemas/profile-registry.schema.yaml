@@ -2,9 +2,31 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry.schema.json
 title: StarCi profile registry
 type: object
-required: [schema, runtimes, aliases, executionModel, defaults, targets, skills, operators, fallback]
+required: [schema, runtimes, aliases, executionModel, targets, skills, operators, fallback]
 properties:
   schema: {const: starci/profile-registry@1}
+  purpose: {type: string}
+  glossary:
+    type: object
+    additionalProperties: {type: string, minLength: 1}
+  pricing:
+    type: object
+    additionalProperties: false
+    required: [currency, unit, asOf]
+    properties:
+      currency: {type: string, minLength: 1}
+      unit: {const: per-million-tokens}
+      asOf: {type: string, minLength: 1}
+      source: {type: string}
+      matching: {type: string}
+  models:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/model"}
+  pools:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/pool"}
   runtimes:
     type: array
     minItems: 1
@@ -31,11 +53,10 @@ properties:
       scheduling: {const: dependency-dag}
       fanOutWithinOperation: {const: forbidden}
       concreteAgentBinding: {const: provider-profile-model}
-      # A pointer, never a number: the slot counts live in runtimes.yaml, which
-      # is the only file scripts/kernel/cli.mjs and scripts/agent/models.mjs read
-      # for capacity.
+      # A pointer, never a number: the slot counts live in this registry's
+      # `pools`, the only file scripts/kernel/cli.mjs and scripts/agent/models.mjs
+      # read for capacity.
       concurrency: {type: string, minLength: 1}
-  defaults: {type: object}
   targets:
     type: object
     minProperties: 1
@@ -89,14 +110,52 @@ properties:
         items: {type: string, minLength: 1}
 $defs:
   model:
-    type: [string, "null"]
-    minLength: 1
+    type: object
+    additionalProperties: false
+    required: [provider, tier, price]
+    properties:
+      provider: {type: string, minLength: 1}
+      tier: {type: string, minLength: 1}
+      price:
+        type: object
+        additionalProperties: false
+        required: [input, output, cacheRead, cacheWrite]
+        properties:
+          input: {type: [number, "null"]}
+          output: {type: [number, "null"]}
+          cacheRead: {type: [number, "null"]}
+          cacheWrite: {type: [number, "null"]}
+          source: {type: string, minLength: 1}
+  pool:
+    type: object
+    additionalProperties: false
+    required: [target, provider, roles, maxParallel, defaultModel, models]
+    properties:
+      target: {type: string, minLength: 1}
+      provider: {type: string, minLength: 1}
+      roles:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+      maxParallel: {type: integer, minimum: 1}
+      capacityAuthority: {type: string, minLength: 1}
+      quotaTelemetry: {type: string, minLength: 1}
+      defaultModel: {type: string, minLength: 1}
+      models:
+        type: object
+        minProperties: 1
+        additionalProperties: {type: string, minLength: 1}
+      effort:
+        type: object
+        additionalProperties: {type: string, minLength: 1}
   target:
     type: object
     additionalProperties: false
-    required: [runtime, profiles, requestedModel, orcaLaunch]
+    required: [runtime, profiles, orcaLaunch]
     properties:
       runtime: {type: string, minLength: 1}
+      defaultModel: {type: string, minLength: 1}
       profiles:
         type: object
         additionalProperties: false
@@ -104,7 +163,6 @@ $defs:
         properties:
           working: {type: string, minLength: 1}
           reasoning: {type: string, minLength: 1}
-      requestedModel: {$ref: "#/$defs/model"}
       executionHosts:
         type: array
         minItems: 1

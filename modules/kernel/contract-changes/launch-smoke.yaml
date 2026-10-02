@@ -8,7 +8,7 @@ summary: >-
   and entry -> [Kernel] (1) -> [Op] (2) -> draw critic (3), the Op started the api dispatch way (startAgent: run-create
   --from <kernel terminal>, task-create, worker-start --task --run --from) and the critic by scripts/work/draw-critic.mjs
   launchCriticWorker on its criticWorkspace placement from the Op's terminal. Every agent is a no-op on the cheapest
-  priced model a runtimes.yaml pool pins (noopAgent: gpt-6-luna, effort low): a parent runs `launch-smoke.mjs stage --as
+  priced model a registry.yaml pool pins (noopAgent: gpt-6-luna, effort low): a parent runs `launch-smoke.mjs stage --as
   <role>` (it starts its child from the parent's own terminal), every agent runs `mark --as <role>` (one result line)
   and reports worker_done; an agent's command names only its role and the run's state directory is found by its own
   ORCA_TERMINAL_HANDLE (resolveState). The smoke reads each worker back with worker-read, checks the depth and the

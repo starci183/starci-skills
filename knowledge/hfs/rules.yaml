@@ -1,6 +1,6 @@
 # knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up; an id with no rule is listed under `retired` with its reason, never reused; count the rules, never type the count).
 #
-# One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
+# One entry per rule: its id, its finding code, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
 # rule is knowledge/hfs/README.md (section 12 lists the same ids and codes); this file is the data behind it. Read it only
 # through scripts/hfs/slots.mjs (loadRuleCatalog, rules); its shape is modules/schemas/hfs-rules.schema.yaml.
@@ -13,8 +13,8 @@
 # scripts and modules/kernel/failure-codes.yaml.
 #
 # Every rule is an error from 2.0. There is no baseline, allowlist or suppression file for a product. The runtime gate
-# (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only `pending`
-# list of that manifest, held by RT_PENDING_STALE and RT_PENDING_ADDED. Codes are quoted: the failure-code
+# (the StarCi runtime repository judged by knowledge/hfs/runtime-slots.yaml) has exactly one, the shrink-only sections of
+# modules/kernel/allowlist.yaml, held by RT_ALLOWLIST_SPRAWL. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
 schema: starci/hfs-rules@2
 version: 2.0.0
@@ -913,7 +913,7 @@ rules:
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest, `ruleParams.be.suffixes`; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
@@ -1172,6 +1172,7 @@ rules:
   - id: R114
     code: "RT_EXTERNAL_OWNER"
     law: "In the runtime repository a process, the network, SQLite or an external binary is reached only by its owner in ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml: an owned module specifier, global or spawned program word is used only by the files of scripts/api/<system> or engine/db that the map names."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_EXTERNAL_OWNER"]
@@ -1180,6 +1181,7 @@ rules:
   - id: R115
     code: "RT_TIER_DIRECTION"
     law: "Every relative import between two runtime owners goes from a tier to a tier its mayImport lists in tiers.runtime of knowledge/hfs/runtime-slots.yaml; owner cycles are ARCH_OWNER_CYCLE."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_TIER_DIRECTION"]
@@ -1188,6 +1190,7 @@ rules:
   - id: R116
     code: "RT_BASE_IMPURE"
     law: "The runtime base tier (the engine foundation and scripts/lib) never writes the filesystem and reads process.env only in a declared seam of ruleParams.runtime.baseEnvSeams."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_BASE_IMPURE"]
@@ -1196,6 +1199,7 @@ rules:
   - id: R117
     code: "RT_API_SHAPE"
     law: "A call file of scripts/api/<system>/ exports exactly one function named in camelCase after the file; only the files of its own system import its lib.mjs; no api system imports another; a system with a calls contract has a call file only for a call id the contract declares."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_API_SHAPE"]
@@ -1204,6 +1208,7 @@ rules:
   - id: R118
     code: "RT_SPEC_PLACEMENT"
     law: "A runtime spec is tests/<area>/<module>[.<topic>].spec.mjs, shared spec code is tests/helpers/<name>.mjs, preloads tests/setup/<name>.mjs and data tests/fixtures/**; a package spec sits beside its source as <name>.spec.*; no file uses the .test. suffix."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_SPEC_PLACEMENT"]
@@ -1212,6 +1217,7 @@ rules:
   - id: R119
     code: "RT_SOURCE_NAME"
     law: "A runtime source file is named <kebab-name>.mjs, never a one-off of ruleParams.runtime.oneOffNames (_*, tmp-*, fix-*, *-backfill, migrate-*, *-old, *.bak*), and its basename is unique inside its tier except lib.mjs and index.mjs."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_SOURCE_NAME"]
@@ -1220,6 +1226,7 @@ rules:
   - id: R120
     code: "RT_RETIRED_PRESENT"
     law: "No path of retired[] and no `from` of moved[] in modules/kernel/retired-paths.yaml is tracked again, and no symbol of its retiredSymbols[] is declared in runtime production code."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_RETIRED_PRESENT"]
@@ -1227,31 +1234,27 @@ rules:
       - {kind: runtime, id: retired-present, at: scripts/hfs/runtime-rules/retired.mjs}
   - id: R121
     code: "RT_GENERATED_DRIFT"
-    law: "A generated copy of the runtime (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) equals what scripts/hfs/sync-runtime.mjs writes from the single source."
+    law: "A generated root of ruleParams.runtime.generated is git-ignored output of its declared generatedBy: the repo's check regenerates every root, the runtime copies (packages/hfs/runtime, packages/eslint/be/runtime, packages/eslint/fe/runtime) are judged equal to what scripts/hfs/sync-runtime.mjs writes from the single source, and no git-tracked path lies under a generated root."
+    scope: runtime
     kinds: [check, codemod]
     gates: [land, runtime]
-    failureCodes: ["RT_GENERATED_DRIFT"]
+    failureCodes: ["RT_GENERATED_DRIFT", "GENERATED_UNTRACKED"]
     enforcers:
       - {kind: runtime, id: generated-drift, at: scripts/hfs/sync-runtime.mjs}
+      - {kind: runtime, id: generated-untracked, at: scripts/hfs/runtime-rules/generated-untracked.mjs}
   - id: R122
     code: "RT_CITED_PATH_MISSING"
     law: "A runtime path cited by live prose or contracts (modules outside the contract history, docs, skills, knowledge, CONTEXT.md, README.md, CONTRIBUTING.md, init, the ui docs) exists; a retired or moved path is cited only by history."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CITED_PATH_MISSING"]
     enforcers:
       - {kind: runtime, id: cited-path, at: scripts/checks/check-contract-cites.mjs}
-  - id: R123
-    code: "RT_PENDING_STALE"
-    law: "Every entry of the pending list of knowledge/hfs/runtime-slots.yaml names a runtime finding code and still allows a finding, and no entry allows a finding the base revision's list did not allow: the list only shrinks."
-    kinds: [check]
-    gates: [land, runtime]
-    failureCodes: ["RT_PENDING_STALE", "RT_PENDING_ADDED"]
-    enforcers:
-      - {kind: runtime, id: pending-ratchet, at: scripts/hfs/runtime-rules/pending.mjs}
   - id: R124
     code: "RT_PINNED_PATH_MOVED"
-    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the fleet stopped."
+    law: "A pinned path of ruleParams.runtime.pinned (persisted outside git) exists, or moved through a modules/kernel/retired-paths.yaml moved[] entry marked quiesced: true, landed with the workers stopped."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_PINNED_PATH_MOVED"]
@@ -1260,6 +1263,7 @@ rules:
   - id: R125
     code: "RT_NODE_MODULES_LINK"
     law: "No runtime source creates a junction or a symlink for a node_modules folder, through node:fs (symlink, symlinkSync, directly or through a local wrapper) or a spawned link command (mklink /J or /D, New-Item -ItemType Junction or SymbolicLink, ln -s): every checkout installs its own dependencies with a real npm ci from the cache."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_NODE_MODULES_LINK"]
@@ -1268,6 +1272,7 @@ rules:
   - id: R126
     code: "RT_CONTROL_CHARACTER"
     law: "Tracked text source of the runtime (*.mjs, *.cjs, *.js, *.ts, *.tsx, *.yaml, *.yml, *.md, *.json outside the generated copies) holds no raw control character (U+0000 to U+001F except tab, LF and CR, and U+007F); the character is written as its escape."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_CONTROL_CHARACTER"]
@@ -1275,7 +1280,8 @@ rules:
       - {kind: runtime, id: control-characters, at: scripts/hfs/runtime-rules/control-chars.mjs}
   - id: R127
     code: "RT_ABSOLUTE_PATH"
-    law: "No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text. A real path-parsing test vector goes to the pending list with a reason."
+    law: "No tracked file of the runtime holds a hard-coded absolute host path: a drive-letter path, a user-profile path (/Users/<name>/, /home/<name>/) or an expanded AppData path. Paths resolve from the runtime root, os.tmpdir(), the config or a state-root helper, and a spec builds every path and prompt fixture from its temp dir; %LOCALAPPDATA% as an unexpanded name is clean. In source the rule reads string and template literals and comments through the syntax tree (a URL and a generic drive-pattern regular expression are not paths); in yaml, json and md it reads line text."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_ABSOLUTE_PATH"]
@@ -1429,7 +1435,7 @@ rules:
       - {kind: eslint-be, id: job-fence-required}
   - id: R159
     code: "BE_JOB_RUN_KEY"
-    law: "In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
+    law: "In a job step (slot be.feature.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_JOB_RUN_KEY"]
@@ -1669,7 +1675,7 @@ rules:
       - {kind: hfs, id: docker, at: scripts/hfs/rules/docker.mjs}
   - id: R189
     code: "HFS_DOCKER_ENTRY"
-    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node` on the standalone `server.js` of the app); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli or migrate app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
+    law: "The runtime stage starts the app's own built entry in exec form (be `node be/dist/apps/<app>/src/main.js`, fe `node` on the standalone `server.js` of the app); an api or Next app sets `ENV PORT` and EXPOSEs the same port and carries a HEALTHCHECK, a worker carries a process HEALTHCHECK and exposes nothing, a cli app says `HEALTHCHECK NONE` and exposes nothing; a Next app's build stage runs `turbo run build --filter=@<project>/<app>` and its `next.config.ts` sets `output: \"standalone\"`."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOCKER_ENTRY"]
@@ -1694,6 +1700,7 @@ rules:
   - id: R192
     code: "RT_FACT_FALSE"
     law: "Every claim of knowledge/hfs/facts.yaml holds against knowledge/hfs/slots.yaml (the one source of the product shape), and no prose of knowledge/**, docs/** or a README states the opposite of a fact (for example that an fe app lacks its own package.json, which fe.app.next requires); prose quotes a fact id or a slot id and never restates the claim."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_FACT_FALSE"]
@@ -1701,15 +1708,17 @@ rules:
       - {kind: runtime, id: facts, at: scripts/hfs/runtime-rules/facts.mjs}
   - id: R193
     code: "RT_RULE_ID_UNKNOWN"
-    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read."
+    law: "Every rule id (R<digits>) that tracked knowledge, docs, code or data names is a rule of this catalog, and the ids run from R01 to the last rule with no undeclared gap: an id with no rule is listed under `retired` with its reason (RT_RULE_ID_GAP), and every rule of the catalog is named by the `hfsRules:` of at least one knowledge/patterns topic or carries `scope: runtime` (RT_RULE_UNCITED). A retired id is a history name that only the contract changes and the changelogs may still spell; specs and generated copies are not read."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
-    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP"]
+    failureCodes: ["RT_RULE_ID_UNKNOWN", "RT_RULE_ID_GAP", "RT_RULE_UNCITED"]
     enforcers:
       - {kind: runtime, id: rule-ids, at: scripts/hfs/runtime-rules/rule-ids.mjs}
   - id: R194
     code: "RT_GENERATED_BLOCK_STALE"
     law: "The app map (section 4), the back-end source tree (5.1), the tier matrix (5.2), the front-end source tree (6.1) and the rule catalog (12) of knowledge/hfs/README.md are generated blocks, rendered by scripts/hfs/readme-blocks.mjs from knowledge/hfs/slots.yaml and rules.yaml between hfs:generated markers and equal to the render byte for byte; the README never restates them by hand. Likewise the `verification.automated` list of a pattern rule is the failure codes of the rules its `hfsRules` names, the `slot` of a `files:` entry is the slot that owns its path, and the `code` of a why-map entry is the code of the catalog rule that lists the lint rule: scripts/hfs/derived-fields.mjs writes them and they equal the derivation byte for byte."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_GENERATED_BLOCK_STALE"]
@@ -1718,6 +1727,7 @@ rules:
   - id: R195
     code: "RT_PROSE_PATH_NO_SLOT"
     law: "Every product path the knowledge, the docs and the READMEs name (a be/ or fe/ path, whole or with placeholders, globs and braces) is owned by a slot of knowledge/hfs/slots.yaml or is a folder above one; a path no slot owns is prose that invented a place or kept one a slot no longer has. App names are free: a literal app name is one the examples or the starter declare, a placeholder stands for any; a ** glob and a topic file of the knowledge are not paths."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_PROSE_PATH_NO_SLOT"]
@@ -1726,6 +1736,7 @@ rules:
   - id: R196
     code: "RT_PROSE_RESTATES_SLOTS"
     law: "Knowledge, docs and READMEs never restate knowledge/hfs/slots.yaml: no fenced block or line names three or more product paths a slot owns, and no sentence lists three or more of the root or side file names the slots declare; a slot is referenced by its id, and the only allowed copy is a generated block between hfs:generated markers. The slot and rule catalogs, the example READMEs and the templates are sources or snapshots, not prose."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
@@ -1734,6 +1745,7 @@ rules:
   - id: R202
     code: "CI_UPLOAD_NOT_SILENT"
     law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
+    scope: runtime
     kinds: [check]
     gates: [land, runtime]
     failureCodes: ["CI_UPLOAD_NOT_SILENT"]
@@ -1755,6 +1767,69 @@ rules:
     failureCodes: ["HFS_COVERAGE_SCOPE_DRIFT"]
     enforcers:
       - {kind: hfs, id: coverage-scope-drift, at: packages/hfs/sync/managed.mjs}
+  - id: R205
+    code: "RT_DOC_NO_OWNER"
+    law: "Every tracked docs/*.md declares exactly one ownership header on its first line — \"Owner: <knowledge/ or modules/ path that exists>\" when the document explains a machine-owned source, \"Task: <one task>\" for a how-to — no two documents carry the same task, and two documents whose titles share two or more topic words while at least 30% of the shorter one's sentences appear in the other are one document merged, not two."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_DOC_NO_OWNER"]
+    enforcers:
+      - {kind: runtime, id: doc-owner, at: scripts/checks/check-doc-owner.mjs}
+  - id: R206
+    code: "RT_EXAMPLE_COUPLING"
+    law: "Runtime source never couples to a product or its example: no tracked file under scripts/, engine/, packages/, ui/src or ui/api - and no managed template under packages/hfs/templates/ - spells a literal examples/<name>, one of the product names this runtime shipped against (the closed PRODUCT_NAMES list of scripts/lib/example-refs.mjs), an inc-<hash> a product name prefixes, or a host drive path. Specs, tests, the generated runtime copies, contract-change history, changelogs and .starciwork records are out of scope; a read the runtime genuinely makes at run time is declared once in scripts/lib/example-refs.mjs and every consumer names that constant."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_EXAMPLE_COUPLING", "RT_PRODUCT_NAME_IN_SOURCE", "RT_HOST_PATH_IN_TEMPLATE"]
+    enforcers:
+      - {kind: runtime, id: example-coupling, at: scripts/checks/check-example-coupling.mjs}
+  - id: R207
+    code: "RT_RETIRED_NAME_LIVE"
+    law: "A name the retired registry declares dead never appears in a live tracked file — not in prose, a comment, a string literal or a path: every retired[].path and moved[].from of modules/kernel/retired-paths.yaml, and every retiredNames[] naming that is not a path (a deleted app, a layer naming, a verb prefix). History (the contract changes, a changelog, a benchmark finding, a .starciwork record), the registry itself and the files of the check may name what was deleted; a slot manifest's forbids value or forbidden-presence tombstone declares a refusal, not a use."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RETIRED_NAME_LIVE"]
+    enforcers:
+      - {kind: runtime, id: retired-names, at: scripts/checks/check-retired-names.mjs}
+  - id: R208
+    code: "RT_PORT_RESTATED"
+    law: "Every port literal of the runtime is spelled once, by its owner, and every other file references the owner: the harness UI ports live in modules/models/runtimes.yaml statusApp.port/devPort read through ui/ports.mjs, the local SonarQube host in scripts/gates/sonar-local.mjs DEFAULT_HOST. No in-scope file that is not the owner spells an owned literal in a port position (a scheme://host:NNNN or host:NNNN authority, a *port*/PORT assignment, a listen(NNNN) call), and an unowned literal in a port position of two or more runtime source files gets one owning exported constant the rest reference. Specs, tests, node_modules, the generated runtime copies, contract-change history, changelogs, .starciwork and the product stack declarations (.starcistacks, starcistacks-services - a product owns the ports of the services it runs) are out of scope."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_PORT_RESTATED"]
+    enforcers:
+      - {kind: runtime, id: port-once, at: scripts/checks/check-port-once.mjs}
+  - id: R209
+    code: "RT_CONFIG_DEFAULT_TWICE"
+    law: "Every documented configuration default is stated once, by its owner, and read through it: a camelCase leaf or lowercase key of config.example.yaml, or a value an owner declares - scripts/machine/home.mjs DEFAULTS (supervisor workers, the land gate, frozenMinutes, pollIntervalMs), engine/config.mjs (connector, ask, UAT, spec and allocation defaults, and DEFAULT_OWNER_LANGUAGE which scripts/machine/home.mjs re-exports), engine/orca-config.mjs (worker depth), scripts/reconciler/state.mjs (the controller mode) - is never restated as a literal fallback (?? or ||, a parameter default, or a language ternary) in any other runtime source file; the reader calls the owner accessor (supervisorSettings(), configuredMode(), ownerLanguage(), ...). Specs, tests, the generated runtime copies, stories and the HFS templates are out of scope, and a bare identifier or a computed value is a read, not a restatement."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CONFIG_DEFAULT_TWICE"]
+    enforcers:
+      - {kind: runtime, id: default-once, at: scripts/checks/check-default-once.mjs}
+  - id: R210
+    code: "RT_VERSION_RESTATED"
+    law: "knowledge/hfs/canon-pins.yaml spells the version of every @starci package and every canon-pinned dependency once; a package.json is the declared install site and a lockfile its resolution. Anywhere else a semver literal equal to a pin - or a name@x.y.z specifier naming one - restates it, except on the declared binding keys a refresher owns and rewrites in place (canon.version of the code-pattern bindings held by check-canon-pins.mjs, provenance.version and identity.version of the grammar snapshots rewritten by scripts/work/ui/grammar-knowledge.mjs). Package manifests, lockfiles, changelogs, contract-change history, specs, tests, the generated runtime copies and .starciwork are out of scope; a restatement is fixed by naming the pin, never the literal."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_VERSION_RESTATED"]
+    enforcers:
+      - {kind: runtime, id: version-pin-once, at: scripts/checks/check-version-pin-once.mjs}
+  - id: R211
+    code: "RT_SLOT_ID_SHAPE"
+    law: "A slot id follows the grammar its manifest declares, read from the manifest not from a list: dot-separated lowercase kebab segments, a first segment of naming.prefixes in knowledge/hfs/slots.yaml (profiles in knowledge/hfs/runtime-slots.yaml), <side>.app.<kind> naming a kind of appKinds.<side>, and every deeper id extending a declared id - an explicit parent field, or a family at least two slots share; a lone deep orphan invents a family. The role-suffix vocabulary holds no synonym pairs: a profile's suffixes never share a word with bannedSuffixes, no naming.refusedPairs pair is live in suffixes on both sides, and naming.sameConceptPairs is the one declared exception (step + saga-step), live on both sides or dropped; naming.glossary binds the five incoming-thing names (consumer, subscription, webhook, processor, handler) to their distinct kinds."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_SLOT_ID_SHAPE"]
+    enforcers:
+      - {kind: runtime, id: slot-id-shape, at: scripts/checks/check-slot-id-shape.mjs}
   - id: R223
     code: "RIGHTS_ROLE_DENIED"
     law: "By the caller's role, the command guard refuses git push, git tag, raw git commit/add/rm/mv, raw git synchronization writes, npm publish, a whole-suite run outside the release cut and unit.verify/e2e.verify, npm ci without the host lock, a release cut, and raw side-effecting tools; modules/kernel/command-policy.yaml is the one rule table read by both the PreToolUse guard and the PATH shim."
@@ -1787,6 +1862,7 @@ retired:
   - {id: R201, reason: "reserved for the CLI lane (CLI_ONLY_ENTRY); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
+  - {id: R123, reason: "RT_PENDING_STALE retired with the pending list itself: ruleParams.runtime.pending and its pending-ratchet enforcer are gone; nothing ratchets a tolerated-finding list"}
   - {id: R128, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R129, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R130, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
@@ -1800,3 +1876,4 @@ retired:
   - {id: R138, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R139, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
   - {id: R140, reason: "skipped when the shape block was renumbered past the ids of main (R143 up); never the id of a landed rule"}
+

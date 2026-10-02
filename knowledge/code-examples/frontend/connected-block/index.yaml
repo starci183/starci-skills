@@ -2,7 +2,7 @@ schema: starci/code-example@1
 id: connected-block
 title: Connected block and pure renderer pair
 purpose: |
-  Show one feature block unit under the shape-slot law: connected index.tsx owns
+  Show one feature block unit under the drawing law: connected index.tsx owns
   data, localization and navigation, folds each api into a Slot and picks the
   shape; pure component.tsx receives only { state, props, on } of atoms. state is
   a drawn SHAPE ("summary" | "detail"), never a data status: the slot's loading,
@@ -62,7 +62,7 @@ verification:
     Verified 2026-09-27 by dropping these files into examples/shape-slot as
     fe/apps/shape-slot/src/components/blocks/ExampleBlock (with stub @/hooks and
     @/modules/i18n/navigation seams): tsc clean, @starci/eslint-canon-fe clean including
-    the shape-slot rules. Mock-only connected mapping is not browser UAT.
+    the drawing rules. Mock-only connected mapping is not browser UAT.
 provenance:
   sources:
     - examples/ecommerce-app/fe/apps/app/src/components/blocks/SessionForm/index.tsx

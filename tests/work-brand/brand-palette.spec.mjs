@@ -7,7 +7,6 @@ import path from 'node:path';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { brandPalette, measurePalette, paletteFindings, promptPaletteBlock, readImage } from '../../scripts/work/brand/brand-palette.mjs';
 import { checkShellConformance } from '../../scripts/work/ui/shell-conformance.mjs';
-import { advisoryCodesFor, loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { NIVO_BRAND, drawnPart, redAccentPart, bluePrimaryPart } from '../fixtures/brand-palette.mjs';
 import { drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';
@@ -144,16 +143,7 @@ test('a tree without a brand record is told so, never refused', async (t) => {
   assert.ok(result.info.some((s) => s.includes('[BRAND_PALETTE_UNAVAILABLE]')));
 });
 
-test('the contracts wire it: registered for new legs, the draw prompt carries the brand colours, the gates name the codes', () => {
-  const changes = loadContractChanges(ROOT);
-  const change = changes.changes.find((c) => c.id === 'brand-palette-gate');
-  assert.ok(change, 'modules/kernel/contract-changes.yaml registers brand-palette-gate');
-  assert.equal(change.reach ?? 'new-legs', 'new-legs');
-  for (const op of ['interface.draw', 'brand.decide', 'interface.implement']) {
-    assert.ok(change.ops.includes(op), op);
-    const { codes: advisory } = advisoryCodesFor(changes, { admittedAt: change.effectiveAt - 1000, op });
-    assert.ok(advisory.includes('PALETTE_OFF_BRAND') && advisory.includes('PRIMARY_ABSENT'), `${op}: an older leg meets the codes as advisory`);
-  }
+test('the contracts wire it: the draw prompt carries the brand colours and the gates name the codes', () => {
   const draw = fs.readFileSync(path.join(ROOT, 'modules/ops/ops/interface.draw.yaml'), 'utf8');
   assert.match(draw, /brand-palette\.mjs --prompt/);
   assert.match(draw, /PALETTE_OFF_BRAND/);

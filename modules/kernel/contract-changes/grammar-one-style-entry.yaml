@@ -1,8 +1,0 @@
-id: grammar-one-style-entry
-effectiveAt: '2026-09-24T19:30:00+07:00'
-summary: "one grammar stylesheet per app: each family sheet @imports common's and each family code entry re-exports ./common, so frontend.grammar keeps one styleEntry (a product that is its own family binds common/common.css); the architecture grammar contract judges each workspace consumer against the @starci/grammar copy Node resolves for it (hoisted or nested), not the hoisted copy alone (nivo inc-ffe60c49f502 follow-up). Adds no finding code"
-ops: [interface.scaffold, interface.implement, code.refactor, review.verify]
-paths:
-  - knowledge/repository-baseline.yaml
-  - scripts/checks/architecture/frontend.mjs
-reach: new-legs

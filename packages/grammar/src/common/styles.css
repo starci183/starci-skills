@@ -852,7 +852,7 @@
      * --- Ink band (0.6.0): `SurfaceCard treatment="ink"`, the page's one signature overview moment. ---
      *
      * The ground is the family's brand ink: `--accent` (Core; a product whose accent is its ink, e.g.
-     * Nivo #040d1c, gets that exact ink). Offset Pop re-binds the ground and its inks to its own ink and
+     * a deep navy #040d1c, gets that exact ink). Offset Pop re-binds the ground and its inks to its own ink and
      * canvas. Everything painted inside re-reads the band's own tokens, so grammar children (SectionHeader,
      * Text, IconTile, Badge, DescriptionList, Divider) keep their anatomy and stay AA on any accent:
      *   - foreground: white on a dark ink (lightness below 0.62), black on a light one - read from the ink

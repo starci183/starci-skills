@@ -1,7 +1,7 @@
 /**
  * The versioned operations of an api app, read from its typed operation table and printed as OpenAPI 3.1.
  *
- * The table is the canon's one declaration of an app's operation surface (knowledge/patterns/be/operations.yaml, BE-OPERATIONS-1):
+ * The table is the canon's one declaration of an app's operation surface (knowledge/patterns/be/api.yaml, BE-OPERATIONS-1):
  * `apps/<app>/src/operations.ts` exports `OPERATIONS`, made by `defineOperations({ "<id>@<version>": operation<Input, Output,
  * RefusalCode>("query" | "mutation") })`. The types come from the TypeScript checker; nothing is executed. An input, an output or a
  * refusal set the checker cannot express (`any`, `unknown`, `Record<string, unknown>`, an unbound generic, `string` as a refusal code)

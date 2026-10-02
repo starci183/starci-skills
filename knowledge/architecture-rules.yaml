@@ -1,10 +1,11 @@
+# owner: the agent-reviewed semantic architecture obligations not decidable by a rule; machine-decidable law lives in knowledge/hfs/rules.yaml only.
 schema: starci/knowledge-source@1
 id: architecture-rules
 title: Common architecture invariants
 purpose: "Semantic design obligations shared by all StarCi projects: TypeScript + Next.js frontend + NestJS backend.
   Every obligation a machine can decide (tiers, composition, public surface, data boundary, configuration) is a rule of
   knowledge/hfs/rules.yaml, the one rule catalog, and is not restated here; this file holds only what needs a reviewing
-  agent. Read docs/architecture-rules.md before the concrete profiles. No manual fallback can pass a missing code check."
+  agent. Read docs/architecture.md before the concrete profiles. No manual fallback can pass a missing code check."
 appliesTo:
   - backend
   - frontend
@@ -13,10 +14,8 @@ provenance:
   reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/rules.yaml
-    - docs/architecture-rules.md
-    - docs/portable-source-architecture.md
-    - docs/backend-source-pattern.md
-    - docs/application-runtime-config-and-health.md
+    - docs/architecture.md
+    - docs/application-stacks.md
   limitations: Fixed Nest/Next family; the source topology is the one HFS tree, framework substitution is not possible. Automated
     checks have explicit supported syntax/path/contract bounds. Missing applicable code-rule coverage blocks
     conformance. Agent design review and real behavioral evidence cover semantic obligations. Runtime

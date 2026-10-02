@@ -17,7 +17,6 @@ export const INFRASTRUCTURE_CODES = Object.freeze({
   HFS_WORK_AGENT_DATA: 'scripts/gates/hfs-sync.mjs',
   // scripts/checks/check-doc-language.mjs: the source-language gate of the runtime
   HFS_SOURCE_NOT_ENGLISH: 'scripts/checks/check-doc-language.mjs',
-  HFS_SOURCE_PENDING_STALE: 'scripts/checks/check-doc-language.mjs',
   // scripts/checks/check-hfs-rules.mjs: the parity of the rule catalog with its enforcers
   HFS_RULES_INVALID: 'scripts/checks/check-hfs-rules.mjs',
   HFS_RULE_NO_ENFORCER: 'scripts/checks/check-hfs-rules.mjs',

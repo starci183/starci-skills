@@ -14,8 +14,7 @@ required:
 properties:
   schema:
     const: work/disposable-accounts@1
-    description: Record family discriminator. Every record names its own family so a file can be validated
-      without inferring its meaning from the directory it happens to sit in.
+    $ref: "urn:work:common:1#/$defs/familyDiscriminator"
   disposable:
     const: true
     description: That every identity below is throwaway. It is only ever true and it is stated rather than
@@ -34,7 +33,7 @@ properties:
         - identity
       properties:
         role:
-          $ref: "#/$defs/slug"
+          $ref: "urn:work:common:1#/$defs/slug"
           description: The role the flow's steps name this account by. It is the join between the walk and
             the custody, so a step naming a role no entry carries is a resolution failure rather than a
             sign-in that fails confusingly.
@@ -45,11 +44,6 @@ properties:
             disposability and the custody path actually live. It is a ref rather than a value, so rotating
             the secret is one edit in one place and this file never held it."
 $defs:
-  slug:
-    type: string
-    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that a name
-      written twice by two authors is the same string.
   recordId:
     type: string
     pattern: ^(?:environment|identity|fixture)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$

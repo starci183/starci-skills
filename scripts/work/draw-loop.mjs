@@ -443,7 +443,7 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
  * draw source, fixtures, grammar resolution and rationale into `out` (a loop round). Shared by a loop round and the
  * settle re-measure (verifyRecordParts), so the runtime judges an installed part exactly as the loop did.
  */
-export async function componentMeasure({ source, fixtures, fixtureFiles, productDir, css = [], prefer = 'auto', grammarDist = null, ui = null, repo, family = null, settings = drawLoopSettings(),
+async function componentMeasure({ source, fixtures, fixtureFiles, productDir, css = [], prefer = 'auto', grammarDist = null, ui = null, repo, family = null, settings = drawLoopSettings(),
   probes = browserProbes, out, proposalDirs = [], viewports, name, fullPage = true, render = defaultComponentRender, sourceCheck = checkDrawSource, keep = false, rationaleFile = undefined }) {
   // The source gate first: TypeScript against the grammar the draw will ship with, then the AST.
   const gate = await sourceCheck({ file: source, fixtures: fixtureFiles, productDir, prefer, grammarDist });

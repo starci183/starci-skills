@@ -54,13 +54,14 @@ test('the self-check cites a rule id for every value and marks every proof case'
 
 test('draw routes to Devin first, Codex (GPT-6 Sol at effort high) the fallback', () => {
   const rt = parseYaml(fs.readFileSync(path.join(root, 'modules/models/runtimes.yaml'), 'utf8'));
+  const pools = parseYaml(fs.readFileSync(path.join(root, 'modules/models/registry.yaml'), 'utf8')).pools;
   const kind = rt.roleOfKind['interface.draw'];
   assert.equal(kind.order, 'draw');
   assert.equal(kind.floor, 'hard');
   assert.deepEqual(rt.allocation.preference.draw, ['devin-agent', 'codex-agent']);
   assert.deepEqual(rt.allocation.tiers.hard.draw, ['devin-agent', 'codex-agent']);
-  assert.equal(rt.runtimes['codex-agent'].models.hard, 'gpt-6-sol');
-  assert.equal(rt.runtimes['codex-agent'].effort.hard, 'high');
+  assert.equal(pools['codex-agent'].models.hard, 'gpt-6-sol');
+  assert.equal(pools['codex-agent'].effort.hard, 'high');
 });
 
 test('the render source is a declared .html asset and full-width controls take the fill geometry', () => {

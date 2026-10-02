@@ -4,7 +4,7 @@
 //   usageOfLedger(db, {sinceMs})             the same folded over a whole ledger (by provider/model, kernel apart)
 //   machineUsage({env, now, windowMs})       every registered ledger + the Supervisor seat: what `boot.mjs --status` prints
 //
-// All reads. A token count is a fact recorded from a CLI session; cost is the recorded cost_usd only (modules/models/prices.yaml,
+// All reads. A token count is a fact recorded from a CLI session; cost is the recorded cost_usd only (modules/models/registry.yaml models.<id>.price,
 // NULL while a model has no declared price) and is reported as null, never as 0, when any contributing row is unpriced.
 // An attempt that settled with no llm_usage row is 'unavailable' (no adapter for its agent, or no session file found) and
 // is counted apart, never given a number.

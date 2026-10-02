@@ -11,7 +11,7 @@ import { CANONICAL_RULE_IDS, RULE_FAMILY_COUNTS } from "./rule-catalog.generated
  * conformance check went on passing against the wrong catalog, which is the worst outcome a check
  * can have.
  *
- * Regenerate with `node scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
+ * Regenerate with `node packages/grammar/scripts/generate-rule-catalog.mjs [knowledgeDir]` from the package root.
  */
 export { RULE_FAMILY_COUNTS }
 

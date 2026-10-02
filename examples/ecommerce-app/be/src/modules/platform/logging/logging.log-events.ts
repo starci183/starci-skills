@@ -6,6 +6,6 @@ export enum LoggingLogEvent {
     WorkerStarted = "worker.started",
     /** The service failed before it could serve; the process exits non-zero. */
     StartupFailed = "server.startup_failed",
-    /** The migrate app finished; the names of the applied migrations ride in the fields. */
+    /** The cli app's migrate run finished; the names of the applied migrations ride in the fields. */
     MigrationsApplied = "migrations.applied",
 }

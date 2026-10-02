@@ -19,6 +19,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { addWorkCommon } from '../../lib/work-schemas.mjs';
 import { isWorkRecordSchema, readWorkspace } from '../record-ownership.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -41,7 +42,7 @@ export function loadWorkSchemaValidators(root = runtimeRoot) {
   }
   const schemaDir = path.join(root, 'modules', 'schemas');
   const catalog = parseYaml(fs.readFileSync(path.join(schemaDir, 'index.yaml'), 'utf8'));
-  const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
+  const ajv = addWorkCommon(new Ajv2020({ strict: false, allErrors: true, logger: false }), root);
   const validators = new Map();
   for (const entry of catalog?.schemas ?? []) {
     if (entry?.subsystem !== 'work-tree' || entry?.dialect !== 'json-schema') continue;

@@ -60,6 +60,7 @@ import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
+import { loadRuntimes } from '../agent/models.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { slugify } from '../lib/slug.mjs';
@@ -256,9 +257,7 @@ export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process
 
 /* ------------------------------------------------------------ routing */
 
-const loadRuntimes = () => parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-
-/** Equal weight for every pool the runtimes registry declares — the absent-shares meaning. */
+/** Equal weight for every pool the model registry declares — the absent-shares meaning. */
 export const equalPoolShares = (runtimes) => Object.fromEntries(Object.keys(runtimes?.runtimes ?? {}).map((pool) => [pool, 1]));
 
 /**
@@ -272,7 +271,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
   const candidates = [];
   for (const pool of Object.keys(shares ?? {})) {
     const provider = runtimes?.runtimes?.[pool]?.provider ?? AGENTS[pool] ?? null;
-    if (!provider) { skipped.push({ pool, reason: 'no runtimes.yaml pool' }); continue; }
+    if (!provider) { skipped.push({ pool, reason: 'no registry.yaml pool' }); continue; }
     if (prefer && provider !== prefer) continue;
     if (avoid.includes(provider)) { skipped.push({ pool, reason: `${provider} failed worker readiness` }); continue; }
     const launch = resolveLaunchModel(pool, 'hard', { runtimes });
@@ -295,7 +294,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
 export async function routeWorker({ m, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
-  // Absent owner shares = equal over every pool runtimes.yaml declares (the
+  // Absent owner shares = equal over every pool registry.yaml declares (the
   // configuredAllocationPolicy contract), never a literal pool list.
   const shares = cfg?.allocation?.shares ?? equalPoolShares(loadRuntimes());
   const windowHours = cfg?.allocation?.windowHours ?? DEFAULT_ALLOCATION_WINDOW_HOURS;

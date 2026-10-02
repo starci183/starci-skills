@@ -45,8 +45,6 @@ const KNOWN_IMAGES = Object.freeze({
   clickhouse: { kind: 'database', aliases: ['clickhouse', 'database', 'db'], probe: { tcp: true } },
   kafka: { kind: 'queue', aliases: ['kafka', 'queue', 'broker'], probe: { tcp: true } },
   redpanda: { kind: 'queue', aliases: ['redpanda', 'kafka', 'queue', 'broker'], probe: { tcp: true } },
-  rabbitmq: { kind: 'queue', aliases: ['rabbitmq', 'amqp', 'queue', 'broker'], probe: { tcp: true } },
-  nats: { kind: 'queue', aliases: ['nats', 'queue', 'broker'], probe: { tcp: true } },
   elasticsearch: { kind: 'search', aliases: ['elasticsearch', 'elastic', 'search'], probe: { tcp: true } },
   opensearch: { kind: 'search', aliases: ['opensearch', 'search'], probe: { tcp: true } },
 });

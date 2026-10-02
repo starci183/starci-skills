@@ -1,3 +1,4 @@
+Owner: modules/ops/ops/brand.decide.yaml
 # The brand is proven by machines
 
 A brand record states what the product looks like: its colour tokens, the mascot, the glyph set, the family

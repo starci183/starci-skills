@@ -8,6 +8,9 @@ appliesTo:
   - backend
   - frontend
 family: repo
+# The slot ids this topic teaches (knowledge/hfs/slots.yaml); scripts/gates/read-digest.mjs inverts these
+# into the READ-step slot -> pattern-topic map (knowledge/op-gate.yaml kinds), each slot's topics in index.yaml order.
+slots: [repo.packages, app.package-manifest, app.lockfile]
 provenance:
   reviewedAt: 2026-09-29
   sources:
@@ -41,7 +44,7 @@ rules:
   - id: REPO-PINS-2
     title: One version of each dependency
     kind: mandatory
-    hfsRules: [R14]
+    hfsRules: [R14, R111]
     requirement: |
       Each dependency has one version across the root and workspace `package.json` files. The root `overrides` fix react, next
       and grammar. A nested copy (`fe/packages/<pkg>/node_modules/@starci/grammar`, a nested entry in `package-lock.json`) is
@@ -56,6 +59,7 @@ rules:
       automated:
         - HFS_DEP_VERSION_SKEW
         - HFS_PACKAGE_MANAGER_MIXED
+        - HFS_PEER_INTEGRATION_MISSING
       manual: []
     relatedExamples: []
   - id: REPO-PINS-3

@@ -57,7 +57,7 @@ test('Orca CODEX_HOME resolves from the platform userData dir, and a test proces
 /* ------------------------------------------------------- claude writer */
 
 const CLAUDE_FIXTURE={numStartups:5,installMethod:'global',tipsHistory:{x:3},hasCompletedOnboarding:true,
-  projects:{[F(UP,'Repositories/todo-app-be')]:{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
+  projects:{[F(UP,'Repositories/shop-be')]:{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
     [W(UP,EA)]:{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
   userID:'9007199254740993123'};
 

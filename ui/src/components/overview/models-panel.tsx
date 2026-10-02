@@ -1,4 +1,4 @@
-import type { FleetSummary } from '../../contract';
+import type { WorkersSummary } from '../../contract';
 import type { Concept } from '../concept';
 import { AgentAvatar, agentOf } from '../agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
@@ -11,7 +11,7 @@ export const concept: Concept = 'C2';
 const number = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 
 /** Running ops per model as bars, plus 24 h token usage. */
-export function ModelsPanel({ summary, bare = false }: { summary: FleetSummary | undefined; bare?: boolean }) {
+export function ModelsPanel({ summary, bare = false }: { summary: WorkersSummary | undefined; bare?: boolean }) {
   const { running } = useAttemptAgents();
   if (!summary) return <p className="p-6 text-sm text-muted-foreground">{t('Loading…')}</p>;
   const families = new Map<string, ReturnType<typeof attemptAgent>[]>();

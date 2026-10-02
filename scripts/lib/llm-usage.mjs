@@ -24,7 +24,9 @@ import { positiveNumber } from './number.mjs';
 export const USAGE_SOURCE = 'cli-transcript';
 export const USAGE_UNAVAILABLE = 'unavailable';
 export const USAGE_AGENTS = Object.freeze(['claude', 'codex']);
-const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'prices.yaml');
+// The price table lives in the ONE model catalog: modules/models/registry.yaml
+// `pricing` + `models.<id>.price`.
+const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'registry.yaml');
 
 const COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'];
 const int = (v) => positiveNumber(v, 0, { int: true });
@@ -177,11 +179,22 @@ export function sumRows(rows) {
 export const promptTokens = (r) => Number(r.inputTokens ?? 0) + Number(r.cacheReadTokens ?? 0) + Number(r.cacheWriteTokens ?? 0);
 
 let priceCache = null;
-/** modules/models/prices.yaml, read once per process (`file` overrides for a spec). */
+/**
+ * modules/models/registry.yaml, read once per process (`file` overrides for a spec). The returned
+ * table is the shape callers have always read: {asOf, source, models:{<id>: {input, output,
+ * cacheRead, cacheWrite, provider, tier, source}}} — each row is the model's `price` entry flattened
+ * with its provider/tier.
+ */
 export function loadPrices(file = PRICES_FILE) {
   if (file === PRICES_FILE && priceCache) return priceCache;
   const doc = readYamlFile(file, null) ?? {};
-  const table = { asOf: doc.asOf ?? null, source: doc.source ?? null, models: doc.models ?? {} };
+  const models = {};
+  for (const [id, m] of Object.entries(doc.models ?? {}))
+    models[id] = m?.price && typeof m.price === 'object'
+      ? { ...m.price, provider: m.provider ?? null, tier: m.tier ?? null }
+      : { input: m?.input ?? null, output: m?.output ?? null, cacheRead: m?.cacheRead ?? null, cacheWrite: m?.cacheWrite ?? null,
+          provider: m?.provider ?? null, tier: m?.tier ?? null, ...(m?.source !== undefined ? { source: m.source } : {}) };
+  const table = { asOf: doc.pricing?.asOf ?? doc.asOf ?? null, source: doc.pricing?.source ?? doc.source ?? null, models };
   if (file === PRICES_FILE) priceCache = table;
   return table;
 }

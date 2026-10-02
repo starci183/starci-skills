@@ -631,7 +631,7 @@ if (isMain(import.meta.url)) {
     for (const key of Object.keys(totals)) totals[key] += counts[key] ?? 0;
   }
   // Sorted within each tier: two runs over an unchanged tree are then byte-identical, which is what makes a
-  // diff across a lane's writes (or across a fleet's concurrent lanes) mean something.
+  // diff across a lane's writes (or across concurrent lanes) mean something.
   const sorted = lines => [...lines].sort();
   for (const line of sorted(out.refuse)) console.log(`REFUSE  ${line}`);
   for (const line of sorted(out.suspect)) console.log(`SUSPECT ${line}`);

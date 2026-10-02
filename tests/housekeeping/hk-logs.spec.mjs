@@ -132,7 +132,7 @@ test('a junction inside a root is never descended into', { skip: process.platfor
   assert.ok(r.skipped.some((e) => e.path === junction && e.reason === 'link'));
 });
 
-test('a symlinked log file is skipped, never deleted through', { skip: process.platform !== 'win32' && 'the guarded path is only meaningful on Windows, where a file symlink needs Developer Mode or SeCreateSymbolicLinkPrivilege; POSIX hosts would exercise a different link semantic than the fleet runs on' }, async (t) => {
+test('a symlinked log file is skipped, never deleted through', { skip: process.platform !== 'win32' && 'the guarded path is only meaningful on Windows, where a file symlink needs Developer Mode or SeCreateSymbolicLinkPrivilege; POSIX hosts would exercise a different link semantic than the host runs on' }, async (t) => {
   const env = envOf(t);
   const outside = tmp(t);
   const target = put(path.join(outside, 'target.log'), 't', OLD);

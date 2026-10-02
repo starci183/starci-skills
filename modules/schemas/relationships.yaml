@@ -42,22 +42,22 @@ schemaToSchema:
   # --- work tree: record-to-record edges ------------------------------------
   - {from: work-acceptance-criterion, to: work-business-rule, type: consumes,
      note: "ac nests under its rule and authors `rule:` (owning br id); has no identity apart from it",
-     source: "modules/schemas/work-layout.yaml shape.ac; work-acceptance-criterion.schema.yaml"}
+     source: "modules/schemas/work-layout.yaml shape.ac; modules/schemas/work-acceptance-criterion.schema.yaml"}
   - {from: work-uat-flow, to: work-disposable-accounts, type: consumes,
      note: "uat-flow's accounts resolve to the collocated accounts.yaml fixture (const accounts.yaml in the flow schema)",
-     source: "modules/schemas/work-uat-flow.schema.yaml:36; check-work-artifacts.mjs:451"}
+     source: "modules/schemas/work-uat-flow.schema.yaml:36; scripts/work/validate/check-work-artifacts.mjs:451"}
   - {from: work-catalog, to: work-feature, type: delegates,
      note: "catalog lists which features exist and where their records live; both are stateless parents",
-     source: "work-catalog/work-feature schema descriptions; check-work-artifacts.mjs:503,521"}
+     source: "work-catalog/work-feature schema descriptions; scripts/work/validate/check-work-artifacts.mjs:503,521"}
   - {from: work-implementation, to: "work/{fr,nfr,sds,ui,business-rule,...}", type: consumes,
      note: "impl `proves` is the outbound edge to records it realises; proof-direction exempt from requiresProof",
-     source: "work-implementation.schema.yaml; check-work-consistency.mjs comment"}
+     source: "modules/schemas/work-implementation.schema.yaml; scripts/work/validate/check-work-consistency.mjs comment"}
   - {from: work-uat-flow, to: "work/{fr,journey,...}", type: consumes,
      note: "uat `proves` — authored forward edge to demonstrated records",
-     source: "work-uat-flow.schema.yaml"}
+     source: "modules/schemas/work-uat-flow.schema.yaml"}
   - {from: work-evidence, to: "(any work record)", type: consumes,
      note: "evidence binds record+source version via recordDigest; expiry computed from it",
-     source: "work-evidence.schema.yaml"}
+     source: "modules/schemas/work-evidence.schema.yaml"}
 
   # --- kernel chain (the goal is a sqlite row; the plan file is
   #     the only schema'd artifact) ------------------------------------------
@@ -149,8 +149,8 @@ schemaToSubsystem:
     note: "read directly as authored sources — contracts of the shipped knowledge/ tree."
 
   build:            # build helpers
-    schemas: [json-exceptions]
-    note: "source-only by design — the one file no consumer projects."
+    schemas: [allowlist]
+    note: "source-only by design — the one allowlist no consumer projects."
 
 # ----------------------------------------------------------------------------
 # Reading order for an agent that must WRITE a governed document:

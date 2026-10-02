@@ -1,3 +1,4 @@
+Owner: knowledge/hfs/rules.yaml
 # Services of one product
 
 A product that runs more than one back-end service stays one repository, one `package.json` and one lockfile. This page is the
