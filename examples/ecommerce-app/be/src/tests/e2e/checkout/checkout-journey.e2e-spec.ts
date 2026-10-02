@@ -6,7 +6,6 @@ import type {
     CartData,
     OrderReceiptData,
     PlaceOrderData,
-    ReceiptDocumentView,
 } from "../../fixtures/e2e-views.contracts"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import { ORDER_SUMMARY, ORDER_LINE_COUNT, CART_ITEM_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
@@ -15,8 +14,8 @@ import { useTestWorld } from "../../world/use-test-world"
 /**
  * The happy path of the checkout end to end: a visitor registers on identity, signs in, browses the catalog through the
  * order cart query, fills the cart, places the order with an idempotency key (a replay answers the same order, never a second
- * one), and the placement transaction leaves a pending order, decremented stock and an empty cart. The buyer then
- * downloads the order's receipt from the private archive through a link that expires; another buyer is refused it. The
+ * one), and the placement transaction leaves a pending order, decremented stock and an empty cart. The receipt of an order
+ * that is not paid yet is not ready; the paid receipt is proven in order/order-paid-archives-receipt. The
  * Postgres reads are out-of-band verification only: every step of the journey travels over the public doors.
  *
  * Run: npm run test:e2e -- checkout/checkout-journey
@@ -96,25 +95,11 @@ describe("checkout journey", () => {
         expect(await readCount(world.db.order, CART_ITEM_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-mug")).toBe(mug.stock - 2)
 
-        // The receipt: archived after the commit, downloaded by the buyer through a presigned link of the private bucket.
-        const receipt = await buyer.read<OrderReceiptData>("orderReceipt", {
+        // The receipt of an order that is not paid yet does not exist: the order service answers not ready, and another buyer not found.
+        const early = await buyer.read<OrderReceiptData>("orderReceipt", {
             variables: { input: { orderId: order.orderId } },
         })
-        expect(receipt.errorCode).toBeNull()
-        const link = new URL(present(receipt.data, "orderReceipt data").orderReceipt.url)
-        const downloaded = await world.http(link.origin).get<ReceiptDocumentView>(`${link.pathname}${link.search}`)
-        expect(downloaded.status).toBe(200)
-        expect(downloaded.body).toMatchObject({
-            orderId: order.orderId,
-            personId,
-            totalMinorUnits: expectedTotal,
-            lines: [
-                { productId: "sku-mug", quantity: 2, unitPriceMinorUnits: mug.priceMinorUnits },
-                { productId: "sku-notebook", quantity: 1, unitPriceMinorUnits: notebook.priceMinorUnits },
-            ],
-        })
-        const unsigned = await world.http(link.origin).get(link.pathname)
-        expect(unsigned.status).toBe(403)
+        expect(early.errorCode).toBe("ORDER_RECEIPT_NOT_READY")
         const stranger = await world.signedInPerson("checkout-stranger")
         const refused = await world.apps.order.api
             .bearing(stranger.sessionToken)

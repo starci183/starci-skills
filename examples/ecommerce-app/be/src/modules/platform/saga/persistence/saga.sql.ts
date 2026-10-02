@@ -18,5 +18,8 @@ export const READ_SAGA = sql`SELECT status, version FROM saga_states WHERE saga 
  * Moves a saga run from one status to the next ($1 saga, $2 correlation id, $3 the status it must be in, $4 the version
  * it was read at, $5 the new status, $6 instant); answers the new version, or no row when another transition moved it first.
  */
-export const MOVE_SAGA = sql`UPDATE saga_states SET status = $5, version = version + 1, updated_at = $6
-    WHERE saga = $1 AND correlation_id = $2 AND status = $3 AND version = $4 RETURNING version`
+export const MOVE_SAGA = sql`WITH moved AS (
+    UPDATE saga_states SET status = $5, version = version + 1, updated_at = $6
+    WHERE saga = $1 AND correlation_id = $2 AND status = $3 AND version = $4 RETURNING version
+)
+SELECT version FROM moved`

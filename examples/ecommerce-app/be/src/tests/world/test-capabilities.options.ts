@@ -62,7 +62,9 @@ export const REALTIME_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 ]
 
 /** The order-summary projection over the order database. */
-export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [() => OrderSummaryModule.register({ isGlobal: true })]
+export const ORDER_SUMMARY_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    () => OrderSummaryModule.register({ isGlobal: true }),
+]
 
 /** The password-grant client over the run's realm. */
 export const KEYCLOAK_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [

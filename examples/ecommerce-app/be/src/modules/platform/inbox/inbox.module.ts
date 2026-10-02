@@ -15,7 +15,11 @@ export class InboxModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
-                { provide: INBOX_MANAGERS, useFactory: (manager: EntityManager) => [manager], inject: [options.connection] },
+                {
+                    provide: INBOX_MANAGERS,
+                    useFactory: (manager: EntityManager) => [manager],
+                    inject: [options.connection],
+                },
                 { provide: INBOX, useClass: PostgresInbox },
             ],
             exports: [INBOX],
