@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
+import {startCutSetCli} from '../helpers/engine-db-cut-set-integration-fixture.mjs';
 
 // Live incident (a base-repos backend.scaffold run): which cut pass runs the whole-set
 // integration gate. settle used to call ordinal === total "final", but once the seam passes the other
@@ -16,7 +17,10 @@ import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 // no other ordinal open closes the set and is the one held to full-regression-final.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+const CLI=startCutSetCli();
+after(()=>CLI.close());
+const runApiFresh=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+const runApi=(...args)=>CLI.run(args);
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const refusal=r=>{try{return JSON.parse(r.stderr.trim().split('\n').at(-1));}catch{return null;}};
 const json=v=>JSON.stringify(v??null);
@@ -66,6 +70,7 @@ const recordChecks=(repo,wf,attempt,names)=>seed(repo,l=>{
 const SLICE=['cut-slice-postcondition','cut-regression-inventory'];
 const status=(repo,wf)=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
 const settlePass=(repo,jobId)=>runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
+const settlePassFresh=(repo,jobId)=>runApiFresh('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
 
 test('the last sibling to settle closes the cut set and alone owes full-regression-final',t=>{
   const repo=workRoot(t),wf='wf-cut-set-close';
@@ -96,7 +101,7 @@ test('the last sibling to settle closes the cut set and alone owes full-regressi
 
   // Ordinal 2 settles last: slice checks alone no longer pass it.
   recordChecks(repo,wf,2,SLICE);
-  const refused=settlePass(repo,o2);
+  const refused=settlePassFresh(repo,o2);
   assert.equal(refused.status,1);
   assert.equal(refusal(refused).code,'cut-checks-missing');
   assert.match(refusal(refused).error,/full-regression-final/);
@@ -134,7 +139,7 @@ test('a failed sibling keeps the set open; its passing retry is the closing pass
   assert.deepEqual(status(repo,wf).cutSets.map(s=>[s.closingOrdinal,s.closingJob]),[[2,retry]],'the failed ordinal still holds the set open');
   seed(repo,l=>dispatchOrdinal(l,wf,retry,4));
   recordChecks(repo,wf,4,SLICE);
-  const refused=settlePass(repo,retry);
+  const refused=settlePassFresh(repo,retry);
   assert.equal(refused.status,1);
   assert.equal(refusal(refused).code,'cut-checks-missing');
   recordChecks(repo,wf,4,[...SLICE,'full-regression-final']);
