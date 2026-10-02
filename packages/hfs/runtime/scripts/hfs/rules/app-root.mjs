@@ -8,6 +8,7 @@
 import { cliFindings } from './cli.mjs';
 import { contractCompatFindings } from './contract-compat.mjs';
 import { depFindings } from './deps.mjs';
+import { dockerFindings } from './docker.mjs';
 import { eventClassContractFindings, patternSpecFindings } from './event-bus.mjs';
 import { feContractFindings } from './fe-contract-documents.mjs';
 import { appFrontendFindings } from './frontend-tree.mjs';
@@ -31,6 +32,7 @@ export function appRootFindings({ repoRoot, files, all, repo, resolver, pins }) 
     ...depFindings({ repoRoot, files: all }),
     ...peerIntegrationFindings({ repoRoot, files: all }),
     ...monorepoFindings({ repoRoot, files: all, repo }),
+    ...dockerFindings({ repoRoot, files: all, repo }),
     ...cliFindings({ files: all, repo, resolver }),
     ...contractCompatFindings({ repoRoot, files: all }),
     ...eventClassContractFindings({ repoRoot, files: all, repo }),

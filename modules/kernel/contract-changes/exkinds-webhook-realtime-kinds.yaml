@@ -7,8 +7,7 @@ summary: >-
   spec, dto/), each opt-in through the declared pattern webhooks or realtime (hfs.json sides.be.patterns) with the proof scenarios
   of ruleParams.be.patternScenarios. The slot be.transport.websocket is deleted (a socket is the realtime kind). New rules R167
   BE_WEBHOOK_SHAPE, R168 BE_WEBHOOK_UNVERIFIED, R169 BE_REALTIME_SHAPE, R170 BE_REALTIME_WRITES and R171 BE_REALTIME_TOPIC_SCOPE
-  (eslint-be webhook-shape, webhook-verify-first, realtime-shape, realtime-read-only, realtime-topic-scope; ids provisional,
-  renumbered to the next free ids at land). R47 now also accepts the spec of a webhook or realtime door beside its door. The door
+  (eslint-be webhook-shape, webhook-verify-first, realtime-shape, realtime-read-only, realtime-topic-scope). R47 now also accepts the spec of a webhook or realtime door beside its door. The door
   slots answer to the door laws (default deny, bounded input, no envelope) through isTransportSlot, and the one-dispatch shape
   of transport-is-thin no longer applies to them. The file suffixes webhook and subscription join the closed vocabulary, and
   socket.io, graphql-subscriptions and graphql-ws are owned by platform/realtime. New knowledge topics

@@ -1,0 +1,50 @@
+# The image canon
+
+Every app builds its own image. This is the pattern; `slots.yaml` (`repo.app-image`, `app.dockerignore`, `app.ci-images`) and the
+rules R172 to R176 (`HFS_DOCKER_*`, `scripts/hfs/rules/docker.mjs`) enforce it, and `hfs scaffold app` writes it. It is adapted from the
+Dockerfiles of the nivo back end and front end to the shape of an app: one `package.json` and one lockfile at the app root, a Nest
+monorepo of `be/apps/<app>`, and an npm-workspaces monorepo of `fe/apps/<app>` and `fe/packages/<pkg>`.
+
+## What stays from the nivo images
+
+- The build context is the context root, here the APP ROOT: `docker build -f be/apps/<app>/Dockerfile -t <project>/<app>:<tag> .`. The header
+  comment of every Dockerfile states that command, and states every deliberate divergence from this canon.
+- Multi-stage: a `build` stage installs and builds, a last `runtime` stage ships only what it needs. `npm ci`, never `npm install`.
+- The runtime is unprivileged (`USER node`), exposes the port it serves and answers a healthcheck.
+- The base is pinned: an exact node version on an exact alpine release (`NODE_IMAGE` in `scripts/hfs/rules/docker.mjs`, one pin for the
+  family), or an image pinned by digest. Any extra stage (a downloaded binary) is checksum-verified.
+- No secret is built in. `.dockerignore` keeps `.env*`, `.starcistacks`, `.secrets`, keys and certificates out of the context itself (a file
+  that is never copied is still uploaded to the daemon and cached); credentials are mounted at run time.
+
+## What differs in this shape
+
+- One `.dockerignore`, at the app root, rendered by `hfs sync` (`templates/app/docker-ignore`). Every image shares it.
+- The workspace manifests come first. The lockfile lists every fe workspace, so `npm ci` needs their `package.json` files: a `manifests`
+  stage copies the root manifests and the `fe/` tree and deletes every file but `package.json`, and the build and runtime stages start from it.
+  The install layer is cached until a manifest changes.
+- A be image (api, worker, cli): `npm run build:be` (tsc and tsc-alias into `be/dist`, from `be/tsconfig.build.json`) in the build stage;
+  the runtime runs `npm ci --omit=dev --ignore-scripts` and copies `be/dist`. The entry is `node be/dist/apps/<app>/src/main.js`.
+  - api: `ENV PORT`, `EXPOSE` the same port, a HEALTHCHECK of `/health/live`.
+  - worker: no listener, a process HEALTHCHECK.
+  - cli (and the migrate kind): one image for every one-off action, run with the command as arguments (`migrate run`): `ENTRYPOINT` is the
+    entry, `CMD ["--help"]`, `HEALTHCHECK NONE`, no `EXPOSE`.
+- An fe image (Next): the build stage copies `be/contracts`, `fe/packages`, `scripts` (the codegen) and its own `fe/apps/<app>`, runs
+  `npm run codegen --silent` and `npx turbo run build --filter=@<project>/<app>`; `next.config.ts` sets `output: "standalone"` and pins
+  `outputFileTracingRoot` to the app root. The runtime copies `.next/standalone`, `.next/static` and `public`, installs nothing, and starts
+  `node fe/apps/<app>/server.js`. `NEXT_PUBLIC_*` values are the one kind of build argument (they are published to every browser by design).
+- The Dockerfile is app-owned: scaffold writes it once, the app edits it (a system package, a build argument), and the rules judge its
+  structure. The `.dockerignore` and `.github/workflows/images.yml` are managed (drift is `HFS_MANAGED_FILE_DRIFT`).
+- The root scripts `docker:build:<app>` (the exact command the header states, tag `<project>/<app>:dev`) and `docker:build` (every image, one after the other)
+  are managed by `hfs sync`; none pushes.
+- CI builds every image on pull requests and on main, path-filtered per app (`images.yml`: a matrix of image, Dockerfile and paths), and
+  never pushes. Publishing an image is the product's decision.
+
+## The rules
+
+| Rule | Code | Judges |
+| --- | --- | --- |
+| R172 | `HFS_DOCKER_BUILD_CONTEXT` | the header names the app's own build command; no COPY or ADD source leaves the context |
+| R173 | `HFS_DOCKER_STAGES` | `build` then `runtime`; `USER node`; no build in the runtime; `npm ci`; the install flags of each side |
+| R174 | `HFS_DOCKER_ENTRY` | the app's own entry; port, EXPOSE and HEALTHCHECK by kind; the standalone output of a Next app |
+| R175 | `HFS_DOCKER_BASE_PIN` | every FROM is a prior stage, the canon node image or a digest-pinned image |
+| R176 | `HFS_DOCKER_SECRETS` | no secret file, URL download or credential-named ARG or ENV |

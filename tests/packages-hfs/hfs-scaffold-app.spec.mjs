@@ -19,6 +19,8 @@ import { createRequire } from 'node:module';
 import { main } from '../../packages/hfs/bin/hfs.mjs';
 import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { coverageExclusions } from '../../packages/hfs/sync/index.mjs';
+import { dockerFindings } from '../../scripts/hfs/rules/docker.mjs';
+import { loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from '../helpers/hfs-app-install.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
@@ -191,6 +193,22 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   const config = jestPreset.starciJestConfig();
   assert.ok(config.coverageReporters.includes('lcov'));
   assert.equal(`be/${config.coverageDirectory}/lcov.info`, LCOV);
+});
+
+test('a scaffolded app has one Dockerfile per app, the managed .dockerignore and images workflow, and its Dockerfiles satisfy the docker rules', (t) => {
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-images-'));
+  t.after(() => fs.rmSync(into, { recursive: true, force: true }));
+  const { root, files } = scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: () => ({ ok: true }) });
+  const declaration = JSON.parse(fs.readFileSync(path.join(root, 'hfs.json'), 'utf8'));
+  const dockerfiles = [...declaration.sides.be.apps.map((app) => `be/apps/${app.name}/Dockerfile`), ...declaration.sides.fe.apps.map((app) => `fe/apps/${app.name}/Dockerfile`)];
+  for (const file of [...dockerfiles, '.dockerignore', '.github/workflows/images.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
+  const repo = resolveRepoDeclaration(loadSlotManifest(), declaration);
+  assert.deepEqual(dockerFindings({ repoRoot: root, files, repo }), [], 'the scaffolded images satisfy the docker rules');
+  const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'images.yml'), 'utf8');
+  assert.match(workflow, /push: false/);
+  for (const file of dockerfiles) assert.ok(workflow.includes(file), `${file} is built by the images workflow`);
+  const ignore = fs.readFileSync(path.join(root, '.dockerignore'), 'utf8').split('\n');
+  for (const secret of ['.starcistacks', '**/.env', '.secrets', 'node_modules']) assert.ok(ignore.includes(secret), `.dockerignore excludes ${secret}`);
 });
 
 test('hfs scaffold app writes the app shape and hfs lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
-import { renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
+import { imageFiles, renderTargets, writeTargets } from '../../packages/hfs/sync/index.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, feAppPackageName } from '../../scripts/hfs/rules/monorepo.mjs';
 import { loadSonarGate } from '../../scripts/gates/sonar-gate.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -57,6 +57,9 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
   writeTargets(dir, renderTargets(declaration, PRESETS));
   // The file a rule reads the content of that the render does not write: the be side's stack declaration.
   put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
+  // One Dockerfile per declared app (R172-R176), the template output, and the standalone output every Next image ships.
+  for (const file of imageFiles(resolveRepoDeclaration(manifest, declaration))) put(file.path, file.content);
+  for (const app of declaration.sides.fe.apps) put(`fe/apps/${app.name}/next.config.ts`, 'export default { output: "standalone" };\n');
   const required = resolver.requiredPaths().paths.map((entry) => entry.path);
   for (const p of required) if (!p.endsWith('/')) put(p, p === 'hfs.json' ? '' : p.endsWith('.json') ? '{}\n' : /^be\/apps\/[^/]+\/src\/app\.module\.ts$/.test(p) ? 'export class AppModule {}\n' : 'export {};\n');
   for (const app of declaration.sides.fe.apps) {

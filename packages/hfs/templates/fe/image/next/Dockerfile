@@ -1,0 +1,42 @@
+# {{project}}/{{app}} - the {{app}} Next app (standalone output). The build context is the APP ROOT (the folder holding the one
+# package.json and package-lock.json), not this folder:
+#
+#   docker build -f fe/apps/{{app}}/Dockerfile -t {{project}}/{{app}}:<tag> .
+#
+# NEXT_PUBLIC_* values are published to every browser by design, so they are the one kind of build argument:
+# add `ARG NEXT_PUBLIC_<NAME>` here and pass it with `--build-arg`. It follows the image canon (knowledge/hfs/docker.md) and
+# diverges from it nowhere. No secret is built in: credentials are mounted at run time and .dockerignore keeps them out of the
+# build context.
+
+FROM {{nodeImage}} AS manifests
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY fe fe
+RUN find fe -type f ! -name package.json -delete
+
+FROM {{nodeImage}} AS build
+WORKDIR /app
+COPY --from=manifests /app ./
+RUN npm ci --ignore-scripts
+
+COPY turbo.json ./
+COPY scripts scripts
+COPY fe/tsconfig.json fe/tsconfig.json
+{{copyInputs}}COPY fe/apps/{{app}} fe/apps/{{app}}
+RUN npm run codegen --silent
+RUN npx turbo run build --filter=@{{project}}/{{app}}
+
+FROM {{nodeImage}} AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT={{port}}
+ENV HOSTNAME=0.0.0.0
+
+COPY --from=build --chown=node:node /app/fe/apps/{{app}}/.next/standalone ./
+COPY --from=build --chown=node:node /app/fe/apps/{{app}}/.next/static ./fe/apps/{{app}}/.next/static
+COPY --from=build --chown=node:node /app/fe/apps/{{app}}/public ./fe/apps/{{app}}/public
+
+USER node
+EXPOSE {{port}}
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "fe/apps/{{app}}/server.js"]

@@ -21,6 +21,7 @@ import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { APP_SCOPE, SIDES, loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
+import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
@@ -176,7 +177,9 @@ export function coverageExclusions(presets, manifest = loadSlotManifest()) {
  * through npm `-w` for start. be: `dev:be` runs the one api app from source and restarts it on change (`dev:be:<app>` each, with
  * several), `start:<app>` runs a built api or worker app, `cli` the built cli app (`npm run cli -- <group> <command>`) and, when the
  * back end declares a connection, `migrate` its migrate command (`cli migrate run`). fe: `dev:fe` runs the one Next app in
- * development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
+ * development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one. Images:
+ * `docker:build:<app>` builds the image of one app (the exact command its Dockerfile header states, tag `<project>/<app>:dev`) and
+ * `docker:build` builds every image, one after the other, never pushing.
  */
 export function appScripts(app) {
   const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
@@ -188,6 +191,8 @@ export function appScripts(app) {
   const built = entry => `node be/dist/apps/${entry.name}/src/main.js`;
   const workspace = entry => feAppPackageName(app.project, entry.name);
   const dev = entry => `npm run codegen --silent && turbo run dev --filter=${workspace(entry)}`;
+  const images = [...be.map(entry => ({ side: 'be', entry })), ...fe.map(entry => ({ side: 'fe', entry }))];
+  const imageCommand = ({ side, entry }) => `docker build -f ${dockerfilePath(side, entry.name)} -t ${app.project}/${entry.name}:dev .`;
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
     ...(fe.length === 1 ? [line('dev:fe', dev(fe[0]))] : fe.map(entry => line(`dev:fe:${entry.name}`, dev(entry)))),
@@ -196,6 +201,8 @@ export function appScripts(app) {
       return [line('cli', built(entry)), ...(connections.length ? [line('migrate', `${built(entry)} ${MIGRATE_COMMAND}`)] : [])];
     }),
     ...fe.map(entry => line(`start:${entry.name}`, `npm run start -w ${workspace(entry)}`)),
+    line('docker:build', images.map(image => `npm run docker:build:${image.entry.name}`).join(' && ')),
+    ...images.map(image => line(`docker:build:${image.entry.name}`, imageCommand(image))),
   ].join('\n    ');
 }
 
@@ -207,6 +214,43 @@ export const opensPackages = side => (side.optionalSlots ?? []).some(id => id ==
 
 /** The stylesheets of the fe side the CSS canon judges, relative to fe/: every app and every workspace package (slot fe.route, fe.package.*). */
 export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
+
+/**
+ * The build matrix of the images workflow: one entry per declared app (be then fe), each with the image name, its Dockerfile and the paths
+ * its build depends on (a be image: its own app, the shared be source, the build config and every workspace manifest; a Next image:
+ * its own app, the fe packages, the be contracts codegen reads, the task graph and the codegen script), both with the root manifests and
+ * the context filter. A YAML block mapping per entry, indented for `strategy.matrix.include`.
+ */
+export function imageMatrix(app) {
+  const shared = ['package.json', 'package-lock.json', '.dockerignore'];
+  const entry = (side, item) => {
+    const own = `${side}/apps/${item.name}/**`;
+    const paths = side === 'be'
+      ? [own, 'be/src/**', 'be/tsconfig*.json', 'fe/**/package.json', ...shared]
+      : [own, 'fe/packages/**', 'fe/tsconfig.json', 'be/contracts/**', 'turbo.json', 'scripts/**', ...shared];
+    return `          - name: ${item.name}\n            file: ${dockerfilePath(side, item.name)}\n            paths: '${JSON.stringify(paths)}'`;
+  };
+  return [...app.sides.be.apps.map(item => entry('be', item)), ...app.sides.fe.apps.map(item => entry('fe', item))].join('\n');
+}
+
+const IMAGE_TEMPLATE = Object.freeze({ api: 'be/image/api', worker: 'be/image/worker', cli: 'be/image/cli', next: 'fe/image/next' });
+
+/**
+ * The Dockerfile of every declared app, [{ path, content }] (app-relative): written once by hfs scaffold from templates/<side>/image/<kind>
+ * and then the app's own, judged by the docker rules (R172-R176). A Next image copies the fe packages only when the fe side opts into
+ * them and the be contracts only when the fe side reads them, so each COPY names a folder the app has.
+ */
+export function imageFiles(app) {
+  const side = app.sides.fe;
+  const inputs = [...(opensPackages(side) ? ['fe/packages'] : []), ...((side.reads ?? []).includes('be/contracts/') ? ['be/contracts'] : [])];
+  const copyInputs = inputs.map(folder => `COPY ${folder} ${folder}\n`).join('');
+  const entries = [...app.sides.be.apps.map(item => ({ side: 'be', item })), ...side.apps.map(item => ({ side: 'fe', item }))];
+  return entries.map(({ side: which, item }) => {
+    const template = IMAGE_TEMPLATE[item.kind];
+    const vars = { project: app.project, app: item.name, nodeImage: NODE_IMAGE, port: DEFAULT_PORT, copyInputs };
+    return { path: dockerfilePath(which, item.name), content: render(readBundled(`${template}/Dockerfile`), vars) };
+  });
+}
 
 /** Every value a template of `scope` can name, derived from hfs.json and the presets. */
 export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest()) {
@@ -228,6 +272,8 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     codecovPaths: scope === APP_SCOPE ? coverageScope(presets).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
+    imageMatrix: imageMatrix(app),
+    imageProject: app.project,
   };
 }
 

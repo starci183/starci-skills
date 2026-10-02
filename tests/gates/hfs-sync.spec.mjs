@@ -78,7 +78,7 @@ describe('hfs.json validation', () => {
 describe('the generated file set', () => {
   it('the root owns the package scripts, prettier, hooks, workflows, Sonar, Codecov and the .gitignore and .starciwork/.gitignore; each side owns its tool configuration', () => {
     assert.deepEqual(Object.keys(rendered()).sort(), [
-      '.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
+      '.dockerignore', '.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.github/workflows/images.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore',
       'be/eslint.config.mjs', 'be/jest.config.js', 'be/src/tests/tsconfig.json', 'be/tsconfig.build.json', 'be/tsconfig.json',
       'codecov.yml', 'fe/eslint.config.mjs', 'fe/stylelint.config.mjs', 'fe/tsconfig.json', 'package.json', 'sonar-project.properties', 'turbo.json',
     ]);
@@ -402,7 +402,7 @@ describe('the be side tool configuration', () => {
 describe('the package.json scripts of the app', () => {
   it('are the fixed scripts of both sides, a be script run from be/, an fe script through its workspace, plus dev, start per app and the cli', () => {
     const scripts = scriptsOf();
-    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'format', 'format:check', 'lint', 'lint:fix', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts).sort(), ['build:be', 'build:fe', 'cli', 'codegen', 'contract:emit', 'dev:be', 'dev:fe:admin', 'dev:fe:app', 'docker:build', 'docker:build:admin', 'docker:build:app', 'docker:build:cli', 'docker:build:core', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'prepare', 'start:admin', 'start:app', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
     assert.equal(scripts.cli, 'node be/dist/apps/cli/src/main.js', 'the cli app runs a command: npm run cli -- <group> <command>');
     assert.equal(scripts.migrate, undefined, 'no connection, nothing to migrate');
@@ -435,6 +435,15 @@ describe('the package.json scripts of the app', () => {
     const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'order', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'cli', kind: 'cli' }], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }));
     assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate|cli)/.test(name)).sort(), ['cli', 'migrate', 'start:admin', 'start:app', 'start:core', 'start:jobs', 'start:order']);
     assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"cli": "node be\/dist\/apps\/x\/src\/main\.js",/);
+  });
+  it('build the image of every app, one after the other and never pushing: docker:build:<app> is the command the Dockerfile header states', () => {
+    const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] } }));
+    assert.equal(many['docker:build:core'], 'docker build -f be/apps/core/Dockerfile -t nivo/core:dev .');
+    assert.equal(many['docker:build:cli'], 'docker build -f be/apps/cli/Dockerfile -t nivo/cli:dev .');
+    assert.equal(many['docker:build:app'], 'docker build -f fe/apps/app/Dockerfile -t nivo/app:dev .');
+    const all = many['docker:build'].split(' && ');
+    assert.deepEqual(all, ['core', 'cli', 'app', 'admin'].map(name => `npm run docker:build:${name}`));
+    assert.ok(Object.values(many).every(command => !/--push|docker push/.test(command)), 'no managed script pushes an image');
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t);

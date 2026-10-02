@@ -10,7 +10,7 @@ summary: >-
   `hfs lint --workspace <dir>` scopes the one lint of the app to one fe workspace. The managed root scripts run the fe side
   through turbo (build:fe, typecheck, dev:fe) and npm -w (start). New rules R128 HFS_MONO_WORKSPACES, R129
   HFS_MONO_FE_WORKSPACE, R130 HFS_MONO_NEST_PROJECTS and R131 HFS_MONO_WORKSPACE_DEP (hfs enforcer
-  scripts/hfs/rules/monorepo.mjs; ids provisional, renumbered to the next free ids at land). R59 reads next-intl from the fe
+  scripts/hfs/rules/monorepo.mjs). R59 reads next-intl from the fe
   workspace manifests.
 reach: new-legs
 paths:
