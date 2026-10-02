@@ -225,7 +225,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
     }
     $globalValues = @{
         '--cwd' = @()
-        '--edition' = @('full')
+        '--edition' = @('full','lite')
     }
     $localValues = @{
         'app add --event' = @()

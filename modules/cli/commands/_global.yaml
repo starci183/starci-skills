@@ -18,5 +18,5 @@ flags:
     summary: print the help of the command
   - name: edition
     type: enum
-    enum: [full]
-    summary: reserved; the only accepted value in this release is full
+    enum: [full, lite]
+    summary: app edition, full or lite; where an app is created or judged (scaffold, check, upgrade)

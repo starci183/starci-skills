@@ -16,7 +16,7 @@ const GLOBAL_YAML = `flags:
   - {name: cwd, type: string}
   - {name: quiet, type: boolean}
   - {name: help, type: boolean}
-  - {name: edition, type: enum, enum: [full]}
+  - {name: edition, type: enum, enum: [full, lite]}
 `;
 const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n`;
 const flagSig = (f) => (typeof f === 'string' ? `{name: ${f}, type: string, required: true}` : `{name: ${f[0]}, type: ${f[1]}${f[2] ? ', required: true' : ''}}`);

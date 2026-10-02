@@ -21,6 +21,7 @@ const POS_KEYS = new Set(['name', 'enum', 'required', 'variadic']);
 const GROUP_REQUIRED = ['group', 'summary', 'owner', 'since'];
 const GROUP_KEYS = new Set([...GROUP_REQUIRED, 'schema']);
 const GLOBAL_KEYS = new Set(['schema', 'flags']);
+const EDITIONS = ['full', 'lite'];
 const GLOBAL_FLAG_NAMES = ['json', 'cwd', 'quiet', 'help', 'edition'];
 // A verb file MUST carry every catalog key (flags may be an empty list). Any other
 // top-level key is the verb's prose contract (reads, writes, returns, refuses,
@@ -48,7 +49,7 @@ const checkFlags = (errors, file, flags, where) => {
     seen.add(f.name);
     if (!FLAG_TYPES.has(f.type)) err(errors, file, `${where}: --${f.name} type must be one of ${[...FLAG_TYPES].join('|')}`);
     if (f.type === 'enum' && (!Array.isArray(f.enum) || !f.enum.length)) err(errors, file, `${where}: --${f.name} enum needs a non-empty enum list`);
-    if (f.name === 'edition' && JSON.stringify(f.enum ?? []) !== JSON.stringify(['full'])) err(errors, file, `${where}: --edition enum is exactly [full]`);
+    if (f.name === 'edition' && JSON.stringify(f.enum ?? []) !== JSON.stringify(EDITIONS)) err(errors, file, `${where}: --edition enum is exactly [${EDITIONS.join(', ')}]`);
     if (f.required !== undefined && typeof f.required !== 'boolean') err(errors, file, `${where}: --${f.name} required must be boolean`);
   }
 };
@@ -89,6 +90,7 @@ const checkVerb = (errors, file, groupName, doc) => {
     if (doc[k] !== undefined && (!Array.isArray(doc[k]) || doc[k].some((x) => typeof x !== 'string'))) err(errors, file, `${k} must be a string list`);
   }
   if (doc.editions !== undefined && !doc.editions.length) err(errors, file, 'editions is empty');
+  for (const e of doc.editions ?? []) if (!EDITIONS.includes(e)) err(errors, file, `editions names an unknown edition ${JSON.stringify(e)} (known: ${EDITIONS.join(', ')})`);
   return doc;
 };
 

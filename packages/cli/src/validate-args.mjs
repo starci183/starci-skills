@@ -111,8 +111,8 @@ export function validateArgs(argv, verb, globalFlags = []) {
       }
     }
 
-    if (global.edition !== undefined && global.edition !== 'full') {
-      throw new Error('--edition expects one of: full');
+    if (global.edition !== undefined && Array.isArray(verb.editions) && !verb.editions.includes(global.edition)) {
+      throw new Error(`${verb.group ?? 'this command'} ${verb.verb ?? ''}`.trim() + ` is not available in the ${global.edition} edition (editions: ${verb.editions.join(', ')})`);
     }
     if (global.cwd === '') throw new Error('--cwd needs a value');
     if (global.json === true && verb.json === 'none') {

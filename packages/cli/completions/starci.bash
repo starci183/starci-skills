@@ -37,7 +37,7 @@ _starci() {
     fi
     case "$prev" in
         --cwd) return 0;;
-        --edition) COMPREPLY=( $(compgen -W "full" -- "$cur") ); return 0;;
+        --edition) COMPREPLY=( $(compgen -W "full lite" -- "$cur") ); return 0;;
     esac
     case "$group:$verb:$prev" in
         app:add:--event) return 0;;

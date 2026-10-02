@@ -7,6 +7,6 @@ flags: []
 exit: {"0": clean, "1": findings, "2": refusal or bad usage}
 json: none
 examples: ['starci app hygiene']
-editions: [full]
+editions: [full, lite]
 since: 1.0.0
 removed: ['hfs work-hygiene', 'npx hfs work-hygiene']

@@ -11,13 +11,13 @@ const global = [
   { name: 'cwd', type: 'string' },
   { name: 'quiet', type: 'boolean' },
   { name: 'help', type: 'boolean' },
-  { name: 'edition', type: 'enum', enum: ['full'] },
+  { name: 'edition', type: 'enum', enum: ['full', 'lite'] },
 ];
 const catalog = {
   global,
   groups: {
     app: { owner: '@starci/hfs', summary: 'app commands', verbs: {
-      check: { group: 'app', verb: 'check', summary: 'check an app', flags: [], json: 'flag' },
+      check: { group: 'app', verb: 'check', summary: 'check an app', flags: [], json: 'flag', editions: ['full'] },
     } },
     runtime: { owner: 'runtime', summary: 'runtime commands', verbs: {
       check: { group: 'runtime', verb: 'check', summary: 'check the runtime', flags: [], json: 'flag' },
@@ -118,7 +118,10 @@ test('removed and bad commands are refusals, while runtime absence is exit 3', a
   assert.match(unknown.value.err, /unknown group/);
   const edition = capture();
   assert.equal(await main(['app', 'check', '--edition', 'lite'], { ...edition, catalog, retired }), 2);
-  assert.match(edition.value.err, /expects one of: full/);
+  assert.match(edition.value.err, /not available in the lite edition/);
+  const badEdition = capture();
+  assert.equal(await main(['app', 'check', '--edition', 'nope'], { ...badEdition, catalog, retired }), 2);
+  assert.match(badEdition.value.err, /expects one of: full, lite/);
 
   const absent = capture();
   assert.equal(await main(['runtime', 'check'], { ...absent, catalog, retired, locateRuntime: () => null }), 3);

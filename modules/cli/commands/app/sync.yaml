@@ -9,6 +9,6 @@ flags:
 exit: {"0": managed output is current, "1": drift or render error, "2": refusal or bad usage}
 json: none
 examples: ['starci app sync --check', 'starci app sync --write']
-editions: [full]
+editions: [full, lite]
 since: 1.0.0
 removed: ['hfs sync', 'npx hfs sync']

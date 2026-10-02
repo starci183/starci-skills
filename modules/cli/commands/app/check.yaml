@@ -9,6 +9,6 @@ flags:
 exit: {"0": clean, "1": findings, "2": refusal or bad usage}
 json: flag
 examples: ['starci app check', 'starci app check --fast', 'starci app check --json']
-editions: [full]
+editions: [full, lite]
 since: 1.0.0
 removed: ['hfs check', 'npx hfs check']

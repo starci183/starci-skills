@@ -20,7 +20,7 @@ const GLOBAL_YAML = `flags:
   - {name: cwd, type: string}
   - {name: quiet, type: boolean}
   - {name: help, type: boolean}
-  - {name: edition, type: enum, enum: [full]}
+  - {name: edition, type: enum, enum: [full, lite]}
 `;
 const GROUP_YAML = `group: kernel\nsummary: kernel verbs\nowner: runtime\nsince: 1.0.0-alpha.4\n`;
 const VERB = `group: kernel
@@ -78,10 +78,10 @@ test('a flag named profile is rejected', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('--edition must be exactly [full], in _global.yaml or anywhere', () => {
-  const root = fixture((put) => put(`${CATALOG_DIR}/_global.yaml`, GLOBAL_YAML.replace('enum: [full]', 'enum: [full, lite]')));
+test('--edition must be exactly [full, lite], in _global.yaml or anywhere', () => {
+  const root = fixture((put) => put(`${CATALOG_DIR}/_global.yaml`, GLOBAL_YAML.replace('enum: [full, lite]', 'enum: [full]')));
   try {
-    assert.ok(catalogErrors(root).some((e) => /--edition enum is exactly \[full\]/.test(e)));
+    assert.ok(catalogErrors(root).some((e) => /--edition enum is exactly \[full, lite\]/.test(e)));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
