@@ -29,7 +29,7 @@ const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 const require_ = createRequire(import.meta.url);
 const jestPreset = require_('../../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
-const PRESETS = { sonarExclusions: jestPreset.sonarExclusions(), coverageSources: [...jestPreset.COVERAGE_SOURCES] };
+const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
 /** The checkout's @starci/test-world, built (dist is build output, never committed; the build runs once when it is absent). */
 const TEST_WORLD = path.join(RUNTIME, 'packages', 'test-world');

@@ -50,7 +50,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
 });
 
 test('the gate judges coverage per service: one service below 100 fails, a non-service file is not part of the measure', () => {
-  // The scope is the one the managed sonar-project.properties renders (hfs sync: the complement of the preset's COVERAGE_SOURCES).
+  // The scope is the one the managed sonar-project.properties renders (hfs sync: the complement of the measured scope derived from the slot manifest).
   const scope=coverageScopeOf(readProperties(path.join(ROOT,'examples','ecommerce-app','sonar-project.properties')));
   assert.ok(scope.exclusions.includes('fe/**')&&scope.exclusions.includes('be/**/*.resolver.ts'));
   const minPercent=thresholdsOf(gate).coverageMinPercent;

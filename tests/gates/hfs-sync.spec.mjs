@@ -10,7 +10,7 @@ import { starciworkGitignoreText } from '../../scripts/lib/starciwork-boundary.m
 import {
   BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, jestCoverageSource, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../../packages/hfs/sync/index.mjs';
-import { coverageComponents, coverageScope, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
+import { coverageComponents, coverageScope, isMeasured, jestCoverage, sonarCoverageExclusions } from '../../scripts/hfs/coverage-scope.mjs';
 import { LOCK_STEP, scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { braceVariants } from '../../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
@@ -620,20 +620,26 @@ describe('hfs scaffold app: the first tree', () => {
     assert.equal(ran, path.join(into, 'nivo'), 'the lock step runs in the new app root, after every file is written');
     assert.equal(fs.existsSync(path.join(into, 'nivo')), false, 'no app and no stub lock is left behind');
   });
-  it('the be skeleton follows the unit standard: only the unit-tested roles (services, cli commands) have a spec, each has one, no composition spec', t => {
+  it('the be skeleton follows the unit standard: a spec only beside a service, a cli command or a measured logic file, each required one has its spec, no composition spec', t => {
     const { root } = scaffold(t);
     const files = filesUnder(root).filter(file => file.startsWith('be/'));
     const specs = files.filter(file => /\.spec\.ts$/.test(file));
-    const subjects = files.filter(file => file.endsWith('.service.ts') || (file.startsWith('be/src/features/cli/') && file.endsWith('.cli.ts')));
-    assert.deepEqual(specs, subjects.map(file => file.replace(/\.ts$/, '.spec.ts')).sort(), 'exactly one spec per service and per cli command and no other spec');
-    assert.ok(subjects.some(file => file.endsWith('.cli.ts')), 'the cli commands are unit-tested subjects');
+    const required = files.filter(file => file.endsWith('.service.ts') || (file.startsWith('be/src/features/cli/') && file.endsWith('.cli.ts')));
+    const subjects = files.filter(file => /\.ts$/.test(file) && !/\.spec\.ts$/.test(file) && (required.includes(file) || isMeasured(MANIFEST, file.slice('be/'.length))));
+    const specOf = file => file.replace(/\.ts$/, '.spec.ts');
+    assert.ok(specs.every(spec => subjects.some(file => specOf(file) === spec)), 'no spec without a service, a cli command or a measured logic file beside it');
+    assert.ok(required.every(file => specs.includes(specOf(file))), 'every service and cli command has its spec');
+    const subjectsOfSpecs = subjects.filter(file => specs.includes(specOf(file)));
+    assert.ok(subjectsOfSpecs.length === specs.length);
+    assert.ok(required.some(file => file.endsWith('.cli.ts')), 'the cli commands are unit-tested subjects');
+    assert.ok(specs.some(spec => /\.(policy|guard|mapper|client|filter)\.spec\.ts$/.test(spec)), 'the logic files that owe 100 carry their specs');
     assert.ok(specs.length >= 3);
-    for (const spec of specs) {
+    for (const spec of specs.filter(spec => required.includes(spec.replace(/\.spec\.ts$/, '.ts')))) {
       const text = read(root, spec);
       assert.match(text, /Test\.createTestingModule\(\{[\s\S]*?providers: \[/, `${spec} builds its subject with the testing module`);
       assert.match(text, /moduleRef\.get\(/, spec);
-      assert.doesNotMatch(text, /\bnew [A-Z]\w*Service\(| as [A-Z]\w*\b|jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
     }
+    for (const spec of specs) assert.doesNotMatch(read(root, spec), /\bnew [A-Z]\w*Service\(| as [A-Z]\w*\b|jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
     assert.ok(!files.some(file => /composition\.spec|\.controller\.spec|\.handler\.spec|\.module\.spec/.test(file)));
   });
   it('the be skeleton follows HFS: one env reader, an enum-named logger port, a public door dispatching one query to a thin handler, default-deny guards, per-app options', t => {
