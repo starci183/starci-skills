@@ -126,6 +126,11 @@ export interface AppDeclaration<TModule extends RegisterableModule<never> = Regi
     readonly options: (wiring: TWiring) => OptionsOf<TModule>
     /** Whether the app listens on an OS-reserved loopback port (default true). A worker has no listener. */
     readonly listen?: boolean
+    /**
+     * Whether the app is created with Nest's `rawBody` (default false), as its `main.ts` does when it verifies signed webhooks
+     * over the exact body (`request.rawBody`).
+     */
+    readonly rawBody?: boolean
     /** What `main.ts` does after `NestFactory.create` and before `listen` (CORS, pipes, prefixes). */
     readonly configure?: (app: INestApplication, options: OptionsOf<TModule>) => void | Promise<void>
     /** GraphQL documents by the name a spec uses (`caller.graphql("createTask", vars)`); a document string is always accepted too. */

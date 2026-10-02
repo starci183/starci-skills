@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
-import { Controller, Get, Module } from "@nestjs/common"
+import { Controller, Get, Module, Post, Req } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import type { AnyTestWorldConfig } from "../config/types"
 import { FakesHost } from "../fakes/framework/host"
@@ -34,6 +34,21 @@ class ApiApp {
     static register(options: ApiOptions): DynamicModule {
         HelloController.greeting = options.greeting
         return { module: ApiApp, controllers: [HelloController] }
+    }
+}
+
+@Controller()
+class RawBodyController {
+    @Post("raw")
+    raw(@Req() request: { readonly rawBody?: Buffer }): { raw: string | null } {
+        return { raw: Buffer.isBuffer(request.rawBody) ? request.rawBody.toString("utf8") : null }
+    }
+}
+
+@Module({})
+class RawBodyApp {
+    static register(): DynamicModule {
+        return { module: RawBodyApp, controllers: [RawBodyController] }
     }
 }
 
@@ -539,5 +554,25 @@ test("a client-secret rotation takes the outage lock too and, never undone, hold
     } finally {
         await other.stop()
         await rotating.stop()
+    }
+})
+
+test("an app declared with rawBody is created with Nest's rawBody, so a signed webhook can be verified over the exact bytes", async () => {
+    await publish()
+    const config = {
+        ...declaration([]),
+        apps: { signed: { module: RawBodyApp, rawBody: true, options: () => ({}) }, plain: { module: RawBodyApp, options: () => ({}) } },
+    } as unknown as AnyTestWorldConfig
+    const world = new World(config, { apps: ["signed", "plain"] } as WorldSpec, { resetRun: async () => undefined })
+    await world.start()
+    try {
+        const exact = '{"id": 1,  "amount":2}'
+        const apps = world.apps as unknown as Record<string, { api: { post<T>(path: string, body?: unknown, options?: { headers?: Record<string, string> }): Promise<{ body: T }> } }>
+        const signed = await apps["signed"]?.api.post<{ raw: string | null }>("/raw", Buffer.from(exact), { headers: { "content-type": "application/json" } })
+        assert.equal(signed?.body.raw, exact)
+        const plain = await apps["plain"]?.api.post<{ raw: string | null }>("/raw", Buffer.from(exact), { headers: { "content-type": "application/json" } })
+        assert.equal(plain?.body.raw, null)
+    } finally {
+        await world.stop()
     }
 })

@@ -38,6 +38,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     apps: {
         todo: { module: TodoApp, operations: TODO_OPERATIONS, options: (w) => ({ port: w.apps.todo.port, database: { name: "primary", url: new Secret(w.db.primary.url) }, /* every URL comes from w */ }) },
         worker: { module: WorkerApp, listen: false, options: (w) => ({ /* ... */ }) },
+        shop: { module: ShopApp, rawBody: true, options: (w) => ({ /* ... */ }) },   // rawBody: created with Nest's rawBody, as a main.ts that verifies signed webhooks over the exact body
     },
     migrate: { module: migrateMain, options: (w) => ({ connections: [/* from w.db */] }) },   // apps/migrate: `bootstrap` export, a function, or an AppModule
     identity: { register: "keycloak", signIn: (world, { email, password }) => /* the public door */ },

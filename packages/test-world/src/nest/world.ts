@@ -637,7 +637,7 @@ export class World {
         if (port === null) {
             return { name, context: await NestFactory.createApplicationContext(module, { logger }), api: null, url: null }
         }
-        const app = await NestFactory.create(module, { logger })
+        const app = await NestFactory.create(module, { logger, rawBody: decl.rawBody === true })
         await decl.configure?.(app, options)
         await app.listen(port, "127.0.0.1")
         const baseUrl = `http://127.0.0.1:${port}`
