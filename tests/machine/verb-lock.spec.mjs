@@ -28,3 +28,13 @@ test('the real host lock serialises two runs in one directory and an error still
   await assert.rejects(() => underHostLock({ role: 'lead', purpose: 'boom', env }, async () => { throw new Error('boom'); }), /boom/);
   assert.equal((await underHostLock({ role: 'lead', purpose: 'after', env }, async () => 'free')).value, 'free');
 });
+
+test('the owner seat locks as a coordinator and every lock refusal reaches the verb unchanged', async () => {
+  let seen;
+  await underHostLock({ role: 'owner', purpose: 'fixture', env: {} }, async () => 1, { withHostLock: async (options, fn) => { seen = options.role; return await fn(); } });
+  assert.equal(seen, 'coordinator');
+  for (const reason of ['not-owner', 'bad-role']) {
+    const refusal = { ok: false, reason };
+    assert.equal(await underHostLock({ role: 'lead', purpose: 'fixture', env: {} }, async () => 1, { withHostLock: async () => refusal }), refusal);
+  }
+});
