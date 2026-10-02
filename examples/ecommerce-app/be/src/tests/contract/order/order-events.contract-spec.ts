@@ -1,5 +1,5 @@
 import * as order from "@modules/events/order"
-import { breakingChanges, readContractFile, samplePayload } from "../../fixtures/contracts/event-contract"
+import { breakingChanges, readContractFile, samplePayload } from "../../fixtures/contracts/event-contract.builder"
 
 const classes = Object.values(order)
 const contract = readContractFile("order", "events.json")
