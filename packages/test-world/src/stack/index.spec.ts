@@ -84,14 +84,14 @@ const fakePg = (queries: Array<string>) => (): PgClient => ({
 
 const namespace = (snake: string): Namespace => ({ snake, kebab: snake.replace(/_/g, "-"), root: `/repo/${snake}` })
 
-const harness = (probed: Array<number> = []) => {
-    const docker = fakeDocker()
+const harness = (probed: Array<number> = [], process: { readonly home?: string; readonly pid?: number; readonly isAlive?: (pid: number) => boolean; readonly docker?: ReturnType<typeof fakeDocker> } = {}) => {
+    const docker = process.docker ?? fakeDocker()
     const http: Array<string> = []
     const queries: Array<string> = []
     const redisCalls: Array<string> = []
     const stack = createStack({
         docker: docker.docker,
-        home: join(scratch, `home${(counter += 1)}`),
+        home: process.home ?? join(scratch, `home${(counter += 1)}`),
         pause: async () => undefined,
         fetch: fakeFetch(http),
         pg: fakePg(queries),
@@ -109,8 +109,8 @@ const harness = (probed: Array<number> = []) => {
             status: async () => [],
             down: async () => undefined,
         },
-        isAlive: () => true,
-        pid: 4321,
+        isAlive: process.isAlive ?? (() => true),
+        pid: process.pid ?? 4321,
         kafkaProbe: async (_host, port) => {
             probed.push(port)
             return true
@@ -212,6 +212,37 @@ describe("stack attach", () => {
         const again = await stack.attach(kafkaRequest(namespace("blog_bbbbbb_w1"), "run2-w1"))
         assert.equal(again.kafka?.listener, 1, "the freed listener is leased again")
         assert.equal(again.kafka?.port, first.kafka?.port)
+    })
+
+    it("a run whose process died is reclaimed by the next attach through the same teardown, and its namespace is free again", async () => {
+        const home = join(scratch, `home${(counter += 1)}`)
+        const docker = fakeDocker()
+        const dead = new Set<number>()
+        const crashed = harness([], { home, pid: 1111, isAlive: (pid) => !dead.has(pid), docker })
+        const ns = namespace("shop_aaaaaa_w1")
+        await crashed.stack.attach(request(ns, "crashed-w1"))
+        dead.add(1111) // the jest process died: no detach ran
+        const next = harness([], { home, pid: 2222, isAlive: (pid) => !dead.has(pid), docker })
+        await next.stack.attach(request(namespace("blog_bbbbbb_w1"), "next-w1"))
+        assert.ok(next.queries.includes('DROP DATABASE IF EXISTS "shop_aaaaaa_w1_primary" WITH (FORCE)'), "the crashed run's database is dropped")
+        assert.ok(next.redisCalls.includes("SELECT 0 | FLUSHDB"), "its redis db is flushed")
+        assert.ok(next.http.includes("DELETE /proxies/crashed-w1-postgresql"), "its proxies are removed")
+        const leases = (await next.stack.status()).leases.map((lease) => lease.runId)
+        assert.deepEqual(leases, ["next-w1"])
+        const again = await next.stack.attach(request(ns, "rerun-w1"))
+        assert.deepEqual(again.postgresql?.databases, { primary: "shop_aaaaaa_w1_primary" }, "the namespace attaches again")
+    })
+
+    it("a dead run that provisioned nothing is dropped without a teardown", async () => {
+        const home = join(scratch, `home${(counter += 1)}`)
+        const docker = fakeDocker()
+        const dead = new Set<number>([3333])
+        const live = harness([], { home, pid: 4444, isAlive: (pid) => !dead.has(pid), docker })
+        const { Registry } = await import("./registry")
+        await new Registry({ dir: home }).update((data) => void data.leases.push({ namespace: "ghost_w1", runId: "ghost", pid: 3333, since: "2026-01-01T00:00:00.000Z", containers: [] }))
+        await live.stack.attach(request(namespace("shop_aaaaaa_w1"), "live-w1"))
+        assert.equal(live.queries.some((query) => query.includes("ghost")), false)
+        assert.deepEqual((await live.stack.status()).leases.map((lease) => lease.runId), ["live-w1"])
     })
 
     it("reset empties the namespace's databases and redis db", async () => {

@@ -10,8 +10,8 @@ export const KAFKA_SLOT_PORT_FIRST = 9101
 /** The scripts of the `apache/kafka` image. */
 export const KAFKA_BIN = "/opt/kafka/bin"
 const INTERNAL_BOOTSTRAP = `localhost:${KAFKA_INTERNAL_PORT}`
-/** How long a teardown waits for a consumer group whose dead member has not timed out yet. */
-const GROUP_DELETE_DEADLINE_MS = 30_000
+/** How long a teardown waits for a consumer group whose dead member has not timed out yet (Kafka's default session timeout is 45 s). */
+const GROUP_DELETE_DEADLINE_MS = 60_000
 
 /** The container port of one slot listener (1-based). */
 export const slotListenerPort = (listener: number): number => KAFKA_SLOT_PORT_FIRST + listener - 1

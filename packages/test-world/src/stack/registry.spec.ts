@@ -50,6 +50,23 @@ describe("registry", () => {
         assert.deepEqual(registry.read().kafkaListeners, { live_ns: 1 })
     })
 
+    it("keeps a dead lease that provisioned something until it is claimed, and lets only one live process claim it", async () => {
+        const dir = home()
+        const alive = new Set([100, 300, 400])
+        const options = { dir, isAlive: (pid: number) => alive.has(pid), pause: fastPause }
+        await new Registry({ ...options, pid: 100 }).update((data) => {
+            data.leases.push({ ...lease("crashed_ns", "r9", 200), identity: { snake: "crashed_ns", kebab: "crashed-ns", root: "/r" }, infra: { toxiproxyApi: "http://127.0.0.1:1" } })
+            leaseRedisDb(data, "crashed_ns")
+        })
+        assert.deepEqual(new Registry(options).read().leases.map((entry) => entry.runId), ["r9"], "a dead lease with infra is kept")
+        assert.equal(new Registry(options).read().redisDbs["crashed_ns"], 0, "and so is what hangs off it")
+        const first = await new Registry({ ...options, pid: 300 }).claimDead()
+        assert.deepEqual(first.map((entry) => [entry.runId, entry.reclaimedBy]), [["r9", 300]])
+        assert.deepEqual(await new Registry({ ...options, pid: 400 }).claimDead(), [], "a live claimer keeps it")
+        alive.delete(300)
+        assert.equal((await new Registry({ ...options, pid: 400 }).claimDead()).length, 1, "a dead claimer's claim is taken over")
+    })
+
     it("allocates redis DB indexes per namespace, reuses them, and frees them", () => {
         const data = new Registry({ dir: home() }).read()
         assert.equal(leaseRedisDb(data, "a"), 0)

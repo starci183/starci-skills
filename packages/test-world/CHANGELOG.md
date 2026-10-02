@@ -23,6 +23,12 @@
 - Added: `webhookApp` on the four payment fakes (sepay, payos, momo, vnpay): the declared app whose listener receives their
   webhooks, for a world with several listening apps (default unchanged: the first listening app). An HTTP fake's `client`
   now receives the declared options.
+- Added: crash reclaim. A run records on its lease what it provisioned, service by service; when its process dies (a crash,
+  a killed jest) the lease is kept, and the next attach (or `down`) claims it and tears it down through the same detach as a
+  normal run: its databases, roles, realm, Redis DB, buckets, topics, consumer groups, namespaces and proxies. One live
+  process claims a dead lease at a time; a dead lease that provisioned nothing is dropped as before. A Kafka teardown waits up
+  to 60 s (the default session timeout is 45 s) for a group whose dead member has not expired.
+- Fixed: the Kafka probe answers false when a cut proxy closes the connection without a reply (it left the promise pending).
 - Added: GraphQL subscriptions in the test API. `api.subscribe(operation, { variables, timeoutMs })` (and on any bound caller,
   `api.as(token).subscribe(...)`) opens a graphql-ws (`graphql-transport-ws`) subscription at the app's GraphQL path on
   Node's own WebSocket (no new dependency), with the caller's bearer as `connectionParams.authorization`. The handle has

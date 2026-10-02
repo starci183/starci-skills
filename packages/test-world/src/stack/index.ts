@@ -228,6 +228,31 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
         }
     }
 
+    /**
+     * Tears down every run whose process died after provisioning (a crash, a killed jest): its databases, roles, realm, Redis DB,
+     * buckets, topics, consumer groups, namespaces and proxies, through the same detach as a normal run. A failure is reported
+     * on stderr and never blocks the caller's own run (the namespace of a reclaimed run is free either way).
+     */
+    const reclaimDead = async (): Promise<ReadonlyArray<string>> => {
+        const reclaimed: Array<string> = []
+        for (const lease of await registry().claimDead()) {
+            if (lease.identity === undefined || lease.infra === undefined) continue
+            try {
+                await detachRun({ namespace: lease.identity, runId: lease.runId, infra: lease.infra })
+            } catch (cause) {
+                process.stderr.write(`@starci/test-world: reclaiming the crashed run ${lease.runId} (${lease.namespace}, pid ${lease.pid}) left a failure: ${cause instanceof Error ? cause.message : String(cause)}\n`)
+            }
+            reclaimed.push(lease.runId)
+        }
+        return reclaimed
+    }
+
+    /** Records what the run provisioned so far on its lease, so a crash after this point is reclaimed exactly. */
+    const recordProvisioned = (namespace: Namespace, runId: string, infra: RunInfra): Promise<void> =>
+        registry().update((data) => {
+            data.leases = data.leases.map((lease) => (lease.runId === runId ? { ...lease, identity: namespace, infra: JSON.parse(JSON.stringify(infra)) as RunInfra } : lease))
+        })
+
     const registerLease = async (namespace: Namespace, runId: string): Promise<void> => {
         await registry().update((data) => {
             const holder = data.leases.find((lease) => lease.namespace === namespace.snake && lease.runId !== runId)
@@ -290,6 +315,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
 
         async down(options = {}) {
             const force = options.force === true
+            await reclaimDead()
             await registry().lock(
                 "up",
                 async () => {
@@ -331,6 +357,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
 
         async attach(request: AttachRequest): Promise<RunInfra> {
             const { namespace, runId } = request
+            await reclaimDead()
             await registerLease(namespace, runId)
             // Built up as services are provisioned so a failure can detach exactly what exists; each entry is the RunX its definition returned.
             const partial: Record<string, unknown> = { toxiproxyApi: "" }
@@ -369,6 +396,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
                     }
                     const run: ProxiedEndpoint = { host: HOST, port, directPort: item.directPort, proxy, image: item.image, container: item.container, ...provisioned.run }
                     partial[item.service] = run
+                    await recordProvisioned(namespace, runId, infraOf())
                     const notes = provisioned.notes
                     if (notes !== undefined) await registry().update((data) => void Object.assign(data.notes, notes))
                 }
@@ -376,6 +404,7 @@ export const createStack = (dependencies: StackDependencies = {}): StackApi => {
                     const cluster = await clusterApi()
                     await cluster.up()
                     partial.cluster = await cluster.attach({ namespace, runId, root: namespace.root, images: request.k3d.images })
+                    await recordProvisioned(namespace, runId, infraOf())
                 }
                 return infraOf()
             } catch (cause) {

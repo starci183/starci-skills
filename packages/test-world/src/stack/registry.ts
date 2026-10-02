@@ -3,12 +3,22 @@ import { join } from "node:path"
 import { TestWorldErrorCode, worldError } from "../errors"
 import { realPause } from "./health"
 import type { Pause } from "./health"
-import type { StackLease } from "./contracts"
+import type { Namespace, RunInfra, StackLease } from "./contracts"
 import { KAFKA_SLOT_LISTENERS, PROXY_PORT_FIRST, PROXY_PORT_LAST } from "./naming"
 
-/** A lease as the registry stores it: the public {@link StackLease} plus the shared containers the run uses (what `down` keeps). */
+/**
+ * A lease as the registry stores it: the public {@link StackLease}, the shared containers the run uses (what `down` keeps),
+ * and what the run provisioned so far (its namespace and infra, recorded service by service during the attach), so a run
+ * whose process died is reclaimed through the same teardown as a normal detach.
+ */
 export interface RegistryLease extends StackLease {
     readonly containers: ReadonlyArray<string>
+    /** The run's namespace, recorded at attach. */
+    readonly identity?: Namespace
+    /** What the run provisioned so far; a dead lease with it is reclaimed, never silently dropped. */
+    readonly infra?: RunInfra
+    /** The pid of the process reclaiming this dead lease, so two processes never tear one run down at once. */
+    readonly reclaimedBy?: number
 }
 
 /** A leased toxiproxy listen port. */
@@ -25,7 +35,7 @@ export interface RegistryData {
     readonly version: 1
     /** Generated secrets by container name. */
     secrets: Record<string, Record<string, string>>
-    /** Live leases; a lease whose pid is dead is dropped on every read. */
+    /** Leases; a dead one that provisioned something stays until it is reclaimed, a dead one that provisioned nothing is dropped on every read. */
     leases: Array<RegistryLease>
     /** Redis DB index by namespace (snake). */
     redisDbs: Record<string, number>
@@ -187,8 +197,27 @@ export class Registry {
         renameSync(temporary, target)
     }
 
+    /**
+     * Claims the dead leases that provisioned something and are not being reclaimed by a live process: they are marked with
+     * this pid and answered; the caller tears each down (the stack's detach), which removes the lease.
+     */
+    async claimDead(): Promise<ReadonlyArray<RegistryLease>> {
+        return this.update((data) => {
+            const claimed: Array<RegistryLease> = []
+            data.leases = data.leases.map((lease) => {
+                if (this.isAlive(lease.pid) || lease.infra === undefined || lease.identity === undefined) return lease
+                if (lease.reclaimedBy !== undefined && lease.reclaimedBy !== this.pid && this.isAlive(lease.reclaimedBy)) return lease
+                const mine = { ...lease, reclaimedBy: this.pid }
+                claimed.push(mine)
+                return mine
+            })
+            return claimed
+        })
+    }
+
     private prune(data: RegistryData): RegistryData {
-        data.leases = data.leases.filter((lease) => this.isAlive(lease.pid))
+        // A dead lease that provisioned nothing has nothing to reclaim; one that did stays until it is torn down.
+        data.leases = data.leases.filter((lease) => this.isAlive(lease.pid) || (lease.infra !== undefined && lease.identity !== undefined))
         const namespaces = new Set(data.leases.map((lease) => lease.namespace))
         const runs = new Set(data.leases.map((lease) => lease.runId))
         for (const namespace of Object.keys(data.redisDbs)) {
