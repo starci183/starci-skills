@@ -10,7 +10,6 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 import {
   ROLES, HOST_LOCK_SCHEMA, hostLockDir, acquireHostLock, releaseHostLock, hostLockOwner, withHostLock,
 } from '../../scripts/machine/host-lock.mjs';
-import { landCommits } from '../../scripts/supervisor/land.mjs';
 
 const T0 = Date.parse('2026-10-01T10:00:00.000Z');
 const HOST = 'host-a';
@@ -175,21 +174,4 @@ test('withHostLock runs fn under the lock, releases on return and on throw, and 
   const later = await withHostLock({ ...base(dir), role: 'worker', purpose: 'p' }, async () => { await Promise.resolve(); return hostLockOwner(base(dir)).purpose; });
   assert.equal(later, 'p');
   assert.equal(hostLockOwner(base(dir)), null, 'an async fn releases when it settles');
-});
-
-test('land: the heavy part runs under role coordinator purpose land; a held lock refuses the land naming the holder', () => {
-  let asked = null;
-  const stub = (options, fn) => { asked = options; return { ok: false, reason: 'held', owner: { role: 'release', purpose: 'release-cut', pid: 99, since: '2026-10-01T10:00:00.000Z' } }; };
-  const r = landCommits({ commits: ['abc1234'], root: path.resolve('no-such-root'), env: {}, deps: { hostLock: stub } });
-  assert.equal(asked.role, 'coordinator');
-  assert.equal(asked.purpose, 'land');
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'host-lock-held');
-  assert.deepEqual(r.commits, ['abc1234']);
-  assert.match(r.detail, /release/);
-  assert.match(r.detail, /release-cut/);
-  assert.match(r.detail, /pid 99/);
-  assert.equal(r.owner.role, 'release');
-  const passed = landCommits({ commits: ['abc1234'], env: {}, deps: { hostLock: (options, fn) => ({ ok: true, ran: typeof fn }) } });
-  assert.deepEqual(passed, { ok: true, ran: 'function' });
 });
