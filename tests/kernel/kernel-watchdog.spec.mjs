@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
 import { buildWakePrompt, wakePromptOf } from '../../scripts/kernel/kernel-watchdog.mjs';
+import { KERNEL_REV_ACKED_EVENT, currentRuntimeRev } from '../../scripts/kernel/runtime-rev.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 const F = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
@@ -262,6 +263,8 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
   const stateFile = path.join(root, 'state.json'), logFile = path.join(root, 'calls.jsonl');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stubFile]),
     STARCI_FAKE_ORCA_LOG: logFile, STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1',
+    // The fake Orca echoes a typed wake onto the screen only in this mode: the watchdog proves a delivery from the screen, never from the send receipt.
+    STARCI_FAKE_ORCA_SEND_STALLED: 'landed',
     LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
   const workflowId = 'wf-watchdog-e2e';
   const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
@@ -269,8 +272,12 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
     seedWorkflow(ledger, { id: workflowId, state: { phase: 'running' }, goal: { markdown: '# goal' },
       jobs: [{ jobId: `kernel-${workflowId}`, kind: 'kernel', status: 'running', workerId: KERNEL,
         payload: { hierarchy: { attempt: 2, runtime: { terminalHandle: KERNEL } } } }, ...jobs],
-      events: [{ kind: 'kernel-booted', entityType: 'kernel', payload: { terminal: KERNEL, launchedBy: 'supervisor', attempt: 2 } }, ...events],
+      events: [{ kind: 'kernel-booted', entityType: 'kernel', payload: { terminal: KERNEL, launchedBy: 'supervisor', attempt: 2 } },
+        // The Kernel acked the current runtime rev: an unacked seat gets a rev paragraph that pushes the wake past the delivery proof's window.
+        { kind: KERNEL_REV_ACKED_EVENT, entityType: 'kernel', payload: { rev: currentRuntimeRev(), files: [], source: 'ack', attempt: 2 } }, ...events],
       signals: [{ key: workflowId, value: signalValue ?? { terminal: KERNEL, dispatch: 'dispatch-kernel-1', host: 'orca', agent: 'claude', launch: 'worker' } }] });
+    // A replaced seat re-binds the workflow's claimed goal: with none, start-workflow answers queue-empty and launches nothing.
+    ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,'goal',?,'{}','claimed',?)").run(workflowId, workflowId, Date.now());
   } finally { ledger.close(); }
   fs.writeFileSync(stateFile, JSON.stringify({ terminals: { [KERNEL]: { handle: KERNEL, connected: true, writable: true,
     sent: false, prompt: null, command: 'claude --model claude-opus-5-5', screen: KERNEL_IDLE, ...(tabTitle ? { tabTitle } : {}) } } }));
@@ -298,7 +305,7 @@ test('a liveness tick types exactly the wake api status implies', async (t) => {
   assert.equal(result.action, 'woken', JSON.stringify(result));
   const wakes = fx.kernelWakes();
   assert.equal(wakes.length, 1, 'exactly one wake typed');
-  const statusValue = fx.api('status').value;
+  const statusValue = fx.api('status');
   assert.equal(wakes[0].text, result.nextWake ?? wakePromptOf(fx.workflowId, statusValue),
     'the typed wake is the wake built from the status read');
   assert.match(wakes[0].text, /Runtime wake for Kernel attempt 2 of wf-watchdog-e2e/,
@@ -311,7 +318,7 @@ test('a turn-idle Kernel behind a non-actionable frontier is left alone', async 
   const fx = await watchdogWorld(t);
   const incident = fx.api('incident', '--kind', 'owner-gate', '--detail', 'the owner decides the scope');
   assert.equal(incident.ok, true, JSON.stringify(incident));
-  assert.equal(fx.api('status').value.frontier.actionable, false);
+  assert.equal(fx.api('status').frontier.actionable, false);
   const { status, result, stderr } = fx.tick();
   assert.equal(status, 0, stderr);
   assert.equal(result.action, 'idle-waiting', JSON.stringify(result));
@@ -325,7 +332,7 @@ test('a repair tick renames a drifted Kernel tab title through Orca', async (t) 
   const { status, result, stderr } = fx.tick();
   assert.equal(status, 0, stderr);
   assert.equal(result.action, 'woken', JSON.stringify(result));
-  const expected = `[Kernel] ${fx.api('status').value.title ?? fx.workflowId}`;
+  const expected = `[Kernel] ${fx.api('status').title ?? fx.workflowId}`;
   assert.equal(result.titleRepair?.title, expected, JSON.stringify(result.titleRepair));
   assert.equal(result.titleRepair?.ok, true);
   const renames = fx.orcaCalls().filter((a) => a[0] === 'terminal' && a[1] === 'rename');
@@ -344,7 +351,7 @@ test('a repair replaces a seat with no worker under the watchdog launcher', asyn
   const restarts = fx.eventsOf('kernel-restarted');
   assert.equal(restarts.length, 1);
   assert.equal(restarts[0].launchedBy, 'watchdog', 'the repair named its launcher');
-  assert.equal(fx.api('status').value.kernel.launchedBy, 'watchdog');
+  assert.equal(fx.api('status').kernel.launchedBy, 'watchdog');
 });
 
 // An idle Kernel due for replacement (3 delivered wakes with no move, the first past the window)
