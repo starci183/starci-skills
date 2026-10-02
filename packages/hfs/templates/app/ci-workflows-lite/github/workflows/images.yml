@@ -1,0 +1,39 @@
+{{header}}
+# Builds each image declared by the lite app. The API image is required; a front-end image is emitted only when declared.
+# Entries are path-filtered and never pushed.
+name: images
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+{{imageMatrix}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            image: ${{ matrix.paths }}
+      - uses: docker/setup-buildx-action@v3
+        if: steps.changed.outputs.image == 'true'
+      - uses: docker/build-push-action@v6
+        if: steps.changed.outputs.image == 'true'
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: false
+          tags: {{imageProject}}/${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max

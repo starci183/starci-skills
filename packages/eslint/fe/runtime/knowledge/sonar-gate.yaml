@@ -81,6 +81,40 @@ overall:
   cognitiveComplexity:
     rule: typescript:S3776
     via: overall.issues
+# Lite is the same quality policy without a test or coverage world. Readers select this block from hfs.json edition;
+# keeping both gates in this document makes every threshold data, never a branch-local restatement.
+lite:
+  gate:
+    name: starci-quality-lite
+    newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
+  newCode:
+    ignoreBelowChangedLines: 20
+    duplication:
+      metric: new_duplicated_lines_density
+      maxPercent: 3
+    issues:
+      blockingSeverities: [BLOCKER, CRITICAL]
+      metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations}
+      max: 0
+    hotspots:
+      metric: new_security_hotspots_reviewed
+      minReviewedPercent: 100
+      unreviewedMax: 0
+  overall:
+    issues:
+      metric: violations
+      max: 0
+      engines: [starci-hfs, eslint, stylelint]
+      types: {bugs: BUG, code_smells: CODE_SMELL, vulnerabilities: VULNERABILITY}
+    hotspots:
+      metric: security_hotspots_reviewed
+      minReviewedPercent: 100
+    duplication:
+      metric: duplicated_lines_density
+      maxPercent: 3
+    cognitiveComplexity:
+      rule: typescript:S3776
+      via: overall.issues
 # The Sonar enforcers of the rule catalog (knowledge/hfs/rules.yaml): the failure code each condition above is the gate of.
 enforces:
   - {rule: R20, code: HFS_SIZE_GROWTH, enforcer: cognitive-complexity, condition: cognitiveComplexity}

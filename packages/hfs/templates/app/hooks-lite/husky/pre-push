@@ -1,0 +1,3 @@
+{{header}}
+# Push gate: types, the one lint, and format. Lite has no test world.
+{{> app/hooks/pre-push-core}}

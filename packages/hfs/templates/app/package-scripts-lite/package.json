@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "prepare": "husky",
+    {{appScripts}}
+{{> app/package-scripts/core.json}}
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:new": "supabase migration new",
+    "db:push": "supabase db push",
+    "db:types": "npm run contract:emit",
+    "db:lint": "{{appBinary}} check --fast",
+    "contract:emit": "{{appBinary}} emit-contracts"
+  }
+}

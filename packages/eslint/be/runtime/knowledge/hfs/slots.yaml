@@ -58,6 +58,8 @@ versioning:
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
+#   liteManagedBy  the template directory hfs sync renders under edition lite (default: managedBy). A slot with only
+#               liteManagedBy is managed only in lite; its effective lite.path still lists literal files;
 #               the managed file list lives here and nowhere in code. A difference is HFS_MANAGED_FILE_DRIFT (a
 #               back end's tsconfig.json: HFS_TS_STRICT when a flag or an option was added).
 #   rules       rule ids (the catalog lands with knowledge/hfs/rules.yaml).
@@ -287,6 +289,7 @@ slots:
     tier: none
     tests: none
     managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
+    liteManagedBy: package-scripts-lite
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT, HFS_MONO_WORKSPACES, HFS_MONO_WORKSPACE_DEP]
   - id: app.task-graph
     profiles: [app]
@@ -357,7 +360,9 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    lite: {path: sonar-project.properties}
     managedBy: quality-config
+    liteManagedBy: quality-config-lite
     rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
   - id: app.hooks
     profiles: [app]
@@ -367,6 +372,7 @@ slots:
     tier: none
     tests: none
     managedBy: hooks
+    liteManagedBy: hooks-lite
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci
     profiles: [app]
@@ -376,6 +382,7 @@ slots:
     tier: none
     tests: none
     managedBy: ci-workflows
+    liteManagedBy: ci-workflows-lite
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-e2e
     profiles: [app]
@@ -397,6 +404,7 @@ slots:
     tier: none
     tests: none
     managedBy: ci-workflows
+    liteManagedBy: ci-workflows-lite
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-db
     profiles: [app]
@@ -406,6 +414,8 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    liteManagedBy: ci-workflows-lite
+    rules: [HFS_MANAGED_FILE_DRIFT]
     since: 2.1.0
   - id: app.dockerignore
     profiles: [app]
@@ -446,6 +456,8 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    lite: {path: scripts/codegen.mjs}
+    liteManagedBy: codegen-lite
     rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: app.sides
     profiles: [app]
