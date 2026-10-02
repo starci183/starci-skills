@@ -1,3 +1,4 @@
+import "server-only"
 import { hasLocale } from "next-intl"
 import { getRequestConfig } from "next-intl/server"
 import { locale as routeLocale } from "next/root-params"
@@ -21,8 +22,7 @@ type MissingMessage = { readonly namespace?: string; readonly key: string }
  * `<app>:<namespace>.<key>`, so the app that forgot it is named on the page. The app's `request.ts` default-exports
  * this for next-intl's plugin, which takes the request config as a plain function.
  */
-export const createRequestConfig =
-    (app: AppName, loadMessages: LoadMessages) =>
+export const createRequestConfig = (app: AppName, loadMessages: LoadMessages) =>
     getRequestConfig(async () => {
         const requested: unknown = await routeLocale()
         const locale = hasLocale(LOCALES, requested) ? requested : DEFAULT_LOCALE
