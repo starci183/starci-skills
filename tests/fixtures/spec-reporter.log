@@ -1,6 +1,0 @@
-✔ first operation is fast (125.4ms)
-✔ second operation is slower (1874.6ms)
-✖ a failed operation still consumed time (500.2ms)
-ℹ tests 3
-ℹ pass 2
-ℹ fail 1

@@ -12,7 +12,7 @@ const RENDER_TOKEN = /\{\{[A-Za-z][A-Za-z0-9.]*\}\}/;
 const VENDORED_BUILD = /(?:^|\/)(?:node_modules|dist|reference-renders)\//;
 
 /** The tracked JavaScript paths in scope, with generated roots and vendored build trees excluded. */
-export function syntaxSourceFiles(files, params) {
+function syntaxSourceFiles(files, params) {
   const generated = (params.generated ?? []).map((entry) => `${String(entry.root).replace(/\/+$/, '')}/`);
   return files.filter((file) => JAVASCRIPT.test(file)
     && !VENDORED_BUILD.test(file)

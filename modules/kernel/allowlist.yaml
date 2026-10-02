@@ -518,3 +518,4 @@ dead-script-entries:
 
 # Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
 export-used: []
+heavy-specs: []

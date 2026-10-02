@@ -24,7 +24,7 @@ import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
 import { mkdtemp } from '../helpers/tmpdir.mjs';
-import { runNpmAsync } from '../helpers/hfs-hfs-scaffold-app.e2e-fixture.mjs';
+import { runNpmAsync } from '../helpers/hfs-hfs-scaffold-app-e2e-fixture.mjs';
 import { startSourceCanonRegistry } from '../helpers/source-canon-registry.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
