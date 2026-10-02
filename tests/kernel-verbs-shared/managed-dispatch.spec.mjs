@@ -334,12 +334,18 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(releases,2,'an unknown release is repeated once, as Orca\'s recovery says');
   const worker=json(s.stdout)?.managedWorker;
   assert.equal(worker?.retryRelease?.state!==undefined,true,'the repeat is on the receipt');
-  // worker-release alone ends the agent: nothing is typed into the terminal and no tab is closed by hand.
-  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close').length,0,'no terminal close');
-  assert.equal(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal send').length,0,'no quit input');
+  // A release is not trusted to end the agent (a released cursor worker kept running): after the last worker-release the runtime closes that worker's
+  // own terminal (scripts/machine/worker-close.mjs); nothing is typed into it.
+  const heads=fx.callArgv().map(a=>a.slice(0,2).join(' '));
+  const closeAt=heads.indexOf('terminal close');
+  assert.ok(closeAt>heads.lastIndexOf('orchestration worker-release'),'the terminal is closed after the release');
+  assert.ok(fx.callArgv().filter(a=>a.slice(0,2).join(' ')==='terminal close').every(a=>a.includes('fake-terminal-1')),'only the worker terminal is closed');
+  assert.equal(heads.filter(h=>h==='terminal send').length,0,'no quit input');
   // Orca\'s own recovery repeats the release once: the first unknown is settled by it; two unknowns leave the worker retained,
-  // which the receipt says (custody) and --release-worker retries later.
-  assert.equal(worker?.custody?.state,unknown===1?'released':'retained',JSON.stringify(worker?.custody));
+  // which the receipt says (custody) and --release-worker retries later. The runtime then closes the worker's terminal itself, and that close read
+  // back disconnected is the proof the worker is gone: custody is released either way, by its own proof.
+  assert.equal(worker?.custody?.state,'released',JSON.stringify(worker?.custody));
+  assert.equal(worker?.custody?.proof,unknown===1?'release-ok':'terminal-disconnected',JSON.stringify(worker?.custody));
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managedWorker?.custody?.state,worker?.custody?.state,'the ledger keeps the worker receipt');
 });
 

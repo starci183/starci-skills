@@ -324,17 +324,17 @@ test('agents collector: a Run whose worker-list fails touches none of its worker
   assert.match(failing.errors.join('\n'), /WORKER_RELEASE_FAILED: worker-release --dispatch ctx_ok/);
 });
 
-test('op-settled whose worker Orca holds reclaimable: released through worker-release, never closed by tab', async () => {
+test('op-settled whose worker Orca holds reclaimable: closed through the one worker close path (release, terminal close, process verify)', async () => {
   const { c, lessons } = controller({ view: ranView(), deps: { workers: async (run) => ({ ok: true, workers: run === 'run_a' ? [workerRow('ctx_op', { handle: 'term_op' })] : [] }) } });
   const { ctx, calls } = ctxOf('active');
   const r = await c.reconcile('gc:job:todo-app-be:op-1', ctx);
-  assert.deepEqual(calls.run.map(([, a]) => a.slice(0, 3)), [['scripts/api/orca/worker-release.mjs', '--dispatch', 'ctx_op']]);
+  assert.deepEqual(calls.run.map(([, a]) => a.slice(0, 3)), [['scripts/machine/worker-close.mjs', '--dispatch', 'ctx_op']]);
   assert.equal(r.closes.length, 1);
   assert.equal(lessons[0].klass, 'worker');
   const unv = controller({ view: ranView(), deps: { workers: async () => ({ ok: true, workers: [workerRow('ctx_op', { handle: 'term_op', liveness: 'unverifiable' })] }) } }).c;
   const { ctx: ctx2, calls: calls2 } = ctxOf('active');
   await unv.reconcile('gc:job:todo-app-be:op-1', ctx2);
-  assert.deepEqual(calls2.run.map(([, a]) => a.slice(0, 3)), [['scripts/api/orca/worker-release.mjs', '--dispatch', 'ctx_op']], 'unverifiable: released through worker-release like any settled worker, never closed by tab');
+  assert.deepEqual(calls2.run.map(([, a]) => a.slice(0, 3)), [['scripts/machine/worker-close.mjs', '--dispatch', 'ctx_op']], 'unverifiable: closed through the same path like any settled worker');
 });
 
 test('unverifiable settled workers are released by the sweep and raise no owner incident (the list is empty after one pass)', async () => {

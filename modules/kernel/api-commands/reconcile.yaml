@@ -65,11 +65,12 @@ reconcile:
     (alreadyRecovered:true). After a requeue or a fence is written (and on
     a repeat), a MANAGED worker's Dispatch is released once per attempt
     (settle's releaseManagedWorker: worker-stop first when it did not settle
-    itself, then worker-release, which alone ends the agent; live smoke E1);
+    itself, then worker-release, the terminal close and the process-tree proof of the one close path, scripts/machine/worker-close.mjs);
     the receipt is returned as managedWorker and recorded as the job event
     'dead-worker-released' {attempt, dispatchId, custody}. Nothing is typed
-    into the terminal and no tab is closed by hand. The settle route
-    releases the same way. Returns
+    into the terminal; the worker's terminal is closed by the runtime's one
+    close path and a survivor finding (worker-process-survived) rides on the
+    receipt without changing the outcome. The settle route releases the same way. Returns
     '{ok:true,jobId,recovery:requeued|fenced|settle,status,attempt,effectState,attemptConsumed,evidence?,worker,proof?|paths?,managedWorker?}'.
     A worker is also dead when its liveness is `quiet`: still at its idle
     prompt (or frozen) longer than its provider's quietMs after a delivered
@@ -127,7 +128,7 @@ reconcile:
     `--release-worker` proves, and if needed redoes, a SETTLED job's worker
     release: settle's release of a managed worker (worker-stop when the
     Dispatch did not settle itself, worker-release, one repeat when the first
-    release is not ok), which alone ends the agent (live smoke E1). Custody
+    release is not ok), then the terminal close and the process-tree proof (scripts/machine/worker-close.mjs; worker-release alone did not end a cursor worker). Custody
     is the release receipt's own state: {state:released, proof:release-ok}
     when the release said ok; retained (release-retained) when Orca keeps the
     worker; unknown (release-<state>) otherwise. Idempotent: a job

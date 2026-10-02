@@ -43,3 +43,68 @@ export const processRowsOfJson = (text) => {
 /** The rows of `ps -eo pid=,ppid=,comm=,args=` (exe/created/ws are null there). */
 export const processRowsOfPs = (text, cmdMax = 4000) => String(text ?? '').split(/\r?\n/).map((line) => /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)).filter(Boolean)
   .map((m) => ({ pid: Number(m[1]), ppid: Number(m[2]), name: m[3].split('/').pop(), exe: null, cmd: m[4].slice(0, cmdMax), created: null, ws: null }));
+
+// ---- the environment of other processes (process-env.mjs) -------------------------------------------------------
+
+// Windows keeps a process's environment block in its PEB: PEB.ProcessParameters (+0x20) -> Environment (+0x80) and
+// EnvironmentSize (+0x3F0), x64 only. A same-user process opens with PROCESS_QUERY_INFORMATION | PROCESS_VM_READ (0x0410).
+const ENV_READER_CSHARP = `
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class StarciProcessEnv {
+  [StructLayout(LayoutKind.Sequential)] struct PBI { public IntPtr Reserved1; public IntPtr PebBaseAddress; public IntPtr Reserved2a; public IntPtr Reserved2b; public IntPtr UniqueProcessId; public IntPtr Reserved3; }
+  [DllImport("ntdll.dll")] static extern int NtQueryInformationProcess(IntPtr h, int cls, ref PBI pbi, int len, out int ret);
+  [DllImport("kernel32.dll")] static extern bool ReadProcessMemory(IntPtr h, IntPtr addr, byte[] buf, IntPtr size, out IntPtr read);
+  [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(int access, bool inherit, int pid);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+  [DllImport("kernel32.dll")] static extern bool IsWow64Process(IntPtr h, out bool wow);
+  static byte[] Read(IntPtr h, IntPtr addr, int size) {
+    var buf = new byte[size]; IntPtr n;
+    if (!ReadProcessMemory(h, addr, buf, (IntPtr)size, out n) || (int)n != size) return null;
+    return buf;
+  }
+  public static Dictionary<string, string> Env(int pid) {
+    var h = OpenProcess(0x0410, false, pid);
+    if (h == IntPtr.Zero) return null;
+    try {
+      bool wow; if (IsWow64Process(h, out wow) && wow) return null;
+      var pbi = new PBI(); int ret;
+      if (NtQueryInformationProcess(h, 0, ref pbi, Marshal.SizeOf(pbi), out ret) != 0) return null;
+      var peb = Read(h, pbi.PebBaseAddress + 0x20, 8); if (peb == null) return null;
+      var parameters = (IntPtr)BitConverter.ToInt64(peb, 0);
+      var envPtr = Read(h, parameters + 0x80, 8); if (envPtr == null) return null;
+      var sizeBuf = Read(h, parameters + 0x3F0, 8); if (sizeBuf == null) return null;
+      long size = BitConverter.ToInt64(sizeBuf, 0);
+      if (size <= 0 || size > 4 * 1024 * 1024) return null;
+      var block = Read(h, (IntPtr)BitConverter.ToInt64(envPtr, 0), (int)size); if (block == null) return null;
+      var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+      foreach (var entry in Encoding.Unicode.GetString(block).Split('\\0')) {
+        if (entry.Length == 0) continue;
+        int i = entry.IndexOf('=', 1); if (i < 0) continue;
+        d[entry.Substring(0, i)] = entry.Substring(i + 1);
+      }
+      return d;
+    } finally { CloseHandle(h); }
+  }
+}`;
+
+/** The PowerShell script reading `names` from the environment of `pids` (every process when null): JSON [{pid, readable, values}]. */
+export function processEnvScript({ names, pids = null }) {
+  const wanted = JSON.stringify([...names].map(String));
+  const ids = pids ? `@(${[...pids].map((p) => Number(p)).filter(Number.isInteger).join(',')})` : '(Get-Process).Id';
+  return [
+    `Add-Type -TypeDefinition @'${ENV_READER_CSHARP}\n'@ -Language CSharp`,
+    `$names = '${psQuote(wanted)}' | ConvertFrom-Json`,
+    `$rows = foreach ($id in ${ids}) { $e = [StarciProcessEnv]::Env([int]$id); $v = [ordered]@{}; foreach ($n in $names) { $v[$n] = if ($null -ne $e -and $e.ContainsKey($n)) { $e[$n] } else { $null } }; [pscustomobject]@{ pid = [int]$id; readable = ($null -ne $e); values = $v } }`,
+    '@($rows) | ConvertTo-Json -Compress -Depth 4',
+  ].join('\n');
+}
+
+/** The rows of that script's JSON. */
+export const processEnvRowsOfJson = (text) => {
+  const t = String(text ?? '').trim();
+  const v = t ? JSON.parse(t) : [];
+  return (Array.isArray(v) ? v : [v]).map((r) => ({ pid: Number(r.pid), readable: r.readable === true, values: r.values ?? {} }));
+};
