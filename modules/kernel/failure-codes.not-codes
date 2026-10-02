@@ -110,3 +110,10 @@ REDIS_CACHE_MANAGER	constant, parser token or key name, not an emitted code
 TOKEN_TOLERANCE	constant, parser token or key name, not an emitted code
 UNEXPECTED_TOKEN	constant, parser token or key name, not an emitted code
 X_FILE	constant, parser token or key name, not an emitted code
+NEXT_PUBLIC_SITE_URL	public environment variable name the front-end config rule allows, not a code
+NEXT_PUBLIC_SUPABASE_ANON_KEY	public environment variable name the front-end config rule allows, not a code
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY	public environment variable name the front-end config rule allows, not a code
+NEXT_PUBLIC_SUPABASE_URL	public environment variable name the front-end config rule allows, not a code
+OBJECT_FUNCTION	PostgreSQL parser enum name (libpg-query ObjectType), not an emitted code
+ROLESPEC_PUBLIC	PostgreSQL parser enum name (libpg-query RoleSpecType), not an emitted code
+VAR_SET_VALUE	PostgreSQL parser enum name (libpg-query VariableSetKind), not an emitted code
