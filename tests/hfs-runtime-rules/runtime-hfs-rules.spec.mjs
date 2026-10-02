@@ -12,6 +12,7 @@ import { runtimeCheck } from '../../scripts/hfs/runtime-check.mjs';
 import { parseSource } from '../../scripts/hfs/runtime-rules/source-ast.mjs';
 import { fileExternalFindings, ownerIdOf } from '../../scripts/hfs/runtime-rules/external-owner.mjs';
 import { fileBaseFindings } from '../../scripts/hfs/runtime-rules/base-pure.mjs';
+import { ciUploadFindings } from '../../scripts/hfs/runtime-rules/ci-upload.mjs';
 import { callExportFinding, callFunctionName, contractCallIds } from '../../scripts/hfs/runtime-rules/api-shape.mjs';
 import { specPlacementFinding } from '../../scripts/hfs/runtime-rules/test-layout.mjs';
 import { nameFindings, sourceNameFindings } from '../../scripts/hfs/runtime-rules/source-name.mjs';
@@ -386,3 +387,32 @@ test('GENERATED_UNTRACKED: a tracked file beside the generated root gives no fin
 test('the runtime manifest has no allowlist block: a runtime finding is fixed, never allowed', () => {
   assert.equal(MANIFEST.pending, undefined, 'the pending mechanism is gone; exceptions live in modules/kernel/allowlist.yaml sections');
 });
+
+// ------------------------------------------------------------------------------------------- CI_UPLOAD_NOT_SILENT
+
+const uploadWorkflow = ({ perms = '    permissions:\n      id-token: write\n', step = '' } = {}) => `name: ci\non: push\njobs:\n  ci:\n${perms}    steps:\n      - uses: actions/checkout@v4\n      - name: coverage upload\n        uses: codecov/codecov-action@v5\n${step || '        with:\n          use_oidc: true\n          fail_ci_if_error: true\n'}`;
+const uploadFindings = (text, file = '.github/workflows/ci.yml') => ciUploadFindings(ctxOf({}, { files: [file], read: () => text }));
+
+test('CI_UPLOAD_NOT_SILENT: an upload without OIDC, without fail_ci_if_error, with continue-on-error, gated on a secret or without id-token is refused', () => {
+  assert.deepEqual(codesOf(uploadFindings(uploadWorkflow({ step: '        with:\n          token: ${{ secrets.CODECOV_TOKEN }}\n          fail_ci_if_error: true\n' }))), ['CI_UPLOAD_NOT_SILENT'], 'a token upload is skipped silently when the secret is absent');
+  assert.match(uploadFindings(uploadWorkflow({ step: '        with:\n          use_oidc: true\n' }))[0].message, /fail_ci_if_error/);
+  assert.match(uploadFindings(uploadWorkflow({ step: '        continue-on-error: true\n        with:\n          use_oidc: true\n          fail_ci_if_error: true\n' }))[0].message, /continue-on-error/);
+  assert.match(uploadFindings(uploadWorkflow({ step: "        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}\n        with:\n          use_oidc: true\n          fail_ci_if_error: true\n" }))[0].message, /gated on a secret/);
+  assert.match(uploadFindings(uploadWorkflow({ perms: '    permissions:\n      contents: read\n' }))[0].message, /id-token: write/);
+});
+
+test('CI_UPLOAD_NOT_SILENT: an OIDC upload that fails the job, in a workflow or in a template with placeholders, is clean', () => {
+  assert.deepEqual(uploadFindings(uploadWorkflow()), []);
+  assert.deepEqual(uploadFindings(uploadWorkflow({ perms: '' }).replace('name: ci\n', 'name: ci\npermissions:\n  id-token: write\n')), [], 'a workflow-level grant counts');
+  assert.deepEqual(uploadFindings(uploadWorkflow({ step: '        if: ${{ !cancelled() }}\n        with:\n          use_oidc: true\n          files: {{lcovReport}}\n          fail_ci_if_error: true\n' }).replace('name: ci', '{{header}}\nname: ci'), 'packages/hfs/templates/app/ci-workflows/github/workflows/ci.yml'), []);
+  assert.deepEqual(uploadFindings('name: x\non: push\njobs:\n  a:\n    steps:\n      - run: echo codecov\n'), [], 'no upload step, nothing to judge');
+  assert.deepEqual(ciUploadFindings(ctxOf({}, { files: ['tests/fixtures/ci.yml', 'docs/notes.yml'], read: () => uploadWorkflow({ perms: '' }) })), [], 'only workflow files are read');
+});
+
+test('CI_UPLOAD_NOT_SILENT: every workflow of this repository, its examples and the hfs templates uploads loudly', () => {
+  const folders = ['.github/workflows', 'packages/hfs/templates/app/ci-workflows/github/workflows', ...fs.readdirSync(path.join(ROOT, 'examples')).map((app) => `examples/${app}/.github/workflows`)];
+  const files = folders.filter((dir) => fs.existsSync(path.join(ROOT, dir))).flatMap((dir) => fs.readdirSync(path.join(ROOT, dir)).map((f) => `${dir}/${f}`));
+  assert.ok(files.length >= 8, 'the root, example and template workflows are read');
+  assert.deepEqual(ciUploadFindings(ctxOf({}, { files, read: (f) => fs.readFileSync(path.join(ROOT, f), 'utf8') })), []);
+});
+

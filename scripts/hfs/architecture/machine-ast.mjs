@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { canonical } from './config.mjs';
-import { sourceLocation } from './typescript.mjs';
+import { sourceLocation } from '../../lib/ts-ast.mjs';
 
 /**
  * The small TypeScript reading kit the R33/R38/R39/R41/R45/R84/R86 machine checks share (connection-map, sql-owner,

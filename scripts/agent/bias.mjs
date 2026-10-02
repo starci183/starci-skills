@@ -43,7 +43,7 @@ const scan = (text, re) => {
   return out;
 };
 
-export function extractRoutingBias(text) {
+function extractRoutingBias(text) {
   const t = String(text ?? '');
   const avoid = scan(t, AVOID_RE);
   const prefer = scan(t, PREFER_RE).filter((a) => !avoid.includes(a));
@@ -52,7 +52,7 @@ export function extractRoutingBias(text) {
 
 // Canonicalize any bias-shaped object: every entry resolves through the
 // alias map (case-insensitive, unknowns dropped), avoid wins over prefer.
-export function normalizeBias(obj) {
+function normalizeBias(obj) {
   const canon = (list) => {
     const out = [];
     for (const raw of Array.isArray(list) ? list : []) {

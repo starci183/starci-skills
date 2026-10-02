@@ -31,7 +31,7 @@ import { parseJson } from '../lib/json.mjs';
 import { preservedRefOf } from './preserved-ref.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
-import { sameOrUnder } from '../lib/path-key.mjs';
+import { pathsOverlap, sameOrUnder } from '../lib/path-key.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
 export const SEAM_RELEASED_EVENT = 'seam-released';
@@ -238,7 +238,6 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/cli.mjs',
 // (canonRedispatchOf), never from scratch.
 
 const CANON_OP = 'code.refactor';
-const overlaps = (a, b) => sameOrUnder(a, b) || sameOrUnder(b, a);
 const srcRootOf = (file) => {
   const segments = String(file).split('/');
   const src = segments.lastIndexOf('src', segments.length - 2);
@@ -271,7 +270,7 @@ export function relocationOf(finding, relocations) {
   if (!Array.isArray(into) || !into.length) return null;
   const owner = rest[2].replace(/\.[^.]+$/, '');
   const home = rest.length > 3 ? `${src}/${rest.slice(0, 3).join('/')}` : moving;
-  const destinations = into.map((dest) => `${src}/${String(dest).replace(/\/+$/, '')}/${owner}`).filter((dest) => !overlaps(dest, home));
+  const destinations = into.map((dest) => `${src}/${String(dest).replace(/\/+$/, '')}/${owner}`).filter((dest) => !pathsOverlap(dest, home));
   return { ruleId: finding.ruleId, file: finding.file, moving, home, owner, destinations };
 }
 
@@ -305,7 +304,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
     if (!slice) continue;
     for (const dest of move.destinations) {
       if (slice.grants.includes(dest)) continue;
-      const holder = slices.find((other) => other !== slice && [...other.paths, ...other.grants].some((root) => overlaps(dest, root)));
+      const holder = slices.find((other) => other !== slice && [...other.paths, ...other.grants].some((root) => pathsOverlap(dest, root)));
       if (!holder) { slice.grants.push(dest); continue; }
       const wire = wireOf(slice.wave);
       wire.paths.add(dest);
@@ -320,7 +319,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
     for (const pkg of packages) {
       for (const shared of sharedRoots) {
         const file = pkg ? `${pkg}/${shared}` : shared;
-        if (!slices.some((other) => other.paths.some((root) => overlaps(file, root)))) wireOf(slice.wave).paths.add(file);
+        if (!slices.some((other) => other.paths.some((root) => pathsOverlap(file, root)))) wireOf(slice.wave).paths.add(file);
       }
     }
   }
@@ -411,7 +410,7 @@ export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
   const overlapsOut = [];
   for (let i = 0; i < live.length; i += 1) {
     for (let j = i + 1; j < live.length; j += 1) {
-      const hit = live[i].paths.find((a) => live[j].paths.some((b) => overlaps(a, b)));
+      const hit = live[i].paths.find((a) => live[j].paths.some((b) => pathsOverlap(a, b)));
       if (hit) overlapsOut.push({ ordinals: [live[i].ordinal, live[j].ordinal], path: hit });
     }
   }
@@ -473,8 +472,8 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
     if (CONFIG_FILE_RE.test(dest) || sharedRoots.some((root) => dest === root || dest.endsWith(`/${root}`))) { wire.push(dest); continue; }
     // A public entry (index.*) is its folder's: the slice gets the folder unless a sibling holds it.
     const target = PUBLIC_ENTRY_RE.test(dest) ? dest.replace(PUBLIC_ENTRY_RE, '') : dest;
-    if (!target || owned.some((o) => overlaps(target, o) && target.length <= o.length)) { wire.push(dest); continue; }
-    if (siblings.some((p) => overlaps(target, p))) wire.push(dest);
+    if (!target || owned.some((o) => pathsOverlap(target, o) && target.length <= o.length)) { wire.push(dest); continue; }
+    if (siblings.some((p) => pathsOverlap(target, p))) wire.push(dest);
     else grants.push(target);
   }
   const blocker = String(report.blocker?.kind ?? '');

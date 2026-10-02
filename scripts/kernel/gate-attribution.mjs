@@ -48,9 +48,10 @@ const ATTRIBUTION_CALLS = { status: gitStatus, log: gitLog };
 import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { insidePath, sameResolvedPath } from '../lib/path-key.mjs';
 
 /** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
-export const WORK_RECORD_PREFIX = '.starciwork/';
+const WORK_RECORD_PREFIX = '.starciwork/';
 const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
 const LEASE_PREFIX = 'path:';
@@ -96,7 +97,7 @@ const dropFirst = (value) => value.split('/').slice(1).join('/');
  * without its first segment; a barrel above an owned path counts. A file that cannot be read imports
  * everything - never a peer on a guess.
  */
-export function importsOwned(root, file, owned) {
+function importsOwned(root, file, owned) {
   let body;
   try { body = fs.readFileSync(path.join(root, file), 'utf8'); } catch { return true; }
   const forms = [...new Set(owned.flatMap((p) => [p, dropFirst(p)]).filter(Boolean))];
@@ -111,8 +112,6 @@ export function importsOwned(root, file, owned) {
   return false;
 }
 
-const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
-const within = (root, file) => { const rel = path.relative(root, file); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
 /**
  * Where one failing entry lives: {root, rel (repo-relative in root), key (the spelling the owned-path
  * canon compares)} - the ledger repository, unless the entry is absolute under another bound root or its
@@ -122,7 +121,7 @@ function locateFailing(value, { repo, roots }) {
   if (typeof value !== 'string' || !value.trim()) return null;
   const raw = value.trim().replace(/\\/g, '/').replace(POSITION, '');
   if (path.isAbsolute(raw)) {
-    const other = roots.find((r) => !samePath(r.root, repo) && within(r.root, raw));
+    const other = roots.find((r) => !sameResolvedPath(r.root, repo) && insidePath(r.root, raw));
     if (other) {
       const rel = failingPath(path.relative(other.root, raw), null);
       return rel ? { root: other.root, rel, key: `${other.name}/${rel}` } : null;
@@ -131,14 +130,14 @@ function locateFailing(value, { repo, roots }) {
   const file = failingPath(raw, repo);
   if (!file) return null;
   const [head, ...rest] = file.split('/');
-  const other = rest.length ? roots.find((r) => !samePath(r.root, repo) && r.name.toLowerCase() === head.toLowerCase()) : null;
+  const other = rest.length ? roots.find((r) => !sameResolvedPath(r.root, repo) && r.name.toLowerCase() === head.toLowerCase()) : null;
   if (other && fs.existsSync(path.join(other.root, ...rest)) && !fs.existsSync(path.join(repo, file))) {
     return { root: other.root, rel: rest.join('/'), key: file };
   }
   // A path printed relative to another repository's root (its own `npm run typecheck`): the one bound
   // repository that holds it, when the ledger repository does not.
   if (!fs.existsSync(path.join(repo, file))) {
-    const holders = roots.filter((r) => !samePath(r.root, repo) && fs.existsSync(path.join(r.root, file)));
+    const holders = roots.filter((r) => !sameResolvedPath(r.root, repo) && fs.existsSync(path.join(r.root, file)));
     if (holders.length === 1) return { root: holders[0].root, rel: file, key: `${holders[0].name}/${file}` };
   }
   return { root: repo, rel: file, key: file };
@@ -160,7 +159,7 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
   const own = (canon ? canon.requests(payload, op).map((r) => r.resourceKey.slice(LEASE_PREFIX.length))
     : (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)).map(compare);
   const roots = [{ root: repo, name: path.basename(repo) },
-    ...(canon?.binding?.repos ?? []).filter((r) => r?.root && !samePath(r.root, repo)).map((r) => ({ root: r.root, name: path.basename(r.root) }))];
+    ...(canon?.binding?.repos ?? []).filter((r) => r?.root && !sameResolvedPath(r.root, repo)).map((r) => ({ root: r.root, name: path.basename(r.root) }))];
   // The owned paths as plain prefixes (app-relative in a bound app): the import guard of a preexisting peer compares
   // against every one of them (importsOwned also tries each without its first segment, the side-relative spelling).
   const ownedPlain = [...new Set((payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean).map((p) => {
@@ -170,7 +169,7 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
   const since = Math.min(...lineage.map((row) => Number(row.created_at)).filter(Number.isFinite));
   const introducers = new Map();
   const introducerOf = (sha, root) => {
-    if (!introducers.has(sha)) introducers.set(sha, resolveIntroducer(db, { commits: [sha], roots: [root, ...roots.map((r) => r.root).filter((r) => !samePath(r, root))] }));
+    if (!introducers.has(sha)) introducers.set(sha, resolveIntroducer(db, { commits: [sha], roots: [root, ...roots.map((r) => r.root).filter((r) => !sameResolvedPath(r, root))] }));
     return introducers.get(sha);
   };
   const ownWorkflow = (found) => found.introducedBy === job.workflow_id || found.workflowId === job.workflow_id;

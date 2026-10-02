@@ -4,10 +4,10 @@
 // character is written as its escape (`\0`, `\b`, `\u001b`). Judged on the bytes of every tracked *.mjs, *.cjs, *.js,
 // *.ts, *.tsx, *.yaml, *.yml, *.md and *.json outside the generated copies. Pure.
 export const CODE = 'RT_CONTROL_CHARACTER';
-export const TEXT_SOURCE = /\.(?:mjs|cjs|js|ts|tsx|ya?ml|md|json)$/;
+const TEXT_SOURCE = /\.(?:mjs|cjs|js|ts|tsx|ya?ml|md|json)$/;
 
 /** True for a byte that is a control character the rule refuses. */
-export const refusedByte = (b) => (b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) || b === 0x7f;
+const refusedByte = (b) => (b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) || b === 0x7f;
 
 /** The RT_CONTROL_CHARACTER finding of one file's bytes (the first offending byte, with how many there are), or null. */
 export function controlCharFinding(file, bytes) {

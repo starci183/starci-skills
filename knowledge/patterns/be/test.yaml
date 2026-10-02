@@ -575,7 +575,7 @@ rules:
       The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
       it with ONE scope, the unit-tested roles: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
       `sonar.coverage.exclusions` listing every executable file that is not of a unit-tested role (SonarQube has no coverage inclusions: hfs sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
-      100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. hfs sync
+      100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with GitHub's OIDC token (`use_oidc`, no secret). hfs sync
       renders the scope into both files from the jest preset's `COVERAGE_SOURCES`, so it can never drift. The Sonar gate
       (`knowledge/sonar-gate.yaml`) holds coverage at 100 overall and on new code, and the runtime judges it per file: one service
       or cli command below 100 fails. Handlers, resolvers, controllers, modules, config and tests are not coverage targets; fe/ has no tests.
@@ -588,7 +588,7 @@ rules:
         write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every file of no unit-tested role (fe/** included), no coverage exclusion; hfs sync renders the file'
       - id: case-2
         when: CI
-        write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action and the CODECOV_TOKEN secret'
+        write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action with use_oidc (job permission id-token: write; no secret and no secret-guarded skip)'
       - id: case-3
         when: codecov.yml
         write: 'project and patch status target 100% on paths be/src/**/*.service.ts and be/src/features/cli/**/*.cli.ts, fe/** ignored; hfs sync renders the file from the same scope as Sonar'

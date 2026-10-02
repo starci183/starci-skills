@@ -56,13 +56,16 @@ import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { runtimeRevOf } from './home.mjs';
 import { hostResourcesFor, resourceThresholds, machineLoad, HOST_RESOURCES_ENV } from './host-resources.mjs';
 import { machineLedgerFiles } from './ledger-files.mjs';
+import { isSpecRun } from '../lib/env.mjs';
+import { positiveNumber } from '../lib/number.mjs';
+import { isoOr } from '../lib/time.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
 export const RECONCILER_WRITER = 'reconciler/resource';
-export const RECONCILER_MODE_FRESH_MS = 120_000;
+const RECONCILER_MODE_FRESH_MS = 120_000;
 
 export const DISPATCH_THROTTLED = 'dispatch-throttled';
-export const OP_RAM_FOOTPRINT = 'op-ram-footprint';
+const OP_RAM_FOOTPRINT = 'op-ram-footprint';
 /** host_samples.kind of one op-ram-footprint sample. */
 export const FOOTPRINT_SAMPLE_KIND = 'op-footprint';
 export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
@@ -77,7 +80,6 @@ const DEFAULT_OP = Object.freeze({ mb: 1200, class: 'light' });
 const MB = 1048576;
 
 const num = (v, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
-const positive = (v, fallback) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : fallback; };
 const median = (list) => { const s = [...list].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const pct1 = (n) => `${Math.round(num(n) * 10) / 10}%`;
 
@@ -86,22 +88,22 @@ export function throttleThresholds(settings = null) {
   const s = settings ?? allocationSettings();
   const t = s?.resources?.ramThrottle ?? {};
   const out = { heavyStopBelowPct: resourceThresholds(s).minFreeRamPct };
-  for (const [key, fallback] of Object.entries(DEFAULTS)) out[key] = positive(t[key], fallback);
+  for (const [key, fallback] of Object.entries(DEFAULTS)) out[key] = positiveNumber(t[key], fallback);
   return out;
 }
 
 /** The opRam table: {default: {mb, class}, kinds: {<op>: {mb, class}}} from allocation.resources.opRam. */
 export function opRamTable(settings = null) {
   const raw = (settings ?? allocationSettings())?.resources?.opRam ?? {};
-  const entry = (v, fallback) => ({ mb: positive(v?.mb, fallback.mb), class: v?.class === 'heavy' || v?.class === 'light' ? v.class : fallback.class });
+  const entry = (v, fallback) => ({ mb: positiveNumber(v?.mb, fallback.mb), class: v?.class === 'heavy' || v?.class === 'light' ? v.class : fallback.class });
   const def = entry(raw.default, DEFAULT_OP);
   const kinds = {};
   for (const [kind, v] of Object.entries(raw)) if (kind !== 'default' && v && typeof v === 'object') kinds[kind] = entry(v, def);
   return { default: def, kinds };
 }
 
-export const opClassOf = (op, table) => (table.kinds[op] ?? table.default).class;
-export const priorMbOf = (op, table) => (table.kinds[op] ?? table.default).mb;
+const opClassOf = (op, table) => (table.kinds[op] ?? table.default).class;
+const priorMbOf = (op, table) => (table.kinds[op] ?? table.default).mb;
 
 /**
  * Per-kind RAM observations out of op-ram-footprint samples [{opAgentRamMb, kernels, running:{kind:n}}]: the op
@@ -138,7 +140,7 @@ export function opRamEstimates(table, samples = [], thresholds = throttleThresho
   return out;
 }
 
-export const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
+const estimateOf = (op, estimates) => estimates[op] ?? estimates.default;
 
 /**
  * The next mode from the previous state and one host sample, with hysteresis. `prev`: {ramMode, cpuHot} (a missing
@@ -174,7 +176,7 @@ export function priorityTable(settings = null, state = {}) {
   const out = {};
   for (const [wf, v] of Object.entries({ ...fromYaml, ...(state?.priorities ?? {}) })) {
     if (v == null) continue;
-    const weight = positive(typeof v === 'object' ? v.weight : v, 1);
+    const weight = positiveNumber(typeof v === 'object' ? v.weight : v, 1);
     const reserve = Math.max(0, Math.floor(num(typeof v === 'object' ? v.reserve : 0)));
     out[wf] = { weight, reserve };
   }
@@ -277,8 +279,8 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 
 /** The DB mode (throttle_state / throttle_events enum normal|heavy|critical) of a code mode, and back. */
 export const dbMode = (mode) => (mode === 'heavy-paused' ? 'heavy' : MODES.includes(mode) ? mode : 'normal');
-export const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
-const iso = (ms) => (ms != null && Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : null);
+const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
+
 
 /**
  * The throttle state object out of the throttle_state row and throttle_decisions: {mode, ramMode, cpuHot, why, at,
@@ -286,15 +288,15 @@ const iso = (ms) => (ms != null && Number.isFinite(Number(ms)) ? new Date(Number
  * {count, open, last}}; {} with neither. ramMode is not a column: it reads as the mode (conservative - after a CPU-only
  * heavy pause the RAM hysteresis holds until free RAM clears heavyResumeAbovePct).
  */
-export function throttleStateOf(m) {
+function throttleStateOf(m) {
   const row = m.throttleState();
   const decisions = m.db.prepare('SELECT count(*) n, sum(released_at IS NULL) open FROM throttle_decisions').get();
   const last = m.db.prepare('SELECT * FROM throttle_decisions ORDER BY seq DESC LIMIT 1').get();
   const throttled = Number(decisions?.n) > 0 ? { count: Number(decisions.n), open: Number(decisions.open ?? 0),
-    last: last ? { at: iso(last.at), jobId: last.job_id, workflowId: last.workflow_id, ledgerId: last.ledger_id, reason: last.reason, waitedMs: last.waited_ms, releasedAt: iso(last.released_at) } : null } : null;
+    last: last ? { at: isoOr(last.at), jobId: last.job_id, workflowId: last.workflow_id, ledgerId: last.ledger_id, reason: last.reason, waitedMs: last.waited_ms, releasedAt: isoOr(last.released_at) } : null } : null;
   if (!row) return throttled ? { throttled } : {};
   const mode = codeMode(row.mode);
-  return { mode, ramMode: mode, cpuHot: Boolean(row.cpu_hot), why: row.reason ?? null, at: iso(row.updated_at), since: iso(row.since),
+  return { mode, ramMode: mode, cpuHot: Boolean(row.cpu_hot), why: row.reason ?? null, at: isoOr(row.updated_at), since: isoOr(row.since),
     writer: row.writer, writerRev: row.writer_rev, effectiveCap: row.effective_cap, heavyCap: row.heavy_cap, running: row.running,
     freeRamPct: row.free_ram_pct, cpuBusy: row.cpu_pct == null ? null : row.cpu_pct / 100, slotTargets: row.slotTargets ?? null,
     priorities: row.priorities ?? {}, throttled };
@@ -325,7 +327,7 @@ export function setPriority({ workflowId, weight = null, reserve = 0, by = 'supe
       const cur = m.throttleState();
       const priorities = { ...(cur?.priorities ?? {}) };
       if (weight == null) priorities[workflowId] = null;
-      else priorities[workflowId] = { weight: positive(weight, 1), reserve: Math.max(0, Math.floor(num(reserve))), by, at: new Date(now).toISOString() };
+      else priorities[workflowId] = { weight: positiveNumber(weight, 1), reserve: Math.max(0, Math.floor(num(reserve))), by, at: new Date(now).toISOString() };
       if (cur) m.update('throttle_state', { priorities_json: priorities }, { id: 1 });
       // No row yet (the Resource controller never published): a normal row by ram-cap, its mode event recorded.
       else m.setThrottle({ mode: 'normal', writer: 'supervisor/ram-cap', reason: `priority override for ${workflowId} before any throttle publication`, priorities });
@@ -380,7 +382,7 @@ export function workersCensus({ db = null, ledgerFile = null, env = process.env 
   return { ops, kernels };
 }
 
-export const countByKind = (ops) => ops.reduce((acc, o) => { acc[o.op] = (acc[o.op] ?? 0) + 1; return acc; }, {});
+const countByKind = (ops) => ops.reduce((acc, o) => { acc[o.op] = (acc[o.op] ?? 0) + 1; return acc; }, {});
 
 const overrideOf = (env) => {
   const raw = env?.[HOST_RESOURCES_ENV];
@@ -401,7 +403,7 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const thresholds = throttleThresholds(s);
   const table = opRamTable(s);
   const override = overrideOf(env);
-  const testContext = Boolean(env?.NODE_TEST_CONTEXT) && !override;
+  const testContext = Boolean(isSpecRun(env ?? {})) && !override;
   const host = hostResourcesFor({ env, repo, settings: s });
   const cpuBusy = override ? (override.cpuBusy != null ? num(override.cpuBusy) : null)
     : testContext && !load ? null

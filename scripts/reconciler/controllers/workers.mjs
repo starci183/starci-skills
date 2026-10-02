@@ -27,19 +27,20 @@
 //
 // Idempotent: a DI's key names what it is about (the cycle's members, the cluster id, the repo), so a second pass
 // re-opens nothing (decisions.mjs keeps one live DI per key). Numbers: modules/reconciler/workers.yaml.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../../../engine/yaml.mjs';
 import { openLedgerReader } from '../../../engine/db/ledger.mjs';
 import { clipLine } from '../../lib/clip.mjs';
+import { shortHash } from '../../lib/hash.mjs';
+import { productLedgers } from '../../lib/ledgers.mjs';
+import { yamlNumberSettings } from '../../lib/read-yaml.mjs';
 import { ownerLanguage, translator } from '../../lib/i18n.mjs';
 import { DEFAULTS as SUPERVISOR_DEFAULTS, supervisorSettings } from '../../machine/home.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const WORKERS_FILE = path.join(ROOT, 'modules', 'reconciler', 'workers.yaml');
+const WORKERS_FILE = path.join(ROOT, 'modules', 'reconciler', 'workers.yaml');
 export const KEYS = Object.freeze({ deps: 'workers:deps', owed: 'workers:owed', land: 'workers:land', push: 'workers:push', metrics: 'workers:metrics', direct: 'workers:direct', notify: 'workers:notify' });
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, depsEveryMs: 300_000, owedEveryMs: 300_000, pushEveryMs: 1_800_000, notifyEveryMs: 300_000, metricsEveryMs: 1_800_000, directEveryMs: 900_000,
   decisionDueMs: 3_600_000, landStallMs: 1_800_000, landFailedMs: 3_600_000, derivedMs: 300_000, urgentOverdueEscalations: 3 });
@@ -48,18 +49,14 @@ const SUPERVISOR = 'supervisor';
 export const PUSH_RUN_TIMEOUT_MS = 1_800_000;
 
 /** modules/reconciler/workers.yaml over DEFAULTS; a missing or bad number keeps its default. */
-export function workersSettings(file = WORKERS_FILE) {
-  let doc = {};
-  try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
-  const out = { ...DEFAULTS };
-  for (const k of Object.keys(DEFAULTS)) if (Number.isFinite(Number(doc[k])) && Number(doc[k]) > 0) out[k] = Number(doc[k]);
-  return out;
+function workersSettings(file = WORKERS_FILE) {
+  return yamlNumberSettings(file, DEFAULTS);
 }
 
 /* ------------------------------------------------------------ pure planners */
 
 /** A Supervisor DI (DESIGN §10.3) the Workers controller opens. Pure. */
-export function workersDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
+function workersDecision({ kind, key, summary, entity, evidence = [], options = [], now, dueMs, productLedger = null, workflowId = null }) {
   return {
     schema: 'starci/decision-item@1', idempotencyKey: key, kind, decider: 'supervisor', ledger: SUPERVISOR,
     ...(productLedger ? { productLedger } : {}), ...(workflowId ? { productWorkflowId: workflowId } : {}),
@@ -171,9 +168,6 @@ export function planLand({ land = null, events = [], dist = null, now, settings 
   return { set, clear };
 }
 
-/** A key component of a free-text signature: a short digest, so the key never carries ':' or spaces. Pure. */
-const sigId = (signature) => crypto.createHash('sha256').update(String(signature)).digest('hex').slice(0, 10);
-
 /**
  * The push pass: one `push-refused` DI per refused repo of a push-mains result. The key names every identity field
  * (MB-07): repo, the stable failure signature and the head; a result missing one opens nothing and is reported
@@ -191,7 +185,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = ow
     const why = r.refused ?? r.error;
     decisions.push({
       ...workersDecision({
-        kind: 'push-refused', key: `push-refused:${repo}:${sigId(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
+        kind: 'push-refused', key: `push-refused:${repo}:${shortHash(signature)}:${head}`, now, dueMs: settings.decisionDueMs,
         entity: { type: 'repo', id: repo }, summary: tr('Push to main refused at {repo} ({signature}{repeat}): {why}', { repo, signature, repeat: r.repeat > 1 ? tr(', attempt {n} at the same head', { n: r.repeat }) : '', why }),
         evidence: [String(why ?? ''), r.outputSha ? tr('blob:{sha} (the full push/hook output, {bytes} bytes)', { sha: r.outputSha, bytes: r.outputBytes ?? '?' }) : null, `head ${r.head}`],
         options: [{ key: 'fix-and-push', title: tr('Fix the cause and let the next push run retry it'), recommended: true }],
@@ -204,7 +198,7 @@ export function planPush({ results = [], now, settings = DEFAULTS, language = ow
 }
 
 /** The direct-commit pass: one Supervisor DI per commit on main no gate land produced. Pure over [{sha, subject}]. */
-export function planDirect({ commits = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
+function planDirect({ commits = [], now, settings = DEFAULTS, language = ownerLanguage() }) {
   const tr = translator(language);
   return commits.map((c) => workersDecision({
     kind: 'runtime-defect', key: `direct-commit:${c.sha}`, now, dueMs: settings.decisionDueMs,
@@ -226,7 +220,6 @@ export const overdueUrgent = (dis, { now, min = DEFAULTS.urgentOverdueEscalation
 
 /* ------------------------------------------------------------ reads */
 
-const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l.ledgerId !== SUPERVISOR && l.file);
 function withReaders(ctx, fn) {
   const readers = [];
   for (const l of productLedgers(ctx)) {

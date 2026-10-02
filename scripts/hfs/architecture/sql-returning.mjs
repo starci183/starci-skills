@@ -16,7 +16,7 @@ export const SQL_RETURNING_RULE_IDS = ['BE_SQL_RETURNING_SHAPE'];
 const RULE = 'BE_SQL_RETURNING_SHAPE';
 
 /** The leading verbs of the top-level statements of `text` that RETURN from an UPDATE or DELETE without a wrapping SELECT. */
-export function unwrappedReturning(text) {
+function unwrappedReturning(text) {
   const found = [];
   let depth = 0;
   let verb = null;

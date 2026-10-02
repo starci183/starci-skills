@@ -499,8 +499,6 @@ dead-script-entries:
     reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); specs read it"
   - path: scripts/example/example-verify.mjs
     reason: "CLI of the example work standard (scripts/work/validate/check-example-work.mjs); a spec reads it"
-  - path: scripts/gates/hfs-sync.mjs
-    reason: "gate CLI that a product repository runs (docs/application-stacks.md); specs read it"
   - path: scripts/gates/repo-presentation.mjs
     reason: "gate CLI that a product repository runs (docs/repo-presentation.md); no spec"
   - path: scripts/kernel/launch-smoke.mjs

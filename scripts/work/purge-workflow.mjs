@@ -32,14 +32,14 @@ import { zipRead } from '../api/fs/zip-read.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const USAGE = 'use: node scripts/work/purge-workflow.mjs --repo <repo> --workflow <id> [--archive-root <dir>] [--apply --approved-by <who> --approval-ref <ref>] [--json]';
-export const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
+const PURGE_MANIFEST_SCHEMA = 'starci/workflow-archive@1';
 const LIVE = new Set([...JOB_STATUSES.dispatchable, ...JOB_STATUSES.fenced]);
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
 const refuse = (code, message) => Object.assign(new Error(message), { code });
 
 /** Every table of the ledger with a workflow_id column (never workflow_purges, the tombstone). */
-export function workflowTables(db) {
+function workflowTables(db) {
   return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name)
     .filter((t) => t !== 'workflow_purges' && db.prepare(`PRAGMA table_info(${t})`).all().some((c) => c.name === 'workflow_id'));
 }

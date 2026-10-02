@@ -97,7 +97,7 @@ ruleParams:
         cmd: [api/fs, api/process]
     # RT_BASE_IMPURE: the base tier never writes the filesystem; it reads process.env only in these declared seams.
     baseWriteMembers: [writeFileSync, appendFileSync, rmSync, rmdirSync, renameSync, unlinkSync, mkdirSync, copyFileSync, cpSync, symlinkSync, linkSync, truncateSync, writeFile, appendFile, rm, rmdir, rename, unlink, mkdir, copyFile, cp, symlink, link, truncate, mkdtempSync, mkdtemp, createWriteStream]
-    baseEnvSeams: [scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
+    baseEnvSeams: [scripts/lib/env.mjs, scripts/lib/sleep-sync.mjs, scripts/gates/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
     # RT_API_SHAPE: the systems that carry a calls contract; every call file of such a system is a calls id and vice versa.
     apiContracts:
       orca: modules/host/orca/calls.yaml
@@ -148,6 +148,10 @@ ruleParams:
       - {id: doc-owner, run: scripts/checks/check-doc-owner.mjs}
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
       - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
+      - {id: clones, run: scripts/checks/check-clones.mjs}
+      - {id: export-used, run: scripts/checks/check-export-used.mjs}
+      - {id: env, run: scripts/checks/check-env.mjs}
+      - {id: specs, run: scripts/checks/check-specs.mjs}
       - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
       - {id: examples-ci, run: scripts/checks/check-examples-ci.mjs}
       - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
@@ -277,7 +281,7 @@ slots:
   # ----- engine ---------------------------------------------------------------------------------------------
   - id: runtime.foundation
     profiles: [runtime]
-    path: "engine/{runtime-root,config,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission}.mjs"
+    path: "engine/{runtime-root,config,invalid-config,orca-config,yaml,plain-object,canonical-json,constants,digest,admission,refuse}.mjs"
     presence: required
     tracked: tracked
     tier: base
@@ -349,7 +353,7 @@ slots:
     tracked: tracked
     tier: base
     tests: none
-    rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_SOURCE_NAME]
+    rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_HELPER_NEAR_COPY, RT_SOURCE_NAME]
   - id: runtime.lib-retired
     profiles: [runtime]
     # Every name is spelled out: a wildcard segment ranks below the <name>.mjs of runtime.lib.

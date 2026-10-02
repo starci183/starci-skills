@@ -48,7 +48,7 @@ import { opLabel, workflowNames } from '../lib/display-names.mjs';
 
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
-export const BASELINE_REPORTS = 8;
+const BASELINE_REPORTS = 8;
 
 const short = (wf) => wf.replace(/^wf-/, '').replace(/-[a-z0-9]{8}$/i, '');
 // A workflow as a person reads it: its display name with the short id after it (scripts/lib/display-names.mjs),
@@ -74,7 +74,7 @@ export const reportsSince = (db, sinceId, wanted = new Set()) =>
 // How long a form URL gets to answer before the digest calls it stale. The
 // probe is a courtesy to the owner, not a health check: a loopback form that
 // cannot answer in this window is not worth relaying either way.
-export const PROBE_TIMEOUT_MS = 1500;
+const PROBE_TIMEOUT_MS = 1500;
 
 // events.event_id is a random token; seq is the order. Latest means highest seq.
 const lastEvent = (db, kind, dispatchId) => db.prepare(
@@ -82,7 +82,7 @@ const lastEvent = (db, kind, dispatchId) => db.prepare(
      AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(kind, dispatchId);
 
 /** The ask form at `url`: 'live' on a 2xx, else 'stale' (a redirect is not followed). The seam askLiveness and openAsks take. */
-export const probeAsk = async (url, timeoutMs) => {
+const probeAsk = async (url, timeoutMs) => {
   const r = await probeUrl(url, { timeoutMs, follow: 0 });
   return r.state === 'answered' && r.status >= 200 && r.status < 300 ? 'live' : 'stale';
 };
@@ -174,7 +174,7 @@ export const orcaTree = (db, { terminals = undefined, workers = undefined, repo 
 };
 
 // Newest direction/artifact images under .starciwork, bounded walk.
-export const newArtifacts = (repo, sinceMs) => {
+const newArtifacts = (repo, sinceMs) => {
   const root = path.join(repo, '.starciwork');
   const found = [];
   const queue = [root]; let head = 0, visited = 0;
@@ -197,8 +197,8 @@ export const newArtifacts = (repo, sinceMs) => {
 // polls said so. Each cycle now reports runtime-shaped open incidents and a streak of refused agent launches
 // (a dead Kernel seat is the reconciler Host controller's: there are no per-workflow watchdog processes).
 export const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|supervisor-gate|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
-export const LAUNCH_STREAK = 3;
-export const LAUNCH_WINDOW_MS = 3600000;
+const LAUNCH_STREAK = 3;
+const LAUNCH_WINDOW_MS = 3600000;
 
 
 /**
@@ -212,11 +212,11 @@ export const orphanKernelJobs = (db) => db.prepare(`SELECT j.job_id, j.workflow_
    ORDER BY j.job_id`).all();
 
 /** Open incidents whose kind says the runtime, not the product, is broken. */
-export const runtimeIncidents = (db, wanted = new Set()) => db.prepare("SELECT incident_id, workflow_id, op_id, last_progress FROM incidents WHERE status='open' ORDER BY updated_at").all()
+const runtimeIncidents = (db, wanted = new Set()) => db.prepare("SELECT incident_id, workflow_id, op_id, last_progress FROM incidents WHERE status='open' ORDER BY updated_at").all()
   .filter((i) => mine(wanted, i.workflow_id) && RUNTIME_INCIDENT.test(i.last_progress ?? ''));
 
 /** Providers whose agent launches were refused LAUNCH_STREAK+ times inside the window: [{provider, count, lastStep, lastError}]. */
-export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {}) => {
+const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {}) => {
   const rows = db.prepare("SELECT workflow_id, payload_json, created_at FROM events WHERE kind='dispatch-rejected' AND created_at > ? ORDER BY seq").all(now - LAUNCH_WINDOW_MS)
     .filter((r) => mine(wanted, r.workflow_id));
   const by = new Map();

@@ -44,7 +44,7 @@ export function directCommits({ root = SKILL_ROOT, env = process.env, m = null }
     .filter((c) => c.sha && !produced.has(c.sha));
 }
 
-export const describeDirect = (c) => `DIRECT-COMMIT ${c.sha} ${c.subject}`;
+const describeDirect = (c) => `DIRECT-COMMIT ${c.sha} ${c.subject}`;
 
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);

@@ -102,7 +102,7 @@ export function worktreesOf(repo, { run = worktreeListQuery } = {}) {
  * Returns {close:[entry], keep:[entry], deferred:[entry]}; each entry names
  * {handle, repo, tabTitle, paneTitle, agent, kind?, reason, marker?}.
  */
-export function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scopes = [], protectedHandles = new Set(), readScreen }) {
+function planTerminalDedupe({ terminals = [], tabTitles = new Map(), scopes = [], protectedHandles = new Set(), readScreen }) {
   const plan = { close: [], keep: [], deferred: [] };
   const boundAnywhere = new Set(scopes.flatMap((s) => [...(s.bound ?? [])]));
   for (const t of terminals) {

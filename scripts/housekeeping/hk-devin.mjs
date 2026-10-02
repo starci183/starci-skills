@@ -68,19 +68,30 @@ const moveFile=(src,dst)=>{
 const inside=(p,rootKey)=>pathKey(p).startsWith(`${rootKey}/`);
 
 /**
+ * One directory's child entries plus its realpath (`parentReal` when the realpath read fails): {entries, real}, or
+ * null when the readdir fails - the error is pushed to `errors` unless the directory simply vanished (ENOENT).
+ */
+const dirEntries=(dir,parentReal,errors)=>{
+  let entries;
+  try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch(error){
+    if(error?.code!=='ENOENT')errors.push({path:dir,code:error?.code??'ERROR',message:String(error?.message??error)});
+    return null;
+  }
+  const real=(()=>{try{return fs.realpathSync.native(dir);}catch{return parentReal;}})();
+  return {entries,real};
+};
+
+/**
  * Files worth archiving under `dir`: regular files with a history extension, at any depth, links skipped.
  * `report` collects skipped entries; `now`/`archiveAfterMs` gate the age.
  */
 const collectHistoryFiles=(dir,{rootKey,now,archiveAfterMs,skipped,errors})=>{
   const out=[];
   const walk=(dir,st,parentReal)=>{
-    let entries;
-    try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch(error){
-      if(error?.code!=='ENOENT')errors.push({path:dir,code:error?.code??'ERROR',message:String(error?.message??error)});
-      return;
-    }
-    const real=(()=>{try{return fs.realpathSync.native(dir);}catch{return parentReal;}})();
-    for(const entry of entries){
+    const listed=dirEntries(dir,parentReal,errors);
+    if(!listed)return;
+    const real=listed.real;
+    for(const entry of listed.entries){
       const p=path.join(dir,entry.name);
       let st;
       try{st=fs.lstatSync(p);}catch{continue;}
@@ -143,13 +154,10 @@ export async function sweepDevinData({apply=false,now=Date.now(),env=process.env
   // User/History, …); files in them older than the window move to the archive root.
   const plan=[];
   const scan=(dir,parentReal)=>{
-    let entries;
-    try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch(error){
-      if(error?.code!=='ENOENT')errors.push({path:dir,code:error?.code??'ERROR',message:String(error?.message??error)});
-      return;
-    }
-    const real=(()=>{try{return fs.realpathSync.native(dir);}catch{return parentReal;}})();
-    for(const entry of entries){
+    const listed=dirEntries(dir,parentReal,errors);
+    if(!listed)return;
+    const real=listed.real;
+    for(const entry of listed.entries){
       const p=path.join(dir,entry.name);
       let st;try{st=fs.lstatSync(p);}catch{continue;}
       if(isLinkLike(p,{parentReal:real,stat:st})){skipped.push({path:p,reason:'link: never descend or move through it'});continue;}

@@ -7,7 +7,7 @@
 // Comment-level suppression (`eslint-disable`) is the lint rule `no-inline-suppression`'s (R18).
 import { found, readJson, readText } from './read.mjs';
 
-export const LINT_SUPPRESSION_FILE = 'HFS_LINT_SUPPRESSION_FILE';
+const LINT_SUPPRESSION_FILE = 'HFS_LINT_SUPPRESSION_FILE';
 const SUPPRESSION_FILE = /(?:^|\/)eslint[.-]suppressions[^/]*$/;
 const SUPPRESSION_SCRIPT_NAME = /(?:^|:)suppressions$/;
 const SUPPRESSION_FLAG = /--(?:suppressions-location|suppress-all|suppress-rule|prune-suppressions)\b/;

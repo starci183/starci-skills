@@ -15,7 +15,7 @@ import { isMain } from '../lib/is-main.mjs';
 import { loadRuleCatalog, loadSlotManifest } from './slots.mjs';
 import { REFERENCE_APP_MANIFEST } from '../lib/example-refs.mjs';
 
-export const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
+const PATTERN_DIRS = Object.freeze(['be', 'fe', 'repo']);
 export const WHY_FILES = Object.freeze([
   { file: 'packages/eslint/fe/lib/why.mjs', kind: 'eslint-fe' },
   { file: 'packages/stylelint/lib/why.mjs', kind: 'stylelint' },

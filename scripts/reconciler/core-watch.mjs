@@ -41,6 +41,7 @@ import { parseRuntimeStamp } from '../lib/orca-orphans.mjs';
 import { worktreePs } from '../api/orca/worktree-ps.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { sameResolvedPath } from '../lib/path-key.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HEARTBEAT_STALE_MS = 90_000;
@@ -206,7 +207,7 @@ function worktreesOf(repo) {
 
 /** The Orca ids of every live registry row (machine.sqlite worktrees, read only). */
 const registeredOrcaIds = () => new Set(readMachine((m) => m.db.prepare('SELECT orca_id FROM worktrees WHERE orca_id IS NOT NULL AND removed_at IS NULL').all().map((r) => r.orca_id), []));
-const sameDir = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
 
 /**
  * Worktree count and orphans per repository (the runtime and every active ledger's repo), from Orca's `worktree ps`
@@ -222,7 +223,7 @@ export function worktreeFacts(repos, { worktreeLimit = null, ps = worktreePs, re
   const ids = registered();
   for (const repo of repos) {
     const key = `worktrees:${path.basename(repo)}`;
-    const main = page.worktrees.find((w) => w.isMainWorktree && w.path && sameDir(w.path, repo));
+    const main = page.worktrees.find((w) => w.isMainWorktree && w.path && sameResolvedPath(w.path, repo));
     const list = main ? page.worktrees.filter((w) => w.repoId === main.repoId && w.hostId === main.hostId) : [];
     const gone = list.filter((w) => !exists(w.path)).map((w) => w.path);
     const unbound = list.filter((w) => !w.isMainWorktree && parseRuntimeStamp(w.comment) && !ids.has(w.id)).map((w) => w.path);

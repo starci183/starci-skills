@@ -19,12 +19,13 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { diffGraphs, frontierOf, validateGraph } from './work-graph-model.mjs';
 import { latestVersion, liveColors, recordVersion, versionOf, versionsOf } from './work-graph-store.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 import { workGraphContext } from './work-graph-context.mjs';
 
 const USAGE = 'use: node scripts/work/work-graph.mjs show|validate|diff|propose --repo <repo> --workflow <id> [...] [--json]';
 const VERBS = ['show', 'validate', 'diff', 'propose'];
 const VALUE_FLAGS = ['repo', 'workflow', 'version', 'file', 'from', 'to', 'job', 'reason', 'slice'];
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 
 export function parseArgs(argv) {
   const [verb, ...rest] = argv;
@@ -47,7 +48,7 @@ const readCandidate = (file) => {
 const contextFor = (repo, graph) => workGraphContext(repo, (graph?.domains ?? []).map((d) => d.id));
 
 /** The op's graphPolicy.workGraph permission, or null. */
-export function graphPermissionOf(op) {
+function graphPermissionOf(op) {
   try { return parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'))?.graphPolicy?.workGraph ?? null; }
   catch { return null; }
 }

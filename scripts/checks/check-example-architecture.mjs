@@ -31,7 +31,7 @@ export function exampleDirs(examplesDir, only) {
  * {name, status, errors, byCode} of one example: status is `clean`, `findings` or `unrunnable` (the CLI refused, printed no
  * report, or a tool of the lint could not run - a lint that did not run is never clean).
  */
-export function checkExample(examplesDir, name, { bin = HFS_BIN } = {}) {
+function checkExample(examplesDir, name, { bin = HFS_BIN } = {}) {
   const run = runNode([bin, 'lint', '--repo', path.join(examplesDir, name), '--format', 'json'], { maxBuffer: 256 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(run.stdout); } catch { report = null; }

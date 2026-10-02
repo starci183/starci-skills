@@ -58,9 +58,9 @@ export const DRAW_NOT_OWNER_ACCEPTED = 'DRAW_NOT_OWNER_ACCEPTED';
 export { DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING };
 export const DRAW_QUALITY_CODES = Object.freeze([SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED,
   ...DRAW_DNA_CODES, ...DRAW_TASTE_CODES, DRAW_LOOP_MISSING, DRAW_RATIONALE_MISSING]);
-export const SCORE_SCHEMA = 'starci/ui-proof-score@1';
+const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
-export const STATUS_BAND_MAX = 0.3;
+const STATUS_BAND_MAX = 0.3;
 const OWNER = 'owner';
 const shaOf = (file) => { try { return sha256File(file); } catch { return null; } };
 const PART_ROLES = new Set(['direction-content', 'direction']);
@@ -83,7 +83,7 @@ export function renderSourceOf(dir, rel) {
 }
 
 /** A real-component part: its render source is the rendered DOM and its `<part>.draw.tsx` sits beside it. */
-export const isComponentSource = (src) => /\.dom\.html$/i.test(String(src)) && isFile(String(src).replace(/\.dom\.html$/i, '.draw.tsx'));
+const isComponentSource = (src) => /\.dom\.html$/i.test(String(src)) && isFile(String(src).replace(/\.dom\.html$/i, '.draw.tsx'));
 /** The part stem of a render source (`<part>.html` or `<part>.dom.html` -> `<part>`). */
 const partStemOf = (src) => String(src).replace(/(?:\.dom)?\.html$/i, '');
 
@@ -97,7 +97,7 @@ export function visibleTextOf(html) {
 
 /** Internal-copy patterns: each {id, rx, why}. Owner ruling 2026-09-27 names the `source:` label (and its Vietnamese
  * form, lexicon drawCopy.sourceLabel), installation ids, kebab ids. */
-export const INTERNAL_COPY = Object.freeze([
+const INTERNAL_COPY = Object.freeze([
   { id: 'source-label', rx: new RegExp(`(^|\\s)(${altOf('drawCopy.sourceLabel')}|source)\\s*:`, 'giu'), why: 'a source label is provenance jargon, not product copy' },
   { id: 'internal-vocabulary', rx: new RegExp(`${altOf('drawCopy.internalVocabulary')}|current source|core system`, 'giu'), why: 'internal system vocabulary' },
   { id: 'record-id', rx: /\b(?:installation|instance|inst|ws|wf|op|job|ctx|req|evt)-[a-z0-9]+(?:-[a-z0-9]+)*\b/gi, why: 'a raw record id' },

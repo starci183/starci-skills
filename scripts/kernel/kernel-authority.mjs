@@ -22,6 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { refuse as refuseError } from '../../engine/refuse.mjs';
+import { splitList } from '../lib/list.mjs';
+import { normPath } from '../lib/path-key.mjs';
 import { SETTLED_JOB_STATUSES, enqueueJob, jobResult, newToken, recordJobResult, setJobStatus, updateJob } from '../../engine/db/ledger.mjs';
 import { operationNodeId } from './verbs/shared/agent-hierarchy.mjs';
 import { clipLine } from '../lib/clip.mjs';
@@ -39,11 +42,11 @@ export const OVERRIDE_KIND = 'kernel-op-override';
 export const PROPOSAL_KIND = 'kernel-proposal';
 export const PUSH_KIND = 'kernel-dispatch-push';
 const parse = (s, d = {}) => parseJsonOr(s, d) ?? d;
-const one = (s, n = 300) => clipLine(String(s ?? '').replace(/\s+/g, ' ').trim(), n);
-export const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
-export const csv = (v) => [...new Set(String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+const one = (s, n = 300) => clipLine(s, n);
+export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
+export const csv = (v) => splitList(v, { dedupe: true });
 export const newId = (prefix) => `${prefix}-${crypto.randomBytes(5).toString('hex')}`;
-const slash = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+const slash = (p) => normPath(p, { dot: true });
 
 /* ------------------------------------------------------------ the api, as a subprocess */
 

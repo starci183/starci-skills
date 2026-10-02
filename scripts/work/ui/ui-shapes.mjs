@@ -15,7 +15,7 @@ import { surfaceValues } from '../layout-tree.mjs';
 
 export const DATA_STATUS_DRAWN = 'DATA_STATUS_DRAWN';
 export const SHAPE_DUPLICATE = 'SHAPE_DUPLICATE';
-export const RETIRED_DATA_STATUS = 'data-status';
+const RETIRED_DATA_STATUS = 'data-status';
 export const DRAWING_ROLES = new Set(['direction', 'direction-content']);
 /** The tool that token-renders a drawing (scripts/work/draw-render.mjs); a ui record's drawings name it. */
 export const DRAW_TOOL = 'draw-render';
@@ -26,7 +26,7 @@ const schemaFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const defs = parseYaml(fs.readFileSync(schemaFile, 'utf8')).$defs;
 
 /** The canonical data statuses, in schema order. */
-export const DATA_STATUSES = Object.freeze([...defs.dataStatus.enum]);
+const DATA_STATUSES = Object.freeze([...defs.dataStatus.enum]);
 const SPELLINGS = new Map([...DATA_STATUSES.map((s) => [s, s]), ...Object.entries(defs.dataStatusAlias.const)]);
 const BY_LENGTH = [...SPELLINGS.keys()].sort((a, b) => b.length - a.length);
 

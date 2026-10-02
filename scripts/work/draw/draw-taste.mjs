@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
+import { ancestorsOf } from '../../lib/dom-tree.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { decodePng } from '../png.mjs';
 import { parseColor, parseCssCustomProperties } from '../brand/brand.mjs';
@@ -30,9 +31,9 @@ export const DRAW_TOO_MANY_BANDS = 'DRAW_TOO_MANY_BANDS';
 export const DRAW_TOO_MANY_BADGES = 'DRAW_TOO_MANY_BADGES';
 export const DRAW_TASTE_CODES = Object.freeze([DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS, DRAW_TOO_MANY_BADGES]);
 /** How close (OKLab deltaE x100) a pixel is to the accent to count as accent. */
-export const ACCENT_TOLERANCE = 8;
+const ACCENT_TOLERANCE = 8;
 /** The side of the solid block (device pixels) an accent pixel must belong to: fills count, strokes do not. */
-export const ACCENT_BLOCK = 5;
+const ACCENT_BLOCK = 5;
 /** The selector draw-render.mjs measures as the brand art band (exempt from the accent budget). */
 export const ACCENT_EXEMPT_SELECTOR = '[data-brand-art], [data-accent-exempt], [data-grammar-part="artwork-band"], [data-grammar-proposal*="Artwork"], [data-grammar-proposal*="artwork"]';
 
@@ -53,16 +54,15 @@ const BAND_CLASS = /(^|[-_])band($|[-_]|s$)/i;
 const BADGE_CLASS = /(^|[-_])(badge|chip|pill|status-pill)($|[-_]{2}|$)/i;
 const nameOf = (el) => String(el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 const partOf = (el) => String(el?.attrs?.[PART_ATTR] ?? '').trim();
-const up = (el) => { const out = []; for (let p = el.parent; p && p.tag !== '#root'; p = p.parent) out.push(p); return out; };
 /** A component root (not one of its own parts that repeats the component attribute). */
-const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && up(el).find((a) => nameOf(a)) && nameOf(up(el).find((a) => nameOf(a))) === nameOf(el));
+const rootOf = (el, names) => names.has(nameOf(el)) && !(partOf(el) && ancestorsOf(el).find((a) => nameOf(a)) && nameOf(ancestorsOf(el).find((a) => nameOf(a))) === nameOf(el));
 const isSeparator = (el) => nameOf(el) === 'Divider' || el.tag === 'hr' || /divider/.test(partOf(el)) || classesOf(el).some((c) => SEPARATOR_CLASS.test(c));
 const isBandMarked = (el) => /(^|-)band$/.test(partOf(el)) || classesOf(el).some((c) => BAND_CLASS.test(c) && !/(badge|brand)/i.test(c));
 const isBadge = (el) => ['Badge', 'StateMark'].includes(nameOf(el)) && !(partOf(el) && nameOf(el.parent ?? {}) === nameOf(el))
   || (!nameOf(el) && classesOf(el).some((c) => BADGE_CLASS.test(c) && !/(dot|icon|label|text)$/i.test(c)));
 
 /** The bands of one card: separators + 1 when it has hairlines, else its children marked band, else 1. */
-export function bandsOfCard(card) {
+function bandsOfCard(card) {
   let level = elementsOf(card).filter(visibleElement);
   // Unwrap single content wrappers (surface-content, a lone div) to reach the band level.
   while (level.length === 1 && !isBandMarked(level[0]) && !isSeparator(level[0]) && elementsOf(level[0]).length) level = elementsOf(level[0]).filter(visibleElement);
@@ -72,10 +72,10 @@ export function bandsOfCard(card) {
 }
 
 const isEntity = (el) => rootOf(el, CARDS) || nameOf(el) === 'StaticStateRow' || ENTITY_PARTS.test(partOf(el))
-  || ((el.tag === 'li' || el.tag === 'tr') && up(el).some((a) => CARDS.has(nameOf(a)) || nameOf(a) === 'DataTable'));
+  || ((el.tag === 'li' || el.tag === 'tr') && ancestorsOf(el).some((a) => CARDS.has(nameOf(a)) || nameOf(a) === 'DataTable'));
 
 /** The badges an entity carries itself (a nested entity's badges are its own). */
-export function badgesOfEntity(entity) {
+function badgesOfEntity(entity) {
   let n = 0;
   const visit = (el) => {
     for (const c of elementsOf(el)) {
@@ -181,7 +181,7 @@ export function accentShareOf(img, accent, { exempt = [], tolerance = ACCENT_TOL
 }
 
 /** The accent-exempt rects of a part in image pixels, from its draw-render record (layout.accentExempt, CSS px). */
-export function exemptRectsOf(record) {
+function exemptRectsOf(record) {
   const dpr = Number(record?.viewport?.deviceScaleFactor ?? 1) || 1;
   return (Array.isArray(record?.layout?.accentExempt) ? record.layout.accentExempt : [])
     .map((r) => ({ x: r.x * dpr, y: r.y * dpr, width: r.width * dpr, height: r.height * dpr }))
@@ -189,7 +189,7 @@ export function exemptRectsOf(record) {
 }
 
 /** The draw-render record beside a part PNG (same stem .json, schema starci/draw-render@1), or null. */
-export function renderRecordOf(png) {
+function renderRecordOf(png) {
   try {
     const doc = JSON.parse(fs.readFileSync(png.replace(/\.png$/i, '.json'), 'utf8'));
     return doc?.schema === 'starci/draw-render@1' ? doc : null;

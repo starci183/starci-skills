@@ -85,7 +85,7 @@ export const APP_SIDES = Object.freeze(['be', 'fe']);
  * and every finding use. Refused: a `repository:<id>/` prefix, an absolute or ../ path, and a side-relative path (src/x
  * where be/src/x exists): OWNER_PATH_NOT_APP_RELATIVE.
  */
-export function ownerPathProblem(rawPath, appRoot) {
+function ownerPathProblem(rawPath, appRoot) {
   const rel = String(rawPath).replaceAll('\\', '/');
   const hint = 'an owner path is app-relative: be/<path>, fe/<path> or a directory of the app root';
   if (/^repository:/.test(rel)) return `${rawPath} names a repository; ${hint}`;
@@ -142,6 +142,26 @@ export function resolveOwnedDirs(id, record, recordsById, workspaceDoc, workRoot
 
 export function missingOwnedDirs(dirs) {
   return dirs.filter(d => !fs.existsSync(d.abs));
+}
+
+/**
+ * The owned paths a record list resolves to under a `.starciwork` tree (`workRoot`, absolute): one entry per
+ * directory resolveOwnedDirs returns - {record, path (forward slashes), via, exists} plus `abs` when `withAbs` -
+ * and `missing`, the record ids nothing answered. `walk` lists a directory's files for the loadRecords scan.
+ */
+export function ownedRecordPaths(records, workRoot, { walk, withAbs = false } = {}) {
+  const recordsById = loadRecords(workRoot, walk);
+  const workspaceDoc = readWorkspace(workRoot);
+  const ownedPaths = [];
+  const missing = [];
+  for (const rid of records) {
+    const rec = recordsById.get(rid);
+    if (!rec) { missing.push(rid); continue; }
+    for (const d of resolveOwnedDirs(rid, rec, recordsById, workspaceDoc, workRoot)) {
+      ownedPaths.push({ record: rid, path: d.rel.replaceAll('\\', '/'), via: d.via, exists: fs.existsSync(d.abs), ...(withAbs ? { abs: d.abs } : {}) });
+    }
+  }
+  return { ownedPaths, missing };
 }
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next']);

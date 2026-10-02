@@ -28,8 +28,10 @@ import { runNode } from '../api/node/run-node.mjs';
 import { execNode } from '../api/node/exec-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
+import { refuse as refuseError } from '../../engine/refuse.mjs';
 import { kernelDecisionItems } from './reported-jobs.mjs';
 import { appendEvent, openDecisionItem, recordDecision, updateDecisionItem } from '../../engine/db/ledger.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { oneLine } from '../lib/clip.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -40,27 +42,27 @@ export const DI_KINDS = Object.freeze(['settle-nongreen', 'worker-question', 'ch
   'stale-gate', 'stale-wait', 'unread-peer', 'orphaned-frontier', 'rev-ack', 'supervisor-ruling', 'cross-workflow', 'deadlock',
   'runtime-defect', 'kernel-proposal', 'seat-unrecoverable', 'service-quarantined', 'quota-exhausted', 'experiment-revert',
   'push-refused', 'retry-decision', 'dispatch-refused', 'cap-starved', 'hypothesis', 'rebase-conflict']);
-export const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
+const DECIDERS = Object.freeze(['kernel', 'supervisor', 'owner']);
 /**
  * Kinds the Supervisor decides unless the opener names another decider (DESIGN §6.4 escalation column: resource,
  * host, workers and learning controllers open these for the Supervisor). `cap-starved` is resource policy (lane
  * rc-gc-resource's Resource controller), next to `quota-exhausted`.
  */
-export const SUPERVISOR_KINDS = Object.freeze(['cap-starved', 'quota-exhausted', 'runtime-defect', 'cross-workflow', 'deadlock',
+const SUPERVISOR_KINDS = Object.freeze(['cap-starved', 'quota-exhausted', 'runtime-defect', 'cross-workflow', 'deadlock',
   'seat-unrecoverable', 'service-quarantined', 'experiment-revert', 'hypothesis', 'push-refused', 'kernel-proposal']);
-export const defaultDeciderOf = (kind) => (SUPERVISOR_KINDS.includes(kind) ? 'supervisor' : 'kernel');
+const defaultDeciderOf = (kind) => (SUPERVISOR_KINDS.includes(kind) ? 'supervisor' : 'kernel');
 /** Kinds the Supervisor may claim from a Kernel without an escalation (DESIGN §11.3 rule 1). */
-export const CROSS_WORKFLOW_KINDS = Object.freeze(['cross-workflow', 'deadlock']);
+const CROSS_WORKFLOW_KINDS = Object.freeze(['cross-workflow', 'deadlock']);
 export const LIVE = Object.freeze(['open', 'claimed', 'escalated']);
 export const CLAIM_TTL_MS = 15 * 60_000;
 export const DEFAULT_DUE_MS = Object.freeze({ kernel: 30 * 60_000, supervisor: 60 * 60_000, owner: 24 * 3_600_000 });
 export const RING_MIN_GAP_MS = 2 * 60_000;
-export const RING_TAG = '[decide]';
+const RING_TAG = '[decide]';
 const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFrom'];
 
-const one = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-export const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
-export const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(`${workflowId}\0${key}`).digest('hex').slice(0, 8)}`;
+const one = (s, n = 300) => oneLine(s, n);
+export const refuse = (message, code, extra = {}) => refuseError(message, code, extra);
+const diIdOf = (workflowId, key) => `di-${crypto.createHash('sha256').update(`${workflowId}\0${key}`).digest('hex').slice(0, 8)}`;
 const isSupervisorActor = (by) => /^supervisor\b/i.test(String(by ?? ''));
 
 /* ------------------------------------------------------------ the store: runtime.sqlite decision_items */
@@ -216,13 +218,13 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
  * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:my-app:'
  * with an empty head merged 73 later refusals into the first DI). Throws decision-key-invalid.
  */
-export function checkKey(key) {
+function checkKey(key) {
   const k = String(key ?? '');
   if (k.length < 5 || k.split(':').some((part) => !part.trim())) throw refuse(`decision key '${k}' has an empty component`, 'decision-key-invalid');
   return k;
 }
 /** The key's named components ({kind, repo, signature, head, ...}): each a non-empty string. Throws decision-key-invalid. */
-export function checkKeyParts(parts) {
+function checkKeyParts(parts) {
   if (!parts || typeof parts !== 'object' || Array.isArray(parts)) throw refuse('keyParts must be an object', 'decision-key-invalid');
   const empty = Object.entries(parts).filter(([, v]) => !String(v ?? '').trim()).map(([k]) => k);
   if (empty.length || !Object.keys(parts).length) throw refuse(`decision keyParts has empty component(s): ${empty.join(', ') || 'none given'}`, 'decision-key-invalid');
@@ -257,7 +259,7 @@ export function claimDecision(ledger, id, { by, now = Date.now(), prefix = 'deci
 }
 
 /** The verb's first word must be one of the DI's allowedVerbs (their first words) when it lists any. */
-export const verbAllowed = (di, verb) => {
+const verbAllowed = (di, verb) => {
   const allowed = (di.allowedVerbs ?? []).map((v) => String(v).trim().replace(/^api\s+/, '').split(/\s+/)[0]).filter(Boolean);
   const head = String(verb ?? '').trim().replace(/^api\s+/, '').split(/\s+/)[0];
   return !allowed.length || allowed.includes(head);
@@ -301,7 +303,7 @@ export function escalateDecision(ledger, id, { to = 'supervisor', by = 'unknown'
 
 /** A Kernel DI blocks new work once it is this old, open and unclaimed (coordinator 2026-09-28, fe-canon). */
 export const BLOCK_AGE_MS = 2 * 60_000;
-export const DECISIONS_FIRST = 'decisions-first';
+const DECISIONS_FIRST = 'decisions-first';
 /** Kinds whose entity is a reported job: live only while the settler still hands that job to the Kernel. */
 const JOB_KINDS = ['settle-nongreen', 'checks-needed', 'retry-decision'];
 /** The env mark apiRun (kernel-authority.mjs) sets on its children: graph-edit / redesign resolve DIs through them. */
@@ -418,7 +420,7 @@ export function refuseDecisionsFirst(db, workflowId, verb, { now = Date.now(), r
 const argValue = (flag, argv = process.argv) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
 
 /** --resolves <id> from this process's argv (route/dispatch/enqueue parse it in cli.mjs; the guard reads it here). */
-export function resolvesArg(argv = process.argv) { const i = argv.indexOf('--resolves'); return i >= 0 ? argv[i + 1] ?? null : null; }
+function resolvesArg(argv = process.argv) { const i = argv.indexOf('--resolves'); return i >= 0 ? argv[i + 1] ?? null : null; }
 
 /**
  * Close what no longer needs the Kernel: a supervisor-ruling opened before the Kernel's latest runtime-rev ack (a
@@ -467,19 +469,11 @@ export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.no
 
 /* ------------------------------------------------------------ the verb as a child (controllers, notify.mjs) */
 
-/** Run `api decisions <argv>` against `repo`: {ok, json, status, err}. `env.STARCI_ACTOR` names the opener. */
-export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
-  const r = runNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env });
-  let json = null;
-  for (const text of [r.stdout, String(r.stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
-  return { ok: r.status === 0 && json?.ok !== false, status: r.status, json, err: String(r.stderr ?? '').slice(0, 1000) };
-}
-
 /**
  * runDecisionsVerb without blocking the calling thread: the reconciler engine has one thread, and a spawnSync of up to
  * timeoutMs there stops every timer (the lease and the heartbeat) for that long (ENGINE-STALL).
  */
-export function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
+function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
   return execNode([API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }).then(({ error, stdout, stderr }) => {
     const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
     let json = null;
@@ -515,7 +509,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 /* ------------------------------------------------------------ the doorbell */
 
-export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: api decisions --workflow ${workflowId}`,
+const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: api decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
     `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
@@ -668,9 +662,9 @@ const liveSupOrRefuse = (m, id, now) => {
 };
 
 /** Open a Supervisor DI in machine.sqlite (sup_decision_items). Returns {di, created, existing, superseded}. */
-export const openSupervisorDecision = (spec, { env = process.env, now = Date.now() } = {}) => withSup((m) => openSupDecisionRow(m, spec, { now }), { env, now });
+const openSupervisorDecision = (spec, { env = process.env, now = Date.now() } = {}) => withSup((m) => openSupDecisionRow(m, spec, { now }), { env, now });
 export const listSupervisorDecisions = ({ env = process.env, all = false, now = Date.now() } = {}) => withSup((m) => supervisorDecisions(m, { all, now }), { env, now });
-export const claimSupervisorDecision = (id, { by, env = process.env, now = Date.now() } = {}) => withSup((m) => {
+const claimSupervisorDecision = (id, { by, env = process.env, now = Date.now() } = {}) => withSup((m) => {
   if (!String(by ?? '').trim()) throw refuse('--claim needs --by <actor>', 'decision-incomplete');
   return m.transaction(() => {
     const di = liveSupOrRefuse(m, id, now);
@@ -681,7 +675,7 @@ export const claimSupervisorDecision = (id, { by, env = process.env, now = Date.
     return effective(supDiOf(supRow(m, id)), now);
   });
 }, { env, now });
-export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, note = null, env = process.env, now = Date.now() } = {}) => withSup((m) => {
+const resolveSupervisorDecision = (id, { by, verb, decisionId = null, note = null, env = process.env, now = Date.now() } = {}) => withSup((m) => {
   if (!String(by ?? '').trim() || !String(verb ?? '').trim()) throw refuse('--resolve needs --by <actor> and --verb <what you ran>', 'decision-incomplete');
   return m.transaction(() => {
     const di = liveSupOrRefuse(m, id, now);
@@ -692,9 +686,9 @@ export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, not
   });
 }, { env, now });
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: node scripts/machine/decisions.mjs supervisor --list`;
+const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: node scripts/machine/decisions.mjs supervisor --list`;
 /** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
-export const SUP_RING_KIND = 'supervisor-ring';
+const SUP_RING_KIND = 'supervisor-ring';
 
 /**
  * Ring the Supervisor seat (the scripts/supervisor/supervisor-watchdog.mjs wake path: wake-delivery.mjs wakeKernel over the seat's

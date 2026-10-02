@@ -34,12 +34,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { argsOf } from '../connectors/lib.mjs';
-import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { botCall, DEFAULT_API_BASE, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
+import { redact } from '../connectors/telegram-polite.mjs';
 import {
   ensureTelegramBridge, getSupervisor, heartbeatSupervisor, registerSupervisor,
 } from './telegram-bridge.mjs';
 import { appendOutbox, readInbox, takeInbox, validSupervisorId } from '../machine/sup-messages.mjs';
 import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from '../machine/home.mjs';
+import { isSpecRun, readEnv } from '../lib/env.mjs';
 
 export const WAIT_TIMEOUT_EXIT = 124;
 
@@ -79,7 +81,7 @@ export async function replyToOwner({ id, text, to = null }, {
       return { ok: true, via, parts: 0, replyTo: null };
     }
     if (!s?.ready) return { ok: false, error: s?.warning ?? 'telegram is off (connectors.telegram)' };
-    if (env.NODE_TEST_CONTEXT && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: false, error: 'test context: refusing the real Bot API' };
+    if (isSpecRun(env) && apiBase === DEFAULT_API_BASE && fetchImpl === globalThis.fetch) return { ok: false, error: 'test context: refusing the real Bot API' };
     if (!String(text ?? '').trim()) return { ok: false, error: 'empty reply' };
     const sup = getSupervisor(id, env);
     const label = sup?.label || id;
@@ -109,7 +111,7 @@ export async function replyToOwner({ id, text, to = null }, {
 }
 
 /** The chat session a desktop chat registers and drains as (Claude Code sets CLAUDE_CODE_SESSION_ID), or null. */
-export const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID ?? '').trim() || null;
+const chatSessionOf = (env = process.env) => String(env?.CLAUDE_CODE_SESSION_ID ?? '').trim() || null;
 
 /**
  * Why a registration of `id` from `terminal` is refused, or null. The owner's channel 'main' belongs to the
@@ -217,7 +219,7 @@ async function main() {
   if (verb === 'register') {
     if (typeof args.label !== 'string' || !args.label.trim()) return fail('register needs --label <text>');
     const repos = typeof args.repos === 'string' ? args.repos.split(',').map((r) => r.trim()).filter(Boolean) : [];
-    const terminal = process.env.ORCA_TERMINAL_HANDLE || null;
+    const terminal = readEnv('ORCA_TERMINAL_HANDLE') || null;
     const refused = registrationRefusal({ id, terminal, force: args.force === true });
     if (refused) return fail(refused, 1);
     // A chat registration (no Orca terminal) records its chat session: drainRefusal lets only that session drain 'main'.
@@ -233,7 +235,7 @@ async function main() {
   if (verb === 'inbox') {
     const peek = args.peek === true;
     if (!peek) {
-      const refused = drainRefusal({ id, terminal: process.env.ORCA_TERMINAL_HANDLE || null });
+      const refused = drainRefusal({ id, terminal: readEnv('ORCA_TERMINAL_HANDLE') || null });
       if (refused) return fail(refused, 1);
     }
     const items = takeInbox(id, { peek });

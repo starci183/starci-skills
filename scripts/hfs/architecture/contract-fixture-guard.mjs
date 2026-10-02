@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { treeOf } from './required-files.mjs';
+import { checkerScope } from './required-files.mjs';
 import { allowsFile } from '../allows.mjs';
+import { unwrapEach } from './ast-walks.mjs';
 
 /**
  * R47 `contract-fixture-guard` (BE_CONTRACT_UNGUARDED). A fake at the network edge serves payload fixtures; a fixture drifts
@@ -28,11 +29,7 @@ const FAKES_DIRECTORY = 'fakes/';
 const PAYLOADS = /^([^/]+)\/payloads\/[^/]+\.json$/u;
 const SHAPE_MATCHERS = new Set(['toEqual', 'toStrictEqual']);
 
-const unwrap = (ts, node) => {
-  let current = node;
-  while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isNonNullExpression(current) || ts.isAwaitExpression(current))) current = current.expression;
-  return current;
-};
+const unwrap = (ts, node) => unwrapEach(ts, node, [ts.isParenthesizedExpression, ts.isAsExpression, ts.isNonNullExpression, ts.isAwaitExpression]);
 
 /** Every node under `root`, itself included. */
 function walk(ts, root, visit) {
@@ -79,11 +76,8 @@ function readSpec(ts, sourceFile, helper, providers) {
 }
 
 export function checkContractFixtureGuard(input) {
-  const { config, graph, context } = input;
-  const ts = context.ts;
-  const resolver = graph.resolver;
+  const { config, graph, ts, resolver, tree } = checkerScope(input);
   const { contractShape } = resolver.ruleParams();
-  const tree = treeOf(config.root);
   const violations = [];
   const fixtures = new Map(); // provider -> first payload fixture file
   const specs = new Map(); // provider -> [contract spec file]

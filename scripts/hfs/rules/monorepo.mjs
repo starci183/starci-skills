@@ -13,13 +13,13 @@ import fs from 'node:fs';
 import { isBuiltin } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findPackage, requirePackage } from '../../lib/package-at.mjs';
+import { loadTypescript } from '../../lib/package-at.mjs';
 import { found, readJson, readText } from './read.mjs';
 
-export const MONO_WORKSPACES = 'HFS_MONO_WORKSPACES';
-export const MONO_FE_WORKSPACE = 'HFS_MONO_FE_WORKSPACE';
-export const MONO_NEST_PROJECTS = 'HFS_MONO_NEST_PROJECTS';
-export const MONO_WORKSPACE_DEP = 'HFS_MONO_WORKSPACE_DEP';
+const MONO_WORKSPACES = 'HFS_MONO_WORKSPACES';
+const MONO_FE_WORKSPACE = 'HFS_MONO_FE_WORKSPACE';
+const MONO_NEST_PROJECTS = 'HFS_MONO_NEST_PROJECTS';
+const MONO_WORKSPACE_DEP = 'HFS_MONO_WORKSPACE_DEP';
 
 /** The npm workspaces of every app, in this order. */
 export const WORKSPACES = Object.freeze(['fe/apps/*', 'fe/packages/*']);
@@ -28,7 +28,7 @@ export const WORKSPACE_LINT = 'hfs lint --workspace .';
 /** The scripts of every fe app workspace, exactly: turbo runs build, dev, lint and typecheck; start serves a build. */
 export const FE_APP_SCRIPTS = Object.freeze({ build: 'next build', dev: 'next dev', lint: WORKSPACE_LINT, start: 'next start', typecheck: 'tsc --noEmit' });
 /** The scripts every fe package workspace has (its build and typecheck commands are its own; its lint is the workspace lint). */
-export const FE_PACKAGE_SCRIPTS = Object.freeze(['build', 'typecheck', 'lint']);
+const FE_PACKAGE_SCRIPTS = Object.freeze(['build', 'typecheck', 'lint']);
 /** The package manager every app root declares (turbo reads it to parse the lockfile); the hfs scaffold writes it. */
 export const PACKAGE_MANAGER = 'npm@11.6.2';
 /** The npm name of an fe app workspace. */
@@ -111,10 +111,7 @@ function nestFindings(repoRoot, files, beApps) {
 }
 
 /** The TypeScript compiler of the app (else of the runtime), or null. */
-function typescriptFor(repoRoot) {
-  const located = findPackage([repoRoot, HERE], ['typescript']);
-  return located ? requirePackage(located) : null;
-}
+const typescriptFor = (repoRoot) => loadTypescript(repoRoot, HERE);
 
 /** The path-alias patterns of a workspace (its tsconfig.json as TypeScript resolves it, `extends` included): [{ prefix, exact }]. */
 function aliasesOf(ts, dir) {

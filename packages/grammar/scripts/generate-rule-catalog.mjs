@@ -23,13 +23,14 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { readEnv } from '../../../scripts/lib/env.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(here, "..")
 
 /** The knowledge tree of the checkout this package sits in (<checkout root>/knowledge). */
 const DEFAULT_KNOWLEDGE_DIR = resolve(packageRoot, "../../knowledge")
-const knowledgeDir = resolve(process.argv[2] ?? process.env.STARCI_KNOWLEDGE_DIR ?? DEFAULT_KNOWLEDGE_DIR)
+const knowledgeDir = resolve(process.argv[2] ?? readEnv('STARCI_KNOWLEDGE_DIR') ?? DEFAULT_KNOWLEDGE_DIR)
 
 /** Directories whose topic files each publish one rule family. */
 const FAMILY_DIRECTORIES = [

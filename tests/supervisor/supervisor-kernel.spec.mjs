@@ -960,7 +960,8 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
 });
 
 test('the push scan reads a diff file in chunks and keeps line numbers across chunk seams', async () => {
-  const { diffScanner, forEachFileLine } = await import('../../scripts/supervisor/push-mains.mjs');
+  const { diffScanner } = await import('../../scripts/supervisor/push-mains.mjs');
+  const { forEachFileLine } = await import('../../scripts/lib/read-text.mjs');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'push-scan-spec-'));
   try {
     const file = path.join(dir, 'range.diff');

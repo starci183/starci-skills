@@ -8,6 +8,7 @@ import { isMeasurementLeg } from '../verify-failure.mjs';
 import { classifyCheck, rerunCheck, settlerSettings } from '../settle/job-settle.mjs';
 import { checkVerdictOf } from '../settle/check-verdict.mjs';
 import { latestAttemptIdOf, recordEnvelopeChecks } from './shared/check-evidence.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 export default {
   verb: 'check',
@@ -43,7 +44,7 @@ export default {
   // H8: a verdict reads only the RAW exit a runtime runner observed. The settler passes what it re-ran itself; any
   // other caller's check whose command the runtime can re-run IS re-run here, its declared exit kept as evidence; a
   // command the runtime cannot re-run is recorded authority 'declared': its red counts, its green never does.
-  const settler = process.env.STARCI_CALLER === 'runtime-settler';
+  const settler = readEnv('STARCI_CALLER') === 'runtime-settler';
   if (!settler) {
     const { rerunTimeoutMs } = settlerSettings();
     parsed.checks = parsed.checks.map((check) => {

@@ -115,7 +115,7 @@ const detemplate = (token) => token.replace(/^\.claude\//, '');
 
 const citeFilesUnder = (dir) => walkFiles(dir, {sorted: true, filter: name => CITE_EXT.test(name), exclude: name => name === 'node_modules'});
 
-export function collectScanFiles(root, scan = DEFAULT_SCAN) {
+function collectScanFiles(root, scan = DEFAULT_SCAN) {
   const files = [];
   for (const rel of scan) {
     const full = path.join(root, rel);

@@ -19,6 +19,7 @@ import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { isFixtureLedgerPath, machineLedgerFiles } from '../machine/ledger-files.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { normPath, pathsOverlap } from '../lib/path-key.mjs';
 
 const require = createRequire(import.meta.url);
 const HOUR_MS = 3600000;
@@ -66,8 +67,8 @@ export function recentDispatchCounts({ db = null, ledgerFile = null, windowHours
 }
 
 const pathOf = (entry) => (typeof entry === 'string' ? entry : entry?.path ?? null);
-const trimGlob = (p) => String(p).replace(/\\/g, '/').replace(/\/?\*+$/, '').replace(/\/+$/, '');
-const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+const trimGlob = (p) => normPath(p, { glob: 'star' });
+const overlaps = pathsOverlap;
 
 /**
  * The author an audit reviews: the latest succeeded op job of the same workflow, created before the auditor,

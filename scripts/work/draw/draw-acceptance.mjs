@@ -53,13 +53,13 @@ export { DATA_STATUS_DRAWN };
 /** The contract change that made the draw acceptance judge every bound asset (modules/kernel/contract-changes/). */
 export const DRAW_ACCEPTANCE_CHANGE = 'draw-adopt-gate';
 export const RENDER_RECORD_SCHEMA = 'starci/draw-render@1';
-export const IMAGEGEN_ASSERTION = 'imagegen-provenance';
+const IMAGEGEN_ASSERTION = 'imagegen-provenance';
 /** The `retired` reason of a drawing image_gen.imagegen painted before token rendering (work-ui-screen.schema.yaml). */
-export const RETIRED_IMAGE_GEN = 'image-gen';
+const RETIRED_IMAGE_GEN = 'image-gen';
 
 const IMAGE = /\.(png|jpe?g|webp)$/i;
 /** Asset roles draw-loop finish binds beside a drawing that are not drawings themselves. */
-export const EVIDENCE_ROLES = new Set(['direction-redline', 'render-asset']);
+const EVIDENCE_ROLES = new Set(['direction-redline', 'render-asset']);
 const UI_SCHEMA = 'work/ui-screen@1';
 const readDoc = (file) => {
   try {
@@ -72,7 +72,7 @@ const shaOf = (file) => { try { return sha256File(file); } catch { return null; 
 const inAssets = (rel) => /(^|\/)assets\//.test(rel);
 
 /** The ui record directory a file belongs to: the nearest ancestor (or itself) holding a work/ui-screen@1 index.yaml under .starciwork. */
-export function uiRecordDirOf(abs) {
+function uiRecordDirOf(abs) {
   let dir = isDir(abs) ? abs : path.dirname(abs);
   for (let hop = 0; hop < 8; hop += 1) {
     if (!slash(dir).includes('/.starciwork/')) return null;

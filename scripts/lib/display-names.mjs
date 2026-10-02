@@ -12,18 +12,18 @@
 // the supervisor digest and progress report, Telegram notices and the harness UI.
 import fs from 'node:fs';
 import path from 'node:path';
-import { clipLine } from './clip.mjs';
+import { clipLine, squash } from './clip.mjs';
 import { ownerLanguage, translator } from './i18n.mjs';
 import { list } from './list.mjs';
 import { parseJson } from './json.mjs';
 import { readYamlFile } from './read-yaml.mjs';
-import { collapse as oneLine } from './terminal-liveness.mjs';
+import { normRel, pathsOverlap } from './path-key.mjs';
 import { PRODUCT_NAME_SEGMENT } from './example-refs.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
-export const DISPLAY_NAME_LIMIT = 80;
+const DISPLAY_NAME_LIMIT = 80;
 export const JOB_WHAT_MAX = 40;
-export const NAME_SEPARATOR = ' · ';
+const NAME_SEPARATOR = ' · ';
 
 const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
 let labelsCache = null;
@@ -44,8 +44,8 @@ export function opLabel(op, language = ownerLanguage()) {
 
 /** One line, whitespace collapsed; '' for nothing. */
 /** `text` cut at a word boundary to at most `max` characters, ending in an ellipsis when cut. */
-export function clipWords(text, max) {
-  const s = oneLine(text);
+function clipWords(text, max) {
+  const s = squash(text);
   if (s.length <= max) return s;
   const room = s.slice(0, max - 1);
   const at = room.lastIndexOf(' ');
@@ -57,7 +57,7 @@ export function clipWords(text, max) {
  * {code: 'rename-bad-title'} otherwise.
  */
 export function normalizeDisplayName(name) {
-  const s = oneLine(name);
+  const s = squash(name);
   if (!s) throw Object.assign(new Error('the display name is empty'), { code: 'rename-bad-title' });
   if (s.length > DISPLAY_NAME_LIMIT) throw Object.assign(new Error(`the display name is ${s.length} characters; at most ${DISPLAY_NAME_LIMIT}`), { code: 'rename-bad-title' });
   return s;
@@ -66,7 +66,7 @@ export function normalizeDisplayName(name) {
 /** A workflows row's name: display_name, else the goal slug (title), else the workflow id. */
 export function workflowDisplayName(row) {
   if (!row) return null;
-  return oneLine(row.display_name) || oneLine(row.title) || row.workflow_id || null;
+  return squash(row.display_name) || squash(row.title) || row.workflow_id || null;
 }
 /** The name of one workflow of `db` (its id when the row is missing). */
 export function workflowNameOf(db, workflowId) {
@@ -74,27 +74,32 @@ export function workflowNameOf(db, workflowId) {
   try { return workflowDisplayName(db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId)) ?? workflowId; }
   catch { return workflowId; }
 }
-/** workflow_id -> name for every workflow of `db`. */
-export function workflowNames(db) {
-  try { return new Map(db.prepare('SELECT * FROM workflows').all().map((row) => [row.workflow_id, workflowDisplayName(row)])); }
-  catch { return new Map(); }
+/** workflow_id -> name for every workflow of `db` (`displayOnly` keeps only rows with a display_name). */
+export function workflowNames(db, { displayOnly = false } = {}) {
+  try {
+    const rows = db.prepare('SELECT * FROM workflows').all().filter((row) => !displayOnly || row.display_name);
+    return new Map(rows.map((row) => [row.workflow_id, displayOnly ? row.display_name : workflowDisplayName(row)]));
+  } catch { return new Map(); }
 }
 /** `Name (id)` for a line that must still carry the key, or the id alone when there is no other name. */
 export const nameWithId = (name, id) => (name && name !== id ? `${name} (${id})` : String(id ?? name ?? ''));
+
+/** The name of an attached file record ({name?, abs}): its declared name, else its basename, forward-slashed. */
+export const attachedNameOf = (file) => String(file.name ?? path.basename(String(file.abs ?? ''))).replace(/\\/g, '/');
 
 // ---------------------------------------------------------------------------------- workflow names
 const BRAND_CASE = { starci: 'StarCi' };
 const REPO_ROLE_SUFFIX = /[-_](backend|be|frontend|fe|api|server|web|app)$/i;
 /** The product's display word(s) from a project or repository name: `shop-be` -> `Shop`. */
 export function productName(raw) {
-  const base = oneLine(raw).replace(REPO_ROLE_SUFFIX, '');
+  const base = squash(raw).replace(REPO_ROLE_SUFFIX, '');
   if (!base) return '';
   return base.split(/[-_\s]+/).filter(Boolean)
     .map((w) => BRAND_CASE[w.toLowerCase()] ?? (w.length <= 3 && /^[a-z]+$/i.test(w) && w === w.toUpperCase() ? w : `${w[0].toUpperCase()}${w.slice(1)}`)).join(' ');
 }
 /** The first clause of the owner's goal text: up to the first sentence end, line break, colon or dash aside. */
-export function firstClause(text) {
-  const s = String(text ?? '').split(/\r?\n/).map(oneLine).find(Boolean) ?? '';
+function firstClause(text) {
+  const s = String(text ?? '').split(/\r?\n/).map(squash).find(Boolean) ?? '';
   const clause = s.split(/(?<=[.!?;:])\s|\s[—–-]\s|\s\(/)[0] ?? '';
   return clause.replace(/[\s.!?;:,]+$/, '').trim();
 }
@@ -105,7 +110,7 @@ export function firstClause(text) {
 export function deriveWorkflowDisplayName({ text, product = null, fallback = null, max = WORKFLOW_NAME_MAX } = {}) {
   const prod = productName(product);
   // The product leads the name already: a goal text that opens with it ("<product>: …") starts after it.
-  let body = oneLine(text);
+  let body = squash(text);
   if (prod && body.toLowerCase().startsWith(prod.toLowerCase())) body = body.slice(prod.length).replace(/^[\s:·,–—-]+/, '');
   const clause = firstClause(body);
   const head = prod ? `${prod}${NAME_SEPARATOR}` : '';
@@ -115,13 +120,13 @@ export function deriveWorkflowDisplayName({ text, product = null, fallback = nul
 }
 
 // ------------------------------------------------------------------------------------ op job names
-const keyOf = (p) => String(typeof p === 'string' ? p : p?.path ?? '').replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/\*\*$/, '').replace(/\/+$/, '').toLowerCase();
+const keyOf = (p) => normRel(p, { fold: true });
 // A path this broad names no target in particular (the whole Work tree, every feature).
 const BROAD = /^(\.starciwork|\.starciwork\/index\.yaml|\.starciwork\/features|\.starciwork\/features\/index\.yaml|src|apps|packages)?$/;
-const meets = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+const meets = pathsOverlap;
 
 /** The work-graph node the job covers most specifically (its longest owned path that meets the job's). */
-export function coveredNode(nodes, paths) {
+function coveredNode(nodes, paths) {
   const keys = paths.map(keyOf).filter((k) => k && !BROAD.test(k));
   let best = null, bestLen = -1;
   for (const node of list(nodes)) {
@@ -134,7 +139,7 @@ export function coveredNode(nodes, paths) {
 
 const titleCache = new Map();
 /** The `title:` of the Work record at `<repo>/<p>` (a record folder or its index.yaml), else null. */
-export function recordTitle(repo, p) {
+function recordTitle(repo, p) {
   if (!repo || !p) return null;
   const rel = String(p).replaceAll('\\', '/').replace(/\/+$/, '');
   if (!rel.startsWith('.starciwork/') || BROAD.test(rel.toLowerCase())) return null;
@@ -155,7 +160,7 @@ export function recordTitle(repo, p) {
       const end = below.findIndex((l) => !/^\s+\S/.test(l));
       value = (end < 0 ? below : below.slice(0, end)).join(' ');
     }
-    title = oneLine(value.replace(/^(['"])(.*)\1$/, '$2')) || null;
+    title = squash(value.replace(/^(['"])(.*)\1$/, '$2')) || null;
   } catch { title = null; }
   if (titleCache.size > 2000) titleCache.clear();
   titleCache.set(file, { mtime, title });
@@ -199,15 +204,15 @@ export function jobWhat({ payload, op = null, nodes = null, repo = null, max = J
   const owned = list(p.owned_paths ?? p.ownedPaths).map((x) => (typeof x === 'string' ? x : x?.path)).filter(Boolean);
   const records = list(p.records).filter((x) => typeof x === 'string');
   const cut = p.cut && typeof p.cut === 'object' ? p.cut : null;
-  const title = oneLine(p.title);
+  const title = squash(p.title);
   const opId = String(op ?? p.opId ?? '');
   const rest = opId && title.toLowerCase().startsWith(opId.toLowerCase()) ? title.slice(opId.length).replace(/^[\s:#·–—-]+/, '') : null;
   const specific = [...owned, ...records].filter((x) => !BROAD.test(keyOf(x)));
   // A title that already fits is the target's own name; a sentence-long one gives way to the short id.
-  const fits = (t) => (t && oneLine(t).length <= max ? t : null);
+  const fits = (t) => (t && squash(t).length <= max ? t : null);
   const node = coveredNode(nodes, owned);
   const candidates = [
-    () => oneLine(p.displayWhat),
+    () => squash(p.displayWhat),
     () => { for (const x of specific) { const t = fits(recordTitle(repo, x)); if (t) return t; } return null; },
     () => fits(node?.title),
     () => (node?.id ? nodeLabel(node) : null),
@@ -217,7 +222,7 @@ export function jobWhat({ payload, op = null, nodes = null, repo = null, max = J
     () => (cut?.id ? words(String(cut.id)) : null),
   ];
   let what = null;
-  for (const pick of candidates) { const v = oneLine(pick()); if (v) { what = v; break; } }
+  for (const pick of candidates) { const v = squash(pick()); if (v) { what = v; break; } }
   const tail = cut && Number(cut.total) > 1 && Number.isInteger(Number(cut.ordinal)) ? ` ${cut.ordinal}/${cut.total}` : '';
   if (!what) return tail ? translator(language)('part{tail}', { tail }) : null;
   return `${clipWords(what, Math.max(8, max - tail.length))}${tail}`;
@@ -225,7 +230,7 @@ export function jobWhat({ payload, op = null, nodes = null, repo = null, max = J
 
 /** `<op label> · <what> · <workflow name>`, skipping a missing part. */
 export function jobDisplayName({ op, what = null, workflowName = null, language = ownerLanguage() } = {}) {
-  return [opLabel(op, language), oneLine(what), oneLine(workflowName)].filter(Boolean).join(NAME_SEPARATOR);
+  return [opLabel(op, language), squash(what), squash(workflowName)].filter(Boolean).join(NAME_SEPARATOR);
 }
 
 /**

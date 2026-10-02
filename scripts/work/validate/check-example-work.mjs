@@ -33,14 +33,14 @@ export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'de
 // architecture/sds layouts. It has no reader: a record carrying it is refused (HFS_WORK_NODE_RETIRED) and
 // must be restated as flat family records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
-export const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
+const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** A reference-shaped id: a record family prefix and at least two dot segments. */
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 /** A drawn shape name: `XBase#state` per work-ui-screen ui.shapes (base ^[A-Z][A-Za-z0-9]*Base$, state a
  * slug). The draw-review applier writes it into ui.review.*.parts[].shape; it joins a component name,
  * not a record id, so the ref scan below must not read it as the `parent#frag` compact syntax. */
-export const SHAPE_NAME_RE = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SHAPE_NAME_RE = /^[A-Z][A-Za-z0-9]*Base#[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Schemas whose `done` is an authored claim by nature (concept 6); every other schema needs proof or a declaration. */
 const AUTHORED_CLAIM_SCHEMAS = new Set(['work/data@1', 'work/brand@1', 'work/policy-decision@1']);
@@ -133,7 +133,7 @@ const collectRecordMap = (scopeRoot) => {
 };
 
 // Agent-data categories still written in place while their op moves to blobs: a WARN, not a refusal.
-export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
+const BOUNDARY_TRANSITIONAL = Object.freeze([]);
 /**
  * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
@@ -144,7 +144,7 @@ export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
  */
-export function trackedFilesUnder(dir) {
+function trackedFilesUnder(dir) {
   const r = lsFiles(['-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
   if (r.error || r.status !== 0) return [];
   return r.stdout.split('\0').filter(Boolean).map((rel) => path.join(dir, rel));

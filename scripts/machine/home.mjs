@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { DEFAULT_OWNER_LANGUAGE, loadConfig } from '../../engine/config.mjs';
 import { machineLog, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { headTime } from '../api/git/head-time.mjs';
+import { readEnv } from '../lib/env.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -27,14 +28,14 @@ export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.ur
 let cachedRev = null;
 export function runtimeRevOf() {
   if (cachedRev) return cachedRev;
-  if (process.env.STARCI_RUNTIME_REV) return (cachedRev = String(process.env.STARCI_RUNTIME_REV));
+  if (readEnv('STARCI_RUNTIME_REV')) return (cachedRev = String(readEnv('STARCI_RUNTIME_REV')));
   const head = headTime(SKILL_ROOT);
   return (cachedRev = head ? `${String(head.time * 1000).padStart(13, '0')}:${head.sha}` : 'unknown');
 }
 export const SUPERVISOR_ID = 'main';
 /** The seats row of the one Supervisor seat. */
 export const SEAT_ID = 'supervisor';
-export const ENABLED_SCOPE = 'supervisor-enabled';
+const ENABLED_SCOPE = 'supervisor-enabled';
 export const SUPERVISOR_TITLE = `[Supervisor] ${SUPERVISOR_ID}`;
 export const WORKER_TITLE_PREFIX = '[Worker]';
 export const FIX_KIND = 'runtime.fix';
@@ -76,6 +77,12 @@ export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'la
 export const withSupervisor = (fn, { env = process.env } = {}) => withMachine(fn, { env });
 /** fn(machine handle) over a read-only handle; `fallback` when machine.sqlite does not exist or cannot be read. */
 export const readSupervisor = (fn, fallback = null, { env = process.env } = {}) => readMachine(fn, fallback, { env });
+
+/**
+ * The `{env}`-bound reader of a supervisor-store projection `read`: `fresh` yields the fallback when the
+ * store is absent (a thunk, so the value is never shared between calls).
+ */
+export const supervisorRead = (read, fresh) => ({ env = process.env } = {}) => readSupervisor(read, fresh(), { env });
 
 /**
  * The seat: {token, value, at, expiresAt, pid, expired, starting} or null (no seat, or an empty one). `value` is what
@@ -135,7 +142,7 @@ export function newestEvent(m, kind) {
  * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
  * config (specs, a one-off CLI run).
  */
-export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
+const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);
 export const DEFAULT_SUPERVISOR_MODE = 'chat';
 /** engine/config.mjs owns the owner-language default; home re-exports it so base (scripts/lib/i18n.mjs) never imports machine. */
 export { DEFAULT_OWNER_LANGUAGE };

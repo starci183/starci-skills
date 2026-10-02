@@ -24,18 +24,18 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { draftText } from '../lib/orca-terminal.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { collapse } from '../lib/terminal-liveness.mjs';
+import { squash } from '../lib/clip.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
-export const CTRL_U = '\u0015';
-export const CLEAR_DRAFT_ATTEMPTS = 8;
+const CTRL_U = '\u0015';
+const CLEAR_DRAFT_ATTEMPTS = 8;
 // The beat between a Ctrl+U and the re-read (a TUI repaints a beat later) —
 // modules/models/runtimes.yaml allocation.draft.intervalMs.
 export const CLEAR_DRAFT_INTERVAL_MS = allocationMs('draft.intervalMs');
 export const DRAFT_STALE = 'draft-stale';
 
 /** True when two drafts read as the same text (whitespace collapsed). */
-export const sameDraft = (a, b) => collapse(a) === collapse(b);
+export const sameDraft = (a, b) => squash(a) === squash(b);
 
 const depsOf = (deps) => ({ read: deps.read ?? terminalRead, send: deps.send ?? terminalSend, sleep: deps.sleep ?? sleepSync });
 const draftReader = (read, terminal) => () => {

@@ -21,17 +21,20 @@ import { runNode } from '../api/node/run-node.mjs';
 import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { posixPath } from '../lib/path-key.mjs';
+import { valueFlags } from '../lib/cli-arg.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { mainTipOf, mergeGuard, resolveGateBase } from './gate.mjs';
+import { tailLines } from '../lib/clip.mjs';
+import { readJsonFile } from '../lib/json.mjs';
 
 export const RELEASE_PROOF_SCHEMA = 'starci/release-proof@1';
 export const RELEASE_STEPS = Object.freeze(['app-installs', 'canon-pins', 'merge-guard', 'check']);
 export const STEP_STATUS = Object.freeze({ pass: 'pass', red: 'red', skipped: 'skipped', toolFailed: 'tool-failed' });
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const USAGE = 'usage: release-proof.mjs --repo <released repository> --base <commit> [--main <ref>] [--out <file>]';
-const tail = (text, n = 3) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join(' | ').slice(0, 600);
+const tail = (text, n = 3) => tailLines(text, n, { join: ' | ', max: 600 });
 
-const isApp = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'hfs.json'), 'utf8'))?.kind === 'app'; } catch { return false; } };
+const isApp = (repo) => readJsonFile(path.join(repo, 'hfs.json'))?.kind === 'app';
 
 /** The default runners of a step's process (node <args>, npm <args>): {status, stdout, stderr, error}. */
 const defaultNode = (args, opts) => runNode(args, { maxBuffer: 512 * 1024 * 1024, ...opts });
@@ -66,7 +69,7 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
     detail: broken ? `check-canon-pins produced no JSON (${broken.label})` : unbound ? 'no code-pattern profile is bound to its canon content digest' : red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ') };
 }
 
-export function mergeGuardStep({ repo, base, main = null }) {
+function mergeGuardStep({ repo, base, main = null }) {
   try {
     const from = resolveGateBase(repo, base);
     const guard = mergeGuard(repo, { base: from, mainTip: mainTipOf(repo, main) });
@@ -92,15 +95,8 @@ export function buildReleaseProof({ repo, base, main = null, runtime = runtimeRo
     exit: ok ? 0 : steps.some((s) => s.status === STEP_STATUS.toolFailed) ? 2 : 1 };
 }
 
-export function parseReleaseArgs(argv) {
-  const opts = { repo: null, base: null, main: null, out: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (['--repo', '--base', '--main', '--out'].includes(arg)) {
-      if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
-    } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
-  }
+function parseReleaseArgs(argv) {
+  const opts = { repo: null, base: null, main: null, out: null, ...valueFlags(argv, ['--repo', '--base', '--main', '--out'], USAGE) };
   if (!opts.repo || !opts.base) throw new Error(`--repo and --base are required; ${USAGE}`);
   return opts;
 }

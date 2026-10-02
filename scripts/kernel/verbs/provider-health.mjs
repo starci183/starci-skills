@@ -3,6 +3,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { readProviderCircuit, writeProviderCircuit } from '../../machine/provider-circuit.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';
 import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 const quotaProbeDue = (circuit, now, everyMs) => {
   const last = Number(circuit?.quotaProbe?.at) || 0;
@@ -24,9 +25,9 @@ const refuseProviderRecover = (out, human) => {
   process.exit(1);
 };
 async function quotaProbe(ledger, args, emit, internals) {
-  const { normalizeProviderId, providerHealthOf } = internals;
+  const { normalizeProvider, providerHealthOf } = internals;
   const db = ledger.db, now = Date.now();
-  const providers = args.provider ? [normalizeProviderId(args.provider)] : quotaProbeProviders();
+  const providers = args.provider ? [normalizeProvider(args.provider)] : quotaProbeProviders();
   const { probeProviderQuota } = await import('../../agent/credential-probe.mjs');
   const results = [];
   for (const key of providers) {
@@ -83,10 +84,10 @@ export default {
     if (args.probe) need(args.recover, 'provider-health --probe goes with --recover');
   },
   async run({ ledger, args, emit, internals }) {
-    const { normalizeProviderId, currentCredentialOf, providerHealthOf,
+    const { normalizeProvider, currentCredentialOf, providerHealthOf,
       providerQuotaProbeCommand, providerRecoverCommand } = internals;
   if (args['quota-probe']) return quotaProbe(ledger, args, emit, internals);
-  const db = ledger.db, key = normalizeProviderId(args.provider), now = Date.now();
+  const db = ledger.db, key = normalizeProvider(args.provider), now = Date.now();
   if (!key) throw Object.assign(new Error('provider-health needs a provider id'), { code: 'provider-unknown' });
   // The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs), worker-wide.
   const stored = readProviderCircuit(key);
@@ -111,7 +112,7 @@ export default {
   }
   const kernel = kernelCallerProof(db);
   if (!kernel) {
-    refuseProviderRecover({ ok: false, code: 'kernel-proof-required', provider: key, terminal: process.env.ORCA_TERMINAL_HANDLE || null,
+    refuseProviderRecover({ ok: false, code: 'kernel-proof-required', provider: key, terminal: readEnv('ORCA_TERMINAL_HANDLE') || null,
       error: `provider-health --recover runs only from a running Kernel terminal of this ledger (ORCA_TERMINAL_HANDLE bound to a running kernel job); the Kernel runs ${providerRecoverCommand(key)}` },
     `provider-health --recover REFUSED for ${key}: kernel-proof-required`);
   }

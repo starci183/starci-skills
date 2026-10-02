@@ -1,7 +1,7 @@
 // api messages: drain the workflow's Runs into the ledger (api-lib/messages.mjs) and list every bridged message.
 import { parseJson } from '../../lib/json.mjs';
-import { getWorkflow } from './shared/rows.mjs';
-import { drainWorkflowMessages, orchestrationMessagesOf, workerQuestionsOf } from './shared/worker-messages.mjs';
+import { workflowVerb } from './shared/rows.mjs';
+import { drainForVerb, orchestrationMessagesOf, workerQuestionsOf } from './shared/worker-messages.mjs';
 const MESSAGE_ROUTES = {
   question: 'answer with api reply --message <id> (api questions lists it)',
   worker_done: 'information: the op files api report; settle from the ledger',
@@ -9,15 +9,8 @@ const MESSAGE_ROUTES = {
   status: 'information: progress or a reply thread; nothing to answer',
 };
 
-export default {
-  verb: 'messages',
-  required: ['workflow'],
-  kernelOnly: true,
-  usageInCore: true,
-  run({ ledger, args, emit, internals }) {
-    const db = ledger.db, workflowId = args.workflow;
-    if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    const drained = drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'messages' }) });
+export default workflowVerb('messages', ({ ledger, args, emit, internals }) => {
+    const { db, workflowId, drained } = drainForVerb(ledger, { args, internals, by: 'messages' });
     const jobs = new Map(db.prepare("SELECT job_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId).map((row) => [row.job_id, row.status]));
     const read = new Set(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='orchestration-messages-read'").all(workflowId)
       .flatMap((row) => parseJson(row.payload_json, {})?.ids ?? []));
@@ -36,5 +29,4 @@ export default {
       `messages ${workflowId}: ${messages.length} orchestration message(s) on ${drained.runs.length} Run(s), ${fresh.length} new${drained.error ? ` — orchestration check failed: ${drained.error}` : ''}`,
       ...messages.slice(-40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
     ].join('\n'), args.json);
-  },
-};
+});

@@ -75,8 +75,3 @@ export function resolveTypeScriptModule(ts, specifier, from, options, host = ts.
   return ts.resolveModuleName(specifier, from, options, host).resolvedModule?.resolvedFileName;
 }
 
-/** Configuration imports prefer Node's package resolution, then the selected TypeScript project. */
-export function resolveNodeOrTypeScriptModule(ts, specifier, from, options, host = ts.sys) {
-  try { return createRequire(from).resolve(specifier); }
-  catch { return resolveTypeScriptModule(ts, specifier, from, options, host); }
-}

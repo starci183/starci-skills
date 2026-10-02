@@ -108,21 +108,15 @@ function canonical(value) {
   return value;
 }
 
-export function putJson(obj) {
-  const encoded = JSON.stringify(canonical(obj));
-  if (encoded === undefined) throw new TypeError('putJson expects a JSON value');
-  return putBlob(Buffer.from(encoded), { mediaType: 'application/json' }).sha;
-}
-
 /* ------------------------------------------------------------ citations, views and bundles */
 
-export const BUNDLE_SCHEMA = 'starci/blob-bundle@1';
+const BUNDLE_SCHEMA = 'starci/blob-bundle@1';
 // Read-only views (files with an extension, materialized bundles) live beside the store, e.g. ~/.starci/artifacts-views.
 const viewRoot = () => `${artifactRoot()}-views`;
 const slash = (p) => String(p).replace(/\\/g, '/');
 
 /** The sha256 a citation names: {sha256}, 'blob:<sha>' or a bare sha; an {artifact} alone needs `db`. */
-export function shaOfRef(ref, { db = null } = {}) {
+function shaOfRef(ref, { db = null } = {}) {
   if (typeof ref === 'string') { const s = ref.trim().replace(/^blob:/, ''); return SHA.test(s) ? s : null; }
   if (!ref || typeof ref !== 'object') return null;
   if (typeof ref.sha256 === 'string' && SHA.test(ref.sha256)) return ref.sha256;
@@ -135,13 +129,6 @@ export function resolveBlob(ref, { db = null } = {}) {
   const sha = shaOfRef(ref, { db });
   const file = sha ? blobPath(sha) : null;
   return file ? { sha256: sha, file } : null;
-}
-
-/** The verified bytes of a citation (throws when the blob is missing or corrupt). */
-export function readBlobRef(ref, { db = null } = {}) {
-  const sha = shaOfRef(ref, { db });
-  if (!sha) throw Object.assign(new Error('not a blob citation'), { code: 'BLOB_REF_INVALID' });
-  return getBlob(sha);
 }
 
 /** A read-only copy of the blob with `ext` (e.g. '.png'), cached beside the store; null when missing. */
@@ -169,7 +156,7 @@ export function putBundle(dir, { mediaTypeOf = () => 'application/octet-stream' 
 }
 
 /** The manifest of a bundle: {schema, files: {rel: sha}} or null. */
-export function bundleManifest(ref, { db = null } = {}) {
+function bundleManifest(ref, { db = null } = {}) {
   const hit = resolveBlob(ref, { db });
   if (!hit) return null;
   try { const doc = JSON.parse(fs.readFileSync(hit.file, 'utf8')); return doc?.schema === BUNDLE_SCHEMA ? doc : null; } catch { return null; }

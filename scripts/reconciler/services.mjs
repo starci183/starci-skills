@@ -38,9 +38,9 @@ import { allocationSettings, loadConfig } from '../../engine/config.mjs'; import
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
-export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
-export const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
-export const RECONCILER_TASK = 'StarCi-Reconciler';
+const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
+const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
+const RECONCILER_TASK = 'StarCi-Reconciler';
 
 /* ------------------------------------------------------------ settings */
 
@@ -175,7 +175,7 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
 }
 
 /** `node scripts/connectors/<script> status` answers running (and, for the tunnel, no health problems). */
-export async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
+async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
   const [cmd, args] = node(`scripts/connectors/${script}`, ['status', ...extraArgs]);
   let last = null;
   for (let i = 1; i <= Math.max(1, tries); i += 1) {
@@ -188,7 +188,7 @@ export async function connectorUp(script, { timeoutMs, tries = 1, run = runChild
 }
 
 /** schtasks /query of one task: {ok, exists, status} (status Ready|Running|Disabled|...). */
-export async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = process.platform } = {}) {
+async function taskState(name, { timeoutMs = 30_000, run = runChild, platform = process.platform } = {}) {
   if (platform !== 'win32') return { ok: false, exists: false, error: 'not windows' };
   const r = await run('schtasks.exe', ['/Query', '/TN', name, '/FO', 'CSV', '/NH'], { timeoutMs });
   if (r.status !== 0) return { ok: false, exists: false };
@@ -301,7 +301,7 @@ export function stepService(rec, probe, { now, entry, backoff, quarantine }) {
 /* ------------------------------------------------------------ the store */
 
 /** services.kind (DBTREE B3) of a store row name. Pure. */
-export const serviceKindOf = (name) => {
+const serviceKindOf = (name) => {
   const n = String(name ?? '');
   if (n.startsWith('ledger:')) return 'ledger';
   if (n.startsWith('sched-task:')) return 'scheduled-task';
@@ -311,7 +311,7 @@ export const serviceKindOf = (name) => {
   return 'host-app';
 };
 /** services.state (DBTREE B3: healthy|ok|degraded|down|quarantined|restarting|booting|stale) of a record state. Pure. */
-export const serviceStateOf = (state) => {
+const serviceStateOf = (state) => {
   switch (String(state ?? '')) {
     case 'healthy': return 'healthy';
     case 'ok': case 'live': case 'idle': case 'busy': case 'working': return 'ok';
@@ -483,7 +483,7 @@ export function turnMinutesOf(screen) {
   return null;
 }
 
-export const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
+const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
 
 const SEAT_AGENTS = ['claude', 'codex', 'devin'];
 /**
@@ -501,7 +501,7 @@ export function seatAgentOf(entry, screen = '', fallback = null) {
 }
 
 /** The seat's terminal, agent and turn: {ok, terminal, agent, state, busy, minutes}. Read-only. */
-export async function turnProbe({ terminal = null, supervisor = false } = {}) {
+async function turnProbe({ terminal = null, supervisor = false } = {}) {
   let handle = terminal;
   if (!handle && supervisor) {
     const home = await import('../machine/home.mjs');
@@ -525,7 +525,7 @@ export async function turnProbe({ terminal = null, supervisor = false } = {}) {
  * The soft interrupt: the agent's own interrupt key(s), a wait of up to idleWaitMs for the turn to end, then the
  * decision doorbell (top DI + its ranked actions) rung at once. Active mode only (reached through ctx.run).
  */
-export async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, supervisor = false, settings = hostSettings() }) {
+async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, supervisor = false, settings = hostSettings() }) {
   const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../lib/sleep-sync.mjs')]);
   const keys = settings.turnBudget.interruptKeys[agent] ?? ['esc'];
   const sent = [];
@@ -549,7 +549,7 @@ export async function turnInterrupt({ terminal, agent, repo = null, workflowId =
 }
 
 /** Close an overdue seat's terminal (the agent's quit first) so the seat watchdog proves it gone and replaces it. */
-export async function turnReplace({ terminal, agent }) {
+async function turnReplace({ terminal, agent }) {
   const [{ quitAgent }, { terminalClose }] = await Promise.all([import('../kernel/quit-agent.mjs'), import('../api/orca/terminal-close.mjs')]);
   let quit = null;
   try { quit = quitAgent({ handle: terminal, agent }); } catch (error) { quit = { error: String(error?.message ?? error) }; }

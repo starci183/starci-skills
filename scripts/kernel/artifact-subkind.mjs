@@ -29,7 +29,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-export const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
+import { resolvedKey } from '../lib/path-key.mjs';
+const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);
 const E2E_OPS = new Set(['e2e.verify']);
@@ -73,7 +74,7 @@ const namesOfNode = (node) => [
   ...NAME_KEYS.map((k) => node[k]), node.generation?.promptPath,
   ...Object.values(node).filter((v) => v && typeof v === 'object' && !Array.isArray(v)).map((v) => v.path),
 ].filter((v) => typeof v === 'string' && v.trim());
-const keyOfAbs = (abs) => (process.platform === 'win32' ? path.resolve(abs).toLowerCase() : path.resolve(abs));
+
 
 const recordIndexCache = new Map();
 /**
@@ -102,7 +103,7 @@ function recordToolIndex(repo, recordDir) {
       if (!node || typeof node !== 'object' || depth > 12) return;
       if (Array.isArray(node)) { for (const v of node) visit(v, depth + 1); return; }
       const tool = toolOfNode(node);
-      if (tool) for (const name of namesOfNode(node)) for (const base of bases) { const k = keyOfAbs(path.resolve(base, name)); if (!index.has(k)) index.set(k, String(tool)); }
+      if (tool) for (const name of namesOfNode(node)) for (const base of bases) { const k = resolvedKey(path.resolve(base, name)); if (!index.has(k)) index.set(k, String(tool)); }
       for (const v of Object.values(node)) visit(v, depth + 1);
     };
     visit(doc);
@@ -124,12 +125,12 @@ export function manifestToolOf(repo, rel) {
   // The record: features/<f>/ui (or impl) when it is one record itself, else features/<f>/ui/<surface>.
   const top = path.resolve(repo, m[1]);
   const recordDir = fs.existsSync(path.join(top, 'index.yaml')) || !m[2] ? top : path.resolve(repo, m[1] + m[2]);
-  return recordToolIndex(repo, recordDir).get(keyOfAbs(path.resolve(repo, file))) ?? null;
+  return recordToolIndex(repo, recordDir).get(resolvedKey(path.resolve(repo, file))) ?? null;
 }
 
 const drawRecordCache = new Map();
 /** True when `<stem>.json` beside the image is a starci/draw-render@1 record (scripts/work/draw-render.mjs captureHtml). */
-export function hasDrawRenderRecord(abs) {
+function hasDrawRenderRecord(abs) {
   const json = abs.replace(/\.[^./\\]+$/, '.json');
   if (!drawRecordCache.has(json)) {
     let ok = false;

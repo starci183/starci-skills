@@ -18,11 +18,12 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { allocationSettings } from '../../engine/config.mjs';
 import { redactText } from '../lib/redact.mjs';
+import { forEachFileLine } from '../lib/read-text.mjs';
 
-export const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
+const PATCH_JSON_SCHEMA = 'starci/patch-json@1';
 const DEFAULT_CAPS = { fileLines: 1500, totalLines: 20000, files: 400, lineChars: 2000, assetBytes: 5 * 1024 * 1024 };
 /** allocation.logs.diff (modules/models/runtimes.yaml) over the defaults. */
-export function diffCaps() {
+function diffCaps() {
   const raw = allocationSettings()?.logs?.diff ?? {};
   const out = { ...DEFAULT_CAPS };
   for (const k of Object.keys(out)) if (Number.isInteger(Number(raw[k])) && Number(raw[k]) > 0) out[k] = Number(raw[k]);
@@ -36,7 +37,7 @@ const LANGUAGE = {
   '.py': 'python', '.go': 'go', '.rs': 'rust', '.sh': 'shell', '.ps1': 'powershell', '.toml': 'toml', '.xml': 'xml', '.svg': 'xml', '.graphql': 'graphql', '.prisma': 'prisma',
 };
 export const languageOf = (p) => LANGUAGE[path.extname(String(p)).toLowerCase()] ?? (/(^|\/)Dockerfile$/.test(p) ? 'dockerfile' : 'text');
-export const isImagePath = (p) => IMAGE_EXT.has(path.extname(String(p)).toLowerCase());
+const isImagePath = (p) => IMAGE_EXT.has(path.extname(String(p)).toLowerCase());
 
 /** A git-quoted path ("a/\303\251.ts") as its UTF-8 string; an unquoted one as it is. */
 export function unquoteGitPath(value) {
@@ -90,7 +91,7 @@ export function decodeBase85Line(line) {
  * `onLiteral({path, side, blob, data})` receives each decoded image literal (side 'after' for the forward
  * section, 'before' for the reverse one).
  */
-export function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
+function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   const files = new Map(), commits = [];
   let totalLines = 0, anyTruncated = false;
   const omitted = new Set();
@@ -211,22 +212,9 @@ export function patchParser({ caps = diffCaps(), onLiteral = null } = {}) {
   };
 }
 
-/** Feed a file's lines to `onLine` in bounded chunks: a patch can exceed any single string. */
-function forEachLine(file, onLine, chunkBytes = 8 * 1024 * 1024) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(chunkBytes);
-    let carry = '';
-    for (;;) {
-      const n = fs.readSync(fd, buf, 0, chunkBytes, null);
-      if (n <= 0) break;
-      const lines = (carry + buf.toString('utf8', 0, n)).split('\n');
-      carry = lines.pop();
-      for (const l of lines) onLine(l);
-    }
-    if (carry) onLine(carry);
-  } finally { fs.closeSync(fd); }
-}
+/** Feed a file's lines to `onLine` in bounded chunks: a patch can exceed any single string. The split is on '\n'
+ *  alone — patchParser.line strips a trailing '\r' itself. */
+const forEachLine = (file, onLine, chunkBytes = 8 * 1024 * 1024) => forEachFileLine(file, onLine, { chunkBytes, eol: '\n' });
 
 /** Parse patch text (a string) - what the specs and small callers use. */
 export function parsePatchText(text, options = {}) {

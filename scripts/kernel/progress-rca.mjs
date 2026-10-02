@@ -42,7 +42,7 @@ export const DECISION_KIND = 'kernel-decision';
 export const DECISION_RESULT_KIND = 'kernel-decision-result';
 export const GRAPH_EDIT_KIND = 'kernel-graph-edit';
 const HOUR = 3_600_000;
-const one = (s, n = 240) => clipLine(String(s ?? '').replace(/\s+/g, ' ').trim(), n);
+const one = (s, n = 240) => clipLine(s, n);
 const parse = (s, d = {}) => parseJsonOr(s, d) ?? d;
 
 /** runtimes.yaml allocation.progress with safe defaults (a missing block never breaks api status). */
@@ -108,10 +108,12 @@ export function priorities() {
   catch { try { return priorityTable(null, {}); } catch { return {}; } }
 }
 
-/** How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
+/**
+ * How many units this workflow may run at once now: min(its priority reserve or maxParallelOps, running + what the
  * worker RAM cap, the pools and its queued-ready work allow). Pure over `core` (the api status fields ramThrottle,
- * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}. */
-export function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
+ * poolLoad) and the counts. {allowed, why, workersFree, poolFree, cap}.
+ */
+function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, workflowId, prio = priorities(), rt = runtimesDoc() }) {
   const rtCap = Number(rt?.maxParallelOps) || 20;
   const thr = core.ramThrottle ?? {};
   const effective = Number(thr.effectiveCap ?? rtCap);
@@ -132,7 +134,7 @@ export function allowedParallelOf({ core = {}, running = 0, queuedReady = 0, wor
 /* ------------------------------------------------------------ progress */
 
 /** Whether this workflow is the top-priority one (highest weight > 1). */
-export function isPriority(workflowId, prio = priorities()) {
+function isPriority(workflowId, prio = priorities()) {
   const w = prio[workflowId]?.weight ?? 1;
   if (w <= 1) return false;
   return Object.values(prio).every((p) => (p.weight ?? 1) <= w);
@@ -513,14 +515,14 @@ export function whyLine(rca, { language = ownerLanguage(), limit = 5 } = {}) {
 }
 
 /** A stable id for one RCA snapshot (clusters + counts). */
-export const rcaDigest = (rca) => crypto.createHash('sha1').update(JSON.stringify((rca?.clusters ?? []).map((c) => [c.cause, c.count, c.open]))).digest('hex').slice(0, 10);
+const rcaDigest = (rca) => crypto.createHash('sha1').update(JSON.stringify((rca?.clusters ?? []).map((c) => [c.cause, c.count, c.open]))).digest('hex').slice(0, 10);
 
 /* ------------------------------------------------------------ the whole view */
 
 /**
  * The cut to re-cut: the op|cut.id with the most open or failed units. {op, cutId, canon, units}. Pure.
  */
-export function recutTargetOf(units) {
+function recutTargetOf(units) {
   const byCut = new Map();
   for (const u of units) {
     if (!u.cut?.id || u.state === 'done' || u.state === 'dropped') continue;
@@ -535,7 +537,7 @@ export function recutTargetOf(units) {
  * Queued, never-dispatched units whose every owned path is absent on disk: [{jobId, paths}]. `resolve(job)` maps a
  * job to absolute paths (null when it cannot tell - such a unit is never called missing).
  */
-export function missingQueuedOf(units, resolve) {
+function missingQueuedOf(units, resolve) {
   const out = [];
   // A path a running unit of this workflow owns (or sits under/over) may be created by it: never called missing.
   const low = (p) => String(p).replace(/\\/g, '/').toLowerCase();

@@ -15,7 +15,7 @@ const TOPIC_FILE = /\.(?:ya?ml|md)$/;
 const FOLDERS_BELOW = ['x.ts', 'index.ts', 'main.ts', 'x/index.ts', 'x/x.ts', 'x/x/x.ts', 'x/src/main.ts', 'package.json'];
 
 /** The declaration the prose is judged against: every app the examples declare plus the starter's, every kind, every optional slot. */
-export function proseDeclaration(manifest, examples, starter) {
+function proseDeclaration(manifest, examples, starter) {
   const apps = (side) => [...new Map([...examples, starter].flatMap((d) => d.sides?.[side]?.apps ?? []).map((a) => [a.name, a])).values()];
   const union = (key, side) => [...new Set([...examples, starter].flatMap((d) => d.sides?.[side]?.[key] ?? []))];
   const first = examples[0];

@@ -25,6 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 /**
  * The machine's RAM right now: {totalRamBytes, freeRamBytes, freeMem} — freeMem is the 0..1 fraction
@@ -144,6 +145,6 @@ export function hostResourcesFor({ env = process.env, repo = null, settings = nu
     }
   }
   const probe = probeHostResources({ env, repo, settings, statfs, meminfo });
-  if (env?.NODE_TEST_CONTEXT) return { ...probe, ok: true, testContext: true };
+  if (isSpecRun(env ?? {})) return { ...probe, ok: true, testContext: true };
   return probe;
 }

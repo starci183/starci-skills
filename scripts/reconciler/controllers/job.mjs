@@ -39,21 +39,21 @@ import { clocksOf } from '../sla.mjs';
 import { settlerSettings, releaseProofOf, EVENTS as SETTLE_EVENTS } from '../../kernel/settle/job-settle.mjs';
 import { reportedJobs, kernelHandoverOf, KERNEL_ONLY_OPS } from '../../machine/reported-jobs.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs'; import { isMain } from '../../lib/is-main.mjs';
-
+import { positiveNumber } from '../../lib/number.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
-export const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
+const JOB_FILE = path.join(skillRoot, 'modules', 'reconciler', 'job.yaml');
 export const SETTLER_SCRIPT = 'scripts/kernel/settle/job-settle.mjs';
 export const OPENED_BY = 'job-controller';
 export const SUPERVISOR_LEDGER = 'supervisor';
-export const WORKERS_KEY = 'workers:supervisor';
-export const HEALTH_KEY = 'health:all';
+const WORKERS_KEY = 'workers:supervisor';
+const HEALTH_KEY = 'health:all';
 const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
 const SETTLED = SETTLED_JOB_LIST;
 
 /* ------------------------------------------------------------------------------------------------ settings */
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+const num = (v, d) => positiveNumber(v, d, { orZero: true });
 /** modules/reconciler/job.yaml + the runtimes.yaml numbers it cites. Never throws. */
 export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
   let doc = {};
@@ -84,13 +84,13 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
     allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
   };
 }
-export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
+const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
   'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK']);
 
 /* ------------------------------------------------------------------------------------------------ keys */
 
 export const jobKey = (ledgerId, jobId) => `job:${ledgerId}:${jobId}`;
-export const wfKey = (ledgerId, workflowId) => `wf:${ledgerId}:${workflowId}`;
+const wfKey = (ledgerId, workflowId) => `wf:${ledgerId}:${workflowId}`;
 /** {type: 'job'|'wf'|'workers', ledgerId, id} of a key, or null. Pure. */
 export function parseKey(key) {
   const s = String(key ?? '');
@@ -219,7 +219,7 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 /* ------------------------------------------------------------------------------------------------ the [Worker] sweep */
 
 /** Host seams for sweepWorkers (the same primitives as scripts/supervisor/supervisor-watchdog.mjs hostDeps). */
-export async function workerSweepDeps() {
+async function workerSweepDeps() {
   const [{ terminalRead }, host, liveness, closeMod, quitMod] = await Promise.all([
     import('../../api/orca/terminal-read.mjs'), import('../../kernel/host-outage.mjs'), import('../../lib/terminal-liveness.mjs'),
     import('../../kernel/close-op-terminal.mjs'), import('../../kernel/quit-agent.mjs')]);
@@ -263,7 +263,7 @@ async function keepClocks(ctx, ledgerId, jobId, clocks) {
  */
 const ARCHIVED_REFUSAL = /workflow-archived: no further writes/;
 const terminalRuns = new Map(); // jobKey -> step kind whose run was refused as workflow-archived
-export const isArchivedRefusal = (r) => ARCHIVED_REFUSAL.test(`${r?.error ?? ''}
+const isArchivedRefusal = (r) => ARCHIVED_REFUSAL.test(`${r?.error ?? ''}
 ${r?.stderr ?? ''}
 ${r?.stdout ?? ''}
 ${JSON.stringify(r?.value ?? null)}`);

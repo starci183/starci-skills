@@ -27,6 +27,7 @@ import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDe
 import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
+import { ciUploadFindings } from './runtime-rules/ci-upload.mjs';
 import { controlCharFindings } from './runtime-rules/control-chars.mjs';
 import { prosePathFindings } from './runtime-rules/prose-path.mjs';
 import { proseRestateFindings } from './runtime-rules/prose-restates.mjs';
@@ -39,6 +40,7 @@ import { RETIRED_PATHS_FILE, pinnedFindings, retiredFindings } from './runtime-r
 import { sizeFindings } from './runtime-rules/size.mjs';
 import { slotAllowsFindings } from './runtime-rules/slot-allows.mjs';
 import { parseSource } from './runtime-rules/source-ast.mjs';
+import { readTextFile } from '../lib/read-text.mjs';
 import { sourceNameFindings } from './runtime-rules/source-name.mjs';
 import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
 import { tierFindings } from './runtime-rules/tier-direction.mjs';
@@ -55,7 +57,7 @@ export function baseRevision(repoRoot) {
 }
 
 /** The production sources of the runtime: tracked .mjs/.cjs/.js under ruleParams.runtime.sourceRoots, generated copies excluded. */
-export function runtimeSources(files, params) {
+function runtimeSources(files, params) {
   const roots = params.sourceRoots;
   const generated = params.generated.map((g) => `${g.root}/`);
   return files.filter((f) => SOURCE.test(f) && roots.some((r) => f === r || f.startsWith(`${r}/`)) && !generated.some((g) => f.startsWith(g)));
@@ -77,7 +79,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
   const params = ruleParams(runtimeManifest, 'runtime');
   const tracked = files ?? trackedFiles(repoRoot);
   const fileSet = new Set(tracked);
-  const read = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel), 'utf8'); } catch { return null; } };
+  const read = (rel) => readTextFile(repoRoot, rel);
   const readBytes = (rel) => { try { return fs.readFileSync(path.join(repoRoot, rel)); } catch { return null; } };
   const sourcePaths = runtimeSources(tracked, params);
   const sources = sourcePaths.map((p) => ({ path: p, text: read(p) ?? '' }));
@@ -113,6 +115,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...generatedBlockFindings(ctx),
     ...prosePathFindings(ctx),
     ...proseRestateFindings(ctx),
+    ...ciUploadFindings(ctx),
   );
   let driftList = drift;
   if (drift === undefined && path.resolve(repoRoot) === path.resolve(skillRoot)) {

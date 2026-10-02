@@ -10,9 +10,10 @@ import { probeAll as probeAllQuota } from '../agent/quota/index.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs';
+import { escapeHtml } from '../lib/escape.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 
-const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
  * Everything the block shows, from machine.sqlite over the machine handle `m` (seats row 'supervisor', sup_signals,
@@ -46,7 +47,7 @@ const blockTexts = (language) => {
  * 'dead' and ⚠ on 'limited'. Providers with no number are skipped; nothing is
  * rendered when no provider reports a figure.
  */
-export function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
+function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
   const t = blockTexts(language);
   const parts = [];
   for (const [name, q] of Object.entries(quota ?? {})) {
@@ -54,7 +55,7 @@ export function renderQuotaLine(quota, { language = ownerLanguage() } = {}) {
     const mark = q.state === 'dead' ? ' ⛔' : q.state === 'limited' ? ' ⚠' : '';
     const resetAt = Date.parse(q.resetsAt ?? '');
     const reset = Number.isFinite(resetAt) ? ` ↻${shortIso(resetAt)}` : '';
-    parts.push(`${esc(name)} ${Math.round(q.usedPercent)}% ${t.used}${mark}${esc(reset)}`);
+    parts.push(`${escapeHtml(name)} ${Math.round(q.usedPercent)}% ${t.used}${mark}${escapeHtml(reset)}`);
   }
   return parts.length ? `📶 ${t.quota}: ${parts.join(' · ')}` : null;
 }
@@ -65,7 +66,7 @@ export function renderSupervisorBlock(snap, { language = ownerLanguage(), land =
   if (!snap) return null;
   const t = blockTexts(language);
   const lines = [];
-  const seat = snap.seat?.value?.terminal ? `${esc(snap.seat.value.agent ?? '')} ${esc(snap.seat.value.terminal.slice(0, 13))}…` : t.none;
+  const seat = snap.seat?.value?.terminal ? `${escapeHtml(snap.seat.value.agent ?? '')} ${escapeHtml(snap.seat.value.terminal.slice(0, 13))}…` : t.none;
   // chat mode (config.yaml supervisor.mode): the owner's chat is the Supervisor; there is no seat to show.
   lines.push(`<b>🧭 ${t.head}</b> — ${snap.mode === 'chat' ? t.chat : snap.enabled === false ? t.off : seat}`);
   const [last, ...older] = snap.ticks;
@@ -73,19 +74,19 @@ export function renderSupervisorBlock(snap, { language = ownerLanguage(), land =
     const series = [...snap.ticks].reverse().map((x) => x.owed ?? '?').join(' → ');
     const prev = older[0]?.owed;
     const arrow = prev == null || last.owed == null ? '' : last.owed > prev ? ' ↑' : last.owed < prev ? ' ↓' : ' =';
-    lines.push(`${t.owed}: <b>${esc(last.owed ?? '?')}</b>${arrow}${last.clusters != null ? ` (${esc(last.clusters)} cluster)` : ''} · ${t.trend} ${esc(series)} · ${t.tick} ${ago(last.at, now)}`);
+    lines.push(`${t.owed}: <b>${escapeHtml(last.owed ?? '?')}</b>${arrow}${last.clusters != null ? ` (${escapeHtml(last.clusters)} cluster)` : ''} · ${t.trend} ${escapeHtml(series)} · ${t.tick} ${ago(last.at, now)}`);
   } else lines.push(`${t.owed}: ${t.noTick}`);
   const quotaLine = renderQuotaLine(quota, { language });
   if (quotaLine) lines.push(quotaLine);
   const active = snap.board.active;
   lines.push(`${t.workers} (${active.length}): ${active.length ? '' : t.idle}`);
-  for (const w of active) lines.push(`  • ${esc(w.agent ?? '?')} — ${esc(w.cluster)} — ${esc(w.ageMin)}m`);
+  for (const w of active) lines.push(`  • ${escapeHtml(w.agent ?? '?')} — ${escapeHtml(w.cluster)} — ${escapeHtml(w.ageMin)}m`);
   const queue = snap.board.reported;
-  lines.push(`${t.queue}: ${land.busy ? `${t.landing} ${esc(land.current?.jobId ?? (land.current?.commits ?? []).map((c) => String(c).slice(0, 9)).join(','))}; ` : ''}${queue.length ? queue.map((q) => esc(q.jobId)).join(', ') : (land.busy ? '' : t.empty)}`);
-  if (snap.lands[0]) lines.push(`${t.lastLand}: ${snap.lands[0].kind === 'land-passed' ? '✅' : '❌'} ${esc(snap.lands[0].entity_id).slice(0, 40)} ${ago(snap.lands[0].created_at, now)}`);
+  lines.push(`${t.queue}: ${land.busy ? `${t.landing} ${escapeHtml(land.current?.jobId ?? (land.current?.commits ?? []).map((c) => String(c).slice(0, 9)).join(','))}; ` : ''}${queue.length ? queue.map((q) => escapeHtml(q.jobId)).join(', ') : (land.busy ? '' : t.empty)}`);
+  if (snap.lands[0]) lines.push(`${t.lastLand}: ${snap.lands[0].kind === 'land-passed' ? '✅' : '❌'} ${escapeHtml(snap.lands[0].entity_id).slice(0, 40)} ${ago(snap.lands[0].created_at, now)}`);
   if (snap.pushes.length) {
     lines.push(`${t.pushes}:`);
-    for (const p of snap.pushes) lines.push(`  • ${esc(path.basename(p.entity_id))} ${p.kind === 'push-main' ? `✅ ${esc(p.payload.head ?? '')}` : `❌ ${esc(String(p.payload.refused ?? p.payload.error ?? '').slice(0, 80))}`} ${ago(p.created_at, now)}`);
+    for (const p of snap.pushes) lines.push(`  • ${escapeHtml(path.basename(p.entity_id))} ${p.kind === 'push-main' ? `✅ ${escapeHtml(p.payload.head ?? '')}` : `❌ ${escapeHtml(String(p.payload.refused ?? p.payload.error ?? '').slice(0, 80))}`} ${ago(p.created_at, now)}`);
   }
   return lines.join('\n');
 }
@@ -95,7 +96,7 @@ export function renderSupervisorBlock(snap, { language = ownerLanguage(), land =
  * names no test machine.sqlite).
  */
 export function supervisorStatusMessage({ language = ownerLanguage(), env = process.env, now = Date.now(), quota = undefined } = {}) {
-  if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env[TEST_REGISTRY_ENV]) return null;
+  if ((isSpecRun(env) || isSpecRun()) && !env[TEST_REGISTRY_ENV]) return null;
   const read = readSupervisor((m) => supervisorSnapshot(m, { now }), null, { env });
   const snap = read ? { ...read, mode: supervisorMode({ env }) } : null;
   // The provider quota line: a live probeAll() unless the caller injected one;

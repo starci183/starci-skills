@@ -46,14 +46,14 @@
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import { opContextOf } from '../guards/op-context.mjs';
 import fs from 'node:fs';
-import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
+import { isBlobFile, readAnswerReceipt, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
 import { dataStatusOf, recipeRenderedOf } from './ui/ui-shapes.mjs';
-import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
+import { assetsOf, flag, indexFilesUnder, list, readYaml, reviewMain, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../machine/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../machine/owner-answers.mjs';
 import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
@@ -85,10 +85,10 @@ export const AUTOPILOT_BY = 'autopilot';
 /** Who may accept a drawing: the owner, the runtime for a drawing the owner did not ask for (auto-accept), or autopilot provisionally. */
 const ACCEPTORS = Object.freeze([OWNER, AUTO_ACCEPTED_BY, AUTOPILOT_BY]);
 /** Whether an acceptance block is autopilot's provisional one (machine gates passed; the owner reviews it at handover). */
-export const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
+const isProvisionalAcceptance = (acceptance) => Boolean(acceptance && acceptance.answeredBy === AUTOPILOT_BY && acceptance.provisional === true);
 
 /** The ui record at `uiDir`: {dir, file, record, workRoot, repoRoot}. Throws when it is not a work/ui-screen@1 record. */
-export function loadDrawing(uiDir) {
+function loadDrawing(uiDir) {
   const dir = path.resolve(uiDir);
   const file = path.join(dir, 'index.yaml');
   if (!fs.existsSync(file)) throw new Error(`${slash(dir)} holds no index.yaml`);
@@ -283,7 +283,7 @@ export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportI
 }
 
 /** drawOwnerRulingOf read from the repository's ledger for op job `jobId` (read-only). Throws when it cannot read it. */
-export function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
+function drawOwnerRulingInRepo(repoRoot, { jobId, record }) {
   const file = ledgerFileFor(repoRoot);
   if (!fs.existsSync(file)) throw new Error(`job ${jobId} is named but ${slash(file)} does not exist: cannot read whether the owner asked for this drawing`);
   const ledger = inspectLedger({ file });
@@ -372,14 +372,7 @@ export function drawReviewQuestion(uiDir, { lang = ownerLanguage(), ownerRequest
 export function applyDrawReview(uiDir, receiptFile, { write = false, now = () => new Date().toISOString() } = {}) {
   const drawing = loadDrawing(uiDir);
   const { dir, file, record, repoRoot } = drawing;
-  // The receipt is the blob serve-ask stored (ask-receipts.mjs: receiptPath, or `blob:<sha256>`); a Work record cites
-  // it as blob:<sha256>. A path inside the repository is still read (an example tree's own receipt).
-  const receiptAbs = receiptFileOf(String(receiptFile), { base: process.cwd() }) ?? path.resolve(String(receiptFile));
-  const receiptRel = receiptRefOf(receiptAbs, repoRoot);
-  if (!isBlobFile(receiptAbs) && (receiptRel.startsWith('../') || path.isAbsolute(receiptRel))) throw new Error(`receipt ${slash(receiptFile)} is neither a stored answer (blob:<sha256>, the receiptPath serve-ask returned) nor a file inside the repository ${slash(repoRoot)}`);
-  let receipt;
-  try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
-  if (receipt?.schema !== 'starci/ask-answer@1') throw new Error(`${slash(receiptFile)} is ${receipt?.schema ?? 'not a receipt'}, not starci/ask-answer@1`);
+  const { receipt, receiptAbs, receiptRel } = readAnswerReceipt(receiptFile, { repoRoot });
   if (receipt.opId && receipt.opId !== DRAW_REVIEW_OP) throw new Error(`the receipt answers a ${receipt.opId} ask, not ${DRAW_REVIEW_OP}`);
   const review = receipt.review;
   if (review?.schema !== DRAW_REVIEW_SCHEMA) throw new Error(`the receipt of ask ${receipt.dispatchId ?? '?'} carries no draw review (question.review): it answered another question - park the draw-review ask (draw-review.mjs question) and apply its answer`);
@@ -488,30 +481,22 @@ function goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write
 }
 
 export function drawReviewMain(argv = []) {
-  const [command, ...args] = argv;
-  const json = args.includes('--json');
-  const ui = flag(args, '--ui');
   const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
-  if (!['status', 'question', 'apply'].includes(command) || !ui) return { exitCode: 2, text: usage };
-  try {
-    if (command === 'status') {
+  return reviewMain(argv, {
+    targetFlag: '--ui', usage, tag: 'draw-review',
+    status: (ui) => {
       const s = drawReviewStatus(ui);
-      return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
-    }
-    if (command === 'question') {
-      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null });
-      return { exitCode: 0, text: `${JSON.stringify(q, null, 2)}\n` };
-    }
-    const receipt = flag(args, '--receipt');
-    if (!receipt) return { exitCode: 2, text: usage };
-    const r = applyDrawReview(ui, receipt, { write: args.includes('--write') });
-    const text = r.decision === 'redraw'
-      ? `the owner asked for a redraw of ${r.record} (ask ${r.dispatchId}); nothing written. Redraw brief: ${r.brief}`
-      : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} ${r.record} done: accepted by ${r.owner.answeredBy} in ask ${r.owner.dispatchId} (receipt ${r.owner.receipt})`;
-    return { exitCode: 0, text: json ? `${JSON.stringify(r, null, 2)}\n` : `${text}\n` };
-  } catch (error) {
-    return { exitCode: 1, text: `draw-review: ${error.message}\n` };
-  }
+      return { result: s, text: `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
+    },
+    question: (ui, args) => ({ result: drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? ownerLanguage(), ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null }) }),
+    apply: (ui, receipt, args) => {
+      const r = applyDrawReview(ui, receipt, { write: args.includes('--write') });
+      const text = r.decision === 'redraw'
+        ? `the owner asked for a redraw of ${r.record} (ask ${r.dispatchId}); nothing written. Redraw brief: ${r.brief}`
+        : `${r.written ? 'wrote' : 'would write (dry run - pass --write)'} ${r.record} done: accepted by ${r.owner.answeredBy} in ask ${r.owner.dispatchId} (receipt ${r.owner.receipt})`;
+      return { result: r, text: `${text}\n` };
+    },
+  });
 }
 
 /**

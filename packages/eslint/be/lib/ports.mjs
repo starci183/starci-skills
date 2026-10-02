@@ -36,7 +36,7 @@ export const ownerNameOf = (hfs, file) => {
  * @param {string} file - A file path.
  * @returns {string | null} The slot-relative path.
  */
-export const pathInSlot = (hfs, file) => {
+const pathInSlot = (hfs, file) => {
     const found = hfs.classify(file)
     if (!found.slot) return null
     const rel = hfs.relative(file)

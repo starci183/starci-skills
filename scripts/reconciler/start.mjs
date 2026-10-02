@@ -39,7 +39,7 @@ import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, configuredMode, reconcilerConfig
 import { probeOrcaAsync, serviceRegistry, servicePorts, startService } from './services.mjs'; import { execNode } from '../api/node/exec-node.mjs';
 import { sleep } from '../lib/sleep.mjs'; import { isMain } from '../lib/is-main.mjs';
 
-export const MIN_SQLITE = '3.51.3';
+const MIN_SQLITE = '3.51.3';
 export const PROFILE = 'operational';
 /** Services `start` never launches itself: Orca is a GUI app (the owner opens it); the scheduled task is the owner's. */
 const NOT_ACTUATED = new Set(['orca']);
@@ -94,7 +94,7 @@ export function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists 
 }
 
 /** The pinned (agent, model) pairs of config.yaml kernel (group or single pin) and supervisor.kernel. Pure. */
-export function configuredPins(config) {
+function configuredPins(config) {
   const pins = [];
   const add = (where, agent, model) => { if (agent && model) pins.push({ where, agent: String(agent), model: String(model) }); };
   const kernel = config?.kernel;
@@ -122,7 +122,7 @@ export function pinProblems(pins, { card = (agent) => { try { return parseYaml(f
 }
 
 /** The newest mtime under `root` (files only, node_modules and dist skipped), or 0. Seam: fs. */
-export function newestMtime(root, { fsImpl = fs } = {}) {
+function newestMtime(root, { fsImpl = fs } = {}) {
   let newest = 0;
   const walk = (dir) => {
     let entries = [];
@@ -153,7 +153,7 @@ export function uiBuildState({ uiDir = path.join(SKILL_ROOT, 'ui'), fsImpl = fs 
 }
 
 /** `npm run build` in ui/: {ok, output}. Seam: npm(args, options). */
-export function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), npm = runNpm } = {}) {
+function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), npm = runNpm } = {}) {
   const r = npm(['run', 'build'], { cwd: uiDir, timeout: 900_000 });
   return { ok: r.status === 0, output: String(r.stdout ?? '').concat(String(r.stderr ?? '')).trim().split(/\r?\n/).slice(-6).join(' | ').slice(0, 500) };
 }
@@ -229,7 +229,7 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
   return items;
 }
 
-export function slaItems(s) {
+function slaItems(s) {
   const open = s.violations?.open ?? 0;
   return [open ? warn('sla', 'violations', 'open violations / SLA', `${open} open violation(s) of ${s.violations.clocks ?? open} SLA clock(s): see the Supervisor digest`, 'node scripts/reconciler/boot.mjs --status')
     : green('sla', 'violations', 'open violations / SLA', `0 violated of ${s.violations?.clocks ?? 0} SLA clock(s)`, { required: false })];
@@ -240,7 +240,7 @@ export function slaItems(s) {
 const SERVICE_LABEL = { orca: 'Orca', 'harness-ui': 'harness UI (local /healthz)', 'harness-tunnel': 'harness tunnel (public /healthz)', 'ask-gateway': 'ask gateway', 'ask-tunnel': 'ask tunnel', 'telegram-bridge': 'Telegram bridge' };
 
 /** Probe every registry service in parallel: [{name, ok, detail, entry}]. Seam: registry. */
-export async function probeServices({ registry = serviceRegistry() } = {}) {
+async function probeServices({ registry = serviceRegistry() } = {}) {
   const wanted = registry.filter((e) => e.kind === 'service');
   return Promise.all(wanted.map(async (entry) => {
     let p;
@@ -250,9 +250,9 @@ export async function probeServices({ registry = serviceRegistry() } = {}) {
 }
 
 /** Whether config.yaml wants a connector service at all (an `off` one is not required). Pure. */
-export const serviceWanted = (name, config) => (name === 'ask-tunnel' ? (config?.connectors?.cloudflare?.mode ?? CONNECTOR_DEFAULTS.cloudflare.mode) !== 'off' : name === 'telegram-bridge' ? config?.connectors?.telegram?.enabled === true : true);
+const serviceWanted = (name, config) => (name === 'ask-tunnel' ? (config?.connectors?.cloudflare?.mode ?? CONNECTOR_DEFAULTS.cloudflare.mode) !== 'off' : name === 'telegram-bridge' ? config?.connectors?.telegram?.enabled === true : true);
 
-export function serviceItems(probes, { publicUrl = null, config = null } = {}) {
+function serviceItems(probes, { publicUrl = null, config = null } = {}) {
   return probes.map((p) => {
     const label = SERVICE_LABEL[p.name] ?? p.name;
     const d = p.detail ?? {};
@@ -267,7 +267,7 @@ export function serviceItems(probes, { publicUrl = null, config = null } = {}) {
 }
 
 /** The Supervisor seat row from `start-supervisor.mjs --status --json` (or the mode). Pure. */
-export function supervisorItem({ mode, statusJson, startJson = null }) {
+function supervisorItem({ mode, statusJson, startJson = null }) {
   if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
   const h = statusJson?.health;
   if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'node scripts/supervisor/start-supervisor.mjs --json');
@@ -276,7 +276,7 @@ export function supervisorItem({ mode, statusJson, startJson = null }) {
 }
 
 /** A Kernel seat row from a watchdog `--once --json` answer. Pure. */
-export function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
+function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
   const name = `Kernel seat ${workflowId}`;
   const id = `seat:kernel:${ledger}:${workflowId}`;
   const action = answer?.action ?? null;
@@ -354,7 +354,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
  * under <repo>/.starciwork/worktrees no live registry row owns). The GC controller's gc:worktrees pass clears orphans.
  * Seam: counts.
  */
-export async function worktreeItems({ env = process.env, repos = [], counts = null } = {}) {
+async function worktreeItems({ env = process.env, repos = [], counts = null } = {}) {
   let rows;
   try { rows = counts ?? (await import('../machine/worktrees.mjs')).worktreeCounts({ env, repos: [SKILL_ROOT, ...(await import('../kernel/target-repo.mjs')).boundRepoRoots(repos)] }); }
   catch (error) { return [warn('preflight', 'worktrees', 'worktrees per repo', `unreadable: ${String(error?.message ?? error).slice(0, 200)}`, 'node scripts/reconciler/start.mjs --check again')]; }
@@ -369,7 +369,7 @@ export async function worktreeItems({ env = process.env, repos = [], counts = nu
 }
 
 /** Every running workflow of every managed repo, its Kernel seat read through the watchdog's read-only pass. */
-export async function kernelSeatItems({ orcaOk = true, config = null, repair = false } = {}) {
+async function kernelSeatItems({ orcaOk = true, config = null, repair = false } = {}) {
   const { resumeRepos, runningWorkflows } = await import('../kernel/managed-repos.mjs');
   const { seatStateOf } = await import('./controllers/host.mjs');
   const { repos } = resumeRepos({ config });
@@ -395,7 +395,7 @@ export function summarize(items) {
   return { ok: redRequired.length === 0, red: redRequired.length, warn: warns.length, green: items.filter((i) => i.status === 'green').length };
 }
 
-export function renderText(items, { applied = [] } = {}) {
+function renderText(items, { applied = [] } = {}) {
   const mark = { green: '[GREEN]', red: '[RED]  ', warn: '[WARN] ' };
   const lines = [];
   for (const group of GROUPS) {
@@ -417,7 +417,7 @@ export function renderText(items, { applied = [] } = {}) {
 
 
 /** Write a named profile to config.yaml (backup first): only `start --set-profile` calls it. {changed, backup} or {error}. */
-export function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = Date.now(), profile = PROFILE } = {}) {
+function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = Date.now(), profile = PROFILE } = {}) {
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return { changed: false, error: `${file} is not readable` }; }
   const out = applyProfileText(text, profile);

@@ -60,7 +60,7 @@ import { envDumpVerdict } from './env-dump-verdict.mjs';
 import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
-
+import { readEnv } from '../lib/env.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -474,7 +474,7 @@ export async function unguardedVerdict({ command, cwd, env = process.env, dialec
 }
 
 /** The shell text of one hook input: Claude's Bash/PowerShell, Codex's Bash and Devin's exec all carry `command`. */
-export function shellCallOf(input) {
+function shellCallOf(input) {
   const command = input?.tool_input?.command;
   if (typeof command !== 'string' || !command.trim()) return null;
   const cwd = input.tool_input.workdir || input.cwd || process.cwd();
@@ -505,7 +505,7 @@ if (isMain(import.meta.url)) {
   process.stdin.on('end', async () => {
     try {
       // The common case - no guard bound and no package manager named - exits before anything heavier than one file read.
-      if (!boundGuard(process.env.ORCA_TERMINAL_HANDLE) && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
+      if (!boundGuard(readEnv('ORCA_TERMINAL_HANDLE')) && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
       const decision = await hookDecision(JSON.parse(raw));
       if (!decision) process.exit(0);
       const { refusalLines, logRefusal } = await import('./refusals.mjs');

@@ -52,7 +52,8 @@ import { livePartsOf, LOOP_SCHEMA } from '../work/draw/draw-loop-coverage.mjs';
 import { rationaleFileOf } from '../work/draw/draw-rationale.mjs';
 import { DIRECTION_REVIEW_SCHEMA, checkDirection, defaultGrammarRoot, readBrandRecord } from '../work/brand/brand.mjs';
 import { sha256File } from '../work/work-io.mjs';
-
+import { readEnv } from '../lib/env.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 export const AUTOPILOT_BY = 'autopilot';
 export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
 export const SUPERVISOR_GATE = 'supervisor-gate';
@@ -74,13 +75,12 @@ export const AUTOPILOT_EVENTS = Object.freeze({
   decision: 'autopilot-decision',
 });
 /** The classes of an ask the owner alone can settle; under autopilot they wait for the end of the flow. */
-export const DEFERRED_CLASSES = Object.freeze(['credential', 'real-money', 'shared-system', 'owner-decision']);
+const DEFERRED_CLASSES = Object.freeze(['credential', 'real-money', 'shared-system', 'owner-decision']);
 const DRAW_REVIEW_SCHEMA = 'starci/draw-review@1';
 const DRAW_REVIEW_KIND = 'draw-review';
 const DIRECTION_REVIEW_KIND = 'brand-direction-review';
 const DAY = 86_400_000;
-
-const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
+const num = (value, fallback) => positiveNumber(value, fallback, { orZero: true });
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
 
 /* ------------------------------------------------------------------ settings */
@@ -91,7 +91,7 @@ export function autopilotSettings(source = null) {
   try { raw = (source ?? allocationSettings())?.autopilot ?? {}; } catch { raw = {}; }
   const budgets = raw.budgets ?? {};
   // STARCI_AUTOPILOT=on|off overrides the runtimes.yaml default for this process (a spec exercising the owner flow).
-  const env = String(process.env.STARCI_AUTOPILOT ?? '').trim().toLowerCase();
+  const env = String(readEnv('STARCI_AUTOPILOT') ?? '').trim().toLowerCase();
   return {
     enabled: env === 'on' ? true : env === 'off' ? false : raw.enabled !== false,
     workflows: raw.workflows && typeof raw.workflows === 'object' ? raw.workflows : {},
@@ -158,13 +158,13 @@ export function autopilotAskClass({ opId = null, question = null, subject = null
 }
 
 /** The default path the work proceeds on while an owner-only item waits for the end of the flow. */
-export const STUB_PATHS = Object.freeze({
+const STUB_PATHS = Object.freeze({
   credential: 'build and unit/integration-test against the declared env var or custody key with a placeholder-<VAR> stand-in and the provider sandbox test stubs (credentialPending); the live-proof legs wait for the handover credential checklist',
   'real-money': 'provider sandbox / test mode only: prove the flow up to the provider hand-off and the unpaid branch; no real transfer is made; the paid-state proof is owed at handover',
   'shared-system': 'leave the shared external system untouched: a dev-only webhook/endpoint on the product\'s own dev channel (or a local stub receiver) proves the integration; the shared switch is owed at handover',
   'owner-decision': 'the asking leg waits for the owner at the end; every leg that does not depend on the decision proceeds',
 });
-export const OWED_PROOFS = Object.freeze({
+const OWED_PROOFS = Object.freeze({
   credential: 'the live proof with the owner\'s real credentials (integration/e2e/uat legs re-run after the handover credential checklist)',
   'real-money': 'the paid-state proof with a real payment, after the owner approves the spend',
   'shared-system': 'the change on the shared external system, after the owner approves it',
@@ -226,7 +226,7 @@ export function drawGateEvidence({ repo, recordPath, reviewed = [], beautyMin = 
  * recipe, rubric, golden bytes) with only the owner-acceptance problems set aside, the archetype declared with every
  * field, and the golden the ask showed still on disk. {ok, archetype, rev, findings[], golden[]}.
  */
-export function directionGateEvidence({ repo, review }) {
+function directionGateEvidence({ repo, review }) {
   const findings = [];
   let brand;
   try { brand = readBrandRecord(repo); } catch (error) { return { ok: false, archetype: review?.archetype ?? null, findings: [{ code: 'BRAND_UNREADABLE', detail: error.message }] }; }
@@ -376,7 +376,7 @@ export function autopilotAnswerAsk({ ledger, repo, workflowId, report, settings 
 /* ------------------------------------------------------------------ deferral, gates, budgets */
 
 /** Asks of the workflow still pending: filed, their job settled awaiting the owner, neither answered nor superseded. */
-export function pendingAsksOf(db, workflowId) {
+function pendingAsksOf(db, workflowId) {
   return db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask'
       AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
       ORDER BY r.report_id`).all(workflowId)
@@ -412,7 +412,7 @@ export function deferredLegsOf(db, workflowId) {
 }
 
 /** Provisional acceptances not yet re-opened: [{dispatchId, opId, jobId, record, class, receiptPath, images[], at}]. */
-export function provisionalOf(db, workflowId) {
+function provisionalOf(db, workflowId) {
   const reopened = new Set(eventsOf(db, workflowId, AUTOPILOT_EVENTS.reopened).map((e) => e.dispatchId));
   const recommended = eventsOf(db, workflowId, AUTOPILOT_EVENTS.recommended).map((e) => ({ ...e, class: 'recommended', record: null }));
   return [...eventsOf(db, workflowId, AUTOPILOT_EVENTS.provisional), ...recommended].filter((e) => !reopened.has(e.dispatchId))
@@ -462,7 +462,7 @@ const raisedOf = (db, workflowId, incidentId) => {
 };
 
 /** Open supervisor-gate incidents: [{incidentId, opId, holds[], detail, since}]. */
-export function supervisorGatesOf(db, workflowId) {
+function supervisorGatesOf(db, workflowId) {
   return openIncidents(db, workflowId).filter((row) => kindOf(row.last_progress) === SUPERVISOR_GATE).map((row) => {
     const raised = db.prepare("SELECT created_at,payload_json FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(workflowId, row.incident_id);
     const payload = parseJson(raised?.payload_json, {}) ?? {};
@@ -570,7 +570,7 @@ export function autopilotSweep({ ledger, repo, workflowId, settings = autopilotS
 }
 
 /** The owner's answer to the end-of-flow credential checklist ask, if any: {dispatchId, receipt}. Only an owner answer counts. */
-export function checklistAnswerOf(db, workflowId) {
+function checklistAnswerOf(db, workflowId) {
   const rows = db.prepare("SELECT r.dispatch_id,r.report_json FROM reports r WHERE r.workflow_id=? AND r.outcome='ask' ORDER BY r.report_id DESC").all(workflowId);
   for (const row of rows) {
     const rj = parseJson(row.report_json, {}) ?? {};

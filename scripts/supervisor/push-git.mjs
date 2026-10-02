@@ -37,15 +37,16 @@ import { git } from './workers.mjs';
 import { defaultPushRepos, pushMains, describePush } from './push-mains.mjs';
 import { SKILL_ROOT, supervisorLog } from '../machine/home.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { readJsonFile } from '../lib/json.mjs';
+import { foldCase, realPath } from '../lib/path-key.mjs';
 
-const canonical = (p) => { const r = path.resolve(p); try { return fs.realpathSync.native(r); } catch { return r; } };
-const key = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
+const key = (p) => foldCase(realPath(p));
 const samePath = (a, b) => key(a) === key(b);
 
 /** Generous per-step ceilings: a full suite is the point of this flow. */
-export const STEP_TIMEOUT_MS = Object.freeze({ runtime: 60 * 60_000, product: 40 * 60_000 });
-export const MAX_ITEMS_PER_GROUP = 12;
-export const MAX_GROUPS = 60;
+const STEP_TIMEOUT_MS = Object.freeze({ runtime: 60 * 60_000, product: 40 * 60_000 });
+const MAX_ITEMS_PER_GROUP = 12;
+const MAX_GROUPS = 60;
 
 /* ------------------------------------------------------------ pure pieces */
 
@@ -62,9 +63,9 @@ export function mainState(repo, { run = git } = {}) {
 }
 
 /** Is this checkout the runtime itself? */
-export const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runtimeRoot);
+const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runtimeRoot);
 
-const readPackage = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')); } catch { return null; } };
+const readPackage = (repo) => readJsonFile(path.join(repo, 'package.json'));
 
 /**
  * The full-suite steps of one checkout. Runtime: npm test + npm run check. App: the managed scripts typecheck, lint,
@@ -163,16 +164,16 @@ const readTail = (file, maxBytes = 24 * 1024 * 1024) => {
 };
 
 /** Run one step in `cwd`, its output to a log file (no spawn buffer to overflow). Returns {ok, exit, ms, log, text, timedOut?}. */
-export function runStep(step, { cwd, timeoutMs, tag = 'repo' } = {}) {
+export function runStep(step, { cwd, timeoutMs, tag = 'repo', env = process.env } = {}) {
   const log = path.join(logDir(), `${tag}-${step.name.replace(/[^\w.-]+/g, '_')}-${Date.now()}.log`);
   const fd = fs.openSync(log, 'w');
   const started = Date.now();
   let r;
   try {
-    const env = { ...process.env, CI: process.env.CI ?? '1', STARCI_PUSH_GIT: '1' };
+    const childEnv = { ...env, CI: env.CI ?? '1', STARCI_PUSH_GIT: '1' };
     r = step.cmd === 'npm'
-      ? runNpm(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env })
-      : runNode(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env });
+      ? runNpm(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env: childEnv })
+      : runNode(step.args, { cwd, stdio: ['ignore', fd, fd], timeout: timeoutMs, env: childEnv });
   } finally { fs.closeSync(fd); }
   const timedOut = r.error?.code === 'ETIMEDOUT' || (r.status == null && r.signal === 'SIGTERM');
   const text = readTail(log);

@@ -21,7 +21,7 @@ const remember = (key, value) => {
 const git = (repo, args, options) => readOnly(repo, args, options);
 
 /** null when the stored report path is safe to hand to git, else the refusal reason. */
-export function refusePath(repo, value) {
+function refusePath(repo, value) {
   if (typeof value !== 'string' || !value.trim()) return 'empty path';
   if (value.includes('\0')) return 'NUL in path';
   if (/^([a-zA-Z]:|[\\/])/.test(value)) return 'absolute path refused';

@@ -18,14 +18,14 @@ import {posixPath,slash} from '../lib/path-key.mjs';
  * The op worktree is never modified, never committed to and never checked out - the base lives in a
  * temporary linked worktree that is removed in a `finally`.
  */
-export const VERIFY_PROOF='starci/verify-proof@1';
+const VERIFY_PROOF='starci/verify-proof@1';
 /** The proof of a sealed candidate: planned only from a verifier-owned oracle manifest. */
-export const CANDIDATE_PROOF='starci/verify-proof@1';
+const CANDIDATE_PROOF='starci/verify-proof@1';
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
 /** A spec/test file in any of the suites this runtime drives (unit, e2e). */
-export const SPEC_PATTERN=/\.(spec|test|e2e-spec)\.[cm]?[jt]sx?$/;
-export const PROOF_TIMEOUT_MS=20*60*1000;
+const SPEC_PATTERN=/\.(spec|test|e2e-spec)\.[cm]?[jt]sx?$/;
+const PROOF_TIMEOUT_MS=20*60*1000;
 export const VERDICTS=['proven','weak','contradiction','checks-only'];
 
 const unique=list=>[...new Set(list)];

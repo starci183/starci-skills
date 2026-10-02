@@ -30,9 +30,9 @@ import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configured
 import { machineUsage } from '../kernel/usage-report.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
-export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
-export const TASK_NAME = 'StarCi-Reconciler';
-export const TASK_EVERY_MINUTES = 5;
+const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
+const TASK_NAME = 'StarCi-Reconciler';
+const TASK_EVERY_MINUTES = 5;
 /**
  * MB-04: a draining engine (reload handover) or one whose workers:push child still runs is left alone this long past a
  * stale heartbeat. The engine renews its lease on its own timer while it drains, so a stale heartbeat beyond this grace
@@ -43,15 +43,15 @@ const selfFile = fileURLToPath(import.meta.url);
 
 /** Kinds of the machine_logs rows boot.mjs writes (actor reconciler). */
 export const SPAWNED_KIND = 'reconciler.engine-spawned';
-export const CRASH_ALERT_KIND = 'reconciler.crash-loop-alert';
+const CRASH_ALERT_KIND = 'reconciler.crash-loop-alert';
 /**
  * Starts that are decisions, not crashes: an owner restart (`--restart`, `start`), a self-reload or land re-exec handover,
  * and a restart after the previous engine ended cleanly. They never count toward the crash-loop guard; only abnormal
  * exits (a hung or dead engine that ensure had to replace) do.
  */
-export const PLANNED_START_REASONS = Object.freeze(['owner-restart', 'start', 'self-reload', 'reload', 'handover', 'planned-restart']);
+const PLANNED_START_REASONS = Object.freeze(['owner-restart', 'start', 'self-reload', 'reload', 'handover', 'planned-restart']);
 /** process_runs.exit_reason values of an engine that ended on purpose. */
-export const PLANNED_EXIT_REASONS = Object.freeze(['clean', 'stopped', 'reload-handover']);
+const PLANNED_EXIT_REASONS = Object.freeze(['clean', 'stopped', 'reload-handover']);
 export const isPlannedStart = (reason) => PLANNED_START_REASONS.includes(String(reason ?? ''));
 
 /**
@@ -104,7 +104,7 @@ export function crashLoopPlan(record, { now = Date.now(), max = 3, windowMs = 1_
  * Spawn the engine detached and hidden (it logs to machine.sqlite; its start reason rides START_REASON_ENV). Returns the
  * pid.
  */
-export function spawnEngine({ safe = false, env = process.env, startReason = 'boot' } = {}) {
+function spawnEngine({ safe = false, env = process.env, startReason = 'boot' } = {}) {
   const child = spawnNode([ENGINE_FILE, ...(safe ? ['--safe'] : [])], { cwd: SKILL_ROOT, env: { ...env, [START_REASON_ENV]: startReason },
     detached: true, stdio: 'ignore' });
   child.unref();

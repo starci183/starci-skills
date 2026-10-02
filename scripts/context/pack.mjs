@@ -30,10 +30,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { mergeOpShared, opSharedOf } from '../lib/op-shared.mjs';
-import { loadRecords, readWorkspace, resolveOwnedDirs } from '../work/record-ownership.mjs';
+import { ownedRecordPaths } from '../work/record-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { walkFiles } from '../lib/walk.mjs';
+import { opCli } from '../lib/cli-arg.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -42,8 +44,7 @@ const FILE_CAP = 200;
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', '.git']);
 
-const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
-  .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
+const walk = dir => (fs.existsSync(dir) ? walkFiles(dir) : []);
 
 /** Bounded file listing under one owned dir — cap is enforced by the caller
  *  across all dirs; `budget` is how many more files may still be collected. */
@@ -139,18 +140,7 @@ function resolveOwnedPaths(records, stateDir, preResolved) {
   }
   const workRoot = path.resolve(stateDir);
   if (!fs.existsSync(workRoot)) return { ownedPaths: [], missing: [], error: `state dir missing: ${workRoot}` };
-  const recordsById = loadRecords(workRoot, walk);
-  const workspaceDoc = readWorkspace(workRoot);
-  const ownedPaths = [];
-  const missing = [];
-  for (const rid of records) {
-    const rec = recordsById.get(rid);
-    if (!rec) { missing.push(rid); continue; }
-    for (const d of resolveOwnedDirs(rid, rec, recordsById, workspaceDoc, workRoot)) {
-      ownedPaths.push({ record: rid, path: d.rel.replaceAll('\\', '/'), via: d.via, exists: fs.existsSync(d.abs), abs: d.abs });
-    }
-  }
-  return { ownedPaths, missing };
+  return ownedRecordPaths(records, workRoot, { walk, withAbs: true });
 }
 
 /**
@@ -302,34 +292,12 @@ export function renderPromptReads(context) {
   return lines;
 }
 
-function usage(code) {
-  console.error(`use: node scripts/context/pack.mjs --op <id>
+const { usage, parseArgs } = opCli(`use: node scripts/context/pack.mjs --op <id>
     [--records a,b] [--state <.starciwork dir>] [--repo <runtime root>]
-    [--out <packet file>] [--json]`);
-  process.exit(code);
-}
-
-function parseArgs(argv) {
-  const a = { records: [] };
-  const take = () => {
-    const v = argv[++parseArgs.i];
-    if (v === undefined) usage(2);
-    return v;
-  };
-  for (parseArgs.i = 0; parseArgs.i < argv.length; parseArgs.i++) {
-    const k = argv[parseArgs.i];
-    if (k === '--op') a.op = take();
-    else if (k === '--records') a.records.push(...take().split(','));
-    else if (k === '--state') a.state = take();
-    else if (k === '--repo') a.repo = take();
-    else if (k === '--out') a.out = take();
-    else if (k === '--json') a.json = true;
-    else if (k === '--help' || k === '-h') usage(0);
-    else usage(2);
-  }
-  a.records = [...new Set(a.records.map(s => s.trim()).filter(Boolean))];
-  return a;
-}
+    [--out <packet file>] [--json]`, {
+  '--repo': (o, take) => { o.repo = take(); },
+  '--out': (o, take) => { o.out = take(); },
+});
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

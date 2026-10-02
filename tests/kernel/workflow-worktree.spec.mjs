@@ -18,8 +18,13 @@ import { isPendingRow } from '../../scripts/machine/worktree-registry.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
 import { workflowWorktreeAt, workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { inspectLedger, ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
+import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 const require = createRequire(import.meta.url);
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
+const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const LINK = process.platform === 'win32' ? 'junction' : 'dir';
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
@@ -319,7 +324,7 @@ test('startAgent threads a new worktree\'s creation flags to worker-start, and n
   for (const k of ['repo', 'baseBranch', 'name', 'setup']) assert.equal(starts[1][k], undefined, `an existing worktree takes no --${k}`);
 });
 
-test('an op launched into a workflow worktree gets a guard file naming it (the history guard refuses commits there)', async (t) => {
+test('guardLaunch writes the workflow worktree into an op guard file', async (t) => {
   const { guardLaunch } = await import('../../scripts/guards/hook-install.mjs');
   const { base, app, ctx } = fixture(t);
   const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-guard', appRepo: app }).record;
@@ -331,7 +336,50 @@ test('an op launched into a workflow worktree gets a guard file naming it (the h
   assert.equal(guard.workflowId, 'wf-guard');
   const outside = guardLaunch({ skillRoot, jobId: 'op-plain', workflowId: 'wf-none', ledgerRepo: app, owned: [], repos: [], config: { guards: { historyHook: false, workHook: false } } });
   assert.equal(JSON.parse(fs.readFileSync(outside.receipt.jobFile, 'utf8')).workflowWorktree, null, 'no workflow worktree, no field value');
-  // api dispatch hands the registry path of the workflow's worktree to the guard (scripts/kernel/verbs/dispatch.mjs).
-  const dispatchSource = fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'scripts', 'kernel', 'verbs', 'dispatch.mjs'), 'utf8');
-  assert.match(dispatchSource, /opGuardLaunch\(\{[^}]*workflowWorktree: workflowTree\?\.path \?\? null/);
+});
+
+test('api dispatch passes the registered workflow worktree to the guard, and null when there is none', (t) => {
+  const { base, app, env, ctx } = fixture(t);
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'),
+    { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const rec = ensureWorkflowWorktree(ctx, { workflowId: 'wf-dispatch-guard', appRepo: app }).record;
+  const fake = path.join(base, 'fake-orca.mjs'), state = path.join(base, 'orca-state.json');
+  fs.writeFileSync(fake, FAKE_ORCA);
+  const childEnv = { ...env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
+    STARCI_FAKE_ORCA_LOG: path.join(base, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: state, LOCALAPPDATA: path.join(base, 'localappdata'),
+    STARCI_OWNER_ROOT: path.join(base, 'owner') };
+  for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete childEnv[key];
+  const seed = (repo, workflowId, jobId, owned) => {
+    const ledger = openLedger({ file: ledgerFileFor(repo) });
+    try {
+      seedWorkflow(ledger, { id: workflowId, goal: { revision: 1, markdown: '# Dispatch guard' }, jobs: [
+        { jobId: `kernel-${workflowId}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: `term-${workflowId}`, payload: {} },
+        { jobId, opId: 'code.refactor', status: 'queued', payload: { opId: 'code.refactor', owned_paths: owned } },
+      ] });
+    } finally { ledger.close(); }
+  };
+  const dispatch = (repo, jobId) => spawnSync(process.execPath, [API, 'dispatch', '--repo', repo, '--job', jobId, '--model', 'codex-agent', '--spawn', '--json'],
+    { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: childEnv });
+  const guardOf = (repo, jobId) => {
+    const ledger = inspectLedger({ file: ledgerFileFor(repo) });
+    try {
+      const row = ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='op-dispatched'").get(jobId);
+      const jobFile = JSON.parse(row.payload_json).guard.jobFile;
+      return JSON.parse(fs.readFileSync(jobFile, 'utf8'));
+    } finally { ledger.close(); }
+  };
+
+  const guarded = 'op-code.refactor-guarded';
+  seed(app, 'wf-dispatch-guard', guarded, ['be/src/']);
+  const inTree = dispatch(app, guarded);
+  assert.equal(inTree.status, 0, inTree.stderr || inTree.stdout);
+  assert.equal(guardOf(app, guarded).workflowWorktree, path.resolve(rec.path));
+
+  const plain = path.join(base, 'plain');
+  fs.mkdirSync(path.join(plain, 'docs'), { recursive: true });
+  const unbound = 'op-code.refactor-unbound';
+  seed(plain, 'wf-dispatch-no-tree', unbound, ['docs/']);
+  const withoutTree = dispatch(plain, unbound);
+  assert.equal(withoutTree.status, 0, withoutTree.stderr || withoutTree.stdout);
+  assert.equal(guardOf(plain, unbound).workflowWorktree, null);
 });

@@ -318,3 +318,19 @@ test('the shipped runtime passes its own check: every eslint id exists and every
   assert.equal(result.refusal, undefined);
   assert.deepEqual(result.findings, []);
 });
+
+test('a failure-catalog code of the rule system that no rule owns and no infrastructure list declares is unowned (S7-02)', () => {
+  const catalog = loadRuleCatalog();
+  const failureCodes = { ...failureCatalog(catalog), HFS_TOOL_ONLY: {}, HFS_DECLARED_TOOL: {} };
+  const findings = run(catalog, { failureCodes, infrastructure: { HFS_DECLARED_TOOL: 'scripts/x.mjs' } });
+  assert.deepEqual(findings.map((f) => f.code), ['HFS_RULE_CODE_UNOWNED']);
+  assert.ok(findings[0].message.startsWith('HFS_TOOL_ONLY is in modules/kernel/failure-codes.yaml'), findings[0].message);
+  assert.deepEqual(run(catalog, { failureCodes: { ...failureCatalog(catalog), HFS_DECLARED_TOOL: {} }, infrastructure: { HFS_DECLARED_TOOL: 'scripts/x.mjs' } }), []);
+});
+
+test('a declared infrastructure code that a rule owns, or the catalog lacks, is stale', () => {
+  const catalog = loadRuleCatalog();
+  const ownedCode = catalog.rules[0].code;
+  const findings = run(catalog, { infrastructure: { [ownedCode]: 'scripts/x.mjs', HFS_GONE_TOOL: 'scripts/x.mjs' } });
+  assert.deepEqual(findings.map((f) => f.code), ['HFS_RULE_CODE_UNOWNED', 'HFS_RULE_CODE_UNOWNED']);
+});

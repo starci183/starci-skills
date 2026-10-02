@@ -38,12 +38,12 @@ const read = (file) => {
 };
 
 /** The dispatch switch in main() — the verbs the process can actually run. */
-export function verbsFromSwitch(source) {
+function verbsFromSwitch(source) {
   return [...source.matchAll(/^\s*case '([a-z][a-z0-9-]*)':\s*return\b/gm)].map((m) => m[1]);
 }
 
 /** The verb column of the usage() heredoc: two-space indent, then the verb. */
-export function verbsFromUsage(source) {
+function verbsFromUsage(source) {
   const start = source.indexOf('const usage = ');
   if (start < 0) throw new SurfaceInputError('cli.mjs has no usage() definition');
   const open = source.indexOf('`', start);
@@ -55,7 +55,7 @@ export function verbsFromUsage(source) {
 }
 
 /** Top-level keys under `commands:` in modules/kernel/api.yaml. */
-export function verbsFromContract(source) {
+function verbsFromContract(source) {
   const doc = parseYaml(source);
   const commands = doc?.commands;
   if (!commands || typeof commands !== 'object') throw new SurfaceInputError('api.yaml has no commands: map');
@@ -63,7 +63,7 @@ export function verbsFromContract(source) {
 }
 
 /** The pipe-separated list on the `starci api <verb>` help line. */
-export function verbsFromCliHelp(source) {
+function verbsFromCliHelp(source) {
   const m = /kernel ledger gate:\s*([a-z0-9|-]+)/.exec(source);
   if (!m) throw new SurfaceInputError('bin/starci.mjs has no `kernel ledger gate:` help line');
   return m[1].split('|').filter(Boolean);
@@ -72,7 +72,7 @@ export function verbsFromCliHelp(source) {
 const filesIn = (dir, rx) => { try { return fs.readdirSync(dir).filter((n) => rx.test(n) && !n.startsWith('_')).sort(); } catch { return []; } };
 
 /** Extension verbs: {verbs, documented, withUsage, badDocs} from scripts/kernel/verbs and modules/kernel/api-commands. */
-export function extensionSurface(root = DEFAULT_ROOT) {
+function extensionSurface(root = DEFAULT_ROOT) {
   const verbsDir = path.join(root, 'scripts', 'kernel', 'verbs');
   const docsDir = path.join(root, 'modules', 'kernel', 'api-commands');
   const verbs = filesIn(verbsDir, /^[a-z][a-z0-9-]*\.mjs$/).map((n) => n.slice(0, -4));
@@ -87,7 +87,7 @@ export function extensionSurface(root = DEFAULT_ROOT) {
   return { verbs, documented, withUsage, badDocs };
 }
 
-export function collectApiSurface(root = DEFAULT_ROOT) {
+function collectApiSurface(root = DEFAULT_ROOT) {
   const apiFile = path.join(root, 'scripts', 'kernel', 'cli.mjs');
   const yamlFile = path.join(root, 'modules', 'kernel', 'api.yaml');
   const binFile = path.join(root, 'bin', 'starci.mjs');

@@ -18,10 +18,10 @@ import { citedPathFindings } from './check-contract-cites.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
 
 /** The folders whose every .mjs must parse. */
-export const SYNTAX_ROOTS = Object.freeze(['engine', 'scripts', 'modules', 'bin']);
+const SYNTAX_ROOTS = Object.freeze(['engine', 'scripts', 'modules', 'bin']);
 
 /** Every .mjs under SYNTAX_ROOTS of `root` (node_modules skipped), sorted. */
-export function syntaxFiles(root = skillRoot) {
+function syntaxFiles(root = skillRoot) {
   return SYNTAX_ROOTS.flatMap((dir) => (fs.existsSync(path.join(root, dir))
     ? walkFiles(path.join(root, dir), { sorted: true, filter: (name) => name.endsWith('.mjs'), exclude: (name) => name === 'node_modules' })
     : []));
@@ -31,7 +31,7 @@ export function syntaxFiles(root = skillRoot) {
 const line = (f) => `${f.code} ${f.message}`;
 
 /** The whole `starci check` of the runtime at `root`: {ok, syntax, runtime, selfChecks}. Prints as it goes (the runtime report as JSON with `json`). */
-export function checkRuntime({ root = skillRoot, json = false } = {}) {
+function checkRuntime({ root = skillRoot, json = false } = {}) {
   const out = (text) => { if (!json) process.stdout.write(`${text}\n`); };
   const err = (text) => { if (!json) process.stderr.write(`${text}\n`); };
 

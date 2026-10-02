@@ -59,7 +59,7 @@ const RETRY_PATTERNS = new Set(['retry-loop', 'repeat-check', 'reroute-loop', 'r
 // A retry cap a Kernel recorded as an incident (route failed-retries-the-same-op, "fired 3 of 3", attempt caps).
 const RETRY_CAP_TEXT = /failed-retries|retr(?:y|ies) cap|attempt cap|max(?:imum)? (?:retries|attempts)|fired \d+ of \d+ times/i;
 const key = (...parts) => parts.filter((p) => p != null && p !== '').join('|');
-const one = (s, n = 220) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
+const one = (s, n = 220) => clipLine(s, n);
 
 /** Push refusal class from its text: secret | lint | test | hook | other. Pure. */
 export function pushClass(p) {
@@ -137,7 +137,7 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
 }
 
 /** sup_events of `kinds` created after `after` (strictly, or at/after with `inclusive`), oldest first, payload parsed. */
-export function eventsSince(m, kinds, after = 0, { inclusive = false } = {}) {
+function eventsSince(m, kinds, after = 0, { inclusive = false } = {}) {
   return m.db.prepare(`SELECT kind, entity_id, payload_json, created_at FROM sup_events WHERE kind IN (${kinds.map(() => '?').join(',')}) AND created_at${inclusive ? '>=' : '>'}? ORDER BY seq`)
     .all(...kinds, after).map((r) => { let p = null; try { p = fullJson(JSON.parse(r.payload_json ?? 'null')); } catch { p = null; } return { ...r, payload: p ?? {} }; });
 }
@@ -180,7 +180,7 @@ export function withSla(items, { seen = {}, acted = { byKey: {}, byWorkflow: {} 
 export const actionLine = (i) => `OWED-ACTION ${i.breach ? 'SLA-BREACH ' : ''}[${i.class}] ${i.key} age=${i.ageMin}m ${i.actedAt ? `acted ${hhmm(i.actedAt)}${i.heldUntil ? ` held until ${hhmm(i.heldUntil)}` : ''}` : 'no action yet'}: ${i.evidence}\n    do: ${i.do}${(i.lessons ?? []).map((l) => `\n    lesson: ${l}`).join('')}`;
 
 /** The longest an action may hold its item out of SLA-BREACH: a hold is re-affirmed at least this often. */
-export const MAX_HOLD_MS = 12 * 3_600_000;
+const MAX_HOLD_MS = 12 * 3_600_000;
 
 /**
  * Record one supervisor action (the audit trail every action leaves). `until` (epoch ms) marks a standing ruling that

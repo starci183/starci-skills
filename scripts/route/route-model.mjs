@@ -51,7 +51,7 @@ import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyO
   providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
-
+import { readEnv } from '../lib/env.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) : null);
 
@@ -60,7 +60,7 @@ const readYaml = p => (fs.existsSync(p) ? parseYaml(fs.readFileSync(p, 'utf8')) 
 // points it at a different directory holding a config.yaml (test and tooling
 // seam). A missing, unparsable or schema-short file is never fatal — routing
 // degrades to "no config" and reports why.
-const ownerRoot = process.env.STARCI_OWNER_ROOT ? path.resolve(process.env.STARCI_OWNER_ROOT) : skillRoot;
+const ownerRoot = readEnv('STARCI_OWNER_ROOT') ? path.resolve(readEnv('STARCI_OWNER_ROOT')) : skillRoot;
 
 // Which config.yaml models.nonOperation role serves each kernel-function kind —
 // the same map engine/config.mjs resolves through nonOperationModels().

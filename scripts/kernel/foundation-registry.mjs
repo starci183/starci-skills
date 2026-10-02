@@ -15,16 +15,17 @@
 // text), written through engine/db/ledger.mjs upsertFoundation / declareFoundations.
 // Every write also appends an event on the acting workflow (entity_type 'foundation').
 import { parseJson } from '../lib/json.mjs';
+import { fail } from '../../engine/refuse.mjs';
 import { declareFoundations, upsertFoundation } from '../../engine/db/ledger.mjs';
 
-export const FOUNDATION_SCHEMA = 'starci/foundation@1';
+const FOUNDATION_SCHEMA = 'starci/foundation@1';
 export const FOUNDATION_KINDS = ['layout-tree', 'brand', 'grammar', 'module', 'contract', 'baseline', 'scaffold', 'other'];
 // The contract change that introduced foundation planning (modules/kernel/contract-changes/):
 // a workflow created after it must declare before its first leg; an older one is told, not held.
 export const FOUNDATION_CHANGE_ID = 'shared-foundation-planning';
 const NAME_RX = /^[a-z0-9][a-z0-9._@/-]{0,79}$/;
 
-const fail = (message, code, extra = {}) => { throw Object.assign(new Error(message), { code, ...extra }); };
+
 
 export function normalizeFoundationName(name) {
   const value = String(name ?? '').trim().toLowerCase();

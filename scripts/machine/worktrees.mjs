@@ -47,6 +47,7 @@ import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './work
 import { pidAlive, machineLog, withMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { shortHash } from '../lib/hash.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -110,7 +111,7 @@ function ledgerLookup(env) {
   return jobStatus;
 }
 
-const hashOf = (p) => crypto.createHash('sha1').update(treeKey(p)).digest('hex').slice(0, 10);
+const hashOf = (p) => shortHash(treeKey(p), { algo: 'sha1' });
 const ageOf = (p, now) => { try { return now - fs.statSync(p).mtimeMs; } catch { return Infinity; } };
 const supLookup = (jobId, env) => { try { return withRegistry((m) => m.supJob(jobId)?.status ?? null, env); } catch { return null; } };
 

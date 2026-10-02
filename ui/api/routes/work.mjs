@@ -5,6 +5,7 @@ import { attemptOpen, pipelineOf } from '../pipeline.mjs';
 import { getBlob } from '../../../engine/db/blob.mjs';
 import { workflowStateOf } from '../../../scripts/kernel/progress-state.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
+import { source, many, one, parse, staleOf, page } from '../query.mjs';
 import { uiState } from '../state.mjs';
 import { reason } from '../reason.mjs';
 
@@ -15,15 +16,7 @@ const OPEN_DI = "('open','claimed','escalated')";
 // archived|finished workflow is locked by events_refuse_archived and can never be resolved.
 const ENDED_JOIN = "LEFT JOIN workflows w ON w.workflow_id=d.workflow_id";
 const ENDED_LIVE = "(w.phase IS NULL OR w.phase NOT IN ('archived','finished'))";
-const source = (db, ...rels) => rels.map(rel => ({ db, rel }));
-const many = (db, sql, ...args) => db.prepare(sql).all(...args);
-const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
-const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
-const staleOf = store => [...store.stale];
-const safeLimit = url => Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-const cursorOf = url => { try { return Math.max(0, Number(JSON.parse(Buffer.from(url.searchParams.get('cursor') ?? '', 'base64url').toString()).offset) || 0); } catch { return 0; } };
-const nextOf = offset => Buffer.from(JSON.stringify({ offset })).toString('base64url');
-const page = (rows, url) => { const offset = cursorOf(url), limit = safeLimit(url); return { data: rows.slice(offset, offset + limit), next: offset + limit < rows.length ? nextOf(offset + limit) : null }; };
+const pageData = (rows, url) => page(rows, url, 'data');
 const ref = (kind, id, project = null, wf = null) => ({ kind, ...(project ? { project } : {}), id: String(id), href: hrefOf(kind, id, project, wf) });
 function hrefOf(kind, id, project, wf = null) {
   const p = encodeURIComponent(project ?? '');
@@ -374,13 +367,13 @@ export function handleWork(request, response, store, url) {
     if (ui) rows = rows.filter(row => row.ui === ui);
     if (q) rows = rows.filter(row => `${row.name} ${row.id} ${row.project}`.toLowerCase().includes(q));
     rows.sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
-    const result = page(rows, url);
+    const result = pageData(rows, url);
     sendJson(request, response, result.data, { sources: [...source('machine', 'metrics_snapshots', 'v_seats', 'v_sla_open'),
       ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_units'))], stale: staleOf(store), next: result.next });
     return true;
   }
   if (pathname === '/api/decisions/log') {
-    const result = page(decisionLog(store, url), url);
+    const result = pageData(decisionLog(store, url), url);
     sendJson(request, response, result.data, { sources: [source('machine', 'sup_decisions')[0], ...store.projects().flatMap(row => source(row.name, 'decisions'))], stale: staleOf(store), next: result.next });
     return true;
   }
@@ -418,7 +411,7 @@ export function handleWork(request, response, store, url) {
     if (op) rows = rows.filter(item => item.op === op);
     if (ui) rows = rows.filter(item => item.ui === ui);
     if (q) rows = rows.filter(item => `${item.unit} ${item.title} ${item.op}`.toLowerCase().includes(q));
-    const result = page(rows, url);
+    const result = pageData(rows, url);
     sendJson(request, response, result.data, { sources: source(row.name, 'v_units', 'v_op_history'), stale: staleOf(store), next: result.next }); return true;
   }
   if (route === 'worktrees') {

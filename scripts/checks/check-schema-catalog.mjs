@@ -104,7 +104,7 @@ export function checkSchemaCatalog({ root = skillRoot } = {}) {
   return { ok: errors.length === 0, errors, stamps, uncatalogued, unused };
 }
 
-export function schemaCatalogMain(argv = []) {
+function schemaCatalogMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h'))
     return { exitCode: 0, text: 'Usage: node scripts/checks/check-schema-catalog.mjs [--json]\n\nEvery `schema:` const under modules/ (excluding modules/ops/ops/) must be catalogued in modules/schemas/index.yaml exactly once. Exit 0 is clean, 1 reports gaps.\n' };
   const result = checkSchemaCatalog();

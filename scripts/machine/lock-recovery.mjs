@@ -6,12 +6,13 @@ import path from 'node:path';
 import { checkoutOf, gitDirOf, isGitImage, lockStat } from '../lib/git-dir.mjs';
 import { indexLock } from '../api/git/index-lock.mjs';
 import { processList } from '../api/process/process-list.mjs';
+import { isSpecRun } from '../lib/env.mjs';
 
 export const LOCK_EVENT = 'git-index-lock-removed';
 
 /** Git-family processes on this host: [{pid, name, commandLine}], or null when the probe failed. A spec run (NODE_TEST_CONTEXT) never reads the host process table. */
 export function listGitProcesses({ platform = process.platform, run, env = process.env } = {}) {
-  if (env.NODE_TEST_CONTEXT) return null;
+  if (isSpecRun(env)) return null;
   const rows = processList({ where: "Name LIKE 'git%'", run, platform, timeoutMs: 30000 });
   return rows ? rows.map((p) => ({ pid: p.pid, name: String(p.name ?? ''), commandLine: p.cmd })).filter((p) => isGitImage(p.name)) : null;
 }

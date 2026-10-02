@@ -32,8 +32,9 @@ test('the catalog carries every emitted code, in the owner-facing shape, and no 
 
 test('the checker refuses an emitted code missing from the catalog, and a retired entry',t=>{
   const base=tmp(t);
-  for(const d of ['scripts/x','modules/kernel','modules/models','modules/ops/ops','engine/db/migrations/runtime','scripts/checks'])fs.mkdirSync(path.join(base,d),{recursive:true});
+  for(const d of ['scripts/x','modules/kernel','modules/models','modules/ops/ops','engine/db/migrations/runtime','scripts/checks','knowledge/hfs'])fs.mkdirSync(path.join(base,d),{recursive:true});
   fs.writeFileSync(path.join(base,'scripts/x/emit.mjs'),"export const r={code:'brand-new-refusal'};\nexport const f='[BRAND_NEW_FINDING]';\nexport const env=process.env.NOT_A_CODE_VAR;\n");
+  fs.writeFileSync(path.join(base,'knowledge/hfs/rules.yaml'),'rules: []\n');
   fs.writeFileSync(path.join(base,'modules/models/kinds.yaml'),'vocabularies:\n  blockers: []\n');
   fs.writeFileSync(path.join(base,'engine/db/migrations/runtime/0001-init.sql'),'-- none\n');
   fs.writeFileSync(path.join(base,'modules/kernel/allowlist.yaml'),'schema: starci/allowlist@1\nnot-codes: []\n');

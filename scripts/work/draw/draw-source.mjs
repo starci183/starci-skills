@@ -56,20 +56,20 @@ export const DRAW_BASE_SIGNATURE = 'DRAW_BASE_SIGNATURE';
 
 export const DRAW_SOURCE_SUFFIX = '.draw.tsx';
 export const GRAMMAR_PACKAGE = '@starci/grammar';
-export const GRAMMAR_MODULE_RX = /^@starci\/grammar(?:\/[a-z][a-z-]*)?$/;
-export const ICON_MODULE_RX = /^(?:@heroicons\/react\/[\w/-]+|lucide-react|@spectrum-icons\/[\w/-]+)$/;
-export const REACT_MODULES = Object.freeze(['react']);
+const GRAMMAR_MODULE_RX = /^@starci\/grammar(?:\/[a-z][a-z-]*)?$/;
+const ICON_MODULE_RX = /^(?:@heroicons\/react\/[\w/-]+|lucide-react|@spectrum-icons\/[\w/-]+)$/;
+const REACT_MODULES = Object.freeze(['react']);
 /** A relative raster import: the art-slot placeholder of a MediaFrame/Image (data-asset-slot; interface.asset owes the art). */
-export const ASSET_MODULE_RX = /^\.{1,2}\/[^?#]+\.(?:png|jpe?g|webp|gif|avif)$/i;
+const ASSET_MODULE_RX = /^\.{1,2}\/[^?#]+\.(?:png|jpe?g|webp|gif|avif)$/i;
 /** Ambient declarations every draw file type-checks with (a raster import is its URL, as draw-render's esbuild emits it). */
-export const DRAW_AMBIENT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'].map((ext) => `declare module "*.${ext}" { const src: string; export default src }\n`).join('');
+const DRAW_AMBIENT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'].map((ext) => `declare module "*.${ext}" { const src: string; export default src }\n`).join('');
 /** HTML a drawing may use, for layout only (grid, region order, list semantics). */
-export const LAYOUT_ELEMENTS = Object.freeze(['div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'nav', 'ul', 'ol', 'li']);
+const LAYOUT_ELEMENTS = Object.freeze(['div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'nav', 'ul', 'ol', 'li']);
 /** The attribute draw-render stamps on every layout element of a draw file (rendered-DOM ownership). */
 export const LAYOUT_ATTR = 'data-draw-layout';
 /** Tailwind steps the grammar spacing scale publishes (GAP-0..6 / PADDING-0..6: 0 .25 .5 .75 1 1.5 2 rem). */
-export const GRAMMAR_SPACING_STEPS = Object.freeze(['0', '1', '2', '3', '4', '6', '8']);
-export const SPACING_RULE_OF_STEP = Object.freeze({ 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 6: 5, 8: 6 });
+const GRAMMAR_SPACING_STEPS = Object.freeze(['0', '1', '2', '3', '4', '6', '8']);
+const SPACING_RULE_OF_STEP = Object.freeze({ 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 6: 5, 8: 6 });
 
 const RESPONSIVE = /^(?:(?:sm|md|lg|xl|2xl|max-sm|max-md|max-lg|max-xl|@[a-z0-9]+|motion-reduce|print):)*/;
 const SPACING_RX = /^-?(?:gap(?:-[xy])?|p[xytblrse]?|m[xytblrse]?|space-[xy]|inset(?:-[xy])?|top|right|bottom|left|start|end)-(.+)$/;
@@ -106,7 +106,7 @@ export function classifyClass(token) {
 }
 
 /** The rationale decision justifying a free spacing class: a spacing|layout decision naming the class, with a rule id. */
-export function justifiedBy(cls, rationale) {
+function justifiedBy(cls, rationale) {
   const escaped = cls.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
   const rx = new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`);
   return list(rationale).find((e) => ['spacing', 'layout'].includes(e?.kind) && list(e.rules).some((r) => String(r).trim())
@@ -127,7 +127,7 @@ export function rationaleFileFor(file) {
   return [...stems.map((s) => path.join(dir, `${s}.rationale.json`)), path.join(dir, 'rationale.json')].find(isFile) ?? null;
 }
 
-export function loadRationaleEntries(file) {
+function loadRationaleEntries(file) {
   if (!file) return [];
   try {
     const doc = JSON.parse(fs.readFileSync(file, 'utf8'));

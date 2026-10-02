@@ -12,16 +12,18 @@
 //   digest      sup_events supervisor-owner-digest
 // The typed rows are machine_logs actor supervisor (sup-log.mjs; /api/supervisor/logs).
 import { redactText } from '../lib/redact.mjs';
+import { clip, squash } from '../lib/clip.mjs';
+import { isoOr } from '../lib/time.mjs';
 import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings, DEFAULT_SUPERVISOR_MODE } from '../machine/home.mjs';
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
 import { learningState } from '../machine/lessons.mjs';
 
-export const STATE_SCHEMA = 'starci/supervisor-state@1';
-const txt = (v, n = 600) => { const s = redactText(String(v ?? '').replace(/\s+/g, ' ').trim()); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+const STATE_SCHEMA = 'starci/supervisor-state@1';
+const txt = (v, n = 600) => clip(redactText(squash(v)), n);
 const orNull = (v, n) => (v == null || v === '' ? null : txt(v, n));
 const num = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
 const int = (v, d = 0) => (Number.isInteger(Number(v)) ? Number(v) : d);
-const iso = (at) => (Number.isFinite(Number(at)) ? new Date(Number(at)).toISOString() : '');
+const iso = (at) => isoOr(at, '');
 
 /** The whole state, every field typed as ui/src/contract.ts SupervisorState says. Never throws. */
 export function readSupervisorState({ env = process.env, now = Date.now(), limit = 50, settings = null } = {}) {

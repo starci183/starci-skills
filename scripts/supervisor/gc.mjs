@@ -85,6 +85,7 @@ import { evictOverCap, spareInfo } from './lane-cap.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { ownerLanguage, translator } from '../lib/i18n.mjs'; import { isMain } from '../lib/is-main.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
@@ -93,7 +94,7 @@ export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'le
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
   leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000, laneCap: 40 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
-export const LEFTOVER_OWNERS = Object.freeze({
+const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/cli.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
   'lane-log': 'the lane process left its log at the lanes root instead of cleaning it after land',
 });
@@ -105,21 +106,20 @@ const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
 const SHELL_TITLE = /^Terminal \d+$/;
 const PROMPT = /PS [A-Za-z]:\\[^>\r\n]*>/g;
 
-const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 /** The gc windows of runtimes.yaml allocation.housekeeping, with their defaults. */
 export function gcSettings(allocation = allocationSettings()) {
   const hk = allocation?.housekeeping ?? {};
   const gc = allocation?.gc ?? {};
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
-  return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
+  return { minAgeMs: positiveNumber(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: positiveNumber(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
     archiveRoot: archiveRootOf(), housekeeping: hk,
-    sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
-    leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
-    laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
+    sweepMs: positiveNumber(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
+    leaseMinAgeMs: positiveNumber(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: positiveNumber(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
+    laneLogRetentionMs: positiveNumber(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
     // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
-    laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
+    laneIdleMs: Math.max(positiveNumber(gc.laneIdleMs, DEFAULTS.laneIdleMs), positiveNumber(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
     // One pass judges lanes for at most laneBudgetMs, then resumes there; laneCap: most lanes that stay registered (lane-cap.mjs).
-    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: num(gc.laneCap, DEFAULTS.laneCap) };
+    laneBudgetMs: positiveNumber(gc.laneBudgetMs, DEFAULTS.laneBudgetMs), laneCap: positiveNumber(gc.laneCap, DEFAULTS.laneCap) };
 }
 
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
@@ -240,7 +240,7 @@ export function ledgerView(repo) {
 }
 
 /** Every lease row of a ledger with its job's and workflow's state (the leases collector's input). */
-export function leaseRowsOf(db) {
+function leaseRowsOf(db) {
   try {
     return db.prepare(`SELECT l.resource_key resourceKey, l.job_id jobId, l.workflow_id workflowId, l.acquired_at acquiredAt, l.expires_at expiresAt,
         j.status jobStatus, j.updated_at jobUpdatedAt, w.phase phase, w.archived_at archivedAt, w.updated_at workflowUpdatedAt
@@ -405,14 +405,14 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, workers = n
 export const WORKER_LIST_UNAVAILABLE = 'WORKER_LIST_UNAVAILABLE';
 
 /** The Orca Runs the runtime owns: every Run a product ledger's job or a Supervisor job names, first-seen order. */
-export const runtimeRuns = ({ sup, ledgers }) => distinctRuns([...ledgers.flatMap((l) => l.jobs.map((j) => j.task?.runId)), ...sup.jobs.map((j) => j.runId)]);
+const runtimeRuns = ({ sup, ledgers }) => distinctRuns([...ledgers.flatMap((l) => l.jobs.map((j) => j.task?.runId)), ...sup.jobs.map((j) => j.runId)]);
 
 /**
  * Orca's worker accounting for the runtime's Runs: every Orca Run a product ledger's job or a Supervisor job names,
  * each listed with --run (never the caller's bound Run) and paged past 100 rows. {rows, runs, errors}: a Run whose
  * listing failed contributes no row, so none of its workers is touched.
  */
-export function runtimeWorkers({ sup, ledgers, list = (run) => workerListAll({ run }) }) {
+function runtimeWorkers({ sup, ledgers, list = (run) => workerListAll({ run }) }) {
   const runs = runtimeRuns({ sup, ledgers });
   const rows = [], errors = [];
   for (const run of runs) {
@@ -492,7 +492,7 @@ function laneContentLanded(commits, branch, root, run) {
 }
 
 /** The lanes collector's resume point: the path key the last bounded pass stopped before (machine.sqlite machine_meta). */
-export const LANE_CURSOR = 'lanes';
+const LANE_CURSOR = 'lanes';
 export const readLaneCursor = (env = process.env) => readSupervisor((m) => m.gcCursor(LANE_CURSOR), null, { env });
 export const writeLaneCursor = (value, env = process.env) => { try { withSupervisor((m) => m.setGcCursor(LANE_CURSOR, value), { env }); } catch { /* the next pass starts over */ } };
 

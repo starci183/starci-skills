@@ -5,6 +5,8 @@ import {parseYaml} from '../../../engine/yaml.mjs';
 import {decodePng} from '../png.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from '../brand/brand.mjs';
 import {slash} from '../../lib/path-key.mjs';
+import {objectList} from '../../lib/list.mjs';
+import {formatCheckLines} from '../../lib/check-format.mjs';
 import {generatedDrawingsOf} from './ui-shapes.mjs';
 
 /**
@@ -42,25 +44,24 @@ export const PALETTE_TOLERANCE=TOKEN_TOLERANCE*12;
  */
 export const MIN_BUCKET_SHARE=0.02;
 /** OKLab chroma below this is grey to a reader; the brand's palette question is about colour, not about ink. */
-export const CHROMA_FLOOR=0.04;
+const CHROMA_FLOOR=0.04;
 /** Lightness outside this band is the page's paper and its ink: near-white and near-black are never a palette. */
-export const MIN_LIGHTNESS=0.12;
+const MIN_LIGHTNESS=0.12;
 export const MAX_LIGHTNESS=0.95;
 /** Steps per OKLab axis. Eight steps put roughly a tenth of the gamut in a bucket - a hue, not a shade. */
-export const DEFAULT_BUCKETS=8;
+const DEFAULT_BUCKETS=8;
 /** Under half opaque is not painted: a pixel the reader cannot see is not part of the palette. */
 const ALPHA_FLOOR=128;
 /** Three is a list. Two rows are a pair the reader reads as two facts; three are a collection. */
-export const MIN_REPEATED_ITEMS=3;
+const MIN_REPEATED_ITEMS=3;
 /**
  * The card classes to look for when the family's DNA snapshot cannot be read. Only the families we ship:
  * both render the Common card renderers, so both carry Common's card classes.
  */
-export const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
+const FALLBACK_CARD_CLASSES={starci:['starci-core-surface','starci-core-surface-card'],'offset-pop':['starci-core-surface','starci-core-surface-card']};
 const OFFENDER_CAP=20;
 
 const round=(value,places=4)=>Number.parseFloat(Number(value).toFixed(places));
-const listOf=value=>(Array.isArray(value)?value:[]).filter(item=>item&&typeof item==='object');
 const text=value=>typeof value==='string'?value:'';
 const check=(id,outcome,detail,evidence={})=>({id,outcome,detail,evidence});
 
@@ -124,9 +125,9 @@ export function brandColours(brand){
     if(parsed)found.push({label,value:String(value),role,scope,hex:parsed.hex,color:parsed});
   };
   const set=(source,scope)=>{
-    for(const token of listOf(source?.tokens))if(typeof token.token==='string')push(token.token,token.value,token.role??null,scope);
-    for(const scale of listOf(source?.scales)){
-      for(const step of listOf(scale.steps))push(`${scale.name??'scale'}/${step.step??'?'}`,step.value,null,scope);
+    for(const token of objectList(source?.tokens))if(typeof token.token==='string')push(token.token,token.value,token.role??null,scope);
+    for(const scale of objectList(source?.scales)){
+      for(const step of objectList(scale.steps))push(`${scale.name??'scale'}/${step.step??'?'}`,step.value,null,scope);
     }
   };
   set(brand?.color,'base');
@@ -370,7 +371,7 @@ export function checkMascotSlot(first,second){
   if(!evidence.allowedIn.length)return check(id,'skip',`The brand names the mascot \`${mascot.name}\` but allows it on no surface, so none is missing it.`,evidence);
   const allowed=evidence.allowedIn.filter(entry=>names(entry,surface.name)||names(entry,surface.route));
   if(!allowed.length)return check(id,'skip',`The brand does not allow the mascot on \`${surface.name??surface.route??'this surface'}\`, so no slot is expected there.`,evidence);
-  const slots=listOf(record?.ui?.artworkSlots).filter(slot=>!slot.screen||names(slot.screen,surface.name)||names(slot.screen,surface.route));
+  const slots=objectList(record?.ui?.artworkSlots).filter(slot=>!slot.screen||names(slot.screen,surface.name)||names(slot.screen,surface.route));
   const carrying=slots.filter(slot=>{
     const words=[text(slot.purpose),text(slot.brief),...(Array.isArray(slot.references)?slot.references.map(text):[])].join(' ');
     return normalize(words).includes(normalize(mascot.name))||MASCOT_REFERENCE.test(words);
@@ -414,7 +415,7 @@ const implementationCandidates=directory=>{
 function candidatesOf(uiDir,record,{captureDir=null}={}){
   if(captureDir)return implementationCandidates(captureDir);
   const root=path.resolve(uiDir);
-  return listOf(record?.ui?.assets).filter(asset=>typeof asset.path==='string'&&/\.png$/i.test(asset.path)&&browserCapture(asset)).map(asset=>{
+  return objectList(record?.ui?.assets).filter(asset=>typeof asset.path==='string'&&/\.png$/i.test(asset.path)&&browserCapture(asset)).map(asset=>{
     const declared=slash(asset.path);
     const entry={path:declared,role:asset.role??null,provenance:asset.provenance??null};
     if(path.isAbsolute(declared)||declared.split('/').includes('..'))return {...entry,error:'the declared path escapes the ui node'};
@@ -468,7 +469,7 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
     for(const id of ['palette-off-brand','primary-absent','entity-list-in-card'])
       checks.push(check(id,'skip','The design record declares no PNG capture under its assets/, so there is no render to read.',{record:slash(path.relative(path.resolve(uiDir),file))}));
   }
-  const surfaces=listOf(record?.ui?.surfaces);
+  const surfaces=objectList(record?.ui?.surfaces);
   if(surfaces.length)for(const surface of surfaces)checks.push(checkMascotSlot({record,brand:identity.brand,screen:surface}));
   else checks.push(check('mascot-slot-missing','skip','The design record names no surface, so no surface could be checked for a mascot slot.',{record:slash(path.relative(path.resolve(uiDir),file))}));
   const generatedDirections=generatedDrawingsOf(record?.ui?.assets).length;
@@ -480,10 +481,8 @@ export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,gra
 
 /** One line per check, for a person reading a terminal. */
 export function formatRenderChecks(result){
-  const mark={pass:'pass',fail:'FAIL',skip:'skip'};
-  const lines=[`render ${result.brand.family??'(no family)'} rev ${result.brand.rev}: ${result.node.candidates} candidate${result.node.candidates===1?'':'s'}, ${result.ok?'no failing check':'failing checks'}`];
-  for(const entry of result.checks)lines.push(`  [${mark[entry.outcome]}] ${entry.id}: ${entry.detail}`);
-  return lines.join('\n');
+  const header=`render ${result.brand.family??'(no family)'} rev ${result.brand.rev}: ${result.node.candidates} candidate${result.node.candidates===1?'':'s'}, ${result.ok?'no failing check':'failing checks'}`;
+  return formatCheckLines(header,result.checks);
 }
 
 // ---------------------------------------------------------------------------

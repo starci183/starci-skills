@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { readOpManifest } from '../lib/op-shared.mjs';
-import { asList, ROUTE_FIELDS } from './route-fields.mjs';
+import { stringItems, ROUTE_FIELDS } from './route-fields.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -76,9 +76,9 @@ function entryFor(file, doc) {
     }
     if (Object.keys(params).length) entry.params = params;
   }
-  if (doc?.nodeKinds) entry.nodeKinds = asList(doc.nodeKinds);
+  if (doc?.nodeKinds) entry.nodeKinds = stringItems(doc.nodeKinds);
   if (doc?.completionProfile) entry.completionProfile = String(doc.completionProfile);
-  const side = asList(doc?.sideEffects);
+  const side = stringItems(doc?.sideEffects);
   if (side.length) entry.sideEffects = { count: side.length, summary: firstLine(side[0]) };
   const reads = ids(doc?.reads), writes = ids(doc?.writes);
   if (reads.length) entry.reads = reads;
@@ -87,7 +87,7 @@ function entryFor(file, doc) {
   if (route) {
     entry.route = {};
     for (const k of ROUTE_FIELDS) {
-      const v = asList(route[k]);
+      const v = stringItems(route[k]);
       if (v.length) entry.route[k] = v;
     }
     // Lifecycle position is the route phase an agent would file this op under;

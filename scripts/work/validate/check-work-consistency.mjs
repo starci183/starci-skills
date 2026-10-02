@@ -110,7 +110,7 @@ const shownFile = rec => path.relative(root, path.join(rec.dir, 'index.yaml')).r
  * identical inventory the per-record checks walked). Findings are appended to `sink`, which also collects the
  * per-tree vocabulary the parity check needs. Exported so the fixture test can point it at a throwaway tree.
  */
-export function checkConsistencyTree(workRoot, records, sink) {
+function checkConsistencyTree(workRoot, records, sink) {
   const refuse = (file, code, message) => sink.refuse.push(`${file}: ${message} [${code}]`);
   const suspect = (file, code, message) => sink.suspect.push(`${file}: ${message} [${code}]`);
 

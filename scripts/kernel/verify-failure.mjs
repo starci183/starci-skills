@@ -27,8 +27,8 @@ export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'i
 /** The ops that walk a served stack: `api dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
 export const ENV_GATED_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify'];
 /** review.verify modes whose run is a measurement: scripts execute and write reports only (CONTEXT.md). */
-export const MEASUREMENT_MODES = ['lint'];
-export const ENV_HEALTH_CHECK = 'env-health';
+const MEASUREMENT_MODES = ['lint'];
+const ENV_HEALTH_CHECK = 'env-health';
 
 // Exit-code semantics of the checkers a measurement runs. `error` codes mean the tool did not measure;
 // any other nonzero code of a known measuring tool is findings. An unknown command's nonzero exit in a
@@ -162,7 +162,7 @@ const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8'
 const posix = (p) => String(p).replace(/\\/g, '/');
 
 /** The workspace repositories {name → role} of a ledger repo (.starciwork/workspace.yaml). */
-export function workspaceRoles(repo) {
+function workspaceRoles(repo) {
   const doc = readYaml(path.join(repo, '.starciwork', 'workspace.yaml'));
   const out = {};
   for (const r of Array.isArray(doc?.repositories) ? doc.repositories : []) if (r?.name) out[r.name] = r.role ?? null;

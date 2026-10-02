@@ -9,14 +9,15 @@
 import { AWAITING_OWNER_STATUS, UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
 import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/db/ledger.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { refuse } from '../../engine/refuse.mjs';
 
 const payloadOf = (row) => parseJsonOr(row?.payload_json ?? '{}') ?? {};
-const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
+
 const pathsOf = (list) => (Array.isArray(list) ? list : []).map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim());
 const safeIntersect = (a, b) => { try { return ownedPathsIntersect(a, b); } catch { return a === b; } };
 
 /** Every try of one unit, oldest first, each with the settle result retryDisposition reads (result_json). */
-export function unitTriesOf(db, workflowId, unitId) {
+function unitTriesOf(db, workflowId, unitId) {
   if (!unitId) return [];
   return db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND unit_id=? AND kind='op' ORDER BY try_no").all(workflowId, unitId)
     .map((row) => ({ ...row, result_json: JSON.stringify(jobResult(db, row.job_id) ?? {}) }));

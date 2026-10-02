@@ -13,7 +13,7 @@ import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { found, readText } from './read.mjs';
 
-export const PROOF_COMMAND_FILE_MISSING = 'HFS_PROOF_COMMAND_FILE_MISSING';
+const PROOF_COMMAND_FILE_MISSING = 'HFS_PROOF_COMMAND_FILE_MISSING';
 const RECORD = /^\.starciwork\/.+\.ya?ml$/;
 const FILE_ARGUMENT = /^(?:\.\/)?[\w@][\w@.\-[\]()]*(?:\/[\w@.\-[\]()]+)*\.[A-Za-z][A-Za-z0-9]{0,7}$/;
 const PATH_SEPARATOR = /\//;

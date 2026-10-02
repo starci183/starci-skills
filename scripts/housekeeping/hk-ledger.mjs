@@ -19,17 +19,19 @@ import path from 'node:path';
 import { openLedger, JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { hasTable } from '../lib/sqlite.mjs';
+import { positiveNumber } from '../lib/number.mjs';
 
-export const DEBUG_LOG_RETENTION_MS = 14 * 86_400_000; // Q5
-export const WORKFLOW_RETENTION_MS = 30 * 86_400_000; // Q6
-export const Q6_APPROVAL = Object.freeze({ by: 'owner',
+const DEBUG_LOG_RETENTION_MS = 14 * 86_400_000; // Q5
+const WORKFLOW_RETENTION_MS = 30 * 86_400_000; // Q6
+const Q6_APPROVAL = Object.freeze({ by: 'owner',
   ref: 'owner decision Q6 (ARCHITECTURE-DB §7, adopted in alpha.3 COMMON.md): a workflow ended more than 30 days ago is zipped, verified and purged' });
 
 const SETTLED = new Set(JOB_STATUSES.settled);
 const statSize = (file) => { try { return fs.statSync(file).size; } catch { return 0; } };
 const familySize = (file) => statSize(file) + statSize(`${file}-wal`) + statSize(`${file}-shm`);
-const positiveMs = (value, d) => { const n = Number(value); return Number.isFinite(n) && n > 0 ? n : d; };
-const has = (db, table) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+
+const has = hasTable;
 
 /** Q5 on an open ledger db (its own transaction): old debug log rows. Returns the rows deleted. */
 function pruneDebugLogs(db, { now }) {
@@ -57,7 +59,7 @@ export function retainLedgerDb(db, { now = Date.now() } = {}) {
  * Q6 candidates of one ledger: [{workflowId, endedAt, ok, why?}] for every workflow that ended more than
  * `retentionMs` ago and is not purged yet. `ok:false` names why it is kept (live jobs, cited evidence).
  */
-export function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_RETENTION_MS } = {}) {
+function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_RETENTION_MS } = {}) {
   const purged = has(db, 'workflow_purges') ? new Set(db.prepare("SELECT workflow_id FROM workflow_purges WHERE state='purged'").all().map((r) => r.workflow_id)) : new Set();
   const rows = db.prepare(`SELECT workflow_id, phase, COALESCE(finished_at, archived_at) AS ended_at FROM workflows
     WHERE (phase='finished' OR archived_at IS NOT NULL) AND COALESCE(finished_at, archived_at) IS NOT NULL AND COALESCE(finished_at, archived_at) < ?
@@ -78,7 +80,7 @@ export function expiredWorkflows(db, { now = Date.now(), retentionMs = WORKFLOW_
 export async function sweepLedgers({ apply = false, now = Date.now(), env = process.env, allocation = allocationSettings(), files = null, machineFile = null,
   archiveRoot = null, purge = null } = {}) {
   const out = { ok: true, apply: Boolean(apply), freedBytes: 0, deleted: 0, retained: [], skipped: [], purged: [], errors: [] };
-  const retentionMs = positiveMs(allocation?.housekeeping?.workflowRetentionMs, WORKFLOW_RETENTION_MS);
+  const retentionMs = positiveNumber(allocation?.housekeeping?.workflowRetentionMs, WORKFLOW_RETENTION_MS);
   let list = files ? files.map((file) => ({ file, repoRoot: null })) : null;
   if (!list) {
     list = readMachine((m) => m.listLedgers().map((l) => ({ file: l.file, repoRoot: l.repoRoot })), null, { file: machineFile ?? machineFileFor(env), env });

@@ -41,9 +41,11 @@ import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { check as orcaCheck } from '../api/orca/check.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
+import { readEnv } from '../lib/env.mjs';
+import { bestEffortCall } from '../agent/best-effort-call.mjs';
 
-export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
-export const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
+const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
+const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
 
 /** The built-in rubric: the r5 bake-off critic sheet (<tmp>/draw-bakeoff/r5/inputs/08-RUBRIC.md), brand-neutral. */
 export const DEFAULT_RUBRIC = Object.freeze({
@@ -113,7 +115,7 @@ export function rubricFor({ workRoot = null, archetype = null, record = null, sh
 }
 
 /** The gate check ids of a rubric: every check marked gate. */
-export const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
+const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
 
 /** The one file the critic writes, in its clean directory. */
 export const VERDICT_FILE = 'verdict.json';
@@ -122,7 +124,7 @@ export const VERDICT_FILE = 'verdict.json';
  * The critic's Task spec. It never sees the drawing brief, the worker's notes or any earlier round: only the clean
  * directory `dir` with the images, the HTML and the rubric. Its one write is `dir`/verdict.json.
  */
-export function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
+function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
   const at = (f) => slash(path.join(dir, f));
   return [
     'You are an independent senior product-design critic. You did NOT draw this screen and you have no other context.',
@@ -186,7 +188,7 @@ const ENDED = new Set(['done', 'completed', 'failed', 'stopped', 'released', 'ex
 const TASK_CLOSED = 'completed';
 const DEFAULT_POLL_MS = 5000;
 const payloadOf = (m) => { try { return typeof m?.payload === 'string' ? JSON.parse(m.payload) : m?.payload ?? null; } catch { return null; } };
-const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const settle = bestEffortCall;
 
 /**
  * The Orca client the critic runs through: the scripts/api/orca wrappers, each replaceable (tests pass a fake).
@@ -285,7 +287,7 @@ async function awaitCritic({ client, runId, entry, dispatchId, terminal, taskId,
  * `parentDispatch` the op's Dispatch the critic nests under (the depth preflight, contract change worker-depth-limit).
  * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
-export async function runCritic({ images, html, rubric, critic, orca = null, entry = process.env.ORCA_TERMINAL_HANDLE || null, placement = {},
+export async function runCritic({ images, html, rubric, critic, orca = null, entry = readEnv('ORCA_TERMINAL_HANDLE') || null, placement = {},
   parentDispatch = placement?.context?.dispatchId ?? (orca ? null : opContextOf()?.dispatchId ?? null),
   pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
   const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };

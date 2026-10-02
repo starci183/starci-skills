@@ -41,6 +41,7 @@ import {
 import { openWorkerHandles } from './workers.mjs';
 import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { bestEffortCall } from '../agent/best-effort-call.mjs';
 
 export const EXIT_HOST_UNAVAILABLE = 75;
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervisor-prompt.md');
@@ -75,7 +76,7 @@ export function launchAuthorityText({ restart = null } = {}) {
     '  or continue (owner rule: the owner never approves launch gates).'].join('\n');
 }
 
-export function renderSupervisorPrompt({ template, doc, settings, restart = null, skillRoot = SKILL_ROOT }) {
+function renderSupervisorPrompt({ template, doc, settings, restart = null, skillRoot = SKILL_ROOT }) {
   return template
     .replaceAll('{launchAuthority}', launchAuthorityText({ restart }))
     .replaceAll('{doctrine}', doctrineOf(doc))
@@ -180,7 +181,7 @@ function closeDuplicates(entries, deps, fallbackAgent) {
 /** Why no [Supervisor] kernel starts in chat mode (config.yaml supervisor.mode). */
 export const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
 
-export const START_LOCK = 'supervisor-start';
+const START_LOCK = 'supervisor-start';
 /**
  * The launcher lock (host_locks 'supervisor-start', TTL the startup reservation): {ok, release} or {ok:false, holder}.
  * A holder whose process is gone never blocks the next launcher.
@@ -316,7 +317,7 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
 
 /* ------------------------------------------------------------ CLI */
 
-const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+const bestEffort = bestEffortCall;
 
 const describe = (r) => {
   if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})`;

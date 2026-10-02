@@ -21,6 +21,7 @@
  * slot view. A name is read only for the fixed vocabulary of the double markers, as whole words.
  */
 import ts from "typescript"
+import { paramParts } from "./lib/ast.mjs"
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isSpecFile, normalizePath } from "./lib/path.mjs"
 import { implementsMigration, inCli, isMigrationFile, mayHoldEntityManager } from "./lib/persistence.mjs"
@@ -30,13 +31,6 @@ import { typed, typeOrigins } from "./lib/types.mjs"
 
 /** The convention's injector vocabulary: `Inject` or `Inject<Thing>`. */
 const INJECT_NAME = /^Inject(?:[A-Z][A-Za-z0-9]*)?$/
-
-/** The decorators of a constructor parameter: on the parameter, its wrapper (`private readonly x`) or its inner identifier. */
-const paramParts = (param) => {
-    const inner = param.type === "TSParameterProperty" ? param.parameter : param
-    const target = inner.type === "AssignmentPattern" ? inner.left : inner
-    return { target, decorators: [...new Set([...(param.decorators ?? []), ...(inner.decorators ?? []), ...(target.decorators ?? [])])] }
-}
 
 /** True when a decorator expression is a call of an `Inject*` function, or of anything typed `TypedParameterDecorator<T>`. */
 const isInjector = (context, decorator) => {

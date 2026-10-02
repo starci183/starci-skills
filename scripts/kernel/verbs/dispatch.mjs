@@ -18,8 +18,9 @@ import { spawnAgent, loadAdapter } from '../../agent/lib.mjs';
 import { DISPATCHES, requirePhase } from './shared/workflow-transitions.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
 import { markRunning, runningOrAbandon } from './shared/dispatch-running.mjs';
-import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, getWorkflow } from './shared/rows.mjs';
-import { PEER_WAIT, leaseCanonOf, openPeerWaits, releaseTypedWaits } from './shared/peer-waits.mjs';
+import { latestGoal, ownedPathsOf, workDirOf, getWorkflow } from './shared/rows.mjs';
+import { leaseCanonOf, releaseTypedWaits } from './shared/peer-waits.mjs';
+import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../machine/host-resources.mjs';
 import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../machine/ram-throttle.mjs';
 import { deferredQueueCause } from '../autopilot-run.mjs';
@@ -34,12 +35,13 @@ import { resumeContextOf } from '../resume-context.mjs';
 import { jobDisplayName, jobWhat, workflowNameOf } from '../../lib/display-names.mjs';
 import { productLocaleFor } from '../product-locale.mjs';
 import { isSeamCut, seamStubForDispatch, cutManifestOf } from '../seam-policy.mjs';
-import { kernelOverrideFor, refuseSettleBacklog } from '../kernel-authority.mjs';
+import { kernelOverrideFor } from '../kernel-authority.mjs';
 import { jobDirOf } from '../job-artifacts.mjs';
 import { packetFileOf, taskSpecOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
+import { readEnv } from '../../lib/env.mjs';
 
 export default {
   verb: 'dispatch',
@@ -47,7 +49,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
+    const { skillRoot, SETTLED, queuedSeamsOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
   // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on api route.
@@ -61,16 +63,7 @@ export default {
   // A paused, stopped, finished or archived workflow launches nothing (H9: an archived workflow's job ran 25 h).
   requirePhase(getWorkflow(db, job.workflow_id), DISPATCHES, 'dispatch');
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
-  refuseSettleBacklog(db, job.workflow_id, 'dispatch');
-  const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
-  if (priorWorker?.connected && priorWorker?.writable) {
-    throw Object.assign(new Error(`job ${jobId} is queued in the ledger but exact worker ${priorWorker.terminalHandle} is still live; reconcile it instead of dispatching a duplicate`), {
-      code: 'job-live-worker', worker: priorWorker,
-    });
-  }
-  const payload = jobPayloadOf(job);
-  const op = job.op_id ?? payload.opId;
-  if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
+  const { payload, op } = queuedJobOp(ledger, { job, verb: 'dispatch', liveHint: 'dispatching a duplicate', internals });
   const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo });
   if (!dispatchTarget.ok) {
     const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
@@ -100,12 +93,7 @@ export default {
   // route already applies; this one is the workflow's own ceiling.
   // A wait whose typed --until-* conditions already hold is released before the gates below read it.
   releaseTypedWaits(ledger, { repo, workflowId: job.workflow_id });
-  const heldBy = ownerGateOf(openOwnerGates(db, job.workflow_id), job);
-  if (heldBy) {
-    const out = { ok: false, jobId, op, reason: heldBy.kind ?? 'owner-gate', incident: heldBy.incidentId };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): ${heldBy.kind ?? 'owner-gate'} — incident ${heldBy.incidentId} holds it until the Kernel resolves it; job stays queued`, args.json);
-    process.exit(1);
-  }
+  refuseOwnerGate(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
   // Autopilot: a deferred leg, or a live proof waiting for the handover credential checklist, is not launched.
   const deferredBy = deferredQueueCause(db, job);
   if (deferredBy) {
@@ -113,18 +101,8 @@ export default {
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${deferredBy.queuedBecause} — ${deferredBy.detail}; job stays queued`, args.json);
     process.exit(1);
   }
-  const peerHeldBy = ownerGateOf(openPeerWaits(db, job.workflow_id), job);
-  if (peerHeldBy) {
-    const out = { ok: false, jobId, op, reason: PEER_WAIT, incident: peerHeldBy.incidentId, peer: peerHeldBy.peer };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): peer-wait — incident ${peerHeldBy.incidentId} holds it until peer ${peerHeldBy.peer} lands what it waits on and the wait is resolved; job stays queued`, args.json);
-    process.exit(1);
-  }
-  const slots = opSlotAdmission(db, job.workflow_id, { excludeJobId: jobId });
-  if (!slots.ok) {
-    const out = { ok: false, jobId, op, reason: 'max-ops', slots };
-    emit(out, `dispatch REFUSED for ${jobId} (${op}): max-ops — ${slots.running} operation(s) already hold a slot at ceiling ${slots.ceiling} (${slots.ceilingSource}); job stays queued`, args.json);
-    process.exit(1);
-  }
+  refusePeerWait(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
+  const slots = opSlotsOrRefuse(ledger, { job, op, opKey: 'op', verb: 'dispatch', suffix: '; job stays queued', emit, args, internals });
   // Seam priority (cut-seam.mjs): the workflow's last free slot goes to a queued cut seam nothing else
   // holds, never to other work, so a seam is not starved behind its own siblings and peers.
   const seamFirst = slots.ceiling != null && slots.ceiling - slots.running <= 1 && !isSeamCut(payload.cut)
@@ -179,7 +157,7 @@ export default {
   // A port held by a process that is not this workspace's server is the one state no op can fix: the job
   // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
   let environmentHealth = null;
-  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && process.env.STARCI_ENV_GATE !== 'off') {
+  if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && readEnv('STARCI_ENV_GATE') !== 'off') {
     environmentHealth = environmentPreStep(repo, payload);
     if (environmentHealth?.declared) {
       ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
