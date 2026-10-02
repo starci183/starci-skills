@@ -18,7 +18,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'runtime' = @('architecture','benchmark-snapshot','check','derived-fields','doctor','gen-ops','housekeeping','install','ledger-hygiene','machine-db','readme-blocks','status','update','validate','version')
         'supervisor' = @('actions','bridge','gc','land','notify','owed','poll','push','ram-cap','report','start','status','stop','tell')
         'uat' = @('assisted-runner','slots')
-        'work' = @('asset-slot','brand','brand-direction','brand-palette','compose-direction','draw-acceptance','draw-dna','draw-feedback','draw-gates','draw-grammar','draw-layer','draw-loop','draw-rationale','draw-render','draw-review','draw-source','draw-taste','example-critique','example-derive','example-evidence','example-verify','grammar-geometry','grammar-knowledge','grammar-proposal','grammar-registry-pin','graph','layout-tree','render-proof','shell-conformance','ui-proof-brief')
+        'work' = @('asset-slot','brand','brand-direction','brand-palette','compose-direction','draw-acceptance','draw-dna','draw-feedback','draw-gates','draw-grammar','draw-layer','draw-loop','draw-rationale','draw-render','draw-review','draw-source','draw-taste','example-critique','example-derive','example-evidence','example-verify','grammar-geometry','grammar-knowledge','grammar-proposal','grammar-registry-pin','graph','hygiene','layout-tree','render-proof','shell-conformance','ui-proof-brief')
         'workflow' = @('assess','define','start','status','stop')
     }
     $flags = '--json --cwd --quiet --help --edition'.Split(' ')

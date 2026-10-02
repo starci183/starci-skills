@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "lint": "hfs lint --workspace .",
+    "lint": "starci app lint --workspace .",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {

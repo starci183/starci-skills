@@ -101,7 +101,6 @@ internal:
   - {path: scripts/work/validate/check-work-consistency.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-deep.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
   - {path: scripts/work/validate/check-work-surfaces.mjs, why: "Work-validation composition member", usedBy: [scripts/work/validate/work-validate.mjs]}
-  - {path: scripts/work/validate/work-hygiene.mjs, why: "Runtime work-hygiene engine behind the app hygiene owner", usedBy: [scripts/kernel/cli.mjs]}
   - {path: tests/fixtures/gate/hfs-lint-eslint-only.mjs, why: "Gate-test fake app CLI", usedBy: [tests/gates/gate.spec.mjs]}
   - {path: tests/helpers/source-canon-registry.mjs, why: "Scaffold-test registry server", usedBy: [tests/packages-hfs/hfs-scaffold-app.spec.mjs]}
   - {path: packages/hfs/runtime/scripts/hfs/architecture.mjs, why: "Generated runtime copy of the HFS architecture entry", usedBy: [scripts/hfs/sync-runtime.mjs]}

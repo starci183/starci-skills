@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // work-hygiene.mjs — the parse, scoped-validate and secret checks a product repo's Work files owe before they are
 // committed (the pre-commit hook scripts/guards/hook-install.mjs installs) and before an op settles (starci kernel settle).
-//   node scripts/work/validate/work-hygiene.mjs staged --repo <root> [--json]     the staged files of <root>, from the index
-//   node scripts/work/validate/work-hygiene.mjs files  --repo <root> [--json] <file>...   the named files, from disk
+//   starci work hygiene staged --repo <root> [--json]     the staged files of <root>, from the index
+//   starci work hygiene files  --repo <root> [--json] <file>...   the named files, from disk
 // Two failure classes slipped through on 2026-09-29: YAML the runtime loader cannot parse (a ": " inside a plain
 // scalar) was committed to a product .starciwork, and literal usernames/passwords sat in accounts.yaml files with no
 // check to flag them. Three checks, read-only, scoped to the files given (never the whole tree, never e2e):

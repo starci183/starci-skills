@@ -26,7 +26,7 @@ _starci() {
         runtime) COMPREPLY=( $(compgen -W "architecture benchmark-snapshot check derived-fields doctor gen-ops housekeeping install ledger-hygiene machine-db readme-blocks status update validate version" -- "$cur") );;
         supervisor) COMPREPLY=( $(compgen -W "actions bridge gc land notify owed poll push ram-cap report start status stop tell" -- "$cur") );;
         uat) COMPREPLY=( $(compgen -W "assisted-runner slots" -- "$cur") );;
-        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
+        work) COMPREPLY=( $(compgen -W "asset-slot brand brand-direction brand-palette compose-direction draw-acceptance draw-dna draw-feedback draw-gates draw-grammar draw-layer draw-loop draw-rationale draw-render draw-review draw-source draw-taste example-critique example-derive example-evidence example-verify grammar-geometry grammar-knowledge grammar-proposal grammar-registry-pin graph hygiene layout-tree render-proof shell-conformance ui-proof-brief" -- "$cur") );;
         workflow) COMPREPLY=( $(compgen -W "assess define start status stop" -- "$cur") );;
             *) COMPREPLY=();;
         esac

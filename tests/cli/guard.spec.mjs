@@ -42,8 +42,8 @@ test('PreToolUse hooks use starci while the PATH-independent git hook stays inte
   assert.ok(commands.includes('starci guard command'));
   assert.ok(commands.includes('starci guard seat-tools'));
   assert.equal(toolGuardCommand(), 'starci guard command');
-  const history = historyHookBody({ branches: ['main'], nodePath: '/runtime/node', verify: '/runtime/scripts/guards/verify-commit.mjs' });
-  assert.match(history, /'\/runtime\/node' '\/runtime\/scripts\/guards\/verify-commit\.mjs'/);
+  const history = historyHookBody({ branches: ['main'], nodePath: '/runtime/node', root: '/runtime' });
+  assert.match(history, /STARCI_RUNTIME='\/runtime' '\/runtime\/node' '\/runtime\/packages\/cli\/bin\/starci\.mjs' guard verify-commit/);
   assert.equal(catalog.groups.guard.verbs['verify-commit'].removed.length, 0);
 });
 

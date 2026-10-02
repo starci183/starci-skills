@@ -69,8 +69,8 @@ branches, functions or statements. From the parent `.claude` tree, run
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook,
 default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check); in the runtime repository
 it runs through `workflow_dispatch` of `.github/workflows/examples.yml`. On push and pull request that workflow runs this app's
-typecheck (tsc over be, turbo over the fe workspaces), `hfs lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
-be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `hfs sync` renders; they
+typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
+be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `starci app sync` renders; they
 run when the app is its own repository. Existing Work
 evidence retains its recorded revisions; the derived index reports stale proof where source or records changed.
 

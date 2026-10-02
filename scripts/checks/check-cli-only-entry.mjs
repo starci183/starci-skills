@@ -188,8 +188,8 @@ const packageScriptMap = (root, files, read, baseContext) => {
 /** Render command builders through deterministic seams so generated hooks/tasks are scanned too. */
 export function generatedEntrySources() {
   return [
-    { file: 'scripts/guards/hook-install.mjs', text: historyHookBody({ branches: [], verify: 'scripts/guards/verify-commit.mjs', nodePath: 'node', terminals: '.starci/guards/terminals' }) },
-    { file: 'scripts/guards/hook-install.mjs', text: workHookBody({ check: 'scripts/work/validate/work-hygiene.mjs', nodePath: 'node' }) },
+    { file: 'scripts/guards/hook-install.mjs', text: historyHookBody({ branches: [], root: '.', nodePath: 'node', terminals: '.starci/guards/terminals' }) },
+    { file: 'scripts/guards/hook-install.mjs', text: workHookBody({ root: '.', nodePath: 'node' }) },
     { file: 'scripts/reconciler/boot.mjs', text: reconcilerTaskScript({ starci: 'starci', workdir: '.', every: 5 }) },
     { file: 'scripts/reconciler/tunnel-task.mjs', text: tunnelTaskScript({ task: 'StarCi Harness Tunnel', starci: 'starci', workdir: '.' }) },
     { file: 'scripts/agent/trust.mjs', text: toolGuardCommand() },

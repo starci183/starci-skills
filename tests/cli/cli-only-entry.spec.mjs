@@ -104,8 +104,8 @@ test('the real command builders render through the injected seams', () => {
   const sources = generatedEntrySources();
   assert.ok(sources.some((source) => source.file === 'scripts/guards/hook-install.mjs'));
   const report = scan({}, { generated: sources });
-  assert.ok(report.findings.some((finding) => finding.script === 'scripts/guards/verify-commit.mjs'), JSON.stringify(report.findings));
-  assert.ok(report.findings.some((finding) => finding.script === 'scripts/work/validate/work-hygiene.mjs'), JSON.stringify(report.findings));
+  assert.ok(!report.findings.some((finding) => finding.script === 'scripts/guards/verify-commit.mjs'), JSON.stringify(report.findings));
+  assert.ok(!report.findings.some((finding) => finding.script === 'scripts/work/validate/work-hygiene.mjs'), JSON.stringify(report.findings));
   assert.ok(!report.findings.some((finding) => finding.file === 'scripts/reconciler/boot.mjs'), JSON.stringify(report.findings));
 });
 

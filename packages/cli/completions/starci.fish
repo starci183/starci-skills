@@ -187,6 +187,7 @@ complete -c starci -n '__fish_seen_subcommand_from work' -a grammar-knowledge -d
 complete -c starci -n '__fish_seen_subcommand_from work' -a grammar-proposal -d 'list or check grammar proposals in Work records'
 complete -c starci -n '__fish_seen_subcommand_from work' -a grammar-registry-pin -d 'check a frontend grammar dependency against the registry pin'
 complete -c starci -n '__fish_seen_subcommand_from work' -a graph -d 'inspect, validate, diff or propose a workflow work graph'
+complete -c starci -n '__fish_seen_subcommand_from work' -a hygiene -d 'parse, scope-validate and secret-check Work and stack files before they are committed'
 complete -c starci -n '__fish_seen_subcommand_from work' -a layout-tree -d 'scan, capture, plan, lock, or inspect a product layout tree'
 complete -c starci -n '__fish_seen_subcommand_from work' -a render-proof -d 'render a proof document for one Work record'
 complete -c starci -n '__fish_seen_subcommand_from work' -a shell-conformance -d 'check Work and implementation records against the measured frontend shell'
