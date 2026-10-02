@@ -2,6 +2,7 @@ import { accountEntities, accountMigrations } from "@modules/domain/account"
 import { cartEntities, cartMigrations } from "@modules/domain/cart"
 import { catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { invoiceEntities, invoiceMigrations } from "@modules/domain/invoice"
+import { loyaltyEntities, loyaltyMigrations } from "@modules/domain/loyalty"
 import { orderEntities, orderMigrations } from "@modules/domain/order"
 import { paymentEntities, paymentMigrations } from "@modules/domain/payment"
 import type { EnvSource } from "@modules/platform/config"
@@ -26,19 +27,20 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
         { ...parseIdentityDatabaseConfig(env), entities: accountEntities, migrations: accountMigrations },
         {
             ...parseOrderDatabaseConfig(env),
-            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities, ...sagaEntities],
+            entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...loyaltyEntities, ...inboxEntities, ...sagaEntities],
             migrations: [
                 ...catalogMigrations,
                 ...cartMigrations,
                 ...orderMigrations,
-                ...paymentMigrations,
+                ...loyaltyMigrations,
+                ...inboxMigrations,
                 ...sagaMigrations,
             ],
         },
         {
             ...parseBillingDatabaseConfig(env),
-            entities: [...invoiceEntities, ...inboxEntities],
-            migrations: [...invoiceMigrations, ...inboxMigrations],
+            entities: [...invoiceEntities, ...paymentEntities, ...inboxEntities],
+            migrations: [...invoiceMigrations, ...paymentMigrations, ...inboxMigrations],
         },
     ],
 })

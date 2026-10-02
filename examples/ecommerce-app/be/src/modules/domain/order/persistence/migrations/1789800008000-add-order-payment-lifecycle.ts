@@ -19,6 +19,6 @@ export class AddOrderPaymentLifecycle1789800008000 implements MigrationInterface
         await queryRunner.query(`DROP INDEX orders_pending_created_idx`)
         await queryRunner.query(`ALTER TABLE orders DROP COLUMN paid_at`)
         await queryRunner.query(`ALTER TABLE orders DROP CONSTRAINT orders_status_check`)
-        await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('confirmed', 'cancelled'))`)
+        await queryRunner.query(`ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'paid', 'cancelled'))`)
     }
 }
