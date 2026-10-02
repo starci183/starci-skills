@@ -211,7 +211,6 @@ function summarize(findings) {
  * only place the edition touches a finding; no check below it knows the edition.
  */
 function judgedFindings(findings, edition, root) {
-  if (edition === 'full') return findings;
   const catalog = loadRuleCatalog({ root });
   return findings.filter((finding) => catalog.judgedIn(finding.code, edition));
 }

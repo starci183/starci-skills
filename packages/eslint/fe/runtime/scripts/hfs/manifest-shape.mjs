@@ -86,7 +86,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 const strList = (v) => stringList(v);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'editions', 'litePresence', 'lite', 'provider', 'coverage'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'pattern', 'trigger', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'liteManagedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'perConnection', 'editions', 'litePresence', 'lite', 'provider', 'coverage', 'entries', 'outcomeHome'];
 /** The fields a slot's `lite` overlay may hold: the same keys it would carry in the slot body, resolved under edition lite. */
 const LITE_OVERLAY_KEYS = ['path', 'requires', 'allows', 'forbids', 'minInstances', 'requiredInstances'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
@@ -152,6 +152,13 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
       if (!ok) bad.push(`${at}: lite may hold only ${LITE_OVERLAY_KEYS.join(', ')}, each shaped as in the slot body`);
     }
   }
+  if (slot.entries !== undefined) {
+    const listed = strList(slot.entries) && slot.entries.length > 0 && new Set(slot.entries).size === slot.entries.length && slot.entries.every(relPath);
+    if (!listed) bad.push(`${at}: entries must be a non-empty list of unique relative file paths`);
+    else if (typeof slot.path !== 'string' || !slot.path.endsWith('/') || slot.owner === true) bad.push(`${at}: entries belong to a directory slot that is not an owner (they name extra public entries of the owner that holds it)`);
+    else if (Array.isArray(slot.allows) && slot.entries.some((entry) => !slot.allows.includes(entry))) bad.push(`${at}: every entry must be one of the names the slot allows`);
+  }
+  if (slot.outcomeHome !== undefined && !(slot.outcomeHome === true && typeof slot.path === 'string' && slot.path && !slot.path.endsWith('/'))) bad.push(`${at}: outcomeHome is true and belongs to a file slot (the one file that declares the repository's Outcome union)`);
   if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
   if (slot.perConnection !== undefined && !(slot.id === 'be.persistence' && strList(slot.perConnection) && slot.perConnection.length && new Set(slot.perConnection).size === slot.perConnection.length && slot.perConnection.every((name) => NAME.test(name)))) bad.push(`${at}: perConnection is a unique list of capability names, only on be.persistence (the platform capabilities whose tables exist on every connection that uses them)`);
   if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);

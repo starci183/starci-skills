@@ -1,14 +1,13 @@
 // database-migrations.mjs - L02 migration name, UTC ordering and base-branch immutability checks. Git reads go
 // through the runtime API call files, and specs may inject the same small runner contract used by database.mjs.
 import { lsTree } from '../../api/git/ls-tree.mjs';
+import { log } from '../../api/git/log.mjs';
 import { mergeBase } from '../../api/git/merge-base.mjs';
 import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
-
-const DB_MIGRATION_SHAPE = 'DB_MIGRATION_SHAPE';
-const MIGRATIONS_DIR = 'supabase/migrations';
+import { DB_MIGRATION_SHAPE, MIGRATIONS_DIR } from './database-constants.mjs';
 const MIGRATION_NAME = /^(\d{14})_([a-z0-9]+(?:-[a-z0-9]+)*)\.sql$/;
 
 /** `<ts14>` -> the UTC instant it names, or null when the digits are no real time (month 13, day 32, ...). */
@@ -25,7 +24,7 @@ export function defaultGit(args, { cwd }) {
   const [verb, ...rest] = args;
   const env = withoutGitLocalEnv(process.env);
   if (verb === 'merge-base') { const sha = mergeBase(cwd, rest[0], rest[1]); return { ok: sha !== null, stdout: sha ?? '' }; }
-  const call = verb === 'ls-tree' ? lsTree : show;
+  const call = verb === 'ls-tree' ? lsTree : verb === 'log' ? log : show;
   const result = call(rest, { cwd, env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: !result.error && result.status === 0, stdout: result.stdout };
 }
@@ -44,7 +43,8 @@ async function baseShaOf(git, repoRoot, base) {
 async function baseMigrationNames(git, repoRoot, sha) {
   const result = await runGit(git, repoRoot, ['ls-tree', '-r', '--name-only', '-z', sha, '--', MIGRATIONS_DIR]);
   if (!result.ok) return [];
-  return result.stdout.split('\0').map((entry) => entry.split('/').pop()).filter(Boolean);
+  const prefix = `${MIGRATIONS_DIR}/`;
+  return result.stdout.split('\0').filter(Boolean).map((entry) => (entry.startsWith(prefix) ? entry.slice(prefix.length) : entry));
 }
 
 async function baseFileText(git, repoRoot, sha, file) {
@@ -52,11 +52,22 @@ async function baseFileText(git, repoRoot, sha, file) {
   return result.ok ? result.stdout : null;
 }
 
+async function migrationTimeLimit(git, repoRoot, file, now) {
+  const result = await runGit(git, repoRoot, ['log', '-1', '--format=%ct', '--', file]);
+  const seconds = Number(result.stdout.trim());
+  if (result.ok && Number.isFinite(seconds) && seconds > 0) return { at: seconds * 1000, tracked: true };
+  return { at: now(), tracked: false };
+}
+
 
 /** L02 findings for names, stamps, ordering and immutability of supabase/migrations/*.sql. */
 export async function migrationShapeFindings({ repoRoot, migrations, git, base, now }) {
   const findings = [];
-  const local = migrations.map((file) => ({ file, name: file.split('/').pop(), match: MIGRATION_NAME.exec(file.split('/').pop()) }));
+  const prefix = `${MIGRATIONS_DIR}/`;
+  const local = migrations.map((file) => {
+    const name = file.startsWith(prefix) ? file.slice(prefix.length) : file;
+    return { file, name, match: MIGRATION_NAME.exec(name) };
+  });
   const stamps = new Map();
   for (const entry of local) {
     if (!entry.match) {
@@ -68,7 +79,11 @@ export async function migrationShapeFindings({ repoRoot, migrations, git, base, 
       findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} carries ${entry.match[1]}, which is no valid UTC time; the stamp is the real creation time`, { stamp: entry.match[1] }));
       continue;
     }
-    if (stamp > now()) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, in the future; a migration stamp is the real UTC creation time so ordering is the CLI's, not a hand-picked date`, { stamp: entry.match[1] }));
+    const limit = await migrationTimeLimit(git, repoRoot, entry.file, now);
+    if (stamp > limit.at) {
+      const boundary = limit.tracked ? `the file's commit time ${new Date(limit.at).toISOString()}` : `the current time ${new Date(limit.at).toISOString()}`;
+      findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} is stamped ${entry.match[1]}, in the future relative to ${boundary}; a migration stamp is its real creation time, never a hand-picked date`, { stamp: entry.match[1], tracked: limit.tracked }));
+    }
     if (stamps.has(stamp)) findings.push(found(DB_MIGRATION_SHAPE, entry.file, `${entry.file} shares stamp ${entry.match[1]} with ${stamps.get(stamp)}; stamps are strictly increasing`, { stamp: entry.match[1], other: stamps.get(stamp) }));
     stamps.set(stamp, entry.file);
   }

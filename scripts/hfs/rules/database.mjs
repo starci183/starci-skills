@@ -1,439 +1,39 @@
-// database.mjs - the Supabase rules of the lite edition (design 4.2, provisional ids L02-L09), judged on the real
-// PostgreSQL AST of each file (scripts/hfs/sql/pg-parse.mjs over the WASM build of libpg-query), never on a regex
-// over the SQL text. Judged paths, app-relative at the app root:
-//   supabase/migrations/<ts14>_<kebab>.sql   L02-L07
-//   supabase/config.toml                     L08 (TOML through smol-toml, lazy)
-//   supabase/types/database.types.ts         L09 (the emitted text is injected; this module starts no Docker)
-//   DB_MIGRATION_SHAPE  (L02) a migration file is named <ts14>_<kebab>.sql, the stamp a valid UTC instant not in
-//                           the future; a migration new against the merge-base sorts after every migration on the
-//                           base; a migration on the base is byte-identical to it (diff is a finding, removal too).
-//                           No merge-base with origin/main or main: ordering and immutability are not judged.
-//   DB_RLS_REQUIRED     (L03) every create table (or create table as) in an exposed schema (public plus the
-//                           config.toml [api] schemas) is followed in the same migration by
-//                           `alter table <t> enable row level security`; a table named in the hfs.json
-//                           supabase.forceRls list also gets `force row level security`. Partition children and
-//                           temp tables are exempt.
-//   DB_DYNAMIC_DDL      (L04) no dynamic SQL builds DDL: every plpgsql EXECUTE, dynamic FOR and dynamic OPEN (in a
-//                           DO block or a function body) whose source literals contain create/alter/drop
-//                           table|policy|function or grant|revoke, and every dynamic statement the parser cannot
-//                           read at all, is a finding - the AST must see every statement a migration runs.
-//   DB_POLICY_SHAPE     (L05) a write or FOR ALL policy never uses using (true) / with check (true); to anon or
-//                           to public is legal only on FOR SELECT with a name ending _public_read, and a SELECT
-//                           policy with using (true) must carry that suffix; every policy is named
-//                           <table>_<role>_<action>; no grant to anon/public on a table without a _public_read
-//                           select policy; a grant to service_role is never written.
-//   DB_DEFINER_SAFE     (L06) a security definer function pins its search_path (a `set search_path = ...` option
-//                           of literals, on the create or a same-migration alter function), lives outside the
-//                           exposed schemas or is `revoke execute ... from public` in the same migration, declares
-//                           a return type, and builds no dynamic SQL but format() templates interpolating only
-//                           through %I/%L.
-//   DB_STORAGE_POLICY   (L07) a bucket inserted into storage.buckets declares public (true only for an id ending
-//                           _public), file_size_limit and allowed_mime_types, and a storage.objects policy naming
-//                           its bucket_id lives in the same migration.
-//   DB_CONFIG_POLICY    (L08) config.toml carries no literal value under a credential key (any leaf key named or
-//                           ending secret|password|token|client_id, or ending _key that is not anon/publishable/
-//                           public): the value is env(NAME). auth.jwt_expiry is <= 3600; auth.enable_signup,
-//                           auth.email.enable_signup, auth.site_url and auth.additional_redirect_urls equal the
-//                           hfs.json `supabase` block ({enableSignup, jwtExpiry, siteUrl, redirectUrls}) when the
-//                           block declares them - the config states nothing the app did not declare.
-//   DB_TYPES_DRIFT      (L09) the committed database.types.ts equals the text `emitTypes()` regenerates now; the
-//                           emit is injected (chunk E wires it to contract:emit) and the rule is silent without it.
+// Supabase database rules (design 4.2, L02-L09). SQL migrations are parsed with libpg-query through
+// database-sql.mjs; config, Git history and generated-type checks are split into bounded sibling modules.
 import { found, readJson, readText } from './read.mjs';
-import { parsePlpgsqlBody, parseSql } from '../sql/pg-parse.mjs';
 import { configFindings, parseToml, typesFindings } from './database-config.mjs';
 import { defaultGit, migrationShapeFindings } from './database-migrations.mjs';
+import { migrationSetPolicyFindings, sqlAnalysis } from './database-sql.mjs';
+import { CONFIG_FILE, DB_CONFIG_POLICY, DB_MIGRATION_SHAPE, MIGRATIONS_DIR, TYPES_FILE } from './database-constants.mjs';
+
 export { migrationStamp } from './database-migrations.mjs';
-
-export const DB_MIGRATION_SHAPE = 'DB_MIGRATION_SHAPE';
-export const DB_RLS_REQUIRED = 'DB_RLS_REQUIRED';
-export const DB_DYNAMIC_DDL = 'DB_DYNAMIC_DDL';
-export const DB_POLICY_SHAPE = 'DB_POLICY_SHAPE';
-export const DB_DEFINER_SAFE = 'DB_DEFINER_SAFE';
-export const DB_STORAGE_POLICY = 'DB_STORAGE_POLICY';
-export const DB_CONFIG_POLICY = 'DB_CONFIG_POLICY';
-export const DB_TYPES_DRIFT = 'DB_TYPES_DRIFT';
-
-const MIGRATIONS_DIR = 'supabase/migrations';
-export const CONFIG_FILE = 'supabase/config.toml';
-export const TYPES_FILE = 'supabase/types/database.types.ts';
-
-const POLICY_ACTIONS = ['select', 'insert', 'update', 'delete', 'all'];
-const WRITE_COMMANDS = new Set(['all', 'insert', 'update', 'delete']);
-const PUBLIC_READ_SUFFIX = '_public_read';
-
-// Dynamic SQL source literals building a create|alter|drop of a table, policy or function, or a grant/revoke.
-const DYNAMIC_DDL = [
-  /\b(?:create|alter|drop)\s+(?:or\s+replace\s+|temp(?:orary)?\s+|unlogged\s+|foreign\s+|unique\s+|if\s+(?:not\s+)?exists\s+|concurrently\s+|materialized\s+)*(?:table|policy|function)\b/i,
-  /\b(?:grant|revoke)\s+(?:select|insert|update|delete|truncate|references|trigger|execute|usage|all)\b/i,
-];
-
-/** The string literals of a plpgsql expression source ('' is the escaped quote), unescaped. */
-const stringLiterals = (text) => [...String(text).matchAll(/'(?:[^']|'')*'/g)].map((m) => m[0].slice(1, -1).replace(/''/g, "'"));
-
-/** A dynamic-SQL expression text builds DDL when one of its literals writes it out. */
-const dynamicBuildsDdl = (text) => stringLiterals(text).some((literal) => DYNAMIC_DDL.some((rx) => rx.test(literal)));
-
-/** node.String.sval of a parser name node. */
-const sval = (node) => node?.String?.sval;
-/** The dotted name of a RangeVar/ObjectWithArgs/funcname list, e.g. ['public','t'] -> 'public.t'. */
-const nameOf = (list) => (list ?? []).map(sval).filter((part) => part !== undefined).join('.');
-/** The schema of a RangeVar, unqualified read as the public default. */
-const schemaOf = (rel) => rel?.schemaname ?? 'public';
-/** The role a RoleSpec names; `to public` is the ROLESPEC_PUBLIC pseudo-role. */
-const roleOf = (roleSpec) => (roleSpec?.RoleSpec?.roletype === 'ROLESPEC_PUBLIC' ? 'public' : roleSpec?.RoleSpec?.rolename ?? null);
-/** The expression is the literal `true`. */
-const isTrue = (expr) => expr?.A_Const?.boolval?.boolval === true;
-/** The expression is a bool literal; `.value` tells true from false (a false literal is `boolval: {}`). */
-const asBool = (expr) => (expr?.A_Const?.boolval === undefined ? null : expr.A_Const.boolval.boolval === true);
-/** The expression is a string literal. */
-const asString = (expr) => expr?.A_Const?.sval?.sval;
-/** The expression is the literal NULL. */
-const isNull = (expr) => expr?.A_Const?.isnull === true;
-
-/** {line} of byte `offset` in `text`: pg's locations are byte offsets, so the line starts are counted in bytes. */
-function lineIndexOf(text) {
-  const bytes = Buffer.from(text, 'utf8');
-  const starts = [0];
-  for (let i = 0; i < bytes.length; i += 1) if (bytes[i] === 0x0a) starts.push(i + 1);
-  return (offset) => {
-    let lo = 0;
-    let hi = starts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (starts[mid] <= offset) lo = mid; else hi = mid - 1;
-    }
-    return lo + 1;
-  };
-}
-
-/** The statement list of one parsed migration as {type, node, index, line}. */
-function statementList(stmts, lineAt) {
-  return (stmts ?? []).map((entry, index) => {
-    const type = Object.keys(entry.stmt ?? {})[0] ?? '';
-    const node = entry.stmt?.[type] ?? {};
-    const offset = entry.stmt_location >= 0 ? entry.stmt_location : (node.location >= 0 ? node.location : 0);
-    return { type, node, index, line: lineAt(offset) };
-  });
-}
+export {
+  CONFIG_FILE,
+  DB_CONFIG_POLICY,
+  DB_DEFINER_SAFE,
+  DB_DYNAMIC_DDL,
+  DB_MIGRATION_SHAPE,
+  DB_POLICY_SHAPE,
+  DB_RLS_REQUIRED,
+  DB_STORAGE_POLICY,
+  DB_TYPES_DRIFT,
+  TYPES_FILE,
+} from './database-constants.mjs';
 
 /**
- * Every plpgsql dynamic statement source (`EXECUTE <expr>`, `FOR ... IN EXECUTE <expr>`, `OPEN ... FOR EXECUTE
- * <expr>`) of a parsed PLpgSQL_function node: [{ text, lineno }].
- */
-function plpgsqlDynamicQueries(root) {
-  const out = [];
-  const visit = (value) => {
-    if (!value || typeof value !== 'object') return;
-    if (Array.isArray(value)) { for (const item of value) visit(item); return; }
-    for (const [key, child] of Object.entries(value)) {
-      if (key === 'PLpgSQL_stmt_dynexecute' || key === 'PLpgSQL_stmt_dynfors') {
-        const text = child?.query?.PLpgSQL_expr?.query;
-        if (text !== undefined) out.push({ text, lineno: child.lineno });
-      } else if (key === 'PLpgSQL_stmt_open') {
-        const text = child?.dynquery?.PLpgSQL_expr?.query;
-        if (text !== undefined) out.push({ text, lineno: child.lineno });
-      }
-      visit(child);
-    }
-  };
-  visit(root);
-  return out;
-}
-
-/** The plpgsql AST of a body string, or null when it cannot be read (the caller reports it opaque). */
-async function plpgsqlOf(body) {
-  try { return await parsePlpgsqlBody(body); } catch { return null; }
-}
-
-// ------------------------------------------------------------------------------------------------ shared extraction
-
-/** Every statement of one migration folded to the facts the rules read. */
-function factsOf(statements) {
-  const tables = [];       // {schema, name, index, line}
-  const enables = [];      // {schema, name, index}            alter table enable row level security
-  const forces = [];       // {schema, name, index}            alter table force row level security
-  const policies = [];     // {name, schema, table, cmd, roles, qual, withCheck, index, line}
-  const grants = [];       // {grant, objtype, objects, privileges, grantees, index, line}
-  const functions = [];    // {node, name, schema, index, line}
-  const alterFunctions = [];// {name, setsPath, index, line}
-  const doBlocks = [];     // {body, language, index, line}
-  const buckets = [];      // {insert, index, line}
-  for (const s of statements) {
-    const { node } = s;
-    if (s.type === 'CreateStmt' || s.type === 'CreateTableAsStmt') {
-      const rel = s.type === 'CreateStmt' ? node.relation : node.into?.rel;
-      if (!rel || node.partbound || rel.relpersistence === 't') continue;
-      tables.push({ schema: schemaOf(rel), name: rel.relname, index: s.index, line: s.line });
-    } else if (s.type === 'AlterTableStmt') {
-      for (const cmd of node.cmds ?? []) {
-        const subtype = cmd?.AlterTableCmd?.subtype;
-        if (subtype === 'AT_EnableRowSecurity') enables.push({ schema: schemaOf(node.relation), name: node.relation?.relname, index: s.index });
-        else if (subtype === 'AT_ForceRowSecurity') forces.push({ schema: schemaOf(node.relation), name: node.relation?.relname, index: s.index });
-      }
-    } else if (s.type === 'CreatePolicyStmt') {
-      policies.push({
-        name: node.policy_name, schema: schemaOf(node.table), table: node.table?.relname,
-        cmd: String(node.cmd_name ?? 'all').toLowerCase(), roles: node.roles?.length ? node.roles.map(roleOf) : ['public'],
-        qual: node.qual, withCheck: node.with_check, index: s.index, line: s.line,
-      });
-    } else if (s.type === 'GrantStmt') {
-      grants.push({
-        grant: node.is_grant === true, objtype: node.objtype,
-        objects: node.objects ?? [], privileges: (node.privileges ?? []).map((p) => String(p?.AccessPriv?.priv_name ?? '').toLowerCase()),
-        grantees: (node.grantees ?? []).map(roleOf), index: s.index, line: s.line,
-      });
-    } else if (s.type === 'CreateFunctionStmt') {
-      const parts = (node.funcname ?? []).map(sval).filter(Boolean);
-      functions.push({ node, name: parts.join('.'), schema: parts.length > 1 ? parts[0] : 'public', index: s.index, line: s.line });
-    } else if (s.type === 'AlterFunctionStmt') {
-      const name = nameOf(node.func?.objname);
-      const setsPath = (node.actions ?? []).some((action) => isSearchPathSet(action?.DefElem));
-      alterFunctions.push({ name, setsPath, index: s.index, line: s.line });
-    } else if (s.type === 'DoStmt') {
-      const option = (key) => (node.args ?? []).find((a) => a?.DefElem?.defname === key)?.DefElem?.arg;
-      doBlocks.push({ body: option('as')?.String?.sval, language: option('language')?.String?.sval ?? 'plpgsql', index: s.index, line: s.line });
-    } else if (s.type === 'InsertStmt' && node.relation?.schemaname === 'storage' && node.relation?.relname === 'buckets') {
-      buckets.push({ node, index: s.index, line: s.line });
-    }
-  }
-  return { tables, enables, forces, policies, grants, functions, alterFunctions, doBlocks, buckets };
-}
-
-/** The DefElem is `set search_path = <literal...>` (a pinned value, never `from current`). */
-function isSearchPathSet(elem) {
-  const v = elem?.arg?.VariableSetStmt;
-  return elem?.defname === 'set' && v?.name === 'search_path' && v?.kind === 'VAR_SET_VALUE'
-    && (v.args ?? []).length > 0 && v.args.every((arg) => arg?.A_Const?.sval !== undefined || arg?.A_Const?.isnull === true);
-}
-
-const functionOption = (node, key) => (node.options ?? []).filter((o) => o?.DefElem?.defname === key).map((o) => o.DefElem);
-const securityDefiner = (node) => functionOption(node, 'security').some((o) => o.arg?.Boolean?.boolval === true || o.arg?.Integer?.ival === 1);
-const functionLanguage = (node) => functionOption(node, 'language').map((o) => o.arg?.String?.sval).filter(Boolean).at(-1) ?? 'sql';
-const functionBody = (node) => functionOption(node, 'as').flatMap((o) => (o.arg?.List?.items ?? []).map((item) => item?.String?.sval ?? '')).join('') || null;
-
-// ------------------------------------------------------------------------------------------------ L03
-
-function rlsFindings(file, facts, exposed, forceRls) {
-  const findings = [];
-  for (const table of facts.tables) {
-    if (!exposed.has(table.schema)) continue;
-    const qualified = `${table.schema}.${table.name}`;
-    if (!facts.enables.some((e) => e.schema === table.schema && e.name === table.name && e.index > table.index)) {
-      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} creates ${qualified} in the exposed schema ${table.schema} without a later \`alter table ${qualified} enable row level security\` in the same migration; the enable ships next to the create so a static pass can see it`, { line: table.line, table: qualified }));
-    }
-    if (forceRls.has(qualified) && !facts.forces.some((e) => e.schema === table.schema && e.name === table.name && e.index > table.index)) {
-      findings.push(found(DB_RLS_REQUIRED, file, `${file}:${table.line} creates ${qualified}, which hfs.json supabase.forceRls declares definer-owned, without \`alter table ${qualified} force row level security\` in the same migration`, { line: table.line, table: qualified }));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L04
-
-/**
- * The dynamic-SQL findings of one plpgsql source list (`queries` from plpgsqlDynamicQueries) under `file`:
- * a statement whose literals write DDL, or one the pass cannot read at all. `baseLine` is the file line the
- * plpgsql source block starts near (lineno counts inside the body).
- */
-function dynamicDdlFindings(file, queries, where, baseLine) {
-  const findings = [];
-  for (const { text, lineno } of queries) {
-    const literals = stringLiterals(text);
-    const line = lineno ? baseLine + lineno - 1 : undefined;
-    if (dynamicBuildsDdl(text)) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}${line ? `:${line}` : ''} ${where} builds DDL dynamically (\`${String(text).slice(0, 120)}\`); write the create/alter/drop or grant/revoke out as statements so the parser sees every one`, { ...(line ? { line } : {}), query: text }));
-    } else if (!literals.length) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}${line ? `:${line}` : ''} ${where} runs dynamic SQL the pass cannot read (\`${String(text).slice(0, 120)}\`); dynamic DDL is refused and a query built from a variable cannot be judged`, { ...(line ? { line } : {}), query: text }));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L05
-
-function policyFindings(file, facts) {
-  const findings = [];
-  for (const p of facts.policies) {
-    const qualified = `${p.schema}.${p.table}`;
-    if (p.name === undefined || !p.name.startsWith(`${p.table}_`)) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${JSON.stringify(p.name)} on ${qualified} is not named <table>_<role>_<action>; the name is the declaration`, { line: p.line, policy: p.name }));
-    } else {
-      const tail = p.name.slice(p.table.length + 1);
-      if (tail !== 'public_read' && !new RegExp(`^[a-z][a-z0-9_]*_(${POLICY_ACTIONS.join('|')})$`).test(tail)) {
-        findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${p.name} on ${qualified} is not named <table>_<role>_<action> (action one of ${POLICY_ACTIONS.join(', ')}; a world-readable select ends _public_read)`, { line: p.line, policy: p.name }));
-      }
-    }
-    const publicRead = typeof p.name === 'string' && p.name.endsWith(PUBLIC_READ_SUFFIX);
-    if (WRITE_COMMANDS.has(p.cmd) && isTrue(p.qual)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${p.name} on ${qualified} is FOR ${p.cmd.toUpperCase()} with USING (true); a write policy never admits every row`, { line: p.line, policy: p.name }));
-    if (WRITE_COMMANDS.has(p.cmd) && isTrue(p.withCheck)) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${p.name} on ${qualified} is FOR ${p.cmd.toUpperCase()} with WITH CHECK (true); a write policy never admits every row`, { line: p.line, policy: p.name }));
-    if (p.cmd === 'select' && isTrue(p.qual) && !publicRead) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${p.name} on ${qualified} is FOR SELECT with USING (true); a world-readable table declares it in the name: <table>_<role>_public_read or <table>_public_read`, { line: p.line, policy: p.name }));
-    if ((p.roles.includes('anon') || p.roles.includes('public')) && !(p.cmd === 'select' && publicRead)) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${p.line} policy ${p.name} on ${qualified} is granted to ${p.roles.includes('anon') ? 'anon' : 'public'}; the anonymous role reaches only FOR SELECT policies named *_public_read`, { line: p.line, policy: p.name }));
-    }
-  }
-  for (const g of facts.grants) {
-    if (!g.grant) continue;
-    if (g.grantees.includes('service_role')) {
-      findings.push(found(DB_POLICY_SHAPE, file, `${file}:${g.line} grants to service_role; the service role bypasses RLS and is never an application path, so it is never granted`, { line: g.line }));
-    }
-    if (!g.grantees.includes('anon') && !g.grantees.includes('public')) continue;
-    for (const object of g.objects) {
-      const rel = object?.RangeVar;
-      if (!rel) continue;
-      const schema = schemaOf(rel);
-      const table = rel.relname;
-      const covered = facts.policies.some((p) => p.schema === schema && p.table === table && p.cmd === 'select' && typeof p.name === 'string' && p.name.endsWith(PUBLIC_READ_SUFFIX));
-      if (!covered) findings.push(found(DB_POLICY_SHAPE, file, `${file}:${g.line} grants ${g.grantees.includes('anon') ? 'anon' : 'public'} on ${schema}.${table} but no *_public_read FOR SELECT policy exists on it in this migration; the grant is legal only beside its declared public-read policy`, { line: g.line, table: `${schema}.${table}` }));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L06
-
-/**
- * A security-definer body's dynamic SQL: an EXECUTE is safe only when it runs one literal or a format() template
- * interpolating solely through %I/%L (%% escapes a percent).
- */
-function definerDynamicFindings(file, fn, queries, baseLine) {
-  const findings = [];
-  for (const { text, lineno } of queries) {
-    const source = String(text).trim();
-    const line = lineno ? baseLine + lineno - 1 : undefined;
-    const detail = { ...(line ? { line } : {}), function: fn.name, query: text };
-    if (/^'(?:[^']|'')*'$/.test(source)) continue;
-    const format = /^format\s*\(\s*'((?:[^']|'')*)'/i.exec(source);
-    if (format) {
-      const template = format[1].replace(/''/g, "'");
-      if (/%(?!I\b|L\b|%)/.test(template.replace(/%%/g, ''))) {
-        findings.push(found(DB_DEFINER_SAFE, file, `${file}${line ? `:${line}` : ''} security definer function ${fn.name} interpolates through a format() specifier that is not %I or %L (\`${source.slice(0, 120)}\`); parameters enter dynamic SQL only quoted`, detail));
-      }
-      continue;
-    }
-    findings.push(found(DB_DEFINER_SAFE, file, `${file}${line ? `:${line}` : ''} security definer function ${fn.name} builds dynamic SQL without format('%I/%L') (\`${source.slice(0, 120)}\`)`, detail));
-  }
-  return findings;
-}
-
-async function definerFindings(file, facts, exposed) {
-  const findings = [];
-  for (const fn of facts.functions) {
-    const node = fn.node;
-    if (!securityDefiner(node)) continue;
-    const pathSet = functionOption(node, 'set').some((o) => isSearchPathSet(o))
-      || facts.alterFunctions.some((a) => a.name === fn.name && a.setsPath && a.index > fn.index);
-    if (!pathSet) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} sets no search_path; add \`set search_path = ''\` (or a pinned schema list) on the create, or an alter function in the same migration - an unset search_path is a privilege-escalation vector`, { line: fn.line, function: fn.name }));
-    if (exposed.has(fn.schema)) {
-      const revoked = facts.grants.some((g) => !g.grant && g.objtype === 'OBJECT_FUNCTION'
-        && g.objects.some((o) => nameOf(o?.ObjectWithArgs?.objname) === fn.name)
-        && (g.privileges.includes('execute') || g.privileges.includes('all'))
-        && g.grantees.includes('public'));
-      if (!revoked) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} lives in the exposed schema ${fn.schema}; keep it in a non-exposed schema (private) or \`revoke execute on function ${fn.name}(...) from public\` in the same migration`, { line: fn.line, function: fn.name }));
-    }
-    if (!node.is_procedure && !node.returnType) findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} declares no return type`, { line: fn.line, function: fn.name }));
-    if (functionLanguage(node) === 'plpgsql') {
-      const body = functionBody(node);
-      if (body === null) continue;
-      const ast = await plpgsqlOf(body);
-      if (ast === null) {
-        findings.push(found(DB_DEFINER_SAFE, file, `${file}:${fn.line} security definer function ${fn.name} has a body the pass cannot read; a definer body must be plain plpgsql`, { line: fn.line, function: fn.name }));
-        continue;
-      }
-      findings.push(...definerDynamicFindings(file, fn, plpgsqlDynamicQueries(ast), fn.line));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L04 (migration level)
-
-async function dynamicFindings(file, facts) {
-  const findings = [];
-  for (const block of facts.doBlocks) {
-    if (block.body === undefined || block.language !== 'plpgsql') {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block in ${block.language} cannot be inspected; a DO block is plpgsql so a static pass sees its statements`, { line: block.line }));
-      continue;
-    }
-    const ast = await plpgsqlOf(block.body);
-    if (ast === null) {
-      findings.push(found(DB_DYNAMIC_DDL, file, `${file}:${block.line} DO block body is not valid plpgsql; the pass must see every statement a migration runs`, { line: block.line }));
-      continue;
-    }
-    findings.push(...dynamicDdlFindings(file, plpgsqlDynamicQueries(ast), 'DO block', block.line));
-  }
-  for (const fn of facts.functions) {
-    if (functionLanguage(fn.node) !== 'plpgsql') continue;
-    const body = functionBody(fn.node);
-    if (body === null) continue;
-    const ast = await plpgsqlOf(body);
-    if (ast === null) continue; // an unreadable definer body is reported by L06 when security definer
-    findings.push(...dynamicDdlFindings(file, plpgsqlDynamicQueries(ast), `function ${fn.name}`, fn.line));
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ L07
-
-/** The values rows of an `insert ... values (...)`: [[expr per column]] or null for a non-VALUES insert. */
-const valueRows = (node) => (node.selectStmt?.SelectStmt?.valuesLists ?? []).map((list) => list?.List?.items ?? []);
-
-function storageFindings(file, facts) {
-  const findings = [];
-  for (const { node, line } of facts.buckets) {
-    const cols = (node.cols ?? []).map((c) => c?.ResTarget?.name);
-    const rows = valueRows(node);
-    if (!cols.length || !rows.length) {
-      findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} inserts into storage.buckets without a literal column list and VALUES; a bucket is declared by name so its policy can be checked`, { line }));
-      continue;
-    }
-    for (const row of rows) {
-      const cell = (name) => row[cols.indexOf(name)];
-      const id = asString(cell('id'));
-      if (id === undefined) {
-        findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} storage.buckets row has no literal id`, { line }));
-        continue;
-      }
-      const isPublicName = id.endsWith('_public');
-      const publicValue = asBool(cell('public'));
-      if (publicValue !== isPublicName) {
-        findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares public = ${publicValue === null ? 'absent' : publicValue}; a bucket is private (public = false) unless its id ends _public`, { line, bucket: id }));
-      }
-      for (const column of ['file_size_limit', 'allowed_mime_types']) {
-        const value = cell(column);
-        if (value === undefined || isNull(value)) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} declares no ${column}; a bucket's size and mime bounds are set where it is created`, { line, bucket: id, column }));
-      }
-      const covered = facts.policies.some((p) => p.schema === 'storage' && p.table === 'objects'
-        && JSON.stringify([p.qual, p.withCheck]).includes('"sval":"bucket_id"')
-        && JSON.stringify([p.qual, p.withCheck]).includes(`"sval":${JSON.stringify(id)}`));
-      if (!covered) findings.push(found(DB_STORAGE_POLICY, file, `${file}:${line} bucket ${JSON.stringify(id)} has no storage.objects policy naming bucket_id '${id}' in this migration; a bucket ships with the policies that scope it`, { line, bucket: id }));
-    }
-  }
-  return findings;
-}
-
-// ------------------------------------------------------------------------------------------------ the rule entry
-
-/**
- * The findings of L02-L09 over the tracked paths `files` (app-relative) of the app at `repoRoot`. Runs only when
- * the app holds a supabase/ tree or declares a `supabase` block in hfs.json; the SQL is parsed by libpg-query's
- * WASM build, loaded lazily, so a full-edition app without Supabase never pays for it. `git` is a gitRunner-shaped
- * runner ((args, {cwd}) -> {ok, stdout}), injectable for specs; `base` names the ref migrations are judged
- * against (else origin/main, else main - no base means ordering and immutability are not judged). `emitTypes` is
- * the injected types generator of chunk E (async ({repoRoot, declaration}) -> text); without it L09 is silent.
- * `now` (epoch ms) is injectable for specs.
+ * Judge the Supabase paths in one app. Git and type emission are injected for deterministic specs; this function
+ * starts neither Docker nor the Supabase CLI. A full app is judged when it declares a Supabase connection, while
+ * lite apps are judged even before their initial Supabase files have all been scaffolded.
  */
 export async function checkDatabase({ repoRoot, files, base, git, edition, supabase, emitTypes, now = () => Date.now() } = {}) {
   const findings = [];
-  const migrations = files.filter((f) => f.startsWith(`${MIGRATIONS_DIR}/`) && f.endsWith('.sql'));
+  const migrations = files.filter((file) => file.startsWith(`${MIGRATIONS_DIR}/`)).sort();
   const declaration = readJson(repoRoot, 'hfs.json');
   const declared = supabase === undefined ? declaration?.supabase : supabase;
   const hasConfig = files.includes(CONFIG_FILE);
-  // The rules also judge a full-edition app the moment a connection declares provider: supabase (design 3.8 note).
-  const supabaseConnection = ['be', 'fe'].some((side) => (declaration?.sides?.[side]?.connections ?? []).some((c) => c?.provider === 'supabase'));
+  const supabaseConnection = ['be', 'fe'].some((side) => (declaration?.sides?.[side]?.connections ?? []).some((connection) => connection?.provider === 'supabase'));
   if (!migrations.length && !hasConfig && !files.includes(TYPES_FILE) && !declared && !supabaseConnection && (edition ?? declaration?.edition) !== 'lite') return findings;
-  const run = git ?? defaultGit;
 
-  // L08: the config is read first - its [api] schemas decide the exposed schemas L03 and L06 judge against.
   let config = null;
   if (hasConfig) {
     const configText = readText(repoRoot, CONFIG_FILE);
@@ -444,32 +44,24 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
       findings.push(...configFindings({ file: CONFIG_FILE, text: configText, toml: config, supabase: declared ?? null }));
     }
   }
-  const apiSchemas = (config?.api?.schemas ?? []).filter((s) => typeof s === 'string');
+
+  const apiSchemas = (config?.api?.schemas ?? []).filter((schema) => typeof schema === 'string');
   const exposed = new Set(['public', ...apiSchemas]);
   const forceRls = new Set((declared?.forceRls ?? []).map((name) => (name.includes('.') ? name : `public.${name}`)));
+  findings.push(...await migrationShapeFindings({ repoRoot, migrations, git: git ?? defaultGit, base, now }));
 
-  findings.push(...await migrationShapeFindings({ repoRoot, migrations, git: run, base, now }));
-
+  const analyses = [];
   for (const file of migrations) {
     const text = readText(repoRoot, file);
-    if (text === null) { findings.push(found(DB_MIGRATION_SHAPE, file, `${file} is not a readable SQL file`, {})); continue; }
-    const lineAt = lineIndexOf(text);
-    let parsed;
-    try {
-      parsed = await parseSql(text);
-    } catch (error) {
-      const position = error?.sqlDetails?.cursorPosition;
-      const line = position ? lineAt(position - 1) : undefined;
-      findings.push(found(DB_MIGRATION_SHAPE, file, `${file}${line ? `:${line}` : ''} is not valid PostgreSQL (${String(error?.message ?? error).split('\n')[0]}); a migration is written out SQL the real parser reads`, { ...(line ? { line } : {}) }));
+    if (text === null) {
+      findings.push(found(DB_MIGRATION_SHAPE, file, `${file} is not a readable SQL file`, {}));
       continue;
     }
-    const facts = factsOf(statementList(parsed.stmts, lineAt));
-    findings.push(...rlsFindings(file, facts, exposed, forceRls));
-    findings.push(...await dynamicFindings(file, facts));
-    findings.push(...policyFindings(file, facts));
-    findings.push(...await definerFindings(file, facts, exposed));
-    findings.push(...storageFindings(file, facts));
+    const analysis = await sqlAnalysis({ file, text, exposed, forceRls });
+    findings.push(...analysis.findings);
+    if (analysis.facts) analyses.push({ file, facts: analysis.facts });
   }
+  findings.push(...migrationSetPolicyFindings(analyses));
 
   findings.push(...await typesFindings({ repoRoot, files, emitTypes, declaration: declared }));
   return findings;

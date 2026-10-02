@@ -260,32 +260,27 @@ const isClientModule = (ts, sourceFile) => sourceFile.statements.some((statement
 
 const isDirectiveStatement = (ts, statement) => ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression);
 
-const exportedActions = (ts, sourceFile) => {
+const exportedValues = (ts, sourceFile) => {
   const hasExport = node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
   const out = [];
   for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.body) out.push(statement);
+    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.name && statement.body) {
+      out.push({ name: statement.name.text, implementation: statement.body, functionNode: statement });
+    }
     if (!ts.isVariableStatement(statement) || !hasExport(statement)) continue;
     for (const declaration of statement.declarationList.declarations) {
-      if (declaration.initializer && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer)) && declaration.initializer.body
-        && ts.isBlock(declaration.initializer.body)) out.push(declaration.initializer);
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+      const functionNode = (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+        && ts.isBlock(declaration.initializer.body) ? declaration.initializer : null;
+      out.push({ name: declaration.name.text, implementation: declaration.initializer, functionNode });
     }
   }
   return out;
 };
 
-const exportedImplementations = (ts, sourceFile, name) => {
-  const hasExport = node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
-  const out = [];
-  for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && hasExport(statement) && statement.name?.text === name && statement.body) out.push(statement.body);
-    if (!ts.isVariableStatement(statement) || !hasExport(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer) out.push(declaration.initializer);
-    }
-  }
-  return out;
-};
+const exportedActions = (ts, sourceFile) => exportedValues(ts, sourceFile).map(value => value.functionNode).filter(Boolean);
+const exportedImplementations = (ts, sourceFile, name) => exportedValues(ts, sourceFile)
+  .filter(value => value.name === name).map(value => value.implementation);
 
 const contains = (kit, root, predicate) => {
   let found = false;

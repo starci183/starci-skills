@@ -2,10 +2,7 @@
 // lazy/injected so applications without Supabase do not load either tool and this rule starts no Docker process.
 import { sameText } from '../../lib/same-text.mjs';
 import { found, readText } from './read.mjs';
-
-const DB_CONFIG_POLICY = 'DB_CONFIG_POLICY';
-const DB_TYPES_DRIFT = 'DB_TYPES_DRIFT';
-const TYPES_FILE = 'supabase/types/database.types.ts';
+import { DB_CONFIG_POLICY, DB_TYPES_DRIFT, TYPES_FILE } from './database-constants.mjs';
 const ENV_REF = /^env\([A-Za-z_][A-Za-z0-9_]*\)$/;
 const PUBLIC_KEYS = new Set(['anon_key', 'publishable_key', 'public_key']);
 
@@ -26,7 +23,7 @@ function tomlEntries(value, path = []) {
 
 const isCredentialKey = (key) => {
   const leaf = key.toLowerCase();
-  return ['secret', 'client_id', 'key', 'password', 'token'].includes(leaf)
+  return ['secret', 'client_id', 'key', 'pass', 'password', 'token'].includes(leaf)
     || /_(secret|password|token|client_id|api_key)$/.test(leaf)
     || (leaf.endsWith('_key') && !PUBLIC_KEYS.has(leaf));
 };
@@ -79,8 +76,12 @@ export function configFindings({ file, text, toml, supabase }) {
     findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.site_url is ${JSON.stringify(auth.site_url ?? 'absent')}; hfs.json supabase.siteUrl declares ${declared.siteUrl}`, { key: 'auth.site_url', declared: declared.siteUrl }));
   }
   if (declared.redirectUrls !== undefined) {
-    for (const url of Array.isArray(auth.additional_redirect_urls) ? auth.additional_redirect_urls : []) {
+    const configured = Array.isArray(auth.additional_redirect_urls) ? auth.additional_redirect_urls : [];
+    for (const url of configured) {
       if (!declared.redirectUrls.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls holds ${url}, which hfs.json supabase.redirectUrls does not declare; the config states nothing the app did not declare`, { key: 'auth.additional_redirect_urls', url }));
+    }
+    for (const url of declared.redirectUrls) {
+      if (!configured.includes(url)) findings.push(found(DB_CONFIG_POLICY, file, `${file} auth.additional_redirect_urls omits ${url}, which hfs.json supabase.redirectUrls declares; the config and declaration must carry the same redirect set`, { key: 'auth.additional_redirect_urls', url }));
     }
   }
   return findings;
