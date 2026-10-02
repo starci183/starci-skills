@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { main } from '../../packages/hfs/bin/hfs.mjs';
 import { appHasDbTypes, dbTypesEmitter, dbTypesPath, emitDbTypes, generateDbTypes, writeDbTypes } from '../../packages/hfs/emit/db-types.mjs';
 import { emitContracts } from '../../packages/hfs/emit/contracts.mjs';
+import { scaffoldApp } from '../../packages/hfs/scaffold/app.mjs';
 import { openHfs } from '../../packages/hfs/runtime/scripts/hfs/slots.mjs';
 import { checkDatabase } from '../../scripts/hfs/rules/database.mjs';
 
@@ -18,6 +21,7 @@ test.after(() => { for (const dir of made) fs.rmSync(dir, { recursive: true, for
 
 const GENERATED = 'export type Database = { public: { Tables: {} } };\n';
 const CONFIG = '[api]\nenabled = true\nschemas = ["public", "storage"]\n';
+const TYPESCRIPT_ENTRY = createRequire(import.meta.url).resolve('typescript');
 
 /** A fake command runner answering `text` (or `failure`) and recording its calls: {file, args, cwd}. */
 const fakeRun = (calls, text = GENERATED, failure = null) => (file, args, opts) => {
@@ -119,6 +123,39 @@ test('emitContracts: an app with provider supabase gets supabase/types/database.
   const second = emitContracts({ repoRoot: path.join(dir, 'be'), declaration: { apps: [] }, run });
   assert.deepEqual(second.types, { path: dbTypesPath, changed: false });
   assert.equal(fs.readFileSync(path.join(dir, dbTypesPath), 'utf8'), GENERATED);
+});
+
+test('emit-contracts CLI regenerates database types for a scaffolded lite app through its injected runner', async () => {
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-db-types-lite-'));
+  made.push(into);
+  const initial = 'export type Database = { initial: true };\n';
+  const { root } = scaffoldApp({
+    name: 'demo',
+    into,
+    edition: 'lite',
+    emitTypes: () => initial,
+    lock: app => {
+      fs.writeFileSync(path.join(app, 'package-lock.json'), '{"lockfileVersion":3}\n');
+      return { ok: true };
+    },
+    now: () => new Date('2026-10-02T12:34:56.000Z'),
+  });
+  const typescriptStub = path.join(root, 'node_modules', 'typescript');
+  fs.mkdirSync(typescriptStub, { recursive: true });
+  fs.writeFileSync(path.join(typescriptStub, 'package.json'), '{"main":"index.js"}\n');
+  fs.writeFileSync(path.join(typescriptStub, 'index.js'), `module.exports = require(${JSON.stringify(TYPESCRIPT_ENTRY)});\n`);
+  const calls = [];
+  const stdout = [];
+  const run = fakeRun(calls);
+
+  assert.equal(await main(['emit-contracts', '--repo', root], { run, stdout: text => stdout.push(text) }), 0);
+  assert.equal(fs.readFileSync(path.join(root, dbTypesPath), 'utf8'), GENERATED);
+  assert.deepEqual(calls, [{
+    file: 'supabase',
+    args: ['gen', 'types', 'typescript', '--local', '--schema', 'public,graphql_public'],
+    cwd: root,
+  }]);
+  assert.match(stdout.join(''), /hfs emit-contracts: 0 written/);
 });
 
 test('dbTypesEmitter is the emitTypes of checkDatabase: drift and emit-failed are findings, identical text is clean', async () => {
