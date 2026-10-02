@@ -15,6 +15,8 @@
 //   preserveAndReset  an op failed or was blocked: its owned paths' work (and any foreign change) is kept as
 //                     preserved/<workflowId>/<op> (a snapshot commit) and put back on the last checkpoint.
 //   rebaseWorkflow    the workflow branch rebased onto main's tip (a milestone when main moved, and the finish); the checkpoint follows.
+//   (api settle runs these through scripts/kernel/workflow-settle.mjs: settleCheckpoint, the Work-record owner rule and
+//                     the milestone rebase.)
 //   finishWorkflow    main is touched only here, in this order: the full gate of the whole branch against its merge-base
 //                     with main, the merge guard, review.verify of the exact head that lands, the rebase (a rebase that
 //                     moves the head forces a re-review), the fast-forward of main and its push, then the worktree is
@@ -57,7 +59,7 @@ import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
-import { gateBaseOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
+import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
 
@@ -98,7 +100,7 @@ const mainOf = (ctx) => ctx?.main ?? 'main';
 const wt = (ctx) => ({ workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending, TERMINAL_JOB_STATUSES, ...(ctx?.worktree ?? {}) });
 
 /** The registry row of the workflow's worktree, its directory present: {workflowId, orcaWorktreeId, path, branch, checkpoint}. */
-function recordOf(ctx, workflowId) {
+export function recordOf(ctx, workflowId) {
   const rec = wt(ctx).workflowWorktreeOf(ctx, workflowId);
   if (!rec) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no workflow worktree in the registry`);
   if (!rec.path || !fs.existsSync(rec.path)) throw fail({ code: 'workflow-worktree-missing' }, `the worktree of workflow ${workflowId} (${rec.path ?? '-'}) is gone`);
@@ -128,6 +130,8 @@ export function leasesOf(ctx, { workflowId, opId }) {
   const live = ctx.db.prepare(`SELECT job_id, payload_json FROM jobs WHERE workflow_id=? AND kind='op' AND job_id<>? AND status IN (${statuses.map(() => '?').join(',')})`).all(workflowId, opId, ...statuses);
   return { own: ownedOf(row.payload_json), others: live.flatMap((r) => ownedOf(r.payload_json)) };
 }
+/** The gate bases an op's settle accepts (gateBasesOf over its owned paths), newest first; [] outside a workflow worktree. */
+export const opGateBasesOf = (ctx, { workflowId, opId }) => (wt(ctx).workflowWorktreeOf(ctx, workflowId) ? gateBasesOf(ctx, workflowId, { owned: leasesOf(ctx, { workflowId, opId }).own }) : []);
 const under = (file, owned) => owned.some((o) => o === '.' || file === o || file.startsWith(`${o}/`));
 const literal = (files) => files.map((f) => `:(literal)${f}`);
 const zlist = (text) => String(text ?? '').split('\0').map((l) => l.trim()).filter(Boolean);
@@ -139,7 +143,7 @@ function changedFiles(dir) {
   return [...new Set([...zlist(tracked.stdout), ...zlist(untracked.stdout)])].sort();
 }
 /** The changed files an op answers for: `mine` under its owned paths, `stray` under no live op's leases at all. */
-function splitChanges(dir, { own, others }) {
+export function splitChanges(dir, { own, others }) {
   const files = changedFiles(dir);
   return { mine: files.filter((f) => under(f, own)), stray: files.filter((f) => !under(f, own) && !under(f, others)) };
 }
@@ -295,17 +299,23 @@ export function runWorkflowGate({ root, base, timeoutMs = 1_800_000 }) {
 }
 
 /**
- * review.verify passed on what lands: the workflow's last settled op is a succeeded review.verify (no op settled after it),
- * and the head its report names is the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
+ * review.verify passed on what lands, pinned to the head (WFWT2 2.5): the workflow's last settled op is a succeeded
+ * review.verify (no op settled after it); the head the runtime recorded at its settle (its workflow-checkpoint event: a
+ * review.verify owns no path, so that checkpoint is the tree it verified) equals the head its report names (no op
+ * checkpointed while it ran), and both equal the head that lands. {ok, jobId?, verifiedHead?, code?, detail?}
  */
 export function reviewVerifiedOf(ctx, { workflowId, head }) {
   if (!ctx?.db?.prepare) return { ok: false, code: 'workflow-finish-verify-missing', detail: 'no ledger to read review.verify from' };
   const last = ctx.db.prepare("SELECT job_id, op_id, status FROM jobs WHERE workflow_id=? AND kind='op' AND status IN ('succeeded','failed') ORDER BY updated_at DESC, job_id DESC LIMIT 1").get(workflowId);
   if (!last) return { ok: false, code: 'workflow-finish-verify-missing', detail: `workflow ${workflowId} has no settled op` };
   if (last.op_id !== 'review.verify' || last.status !== 'succeeded') return { ok: false, code: 'workflow-finish-verify-missing', detail: `the last settled op is ${last.job_id} (${last.op_id} ${last.status}), not a passing review.verify` };
-  const verifiedHead = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
-  if (!verifiedHead || verifiedHead !== head) return { ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead, detail: `review.verify ${last.job_id} verified ${verifiedHead ?? 'no head'}, not the head ${head} that lands: run review.verify again` };
-  return { ok: true, jobId: last.job_id, verifiedHead };
+  const reported = ctx.db.prepare("SELECT json_extract(report_json,'$.head') AS head FROM reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1").get(last.job_id)?.head ?? null;
+  const settledAt = ctx.db.prepare("SELECT json_extract(payload_json,'$.sha') AS sha FROM events WHERE workflow_id=? AND entity_type='job' AND entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1").get(workflowId, last.job_id, CHECKPOINT_EVENTS.checkpoint)?.sha ?? null;
+  const stale = (detail) => ({ ok: false, code: 'workflow-finish-verify-stale', jobId: last.job_id, verifiedHead: settledAt ?? reported, detail });
+  if (!settledAt) return stale(`the runtime recorded no checkpoint at the settle of review.verify ${last.job_id}: run review.verify again`);
+  if (!reported || !settledAt.startsWith(reported)) return stale(`review.verify ${last.job_id} reported ${reported ?? 'no head'}, but the tree at its settle was ${settledAt}: an op checkpointed while it ran; run review.verify again`);
+  if (settledAt !== head) return stale(`review.verify ${last.job_id} verified ${settledAt}, not the head ${head} that lands: run review.verify again`);
+  return { ok: true, jobId: last.job_id, verifiedHead: settledAt };
 }
 
 function pushMain(repoRoot, main) {

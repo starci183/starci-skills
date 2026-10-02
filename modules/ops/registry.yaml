@@ -286,9 +286,6 @@ ops:
       resumeFrom:
         default: ""
         setBy: kernel
-      admissionBase:
-        default: ""
-        setBy: kernel
     nodeKinds:
       - implementation
     completionProfile: implementation

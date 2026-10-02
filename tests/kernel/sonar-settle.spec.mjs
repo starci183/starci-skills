@@ -211,7 +211,7 @@ const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement
     ledger.transaction(db=>{
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
-        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD'),branch:'main'}});
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'implemented',files,head:git('rev-parse','HEAD')}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
         recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
     });

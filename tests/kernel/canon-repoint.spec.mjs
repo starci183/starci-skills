@@ -101,3 +101,13 @@ test('RCA: a checker failing on an unresolved import is broken-import (not check
   assert.ok(acts[0].command.endsWith('graph-edit --repo r --workflow wf-x --edit wire --op code.refactor --paths "todo-app-fe/apps/app/src/a.ts,todo-app-fe/apps/app/src/b.ts,todo-app-fe/apps/app/src/c.ts" --before op-next-1 --decision <id>'), acts[0].command);
   assert.ok(!actionsOf({ progress, rca: { clusters: [] }, units, workflowId: 'wf-x', importsBroken: { ...importsBroken, repointQueued: true } }).some((a) => a.cause === 'broken-import'), 'a queued repoint is not asked for twice');
 });
+
+test('RCA: a failed unit whose work the runtime preserved is partial-work, continued from its preserved ref; a commit its report names is no evidence', async () => {
+  const { causesOf, CAUSES } = await import('../../scripts/kernel/progress-rca.mjs');
+  const report = { outcome: 'blocked', summary: 'moved the layouts, committed 1729' + '7b729 then blocked', blocker: { kind: 'shared-change', detail: 'needs package.json' } };
+  const preserved = { checkpoint: { kind: 'workflow-op-preserved', preservedRef: 'refs/heads/preserved/wf-x/op-code.refactor-1' } };
+  assert.ok(CAUSES['partial-work'], 'partial-work is a catalogued cause');
+  assert.equal(CAUSES['partial-commit'], undefined, 'no op commits: partial-commit is gone');
+  assert.ok(causesOf({ status: 'failed', result: preserved, report }).includes('partial-work'));
+  assert.ok(!causesOf({ status: 'failed', result: {}, report }).includes('partial-work'), 'a commit named in prose proves nothing');
+});

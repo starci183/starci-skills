@@ -135,7 +135,7 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
     ledger.transaction(db=>{
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
-        report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files,head:spawnSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).stdout.trim(),branch:'main'}});
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files,head:spawnSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).stdout.trim()}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
         recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
     });

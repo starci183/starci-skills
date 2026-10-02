@@ -24,7 +24,7 @@ import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { revList } from '../api/git/rev-list.mjs';
 import { formatPatch as gitFormatPatch } from '../api/git/format-patch.mjs';
 import { gitResultOf } from '../lib/git.mjs';
-import { landingRepos, specBatches } from './settle-landed.mjs';
+import { landingRepos, specBatches } from './owned-path-effects.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson, patchJsonFileOf, patchAssetsDirOf } from './patch-json.mjs';

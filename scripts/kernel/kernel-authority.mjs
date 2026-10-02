@@ -185,7 +185,7 @@ export function failedShapesOf(db, workflowId, job) {
   for (const j of unit.jobs) {
     if (j.status !== 'failed' || j.job_id === job.job_id) continue;
     const causes = causesOf({ status: j.status, result: j.result, report: reports.get(j.job_id) ?? null });
-    if (causes.includes('partial-commit')) continue; // the base moved: a continuation of the same shape is new work
+    if (causes.includes('partial-work')) continue; // the base moved: a continuation of the same shape is new work
     if (causes.some(isShapeCause)) out.set(shapeOf(j.op_id, j.payload), { jobId: j.job_id, causes });
   }
   return out;

@@ -448,7 +448,7 @@ export async function commandVerdict({ command, cwd, guard, env = process.env, d
     if (kill) return { tool: c.program, ...kill };
     const del = recursiveDeleteVerdict(c.program, c.args, c.dialect);
     if (del) return { tool: c.program, ...del };
-    const launch = launchVerdict(c.program, c.args);
+    const launch = launchVerdict(c.program, c.args, guard);
     if (launch) return { tool: c.program, ...launch };
     if (c.program === 'git') { const h = workflowHistoryVerdict({ args: c.args, cwd: c.cwd, guard, parseGitArgv: d.policy.parseGitArgv }); if (h) return h; }
     if (c.program === 'git') { const v = await gitVerdict({ args: c.args, cwd: c.cwd, env: c.env, guard, deps: d }); if (v) return v; }

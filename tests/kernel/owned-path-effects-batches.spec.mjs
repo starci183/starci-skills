@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ownedPathEffects } from '../../scripts/kernel/settle-landed.mjs';
+import { ownedPathEffects } from '../../scripts/kernel/owned-path-effects.mjs';
 import { writeJobPatch } from '../../scripts/kernel/job-artifacts.mjs';
 
 const git = (root, ...args) => {

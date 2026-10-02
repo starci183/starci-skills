@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseRequests,ownedPathsIntersect,ownedPathspec} from '../../engine/admission.mjs';
-import {ownedPathEffects} from '../../scripts/kernel/settle-landed.mjs';
+import {ownedPathEffects} from '../../scripts/kernel/owned-path-effects.mjs';
 import {resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
@@ -232,7 +232,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> settle, ev
   const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
   const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',
-    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head,branch:'main'}));
+    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head}));
   const filed=fx.run('report','--job',routes,'--report',reportFile);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
   // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.

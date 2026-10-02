@@ -7,6 +7,7 @@ import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader,
 import { normWork } from '../../lib/path-key.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
 import { loadContractChanges } from '../../machine/contract-version.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
 export default {
   verb: 'record-change',
@@ -24,10 +25,11 @@ export default {
     if (!reason) throw Object.assign(new Error('record-change needs --reason <what the change withdraws or replaces, and why>'), { code: 'record-change-reason-missing' });
     const record = normWork(args.record);
     if (!isWorkInput(record)) throw Object.assign(new Error(`--record must name a .starciwork record (a record directory or file, no glob), got '${args.record}'`), { code: 'record-change-record-invalid' });
-    const workDir = workDirOf(repo);
-    const files = createWorkDigester(repo, { workDir }).files(record);
+    // The owner's records live in its workflow worktree (WFWT2 2.8): read and judge them there, committed at its branch.
+    const workDir = workDirOf(repo), tree = workflowWorktreeOf({ env: process.env }, workflowId)?.path ?? repo;
+    const files = createWorkDigester(tree, { workDir }).files(record);
     const keys = Object.keys(files).sort();
-    if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${repo}`), { code: 'record-change-record-missing' });
+    if (!keys.length) throw Object.assign(new Error(`${record} holds no record file (index.yaml/resource.yaml) in ${tree}`), { code: 'record-change-record-missing' });
     const ownerOf = createOwnership(db, { repo, workDir });
     const foreign = keys.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId !== workflowId);
     if (foreign.length) {
@@ -36,12 +38,12 @@ export default {
         payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
       throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with api notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
     }
-    const heads = committedReader(repo, { workDir })(keys);
+    const heads = committedReader(tree, { workDir })(keys);
     const inFlight = heads ? keys.filter((file) => !committedMatches(heads.get(file) ?? null, files[file].slice(0, 16))) : [];
     if (inFlight.length) {
-      throw Object.assign(new Error(`${inFlight.length} record file(s) of ${record} differ from their committed revision (${inFlight.slice(0, 5).join(', ')}): commit the change first - only a committed revision is declared`), { code: 'record-change-uncommitted', files: inFlight });
+      throw Object.assign(new Error(`${inFlight.length} record file(s) of ${record} differ from their committed revision (${inFlight.slice(0, 5).join(', ')}): the runtime commits a record when the op that wrote it settles green (its checkpoint); declare after that - only a committed revision is declared`), { code: 'record-change-uncommitted', files: inFlight });
     }
-    const revs = keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(repo, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
+    const revs = keys.map((file) => { try { return changeNoteOf(fs.readFileSync(path.join(tree, workDir, file.slice('.starciwork/'.length)), 'utf8'))?.rev ?? null; } catch { return null; } }).filter((rev) => rev != null);
     const now = Date.now();
     const owner = ownerOf(keys[0]);
     const entry = { reach, reason, at: now, by: workflowId, ownerBy: owner.by, ...(revs.length ? { rev: Math.max(...revs) } : {}),

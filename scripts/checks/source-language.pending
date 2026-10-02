@@ -5,9 +5,7 @@ scripts/checks/check-guidance-commands.mjs
 scripts/checks/check-hfs-rules.mjs
 scripts/connectors/telegram.mjs
 scripts/kernel/ask-server.mjs
-scripts/kernel/cli.mjs
 scripts/kernel/progress-rca.mjs
-scripts/kernel/verbs/graph-edit.mjs
 scripts/lib/redact.mjs
 scripts/machine/owner-claim.mjs
 scripts/supervisor/owed.mjs
