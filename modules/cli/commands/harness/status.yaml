@@ -2,10 +2,13 @@ group: harness
 verb: status
 owner: runtime
 summary: report whether the harness health endpoint is up
-impl:
-  script: ui/start.mjs
-  args: [status]
+impl: {module: scripts/machine/harness-verbs.mjs, export: harnessStatusVerb}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - status probes /healthz at the local harness URL derived from the runtime statusApp port
 flags: []
+positional: []
 exit:
   "0": harness is healthy
   "1": harness is down or its probe failed
@@ -16,4 +19,5 @@ examples:
   - starci harness status --json
 editions: [full]
 since: 1.0.0-alpha.4
-removed: []
+removed:
+  - node ui/start.mjs status

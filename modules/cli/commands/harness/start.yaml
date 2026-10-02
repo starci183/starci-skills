@@ -2,13 +2,16 @@ group: harness
 verb: start
 owner: runtime
 summary: start the harness API and UI or its named tunnel
-impl:
-  script: ui/start.mjs
-  args: [start]
+impl: {module: scripts/machine/harness-verbs.mjs, export: harnessStartVerb}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - the API binds 127.0.0.1 at STARCI_STATUS_PORT when set, otherwise the runtime statusApp port
+  - the named tunnel reads %USERPROFILE%/.cloudflared/harness.yml and never accepts a token
+  - the local API stays in the verb process and Vite is its only child process
 flags:
-  - name: tunnel
-    type: boolean
-    summary: run the named Cloudflare tunnel instead of the local API and UI
+  - {name: tunnel, type: boolean, summary: run the named Cloudflare tunnel instead of the local API and UI}
+positional: []
 exit:
   "0": harness ran until stopped
   "1": a harness child failed
@@ -22,3 +25,5 @@ since: 1.0.0-alpha.4
 removed:
   - node ui/start.mjs
   - node ui/start.mjs --tunnel
+  - node ui/start.mjs start
+  - node ui/start.mjs start --tunnel
