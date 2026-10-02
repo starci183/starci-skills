@@ -16,7 +16,7 @@ const truthy = (value) => value === true || String(value).toLowerCase() === 'tru
 const grantsIdToken = (permissions) => permissions !== null && typeof permissions === 'object' && String(permissions['id-token']) === 'write';
 
 /** The CI_UPLOAD_NOT_SILENT findings of one workflow text; a text that is not YAML yields none (the other checks name it). */
-export function workflowUploadFindings({ path: file, text }) {
+function workflowUploadFindings({ path: file, text }) {
   if (!text.includes('codecov/codecov-action')) return [];
   let doc;
   try { doc = parseYaml(text.replace(/^\{\{\w+\}\}\s*$/gm, '').replace(/\{\{\w+\}\}/g, 'x')); } catch { return []; }
