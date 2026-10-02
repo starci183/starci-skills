@@ -1,0 +1,12 @@
+services:
+  billing:
+    # The billing worker, built from this repository: the context is the app root, the Dockerfile is the app's own. The tag is the
+    # exact version of the image (never a moving tag); it has no listener, so no port is published.
+    image: ecommerce-app/billing:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/billing/Dockerfile
+    profiles: [app]
+    depends_on:
+      - postgres
+      - redis

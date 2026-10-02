@@ -4,8 +4,8 @@ summary: >-
   Lane PATTERNS (lead C1), unit U1b: kinds are generated only when they are used. `hfs add <job|reactor|queue|projection> <name>` generates exactly
   one kind's file tree from the `files:` tree of its pattern topic (the single source of the paths, slots, rules and template bodies), adds the missing
   platform capabilities of the kind's patterns and registers them in hfs.json. `sides.be.kinds` (new, validated against the manifest triggerKinds) is
-  required for every trigger kind in use: R143 BE_KIND_DECLARATION requires the kinds declared to equal the kinds in use, with the patterns of
-  `ruleParams.be.kindPatterns` declared and their platform capabilities tracked; R144 BE_KIND_EMPTY refuses a file directly in a kind folder, a feature named
+  required for every trigger kind in use: R159 BE_KIND_DECLARATION requires the kinds declared to equal the kinds in use, with the patterns of
+  `ruleParams.be.kindPatterns` declared and their platform capabilities tracked; R160 BE_KIND_EMPTY refuses a file directly in a kind folder, a feature named
   like a kind and a member with no TypeScript. ruleParams.be gains kindPatterns and addKinds. The module folders of `src/modules/` that
   HFS_MODULE_TIER_INVALID accepts are read from the slot paths (events, queues and projections join domain, platform and integrations). The cqrs rule
   handler-is-thin accepts a projection as the one collaborator of a handler.

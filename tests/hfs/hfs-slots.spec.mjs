@@ -21,7 +21,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
+const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }, { name: 'agentos', envPrefix: 'AGENTOS_DB', owner: 'core', isolation: 'database' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
 const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe }, ...rest });
 const APP = app();
@@ -80,7 +80,7 @@ test('hfs.json: schema and loader agree', () => {
     'a standalone back end (profile)': { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] },
     'kind other than app': { ...APP, kind: 'be' },
     'one side only': { ...APP, sides: { be: BE_SIDE } },
-    'fe with connections': app({ fe: { ...FE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }),
+    'fe with connections': app({ fe: { ...FE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database' }] } }),
     'connection as a bare string': app({ be: { ...BE_SIDE, connections: ['primary'] } }),
     'no apps on a side': app({ fe: { apps: [] } }),
     'unknown key': { ...APP, owners: ['x'] },
@@ -93,10 +93,20 @@ test('hfs.json: schema and loader agree', () => {
   }
   // semantic only (the schema cannot state them): one name per database, env keys disjoint across connections, app names unique across sides
   for (const connections of [
-    [{ name: 'primary', envPrefix: 'A_DB' }, { name: 'primary', envPrefix: 'B_DB' }],
-    [{ name: 'order', envPrefix: 'ORDER' }, { name: 'order-archive', envPrefix: 'ORDER_ARCHIVE' }],
+    [{ name: 'primary', envPrefix: 'A_DB', owner: 'core', isolation: 'database' }, { name: 'primary', envPrefix: 'B_DB', owner: 'core', isolation: 'database' }],
+    [{ name: 'order', envPrefix: 'ORDER', owner: 'core', isolation: 'database' }, { name: 'order-archive', envPrefix: 'ORDER_ARCHIVE', owner: 'core', isolation: 'database' }],
   ]) refusal(() => resolveRepoDeclaration(manifest, app({ be: { ...BE_SIDE, connections } })), 'HFS_DECLARATION_INVALID');
   refusal(() => resolveRepoDeclaration(manifest, app({ fe: { apps: [{ name: 'core', kind: 'next' }] } })), 'HFS_DECLARATION_INVALID');
+  // a bounded context (a connection) is owned by one api or worker app and is isolated as a database or a schema
+  const owned = (extra) => app({ be: { ...BE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'core', isolation: 'database', ...extra }] } });
+  for (const extra of [{ owner: undefined }, { isolation: undefined }, { owner: 'ghost' }, { owner: 'migrate' }, { isolation: 'table' }]) {
+    const declaration = JSON.parse(JSON.stringify(owned(extra)));
+    // the schema states the shape; the owner being a declared api or worker app is semantic only
+    if (!['ghost', 'migrate'].includes(extra.owner)) assert.equal(validateRepoSchema(declaration), false, `schema accepted ${JSON.stringify(extra)}`);
+    refusal(() => resolveRepoDeclaration(manifest, JSON.parse(JSON.stringify(owned(extra)))), 'HFS_DECLARATION_INVALID');
+  }
+  assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(owned({ owner: 'worker', isolation: 'schema' })))), true);
+  assert.deepEqual(resolveRepoDeclaration(manifest, owned({ owner: 'worker', isolation: 'schema' }), { side: 'be' }).connections[0], { name: 'primary', envPrefix: 'PRIMARY_DB', owner: 'worker', isolation: 'schema' });
   assert.deepEqual(resolveRepoDeclaration(manifest, APP, { side: 'be' }).connections, BE_SIDE.connections);
   assert.equal(resolveRepoDeclaration(manifest, APP).profile, 'app');
 });

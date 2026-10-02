@@ -7,7 +7,7 @@ export interface OrderRow {
     /** The buyer. */
     personId: string
     /** The lifecycle state. */
-    status: "confirmed"
+    status: "pending" | "paid" | "cancelled"
     /** The order total in minor units. */
     totalMinorUnits: number
     /** The ISO currency code. */
@@ -24,7 +24,7 @@ export interface OrderRow {
 export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     id: "o-1",
     personId: "p-1",
-    status: "confirmed",
+    status: "pending",
     totalMinorUnits: 1250,
     currency: "USD",
     idempotencyKey: null,
@@ -33,13 +33,36 @@ export const orderRow = (overrides: Partial<OrderRow> = {}): OrderRow => ({
     ...overrides,
 })
 
+/** The columns of an order line row. */
+export interface OrderLineRow {
+    /** The line id. */
+    id: string
+    /** The order the line belongs to. */
+    orderId: string
+    /** The SKU. */
+    productId: string
+    /** How many units were sold. */
+    quantity: number
+    /** The unit price captured at confirmation, in minor units. */
+    unitPriceMinorUnits: number
+}
+
+/** An order line row with valid defaults; the spec overrides only what matters. */
+export const orderLineRow = (overrides: Partial<OrderLineRow> = {}): OrderLineRow => ({
+    id: "l-1",
+    orderId: "o-1",
+    productId: "sku-1",
+    quantity: 2,
+    unitPriceMinorUnits: 500,
+    ...overrides,
+})
+
 /** The confirmed order the doors answer, with valid defaults. */
 export const placedOrder = (overrides: Partial<PlacedOrder> = {}): PlacedOrder => ({
     orderId: "o-1",
-    status: "confirmed",
+    status: "pending",
     totalMinorUnits: 1250,
     currency: "USD",
-    paymentId: "pay-1",
     replayed: false,
     ...overrides,
 })

@@ -20,6 +20,14 @@ export interface CapturePaymentParams {
     readonly amountMinorUnits: number
 }
 
+/** What refunding the payment of an order needs; the write joins the caller transaction. */
+export interface RefundPaymentParams {
+    /** The transaction manager of the caller. */
+    readonly manager: EntityManager
+    /** The order whose payment is given back. */
+    readonly orderId: string
+}
+
 /** The payment of an order, or null when none was captured. */
 export type FindPaymentResult = PaymentView | null
 

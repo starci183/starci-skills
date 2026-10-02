@@ -241,7 +241,7 @@ export const ghost = () => InjectEntityManager('nowhere');
 test("connection-map: one connection file set per declared connection, one registration per app, one injector per connection", (t) => {
     const f = projectFixture({
         files: CONNECTION_FILES,
-        declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY" }, { name: "agentos", envPrefix: "AGENTOS" }, { name: "billing", envPrefix: "BILLING" }] },
+        declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY", owner: "core", isolation: "database" }, { name: "agentos", envPrefix: "AGENTOS", owner: "core", isolation: "database" }, { name: "billing", envPrefix: "BILLING", owner: "core", isolation: "database" }] },
         apps: [{ name: "core", kind: "api" }, { name: "worker", kind: "worker" }, { name: "migrate", kind: "migrate" }],
     })
     t.after(f.cleanup)

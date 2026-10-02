@@ -24,6 +24,16 @@ export interface ProductsByIdsParams {
     readonly ids: ReadonlyArray<string>
 }
 
+/** What releasing stock back needs: the same shape as a reservation, since a release gives back what a reservation took. */
+export interface ReleaseStockParams {
+    /** The transaction manager of the caller. */
+    readonly manager: EntityManager
+    /** The SKU. */
+    readonly productId: string
+    /** How many units to give back. */
+    readonly quantity: number
+}
+
 /** What reserving stock needs; the write joins the caller transaction. */
 export interface ReserveStockParams {
     /** The transaction manager of the caller. */

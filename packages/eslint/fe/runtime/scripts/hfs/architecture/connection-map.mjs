@@ -17,8 +17,11 @@ import { locateDeclaration } from '../slots.mjs';
  *     forms only in platform/database, the migrate app and the test fixtures; an exported `Inject*EntityManager`
  *     anywhere else (a capability-specific injector, a duplicate) is refused;
  *   - inside one app every connection is passed to the platform/database module registration once;
+ *   - a connection whose hfs.json `isolation` is `schema` reads `<PREFIX>_SCHEMA` in its config (a context is its own database or its own
+ *     schema of a shared one; splitting it out later is an env change only);
  *   - in every `.starcistacks/<env>/runtime/env` two connections whose `<PREFIX>_HOST`, `<PREFIX>_PORT` and
- *     `<PREFIX>_NAME` (or `_DATABASE`, whichever the config reads) resolve to one triple are the same database.
+ *     `<PREFIX>_NAME` (or `_DATABASE`, whichever the config reads) resolve to one triple are the same database, unless both are
+ *     `isolation: schema` with different `<PREFIX>_SCHEMA` values (two contexts as schemas of one database).
  */
 export const CONNECTION_RULE_IDS = ['BE_CONNECTION_DUPLICATE'];
 
@@ -92,12 +95,14 @@ export function checkConnectionMap(input) {
       report(configRel, `Connection ${connection.name} needs ${configRel}, the one place its ${connection.envPrefix}_* keys are read.`, { connection: connection.name });
       continue;
     }
+    let readsSchema = false;
     kit.walk(configFile.sourceFile, node => {
       let key = null;
       if (ts.isStringLiteralLike(node) && ENV_KEY.test(node.text)) key = node.text;
       else if (ts.isPropertyAccessExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'env'
         && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'process' && ENV_KEY.test(node.name.text)) key = node.name.text;
       if (key === null) return true;
+      if (key === `${connection.envPrefix}_SCHEMA`) readsSchema = true;
       const own = key.startsWith(`${connection.envPrefix}_`);
       const foreign = declared.find(other => other !== connection && key.startsWith(`${other.envPrefix}_`));
       if (!own || foreign) {
@@ -105,6 +110,7 @@ export function checkConnectionMap(input) {
       }
       return false;
     });
+    if (connection.isolation === 'schema' && !readsSchema) report(configRel, `Connection ${connection.name} is isolated as a schema of a shared database (hfs.json isolation), so ${configRel} must read ${connection.envPrefix}_SCHEMA and hand it to the data source; splitting the context out into its own database is then an env change only.`, { connection: connection.name });
   }
   for (const file of databaseFiles) {
     const match = /^(.+)\.(connection|decorators|config)\.ts$/u.exec(path.posix.basename(file.rel));
@@ -189,7 +195,7 @@ export function checkConnectionMap(input) {
     const rel = path.relative(config.root, path.join(stacksRoot, env, 'runtime', 'env')).split(path.sep).join('/');
     const values = readEnvFiles(path.join(stacksRoot, env, 'runtime', 'env'));
     if (!values || values.size === 0) { stacksSkipped += 1; continue; }
-    const seen = new Map();
+    const seen = new Map(); // host|port|database -> [{name, isolation, schema}]
     let resolved = 0;
     for (const connection of declared) {
       const configFile = kit.graphFile(`${DATABASE_DIR}/${connection.name}.config.ts`);
@@ -200,9 +206,15 @@ export function checkConnectionMap(input) {
       if (!host || !port || !database) continue;
       resolved += 1;
       const triple = `${host.toLowerCase()}|${port}|${database}`;
-      if (seen.has(triple)) {
-        report(rel, `Connections ${seen.get(triple)} and ${connection.name} resolve to the same database (${host}:${port}/${database}) in stack ${env}; one physical database is one connection.`, { connection: connection.name, env });
-      } else seen.set(triple, connection.name);
+      const schema = connection.isolation === 'schema' ? (values.get(`${connection.envPrefix}_SCHEMA`) ?? '') : null;
+      const sharing = seen.get(triple) ?? [];
+      // Two contexts may share one database only as distinct, named schemas; a context that is its own database shares it with nobody.
+      const clash = sharing.find(other => schema === null || other.schema === null || other.schema === schema);
+      if (clash) {
+        report(rel, `Connections ${clash.name} and ${connection.name} resolve to the same database (${host}:${port}/${database}${schema !== null && clash.schema === schema ? `, schema ${schema || '(none)'}` : ''}) in stack ${env}; contexts share a database only as distinct schemas (isolation schema, a different ${connection.envPrefix}_SCHEMA), otherwise one physical database is one connection.`, { connection: connection.name, env });
+      }
+      sharing.push({ name: connection.name, schema });
+      seen.set(triple, sharing);
     }
     if (resolved) stacksChecked += 1; else stacksSkipped += 1;
   }

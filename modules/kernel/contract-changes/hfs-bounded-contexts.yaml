@@ -1,0 +1,43 @@
+id: hfs-bounded-contexts
+effectiveAt: '2026-10-02T09:00:00+07:00'
+summary: >-
+  Owner decision 2026-10-02 (bounded contexts, alpha.4). A connection of hfs.json is a bounded context: every
+  `sides.be.connections` entry gains a required `owner` (the api or worker app that composes it) and `isolation`
+  (`database` or `schema`; a schema context reads `<PREFIX>_SCHEMA`, and the split to its own database is an env
+  change). New rules, all errors: R154 BE_CONTEXT_OWNER (an app composes only the connections and capabilities of the
+  contexts it owns, the cli composes all), R155 BE_CONTEXT_COUPLING (no cross-context entity relation, migration
+  foreign key or import), R156 BE_CONTEXT_TRANSACTION (one transaction touches one context's connection), R157
+  BE_CONTRACT_BREAKING (events.json against its pinned events.pin.json evolves only additively, a breaking change is
+  `<event>.v2`) and R158 BE_CONTEXT_PLATFORM_TABLES (a perConnection platform capability, the event-bus outbox and the
+  job table, has its tables on every connection that uses it). R86 BE_SQL_TABLE_OWNER now reads only the tables of its
+  own context (a cross-context JOIN is refused), R84 BE_CONNECTION_DUPLICATE allows two schema contexts in one
+  database with different schemas, and R35 BE_SCHEMA_OWNER lets a perConnection platform capability register on several
+  connections. The be.persistence slot covers `src/modules/projections/<capability>/persistence/`, the manifest slot field
+  `perConnection` lists the platform capabilities that exist per connection, the context tiers are domain and projections,
+  and the opt-in slot be.contract.events.pin is new. BE-PERSISTENCE-2, -3, -5, -8 and -9 change and BE-PERSISTENCE-11 to -15 are new;
+  BE-CONVENTION 1.4.1, 1.4.3, 1.4.6 change and 1.4.7 is new. Rule ids are provisional and renumber at rebase.
+reach: new-legs
+paths:
+  - scripts/hfs/architecture/context-map.mjs
+  - scripts/hfs/architecture/context-owner.mjs
+  - scripts/hfs/architecture/context-coupling.mjs
+  - scripts/hfs/architecture/context-transaction.mjs
+  - scripts/hfs/architecture/context-platform-tables.mjs
+  - scripts/hfs/architecture/sql-owner.mjs
+  - scripts/hfs/architecture/connection-map.mjs
+  - scripts/hfs/architecture/schema-owner.mjs
+  - scripts/hfs/architecture/surface.mjs
+  - scripts/hfs/architecture/index.mjs
+  - scripts/hfs/rules/contract-compat.mjs
+  - scripts/hfs/check.mjs
+  - scripts/hfs/slots.mjs
+  - scripts/hfs/manifest-shape.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/persistence.yaml
+  - knowledge/patterns/be/index.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-bounded-contexts.yaml
+  - modules/schemas/hfs-repo.schema.yaml
+  - modules/schemas/hfs-slots.schema.yaml

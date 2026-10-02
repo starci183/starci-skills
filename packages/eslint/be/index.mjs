@@ -45,6 +45,7 @@ import { recommended as querySafetyRecommended, rules as querySafetyRules } from
 import { recommended as resilienceRecommended, rules as resilienceRules } from "./resilience.mjs"
 import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
 import { recommended as serviceDepsRecommended, rules as serviceDepsRules } from "./service-deps.mjs"
+import { recommended as serviceIsolationRecommended, rules as serviceIsolationRules } from "./service-isolation.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
 import { recommended as specNoSkipRecommended, rules as specNoSkipRules } from "./spec-no-skip.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
@@ -89,6 +90,7 @@ const CONTRIBUTIONS = [
     { law: "resilience", rules: resilienceRules, recommended: resilienceRecommended },
     { law: "schema-authority", rules: schemaAuthorityRules, recommended: schemaAuthorityRecommended },
     { law: "service-deps", rules: serviceDepsRules, recommended: serviceDepsRecommended },
+    { law: "service-isolation", rules: serviceIsolationRules, recommended: serviceIsolationRecommended },
     { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
     { law: "spec-no-skip", rules: specNoSkipRules, recommended: specNoSkipRecommended },
     { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },

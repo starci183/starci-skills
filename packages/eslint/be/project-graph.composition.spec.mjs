@@ -266,7 +266,7 @@ const SCHEMA_GOOD = {
     [`${BILLING}/persistence/migrations/1789800000000-create-invoices.ts`]: MIGRATION("CreateInvoices1789800000000"),
 }
 const schemaRepo = (t, files) => repo(t, {
-    declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY" }, { name: "agentos", envPrefix: "AGENTOS" }] },
+    declaration: { connections: [{ name: "primary", envPrefix: "PRIMARY", owner: "core", isolation: "database" }, { name: "agentos", envPrefix: "AGENTOS", owner: "core", isolation: "database" }] },
     apps: [{ name: "core", kind: "api" }, { name: "migrate", kind: "migrate" }],
     files: { ...SCHEMA_GOOD, "apps/migrate/src/main.ts": "void 0;\n", ...files },
 })

@@ -28,7 +28,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
-import { APP_KIND, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { APP_KIND, connectionShapeProblems, ENV_PREFIX, MANIFEST_KINDS, NAME, PRESENCE, RUNTIME_KIND, SEMVER, SLOT_ID, TESTS, TRACKED, manifestKind, runtimeSemanticProblems, runtimeShapeProblems, slotProblems, tierMapProblems } from './manifest-shape.mjs';
+import { declaredSlotEnabled, kindParamProblems, kindShapeProblems, optionalSlotProblems, patternShapeProblems, scenarioProblem, triggerProblems } from './declaration-slots.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 /** The manifest of kind runtime: the standard tree of the StarCi runtime repository (judged by scripts/hfs/runtime-check.mjs). */
@@ -186,13 +187,7 @@ function manifestShapeProblems(m) {
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
     if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 10) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape {helper}, patternScenarios, kindPatterns and addKinds');
-    const kindPatterns = rp.be.kindPatterns;
-    if (!isPlainObject(kindPatterns) || !Object.entries(kindPatterns).every(([kind, list]) => (m.triggerKinds ?? []).includes(kind) && Array.isArray(list) && list.every((p) => NAME.test(String(p))) && new Set(list).size === list.length)) bad.push('ruleParams.be.kindPatterns must map a trigger kind to a unique list of pattern names');
-    const addKinds = rp.be.addKinds;
-    const addKindOk = (spec) => isPlainObject(spec) && NAME.test(String(spec.topic)) && NAME.test(String(spec.variable)) && Array.isArray(spec.patterns) && spec.patterns.every((p) => NAME.test(String(p))) && (spec.trigger === undefined || NAME.test(String(spec.trigger))) && (spec.needs === undefined || (Array.isArray(spec.needs) && spec.needs.every((n) => NAME.test(String(n))))) && (spec.also === undefined || (Array.isArray(spec.also) && spec.also.every((n) => NAME.test(String(n))))) && (spec.defaults === undefined || isPlainObject(spec.defaults));
-    if (!isPlainObject(addKinds) || !Object.entries(addKinds).every(([noun, spec]) => NAME.test(noun) && addKindOk(spec))) bad.push('ruleParams.be.addKinds must map a noun to {topic, variable, patterns, trigger?, needs?, defaults?}');
-    const scenarios = rp.be.patternScenarios;
-    if (!isPlainObject(scenarios) || !Object.entries(scenarios).every(([name, list]) => /^[a-z][a-z0-9-]*$/.test(name) && Array.isArray(list) && list.length > 0 && list.every((id) => /^[a-z][a-z0-9-]*$/.test(String(id))) && new Set(list).size === list.length)) bad.push('ruleParams.be.patternScenarios must map a pattern name to a non-empty list of unique kebab-case scenario ids');
+    bad.push(...scenarioProblem(rp.be.patternScenarios), ...kindParamProblems(rp.be, m.triggerKinds));
     if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
@@ -232,8 +227,7 @@ function manifestSemanticProblems(m) {
         const tiers = m.tiers[profile];
         if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
         if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
-        if (slot.trigger !== undefined && !(m.triggerKinds ?? []).includes(slot.trigger)) bad.push(`slot ${slot.id}: trigger ${slot.trigger} is not one of triggerKinds`);
-        if (slot.trigger !== undefined && slot.tier !== 'feature') bad.push(`slot ${slot.id}: a trigger belongs to a feature-tier slot`);
+        bad.push(...triggerProblems(slot, m.triggerKinds));
       }
       if (slot.appKind === undefined) {
         for (const variant of braceVariants(slot.path)) {
@@ -322,14 +316,12 @@ function declarationShapeProblems(d) {
       else names.set(app.name, side);
     });
     if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
-    if (s.kinds !== undefined && (!Array.isArray(s.kinds) || !s.kinds.every((v) => NAME.test(String(v))) || new Set(s.kinds).size !== s.kinds.length)) bad.push(`${at}.kinds must be a unique list of trigger kind names`);
-    if (s.patterns !== undefined && (!Array.isArray(s.patterns) || !s.patterns.every((v) => NAME.test(String(v))) || new Set(s.patterns).size !== s.patterns.length)) bad.push(`${at}.patterns must be a unique list of pattern names`);
+    bad.push(...patternShapeProblems(s, at, NAME), ...kindShapeProblems(s, at, NAME));
     if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
     if (s.connections !== undefined) {
       if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
-      // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
-      const list = Array.isArray(s.connections) ? s.connections : null;
-      if (!list || !list.every((c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
+      const list = Array.isArray(s.connections) ? s.connections : null; const shape = connectionShapeProblems(list, s.apps);
+      if (shape.length) bad.push(...shape);
       else {
         if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
         for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
@@ -345,15 +337,7 @@ const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `
 function sideProblems(manifest, side, s) {
   const bad = [];
   for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
-  for (const id of s.optionalSlots ?? []) {
-    const slot = manifest.slots.find((candidate) => candidate.id === id);
-    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
-    else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
-    else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
-  }
-  if (s.kinds !== undefined && side !== 'be') bad.push(`sides.${side}.kinds belongs to the be side`);
-  for (const kind of s.kinds ?? []) if (!(manifest.triggerKinds ?? []).includes(kind)) bad.push(`sides.${side}.kinds names ${kind}, which is not one of triggerKinds (${(manifest.triggerKinds ?? []).join(', ')})`);
-  for (const name of s.patterns ?? []) if (!manifest.slots.some((slot) => slot.profiles.includes(side) && slot.pattern === name)) bad.push(`sides.${side}.patterns names ${name}, which no ${side} slot declares as its pattern`);
+  bad.push(...optionalSlotProblems(manifest, side, s));
   for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
   const connections = s.connections ?? [];
   for (const slot of manifest.slots) {
@@ -404,9 +388,8 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
       profile: name,
       apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
       optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
-      patterns: Object.freeze([...(s.patterns ?? [])]),
-      kinds: Object.freeze([...(s.kinds ?? [])]),
-      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
+      patterns: Object.freeze([...(s.patterns ?? [])]), kinds: Object.freeze([...(s.kinds ?? [])]),
+      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix, owner: c.owner, isolation: c.isolation }))),
       reads: Object.freeze([...(s.reads ?? [])]),
       manifestVersion: manifest.version,
     })];
@@ -470,8 +453,7 @@ function createScopeResolver(manifest, repo) {
 
   const slotEnabled = (slot) => {
     if (slot.presence !== 'opt-in') return true;
-    if (slot.appKind !== undefined) return repo.apps.some((a) => a.kind === slot.appKind);
-    return repo.optionalSlots.includes(slot.id) || (slot.pattern !== undefined && (repo.patterns ?? []).includes(slot.pattern));
+    return declaredSlotEnabled(slot, repo);
   };
   const clean = (p) => posixPath(p).replace(/\/+$/, '');
 

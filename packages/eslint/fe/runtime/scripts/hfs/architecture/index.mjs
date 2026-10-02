@@ -31,6 +31,10 @@ import { checkUnitSpecProviders, UNIT_SPEC_PROVIDERS_RULE_IDS } from './unit-spe
 import { checkInjectionTokenExported, INJECTION_TOKEN_EXPORTED_RULE_IDS } from './injection-token-exported.mjs';
 import { checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS } from './contract-fixture-guard.mjs';
 import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
+import { checkContextOwner, CONTEXT_OWNER_RULE_IDS } from './context-owner.mjs';
+import { checkContextCoupling, CONTEXT_COUPLING_RULE_IDS } from './context-coupling.mjs';
+import { checkContextTransaction, CONTEXT_TRANSACTION_RULE_IDS } from './context-transaction.mjs';
+import { checkContextPlatformTables, CONTEXT_PLATFORM_TABLES_RULE_IDS } from './context-platform-tables.mjs';
 import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
 import { checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS } from './background-unowned.mjs';
 import { checkTransportOwner, TRANSPORT_OWNER_RULE_IDS } from './transport-owner.mjs';
@@ -68,6 +72,10 @@ const BACKEND_MACHINE = {
   unitSpecProviders: [checkUnitSpecProviders, UNIT_SPEC_PROVIDERS_RULE_IDS],
   injectionTokenExported: [checkInjectionTokenExported, INJECTION_TOKEN_EXPORTED_RULE_IDS],
   schemaOwner: [checkSchemaOwner, SCHEMA_OWNER_RULE_IDS],
+  contextOwner: [checkContextOwner, CONTEXT_OWNER_RULE_IDS],
+  contextCoupling: [checkContextCoupling, CONTEXT_COUPLING_RULE_IDS],
+  contextTransaction: [checkContextTransaction, CONTEXT_TRANSACTION_RULE_IDS],
+  contextPlatformTables: [checkContextPlatformTables, CONTEXT_PLATFORM_TABLES_RULE_IDS],
   modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
   testWorldFiles: [checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS],

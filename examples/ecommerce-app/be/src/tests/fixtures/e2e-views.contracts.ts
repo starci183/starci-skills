@@ -44,8 +44,6 @@ export interface PlacedOrderView {
     totalMinorUnits: number
     /** The currency. */
     currency: string
-    /** The captured payment. */
-    paymentId: string
     /** True when the answer replays an earlier confirmation. */
     replayed: boolean
 }
@@ -80,8 +78,6 @@ export interface ReceiptDocumentView {
     lines: Array<{ productId: string; quantity: number; unitPriceMinorUnits: number }>
     /** The total in minor units. */
     totalMinorUnits: number
-    /** The captured payment. */
-    paymentId: string
 }
 
 /** The outcome of clearCart. */

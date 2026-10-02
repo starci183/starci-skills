@@ -10,8 +10,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: b70dc1957d62b569327d1898516482f5f2c76ea7a0f77a1c10d786690f41af28
-        files: 140
+        value: 3247ee47838cb045d370c07b470732c97c4b762902310604b22172a6d68b3728
+        files: 147
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -95,6 +95,14 @@ profiles:
       - BE-REACTORS-3
       - BE-REACTORS-4
       - BE-RESILIENCE-1
+      - BE-SAGA-1
+      - BE-SAGA-2
+      - BE-SAGA-3
+      - BE-SAGA-4
+      - BE-SERVICES-1
+      - BE-SERVICES-2
+      - BE-SERVICES-3
+      - BE-SERVICES-4
       - BE-TEMPORAL-1
       - BE-TEST-1
       - BE-TEST-2
@@ -573,6 +581,47 @@ profiles:
         sourceRuleIds: [BE-IDEMPOTENCY-2]
         rationale: A lint rule cannot see a migration's column types, whether the unique constraint actually exists on (source, event_id), or whether an adapter claims by insert-and-catch rather than a racy check-then-insert; this is reviewed against the actual migration and adapter.
         guidance: knowledge/patterns/be/idempotency.yaml
+      - id: NEST-SERVICE-ISOLATION
+        sourceRuleIds: [BE-SERVICES-1]
+        applicability: { include: ['apps/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: A service app (`apps/<service>/`) imports no file of a sibling service app; services share only the `src` libraries.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/service-isolation]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/services.yaml
+          review: Confirm shared code a service needs lives in `src` and that a call to a sibling goes through its API client or its vendored contract, not through a copied file.
+        status: implemented
+      - id: NEST-SAGA-OBSERVATION
+        sourceRuleIds: [BE-SAGA-1, BE-SAGA-2, BE-SAGA-3, BE-SAGA-4]
+        rationale: These are tree checks of `hfs check` (BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_CONSUMER_DEDUPE, BE_SAGA_E2E_MISSING) over a folder tree, event names and e2e spec files, not lint rules; whether a compensation really undoes its step, a step is idempotent and an injected fault is the right one is reviewed against the accepted design.
+        guidance: knowledge/patterns/be/saga.yaml
+      - id: NEST-SERVICE-STACK-AND-CONTRACT-OBSERVATION
+        sourceRuleIds: [BE-SERVICES-2, BE-SERVICES-3, BE-SERVICES-4]
+        rationale: These are tree checks of `hfs check` (HFS_IMAGE_UNPINNED, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING), not lint rules; whether a spec asserts the right behaviour, whether a version bump is compatible and whether a saga compensates every failure is reviewed against the accepted design.
+        guidance: knowledge/patterns/be/services.yaml
+
+      - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
+        sourceRuleIds: [BE-EVENT-BUS-3, BE-EVENT-BUS-4, BE-QUEUES-1]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: The outbox is written only by a domain service with the manager of its own transaction, a message consumer is a transport door named after its event that forwards the event id, and a queue producer passes its own tx.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/outbox-write-tx, starci-be/event-consumer-shape, starci-be/queue-producer-shape]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/event-bus.yaml
+          review: Confirm each published event crosses a context or starts asynchronous work, and that each consumer's retry budget fits its side effects.
+        status: implemented
+      - id: NEST-EVENT-BUS-OBSERVATION
+        sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
+        rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
+        guidance: knowledge/patterns/be/event-bus.yaml
 
       - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
         sourceRuleIds: [BE-EVENT-BUS-3, BE-EVENT-BUS-4, BE-QUEUES-1]
@@ -622,8 +671,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 1cc329ec27ab0f74defcf32cb224b05f0e97c51014d77091351a5861050d9192
-        files: 148
+        value: 8b726d0e83bbb4eee792dbf834999d67b36da79e1f99dbf80db9d4f9f44f1f4b
+        files: 154
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:

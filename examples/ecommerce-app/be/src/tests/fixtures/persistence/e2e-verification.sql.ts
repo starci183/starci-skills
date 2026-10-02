@@ -1,9 +1,12 @@
 import { sql } from "@modules/platform/database"
 import type {
     CountRow,
+    InvoiceRow,
+    OutboxStateRow,
     OrderLineRow,
     OrderRow,
     OrderSummaryRow,
+    SagaStateRow,
     PaymentRow,
     PersonRow,
     RowQuery,
@@ -62,8 +65,42 @@ export const PAYMENT_COUNT: RowQuery<CountRow> = {
     text: sql`SELECT count(*)::int AS count FROM payments WHERE person_id = $1`,
 }
 
+/** The invoices of one order ($1 order id): at most one, whatever the redeliveries. */
+export const INVOICES_OF_ORDER: RowQuery<InvoiceRow> = {
+    text: sql`SELECT order_id, status, total_minor_units FROM invoices WHERE order_id = $1 LIMIT 10`,
+}
+
+/** The cancelled order with this id ($1 order id): one row, or none while it is still confirmed. */
+export const CANCELLED_ORDER: RowQuery<OrderSummaryRow> = {
+    text: sql`SELECT status, total_minor_units FROM orders WHERE id = $1 AND status = 'cancelled'`,
+}
+
+/** The state of the place-order saga run of one order ($1 order id). */
+export const PLACE_ORDER_SAGA_STATE: RowQuery<SagaStateRow> = {
+    text: sql`SELECT status, version FROM saga_states WHERE saga = 'place-order' AND correlation_id = $1`,
+}
+
+/** How many invoices the billing database holds for the orders of one person ($1 person id). */
+export const INVOICE_COUNT_OF_PERSON: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM invoices WHERE person_id = $1`,
+}
+
+/** How many events the billing inbox claimed ($1 source). */
+export const INBOX_CLAIM_COUNT: RowQuery<CountRow> = {
+    text: sql`SELECT count(*)::int AS count FROM inbox_claims WHERE source = $1`,
+}
+
 /** The stock of one product ($1 SKU). */
 export const STOCK_OF: RowQuery<StockRow> = { text: sql`SELECT stock FROM products WHERE id = $1` }
 
 /** How many products the catalog holds. */
 export const PRODUCT_COUNT: RowQuery<CountRow> = { text: sql`SELECT count(*)::int AS count FROM products` }
+
+/** The outbox rows of one event id in write order ($1 event id): the name, the topic and whether the relay sent it. */
+export const OUTBOX_OF_EVENT: RowQuery<OutboxStateRow> = {
+    text: sql`SELECT event_name, topic, sent_at IS NOT NULL AS sent FROM event_outbox WHERE event_id = $1 ORDER BY id LIMIT 500`,
+}
+
+/** Writes the outbox row of an event id a second time, as a relay that crashed after sending would ($1 event id). */
+export const DUPLICATE_OUTBOX_ROW = sql`INSERT INTO event_outbox (event_id, event_name, topic, message_key, envelope, created_at)
+    SELECT event_id, event_name, topic, message_key, envelope, created_at FROM event_outbox WHERE event_id = $1 ORDER BY id LIMIT 1`

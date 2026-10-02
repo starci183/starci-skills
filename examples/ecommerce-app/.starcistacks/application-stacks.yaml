@@ -3,29 +3,38 @@ sources:
   - repository: ecommerce-app
 components:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     role: stateful
     compose: infra/compose/postgres.yaml
   redis:
-    image: redis:7
+    image: redis:7@sha256:c6eabf748fc7a61dbb5a705c78bcf3d6377b1127a97d0ce965c11c44ba46896f
     role: stateful
     compose: infra/compose/redis.yaml
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.0@sha256:09a381c715ab0b111835b70f2905955274843a219c6f27efb348e4d9f4086858
     role: stateful
     compose: infra/compose/keycloak.yaml
   minio:
     image: cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
     role: stateful
     compose: infra/compose/minio.yaml
+  kafka:
+    image: apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69
+    role: stateful
+    compose: infra/compose/kafka.yaml
+    purpose: The event bus (Apache Kafka in KRaft mode, no ZooKeeper) the order and billing services publish to and consume from; healthchecked by kafka-topics.sh.
   identity:
-    image: ecommerce-app/identity
+    image: ecommerce-app/identity:1.0.0
     role: service
     compose: infra/compose/identity.yaml
   order:
-    image: ecommerce-app/order
+    image: ecommerce-app/order:1.0.0
     role: service
     compose: infra/compose/order.yaml
+  billing:
+    image: ecommerce-app/billing:1.0.0
+    role: service
+    compose: infra/compose/billing.yaml
 environments:
   dev:
     status: supported
@@ -41,6 +50,8 @@ environments:
         port: 8149
       minio:
         port: 9069
+      kafka:
+        port: 9161
       identity:
         port: 5070
       order:

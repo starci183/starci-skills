@@ -1,7 +1,5 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
-import { InjectPaymentService } from "@modules/domain/payment"
-import type { PaymentService } from "@modules/domain/payment"
 import { InjectReceiptStorage } from "@modules/integrations/receipt-storage"
 import type { ReceiptLink, ReceiptStorage } from "@modules/integrations/receipt-storage"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
@@ -9,7 +7,7 @@ import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
-import { OrderError, OrderErrorCode } from "./errors/order.error"
+import { OrderErrorCode } from "./errors/order.error"
 import type { ArchivedReceiptKey, ReceiptDocument, ReceiptLinkParams } from "./order.contracts"
 import { OrderLogEvent } from "./order.log-events"
 import { OrderEntity } from "./persistence/entities/order.entity"
@@ -25,7 +23,6 @@ export class ReceiptService {
     constructor(
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectReceiptStorage() private readonly storage: ReceiptStorage,
-        @InjectPaymentService() private readonly payments: PaymentService,
         @InjectLogger() private readonly logger: Logger,
     ) {}
 
@@ -67,9 +64,6 @@ export class ReceiptService {
             order: { productId: "ASC" },
             take: LIST_ROWS_MAX,
         })
-        const payment = await this.payments.findByOrder({ orderId: order.id })
-        if (payment === null)
-            throw new OrderError({ code: OrderErrorCode.PaymentMissing, params: { orderId: order.id } })
         return {
             orderId: order.id,
             personId: order.personId,
@@ -80,7 +74,6 @@ export class ReceiptService {
             })),
             totalMinorUnits: order.totalMinorUnits,
             currency: order.currency,
-            paymentId: payment.paymentId,
             placedAt: order.createdAt.toISOString(),
         }
     }

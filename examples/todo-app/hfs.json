@@ -10,7 +10,7 @@
         { "name": "worker", "kind": "worker" },
         { "name": "migrate", "kind": "migrate" }
       ],
-      "connections": [{ "name": "primary", "envPrefix": "PRIMARY_DB" }],
+      "connections": [{ "name": "primary", "envPrefix": "PRIMARY_DB", "owner": "todo", "isolation": "database" }],
       "optionalSlots": ["repo.docs", "be.contract.graphql", "be.transport.message", "be.transport.schedule"]
     },
     "fe": {
