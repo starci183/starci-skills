@@ -8,6 +8,7 @@
  * Order of a start: reset what the previous spec file left (truncate, realm users, redis db, namespaces, fakes), reserve the
  * ports of every listening app FIRST, build the wiring, then `AppModule.register(options)` per app, listen, open the db handles.
  */
+import type { GraphqlSubscription } from "./subscription"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { Module } from "@nestjs/common"
@@ -102,6 +103,8 @@ export class World {
     private lock: WorldLock | null = null
     /** The outages this world has in force (service names, plus a secret rotation); the exclusive lock is held while any is. */
     private readonly outages = new Set<string>()
+    /** The subscriptions opened through this world's apps: the ones a spec left open are closed before the apps stop. */
+    private readonly subscriptions: Array<GraphqlSubscription<unknown>> = []
     /** The connections this world took down (`infra.postgresql.connection(name).cut()`) and has not restored yet. */
     private readonly downConnections = new Set<string>()
 
@@ -196,6 +199,7 @@ export class World {
             this.lock?.close()
             this.lock = null
         }
+        await Promise.all(this.subscriptions.splice(0).map((subscription) => subscription.close().catch(() => undefined)))
         const failures: Array<unknown> = []
         const contexts = [...(runtime.root === null ? [] : [runtime.root]), ...[...runtime.apps].reverse().map((app) => app.context)]
         for (const context of contexts) {
@@ -642,6 +646,7 @@ export class World {
             baseUrl,
             operations: decl.operations ?? {},
             graphqlPath: decl.graphqlPath ?? "/graphql",
+            track: (subscription) => void this.subscriptions.push(subscription),
             signIn: async (email, password) => {
                 if (identity === undefined) throw notDeclared("identity")
                 return identity.signIn(this.identityWorld(), { email, password })

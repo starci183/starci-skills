@@ -75,6 +75,8 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 | `world.interruptDatabase(fn, connection?)` | `infra.postgresql.during(fn)`, or `infra.postgresql.connection(name).during(fn)` with a connection. |
 | `useSandbox({ provider, keys, module, client })` | contract layer: the real client against a provider sandbox; the library reads the keys and skips when absent. |
 
+
+GraphQL subscriptions: `world.apps.<name>.api.as(token).subscribe(operation, { variables })` opens a graphql-ws subscription (the caller's bearer goes in `connectionParams.authorization`) and resolves once the server acknowledged it; trigger the push afterwards, `await sub.next()` for the next frame, `sub.frames()` to prove nothing arrived, `await sub.close()` to release it.
 ## One warm stack for all repos
 
 `starci-test-stack up|down|status` (the managed `npm run test:stack -- up`). The globalSetup attaches to the stack or starts it. Containers are keyed by image (`starci-ts-<service>-<hash of image>`): two repositories on the same Postgres image share one container, another version gets its own. Machine state lives in `~/.starci/test-stack` (registry with leases, cross-process lock).

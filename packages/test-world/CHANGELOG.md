@@ -18,6 +18,12 @@
   stops its login only (`NOLOGIN`), so the contexts beside it keep serving. Contexts sharing a database must each declare a
   distinct schema (never `public` or `pg_*`).
 - Changed: extensions are created in `public` of each database.
+- Added: GraphQL subscriptions in the test API. `api.subscribe(operation, { variables, timeoutMs })` (and on any bound caller,
+  `api.as(token).subscribe(...)`) opens a graphql-ws (`graphql-transport-ws`) subscription at the app's GraphQL path on
+  Node's own WebSocket (no new dependency), with the caller's bearer as `connectionParams.authorization`. The handle has
+  `next(timeoutMs)` (waits for the next unread frame, TEST_WORLD_TIMED_OUT at the deadline), `frames()`, `errors()`,
+  `closed()` and `close()`; a refused connection rejects with its close code, and the world closes any subscription a spec
+  left open before the apps stop. For EX-KINDS (ecommerce realtime scenarios).
 - Changed: the SePay fake signs every delivery with a timestamp: `x-sepay-timestamp: <epoch ms>` and `x-sepay-signature:
   sha256=<hmac of "<timestamp>.<exact body>">` (`sepaySignature`, `sepayVerifySignature`; the body-only `sepayBodySignature`
   and `sepayVerifyBody` are removed). `replayWebhook(reference, { ageMs })` and `delayWebhook({ ..., ageMs })` deliver the

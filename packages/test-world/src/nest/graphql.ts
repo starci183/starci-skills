@@ -1,5 +1,7 @@
 import type { GraphqlObserved, GraphqlWire, HttpCaller, TestApi, TestCaller } from "./api"
 import { createHttpClient } from "./http-client"
+import { openSubscription, websocketUrlOf } from "./subscription"
+import type { GraphqlSubscription } from "./subscription"
 
 const UNPARSABLE_LIMIT = 2000
 
@@ -28,6 +30,8 @@ export interface AppApiSpec {
     readonly operations: Readonly<Record<string, string>>
     readonly graphqlPath: string
     readonly signIn: (email: string, password: string) => Promise<{ readonly sessionToken: string; readonly personId: string }>
+    /** Called with every subscription opened through this app's callers, so the world can close what a spec left open. */
+    readonly track?: (subscription: GraphqlSubscription<unknown>) => void
 }
 
 const callerOf = (spec: AppApiSpec, bearerToken?: string): TestCaller => {
@@ -47,6 +51,18 @@ const callerOf = (spec: AppApiSpec, bearerToken?: string): TestCaller => {
         graphql: send,
         read: (operation, options) => send(operation, options?.variables),
         mutate: (operation, options) => send(operation, options?.variables),
+        subscribe: async <TData>(operation: string, options?: { readonly variables?: Record<string, unknown>; readonly timeoutMs?: number }) => {
+            const subscription = await openSubscription<TData>({
+                url: websocketUrlOf(spec.baseUrl, spec.graphqlPath),
+                query: spec.operations[operation] ?? operation,
+                variables: options?.variables,
+                bearerToken,
+                timeoutMs: options?.timeoutMs,
+                label: spec.operations[operation] === undefined ? operation.slice(0, 80) : operation,
+            })
+            spec.track?.(subscription as GraphqlSubscription<unknown>)
+            return subscription
+        },
     }
 }
 
