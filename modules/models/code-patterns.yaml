@@ -10,8 +10,8 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: dc076097fe3b071f00e439534c26be3c7c27238a0fae5a516d348a178a6aa6fc
-        files: 137
+        value: 2f5ae7b36f503229a0b0b572926bc494b5e202a5daa04b3fde49e7a264dca728
+        files: 140
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -64,6 +64,11 @@ profiles:
       - BE-IMPORTS-7
       - BE-MESSAGES-1
       - BE-MESSAGES-2
+      - BE-JOBS-1
+      - BE-JOBS-2
+      - BE-JOBS-3
+      - BE-JOBS-4
+      - BE-JOBS-5
       - BE-NAMING-1
       - BE-NAMING-2
       - BE-NAMING-3
@@ -77,7 +82,18 @@ profiles:
       - BE-QUEUES-1
       - BE-QUEUES-2
       - BE-QUEUES-3
+      - BE-PROJECTIONS-1
+      - BE-PROJECTIONS-2
+      - BE-PROJECTIONS-3
+      - BE-PROJECTIONS-4
+      - BE-QUEUES-1
+      - BE-QUEUES-2
+      - BE-QUEUES-3
       - BE-QUEUES-4
+      - BE-REACTORS-1
+      - BE-REACTORS-2
+      - BE-REACTORS-3
+      - BE-REACTORS-4
       - BE-RESILIENCE-1
       - BE-TEMPORAL-1
       - BE-TEST-1
@@ -577,6 +593,25 @@ profiles:
         rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
         guidance: knowledge/patterns/be/event-bus.yaml
 
+      - id: NEST-FENCED-JOB-AND-PROJECTION
+        sourceRuleIds: [BE-JOBS-1, BE-JOBS-2, BE-JOBS-3, BE-JOBS-4, BE-PROJECTIONS-1, BE-PROJECTIONS-2]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: The job row is written only by platform/jobs, a guarded write requires the fencing token in its type, an external effect of a step carries the run key, a processor extends the fenced base, and a read-model table is written only by its projection which speaks recompute and get.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/job-write-owner, starci-be/job-fence-required, starci-be/job-run-key, starci-be/job-shape, starci-be/projection-write-owner, starci-be/projection-shape]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/jobs.yaml
+          review: Confirm each step is safe to repeat under the same run key, the provider honours it, and each recompute is idempotent.
+        status: implemented
+      - id: NEST-JOB-PROJECTION-REACTOR-OBSERVATION
+        sourceRuleIds: [BE-JOBS-5, BE-PROJECTIONS-3, BE-PROJECTIONS-4, BE-REACTORS-1, BE-REACTORS-2, BE-REACTORS-3, BE-REACTORS-4]
+        rationale: The scenarios are checked by hfs check (BE_PATTERN_SPEC_MISSING) and the kind boundary by the architecture machine (BE_KIND_ISOLATION); whether a zombie is really refused, a replay rebuilds the same rows and a reactor copy is complete is reviewed against the test-world runs.
+        guidance: knowledge/patterns/be/jobs.yaml
+
   next:
     title: StarCi Next.js code pattern
     canon:
@@ -587,7 +622,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: f71204c7afb2a503c098320ade2de11e842ae3a3af09947add4831a347657c35
+        value: cd271be1146986a15e8a8a52f22a80bc98e75f4fbb25f39250cb0aadcc68eb87
         files: 148
     sourceRuleRoots:
       - knowledge/patterns/fe

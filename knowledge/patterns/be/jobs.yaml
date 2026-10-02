@@ -1,0 +1,207 @@
+schema: starci/knowledge-source@1
+id: be.jobs
+title: Fenced background jobs
+purpose: |-
+  Given work that runs in the background and must survive a worker that stalls, restarts or is replaced, how is it claimed and
+  settled? A job is a row whose `fencingToken` the claim bumps. Every write on a claimed job carries the token the writer holds and
+  is refused when it is stale, so a zombie worker (one that lost its claim but kept running) changes nothing, and every external
+  effect carries a run key that includes the token, so the provider drops a repeat. `platform/jobs` is the one owner of the row.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-10-02
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner decision 2026-10-02 (fenced jobs with a required fencing token)
+    - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+  limitations: |-
+    Static checks prove who writes the job row, that the token is required in the type and not cast around, that effects carry a
+    run key and that a processor has the fenced base. They do not prove that the provider honours the idempotency key or that a
+    step is safe to repeat; the test-world scenarios (`fenced-job/*`) prove the zombie and re-dispatch behaviour against real
+    Postgres and a double of the provider.
+rules:
+  - id: BE-JOBS-1
+    title: The job row has one owner and one atomic claim
+    kind: mandatory
+    hfsRules: [R137]
+    requirement: |-
+      `modules/platform/jobs` holds the job entity (`id`, `kind`, `status`, `currentStep`, `fencingToken`, `claimedBy`,
+      `leaseExpiresAt`, `payload`), `job-claim.service.ts` and the persistence of the table. `claim()` is one atomic statement
+      (`UPDATE jobs SET fencing_token = fencing_token + 1, claimed_by = $1, lease_expires_at = $2 WHERE id = $3 AND (status = 'ready' OR lease_expires_at < $4) RETURNING ...`,
+      a `SqlText` constant) and returns the bumped token. Nothing else writes the row: no `manager.update`, `increment`, `save`,
+      `insert`, `delete` or query-builder write on the job entity outside `platform/jobs`. The table exists on every connection
+      that runs jobs.
+    rationale: |-
+      A read-modify-write claim races, and a second writer defeats the fence. One owner and one atomic statement keep the token
+      monotonic.
+    cases:
+      - id: case-1
+        when: A worker picks up a job
+        write: 'const job = await this.claims.claim({ kind: "send-receipt", workerId, leaseMs })  // token = previous + 1'
+    verification:
+      automated:
+        - BE_JOB_WRITE_OUTSIDE_OWNER
+        - BE_SQL_TABLE_OWNER
+      manual:
+        - Confirm the claim SQL is a single statement and the lease length fits the longest step.
+    relatedExamples: [fenced-job]
+  - id: BE-JOBS-2
+    title: Every write to a claimed job carries expectedFencingToken, required in the type
+    kind: mandatory
+    hfsRules: [R138]
+    requirement: |-
+      `JobClaims.advance`, `complete` and `fail` take `GuardedWrite & {...}` where `GuardedWrite = { jobId: string; expectedFencingToken: number }`:
+      the token is required, never optional or nullable, and a call never passes it through `as`, `!` or `any`. Each write is
+      `UPDATE ... WHERE id = $1 AND fencing_token = $2`; zero rows updated throws `JobFencedOut` and the worker stops with no
+      further effect. A step or processor never catches around a guarded write: the `FencedProcessor` base owns the failure path.
+    rationale: |-
+      An optional guard is a guard some caller forgets. The token is checked atomically by the store that accepts the write, which
+      is the only place a stale worker can be refused.
+    cases:
+      - id: case-1
+        when: A step finishes
+        write: 'await this.claims.advance({ jobId: job.jobId, expectedFencingToken: job.fencingToken, step: "send" })'
+    verification:
+      automated:
+        - BE_JOB_FENCE_REQUIRED
+      manual: []
+    relatedExamples: [fenced-job]
+  - id: BE-JOBS-3
+    title: An external effect carries a run key that includes the token
+    kind: mandatory
+    hfsRules: [R139]
+    requirement: |-
+      `JobClaims.runKey(job, step)` returns a `RunKey` (`<jobId>:<step>:<fencingToken>`); it is the only way to make one. Every call
+      from `steps/<step>.step.ts` to an integration passes it as the provider's idempotency key, so a repeated effect of a stale
+      worker is dropped by the provider. A read from an integration belongs in the application layer, not in a step. When the
+      provider cannot enforce idempotency, constrain overlap and reconcile before a retry.
+    rationale: |-
+      Fencing the local row does not fence the remote effect. The key ties the effect to one claim.
+    cases:
+      - id: case-1
+        when: A step sends a mail
+        write: 'await this.mail.send(message, this.claims.runKey(job, "send"))'
+    verification:
+      automated:
+        - BE_JOB_RUN_KEY
+      manual:
+        - Confirm the provider documents idempotent handling of its key.
+    relatedExamples: [fenced-job]
+  - id: BE-JOBS-4
+    title: A job is a processor plus steps, started by a producer and run by a worker or api app
+    kind: mandatory
+    hfsRules: [R140, R136, R46]
+    requirement: |-
+      `features/jobs/<job>/<job>.processor.ts` declares a class extending `FencedProcessor` (it claims, calls `process(job)` and
+      settles through the guarded writes); `steps/<step>.step.ts` declares a class implementing `JobStep`; `application/` holds
+      plain CQRS. A domain service starts the job with a typed queue producer `enqueueX(payload, tx)` inside its transaction
+      (queues.yaml). The jobs kind imports only `modules/*`: it never imports an api, saga or reactor feature, and it talks to
+      them through events. An app of kind `worker` or `api` composes the job module.
+    rationale: |-
+      One place and one base class mean a job cannot skip the fence, and the kind boundary keeps a long job from running inside a
+      request.
+    cases:
+      - id: case-1
+        when: A new background job send-receipt
+        write: 'features/jobs/send-receipt/{send-receipt.processor.ts, send-receipt.module.ts, steps/mail.step.ts, application/send-receipt.command.ts}'
+    verification:
+      automated:
+        - BE_JOB_SHAPE
+        - BE_KIND_ISOLATION
+        - BE_BACKGROUND_UNOWNED
+      manual:
+        - Confirm each step is one external effect that is safe to repeat under the same run key.
+    relatedExamples: [fenced-job]
+  - id: BE-JOBS-5
+    title: A declared fenced-job is proven on the test world
+    kind: mandatory
+    hfsRules: [R135]
+    requirement: |-
+      An app that declares `fenced-job` has tests titled `fenced-job/<scenario>: ...` for `claim-bumps-token`,
+      `zombie-fenced-out` (a worker with a stale token gets `JobFencedOut` and the external double sees zero calls) and
+      `redispatch-isolated` (a re-dispatch claims a higher token, the old worker's write is refused and the new run's effects carry
+      their own run key), run on the test world with real Postgres.
+    rationale: |-
+      The fence is a runtime property; only a paused old worker resuming after reassignment shows it holds.
+    cases:
+      - id: case-1
+        when: The send-receipt e2e suite
+        write: "it('fenced-job/zombie-fenced-out: the stale worker changes nothing', ...)"
+    verification:
+      automated:
+        - BE_PATTERN_SPEC_MISSING
+      manual: []
+    relatedExamples: [fenced-job]
+files:
+  - path: src/modules/platform/jobs/index.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/jobs.module.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/jobs.module-definition.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/jobs.options.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/jobs.config.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/jobs.decorators.ts
+    slot: be.platform.jobs
+    role: InjectJobClaims and its token.
+  - path: src/modules/platform/jobs/jobs.contracts.ts
+    slot: be.platform.jobs
+    role: ClaimedJob, GuardedWrite, RunKey.
+  - path: src/modules/platform/jobs/jobs.port.ts
+    slot: be.platform.jobs
+    role: JobClaims and JobStep ports.
+    rules: [BE_JOB_FENCE_REQUIRED]
+  - path: src/modules/platform/jobs/job-claim.service.ts
+    slot: be.platform.jobs
+    role: The claim and the guarded writes; the only writer of the job row.
+    spec: src/modules/platform/jobs/job-claim.service.spec.ts
+    rules: [BE_JOB_WRITE_OUTSIDE_OWNER]
+  - path: src/modules/platform/jobs/fenced.processor.ts
+    slot: be.platform.jobs
+    role: The base class every processor extends.
+  - path: src/modules/platform/jobs/jobs.log-events.ts
+    slot: be.platform.jobs
+  - path: src/modules/platform/jobs/errors/jobs.error.ts
+    slot: be.platform.jobs
+    role: JobFencedOut.
+  - path: src/modules/platform/jobs/persistence/connection.ts
+    slot: be.persistence
+    role: The job entity array registered on every connection that runs jobs.
+  - path: src/modules/platform/jobs/persistence/entities/job.entity.ts
+    slot: be.persistence
+  - path: src/modules/platform/jobs/persistence/jobs.sql.ts
+    slot: be.persistence
+    role: The claim and guarded-write statements as SqlText constants.
+  - path: src/modules/platform/jobs/persistence/migrations/<epochMs13>-create-jobs.ts
+    slot: be.persistence
+  - path: src/features/jobs/<job>/index.ts
+    slot: be.feature.jobs
+  - path: src/features/jobs/<job>/<job>.module.ts
+    slot: be.feature.jobs
+  - path: src/features/jobs/<job>/<job>.processor.ts
+    slot: be.feature.jobs
+    role: The processor of one job; extends FencedProcessor.
+    rules: [BE_JOB_SHAPE]
+  - path: src/features/jobs/<job>/steps/<step>.step.ts
+    slot: be.jobs.steps
+    role: One external effect; implements JobStep and passes the run key.
+    rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
+  - path: src/features/jobs/<job>/application/<action>.command.ts
+    slot: be.feature.application
+    optional: true
+  - path: src/features/jobs/<job>/application/<action>.handler.ts
+    slot: be.feature.application
+    optional: true
+  - path: src/features/jobs/<job>/application/<action>.contracts.ts
+    slot: be.feature.application
+    optional: true
+  - path: src/tests/e2e/<area>/<job>.e2e-spec.ts
+    slot: be.tests.e2e
+    role: "Titles fenced-job/<scenario>: ... prove the pattern."
+    spec: fenced-job/claim-bumps-token, fenced-job/zombie-fenced-out, fenced-job/redispatch-isolated
+    rules: [BE_PATTERN_SPEC_MISSING]

@@ -86,7 +86,7 @@ rules:
     requirement: |-
       When the capability exists its injector exists under this name: `Inject<Conn>EntityManager` (platform/database, one per
       connection), `InjectClock` (platform/clock), `InjectLogger` (platform/logging), `InjectCache` (integrations/cache),
-      `InjectHttpClient` (platform/http), `InjectMessagePublisher` (platform/messaging), `InjectOutbox` (platform/outbox),
+      `InjectHttpClient` (platform/http), `InjectEventBus` and `InjectEventConsumerRegistry` (platform/event-bus), `InjectQueueOutbox` (platform/queue),
       `InjectInbox` (platform/inbox), `InjectMessageCatalog` and `InjectRequestLocale` (platform/i18n),
       `InjectCommandBus` and `InjectQueryBus` (platform/cqrs), `InjectAdvisoryLock` (platform/database), `Inject<Cap>Options`
       (each capability with options) and `Inject<Provider>` for each integration SDK client (`InjectPayOS`, `InjectStripe`,

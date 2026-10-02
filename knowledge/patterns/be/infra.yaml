@@ -26,8 +26,8 @@ rules:
     requirement: |-
       An import or a global reference of a raw library is allowed only in its owner, read from `ruleParams.be.infraOwners` of
       the slot manifest: `fetch`, `axios`, `got`, `undici`, `node:http(s)` request APIs in `platform/http`; `cache-manager`,
-      `redis`, `ioredis` in `integrations/{cache,redis}`; `bullmq`, `@nestjs/bullmq`, `kafkajs` in `platform/messaging`;
-      `setInterval`, `setTimeout`, `node:timers*` in `platform/{scheduling,retry,messaging,http}`; `winston` in
+      `redis`, `ioredis` in `integrations/{cache,redis}`; `bullmq`, `@nestjs/bullmq` in `platform/queue`, `kafkajs` in `platform/event-bus`;
+      `setInterval`, `setTimeout`, `node:timers*` in `platform/{retry,event-bus,queue,http}`; `winston` in
       `platform/logging`; `dayjs`, `moment`, `date-fns-tz` in `platform/{clock,primitives}`. `@nestjs/schedule`, `@nestjs/config`,
       `dotenv` and `@nestjs/event-emitter` are owned by nobody. Everything else asks the owner's port through its injector.
     rationale: |-
@@ -39,7 +39,7 @@ rules:
         write: 'Inject `@InjectHttpClient() private readonly httpClient: HttpClient` and call `httpClient.request({ method, url, headers, body, timeoutMs })`.'
       - id: case-2
         when: Code needs to run something later
-        write: 'A `transport/schedule/<job>.job.ts` or a queue declared with `defineQueue<Payload>` through `InjectMessagePublisher`; never `setTimeout` or `@Cron`.'
+        write: 'A typed queue producer `modules/queues/<queue>/<queue>.queue.ts` (a BullMQ job scheduler for a recurring task) and a `features/jobs/<job>/<job>.processor.ts`; never `setTimeout` or `@Cron`.'
     verification:
       automated:
         - BE_INFRA_OWNER

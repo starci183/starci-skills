@@ -167,7 +167,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, cli, event, queue, projection, projection-entity, processor, step, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
     # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
     # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
     contractShape: {helper: shapeOf}
@@ -176,7 +176,9 @@ ruleParams:
     patternScenarios:
       event-bus: [atomic-with-transaction, relay-only-after-commit, redelivery-then-dead-letter, duplicate-delivery-is-a-noop]
       queue: [enqueue-atomic-with-transaction, relay-job-id-is-outbox-id, scheduler-fires-once]
-    bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
+      fenced-job: [claim-bumps-token, zombie-fenced-out, redispatch-isolated]
+      projection: [recompute-is-idempotent, replay-rebuilds]
+    bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, job, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
@@ -623,7 +625,7 @@ slots:
   - id: be.app.worker
     profiles: [be]
     path: "apps/<app>/src/"
-    appKind: worker               # composes transport/schedule and transport/message modules only
+    appKind: worker               # composes transport/message modules and job processors only
     presence: opt-in
     tracked: tracked
     tier: app
@@ -674,7 +676,7 @@ slots:
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]
-    path: "src/features/<feature>/application/"
+    path: "src/features/{,jobs/,reactors/}<feature>/application/"     # inside a trigger kind (jobs, reactors) the feature folder is one level down
     presence: required
     tracked: tracked
     tier: feature
@@ -684,7 +686,7 @@ slots:
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.application.support
     profiles: [be]
-    path: "src/features/<feature>/application/support/"
+    path: "src/features/{,jobs/,reactors/}<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
@@ -717,7 +719,7 @@ slots:
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
-    path: "src/features/<feature>/transport/message/"
+    path: "src/features/{,reactors/}<feature>/transport/message/"
     presence: opt-in              # queue worker: consumed only by a worker app
     pattern: event-bus            # a consumer reads the event bus; declaring the pattern enables the slot
     tracked: tracked
@@ -725,18 +727,7 @@ slots:
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
-    composedBy: [worker]
-    rules: [BE_BACKGROUND_UNOWNED]
-  - id: be.transport.schedule
-    profiles: [be]
-    path: "src/features/<feature>/transport/schedule/"
-    presence: opt-in              # cron job, sweep or outbox publisher: consumed only by a worker app
-    tracked: tracked
-    tier: feature
-    requires: ["<feature>-schedule.module.ts"]
-    allows: ["<job>.job.ts"]
-    tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.websocket
     profiles: [be]
@@ -907,10 +898,44 @@ slots:
     tracked: tracked
     tier: feature
     owner: true
-    requires: [index.ts, "<job>.module.ts"]
-    allows: [index.ts, "<job>.module.ts", "<job>.processor.ts", application/, steps/, transport/]
+    requires: [index.ts, "<job>.module.ts", "<job>.processor.ts", steps/]
+    allows: [index.ts, "<job>.module.ts", "<job>.processor.ts", application/, steps/]
     tests: none
     rules: [BE_KIND_ISOLATION, BE_FEATURE_IMPORTS_FEATURE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.jobs.steps
+    profiles: [be]
+    path: "src/features/jobs/<job>/steps/"
+    presence: opt-in
+    pattern: fenced-job           # one external effect per step; it takes the claimed job and writes through the guarded methods
+    tracked: tracked
+    tier: feature
+    allows: ["<step>.step.ts"]
+    tests: none
+    rules: [BE_JOB_SHAPE, BE_JOB_RUN_KEY]
+  - id: be.platform.jobs
+    profiles: [be]
+    path: "src/modules/platform/jobs/"
+    presence: opt-in
+    pattern: fenced-job           # the ONE fencing primitive: the job entity, the claim that bumps the token, guarded writes (knowledge/patterns/be/jobs.yaml)
+    tracked: tracked
+    tier: platform
+    owner: true
+    requires: [index.ts, jobs.module.ts, jobs.port.ts, jobs.contracts.ts, job-claim.service.ts, job-claim.service.spec.ts, fenced.processor.ts]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE, BE_JOB_WRITE_OUTSIDE_OWNER, BE_JOB_FENCE_REQUIRED]
+  - id: be.projections
+    profiles: [be]
+    path: "src/modules/projections/<name>/"
+    presence: opt-in
+    pattern: projection           # a read model: only its projection writes its table; recompute is idempotent and replayable; readers use get*
+    tracked: tracked
+    tier: projections
+    owner: true
+    requires: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts"]
+    allows: [index.ts, "<name>.module.ts", "<name>.projection.ts", "<name>.projection-entity.ts", "<name>.contracts.ts", persistence/]
+    tests: none
+    rules: [BE_PROJECTION_WRITE_OWNER, BE_PROJECTION_SHAPE, BE_TIER_DIRECTION]
   - id: be.integrations
     profiles: [be]
     path: "src/modules/integrations/<provider>/"

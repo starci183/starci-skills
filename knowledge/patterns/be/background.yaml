@@ -53,15 +53,16 @@ rules:
     kind: mandatory
     hfsRules: [R46, R31]
     requirement: |-
-      An app of kind `worker` composes the message transport and the processors; an api app never consumes a queue or runs a
-      processor, because that work would then run once per replica of the api. Every message transport has at least one app that
-      composes it, and an e2e run boots that app's real AppModule.
+      An app of kind `worker` or `api` composes the message transport and the job processors of its own service (a separate worker app
+      is opt-in, for a service that must scale its consumers on their own). Every message transport and processor is composed by at
+      least one app, and an e2e run boots that app's real AppModule. A schedule is a BullMQ job scheduler, so it runs once for the
+      fleet whatever the replica count.
     rationale: |-
-      A job that no process composes never runs, and a job inside a replicated api runs many times.
+      A job or consumer that no process composes never runs.
     cases:
       - id: case-1
-        when: A worker app
-        write: 'be/apps/worker/src/app.module.ts registers BillingScheduleModule and BillingMessageModule and no controller or resolver.'
+        when: A service app
+        write: 'be/apps/order/src/app.module.ts imports PaymentStatusMessageModule and SendReceiptModule next to its api transport modules.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED
@@ -90,26 +91,6 @@ rules:
         - Confirm the schedule and the overlap policy fit the recovery contract.
     relatedExamples: []
   - id: BE-BACKGROUND-4
-    title: Lease and fencing
-    kind: mandatory
-    hfsRules: [R46]
-    requirement: |-
-      Lease expiry allows a new claimant; it does not stop the old process. A monotonic execution token is checked atomically
-      by the resource that accepts the write. When the provider cannot enforce fencing, use its idempotency or reconciliation
-      contract, constrain overlap, and represent unknown effects explicitly before a retry. A stale worker that resumes after
-      reassignment must have its writes and settlement rejected by the real authority.
-    rationale: |-
-      Updating a local record with a fence after an unfenced external call does not fence the external effect.
-    cases:
-      - id: case-1
-        when: A claim
-        write: 'UPDATE ... SET lease_token = $2 WHERE id = $1 AND lease_expires_at < $3 returning the new token, as a SqlText constant; every write checks the token.'
-    verification:
-      automated: []
-      manual:
-        - Run a paused old worker resuming after reassignment against the actual store and assert its writes are refused.
-    relatedExamples: []
-  - id: BE-BACKGROUND-5
     title: Producers publish through the event bus or a typed queue producer
     kind: mandatory
     hfsRules: [R82, R90, R132]

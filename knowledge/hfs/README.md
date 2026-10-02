@@ -77,8 +77,8 @@ A slot has an `id`, the `profiles` it exists in, a `path` pattern, a `presence`,
 | --- | --- | --- |
 | Helper or type used by one feature only | `be/src/features/<feature>/application/support/<name>.ts` (`be.feature.application.support`, optional); another feature cannot import it, a second user moves it to a `domain` capability | minor |
 | Command line entry | `transport/cli/<name>.cli.ts` in the feature plus a back-end app of kind `cli` (`be.feature.transport.cli`, opt-in); it dispatches one command or query | minor |
-| Queue consumer | `transport/message/` in the feature plus a back-end app of kind `worker` | none, declared in `hfs.json` |
-| Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts` | none |
+| Event consumer | `transport/message/<event>.consumer.ts` in the feature plus a back-end app of kind `api` or `worker`; declares the pattern `event-bus` | none, declared in `hfs.json` |
+| Background job, sweep, recurring task | `features/jobs/<job>/<job>.processor.ts` plus a typed queue `modules/queues/<queue>/<queue>.queue.ts` with a BullMQ job scheduler; declares the patterns `queue` and `fenced-job` | none, declared in `hfs.json` |
 | Another api app or a cli | `be/apps/<name>` plus its kind in `hfs.json` `sides.be.apps` | none |
 | Another Next app | `fe/apps/<name>` plus kind `next` in `hfs.json` `sides.fe.apps` | none |
 | New app kind or protocol | new slot `be.app.<kind>` or `be.transport.<protocol>` | minor |
@@ -187,7 +187,6 @@ be/src/features/<feature>/
   transport/http/                        opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (webhooks, OAuth, health, byte streams)
   transport/websocket/                   opt-in: <feature>-websocket.module.ts, <channel>.gateway.ts
   transport/message/                     opt-in: <feature>-message.module.ts, <event>.consumer.ts
-  transport/schedule/                    opt-in: <feature>-schedule.module.ts, <job>.job.ts
   transport/cli/                         opt-in: <feature>-cli.module.ts, <name>.cli.ts; composed only by an app of kind cli
   messages/                              opt-in: <feature>.messages.ts (vi and en copy)
 be/src/modules/domain/<capability>/      index.ts, module, module-definition, options, config, decorators, log-events, errors/, persistence/, messages/, services
@@ -280,12 +279,13 @@ with `src` or `.starcistacks`.
 
 ### 5.7 Background work (R46)
 
-Background work is a transport. `transport/schedule/<job>.job.ts` (a `ScheduledJob` with `run(at)`) and
-`transport/message/<event>.consumer.ts` dispatch one command exactly as a resolver does. Mechanisms live in
-`platform/scheduling` and `platform/messaging` (adapters over the queue and stream libraries, with lease and fencing).
-Only an app of kind `worker` composes them; an api app never runs cron. A method named `sweep*`, `deliver*`,
-`reconcile*`, `retry*` or `relay*` that no job or consumer calls is a failure. Producers publish through typed queues, and
-a publish that must be atomic with a write goes through the outbox inside the transaction.
+Background work is a transport. `transport/message/<event>.consumer.ts` (an `EventConsumer` of `platform/event-bus`) and
+`features/jobs/<job>/<job>.processor.ts` (a `FencedProcessor` of `platform/jobs`) dispatch one command exactly as a resolver does.
+Mechanisms live in `platform/event-bus` (Kafka behind a transactional outbox, with inbox, retry and dead letter), `platform/queue`
+(BullMQ with the outbox relay and job schedulers) and `platform/jobs` (the fencing token). An app of kind `api` or `worker`
+composes them; `@Cron`, `@Interval` and `@Timeout` exist nowhere, a schedule is a BullMQ job scheduler. A method named
+`sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` that no processor or consumer calls is a failure. A domain service
+publishes `eventBus.publish(event, tx)` or enqueues `enqueueX(payload, tx)` inside its own transaction (knowledge/patterns/be/event-bus.yaml, queues.yaml, jobs.yaml).
 
 ### 5.8 Modules, features and injection (R29 to R33, R45, R85, R87, R88)
 
@@ -675,3 +675,9 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R134 | `BE_QUEUE_PRODUCER_SHAPE` | In `modules/queues/<queue>/<queue>.queue.ts` every exported function or class method that writes the `QueueOutbox` port of platform/queue declares a `tx` parameter typed `EntityManager` and passes that parameter as the first argument of the write; a write with another manager, an outer manager or none is a finding (pattern queue). |
 | R135 | `BE_PATTERN_SPEC_MISSING` | Every pattern a back end declares (hfs.json sides.be.patterns) is proven on the test world: each scenario id of ruleParams.be.patternScenarios.<pattern> has a test titled `<pattern>/<scenario>: ...` (the first argument of `it(` or `test(`) in an e2e or integration spec under be/src/tests; a declared pattern with a missing scenario is a finding. |
 | R136 | `BE_KIND_ISOLATION` | No trigger kind imports another: a feature whose owner slot names one `trigger` (api, webhooks, realtime, saga, reactors, jobs, cli) never imports (static, dynamic, re-export or type-only) a feature of another kind; each kind imports only `modules/*` and only be/apps/* compose features. The kinds meet through the event bus: a domain service publishes `eventBus.publish(event, tx)` and the other kind consumes it. The importing and imported owners are read from the slot view (slot field `trigger`), never from a folder name; the finding replaces BE_FEATURE_IMPORTS_FEATURE when both features name different kinds. |
+| R137 | `BE_JOB_WRITE_OUTSIDE_OWNER` | The job entity (the class `platform/jobs` declares in its persistence) is written only by `platform/jobs`: an `update`, `increment`, `decrement`, `save`, `insert`, `upsert`, `delete`, `remove`, `softDelete` or a query-builder write on it in any other file (the test world, e2e and fixtures aside) is a finding. The entity is found by the type origin of the call's arguments or builder chain, never by a name; raw SQL is judged by BE_SQL_TABLE_OWNER (pattern fenced-job). |
+| R138 | `BE_JOB_FENCE_REQUIRED` | Every `JobClaims` method that takes a job (a parameter type with `jobId`) declares a required, non-nullable `expectedFencingToken: number`; no call on `JobClaims` outside `platform/jobs` casts around it (`as`, a type assertion or `!` in an argument); and a `catch` around a `JobClaims` write rethrows, so a `JobFencedOut` stops the zombie with no further effect (pattern fenced-job). |
+| R139 | `BE_JOB_RUN_KEY` | In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job). |
+| R140 | `BE_JOB_SHAPE` | A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job). |
+| R141 | `BE_PROJECTION_WRITE_OWNER` | A projection's entity (a class of `<name>.projection-entity.ts` in `modules/projections/<name>/`) is written only by the `<name>.projection.ts` of the same folder (the test world, e2e and fixtures aside): a write on it from a domain service, a handler, another projection or another file of the folder is a finding. The entity is found by the type origin of the write's arguments or builder chain (pattern projection). |
+| R142 | `BE_PROJECTION_SHAPE` | Every public method of a `<name>.projection.ts` class is `recompute*` (idempotent write from the source facts) or `get*` (read); the `index.ts` of a projection exports nothing from a `.projection-entity` file; and a feature whose kind is api calls no `recompute*` method of a projection (it reads through `get*`). The kind is read from the owner slot's `trigger` (pattern projection). |

@@ -496,18 +496,18 @@ test("register-once: the feature case is bounded to the feature owner: another f
 // module-per-transport ------------------------------------------------------------------------------------------------------
 const TRANSPORT_MODULE = (name, imports = "", importLine = "") => `import { Module } from '@nestjs/common';\n${importLine}@Module({ imports: [${imports}] })\nexport class ${name} {}\n`
 const TRANSPORT_FEATURE = {
-    "src/features/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AScheduleModule } from './transport/schedule/a-schedule.module';\nexport { AModule } from './a.module';\n",
+    "src/features/a/index.ts": "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AMessageModule } from './transport/message/a-message.module';\nexport { AModule } from './a.module';\n",
     "src/features/a/a.module.ts": TRANSPORT_MODULE("AModule"),
     "src/features/a/transport/graphql/a-graphql.module.ts": TRANSPORT_MODULE("AGraphqlModule", "AModule", "import { AModule } from '../../a.module';\n"),
-    "src/features/a/transport/schedule/a-schedule.module.ts": TRANSPORT_MODULE("AScheduleModule", "AModule", "import { AModule } from '../../a.module';\n"),
+    "src/features/a/transport/message/a-message.module.ts": TRANSPORT_MODULE("AMessageModule", "AModule", "import { AModule } from '../../a.module';\n"),
 }
 const TRANSPORT_APP = (imports, names = imports) => `import { Module } from '@nestjs/common';\nimport { ${names} } from '../../../src/features/a';\n@Module({ imports: [${imports}] })\nexport class AppModule {}\n`
 const TRANSPORT_APPS = [{ name: "core", kind: "api" }, { name: "jobs", kind: "worker" }]
 const transportRepo = (t, files) => repo(t, {
     apps: TRANSPORT_APPS,
-    files: { ...TRANSPORT_FEATURE, "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule"), "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": TRANSPORT_APP("AScheduleModule"), ...files },
+    files: { ...TRANSPORT_FEATURE, "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule"), "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": TRANSPORT_APP("AMessageModule"), ...files },
 })
-const TRANSPORT_CLEAN = ["src/features/a/transport/graphql/a-graphql.module.ts", "src/features/a/transport/schedule/a-schedule.module.ts", "apps/core/src/app.module.ts", "apps/jobs/src/app.module.ts"]
+const TRANSPORT_CLEAN = ["src/features/a/transport/graphql/a-graphql.module.ts", "src/features/a/transport/message/a-message.module.ts", "apps/core/src/app.module.ts", "apps/jobs/src/app.module.ts"]
 
 test("module-per-transport: one module per transport folder, none per operation, no module-definition in a feature", (t) => {
     const f = transportRepo(t, {
@@ -527,14 +527,13 @@ test("module-per-transport: one module per transport folder, none per operation,
 
 test("module-per-transport: an app imports only the transport modules its kind composes, never a feature application module", (t) => {
     const wrongKind = transportRepo(t, {
-        "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule, AScheduleModule"),
-        "apps/jobs/src/app.module.ts": TRANSPORT_APP("AScheduleModule, AGraphqlModule"),
+        "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule, AMessageModule"),
+        "apps/jobs/src/app.module.ts": TRANSPORT_APP("AMessageModule, AGraphqlModule"),
     })
     wrongKind.tester.run("module-per-transport", rules["module-per-transport"], {
-        valid: ok(wrongKind, TRANSPORT_CLEAN.slice(0, 2)),
+        valid: ok(wrongKind, [...TRANSPORT_CLEAN.slice(0, 2), "apps/core/src/app.module.ts"]),
         invalid: [...bad(wrongKind, [
-            ["apps/core/src/app.module.ts", [3, /composes graphql, http, websocket transports only/]],
-            ["apps/jobs/src/app.module.ts", [3, /composes message, schedule transports only/]],
+            ["apps/jobs/src/app.module.ts", [3, /composes message transports only/]],
         ])],
     })
     const application = transportRepo(t, { "apps/core/src/app.module.ts": TRANSPORT_APP("AGraphqlModule, AModule") })
@@ -599,62 +598,56 @@ test("module-registration: a handler registered by one module, a provider by its
 })
 
 // background-unowned --------------------------------------------------------------------------------------------------------
-const JOB = "export class SweepJob {\n  readonly name = 'sweep';\n  run(): Promise<void> { return Promise.resolve(); }\n}\n"
-const SCHEDULE_MODULE = "import { Module } from '@nestjs/common';\nimport { SweepJob } from './sweep.job';\n@Module({ providers: [SweepJob] })\nexport class AScheduleModule {}\n"
-const WORKER_APP = "import { Module } from '@nestjs/common';\nimport { AScheduleModule } from '../../../src/features/a';\n@Module({ imports: [AScheduleModule] })\nexport class AppModule {}\n"
+const PROCESSOR = "export class SweepProcessor {\n  async process(): Promise<void> { return Promise.resolve(); }\n}\n"
+const JOB_MODULE = "import { Module } from '@nestjs/common';\nimport { SweepProcessor } from './sweep.processor';\n@Module({ providers: [SweepProcessor] })\nexport class SweepModule {}\n"
+const WORKER_APP = "import { Module } from '@nestjs/common';\nimport { SweepModule } from '../../../src/features/jobs/sweep';\n@Module({ imports: [SweepModule] })\nexport class AppModule {}\n"
 const BILLING_SERVICE = {
     "src/modules/domain/billing/index.ts": "export { BillingService } from './billing.service';\n",
     "src/modules/domain/billing/billing.service.ts": "export class BillingService {\n  async sweepExpired(): Promise<number> { return 0; }\n}\n",
 }
 const JOB_FEATURE = {
-    "src/features/a/index.ts": "export { AScheduleModule } from './transport/schedule/a-schedule.module';\n",
-    "src/features/a/a.module.ts": "export class AModule {}\n",
-    "src/features/a/application/purge.handler.ts": "import { BillingService } from '../../../modules/domain/billing';\nexport class PurgeHandler {\n  constructor(private readonly billing: BillingService) {}\n  purge(): Promise<number> { return this.billing.sweepExpired(); }\n}\n",
-    "src/features/a/transport/schedule/sweep.job.ts": JOB,
-    "src/features/a/transport/schedule/a-schedule.module.ts": SCHEDULE_MODULE,
+    "src/features/jobs/sweep/index.ts": "export { SweepModule } from './sweep.module';\n",
+    "src/features/jobs/sweep/sweep.module.ts": JOB_MODULE,
+    "src/features/jobs/sweep/application/purge.handler.ts": "import { BillingService } from '../../../../modules/domain/billing';\nexport class PurgeHandler {\n  constructor(private readonly billing: BillingService) {}\n  purge(): Promise<number> { return this.billing.sweepExpired(); }\n}\n",
+    "src/features/jobs/sweep/sweep.processor.ts": PROCESSOR,
 }
 const BACKGROUND_APPS = [{ name: "core", kind: "api" }, { name: "jobs", kind: "worker" }]
-const backgroundRepo = (t, files, apps = BACKGROUND_APPS) => repo(t, { apps, files: { ...BILLING_SERVICE, ...JOB_FEATURE, "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": WORKER_APP, ...files } })
-const JOB_CLEAN = ["src/features/a/transport/schedule/sweep.job.ts", "src/features/a/transport/schedule/a-schedule.module.ts", "src/modules/domain/billing/billing.service.ts", "apps/jobs/src/app.module.ts"]
+const backgroundRepo = (t, files, apps = BACKGROUND_APPS) => repo(t, { apps, declaration: { patterns: ["fenced-job"] }, files: { ...BILLING_SERVICE, ...JOB_FEATURE, "apps/jobs/src/main.ts": "void 0;\n", "apps/jobs/src/app.module.ts": WORKER_APP, ...files } })
+const JOB_CLEAN = ["src/features/jobs/sweep/sweep.processor.ts", "src/features/jobs/sweep/sweep.module.ts", "src/modules/domain/billing/billing.service.ts", "apps/jobs/src/app.module.ts"]
 
-test("background-unowned: a job a worker app composes, and a background method it reaches, are owned; a stray scheduler and an unreached method are not", (t) => {
+test("background-unowned: a processor a worker app composes, and a background method it reaches, are owned; an unreached method is not", (t) => {
     const f = backgroundRepo(t, {
-        "src/modules/domain/orders/index.ts": "export { OrdersService } from './orders.service';\n",
-        "src/modules/domain/orders/orders.service.ts": "import { Cron, Interval } from '@nestjs/schedule';\nexport class OrdersService {\n  @Cron('* * * * *') tick(): void {}\n  @Interval(1000) poll(): void {}\n  start(): void { setInterval(() => this.tick(), 1000); }\n}\n",
-        "src/modules/platform/scheduling/index.ts": "export { SchedulingService } from './scheduling.service';\n",
-        "src/modules/platform/scheduling/scheduling.service.ts": "import { Interval } from '@nestjs/schedule';\nexport class SchedulingService {\n  @Interval(1000) tick(): void {}\n  start(): void { setInterval(() => this.tick(), 1000); }\n}\n",
         "src/modules/domain/payments/index.ts": "export { PaymentsService } from './payments.service';\n",
         "src/modules/domain/payments/payments.service.ts": "export class PaymentsService {\n  async deliverReceipts(): Promise<void> {}\n  async reconcile(): Promise<void> {}\n  async retryFailed(): Promise<void> {}\n  async delivery(): Promise<void> {}\n}\n",
     })
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, [...JOB_CLEAN, "src/modules/platform/scheduling/scheduling.service.ts"]),
+        valid: ok(f, JOB_CLEAN),
         invalid: [...bad(f, [
-            ["src/modules/domain/orders/orders.service.ts", [3, /@Cron schedules work inside a class outside platform\/scheduling/], [4, /@Interval schedules work/], [5, /setInterval starts a scheduler outside platform\/scheduling/]],
             ["src/modules/domain/payments/payments.service.ts", [2, /deliverReceipts is background work/], [3, /reconcile is background work/], [4, /retryFailed is background work/]],
         ])],
     })
 })
 
-test("background-unowned: a job and a consumer no worker app composes are refused", (t) => {
+test("background-unowned: a processor and a consumer no worker or api app composes are refused", (t) => {
     const f = backgroundRepo(t, {
         "apps/jobs/src/app.module.ts": "import { Module } from '@nestjs/common';\n@Module({})\nexport class AppModule {}\n",
         "src/features/b/index.ts": "export const b = 1;\n",
         "src/features/b/transport/message/paid.consumer.ts": "export class PaidConsumer {}\n",
     })
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/a/a.module.ts", "src/features/b/index.ts"]),
+        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/jobs/sweep/sweep.module.ts", "src/features/b/index.ts"]),
         invalid: [...bad(f, [
-            ["src/features/a/transport/schedule/sweep.job.ts", [1, /is a job that no worker app composes/]],
-            ["src/features/b/transport/message/paid.consumer.ts", [1, /is a consumer that no worker app composes/]],
+            ["src/features/jobs/sweep/sweep.processor.ts", [1, /is a processor that no service app composes/]],
+            ["src/features/b/transport/message/paid.consumer.ts", [1, /is a consumer that no service app composes/]],
             ["src/modules/domain/billing/billing.service.ts", [2, /sweepExpired is background work/]],
         ])],
     })
 })
 
-test("background-unowned: a job with no worker app declared is refused", (t) => {
+test("background-unowned: a processor with no worker app declared is refused", (t) => {
     const f = backgroundRepo(t, { "apps/jobs/src/app.module.ts": null, "apps/jobs/src/main.ts": null }, [{ name: "core", kind: "api" }])
     f.tester.run("background-unowned", rules["background-unowned"], {
-        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/a/a.module.ts"]),
-        invalid: [...bad(f, [["src/features/a/transport/schedule/sweep.job.ts", [1, /declares no worker app/]]])],
+        valid: ok(f, ["src/modules/domain/billing/index.ts", "src/features/jobs/sweep/sweep.module.ts"]),
+        invalid: [...bad(f, [["src/features/jobs/sweep/sweep.processor.ts", [1, /declares no worker app/]]])],
     })
 })

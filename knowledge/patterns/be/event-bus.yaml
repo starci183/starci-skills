@@ -213,10 +213,6 @@ files:
   - path: src/features/<kind>/<feature>/transport/message/<feature>-message.module.ts
     slot: be.transport.message
     role: Registers the consumers with the registry.
-  - path: contracts/<service>/events.json
-    slot: be.contract.events
-    role: The vendored event contract, emitted by hfs emit-contracts.
-    rules: [BE_EVENT_CLASS_CONTRACT]
   - path: src/tests/e2e/<area>/<event>.e2e-spec.ts
     slot: be.tests.e2e
     role: "The consumed event's e2e flow; titles event-bus/<scenario>: ... prove the pattern."

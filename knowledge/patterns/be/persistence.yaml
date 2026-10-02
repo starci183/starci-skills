@@ -146,9 +146,9 @@ rules:
     kind: mandatory
     hfsRules: [R46, R82]
     requirement: |-
-      When a database change must lead to an external message, the handler calls `outbox.enqueue(manager, message)` on an
-      `InjectOutbox()` parameter inside the same transaction. The `platform/outbox` job relays the row with bounded backoff and
-      an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
+      When a database change must lead to an external message, the domain service calls `eventBus.publish(event, tx)` (or a queue producer's `enqueueX(payload, tx)`)
+      inside the same transaction. The relay of `platform/event-bus` (or `platform/queue`) hands the committed row to Kafka (or
+      BullMQ) with bounded backoff and an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
       business result are different facts, and an outbox alone is not exactly-once processing. Outbox tables and migrations
       live in the platform capability that owns them.
     rationale: |-

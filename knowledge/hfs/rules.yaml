@@ -1353,3 +1353,51 @@ rules:
     enforcers:
       - {kind: eslint-be, id: kind-isolation}
       - {kind: machine, id: tiers, at: scripts/hfs/architecture/tiers.mjs}
+  - id: R137
+    code: "BE_JOB_WRITE_OUTSIDE_OWNER"
+    law: "The job entity (the class `platform/jobs` declares in its persistence) is written only by `platform/jobs`: an `update`, `increment`, `decrement`, `save`, `insert`, `upsert`, `delete`, `remove`, `softDelete` or a query-builder write on it in any other file (the test world, e2e and fixtures aside) is a finding. The entity is found by the type origin of the call's arguments or builder chain, never by a name; raw SQL is judged by BE_SQL_TABLE_OWNER (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_WRITE_OUTSIDE_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: job-write-owner}
+  - id: R138
+    code: "BE_JOB_FENCE_REQUIRED"
+    law: "Every `JobClaims` method that takes a job (a parameter type with `jobId`) declares a required, non-nullable `expectedFencingToken: number`; no call on `JobClaims` outside `platform/jobs` casts around it (`as`, a type assertion or `!` in an argument); and a `catch` around a `JobClaims` write rethrows, so a `JobFencedOut` stops the zombie with no further effect (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_FENCE_REQUIRED"]
+    enforcers:
+      - {kind: eslint-be, id: job-fence-required}
+  - id: R139
+    code: "BE_JOB_RUN_KEY"
+    law: "In a job step (slot be.jobs.steps) every call on a receiver typed by an `integrations` owner passes an argument of the `RunKey` type of `platform/jobs`, produced by `JobClaims.runKey(job, step)` (it includes the fencing token), never built with a cast; a read belongs in the application layer, not in a step (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_RUN_KEY"]
+    enforcers:
+      - {kind: eslint-be, id: job-run-key}
+  - id: R140
+    code: "BE_JOB_SHAPE"
+    law: "A `<job>.processor.ts` exists only in `features/jobs/<job>/`, is named after its job and declares a class extending the `FencedProcessor` of `platform/jobs`; a `steps/<step>.step.ts` exists only in `features/jobs/<job>/steps/` and declares a class implementing `JobStep`; a class implementing `JobStep` exists nowhere else (pattern fenced-job)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JOB_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: job-shape}
+  - id: R141
+    code: "BE_PROJECTION_WRITE_OWNER"
+    law: "A projection's entity (a class of `<name>.projection-entity.ts` in `modules/projections/<name>/`) is written only by the `<name>.projection.ts` of the same folder (the test world, e2e and fixtures aside): a write on it from a domain service, a handler, another projection or another file of the folder is a finding. The entity is found by the type origin of the write's arguments or builder chain (pattern projection)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_PROJECTION_WRITE_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: projection-write-owner}
+  - id: R142
+    code: "BE_PROJECTION_SHAPE"
+    law: "Every public method of a `<name>.projection.ts` class is `recompute*` (idempotent write from the source facts) or `get*` (read); the `index.ts` of a projection exports nothing from a `.projection-entity` file; and a feature whose kind is api calls no `recompute*` method of a projection (it reads through `get*`). The kind is read from the owner slot's `trigger` (pattern projection)."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_PROJECTION_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: projection-shape}

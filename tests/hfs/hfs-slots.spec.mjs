@@ -21,7 +21,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
+const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
 const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe }, ...rest });
 const APP = app();
@@ -210,7 +210,7 @@ test('BE side: which slot owns a path', () => {
   assert.equal(owner('src/features/orders/application/support/price-lines.ts'), 'owned:be.feature.application.support');
   assert.equal(owner('src/features/orders/application/support/price-lines.spec.ts'), 'owned:be.feature.application.support');
   assert.equal(owner('src/features/orders/transport/http/place.controller.ts'), 'owned:be.transport.http');
-  assert.equal(owner('src/features/orders/transport/schedule/sweep.job.ts'), 'owned:be.transport.schedule');
+  assert.equal(owner('src/features/jobs/send/send.processor.ts'), 'not-enabled:be.feature.jobs');                         // opt-in kind: the pattern fenced-job is not declared
   assert.equal(owner('src/features/orders/transport/cli/import.command.ts'), 'not-enabled:be.feature.transport.cli');     // opt-in, not declared
   assert.equal(owner('src/features/orders/transport/message/paid.consumer.ts'), 'not-enabled:be.transport.message');     // opt-in, not declared
   assert.equal(owner('src/modules/domain/orders/orders.service.ts'), 'owned:be.domain');
@@ -416,7 +416,7 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
   assert.ok(slot, 'the support slot exists');
-  assert.equal(slot.path, 'src/features/<feature>/application/support/');
+  assert.equal(slot.path, 'src/features/{,jobs/,reactors/}<feature>/application/support/');
   assert.equal(slot.presence, 'optional');
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.tests, 'none');
