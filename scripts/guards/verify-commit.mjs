@@ -8,7 +8,9 @@
 // Fail-open on the check's OWN faults: a bug here must never block a commit, so an internal error lets it land.
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { diffTree } from '../api/git/diff-tree.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { refusalLines, logRefusal } from './refusals.mjs';
@@ -16,7 +18,7 @@ import { refusalLines, logRefusal } from './refusals.mjs';
 const say = (line) => process.stderr.write(`${line}\n`);
 
 function gitTop(git, cwd) {
-  const r = gitSpawn(git, ['rev-parse', '--show-toplevel'], { cwd });
+  const r = revParseQuery(['--show-toplevel'], { cwd, git });
   return r.status === 0 && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null;
 }
 
@@ -25,14 +27,14 @@ function gitTop(git, cwd) {
 // is a commit of its own; a pull or fast-forward of published history brings none. (diff-tree of a merge without -c
 // lists nothing, so a merged foreign branch landed unseen.)
 export function foreignPathsOf({ git = 'git', cwd, oldSha, newSha, owned }) {
-  const run = (args) => gitSpawn(git, args, { cwd });
+  const run = (call, args) => call(args, { cwd, git });
   const top = gitTop(git, cwd);
-  const brought = run(['rev-list', newSha, '--not', oldSha, '--remotes']);
+  const brought = run(revList, [newSha, '--not', oldSha, '--remotes']);
   if (brought.status !== 0 || !top) return { checked: false, foreign: [] };
   const roots = owned.map(pathKey);
   const foreign = new Set();
   for (const sha of brought.stdout.split(/\r?\n/).filter(Boolean)) {
-    const listed = run(['diff-tree', '-r', '-c', '--root', '--name-only', '--no-commit-id', '-z', sha]);
+    const listed = run(diffTree, ['-r', '-c', '--root', '--name-only', '--no-commit-id', '-z', sha]);
     if (listed.status !== 0) return { checked: false, foreign: [] };
     for (const rel of listed.stdout.split('\0').filter(Boolean)) {
       const n = pathKey(path.join(top, rel));

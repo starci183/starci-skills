@@ -58,7 +58,7 @@ import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './w
 import { readJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
 import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
@@ -307,7 +307,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
       records.push(...await captureHtml({ html: built.html, out, viewports: vps, theme: 'light', fullPage, name, source: built.source, playwright, rationale }));
       if (harnessDir && !fs.existsSync(path.join(harnessDir, 'index.html'))) { fs.mkdirSync(harnessDir, { recursive: true }); fs.cpSync(workDir, harnessDir, { recursive: true }); }
     } finally {
-      safeRemoveTree(workDir, { hold: artifactHoldReason });
+      safeRemove(workDir, { hold: artifactHoldReason });
     }
   }
   return records;
@@ -730,7 +730,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir, { hold: artifactHoldReason });
+      safeRemove(dir, { hold: artifactHoldReason });
     }
   }
   for (const { html, parts: group } of byHtml.values()) {
@@ -752,7 +752,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(html)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir, { hold: artifactHoldReason });
+      safeRemove(dir, { hold: artifactHoldReason });
     }
   }
   return { findings, parts };

@@ -37,7 +37,7 @@
 //             file content with a clean tree, idle for gcLaneGraceMs; a detached land scratch while no land runs; an
 //             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
 //             the worktree GC (scripts/machine/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
-//             The node_modules junction is unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
+//             The node_modules junction is unlinked first, then the tree goes through safeRemove (links unlinked, never followed; never
 //             `git worktree remove --force`), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
@@ -64,13 +64,12 @@ import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { workerListAll, activeWorkersAllRuns } from '../api/orca/worker-list.mjs';
+import { workerListAll, activeWorkersAllRuns } from '../machine/worker-list-all.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../machine/close-verify.mjs';
-import { gitResult } from '../api/git/lib.mjs';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { parseWorktreeList, laneActivity, treeBytes } from '../housekeeping/hk-lanes.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
+import { parseWorktreeList, laneActivity, treeBytes, laneGit } from '../housekeeping/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { pathKey } from '../lib/path-key.mjs';
@@ -428,9 +427,6 @@ export function runtimeWorkers({ sup, ledgers, list = (run) => workerListAll({ r
 
 /* ------------------------------------------------------------ processes */
 
-/** taskkill /T /F of one process tree (scripts/api/process/kill-tree.mjs); true when it answered 0. */
-export const killTree = (pid) => killProcessTree(pid).ok;
-
 /**
  * The leaked processes of a process table. Pure. [{pid, name, kind, reason, ws}]:
  *   orphan-agent  an agent CLI (isAgentProcess) whose parent is gone, older than minAgeMs - never the Claude desktop
@@ -509,7 +505,7 @@ export const writeLaneCursor = (value, env = process.env) => { try { withSupervi
  */
 export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, workers = [],
   cursor = null, clock = Date.now }) {
-  const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
+  const run = git ?? laneGit;
   const base = lanesRoot({ env });
   const items = [], errors = [];
   let freedBytes = 0;
@@ -530,7 +526,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; return; }
     // safeRemoveWorktree: every link removed as a link (found without following one), zero links asserted, then git
     // worktree remove, and the main checkout asserted untouched (a violation stops the collector).
-    const r = safeRemoveWorktree(w.path, { repo: root, git: run });
+    const r = safeRemoveWorktree(w.path, { repo: root, git });
     if (r.fatal) { fatal = { path: w.path, damage: r.damage }; errors.push(`${w.path}: main checkout damaged: ${(r.damage ?? []).join('; ')}`); item('refuse', w.path, 'removal changed the main checkout: the GC stops', { ok: false }); return; }
     if (!r.ok) { errors.push(`${w.path}: ${(r.errors ?? []).slice(0, 2).map((e) => e.message).join('; ')}`); item('refuse', w.path, 'removal failed', { ok: false }); return; }
     markRemoved(w.path, { env });
@@ -732,7 +728,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
         const plan = orphanProcesses({ table, now, minAgeMs: settings.minAgeMs, listedCount: (listedNow?.ok ? listedNow.terminals.filter((t) => t.connected !== false).length : lastListedCount) });
         for (const p of plan) {
           let ok = null;
-          if (apply) { ok = (deps.kill ?? killTree)(p.pid); if (ok) report.counts.processes += 1; else report.errors.push(`kill ${p.pid} (${p.kind}) failed`); }
+          if (apply) { ok = deps.kill ? deps.kill(p.pid) : killTree(p.pid).ok; if (ok) report.counts.processes += 1; else report.errors.push(`kill ${p.pid} (${p.kind}) failed`); }
           report.items.push({ class: 'process', action: 'kill-tree', target: `pid ${p.pid} ${p.name}`, verdict: 'collect', reason: p.reason, ok, ramBytes: p.ws ?? null });
         }
       }

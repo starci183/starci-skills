@@ -27,7 +27,7 @@ import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../../api/git/lib.mjs';
+import { catFile } from '../../api/git/cat-file.mjs'; import { diff as gitDiff } from '../../api/git/diff.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { lsTree } from '../../api/git/ls-tree.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
@@ -99,25 +99,25 @@ export function declaredProjectsOf(checks, root) {
 
 /* ------------------------------------------------------------ git */
 
-export function git(root, args, { input = null, encoding = 'utf8', timeoutMs = 120_000 } = {}) {
-  const r = runGit(args, { dir: root, encoding, ...(input == null ? {} : { input: Buffer.from(input) }),
+export function git(call, root, args, { input = null, encoding = 'utf8', timeoutMs = 120_000 } = {}) {
+  const r = call(args, { dir: root, encoding, ...(input == null ? {} : { input: Buffer.from(input) }),
     timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: r.stdout, stderr: String(r.stderr ?? '') };
 }
 
 /** The owned files at the base commit: {rel (to root) -> content}. rels are root-relative posix paths. */
 export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
-  const top = run(root, ['rev-parse', '--show-toplevel']);
+  const top = run(revParseQuery, root, ['--show-toplevel']);
   if (!top.ok) return { ok: false, reason: 'not a git checkout' };
   const gitRoot = String(top.stdout).trim();
   const prefix = norm(path.relative(gitRoot, root));
   const full = (rel) => (prefix ? `${prefix}/${rel}` : rel);
-  const listed = run(gitRoot, ['ls-tree', '-r', '-z', '--full-name', '--name-only', base, '--', ...ownedRels.map(full)]);
+  const listed = run(lsTree, gitRoot, ['-r', '-z', '--full-name', '--name-only', base, '--', ...ownedRels.map(full)]);
   if (!listed.ok) return { ok: false, reason: `git ls-tree ${base}: ${listed.stderr.trim().slice(0, 200)}` };
   const names = String(listed.stdout).split('\0').filter(Boolean);
   const blobs = new Map();
   if (!names.length) return { ok: true, blobs };
-  const batch = run(gitRoot, ['cat-file', '--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: null });
+  const batch = run(catFile, gitRoot, ['--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: null });
   if (!batch.ok) return { ok: false, reason: 'git cat-file --batch failed' };
   const buf = batch.stdout;
   let at = 0;
@@ -297,7 +297,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   const where = await resolveRoot(item, { repo });
   if (!where.ok) return hand('parity-unresolved', where.why);
   const { root, ownedRels } = where;
-  if (!git(root, ['cat-file', '-e', `${base}^{commit}`]).ok) return hand('parity-base-unknown', `admission base ${base} is not a commit in ${root}`);
+  if (!git(catFile, root, ['-e', `${base}^{commit}`]).ok) return hand('parity-base-unknown', `admission base ${base} is not a commit in ${root}`);
 
   // (c) every declared check is an action, a baseline, covered by an owned-scope measurement, or re-runs green.
   const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
@@ -380,7 +380,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // git diff --check over the slice's diff (only when the worker declared one).
   let diffed = null;
   if (covered.diff.length) {
-    diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(root, ['diff', '--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
+    diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(gitDiff, root, ['--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
     await record({ name: PARITY_CHECKS.diff, command: `git diff --check ${base} -- <owned paths>`, cwd: root,
       phase: 'parity', runner: 'parity', exitCode: diffed.ok ? 0 : 1, output: diffed,
       summary: { ok: diffed.ok, tail: diffed.tail ?? null } });

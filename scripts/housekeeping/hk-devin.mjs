@@ -32,8 +32,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {listProcessNames} from '../api/process/process-names.mjs';
-import {isLinkLike} from '../api/fs/safe-remove.mjs';
+import {processNames} from '../api/process/process-names.mjs';
+import {isLinkLike} from '../api/fs/is-link-like.mjs';
 import {pathKey} from '../lib/path-key.mjs';
 import {archiveRoot as archiveRootOf} from '../machine/home.mjs';
 import {allocationSettings} from '../../engine/config.mjs';
@@ -126,7 +126,7 @@ export async function sweepDevinData({apply=false,now=Date.now(),env=process.env
   const skipped=[],errors=[];
   if(!fs.existsSync(root))return{ok:true,freedBytes:0,movedBytes:0,skipped,errors,report};
   let names=null;
-  try{names=await(processes??listProcessNames)();}catch(error){
+  try{names=await(processes??processNames)();}catch(error){
     errors.push({path:'processes',code:'PROBE',message:String(error?.message??error)});
   }
   // A probe that cannot answer fails closed: assume devin is up and mutate nothing.

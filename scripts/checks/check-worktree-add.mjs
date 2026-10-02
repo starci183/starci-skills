@@ -23,7 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -71,7 +71,7 @@ const scanned = (rel) => EXTENSIONS.test(rel) && !rel.startsWith('tests/') && !r
 
 /** {ok, hits: [{file, line, text}], files} over the tracked tree at `root`. */
 export function scanWorktreeAdd(root, { files = null } = {}) {
-  const listed = files ?? (() => { const r = runGit(['ls-files'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
+  const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const hits = [];
   let count = 0;
   for (const rel of listed.map((f) => f.replace(/\\/g, '/'))) {

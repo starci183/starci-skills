@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../../api/git/lib.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs';
+import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
+import { gitOutputOf } from '../../lib/git.mjs';
 
 /**
  * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
@@ -26,10 +28,10 @@ const ALSO_JUDGED_TIER_NONE = new Set(['fe.app.next']);
 
 function gitFiles(root) {
   try {
-    const run = args => gitOutput(args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
-    run(['rev-parse', '--is-inside-work-tree']);
-    const deleted = new Set(run(['ls-files', '--deleted', '-z', '--', '.']).split('\0').filter(Boolean));
-    return run(['ls-files', '--cached', '-z', '--', '.']).split('\0').filter(file => file && !deleted.has(file));
+    const run = (call, args) => gitOutputOf(call(args, { cwd: root, maxBuffer: 256 * 1024 * 1024 }));
+    run(revParseQuery, ['--is-inside-work-tree']);
+    const deleted = new Set(run(lsFiles, ['--deleted', '-z', '--', '.']).split('\0').filter(Boolean));
+    return run(lsFiles, ['--cached', '-z', '--', '.']).split('\0').filter(file => file && !deleted.has(file));
   } catch {
     return null;
   }

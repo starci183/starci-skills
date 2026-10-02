@@ -17,7 +17,7 @@
 // The push secret scan (scripts/supervisor/push-mains.mjs) passes a `.enc` only when isSopsEnvelope holds (scripts/lib/sops-envelope.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
-import { sopsDecrypt } from '../api/sops/decrypt.mjs';
+import { decrypt } from '../api/sops/decrypt.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { setCommand, sopsFormatFor, testSecretPaths } from '../lib/sops-envelope.mjs';
 
@@ -27,7 +27,7 @@ export function testSecret(name, { repo, stack = 'dev', env = process.env, sops 
   if (fs.existsSync(plain)) return fs.readFileSync(plain, 'utf8').replace(/\r?\n$/, '');
   if (!fs.existsSync(enc)) throw new Error(`test secret ${name} is not in .starcistacks/${rel}.enc; store it with \`${setCommand(name, stack)}\` in ${repo}`);
   const format = sopsFormatFor(plain);
-  const r = sopsDecrypt(sops, ['--decrypt', '--input-type', format, '--output-type', format, enc], { cwd: path.resolve(String(repo)), env, maxBuffer: 1024 * 1024 });
+  const r = decrypt(sops, ['--decrypt', '--input-type', format, '--output-type', format, enc], { cwd: path.resolve(String(repo)), env, maxBuffer: 1024 * 1024 });
   if (r.error?.code === 'SOPS_MISSING') throw r.error;
   if (r.status !== 0) throw new Error(`test secret ${name}: sops could not decrypt .starcistacks/${rel}.enc (${String(r.stderr ?? r.error?.message ?? '').trim().split(/\r?\n/).pop()})`);
   return String(r.stdout).replace(/\r?\n$/, '');

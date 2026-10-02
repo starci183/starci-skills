@@ -3,9 +3,12 @@
 // they carry the same README title, the same stack-declaration project name and the same sibling repositories.
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { remote as gitRemote } from '../api/git/remote.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 
-const git = (root, args) => gitOutput(args, { cwd: root }).trim();
+/** One git call (a scripts/api/git call file) in `root`: its trimmed stdout; throws unless git exits 0. */
+const git = (call, root, args) => gitOutputOf(call(args, { cwd: root })).trim();
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 
 /** { repositoryRoot, inWorkTree, home } for `root`: home is the main checkout folder when root is a repository top level. */
@@ -13,9 +16,9 @@ function identityOf(root) {
   let inWorkTree = false, repositoryRoot = false, home = null;
   try {
     // Identity comes from Git only when root IS a repository (or worktree) top level, never a folder inside one.
-    repositoryRoot = real(git(root, ['rev-parse', '--show-toplevel'])) === real(root);
+    repositoryRoot = real(git(revParseQuery, root, ['--show-toplevel'])) === real(root);
     inWorkTree = true;
-    const common = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']));
+    const common = path.resolve(root, git(revParseQuery, root, ['--git-common-dir']));
     if (repositoryRoot && path.basename(common) === '.git') home = path.dirname(common);
   } catch { /* Not a Git work tree; the caller falls back to the folder and package name. */ }
   return { inWorkTree, repositoryRoot, home };
@@ -31,7 +34,7 @@ export function repositoryName(root) {
   if (home) return path.basename(home);
   if (repositoryRoot) {
     try {
-      const remote = git(root, ['remote', 'get-url', 'origin']).replace(/[\/]+$/u, '').replace(/\.git$/iu, '');
+      const remote = git(gitRemote, root, ['get-url', 'origin']).replace(/[\/]+$/u, '').replace(/\.git$/iu, '');
       const name = remote.split(/[\/:]/u).pop();
       if (name) return name;
     } catch { /* No origin remote. */ }

@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CHECK_CODES } from './check.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -124,7 +124,7 @@ if (isMain(import.meta.url)) {
     for (const bundle of Object.keys(BUNDLES)) {
       const bundleRoot = path.join(runtimeRoot, bundle);
       // A generated copy is never a held artifact: nothing but this script writes it.
-      const removed = safeRemoveTree(bundleRoot, { hold: () => null });
+      const removed = safeRemove(bundleRoot, { hold: () => null });
       if (!removed.ok) throw new Error(`cannot clear ${bundle}: ${removed.errors.map((e) => e.message).join("; ")}`);
       for (const [file, text] of expectedBundle(bundle)) {
         const target = path.join(bundleRoot, file);

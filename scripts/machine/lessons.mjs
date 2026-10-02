@@ -43,7 +43,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { diffTree } from '../api/git/diff-tree.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
@@ -240,17 +240,13 @@ export function guardLand({ files, wronglyBlocked = null, specText = (f) => '', 
   return { ok: refusals.length === 0, tier: t.tier, refusals };
 }
 
-export const git = (args, { cwd = SKILL_ROOT } = {}) => {
-  const r = gitSpawn('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 });
-  return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? '').trim() };
-};
 /** The files the commits change, with their status letter. */
 export function commitFiles(commits, { cwd = SKILL_ROOT } = {}) {
   const map = new Map();
   for (const sha of commits) {
-    const r = git(['diff-tree', '--no-commit-id', '--name-status', '-r', '-M', sha], { cwd });
-    if (!r.ok) throw Object.assign(new Error(`git diff-tree ${sha}: ${r.err}`), { code: 'commit-unreadable' });
-    for (const line of r.out.split(/\r?\n/).filter(Boolean)) {
+    const r = diffTree(['--no-commit-id', '--name-status', '-r', '-M', sha], { cwd, maxBuffer: 64 * 1024 * 1024 });
+    if (r.status !== 0) throw Object.assign(new Error(`git diff-tree ${sha}: ${String(r.stderr ?? r.error?.message ?? '').trim()}`), { code: 'commit-unreadable' });
+    for (const line of String(r.stdout ?? '').trim().split(/\r?\n/).filter(Boolean)) {
       const [st, ...rest] = line.split('\t');
       map.set(norm(rest.at(-1)), { path: norm(rest.at(-1)), status: st[0] });
     }

@@ -166,6 +166,18 @@ test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called,
   assert.deepEqual(retiredFindings(ctx), []);
 });
 
+test('RT_RETIRED_PRESENT: a migration comment that names a retired symbol is a stale cite; the replacement and SQL code are clean', () => {
+  const sql = {
+    'engine/db/migrations/machine/0001-init.sql': 'CREATE TABLE t(x);\n-- removed by safeRemoveTree, never followed\n',
+    'engine/db/migrations/runtime/0001-init.sql': "-- removed by safeRemove\nCREATE TABLE safeRemoveTree_log(x); INSERT INTO t VALUES('safeRemoveTree');\n",
+  };
+  const ctx = (files) => ctxOf({}, { files: Object.keys(files), read: (p) => files[p] ?? null, retiredPaths: { retiredSymbols: [{ symbol: 'safeRemoveTree', replacedBy: 'safeRemove' }] } });
+  const found = retiredFindings(ctx(sql));
+  assert.deepEqual(found.map((f) => [f.code, f.path, f.line]), [['RT_RETIRED_PRESENT', 'engine/db/migrations/machine/0001-init.sql', 2]]);
+  assert.match(found[0].message, /names safeRemoveTree in a comment/);
+  assert.deepEqual(retiredFindings(ctx({ 'engine/db/migrations/runtime/0001-init.sql': sql['engine/db/migrations/runtime/0001-init.sql'] })), []);
+});
+
 const PINNED_FILES = ['bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
 
 test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesced: true, is refused', () => {

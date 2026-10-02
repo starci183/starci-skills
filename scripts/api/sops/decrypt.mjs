@@ -9,7 +9,7 @@ import { resolveSops } from './lib.mjs';
  * Run `<bin> <args>` (bin null: the sops resolveSops finds) with SOPS_AGE_KEY_FILE defaulted to ~/.starci/master.identity.
  * {status, stdout, stderr, error}; a missing sops is {status: null, error: SOPS_MISSING}.
  */
-export function sopsDecrypt(bin, args, { env = process.env, cwd = undefined, maxBuffer = 16 * 1024 * 1024, timeout = undefined } = {}) {
+export function decrypt(bin, args, { env = process.env, cwd = undefined, maxBuffer = 16 * 1024 * 1024, timeout = undefined } = {}) {
   const exe = bin ?? resolveSops(env);
   if (!exe) return { status: null, stdout: '', stderr: '', error: Object.assign(new Error('sops is not installed (Windows: winget install Mozilla.SOPS)'), { code: 'SOPS_MISSING' }) };
   const r = spawnSync(exe, args, {

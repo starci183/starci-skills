@@ -10,7 +10,7 @@
 // is removed.
 import { pathKey, sameOrUnder } from '../lib/path-key.mjs';
 import { activeWorkerOn, terminalHandleOf } from '../lib/worker-accounting.mjs';
-import { activeWorkersAllRuns } from '../api/orca/worker-list.mjs';
+import { activeWorkersAllRuns } from './worker-list-all.mjs';
 import { readSupervisor, FIX_KIND } from './home.mjs';
 
 export const LANE_IDLE_MS = 3_600_000;

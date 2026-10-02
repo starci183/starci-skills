@@ -3,7 +3,8 @@
 //   node scripts/api/orca/terminal-rename.mjs --terminal <handle> --title <text>
 // Used after managed worker-start because creation display-name flags are not
 // applicable to a fresh agent terminal inside an existing worktree.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function terminalRename({ terminal, title }) {
   const r = orcaCall('terminal-rename', { terminal, title });

@@ -4,7 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256} from '../../../engine/digest.mjs';
-import { gitOutput } from '../../api/git/lib.mjs';
+import { log as gitLog } from '../../api/git/log.mjs';
+import { gitOutputOf } from '../../lib/git.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {APP_SIDES, appRootOf, readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../record-ownership.mjs';
 import { isMain } from '../../lib/is-main.mjs';
@@ -39,7 +40,7 @@ export function runTimeOf(run) {
 /** The files under `dirs` that a commit after `since` touched (repository-relative, unique); [] outside a Git work tree. */
 function committedSince(cwd, since, dirs) {
   let out = '';
-  try { out = gitOutput(['log', `--since=${since.toISOString()}`, '--format=', '--name-only', '--', ...dirs], { cwd }); } catch { return []; }
+  try { out = gitOutputOf(gitLog([`--since=${since.toISOString()}`, '--format=', '--name-only', '--', ...dirs], { cwd })); } catch { return []; }
   return [...new Set(out.split(/\r?\n/).filter(Boolean))];
 }
 

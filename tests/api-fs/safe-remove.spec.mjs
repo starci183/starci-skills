@@ -5,20 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike, safeRemoveTree, forbiddenRoot } from '../../scripts/api/fs/safe-remove.mjs';
+import { isLinkLike } from '../../scripts/api/fs/is-link-like.mjs';
+import { safeRemove } from '../../scripts/api/fs/safe-remove.mjs';
+import { forbiddenRoot } from '../../scripts/api/fs/forbidden-root.mjs';
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 import { safeRemoveWorktree } from '../../scripts/machine/worktree-git.mjs';
 
 // Live defect: a recursive delete of a scratch tree followed node_modules
 // junctions into the live repository and deleted 674 tracked files and its node_modules. Git for Windows'
 // `git worktree remove --force` follows a junction inside the worktree. The runtime deletes trees only through
-// safeRemoveTree, which never descends into a link. Every case here builds a REAL junction (a dir symlink off
+// safeRemove, which never descends into a link. Every case here builds a REAL junction (a dir symlink off
 // Windows) to a sentinel directory and proves the sentinel is never touched.
 const LINK = process.platform === 'win32' ? 'junction' : 'dir';
 
 function sandbox(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-safe-remove-')));
-  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
+  t.after(() => { safeRemove(root, { hold: artifactHoldReason }); });
   const sentinel = path.join(root, 'sentinel');
   fs.mkdirSync(path.join(sentinel, 'src', 'deep'), { recursive: true });
   fs.writeFileSync(path.join(sentinel, 'package.json'), '{"name":"@scope/ui"}\n');
@@ -52,10 +54,10 @@ test('isLinkLike: a junction (or dir symlink) is a link, a plain directory and a
   assert.equal(isLinkLike(path.join(root, 'missing')), false);
 });
 
-test('safeRemoveTree removes a tree full of links to a sentinel and never touches the sentinel', (t) => {
+test('safeRemove removes a tree full of links to a sentinel and never touches the sentinel', (t) => {
   const { root, sentinel, intact } = sandbox(t);
   const scratch = linkedScratch(root, sentinel);
-  const out = safeRemoveTree(scratch, { hold: artifactHoldReason });
+  const out = safeRemove(scratch, { hold: artifactHoldReason });
   assert.equal(out.ok, true, JSON.stringify(out.errors));
   assert.equal(fs.existsSync(scratch), false);
   assert.equal(out.removed.links, 2, 'both links are unlinked as links');
@@ -63,29 +65,29 @@ test('safeRemoveTree removes a tree full of links to a sentinel and never touche
   assert.equal(fs.readFileSync(path.join(sentinel, 'src', 'index.ts'), 'utf8'), 'export const ui = 1\n', 'a hard link loses only its name');
 });
 
-test('safeRemoveTree on a root that is itself a link unlinks only the link', (t) => {
+test('safeRemove on a root that is itself a link unlinks only the link', (t) => {
   const { root, sentinel, intact } = sandbox(t);
   const link = path.join(root, 'root-link');
   fs.symlinkSync(sentinel, link, LINK);
-  const out = safeRemoveTree(link, { hold: artifactHoldReason });
+  const out = safeRemove(link, { hold: artifactHoldReason });
   assert.equal(out.ok, true);
   assert.deepEqual(out.removed, { files: 0, dirs: 0, links: 1 });
   assert.equal(intact(), true);
 });
 
-test('safeRemoveTree refuses a filesystem root, the home and the temp directory; a missing path is ok', () => {
+test('safeRemove refuses a filesystem root, the home and the temp directory; a missing path is ok', () => {
   assert.equal(forbiddenRoot(path.parse(process.cwd()).root, { hold: artifactHoldReason }), 'a filesystem root');
-  assert.equal(safeRemoveTree(os.tmpdir(), { hold: artifactHoldReason }).errors[0].code, 'REFUSED');
-  assert.equal(safeRemoveTree(os.homedir(), { hold: artifactHoldReason }).errors[0].code, 'REFUSED');
-  assert.equal(safeRemoveTree('', { hold: artifactHoldReason }).ok, false);
-  assert.equal(safeRemoveTree(path.join(os.tmpdir(), 'starci-safe-remove-never-made-0'), { hold: artifactHoldReason }).ok, true);
-  assert.equal(safeRemoveTree(path.join(os.tmpdir(), 'starci-safe-remove-never-made-0')).errors[0].code, 'REFUSED', 'no artifact-hold check: refused (fail closed)');
+  assert.equal(safeRemove(os.tmpdir(), { hold: artifactHoldReason }).errors[0].code, 'REFUSED');
+  assert.equal(safeRemove(os.homedir(), { hold: artifactHoldReason }).errors[0].code, 'REFUSED');
+  assert.equal(safeRemove('', { hold: artifactHoldReason }).ok, false);
+  assert.equal(safeRemove(path.join(os.tmpdir(), 'starci-safe-remove-never-made-0'), { hold: artifactHoldReason }).ok, true);
+  assert.equal(safeRemove(path.join(os.tmpdir(), 'starci-safe-remove-never-made-0')).errors[0].code, 'REFUSED', 'no artifact-hold check: refused (fail closed)');
 });
 
 // The helper that exists to protect live checkouts refuses to remove one whole: the runtime, the repository
 // hosting it, the repositories root, and any primary checkout (its .git is a directory). A linked worktree's
 // .git is a file, so a scratch worktree still goes.
-test('safeRemoveTree refuses the runtime, the repositories root and a primary git checkout', (t) => {
+test('safeRemove refuses the runtime, the repositories root and a primary git checkout', (t) => {
   const runtime = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   assert.equal(forbiddenRoot(runtime, { hold: artifactHoldReason }), 'the runtime');
   assert.equal(forbiddenRoot(path.dirname(runtime), { hold: artifactHoldReason }), 'the repository hosting the runtime');
@@ -93,7 +95,7 @@ test('safeRemoveTree refuses the runtime, the repositories root and a primary gi
   assert.ok(['the repositories root', 'a filesystem root'].includes(forbiddenRoot(path.dirname(path.dirname(runtime)), { hold: artifactHoldReason })));
   const { root } = sandbox(t);
   const { repo, worktree } = repoWithWorktree(root);
-  const refused = safeRemoveTree(repo, { hold: artifactHoldReason });
+  const refused = safeRemove(repo, { hold: artifactHoldReason });
   assert.equal(refused.errors[0]?.code, 'REFUSED');
   assert.match(refused.errors[0].message, /a git checkout/);
   assert.equal(fs.existsSync(path.join(repo, '.git')), true, 'nothing was removed');

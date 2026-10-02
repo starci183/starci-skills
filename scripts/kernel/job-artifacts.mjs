@@ -20,15 +20,21 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
 import { hostPathHits } from '../lib/host-path.mjs';
-import { gitResult, runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { formatPatch as gitFormatPatch } from '../api/git/format-patch.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson, patchJsonFileOf, patchAssetsDirOf } from './patch-json.mjs';
 import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFACT_KINDS, ARTIFACT_SUBKINDS } from '../machine/evidence-store.mjs';
 import { jobScratchDirOf } from './op-prompt.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+
+/** One git call (a scripts/api/git call file) as {ok, stdout, error}. */
+const gitResult = (call, args, options) => gitResultOf(call(args, options));
 
 export { kindOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
@@ -122,7 +128,7 @@ export function jobShasOf({ envelope = null, result = null, payload = null }) {
   return { head: claimed?.trim() ?? evidenced ?? null, landed: landed && SHA.test(landed) ? landed : null, cherryPicked, base };
 }
 
-const revParse = (root, ref, timeout) => { const r = gitResult(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { dir: root, timeout }); return r.ok ? r.stdout.trim() : null; };
+const revParse = (root, ref, timeout) => { const r = gitResult(revParseQuery, ['--verify', '--quiet', `${ref}^{commit}`], { dir: root, timeout }); return r.ok ? r.stdout.trim() : null; };
 
 /**
  * Write the job's commits as <job dir>/<job>.patch (git format-patch over its owned paths), once: an existing
@@ -142,7 +148,7 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
     .filter((r) => typeof r === 'string' && r && statOf(r)?.isDirectory()).map((r) => path.resolve(r));
   const holder = [...new Set(candidates)].find((root) => revParse(root, target, timeout));
   if (!holder) return { missing: [target], head: shas.head, landed: shas.landed, state };
-  const top = gitResult(['rev-parse', '--show-toplevel'], { dir: holder, timeout });
+  const top = gitResult(revParseQuery, ['--show-toplevel'], { dir: holder, timeout });
   const root = top.ok ? path.resolve(top.stdout.trim()) : holder;
   const full = revParse(root, target, timeout);
   let specs = landedRepos.find((r) => r?.repo && keyOf(r.repo) === keyOf(root))?.paths ?? null;
@@ -158,13 +164,13 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
     const since = `@${Math.floor(sinceMs / 1000)}`;
     const commits = new Set();
     for (const batch of specBatches(specs)) {
-      const log = gitResult(['rev-list', `--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
+      const log = gitResult(revList, [`--since=${since}`, full, '--', ...batch.map((s) => `:(literal)${s}`)], { dir: root, timeout });
       if (!log.ok) { commits.clear(); break; }
       for (const sha of log.stdout.split(/\s+/).filter(Boolean)) commits.add(sha);
     }
     // A batch's last commit need not be the oldest across the whole owned set.
     if (commits.size) {
-      const history = gitResult(['rev-list', `--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
+      const history = gitResult(revList, [`--since=${since}`, full], { dir: root, timeout, maxBuffer: 64 * 1024 * 1024 });
       const oldest = history.ok ? history.stdout.split(/\s+/).filter((sha) => commits.has(sha)).at(-1) : null;
       if (oldest) base = revParse(root, `${oldest}^`, timeout) ?? 'root';
     }
@@ -177,7 +183,7 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
   const formatPatch = (revs, paths) => {
     const parts = [];
     for (const batch of paths.length ? specBatches(paths) : [[]]) {
-      const run = runGit(['format-patch', '--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
+      const run = gitFormatPatch(['--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
         { dir: root, timeout, encoding: null, maxBuffer: 1024 * 1024 * 1024 });
       if (run.error || run.status !== 0) return run;
       if (run.stdout?.length) parts.push(run.stdout);
@@ -305,7 +311,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       walk(recordings, found, (file) => kindOf(file) !== 'file');
       for (const abs of found) stage(abs, { name: `recordings/${slashed(path.relative(recordings, abs))}`, role: roleOf(abs) });
     }
-  } finally { safeRemoveTree(tmp, { hold: artifactHoldReason }); }
+  } finally { safeRemove(tmp, { hold: artifactHoldReason }); }
   const byKind = {}, bySubkind = {};
   for (const item of staged) { byKind[item.kind] = (byKind[item.kind] ?? 0) + 1; const sk = item.subkind ?? 'unknown'; bySubkind[sk] = (bySubkind[sk] ?? 0) + 1; }
   let added = 0, proofs = 0;

@@ -4,7 +4,8 @@
 //   node scripts/api/orca/worker-show.mjs --dispatch <dispatch_id>
 // Returns {ok, state, dispatch, effective, hostUnavailable} — state is result.worker.state; hostUnavailable is an Orca that
 // did not answer (proves nothing about the worker).
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
 export function workerShow({ dispatch }) {

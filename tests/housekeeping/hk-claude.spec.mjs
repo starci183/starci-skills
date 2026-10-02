@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { sweepClaudeTranscripts, claudeProjectSlug, claudeProjectsRoots } from '../../scripts/housekeeping/hk-claude.mjs';
-import { safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { safeRemove } from '../../scripts/api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs'; const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/');
 
 // STORAGE-PROMPT.md item 10 on fake trees: ~/.claude/projects/<slug>/*.jsonl older than the archive
@@ -18,7 +18,7 @@ const LINK = process.platform === 'win32' ? 'junction' : 'dir';
 
 function sandbox(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hk-claude-')));
-  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
+  t.after(() => { safeRemove(root, { hold: artifactHoldReason }); });
   const projects = path.join(root, 'projects');
   const archive = path.join(root, 'archive');
   fs.mkdirSync(projects, { recursive: true });

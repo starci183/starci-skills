@@ -32,7 +32,9 @@ import { probe } from '../api/http/probe.mjs';
 import { readMachine } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { claudeDebugSettings } from '../../engine/config.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { parseWorktreeList } from '../housekeeping/hk-lanes.mjs';
 import { orphanLedgerFindings } from '../housekeeping/hk-orphan-ledgers.mjs';
 import { parseRuntimeStamp } from '../lib/orca-orphans.mjs';
@@ -197,8 +199,8 @@ function ledgerFacts() {
 }
 
 /** `git worktree list` of `repo` as [{path, branch, prunable, ...}], or null when git refuses. */
-function worktreesOf(repo, git = gitResult) {
-  const r = git(['worktree', 'list', '--porcelain'], { cwd: repo });
+function worktreesOf(repo) {
+  const r = gitResultOf(worktreeListQuery(['--porcelain'], { cwd: repo }));
   return r.ok ? parseWorktreeList(r.stdout) : null;
 }
 
@@ -240,9 +242,9 @@ function entryCount(dir) { try { return fs.readdirSync(dir).length; } catch { re
  * Main-checkout integrity of the runtime repository checkout `main`: tracked files deleted from the working tree (a
  * worktree removal through a junction empties it), and node_modules / packages/node_modules missing or empty. Read only.
  */
-export function integrityFacts(main, { git = gitResult } = {}) {
+export function integrityFacts(main, { git = (args, opts) => gitResultOf(lsFiles(args, opts)) } = {}) {
   const facts = new Map();
-  const deleted = git(['ls-files', '--deleted'], { cwd: main });
+  const deleted = git(['--deleted'], { cwd: main });
   if (!deleted.ok) facts.set('integrity:tracked-deleted', `git ls-files --deleted failed in ${main}: ${deleted.error}`);
   else {
     const files = deleted.stdout.split(/\r?\n/).filter(Boolean);

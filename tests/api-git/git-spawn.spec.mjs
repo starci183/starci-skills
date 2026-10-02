@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn, runGit, gitResult } from '../../scripts/api/git/lib.mjs';
+import { gitSpawn, runGit } from '../../scripts/api/git/lib.mjs';
+import { gitResultOf } from '../../scripts/lib/git.mjs';
+
+const gitResult = (args, options) => gitResultOf(runGit(args, options));
 
 // Guard/kernel scripts each spelt the same git spawn by hand: encoding utf8, windowsHide, a cwd
 // here, a `-C` there. scripts/lib/git.mjs is the one helper; gitSpawn keeps the
@@ -24,7 +27,7 @@ test('runGit composes -C dir before the args; the cwd form spawns inside the dir
   assert.equal(inCwd.stdout.trim(), 'true');
 });
 
-test('gitResult folds the result into {ok, stdout, error}', () => {
+test('gitResultOf folds a git spawn result into {ok, stdout, error}', () => {
   const ok = gitResult(['rev-parse', '--verify', 'HEAD'], { dir: ROOT });
   assert.equal(ok.ok, true);
   assert.match(ok.stdout.trim(), /^[0-9a-f]{40}$/);

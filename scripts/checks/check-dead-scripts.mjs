@@ -20,7 +20,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { gitOutput } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
 export const ENTRIES_FILE = 'scripts/checks/dead-scripts.entries';
@@ -100,7 +101,7 @@ export function deadScriptFindings({ tracked, read }) {
 
 /** Run the check on the runtime at `root`. */
 export function checkDeadScripts(root = skillRoot) {
-  const tracked = gitOutput(['ls-files', '-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
+  const tracked = gitOutputOf(lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }), 'git ls-files -z').split('\0').filter(Boolean);
   return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
 }
 

@@ -17,12 +17,12 @@
 //  5. conventional-commit scope      "type(scope):" matches the title of exactly one workflow line
 // A resolved workflow that is no longer running hands the follow-up to the
 // running workflow with the same title (its successor run).
-import { runGit } from '../api/git/lib.mjs';
+import { show as gitShow } from '../api/git/show.mjs';
 import { ownedPathsIntersect } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 
-const git = (cwd, args) => {
-  const r = runGit(args, { dir: cwd, timeout: 20_000 });
+const git = (call, cwd, args) => {
+  const r = call(args, { dir: cwd, timeout: 20_000 });
   return r.status === 0 ? r.stdout : null;
 };
 const tokens = (text) => String(text ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
@@ -31,7 +31,7 @@ const LIVE = (wf) => wf && wf.phase !== 'finished' && !wf.archived_at;
 /** The commit as git knows it in one of `roots`: {sha, subject, message, root} or null. */
 export function commitInfo(roots, ref) {
   for (const root of roots) {
-    const out = git(root, ['show', '-s', '--format=%H%x00%s%x00%B', `${ref}^{commit}`]);
+    const out = git(gitShow, root, ['-s', '--format=%H%x00%s%x00%B', `${ref}^{commit}`]);
     if (!out) continue;
     const [sha, subject, message] = out.split('\0');
     return { sha: sha.trim(), subject: subject.trim(), message: message.trim(), root };
@@ -106,7 +106,7 @@ export function commitOwnerJobs(db, { workflowId, commits = [], roots = [] }) {
   const files = new Set();
   for (const ref of commits) {
     for (const root of roots) {
-      const out = git(root, ['show', '--name-only', '--format=', `${ref}^{commit}`]);
+      const out = git(gitShow, root, ['--name-only', '--format=', `${ref}^{commit}`]);
       if (out == null) continue;
       for (const line of out.split('\n')) if (line.trim()) files.add(line.trim());
       break;

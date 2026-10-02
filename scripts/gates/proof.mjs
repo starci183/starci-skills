@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {runCommand} from '../api/process/run-command.mjs';
-import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
+import {safeRemove} from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {safeRemoveWorktree,createScratchWorktree} from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
@@ -103,10 +103,10 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
   const scratch=path.join(parent,'base');
   const cleanup=()=>{
     // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch
-    // (a dependency link) would be followed into its target. safeRemoveTree never
+    // (a dependency link) would be followed into its target. safeRemove never
     // descends into a link; prune drops the registration.
     try{safeRemoveWorktree(scratch,{repo:worktree,git});}catch{/* the temporary worktree is best-effort */}
-    try{safeRemoveTree(parent, { hold: artifactHoldReason });}catch{/* nothing to keep */}
+    try{safeRemove(parent, { hold: artifactHoldReason });}catch{/* nothing to keep */}
     if(!fs.existsSync(scratch))markRemoved(scratch);
   };
   try{

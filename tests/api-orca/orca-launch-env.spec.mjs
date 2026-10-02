@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hostLaunchEnv } from '../../scripts/api/orca/lib.mjs';
+import { hostLaunchEnv } from '../../scripts/lib/host-launch-env.mjs';
 const DRIVE = `${process.cwd().split(/[\\/]/)[0]}\\`;
 const sourceEnv = () => ({
   PATH: `${DRIVE}Windows;${DRIVE}Tools`,

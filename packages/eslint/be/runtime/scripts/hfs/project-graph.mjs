@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import { checkArchitecture } from './architecture/index.mjs';
 import { openHfs } from './slots.mjs';
 import { pathFindings } from './path-findings.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { onLintSurface } from './architecture/surface.mjs';
 
@@ -34,7 +34,7 @@ export function projectGraph({ repoRoot, runtimeRoot, injectedTypeScript }) {
     const opened = openHfs({ root: runtimeRoot, repoRoot: key });
     const report = checkArchitecture({ repositoryRoot: key, hfs: opened, injectedTypeScript, surface: 'lint' });
     if (report.errors.length) throw new Error(`the project graph of ${key} cannot be built: ${report.errors.map((e) => `${e.ruleId}: ${e.message}`).join('; ')}`);
-    const listed = runGit(['ls-files', '-z', '--cached', '--exclude-standard'], { dir: key, maxBuffer: 256 * 1024 * 1024 });
+    const listed = lsFiles(['-z', '--cached', '--exclude-standard'], { dir: key, maxBuffer: 256 * 1024 * 1024 });
     if (listed.error || listed.status !== 0) throw new Error(`the project graph of ${key} needs a Git work tree (git ls-files failed)`);
     const tracked = listed.stdout.split('\0').filter(Boolean).map(posixPath);
     const repoFindings = pathFindings({ files: tracked, resolver: opened, profile: opened.repo.profile }).filter((finding) => onLintSurface(key, finding));

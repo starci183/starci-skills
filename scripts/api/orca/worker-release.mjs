@@ -3,7 +3,8 @@
 //   node scripts/api/orca/worker-release.mjs --dispatch <dispatch_id>
 // Outcome and effectState come from the calls.yaml classify block; returns
 // {ok, outcome, effectState, dispatchId, state, result}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
 export function workerRelease({ dispatch }) {

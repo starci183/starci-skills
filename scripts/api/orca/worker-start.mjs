@@ -9,7 +9,8 @@
 // for an op), and the first issue already carries the --retry-request id derived from it.
 // Outcome and effectState come from the calls.yaml classify block; returns
 // {ok, outcome, effectState, dispatchId, taskId, runId, agentTerminalHandle, state, launch, result, request}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
 export function workerStart({ spec, taskTitle, worktree, agent, model, effort, name, repo, baseBranch, displayName, setup, timeoutMs, run, from, request }) {

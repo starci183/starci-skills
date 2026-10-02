@@ -32,7 +32,7 @@
 //    where name=...), which also ends Orca and every other agent's processes of that name (a lane's taskkill of node.exe
 //    restarted Orca, 2026-10-01); an agent ends only the PIDs it started.
 //  - deletes: a recursive delete (rm -r, rmdir|rd /s, del /s, robocopy /MIR|/PURGE, Remove-Item -Recurse and its
-//    aliases), which follows a junction into the live tree; trees go through safeRemoveTree.
+//    aliases), which follows a junction into the live tree; trees go through safeRemove.
 //  - workflow history: inside the workflow worktree its guard names (guard.workflowWorktree, contract change
 //    workflow-worktree), a git command that changes history or a ref, or discards tracked work (commit, merge, rebase,
 //    push, pull, cherry-pick, revert, am, reset to a revision or with a mode, checkout of a branch or a path, switch,
@@ -306,7 +306,7 @@ const killVerdict = (program, args) => {
 
 // A recursive delete follows a junction or symlink inside the tree and empties the live tree it points at (a Git for
 // Windows worktree removal deleted 674 live files through node_modules junctions; a later incident emptied main's
-// node_modules the same way). The runtime's safeRemoveTree removes every link as a
+// node_modules the same way). The runtime's safeRemove removes every link as a
 // link first. One junction is removed on its own with `cmd /c rmdir <path>` (no /s), which removes the link only.
 const REMOVE_ITEM = new Set(['remove-item', 'ri', 'rm', 'del', 'erase', 'rd', 'rmdir']);
 const POWERSHELL_RECURSE = /^-r(?:e(?:c(?:u(?:r(?:se?)?)?)?)?)?(?::(?!\$?false$).*)?$/i;
@@ -330,7 +330,7 @@ const recursiveDeleteVerdict = (program, args, dialect) => {
   if (!how) return null;
   return { code: 'RECURSIVE_DELETE', command: [program, ...args].join(' ').slice(0, 200),
     reason: `${how} deletes a tree recursively and follows every junction or symlink inside it into the live tree it points at (a worktree removal through node_modules junctions deleted 674 live files)`,
-    remedy: 'remove a tree only through the runtime\'s safeRemoveTree (scripts/api/fs/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
+    remedy: 'remove a tree only through the runtime\'s safeRemove (scripts/api/fs/safe-remove.mjs), which removes every link as a link first; remove one junction with `cmd /c rmdir <path>` (no /s); a single file with `rm <file>`' };
 };
 
 // Ops never commit (contract change workflow-worktree): inside a workflow worktree the runtime is the only writer of
@@ -391,7 +391,7 @@ function appRouterGlob({ args, cwd, deps }) {
     if (!literal.changed) return null;
     const dir = parseGitArgv(args, cwd).cwd;
     const files = (spec) => {
-      const r = deps.git.gitSpawn('git', ['ls-files', '-c', '-o', '--exclude-standard', '-z', ...spec], { cwd: dir });
+      const r = deps.git.lsFiles(['-c', '-o', '--exclude-standard', '-z', ...spec], { cwd: dir });
       return r.status === 0 ? new Set(r.stdout.split('\0').filter(Boolean)) : null;
     };
     let globbed, named, remedy;
@@ -419,9 +419,9 @@ function appRouterGlob({ args, cwd, deps }) {
 
 async function gitVerdict({ args, cwd, env, guard, deps }) {
   const { classifyGit, pathspecListOnStdin } = deps.policy;
-  const { gitSpawn } = deps.git;
-  const top = () => { const r = gitSpawn('git', ['rev-parse', '--show-toplevel'], { cwd }); return r.status === 0 && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
-  const currentConfig = (key) => { const r = gitSpawn('git', ['config', '--get', key], { cwd }); return r.status === 0 ? r.stdout.trim() : null; };
+  const { revParseQuery, configGet } = deps.git;
+  const top = () => { const r = revParseQuery(['--show-toplevel'], { cwd }); return r.status === 0 && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
+  const currentConfig = (key) => { const r = configGet(cwd, key); return r.ok ? r.stdout : null; };
   const verdict = classifyGit(args, { cwd, owned: guard?.owned ?? null, top: guard?.owned?.length ? top() : null, env, stdin: null, currentConfig });
   const command = args.join(' ').slice(0, 200);
   if (!verdict.allow) return { tool: 'git', ...verdict, command };
@@ -432,8 +432,8 @@ async function gitVerdict({ args, cwd, env, guard, deps }) {
 }
 
 const loadDeps = async () => {
-  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../machine/lock-recovery.mjs')]);
-  return { policy, npm, git, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
+  const [policy, npm, { lsFiles }, { revParseQuery }, { configGet }, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/ls-files.mjs'), import('../api/git/rev-parse-query.mjs'), import('../api/git/config-get.mjs'), import('../machine/lock-recovery.mjs')]);
+  return { policy, npm, git: { lsFiles, revParseQuery, configGet }, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
 };
 
 /**

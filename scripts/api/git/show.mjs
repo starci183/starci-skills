@@ -1,8 +1,6 @@
-// show.mjs — `git show <rev>:<path>`: the exact text of a file at a revision, or null when the revision does not hold it.
+// show.mjs — `git show <args>`: an object of a repository - a file at a revision (`<rev>:<path>`), or a commit's
+// header and message (-s --format=...).
 import { runGit } from './lib.mjs';
 
-/** The text of `file` (repository-relative, forward slashes) at `rev` in the repository at `cwd`, untrimmed; null when absent. */
-export const show = (cwd, rev, file) => {
-  const r = runGit(['show', `${rev}:${file}`], { cwd, maxBuffer: 64 * 1024 * 1024 });
-  return !r.error && r.status === 0 ? r.stdout : null;
-};
+/** The spawn result {status, stdout, stderr, error} of `git show ...args`; options are runGit's (cwd or dir, config, timeout, maxBuffer, input, encoding, env, git). */
+export const show = (args = [], options = {}) => runGit(['show', ...args], options);

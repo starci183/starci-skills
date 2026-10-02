@@ -5,7 +5,9 @@
 // Returns {ok, screen, draft} — screen is the extracted frame text, ready to pattern-test; draft is
 // the text sitting unsubmitted in the agent's input box (Orca's `draft`, which the frame leaves
 // out), or null. A reader that ignores draft cannot see a send whose Enter never landed.
-import { orcaCall, terminalOf, frameText, draftText, arg, flag } from './lib.mjs';
+import { orcaCall, terminalOf } from './lib.mjs';
+import { frameText, draftText } from '../../lib/orca-terminal.mjs';
+import { arg, flag } from '../../lib/cli-arg.mjs';
 
 export function terminalRead({ terminal, screen = true, limit }) {
   const r = orcaCall('terminal-read', { terminal, screen: Boolean(screen), limit });

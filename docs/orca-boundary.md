@@ -52,7 +52,7 @@ Each adapter carries a one-line `// Deep map WRAP <IDs>: <reason>` comment namin
 | W6 | none yet | When the ledger fences `effect_unknown`, the attempt should also be `worker-abandon`ed. There is no adapter yet; adding one is pending. |
 | W7 | `worker-show.mjs`, `worker-list.mjs` | The seat state machine (parked, quarantined, replacement rate limit, `kernel_rev` ack). The death proof is a positive `exited`. |
 | A2 | `worker-list.mjs` | The admission policy (fair-share slots, hysteresis, RAM throttle). The live count is Orca's. |
-| M2 | `orch-reply.mjs` | The ledger disposition of a worker question. |
+| M2 | `reply.mjs` | The ledger disposition of a worker question. |
 | M6 | `worker-show.mjs` | Lease renewal from `dispatch.lastHeartbeatAt`. |
 | R1 | `run-show.mjs`, `run-use.mjs`, `run-create.mjs` | The rebind-once guard, because a repeated `run-use` fences live consumers. |
 | R2 | `run-create.mjs`, `worker-start.mjs` | Which Run a seat or [Worker] launch reuses. |
@@ -73,7 +73,7 @@ Each adapter carries a one-line `// Deep map WRAP <IDs>: <reason>` comment namin
 Orca 1.4.209 states that not every worker has a terminal and that `orca terminal` verbs do not accept every worker
 handle; `worker-read --source auto` always works. A worker's **output** is therefore read by Dispatch only:
 
-- `scripts/api/orca/worker-read.mjs`: `workerRead` reads one page; `workerOutput` follows the top-level cursor
+- `scripts/api/orca/worker-read.mjs` `workerRead` reads one page; `scripts/machine/worker-output.mjs` `workerOutput` follows the top-level cursor
   unchanged until a page is empty, and restarts once without the cursor on `source_changed`. Its `contentComplete`
   is true only when every page said so; `clipping` is kept.
 - `api observe` returns `output` (read by the job's Dispatch). The turn state is still classified from the frame (T2).

@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
-import { safeRemoveTree } from '../../api/fs/safe-remove.mjs';
+import { safeRemove } from '../../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
 
@@ -231,7 +231,7 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
       results.push({ part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings });
     }
   } finally {
-    if (scratch) safeRemoveTree(scratch, { hold: artifactHoldReason });
+    if (scratch) safeRemove(scratch, { hold: artifactHoldReason });
   }
   return results;
 }

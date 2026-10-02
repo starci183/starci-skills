@@ -5,7 +5,8 @@
 // objects are serialized by orcaCall. Settle and finish use it to close the
 // operation Task they opened, so a job that ends leaves no open Task in the
 // workflow Run.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function taskUpdate({ id, status, result, run, from }) {
   const r = orcaCall('task-update', { id, status, result, run, from });

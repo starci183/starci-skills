@@ -38,7 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
@@ -147,7 +147,7 @@ export function scanRange({ cwd, from, to }) {
     const scanner = diffScanner(files, { encText });
     forEachFileLine(out, (l) => scanner.line(l));
     return { ok: scanner.findings.length === 0, findings: scanner.findings, files };
-  } finally { safeRemoveTree(dir, { hold: artifactHoldReason }); }
+  } finally { safeRemove(dir, { hold: artifactHoldReason }); }
 }
 
 /** Push one repository's main (see the header). `dryRun` stops after the scan. Never throws. */
@@ -390,14 +390,14 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
     for (const link of links.splice(0).reverse()) unlinkLink(link);
     // safeRemoveWorktree: every link left (recorded or not) removed as a link, found without following one; zero links
     // asserted; only then `git worktree remove`; the main checkout asserted untouched.
-    try { safeRemoveWorktree(worktree, { repo, git: run }); } catch { /* best effort */ }
-    try { safeRemoveTree(base, { hold: artifactHoldReason }); } catch { /* best effort */ }
+    try { safeRemoveWorktree(worktree, { repo, git: run === git ? null : run }); } catch { /* best effort */ }
+    try { safeRemove(base, { hold: artifactHoldReason }); } catch { /* best effort */ }
     if (!fs.existsSync(worktree)) markRemoved(worktree);
   };
   const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };
   try {
     // The one scratch worktree API (scripts/api/git/worktree-add.mjs): registered for the GC, removed by cleanup().
-    const added = createScratchWorktree({ repoRoot: repo, dir: worktree, kind: 'push-scratch', detach: true, base: 'main', git: run });
+    const added = createScratchWorktree({ repoRoot: repo, dir: worktree, kind: 'push-scratch', detach: true, base: 'main', git: run === git ? null : run }); // a spec's runner, else the call files' own
     if (!added.ok) return unavailable(added.detail || added.reason || 'git worktree add failed');
     // The scratch installs its own dependencies from the lockfile (a real npm ci from the cache), never a link to the
     // live node_modules (RT_NODE_MODULES_LINK).

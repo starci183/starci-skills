@@ -2,19 +2,19 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {sopsDecrypt} from '../api/sops/decrypt.mjs';import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShellInherit} from '../api/process/run-shell.mjs';
+import {decrypt} from '../api/sops/decrypt.mjs';import {containerInspect} from '../api/docker/container-inspect.mjs';import {scanRun} from '../api/sonar/scan-run.mjs';import {runShell} from '../api/process/run-shell.mjs';
 import {createHash} from 'node:crypto';
 import { isMain } from '../lib/is-main.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {safeRemoveTree} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
+import {safeRemove} from '../api/fs/safe-remove.mjs'; import {runNode} from '../api/node/run-node.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
 import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from './runtime-host.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { log as gitLog } from '../api/git/log.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
@@ -281,7 +281,7 @@ export function readCustody(cfg,ref){
     else if(!fs.existsSync(cfg.identity))reasons.push(`master identity ${cfg.identity} is missing`);
     else{
       const [bin,args]=launcher(sops,['--decrypt','--input-type','binary','--output-type','binary',enc]);
-      const result=sopsDecrypt(bin,args,{env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+      const result=decrypt(bin,args,{env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
       const value=result.status===0?String(result.stdout??'').trim():'';
       if(value)return {present:true,value:remember(value),via:'sops',name};
       reasons.push(result.error?.code==='ETIMEDOUT'?`sops did not decrypt ${name}.enc within ${cfg.timeoutMs}ms`:result.error?`sops failed to start: ${result.error.code??result.error.message}`:`sops could not decrypt ${name}.enc (exit ${result.status})`);
@@ -622,13 +622,13 @@ async function runScanner(cwd,{command,args},env,timeoutMs){
   return {...run,log:scrub(run.log),display:line};
 }
 
-const git=(cwd,args)=>runGit(['-c','core.quotepath=off',...args],{cwd,maxBuffer:64*1024*1024});
+const git=(call,cwd,args)=>call(args,{cwd,config:{'core.quotepath':'off'},maxBuffer:64*1024*1024});
 
 function gitRevision(cwd){
-  const head=git(cwd,['log','-1','--format=%H %ct','HEAD']);
+  const head=git(gitLog,cwd,['-1','--format=%H %ct','HEAD']);
   if(head.status!==0)return {commit:null};
   const [commit,seconds]=head.stdout.trim().split(' ');
-  const dirty=git(cwd,['status','--porcelain','--untracked-files=no']);
+  const dirty=git(gitStatus,cwd,['--porcelain','--untracked-files=no']);
   return {commit,committedAt:new Date(Number(seconds)*1000).toISOString(),dirty:dirty.status===0?dirty.stdout.trim().length>0:null};
 }
 
@@ -676,15 +676,15 @@ const splitList=value=>(Array.isArray(value)?value:[value]).flatMap(v=>String(v?
 export function sliceChanges(cwd,{base,paths}={}){
   const scope=splitList(paths);
   const baseRef=base||'HEAD';
-  const resolved=git(cwd,['rev-parse','--verify','--quiet',`${baseRef}^{commit}`]);
-  if(resolved.error||(resolved.status!==0&&git(cwd,['rev-parse','--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
+  const resolved=git(revParseQuery,cwd,['--verify','--quiet',`${baseRef}^{commit}`]);
+  if(resolved.error||(resolved.status!==0&&git(revParseQuery,cwd,['--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
   if(resolved.status!==0)return {ok:false,code:'SLICE_BASE_UNKNOWN',reason:`the slice base ${baseRef} is not a commit in ${cwd}`};
   const pathspec=scope.length?['--',...scope]:[];
   const collect=commit=>{
-    const diff=git(cwd,['diff','--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
+    const diff=git(gitDiff,cwd,['--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
     if(diff.status!==0)return {error:String(diff.stderr).trim().split(/\r?\n/)[0]};
     const files=parseDiffNewLines(diff.stdout);
-    const untracked=git(cwd,['ls-files','--others','--exclude-standard','-z',...pathspec]);
+    const untracked=git(lsFiles,cwd,['--others','--exclude-standard','-z',...pathspec]);
     for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
       if(files.some(f=>f.path===file))continue;
       let lines=0;
@@ -700,10 +700,9 @@ export function sliceChanges(cwd,{base,paths}={}){
   // An attempt that authored no delta of its own (its slice was committed by an earlier attempt, so the base the op
   // recorded is HEAD) read as SLICE_EMPTY and left backend.implement red in ops (nivo, 2 of 5 scans). The slice is then
   // what the branch carries inside --paths beyond its merge-base with the trunk: the same code the gate has to judge.
-  if(!files.length&&git(cwd,['rev-parse','--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
+  if(!files.length&&git(revParseQuery,cwd,['--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
     for(const ref of ['@{upstream}','origin/main','main','origin/master','master']){
-      const mergeBase=git(cwd,['merge-base','HEAD',ref]);
-      const sha=mergeBase.status===0?mergeBase.stdout.trim():'';
+      const sha=mergeBaseOf(cwd,'HEAD',ref)??'';
       if(!sha||sha===baseCommit)continue;
       const alt=collect(sha);
       if(alt.files?.length){files=alt.files;used=sha;baseFallback={requested:baseRef,merged:ref,baseCommit:sha,reason:'the attempt changed nothing after its recorded base; the slice is the branch delta since its merge-base with the trunk'};break;}
@@ -1146,7 +1145,7 @@ export async function scan(cfg,options={}){
     if(judged.result.verdict==='pass')return finish('pass');
     return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
-    safeRemoveTree(workDir,{hold:artifactHoldReason});
+    safeRemove(workDir,{hold:artifactHoldReason});
     // The throwaway slice project is judged and gone: the next scan of the same scope re-creates it.
     if(isolated&&!options.keepSliceProject){
       const removed=await call(cfg,'POST','/api/projects/delete',{token:admin.value,form:{project:isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));
@@ -1267,7 +1266,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
     if(!child.ok||!args.rest?.length)report={schema:SCHEMA,command:'token',host:cfg.host,...(key?{projectKey:key}:{}),custody:child.custody,outcome:child.ok?'present':'blocked'};
     else{
       // A shell resolves npm/npx .cmd shims on Windows; each argument is quoted so paths with spaces survive.
-      return {exitCode:runShellInherit(args.rest.map(quote).join(' '),child.env)};
+      return {exitCode:runShell(args.rest.map(quote).join(' '),child.env)};
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,

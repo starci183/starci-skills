@@ -31,12 +31,13 @@
 // lingers outside Orca after it (orcaAgents / reapOrphaned: a lingering tree is killed and read back).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { listHostProcesses } from '../api/process/process-list.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
+import { processList } from '../api/process/process-list.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
@@ -118,7 +119,7 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
 /** The host's process table: [{pid, ppid, name, exe, cmd, created}] or null when unreadable (not Windows, CIM failed). */
 export function processTable({ run, platform = process.platform } = {}) {
   if (platform !== 'win32') return null;
-  return listHostProcesses({ cmdMax: 300, run, platform });
+  return processList({ cmdMax: 300, run, platform });
 }
 
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
@@ -144,7 +145,7 @@ export function orcaAgents(table) {
  * was in a closed terminal and lingers: its tree is killed (taskkill /T /F) and the table read again.
  * {checked, lingering, killed, remaining} - remaining 0 is the proof.
  */
-export function reapOrphaned(before, { table = processTable, kill = (pid) => killProcessTree(pid).ok, sleep = sleepSync } = {}) {
+export function reapOrphaned(before, { table = processTable, kill = (pid) => killTree(pid).ok, sleep = sleepSync } = {}) {
   if (!before) return { checked: false };
   const lingeringOf = (t) => {
     const now = orcaAgents(t);

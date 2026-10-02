@@ -7,10 +7,11 @@
 // nothing about a tree it does not list (scripts/lib/orca-orphans.mjs psCoverage).
 // Returns {ok, worktrees: [{id, repoId, hostId, path, branch, comment, isMainWorktree, liveTerminalCount, lastActivityAt,
 // status}], truncated, omittedHostIds, error, hostUnavailable}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 /** Rows asked per page: above any host's real count, so a page is complete unless Orca says it truncated it. */
-export const PS_LIMIT = 10000;
+const PS_LIMIT = 10000;
 
 export function worktreePs({ limit = PS_LIMIT } = {}) {
   const r = orcaCall('worktree-ps', { limit });

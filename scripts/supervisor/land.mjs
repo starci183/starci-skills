@@ -66,7 +66,8 @@ import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../eng
 import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveTree, unlinkNodeModulesLink } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
+import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
@@ -257,7 +258,7 @@ export function removeScratch(dir, { root }) {
   try {
     // safeRemoveWorktree: every link (the node_modules junction to the live tree included) removed as a link, found
     // without following one; zero links asserted; only then `git worktree remove`; the main checkout asserted untouched.
-    safeRemoveWorktree(dir, { repo: root, git });
+    safeRemoveWorktree(dir, { repo: root });
     const gone = !fs.existsSync(dir);
     if (gone) markRemoved(dir);
     return gone;
@@ -290,7 +291,7 @@ export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS,
 function makeScratch({ root, base, env }) {
   const dir = path.join(landRoot(env), `scratch-${process.pid}-${Date.now().toString(36)}${randomBytes(2).toString('hex')}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
-  const added = createScratchWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base, git });
+  const added = createScratchWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base });
   if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.detail || added.reason || 'git worktree add failed' }; }
   const deps = fs.existsSync(path.join(dir, 'package-lock.json')) ? ci(dir) : { ok: true }; // its own npm ci; never a junction to the live node_modules (RT_NODE_MODULES_LINK)
   if (!deps.ok) { removeScratch(dir, { root }); return { ok: false, error: `npm ci in the land scratch failed (exit ${deps.status ?? 'unknown'}): ${deps.stderr.slice(-400)}` }; }
@@ -378,7 +379,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
       failures = uniqFailures(fs.readFileSync(out, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).map((f) => ({ file: rel(String(f.file)), name: String(f.name) })));
     } catch { failures = null; }
     return { ...r, failures };
-  } finally { try { safeRemoveTree(tmpDir, { hold: artifactHoldReason }); } catch { /* temp */ } }
+  } finally { try { safeRemove(tmpDir, { hold: artifactHoldReason }); } catch { /* temp */ } }
 }
 
 /**

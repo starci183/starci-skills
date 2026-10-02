@@ -6,9 +6,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allocationMs } from '../../engine/config.mjs';
 import { ownedPathspec } from '../../engine/admission.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 
-const git = (cwd, args, timeout) => gitResult(args, { dir: cwd, timeout });
+/** One git call (a scripts/api/git call file) in the repository at `cwd`, as {ok, stdout, error}. */
+const git = (call, cwd, args, timeout) => gitResultOf(call(args, { dir: cwd, timeout }));
 
 const nearestExistingDir = (abs) => {
   let dir = abs;
@@ -34,7 +38,7 @@ export function landingRepos({ base, ownedPaths = [], placements, timeoutMs }) {
     const abs = path.resolve(item.base, String(item.path).replace(/[\\/]\*\*[\\/]?$/, '') || '.');
     const dir = nearestExistingDir(abs);
     if (!dir) continue;
-    if (!probes.has(dir)) probes.set(dir, [git(dir, ['rev-parse', '--show-toplevel'], timeoutMs), git(dir, ['rev-parse', '--show-prefix'], timeoutMs)]);
+    if (!probes.has(dir)) probes.set(dir, [git(revParseQuery, dir, ['--show-toplevel'], timeoutMs), git(revParseQuery, dir, ['--show-prefix'], timeoutMs)]);
     const [top, prefix] = probes.get(dir);
     if (!top.ok || !prefix.ok || !top.stdout.trim()) continue;
     const root = path.resolve(top.stdout.trim());
@@ -73,7 +77,7 @@ const dirtyOf = (root, specs, timeoutMs, label) => {
     // -z: NUL-separated records with literal paths — no C-quoting, so a name carrying bytes like the
     // U+F03A a Windows checkout writes for ':' round-trips (inc-e7e54ba0b970). A rename/copy record
     // is `XY <dest>\0<origin>`; the origin is the next record and is not itself evidence.
-    const r = git(root, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
+    const r = git(gitStatus, root, ['--porcelain', '-z', '--untracked-files=all', '--', ...batch.map(ownedPathspec)], timeoutMs);
     if (!r.ok) return { error: r.error };
     const records = r.stdout.split('\0');
     for (let i = 0; i < records.length; i++) {
@@ -108,7 +112,7 @@ export function ownedPathEffects({ base, ownedPaths = [], placements, sinceMs })
     if (d.error) return { provable: false, why: 'git-status', repo: root, error: d.error };
     const shas = new Set();
     for (const batch of specBatches(specs)) {
-      const log = git(root, ['log', '--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
+      const log = git(gitLog, root, ['--all', `--since=${since}`, '--format=%H', '--', ...batch.map(ownedPathspec)], timeoutMs);
       if (!log.ok) return { provable: false, why: 'git-log', repo: root, error: log.error };
       for (const sha of log.stdout.split('\n').map((line) => line.trim()).filter(Boolean)) shas.add(sha);
     }

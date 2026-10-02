@@ -30,7 +30,7 @@ import { commandVerdict } from '../guards/command-guard.mjs';
 import * as gitPolicy from '../guards/git-policy.mjs';
 import * as depsGuard from '../guards/deps-guard.mjs';
 import { CATALOG_FILE } from './check-failure-codes.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const GUIDANCE_CODE = 'RT_GUIDANCE_REFUSED_COMMAND';
@@ -110,7 +110,7 @@ export function excusedBy(sentence, span) {
 // Static deps for the guard's own matcher: no git spawn, no index-lock recovery, nothing written.
 const STATIC_DEPS = Object.freeze({
   policy: gitPolicy, npm: depsGuard,
-  git: { gitSpawn: () => ({ status: 1, stdout: '', stderr: '' }) },
+  git: { lsFiles: () => ({ status: 1, stdout: '', stderr: '' }), revParseQuery: () => ({ status: 1, stdout: '', stderr: '' }), configGet: () => ({ ok: false, stdout: '', stderr: '' }) },
   indexLock: { preflightIndexLock: async () => {} },
   say: () => {},
 });
@@ -166,7 +166,7 @@ export function markdownUnits(text) {
 
 /** {ok, findings: [{file, key, command, code, sentence}], files} over the tracked guidance of `root`. */
 export async function scanGuidance(root = skillRoot, { files = null } = {}) {
-  const listed = files ?? (() => { const r = runGit(['ls-files'], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
+  const listed = files ?? (() => { const r = lsFiles([], { cwd: root, maxBuffer: 64 * 1024 * 1024 }); return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : []; })();
   const findings = [];
   let count = 0;
   for (const rel of listed.map((f) => f.replace(/\\/g, '/')).filter(isGuidanceFile)) {

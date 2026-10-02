@@ -3,7 +3,8 @@
 // worktree-list.mjs — the calls.yaml `worktree-list` call as a callable function.
 //   node scripts/api/orca/worktree-list.mjs [--repo <sel>]
 // Returns {ok, worktrees: [{id, path, branch, displayName, isMainWorktree}], error}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function worktreeList({ repo } = {}) {
   const r = orcaCall('worktree-list', { repo });

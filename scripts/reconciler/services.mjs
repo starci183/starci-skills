@@ -399,9 +399,9 @@ export function openServiceStore({ env = process.env } = {}) {
 
 const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
-/** Launch environment for a desktop host: no agent/Claude session variables (scripts/api/orca/lib.mjs hostLaunchEnv). */
+/** Launch environment for a desktop host: no agent/Claude session variables (scripts/lib/host-launch-env.mjs hostLaunchEnv). */
 export async function cleanEnv(env = process.env) {
-  const { hostLaunchEnv } = await import('../api/orca/lib.mjs');
+  const { hostLaunchEnv } = await import('../lib/host-launch-env.mjs');
   const scrubbed = hostLaunchEnv(env);
   for (const key of Object.keys(scrubbed)) if (/^STARCI_(?:ACTOR|RECONCILER_EPOCH)$/.test(key)) delete scrubbed[key];
   return scrubbed;
@@ -438,8 +438,8 @@ export async function startService(name, { settings = hostSettings(), ports = se
   const s = settings.services[name] ?? {};
   switch (name) {
     case 'orca': {
-      const { orcaAppExe } = await import('../api/orca/lib.mjs');
-      const app = orcaAppExe();
+      const { status } = await import('../api/orca/status.mjs');
+      const app = status({ timeout: 5000 }).appExe;
       if (!app) return { ok: false, error: 'no Orca app beside the orca CLI' };
       const r = powershell(orcaRestartScript({ app, closeWaitMs: s.closeWaitMs ?? 30_000 }), { env: clean, timeout: (s.closeWaitMs ?? 30_000) + 120_000 });
       return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
@@ -526,7 +526,7 @@ export async function turnProbe({ terminal = null, supervisor = false } = {}) {
  * decision doorbell (top DI + its ranked actions) rung at once. Active mode only (reached through ctx.run).
  */
 export async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, supervisor = false, settings = hostSettings() }) {
-  const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../api/orca/lib.mjs')]);
+  const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../lib/sleep-sync.mjs')]);
   const keys = settings.turnBudget.interruptKeys[agent] ?? ['esc'];
   const sent = [];
   for (const key of keys) {

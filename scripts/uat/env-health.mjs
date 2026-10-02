@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const ENV_HEALTH_SCHEMA = 'starci/env-health@1';
@@ -78,9 +78,9 @@ export async function discoverHealth(origin, { timeoutMs = 5000, candidates = HE
 
 /* ---------------------------------------------------------------- listeners, processes */
 
-export function killTree(pid, { platform = process.platform } = {}) {
+export function stopListener(pid, { platform = process.platform } = {}) {
   try {
-    if (platform === 'win32') return killProcessTree(pid, { platform, timeoutMs: 20000 }).ok;
+    if (platform === 'win32') return killTree(pid, { platform, timeoutMs: 20000 }).ok;
     try { process.kill(-pid, 'SIGTERM'); } catch { process.kill(pid, 'SIGTERM'); }
     return true;
   } catch { return false; }
@@ -252,7 +252,7 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
           remedy: `port ${port} is held by PID ${listener.pid} (${listener.commandLine ?? 'unknown command'}), which is not a server of this workspace and does not answer ${url} with ${expect}; free the port or re-declare it - env-health never stops a foreign process` });
         continue;
       }
-      if (restart) { const killed = killTree(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
+      if (restart) { const killed = stopListener(listener.pid); actions.push(`killed ${state} own listener PID ${listener.pid}${killed ? '' : ' (kill failed)'}`); if (killed) state = 'down'; }
     }
     const start = registered?.command ? { command: registered.command, cwd: registered.cwd, from: 'registry' }
       : doc?.configuration?.start?.[name] ? { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null } : null;
@@ -339,7 +339,7 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
         writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
         return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url }, EXIT_READY);
       }
-      if (killTree(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
+      if (stopListener(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
     } else if (listener) {
       return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
     }

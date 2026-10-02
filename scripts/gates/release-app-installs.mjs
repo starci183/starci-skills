@@ -18,7 +18,7 @@ import { runNpx } from '../api/npm/run-npx.mjs';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -51,7 +51,7 @@ try {
   if (keep) console.log(`release-app-installs: kept ${app}`);
   else {
     // The fresh install is real npm output (links included): removed without ever following a link.
-    const removed = safeRemoveTree(into, { hold: artifactHoldReason });
+    const removed = safeRemove(into, { hold: artifactHoldReason });
     if (!removed.ok) console.log(`release-app-installs: could not remove ${into}: ${removed.errors.map((e) => `${e.code} ${e.path}`).join('; ')}`);
   }
 }

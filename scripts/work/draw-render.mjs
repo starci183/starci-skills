@@ -55,7 +55,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import {sha256} from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
@@ -664,7 +664,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
     if (o.harnessOut) { fs.mkdirSync(o.harnessOut, { recursive: true }); fs.cpSync(workDir, o.harnessOut, { recursive: true }); }
     return records;
   } finally {
-    safeRemoveTree(workDir, { hold: artifactHoldReason });
+    safeRemove(workDir, { hold: artifactHoldReason });
   }
 }
 

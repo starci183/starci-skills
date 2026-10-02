@@ -1,7 +1,8 @@
 // close-op-terminal.mjs — close a settled operation's Orca terminal so it stays closed.
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { exitedAgentPromptRow } from '../lib/terminal-liveness.mjs';
 import { unbindGuardTerminal } from '../guards/hook-install.mjs';

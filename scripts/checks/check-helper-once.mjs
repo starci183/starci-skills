@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -180,7 +180,7 @@ export function helperOnceFindings({ tracked, read }) {
 
 /** Run the check on the runtime at `root`. */
 export function checkHelperOnce(root = skillRoot) {
-  const tracked = runGit(['ls-files', '-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
+  const tracked = lsFiles(['-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
   return helperOnceFindings({ tracked, read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') });
 }
 

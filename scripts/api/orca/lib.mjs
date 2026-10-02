@@ -2,14 +2,15 @@
 // It owns: binary resolution (orca.cmd cannot spawn on Windows without a
 // shell), STARCI_ORCA_COMMAND/STARCI_ORCA_ARGS overrides, the calls.yaml
 // contract (argv assembly, declared-flag refusal, timeouts, receipt
-// classification), the live agent-context comparison before the first
-// mutation, terminal frame extraction and sleepSync.
+// classification) and the live agent-context comparison before the first
+// mutation (scripts/lib/orca-listing.mjs compares).
 // Wrappers name a verb and shape its receipt; they never build argv.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readModuleJson } from '../../../engine/runtime-root.mjs';
+import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
 
 export const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
@@ -27,12 +28,6 @@ export const orcaAppExe = (cli = ORCA) => {
   const exe = path.resolve(path.dirname(cli), '..', '..', 'Orca.exe');
   return fs.existsSync(exe) ? exe : null;
 };
-
-/** Launch the desktop host without inheriting an agent's Claude/ACP session. */
-export function hostLaunchEnv(env = process.env) {
-  return Object.fromEntries(Object.entries(env).filter(([key]) =>
-    !/^(?:CLAUDECODE|CLAUDE_CODE_.*|CLAUDE_AGENT_.*|CLAUDE_SESSION_ID|AGENT_SESSION_ID|SESSION_ID|ACP_BACKEND)$/i.test(key)));
-}
 
 export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
@@ -76,33 +71,8 @@ export function hostUnavailableOf(run, receipt) {
   return run.status !== 0 && HOST_DOWN_TEXT.test(`${message ?? ''}\n${run.stderr ?? ''}\n${receipt ? '' : run.stdout ?? ''}`);
 }
 
-export { sleepSync } from '../../lib/sleep-sync.mjs';
 export const jsonOf = (text) => { try { return JSON.parse(text || 'null'); } catch { return null; } };
 export const terminalOf = (envelope) => envelope?.result?.terminal ?? jsonOf(envelope?.stdout)?.result?.terminal ?? null;
-
-export function frameText(terminal) {
-  if (!terminal) return '';
-  if (typeof terminal.screen === 'string') return terminal.screen;
-  if (Array.isArray(terminal.tail)) return terminal.tail.join('\n');
-  if (typeof terminal.tail === 'string') return terminal.tail;
-  return terminal.preview ?? '';
-}
-
-/**
- * The unsubmitted text an agent's input box holds, or null. Orca's `terminal read` answers it as
- * `draft` beside the frame and leaves it OUT of the rendered rows: a Kernel whose input box held
- * '[watchdog] wake: api status' (2026-09-25) showed a bare '❯' on every screen read, so a send without
- * Enter, or one whose Enter was dropped, left text no reader saw, and the next send appended to it.
- * Whitespace alone is no draft.
- */
-export const draftText = (terminal) => (typeof terminal?.draft === 'string' && terminal.draft.trim() ? terminal.draft : null);
-
-// --name value CLI arg reader shared by the thin wrappers.
-export const arg = (argv, name, fallback = null) => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : fallback;
-};
-export const flag = (argv, name) => argv.includes(`--${name}`);
 
 const JSON_FLAG = CALLS.defaults?.jsonFlag ?? 'json';
 const ENVELOPE_SCHEMA = CALLS.envelope?.schema ?? 'starci/orca-call-result@1';
@@ -168,42 +138,6 @@ function classify(entry, exitCode, receipt) {
 // before any effect; the listing itself failing to read is the same refusal.
 let liveListing;
 
-const commandName = (c) => typeof c === 'string' ? c
-  : (typeof c?.command === 'string' ? c.command
-    : typeof c?.name === 'string' ? c.name
-      : typeof c?.usage === 'string' ? c.usage.split(/\s+--?/)[0].trim() : null);
-
-function liveFlags(c) {
-  const out = new Set();
-  if (!c || typeof c !== 'object') return out;
-  const raw = c.flags ?? c.options ?? c.arguments ?? [];
-  for (const f of Array.isArray(raw) ? raw : Object.keys(raw)) {
-    const name = typeof f === 'string' ? f : (f?.flag ?? f?.name ?? f?.long ?? null);
-    if (typeof name === 'string') out.add(name.replace(/^--?/, '').split(/[\s=,]/)[0]);
-  }
-  return out;
-}
-
-/** An agent-context `commands` array as Map<command, Set<flag>>, or null. */
-export function listingOf(commands) {
-  if (!Array.isArray(commands)) return null;
-  const listing = new Map();
-  for (const c of commands) {
-    const name = commandName(c);
-    if (name) listing.set(name, liveFlags(c));
-  }
-  return listing.size ? listing : null;
-}
-
-/** The commands calls.yaml requires of `listing`, or null when it satisfies them. */
-export function missingFrom(listing, entry, jsonFlag = JSON_FLAG) {
-  if (!listing) return { listing: 'unreadable' };
-  const flags = listing.get(entry?.command);
-  if (!flags) return { command: entry?.command ?? null };
-  const missing = (entry.flags ?? []).filter((f) => f !== jsonFlag && !flags.has(f));
-  return missing.length ? { command: entry.command, flags: missing } : null;
-}
-
 // Only a read listing is kept: a host that did not answer is asked again at the
 // next mutation instead of refusing every later call of this process.
 let listingHostUnavailable = false;
@@ -219,7 +153,7 @@ function agentContextListing() {
   return liveListing;
 }
 
-const liveDrift = (entry) => missingFrom(agentContextListing(), entry);
+const liveDrift = (entry) => missingFrom(agentContextListing(), entry, JSON_FLAG);
 
 const driftEnvelope = (verb, entry, missing) => ({
   hostUnavailable: missing.listing === 'unreadable' && listingHostUnavailable,

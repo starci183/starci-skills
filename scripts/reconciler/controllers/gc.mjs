@@ -109,7 +109,7 @@ const liveDeps = {
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
   // Orca's worker accounting of one Run (every page).
-  workers: async (run) => (await import('../../api/orca/worker-list.mjs')).workerListAll({ run }),
+  workers: async (run) => (await import('../../machine/worker-list-all.mjs')).workerListAll({ run }),
   worktrees: async ({ env, repos }) => (await import('../../machine/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
   worktreeSettings: async () => (await import('../../machine/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,

@@ -18,9 +18,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { foldCase } from '../lib/path-key.mjs';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
@@ -59,13 +59,13 @@ export function linksUnderRoot(root, { depth = DEFAULT_DEPTH } = {}) {
 }
 
 /** Linked worktrees (not the main checkout) of every repository directly under root, that live under root. */
-export function worktreesUnderRoot(root, { git = (cwd, args) => gitSpawn('git', args, { cwd, timeout: 20_000 }) } = {}) {
+export function worktreesUnderRoot(root, { git = (cwd, args) => worktreeListQuery(args, { cwd, timeout: 20_000 }) } = {}) {
   const found = [];
   let names; try { names = fs.readdirSync(root); } catch { return found; }
   for (const name of names) {
     const repo = path.join(root, name);
     try { if (!fs.statSync(path.join(repo, '.git')).isDirectory()) continue; } catch { continue; }
-    const listed = git(repo, ['worktree', 'list', '--porcelain']);
+    const listed = git(repo, ['--porcelain']);
     if (listed.status !== 0) continue;
     const trees = String(listed.stdout).split(/\r?\n/).filter((line) => line.startsWith('worktree ')).map((line) => path.resolve(line.slice('worktree '.length)));
     for (const tree of trees.slice(1)) if (topOf(root, tree) !== null) found.push({ repo, worktree: tree });

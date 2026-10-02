@@ -8,19 +8,19 @@
 // block, so this module never reads the yaml itself past that one import.
 //
 // Safety, same as everywhere the runtime deletes:
-//   - removal goes through safeRemoveTree only, which never descends into a junction/symlink/reparse point;
+//   - removal goes through safeRemove only, which never descends into a junction/symlink/reparse point;
 //   - a top-level entry that IS a link is skipped outright — the sweep does not even unlink it, because a
 //     stray temp link pointing into a live checkout must be a human's call, not a sweeper's;
 //   - `${TEMP}/claude` is never touched, whatever the prefix list says;
 //   - an entry a live process holds (EBUSY/EPERM) is recorded under `skipped`, never under `errors`;
 //   - a fixture that is a git checkout (.git directory, e.g. work-v3-cli-*) is removed like any other entry:
-//     safeRemoveTree is told the temp root (checkoutsUnder), so its "refusing to remove a git checkout" guard
+//     safeRemove is told the temp root (checkoutsUnder), so its "refusing to remove a git checkout" guard
 //     yields only for a checkout strictly inside the temp root by real path. A checkout whose git metadata
 //     (.git, HEAD, index, logs/HEAD) changed within tmpMaxAgeMs is live and skipped; one outside the temp root
-//     stays refused by safeRemoveTree.
+//     stays refused by safeRemove.
 //
 // The seams are injected so the spec never touches the real TEMP: `env` supplies TEMP/TMP, `now` supplies
-// the clock, `remove` supplies the remover (safeRemoveTree with checkoutsUnder the temp root by default),
+// the clock, `remove` supplies the remover (safeRemove with checkoutsUnder the temp root by default),
 // `allocation` supplies the settings.
 // A dry run (apply:false) removes nothing: would-be-deleted entries land in `skipped` with the 'dry run'
 // reason and their bytes in `freedBytes`, so the report reads "what --apply would free".
@@ -28,7 +28,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
-import { isLinkLike, safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { foldCase } from '../lib/path-key.mjs';
 
@@ -43,7 +44,7 @@ const BUSY_CODES = new Set(['EBUSY', 'EPERM']);
 
 /**
  * The bytes a file or tree occupies, walked with the same never-through-a-link discipline as
- * safeRemoveTree: a link contributes nothing because deleting it frees nothing under its target.
+ * safeRemove: a link contributes nothing because deleting it frees nothing under its target.
  */
 function treeSize(root, parentReal = null) {
   let st;
@@ -102,7 +103,7 @@ export async function sweepTmp({
 }
 
 function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove, out }) {
-  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { hold: artifactHoldReason, checkoutsUnder: tempRoot }));
+  const removeEntry = remove ?? ((target) => safeRemove(target, { hold: artifactHoldReason, checkoutsUnder: tempRoot }));
 
   let parentReal = null;
   try { parentReal = fs.realpathSync.native(tempRoot); } catch { /* isLinkLike resolves it per entry */ }

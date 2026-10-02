@@ -21,8 +21,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { guardsRoot } from './guards-root.mjs';
 import { fileURLToPath } from 'node:url';
-import { gitSpawn } from '../api/git/lib.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { checkIgnore } from '../api/git/check-ignore.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
@@ -105,7 +108,8 @@ export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..')
   return true;
 }
 
-const git = (cwd, args) => gitSpawn('git', ['-C', cwd, ...args], { timeout: 20_000 });
+/** One git call (a scripts/api/git call file) in the repository at `cwd`. */
+const git = (call, cwd, args) => call(args, { dir: cwd, timeout: 20_000 });
 
 export function historyHookBody({ branches = [], verify, nodePath = process.execPath, terminals = terminalsDir() }) {
   const protectedList = [...new Set(['main', 'master', ...branches.filter((b) => /^[A-Za-z0-9._/-]+$/.test(b))])].join(' ');
@@ -172,10 +176,10 @@ exit $status
  * gets husky's own self-ignoring `.gitignore` of `*`.
  */
 function hookTarget(repoRoot, name) {
-  const top = git(repoRoot, ['rev-parse', '--show-toplevel']);
+  const top = git(revParseQuery, repoRoot, ['--show-toplevel']);
   if (top.status !== 0) return { installed: false, reason: 'not-a-git-checkout' };
   const root = path.resolve(top.stdout.trim());
-  const hooks = git(root, ['rev-parse', '--git-path', 'hooks']);
+  const hooks = git(revParseQuery, root, ['--git-path', 'hooks']);
   if (hooks.status !== 0) return { installed: false, reason: 'no-hooks-path' };
   const hooksDir = path.resolve(root, hooks.stdout.trim());
   const file = path.join(hooksDir, name);
@@ -183,7 +187,7 @@ function hookTarget(repoRoot, name) {
   const inWorktree = inside(root, hooksDir) && !inside(path.join(root, '.git'), hooksDir);
   if (inWorktree && !fs.existsSync(file)) {
     const rel = path.relative(root, file).replace(/\\/g, '/');
-    const isIgnored = () => git(root, ['check-ignore', '-q', '--no-index', '--', rel]).status === 0;
+    const isIgnored = () => git(checkIgnore, root, ['-q', '--no-index', '--', rel]).status === 0;
     if (!isIgnored()) {
       // A relative core.hooksPath (husky's .husky/_) resolves per checkout: husky generates that directory, with
       // its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none. A hooks directory
@@ -192,12 +196,12 @@ function hookTarget(repoRoot, name) {
       const relDir = path.relative(root, hooksDir).replace(/\\/g, '/');
       const absent = !fs.existsSync(hooksDir);
       const empty = absent || (fs.statSync(hooksDir).isDirectory() && fs.readdirSync(hooksDir).length === 0);
-      const tracked = git(root, ['ls-files', '--', relDir]);
+      const tracked = git(lsFiles, root, ['--', relDir]);
       if (!empty || tracked.status !== 0 || tracked.stdout.trim()) return { installed: false, reason: 'hooks-dir-tracked', path: file };
       fs.mkdirSync(hooksDir, { recursive: true });
       fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
       if (!isIgnored()) {
-        if (absent) safeRemoveTree(hooksDir, { hold: artifactHoldReason });
+        if (absent) safeRemove(hooksDir, { hold: artifactHoldReason });
         else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
         return { installed: false, reason: 'hooks-dir-tracked', path: file };
       }
@@ -216,7 +220,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   if (target.installed === false) return target;
   const { root, hooksDir, file } = target;
   const branches = [];
-  const list = git(root, ['worktree', 'list', '--porcelain']);
+  const list = git(worktreeListQuery, root, ['--porcelain']);
   if (list.status === 0) for (const line of list.stdout.split(/\r?\n/)) if (line.startsWith('branch refs/heads/')) branches.push(line.slice('branch refs/heads/'.length));
   const body = historyHookBody({ branches, verify: path.join(skillRoot, 'scripts', 'guards', 'verify-commit.mjs'), nodePath, terminals: terminalsDir(skillRoot) });
   if (fs.existsSync(file)) {

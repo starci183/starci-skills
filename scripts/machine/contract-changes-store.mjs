@@ -5,7 +5,9 @@
 // single-file list. Readers go through readContractChangesDoc / readContractChangesDocAt only.
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { lsTree } from '../api/git/ls-tree.mjs';
+import { catFile } from '../api/git/cat-file.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
@@ -42,19 +44,19 @@ export function readContractChangesDoc(root, { dir = path.join(root, CONTRACT_CH
   return mergeContractChanges({ entries });
 }
 
-const gitRun = (cwd, args, input = undefined) => {
-  const r = runGit(args, { cwd, input, maxBuffer: 256 * 1024 * 1024 });
+const gitRun = (call, cwd, args, input = undefined) => {
+  const r = call(args, { cwd, input, maxBuffer: 256 * 1024 * 1024 });
   return r.status === 0 ? String(r.stdout ?? '') : null;
 };
 
 /** The registry at git revision `rev` of the repository at `cwd` (one ls-tree and one cat-file --batch). Null when git cannot read the revision. */
 export function readContractChangesDocAt(cwd, rev) {
-  if (gitRun(cwd, ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`]) == null) return null;
-  const listed = gitRun(cwd, ['ls-tree', '-r', '--name-only', rev, '--', `${CONTRACT_CHANGES_DIR}/`]) ?? '';
+  if (gitRun(revParseQuery, cwd, ['--verify', '--quiet', `${rev}^{commit}`]) == null) return null;
+  const listed = gitRun(lsTree, cwd, ['-r', '--name-only', rev, '--', `${CONTRACT_CHANGES_DIR}/`]) ?? '';
   const rels = listed.split(/\r?\n/).map(norm).filter(isContractChangesPath);
   const want = rels;
   if (!want.length) return mergeContractChanges({ entries: [] });
-  const out = gitRun(cwd, ['cat-file', '--batch'], want.map((f) => `${rev}:${f}`).join('\n') + '\n');
+  const out = gitRun(catFile, cwd, ['--batch'], want.map((f) => `${rev}:${f}`).join('\n') + '\n');
   if (out == null) return null;
   const buf = Buffer.from(out, 'utf8');
   const texts = [];

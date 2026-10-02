@@ -52,8 +52,15 @@ export function specifiersOf(text) {
   return [...found];
 }
 
+/** {ok, files, error}: every path the index of the repository at `dir` tracks (-z keeps any file name), or why git could not list them. */
+const trackedList = (dir) => {
+  const r = lsFiles(['-z', '--cached'], { dir, maxBuffer: 256 * 1024 * 1024 });
+  const ok = !r.error && r.status === 0;
+  return { ok, files: ok ? String(r.stdout).split('\0').filter(Boolean) : [], error: ok ? null : String(r.stderr ?? r.error?.message ?? '').trim() };
+};
+
 /** Tracked source files of `root` (posix, relative), never under the worktrees dir or node_modules. */
-export function trackedSources(root, { list = lsFiles } = {}) {
+export function trackedSources(root, { list = trackedList } = {}) {
   const r = list(root);
   if (!r.ok) throw Object.assign(Error(`git ls-files failed in ${root}: ${String(r.error ?? '').slice(0, 200)}`), { code: 'IMPORT_SCAN_UNAVAILABLE' });
   return r.files.map(posix)

@@ -30,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { starciLocalRoot } from '../../engine/db/machine.mjs';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { realpathOr } from '../lib/fs-kind.mjs';
 

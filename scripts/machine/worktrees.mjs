@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import {
   worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason, pendingPathOf,
   treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ENDED_WORKFLOW_PHASES,
@@ -39,7 +39,7 @@ import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict } from
 import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
 import { mainRootOf, registeredAt, removeScratchWorktree } from './worktree-git.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
-import { isAncestor } from '../api/git/merge-base.mjs';
+import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { branchDescription } from '../api/git/branch-description.mjs';
 import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { pidAlive, machineLog } from '../../engine/db/machine.mjs';

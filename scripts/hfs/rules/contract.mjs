@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { found } from './read.mjs';
-import { safeRemoveTree } from '../../api/fs/safe-remove.mjs';
+import { safeRemove } from '../../api/fs/safe-remove.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
 export const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
@@ -94,7 +94,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
     }
   } finally {
     // A temp directory this rule made itself, in no ledger's repository: no indexed job artifact can live in it.
-    safeRemoveTree(scratch, { hold: () => null });
+    safeRemove(scratch, { hold: () => null });
   }
   return { findings, apps };
 }

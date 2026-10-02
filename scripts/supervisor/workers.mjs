@@ -55,7 +55,7 @@ import { ci } from '../api/npm/ci.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../machine/close-verify.mjs';
 import { machineLoad } from '../machine/host-resources.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
-import { gitSpawn } from '../api/git/lib.mjs';
+import { catFile } from '../api/git/cat-file.mjs'; import { cherry as gitCherry } from '../api/git/cherry.mjs'; import { cherryPick } from '../api/git/cherry-pick.mjs'; import { commitTree } from '../api/git/commit-tree.mjs'; import { config as gitConfig } from '../api/git/config.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { hook as gitHook } from '../api/git/hook.mjs'; import { log as gitLog } from '../api/git/log.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { mergeBaseQuery } from '../api/git/merge-base-query.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { push as gitPush } from '../api/git/push.mjs'; import { remote as gitRemote } from '../api/git/remote.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { statusQuery } from '../api/git/status-query.mjs'; import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs'; const SUPERVISOR_GIT = { 'cat-file': catFile, cherry: gitCherry, 'cherry-pick': cherryPick, 'commit-tree': commitTree, config: gitConfig, diff: gitDiff, hook: gitHook, log: gitLog, 'ls-files': lsFiles, 'merge-base': mergeBaseQuery, 'merge-tree': mergeTree, push: gitPush, remote: gitRemote, 'rev-list': revList, 'rev-parse': revParseQuery, show: gitShow, status: statusQuery, 'symbolic-ref': symbolicRefQuery };
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
@@ -99,9 +99,9 @@ const csv = (v) => (typeof v === 'string' ? v.split(',').map((s) => s.trim()).fi
 const slug = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'fix';
 export const normPath = (p) => posixPath(p).replace(/\/+$/, '');
 
-/** git in `cwd`: {ok, status, stdout, stderr}. */
-export function git(args, { cwd = SKILL_ROOT, input = undefined, env = undefined, timeoutMs = 300_000 } = {}) {
-  const r = gitSpawn('git', args, { cwd, timeout: timeoutMs, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
+/** The supervisor's git runner (land, push-mains, push-git, direct-commits; their `run`/`git` seams take the same argv): `args[0]` names the scripts/api/git call file it runs, in `cwd`: {ok, status, stdout, stderr}. */
+export function git([verb, ...args], { cwd = SKILL_ROOT, input = undefined, env = undefined, timeoutMs = 300_000 } = {}) {
+  const r = (SUPERVISOR_GIT[verb] ?? (() => { throw new Error(`git ${verb}: no scripts/api/git call file in the supervisor's git calls`); }))(args, { cwd, timeout: timeoutMs, input, env: env ?? process.env, maxBuffer: 64 * 1024 * 1024 });
   const timedOut = r.error?.code === 'ETIMEDOUT' || (r.status == null && r.signal === 'SIGTERM');
   return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim(), error: r.error?.message ?? null, ...(timedOut ? { timedOut: true, timeoutMs } : {}) };
 }

@@ -34,10 +34,11 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
 import { loadPins } from './canon-pins.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { diff } from '../api/git/diff.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
 
 export const PROOF_EXIT = Object.freeze({ green: 0, red: 1, unrun: 2 });
 export const PROOF_CODES = Object.freeze({ install: 'PACKAGE_INSTALL_RED', test: 'PACKAGE_TEST_RED', noTest: 'PACKAGE_NO_TEST', unrun: 'PACKAGE_PROOF_UNRUN' });
@@ -122,7 +123,7 @@ export function nodeModulesAbove(dir) {
 
 /** The files git tracks under `dir`, relative to it; null when `dir` is not inside a git work tree. */
 export function gitTrackedUnder(dir) {
-  const r = runGit(['ls-files', '-z', '--', '.'], { cwd: dir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const r = lsFiles(['-z', '--', '.'], { cwd: dir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return r.status === 0 ? String(r.stdout).split('\0').filter(Boolean) : null;
 }
 
@@ -205,7 +206,7 @@ export function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = n
   } catch (error) {
     return every('unrun', PROOF_CODES.unrun, { output: String(error?.stack ?? error) });
   } finally {
-    safeRemoveTree(temp, { hold: artifactHoldReason });
+    safeRemove(temp, { hold: artifactHoldReason });
   }
 }
 
@@ -228,9 +229,9 @@ export function packageCleanTestMain(argv = [], { root = runtimeRoot, out = (s) 
     if (argv[i] === '--changed') { changed = [...(changed ?? [])]; while (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) changed.push(argv[(i += 1)]); }
     else if (argv[i] === '--base' && argv[i + 1]) {
       const range = `${argv[(i += 1)]}..HEAD`;
-      const diff = runGit(['diff', '--name-only', '--no-renames', range], { cwd: root, encoding: 'utf8' });
-      if (diff.status !== 0) { out(`package-clean-test: git diff ${range} failed: ${String(diff.stderr || diff.error?.message || '').trim()}\n`); return PROOF_EXIT.unrun; }
-      changed = [...(changed ?? []), ...String(diff.stdout).split(/\r?\n/).filter(Boolean)];
+      const names = diff(['--name-only', '--no-renames', range], { cwd: root, encoding: 'utf8' });
+      if (names.status !== 0) { out(`package-clean-test: git diff ${range} failed: ${String(names.stderr || names.error?.message || '').trim()}\n`); return PROOF_EXIT.unrun; }
+      changed = [...(changed ?? []), ...String(names.stdout).split(/\r?\n/).filter(Boolean)];
     } else { out(`${USAGE}\n`); return PROOF_EXIT.unrun; }
   }
   const set = publishSet(root);

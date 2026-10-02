@@ -52,7 +52,7 @@ import { pidAlive, starciLocalRoot, withMachine } from '../../engine/db/machine.
 import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, recordAlive, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
-import { listHostProcesses } from '../api/process/process-list.mjs';
+import { processList } from '../api/process/process-list.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 export const TUNNEL_FILE = fileURLToPath(import.meta.url);
@@ -287,7 +287,7 @@ export const probeGateway = async (port, { timeoutMs = 3000 } = {}) => {
 
 /** Every `tunnel.mjs run` process on this host ({pid, commandLine}), or null when the table cannot be read. */
 export function tunnelProcesses() {
-  const rows = listHostProcesses({ where: "Name='node.exe'", match: /tunnel\.mjs\S*\s+run\b/, timeoutMs: 20000 });
+  const rows = processList({ where: "Name='node.exe'", match: /tunnel\.mjs\S*\s+run\b/, timeoutMs: 20000 });
   return rows ? rows.filter((p) => p.pid !== process.pid).map((p) => ({ pid: p.pid, commandLine: p.cmd })) : null;
 }
 

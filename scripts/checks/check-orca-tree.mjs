@@ -41,7 +41,7 @@ import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { SCHEMA, readTerminals, readWorkers, ledgerRuns, orcaTreeFindings, formatFinding } from '../supervisor/orca-tree.mjs';
 

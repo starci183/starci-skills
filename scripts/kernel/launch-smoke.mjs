@@ -54,9 +54,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { show as gitShow } from '../api/git/show.mjs'; import { branchList } from '../api/git/branch-list.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs'; import { isMain } from '../lib/is-main.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
@@ -136,10 +136,10 @@ export async function defaultClient() {
       sideOf: wt.sideOf, canDispatchConcurrently: wt.canDispatchConcurrently, release: wt.releaseWorkflowWorktree,
       checkpointOp: cp.checkpointOp, gateBaseOf: tree.gateBaseOf, preserveAndReset: cp.preserveAndReset, finish: cp.finishWorkflow,
     },
-    git: (args, dir) => gitResult(args, { dir }),
+    git: (args, dir) => smokeGit(args, dir),
   };
 }
-
+const SMOKE_CALLS = { 'rev-parse': revParseQuery, 'ls-files': lsFiles, status: gitStatus, show: gitShow, branch: (rest, options) => branchList(rest.filter((a) => a !== '--list'), options) }; /* the smoke's git calls by verb: the git seam takes the whole argv */ const smokeGit = ([verb, ...rest], dir) => (verb === 'merge-base' && rest[0] === '--is-ancestor' ? { ok: isAncestor(dir, rest[1], rest[2]), stdout: '', error: '' } : gitResultOf(SMOKE_CALLS[verb](rest, { dir })));
 // ------------------------------------------------------------------ state directory
 /** Where every smoke run keeps its state directory. */
 export const stateParentOf = (tmp = os.tmpdir()) => path.join(tmp, 'starci-launch-smoke');
@@ -613,7 +613,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     // A workflow that never finished, or a worktree the controller never removed, is still given back (link check,
     // Orca's worktree removal, the row closed).
     if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await settleAsync(() => orca.workflow.release(orca.ctx, workflowId));
-    safeRemoveTree(state, { hold: artifactHoldReason });
+    safeRemove(state, { hold: artifactHoldReason });
   }
   for (const [name, roles] of Object.entries(PATHS)) {
     const problems = [];

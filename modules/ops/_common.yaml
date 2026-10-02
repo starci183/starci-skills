@@ -454,7 +454,7 @@ sections:
         and the workflow worktree that Orca creates at Kernel start and the runtime's host-side controller removes after
         the workflow's finish). Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `del /s`,
         `robocopy /MIR` or `/PURGE`, `Remove-Item -Recurse` and its aliases; RECURSIVE_DELETE): a recursive delete
-        follows a junction into the live tree; a tree goes only through the runtime's safeRemoveTree
+        follows a junction into the live tree; a tree goes only through the runtime's safeRemove
         (scripts/api/fs/safe-remove.mjs), one junction is removed with `cmd /c rmdir <path>` (no /s), one file with
         `rm <file>`. Never start an agent or a terminal outside Orca's supervision: no raw terminal create
         (RAW_TERMINAL_CREATE) and no headless agent CLI (`codex exec`, `claude -p`/`--print`, `cursor-agent -p`,

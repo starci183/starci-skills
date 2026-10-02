@@ -4,7 +4,8 @@
 //   node scripts/api/orca/run-create.mjs --objective <text> --request <identity json> [--from <handle>]
 // Returns {ok, runId, result, request} — runId is result.run.id. `request` is the caller's ledger identity: calls.yaml
 // declares run-create replay: request, so the first issue carries the --retry-request id derived from it.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 import { isMain } from '../../lib/is-main.mjs';
 
 export function runCreate({ objective, from, request }) {

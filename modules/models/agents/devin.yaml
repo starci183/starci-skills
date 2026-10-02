@@ -73,7 +73,7 @@ knownFailures:
     action: 'Send "5" + Enter once (session bypass) — do not answer individual allows, they re-prompt per command kind.'
     seenAt: 2026-09-20
   - signal: 'devin opens a login menu instead of a prompt'
-    meaning: 'Missing credentials, or ACP_BACKEND leaked into the Orca host (scripts/api/orca/lib.mjs hostLaunchEnv strips it).'
+    meaning: 'Missing credentials, or ACP_BACKEND leaked into the Orca host (scripts/lib/host-launch-env.mjs hostLaunchEnv strips it).'
     action: devin auth login, or restart the Orca host without ACP_BACKEND.
     seenAt: 2026-09-20
   - signal: 'Client error: Protocol error (unimplemented): We are currently experiencing capacity issues with this serving model.'

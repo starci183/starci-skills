@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { workerOutput, messageText, SOURCE_CHANGED } from '../../scripts/api/orca/worker-read.mjs';
+import { workerOutput } from '../../scripts/machine/worker-output.mjs';
+import { messageText } from '../../scripts/lib/transcript-text.mjs';
+
+const SOURCE_CHANGED = 'source_changed';
 import { readWorkerOutput, snapshotOpenAttempts, snapshotSeats, finalizeAttemptTranscript, outputHeader } from '../../scripts/kernel/transcripts.mjs';
 import { closeOperationTerminal } from '../../scripts/kernel/close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
@@ -161,7 +164,7 @@ test('closeOperationTerminal reads no output: the transcript is the caller\'s wo
 });
 
 test('a worker without a PTY reads unverified, never gone: terminal_unsupported_for_agent_session is no gone code', async () => {
-  const { TERMINAL_GONE_CODES } = await import('../../scripts/api/orca/terminal-show.mjs');
+  const { TERMINAL_GONE_CODES } = await import('../../scripts/lib/orca-terminal.mjs');
   assert.equal(TERMINAL_GONE_CODES.has('terminal_unsupported_for_agent_session'), false);
   assert.equal(TERMINAL_GONE_CODES.has('terminal_handle_stale'), true);
 });

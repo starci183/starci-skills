@@ -38,7 +38,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { hhmmss } from '../lib/time.mjs';
 import { classifyAgentScreen } from '../lib/terminal-liveness.mjs';
 import { orcaTreeFindings, readTerminals, formatFinding, ledgerRuns } from './orca-tree.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';

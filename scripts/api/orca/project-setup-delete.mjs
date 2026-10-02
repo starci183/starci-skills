@@ -4,7 +4,8 @@
 // Removes a project host setup. A repo-backed setup's id is the repo id `repo add` answered, and deleting it removes the
 // repository registration (Orca has no `repo rm`): a live spec that registered a throwaway repository removes it here.
 // Returns {ok, error, errorCode, hostUnavailable}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function projectSetupDelete({ setup }) {
   const r = orcaCall('project-setup-delete', { setup });

@@ -5,7 +5,8 @@
 // Binds the Run to --from as its coordinator. Returns {ok, run, errorCode, error, request, hostUnavailable}.
 // calls.yaml declares run-use replay: request (a repeated run-use fences live Dispatches): its ledger identity is the
 // pair it binds, {run, from}, so a lost receipt replays the recorded rebind instead of issuing a second one.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function runUse({ id, from }) {
   const r = orcaCall('run-use', { id, from }, { request: { run: id, from } });

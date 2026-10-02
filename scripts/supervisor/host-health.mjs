@@ -2,19 +2,20 @@
 // counts, the parents holding the most of them, and the per-owner grouping each bottleneck sample records. A count
 // over its threshold is reported, never stopped.
 import os from 'node:os';
-import { killProcessTree } from '../api/process/kill-tree.mjs';
-import { listHostProcesses, listHostProcessesAsync } from '../api/process/process-list.mjs';
+import { killTree } from '../api/process/kill-tree.mjs';
+import { processList } from '../api/process/process-list.mjs';
+import { processListAsync } from '../api/process/process-list-async.mjs';
 
 /** Every process on this host: [{pid, ppid, name, exe, cmd, ws, created, cpu}] (cpu: % of one core), or null when unreadable. */
 export function listProcesses({ platform = process.platform, run = undefined } = {}) {
   if (platform !== 'win32') return null;
-  return listHostProcesses({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
+  return processList({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
 }
 
 /** listProcesses without blocking the thread (the reconciler engine's read): same rows, or null. */
 export function listProcessesAsync({ platform = process.platform, run = null } = {}) {
   if (platform !== 'win32') return Promise.resolve(null);
-  return listHostProcessesAsync({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
+  return processListAsync({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
 }
 
 const indexOf = (procs) => {
@@ -62,7 +63,7 @@ export function hostVerdict(procs, { maxNode, maxGit }) {
 
 /** Stop one process tree, forced. {ok, rootPid, output}. */
 export function stopTree(rootPid, { platform = process.platform, run = undefined } = {}) {
-  const r = killProcessTree(rootPid, { platform, run, timeoutMs: 120_000 });
+  const r = killTree(rootPid, { platform, run, timeoutMs: 120_000 });
   return { ok: r.ok, rootPid, output: r.output };
 }
 

@@ -2,7 +2,7 @@
 import { orcaSettings } from '../../engine/orca-config.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerListAll } from '../machine/worker-list-all.mjs';
 import { dispatchDepthOf, launchDepth, depthVerdict, dispatchOfTerminal } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { launchedDispatchOf } from './launched-terminals.mjs';

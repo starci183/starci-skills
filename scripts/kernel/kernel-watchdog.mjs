@@ -33,7 +33,7 @@ import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefuse
 import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
-import { sleepSync } from '../api/orca/lib.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).

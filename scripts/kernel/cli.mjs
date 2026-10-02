@@ -81,7 +81,8 @@ import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -148,7 +149,7 @@ import { attributeRedGate, failingFromText, peerRouteOf } from './gate-attributi
 import { accountList } from '../api/orca/account-list.mjs';
 import { runCreate } from '../api/orca/run-create.mjs';
 import { salvageUnfiledReport, unfiledReportCandidates } from './report-salvage.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { gitResultOf } from '../lib/git.mjs';
 import { hostWideDisconnectOf } from './host-event.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
@@ -4079,7 +4080,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, workflowWorktr
       let dir = path.resolve(value);
       while (true) {
         if (fs.existsSync(dir)) {
-          const root = gitResult(['rev-parse', '--show-toplevel'], { dir, timeout: 10_000 });
+          const root = gitResultOf(revParseQuery(['--show-toplevel'], { dir, timeout: 10_000 }));
           if (root.ok && root.stdout.trim()) return path.resolve(root.stdout.trim());
         }
         const parent = path.dirname(dir);

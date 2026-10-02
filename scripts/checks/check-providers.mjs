@@ -2,7 +2,7 @@ import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {agentContext} from '../api/orca/agent-context.mjs';
-import {missingFrom} from '../api/orca/lib.mjs';
+import {missingFrom} from '../lib/orca-listing.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';

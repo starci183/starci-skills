@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { TEST_REGISTRY_ENV, openMachine } from '../../engine/db/machine.mjs';
-import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { safeRemove } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export function fakeCtx(overrides = {}) {
@@ -90,7 +90,7 @@ export function tempState({ prefix = 'starci-reconciler-' } = {}) {
     close() {
       for (const x of owned.reverse()) { try { x.close(); } catch { /* closed */ } }
       try { db.close(); } catch { /* closed */ }
-      try { safeRemoveTree(dir, { hold: artifactHoldReason }); } catch { /* best effort */ }
+      try { safeRemove(dir, { hold: artifactHoldReason }); } catch { /* best effort */ }
     },
   };
 }

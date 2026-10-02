@@ -25,7 +25,7 @@ import { snapshotCommit } from '../../scripts/api/git/snapshot-commit.mjs';
 import { reserveOrcaSlot } from '../../scripts/machine/worktree-orca.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
-import { linksUnder } from '../../scripts/api/fs/safe-remove.mjs';
+import { linksUnder } from '../../scripts/api/fs/links-under.mjs';
 import { scanWorktreeAdd, strayLines } from '../../scripts/checks/check-worktree-add.mjs';
 import { collectLanes, readLaneCursor, writeLaneCursor } from '../../scripts/supervisor/gc.mjs';
 import { createGcController } from '../../scripts/reconciler/controllers/gc.mjs';

@@ -4,7 +4,8 @@
 //   node scripts/api/orca/worktree-create.mjs --repo <sel> --name <n> [--base-branch <ref>] [--setup run|skip|inherit] [--comment <t>]
 // Always a top-level row (--no-parent). Orca picks the path and the branch (its name with '/' turned into '-', a -2
 // suffix when taken); the receipt's worktree is what the caller records. Returns {ok, worktree: {id, path, branch, head}, error}.
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 const branchOf = (ref) => (ref ? String(ref).replace(/^refs\/heads\//, '') : null);
 

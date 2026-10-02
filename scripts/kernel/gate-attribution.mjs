@@ -39,7 +39,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findOwnedPathLeaseConflicts, leaseCompareForm, normalizeOwnedPath, ownedPathLeaseRequests, ownedPathsIntersect } from '../../engine/admission.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { gitResultOf } from '../lib/git.mjs';
+
+// The git calls of the attribution, by verb (the `git` seam takes the whole argv): each through its scripts/api/git call file.
+const ATTRIBUTION_CALLS = { status: gitStatus, log: gitLog };
 import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -143,11 +148,11 @@ function locateFailing(value, { repo, roots }) {
  * attributeRedGate(db, {repo, job, failing, canon?, git?}) ->
  *   {class, files:[{path, owner, via?, workflowId?, jobId?, commit?}], peers:[{workflowId, via, jobId?, commit?, files[]}]}
  * `canon` is the ledger's lease canonicalizer (scripts/kernel/lease-canon.mjs; its `binding` names the
- * project's other repositories); `git(args, dir)` returns gitResult's {ok, stdout} and defaults to git
+ * project's other repositories); `git(args, dir)` returns {ok, stdout} (scripts/lib/git.mjs gitResultOf) and defaults to git
  * in `dir` (the repository holding the file).
  */
 export function attributeRedGate(db, { repo, job, failing = [], canon = null, git = null }) {
-  const run = git ?? ((args, dir = repo) => gitResult(args, { dir, timeout: 20_000 }));
+  const run = git ?? (([verb, ...rest], dir = repo) => gitResultOf(ATTRIBUTION_CALLS[verb](rest, { dir, timeout: 20_000 })));
   const payload = payloadOf(job);
   const op = job.op_id ?? payload.opId ?? null;
   const canonical = (file) => (canon ? canon.canonical(file, { op, payload }) : file);

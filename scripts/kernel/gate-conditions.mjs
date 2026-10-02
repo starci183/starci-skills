@@ -30,7 +30,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { lsTree } from '../api/git/ls-tree.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundation-registry.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -210,8 +212,8 @@ export const conditionLabel = (cond) => {
   }
 };
 
-const git = (repo, args) => {
-  const r = runGit(args, { dir: repo, timeout: GIT_TIMEOUT_MS });
+const git = (call, repo, args) => {
+  const r = call(args, { dir: repo, timeout: GIT_TIMEOUT_MS });
   return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? r.error?.message ?? '').trim() };
 };
 /**
@@ -294,11 +296,11 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
     if (cond.type === 'commit') {
       const repoAbs = path.isAbsolute(cond.repo) ? cond.repo : path.join(repo, cond.repo);
       if (!fs.existsSync(repoAbs)) return { met: false, evidence: `${cond.repo} absent` };
-      const ref = git(repoAbs, ['rev-parse', '--verify', '--quiet', `${cond.target}^{commit}`]);
+      const ref = git(revParseQuery, repoAbs, ['--verify', '--quiet', `${cond.target}^{commit}`]);
       if (ref.ok && ref.out) return { met: true, evidence: `${cond.repo} ${cond.target} = ${ref.out.slice(0, 12)}` };
-      const tree = git(repoAbs, ['ls-tree', '--name-only', 'HEAD', '--', cond.target]);
+      const tree = git(lsTree, repoAbs, ['--name-only', 'HEAD', '--', cond.target]);
       if (tree.ok && tree.out) {
-        const head = git(repoAbs, ['log', '-1', '--format=%H', 'HEAD', '--', cond.target]);
+        const head = git(gitLog, repoAbs, ['-1', '--format=%H', 'HEAD', '--', cond.target]);
         return { met: true, evidence: `${cond.repo}:${cond.target} committed at HEAD (last touched ${head.out.slice(0, 12) || '?'})` };
       }
       return { met: false, evidence: `${cond.repo}: ${cond.target} is neither a commit nor committed at HEAD` };

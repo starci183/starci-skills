@@ -46,7 +46,7 @@ export const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);
 export function baseRevision(repoRoot) {
   for (const ref of ['main', 'origin/main']) {
     const sha = mergeBase(repoRoot, 'HEAD', ref);
-    if (sha) return { sha, show: (file) => show(repoRoot, sha, file) };
+    if (sha) return { sha, show: (file) => { const r = show([`${sha}:${file}`], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 }); return !r.error && r.status === 0 ? r.stdout : null; } };
   }
   return null;
 }

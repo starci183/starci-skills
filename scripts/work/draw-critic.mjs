@@ -27,7 +27,10 @@ import path from 'node:path';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import crypto from 'node:crypto';
-import { gitResult } from '../api/git/lib.mjs';
+import { hashObject } from '../api/git/hash-object.mjs';
+import { commitTree } from '../api/git/commit-tree.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 import { createOrcaWorktree, removeOrcaWorktree } from '../machine/worktree-orca.mjs';
 import { opContextOf } from '../guards/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
@@ -36,7 +39,7 @@ import { startAgent } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
-import { orchCheck } from '../api/orca/orch-check.mjs';
+import { check as orcaCheck } from '../api/orca/check.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 
 export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
@@ -198,7 +201,7 @@ function clientOf(orca) {
     show: o.workerShow ?? workerShow,
     stop: o.workerStop ?? workerStop,
     release: o.workerRelease ?? workerRelease,
-    check: o.check ?? orchCheck,
+    check: o.check ?? orcaCheck,
     taskUpdate: o.taskUpdate ?? taskUpdate,
   };
 }
@@ -213,10 +216,10 @@ function clientOf(orca) {
  */
 export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context = opContextOf(), env = process.env, orca = undefined } = {}) {
   if (!repoRoot) return { ok: false, error: `no git repository at ${slash(process.cwd())} to place the critic worktree in` };
-  const git = (args, input = undefined) => gitResult(['-c', 'user.name=StarCi runtime', '-c', 'user.email=runtime@starci.invalid', ...args], { cwd: repoRoot, input });
-  const tree = git(['hash-object', '-t', 'tree', '-w', '--stdin'], '');
+  const git = (call, args, input = undefined) => gitResultOf(call(args, { cwd: repoRoot, input, config: { 'user.name': 'StarCi runtime', 'user.email': 'runtime@starci.invalid' } }));
+  const tree = git(hashObject, ['-t', 'tree', '-w', '--stdin'], '');
   if (!tree.ok) return { ok: false, error: `empty tree: ${tree.error}` };
-  const commit = git(['commit-tree', tree.stdout.trim(), '-m', 'draw critic placement (empty tree)']);
+  const commit = git(commitTree, [tree.stdout.trim(), '-m', 'draw critic placement (empty tree)']);
   if (!commit.ok) return { ok: false, error: `empty commit: ${commit.error}` };
   const made = createOrcaWorktree({ repoRoot, kind: 'critic', name: `draw-critic-${crypto.randomBytes(4).toString('hex')}`, base: commit.stdout.trim(), cap: null, env,
     owner: { workflowId: context?.workflowId ?? null, jobId: context?.jobId ?? null }, ...(orca ? { orca } : {}) });
@@ -228,7 +231,7 @@ export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, en
   return removeOrcaWorktree({ repoRoot, orcaId, dir, branch, deleteBranch: branch ? 'force' : null, env, ...(orca ? { orca } : {}) });
 }
 
-const gitRootOf = (cwd) => { const r = gitResult(['rev-parse', '--show-toplevel'], { cwd }); return r.ok && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
+const gitRootOf = (cwd) => { const r = gitResultOf(revParseQuery(['--show-toplevel'], { cwd })); return r.ok && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
 
 /**
  * Start the critic worker on its placement `dir` through worker-start (startAgent: run-create --from `entry`,

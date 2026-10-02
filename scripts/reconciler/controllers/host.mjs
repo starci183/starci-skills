@@ -205,7 +205,7 @@ export function createHostController(deps = {}) {
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../machine/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
   // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
-  const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../api/orca/worker-list.mjs')).activeWorkersAllRuns());
+  const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../machine/worker-list-all.mjs')).activeWorkersAllRuns());
   // The handles a responding Orca lists, or null when it does not answer (read-only: runs in both modes).
   const terminalHandles = deps.terminalHandles ?? (async () => {
     const r = await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST)], { timeoutMs: 60_000 });

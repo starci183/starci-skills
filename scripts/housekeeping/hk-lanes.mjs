@@ -20,8 +20,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gitResult } from '../api/git/lib.mjs';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { reflog as gitReflog } from '../api/git/reflog.mjs';
+import { revParseQuery } from '../api/git/rev-parse-query.mjs';
+import { mergeBase } from '../api/git/merge-base.mjs';
+import { worktreeListQuery } from '../api/git/worktree-list-query.mjs';
+import { worktreePrune } from '../api/git/worktree-prune.mjs';
+import { statusQuery as gitStatus } from '../api/git/status-query.mjs';
+import { cherry as gitCherry } from '../api/git/cherry.mjs';
+import { revList } from '../api/git/rev-list.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { diffTree } from '../api/git/diff-tree.mjs';
+import { log as gitLog } from '../api/git/log.mjs';
+import { branchDelete } from '../api/git/branch-delete.mjs';
+import { gitResultOf } from '../lib/git.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -117,8 +129,27 @@ export function laneActivity({ worktree, branch, root, run }) {
  * nothing. `git` is an injectable runner `(args, {cwd}) -> {ok, stdout, error}`.
  * Returns {ok, apply, at, lanesRoot, freedBytes, removed, wouldRemove, skipped, errors}.
  */
+// The git calls of a lane sweep (this one and scripts/supervisor/gc.mjs collectLanes), by verb: the `git` seam takes the
+// whole argv (a spec's fake), so the default picks the call file each verb names (scripts/api/git/) and folds its result
+// to {ok, stdout, error}.
+const LANE_CALLS = {
+  reflog: (rest, opts) => gitResultOf(gitReflog(rest, opts)),
+  'rev-parse': (rest, opts) => gitResultOf(revParseQuery(rest, opts)),
+  'merge-base': ([a, b], { cwd }) => { const sha = mergeBase(cwd, a, b); return { ok: Boolean(sha), stdout: sha ?? '', error: sha ? '' : `no merge-base of ${a} and ${b}` }; },
+  worktree: ([sub, ...rest], opts) => (sub === 'list' ? gitResultOf(worktreeListQuery(rest, opts)) : (({ ok, stdout, stderr }) => ({ ok, stdout, error: stderr }))(worktreePrune(opts.cwd))),
+  status: (rest, opts) => gitResultOf(gitStatus(rest, opts)),
+  cherry: (rest, opts) => gitResultOf(gitCherry(rest, opts)),
+  'rev-list': (rest, opts) => gitResultOf(revList(rest, opts)),
+  diff: (rest, opts) => gitResultOf(gitDiff(rest, opts)),
+  'diff-tree': (rest, opts) => gitResultOf(diffTree(rest, opts)),
+  log: (rest, opts) => gitResultOf(gitLog(rest, opts)),
+  branch: ([, branch], { cwd }) => { const r = branchDelete({ repoRoot: cwd, branch, mode: 'merged' }); return { ok: r.ok, stdout: '', error: r.detail ?? '' }; },
+};
+/** The default lane git runner: (args, {cwd}) -> {ok, stdout, error}. */
+export const laneGit = ([verb, ...rest], opts) => LANE_CALLS[verb](rest, opts);
+
 export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
-  const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
+  const run = git ?? laneGit;
   const base = lanesRoot({ env, config });
   const out = { ok: true, apply: apply === true, at: new Date(now).toISOString(), lanesRoot: base, freedBytes: 0, removed: [], wouldRemove: [], skipped: [], errors: [] };
   const skip = (p, reason, detail = null) => out.skipped.push({ path: p, reason, ...(detail ? { detail } : {}) });
@@ -166,7 +197,7 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }
-    const removed = safeRemoveWorktree(w.path, { repo: root, git: run });
+    const removed = safeRemoveWorktree(w.path, { repo: root, git });
     // A removal that changed the main checkout stops housekeeping's lane pass at once (safe-remove.mjs mainCheckoutGuard).
     if (removed.fatal) { fail(w.path, `main checkout damaged: ${(removed.damage ?? []).join('; ')}`); out.stopped = { path: w.path, damage: removed.damage }; break; }
     if (!removed.ok) { fail(w.path, (removed.errors ?? [])[0]?.message || removed.reason || 'worktree removal failed'); continue; }

@@ -10,7 +10,7 @@ import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
 import { walkFiles } from '../../lib/walk.mjs';
 import {blobPath} from '../../../engine/db/blob.mjs';
 import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
-import { runGit } from '../../api/git/lib.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs';
 import {sealedLocationProblem} from './check-work-artifacts.mjs'; import { isMain } from '../../lib/is-main.mjs';
 
 /**
@@ -145,7 +145,7 @@ export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
  */
 export function trackedFilesUnder(dir) {
-  const r = runGit(['ls-files', '-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
+  const r = lsFiles(['-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
   if (r.error || r.status !== 0) return [];
   return r.stdout.split('\0').filter(Boolean).map((rel) => path.join(dir, rel));
 }

@@ -1,7 +1,7 @@
 // The orchestration drain (scripts/kernel/verbs/shared/worker-messages.mjs drainWorkflowMessages, map REPLACE #7): every Run of a
 // workflow is read through Orca's consuming check naming the Kernel terminal, every message of a Delivery is written into
 // the ledger in ONE transaction, and the Delivery is acknowledged only after that commit. A replayed Delivery writes
-// nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the orch-check
+// nothing twice. worker_done rows are settlement's hand-off (workerDoneOf). The check is a fake of the scripts/api/orca/check.mjs
 // wrapper: nothing reaches a host.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ function fixture(t) {
 const msg = (id, type, extra = {}) => ({ id, run_id: RUN, from_handle: `dispatch:${DISPATCH}`, to_handle: `run:${RUN}`, type,
   subject: type, body: `${type} ${id}`, thread_id: null, payload: JSON.stringify({ dispatchId: DISPATCH, taskId: 'task_op', ...extra }), created_at: '2026-10-01T00:00:00Z' });
 
-/** A fake orch-check: `batches` are the Deliveries in order; one replays until acked. `trace` records calls and commits. */
+/** A fake check call: `batches` are the Deliveries in order; one replays until acked. `trace` records calls and commits. */
 function fakeCheck(batches, trace, { fenceFor = null, ackFails = false } = {}) {
   let i = 0;
   return ({ run, terminal, ack = null }) => {

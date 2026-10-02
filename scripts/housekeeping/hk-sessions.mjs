@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isLinkLike } from '../api/fs/safe-remove.mjs';
+import { isLinkLike } from '../api/fs/is-link-like.mjs';
 import { pathKey, samePath, slash } from '../lib/path-key.mjs';
 import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { allocationSettings } from '../../engine/config.mjs';

@@ -1,7 +1,7 @@
 // Orchestration messages of a workflow's Orca Runs, bridged into the ledger, and the worker questions read from it.
 //
 // Transport (orca-deep-map REPLACE #7): each Run's coordinator inbox is drained through Orca's consuming
-// `orchestration check --run <run> --terminal <kernel>` (scripts/api/orca/orch-check.mjs). A Delivery is up to 50
+// `orchestration check --run <run> --terminal <kernel>` (scripts/api/orca/check.mjs). A Delivery is up to 50
 // messages of every type and replays until it is acknowledged, so the order is: check, write EVERY message of the
 // Delivery into the ledger in one transaction, and only after that commit `--ack <delivery>` (the ack call returns the
 // next Delivery). A crash between the commit and the ack replays the Delivery; every write is keyed by the Orca message
@@ -18,7 +18,7 @@
 // The ledger rows are what survives Orca's inbox and what the Kernel reads through api (status, questions, messages).
 import { JOB_STATUSES, postInbox, setInboxStatusByKey } from '../../../../engine/db/ledger.mjs';
 import { parseJson } from '../../../lib/json.mjs';
-import { orchCheck } from '../../../api/orca/orch-check.mjs';
+import { check as orcaCheck } from '../../../api/orca/check.mjs';
 import { JOB_ROW } from '../../../machine/job-row.mjs';
 import { contractDispatchIdOf, jobPayloadOf, operationTerminalHandleOf } from './rows.mjs';
 
@@ -167,7 +167,7 @@ export const closeStaleQuestions = (db, workflowId, at = Date.now()) => {
  * is never re-bound. `check` replaces the Orca wrapper (specs).
  * {ok, runs, deliveries, questions, messages, heartbeats, closed, errors[{runId, code, error}], error}.
  */
-export function drainWorkflowMessages(ledger, workflowId, { check = orchCheck, rebind = null, maxDeliveries = MAX_DELIVERIES_PER_DRAIN } = {}) {
+export function drainWorkflowMessages(ledger, workflowId, { check = orcaCheck, rebind = null, maxDeliveries = MAX_DELIVERIES_PER_DRAIN } = {}) {
   const db = ledger.db;
   const runIds = [...workflowRunIdsOf(db, workflowId)];
   const out = { ok: true, runs: runIds, deliveries: 0, questions: 0, messages: 0, heartbeats: 0, closed: 0, errors: [], error: null };

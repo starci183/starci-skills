@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { brokenImports } from '../import-scan.mjs';
 import { fileURLToPath } from 'node:url';
-import { runGit } from '../../api/git/lib.mjs';
+import { revParseQuery } from '../../api/git/rev-parse-query.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
@@ -37,7 +37,7 @@ export function importTreesOf(db, { workflowId, worktreeOf = (id) => workflowWor
 }
 
 const stateKey = (tree) => {
-  const r = runGit(['rev-parse', 'HEAD'], { cwd: tree.path, timeout: 60_000 });
+  const r = revParseQuery(['HEAD'], { cwd: tree.path, timeout: 60_000 });
   return `${tree.path}\0${String(r.stdout ?? '').trim()}`;
 };
 

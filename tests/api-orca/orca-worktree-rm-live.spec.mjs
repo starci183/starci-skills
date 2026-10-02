@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { orcaStatus } from '../../scripts/api/orca/status.mjs';
+import { status } from '../../scripts/api/orca/status.mjs';
 import { repoAdd } from '../../scripts/api/orca/repo-add.mjs';
 import { projectSetupDelete } from '../../scripts/api/orca/project-setup-delete.mjs';
 import { worktreeCreate } from '../../scripts/api/orca/worktree-create.mjs';
@@ -37,7 +37,7 @@ function unavailable() {
   if (!ORCA_LIVE_OPT_IN) return 'a live Orca probe runs only with STARCI_ORCA_LIVE=1 or STARCI_REQUIRE_ORCA_LIVE=1';
   if (process.platform !== 'win32') return 'the junction probe is Windows-only (mklink /J)';
   if (process.env.STARCI_ORCA_COMMAND || process.env.STARCI_ORCA_ARGS) return 'STARCI_ORCA_COMMAND points at a stub, not the real Orca';
-  const st = orcaStatus();
+  const st = status();
   return st.ok && st.reachable ? null : `orca runtime not reachable (${String(st.error ?? st.state ?? 'no answer').slice(0, 120)})`;
 }
 const reason = unavailable();

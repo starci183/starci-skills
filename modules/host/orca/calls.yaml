@@ -275,7 +275,7 @@ calls:
       Consuming FIFO Delivery of a Run's coordinator inbox: up to 50 messages of every type in
       {runId, deliveryId, messages[], acknowledged}; the same Delivery replays until --ack names it, and
       check --ack <delivery> acknowledges it (idempotently) and returns the next one. Issued only through
-      scripts/api/orca/orch-check.mjs. scripts/kernel/verbs/shared/worker-messages.mjs drains each workflow Run with
+      scripts/api/orca/check.mjs. scripts/kernel/verbs/shared/worker-messages.mjs drains each workflow Run with
       --run <run> --terminal <Kernel terminal>, writes every message into the ledger in one transaction and
       acks only after that commit (map REPLACE #7). Smoke E2 (2026-10-01, Orca 1.4.209): a process outside
       any Orca terminal is accepted; only a terminal that is no longer the Run's coordinator (a newer
@@ -292,7 +292,7 @@ calls:
     receipt: [result]
     note: >-
       Answers one worker `question` message; the worker's blocking ask returns with the body. Issued only by
-      `api reply` (scripts/api/orca/orch-reply.mjs) from the Kernel's own terminal, so Orca resolves --from to
+      `api reply` (scripts/api/orca/reply.mjs) from the Kernel's own terminal, so Orca resolves --from to
       the Run's coordinator. No retry-request replay: a duplicate reply is a second message, so an unknown
       result is never re-issued; the question stays pending in the ledger for the Kernel to decide.
   send:

@@ -6,7 +6,8 @@
 // mutation and what `scripts/checks/check-providers.mjs --live` compares in bulk.
 // Returns {ok, commands, listing, schemaVersion} — listing is
 // Map<command, Set<flag>>.
-import { orcaCall, listingOf } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { listingOf } from '../../lib/orca-listing.mjs';
 
 export function agentContext() {
   const r = orcaCall('agent-context');

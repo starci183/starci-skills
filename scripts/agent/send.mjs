@@ -3,7 +3,7 @@
 //   node scripts/agent/send.mjs --terminal <h> --agent <a>
 //     (--text <t> | --text-file <f>) [--worktree <path>] [--dispatch-id <id>] [--no-await]
 // --agent loads the adapter card for delivery mode + submission patterns.
-import { arg, flag } from '../api/orca/lib.mjs';
+import { arg, flag } from '../lib/cli-arg.mjs';
 import { loadAdapter, deliverPrompt, awaitSubmission, awaitAttestation } from './lib.mjs';
 import { cleanupDeliveryArtifact } from './delivery-artifact.mjs';
 import fs from 'node:fs';

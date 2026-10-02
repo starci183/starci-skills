@@ -53,7 +53,10 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
 import { allowsFile } from './allows.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
-import { gitOutput } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { diff as gitDiff } from '../api/git/diff.mjs';
+import { mergeBase } from '../api/git/merge-base.mjs';
+import { gitOutputOf } from '../lib/git.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './tree.mjs';
 import { contractFindings } from './rules/contract.mjs';
@@ -120,7 +123,7 @@ export function readWhy(root = skillRoot, codes = CHECK_CODES) {
 export function trackedFiles(repoRoot) {
   let out;
   try {
-    out = gitOutput(['ls-files', '-z', '--cached', '--exclude-standard'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
+    out = gitOutputOf(lsFiles(['-z', '--cached', '--exclude-standard'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files');
   } catch (error) {
     refuse('HFS_REPO_UNREADABLE', `${repoRoot} is not a readable Git work tree (${String(error?.stderr ?? error?.message ?? error).trim().split('\n')[0]})`, { repoRoot });
   }
@@ -356,15 +359,11 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
 // ------------------------------------------------------------------------------------------ the whole check
 
-const gitOut = (repoRoot, args) => gitOutput(args, { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
-
 /** The merge-base of HEAD with `base`, else with origin/main, else with main; null when none resolves. */
 function mergeBaseOf(repoRoot, base) {
   for (const ref of base ? [base] : ['origin/main', 'main']) {
-    try {
-      const sha = gitOut(repoRoot, ['merge-base', 'HEAD', ref]).trim();
-      if (sha) return sha;
-    } catch { /* this ref has no merge-base with HEAD; try the next */ }
+    const sha = mergeBase(repoRoot, 'HEAD', ref); // null: this ref has no merge-base with HEAD; try the next
+    if (sha) return sha;
   }
   return null;
 }
@@ -377,7 +376,7 @@ export function changedSince(repoRoot, base) {
       ? `--base ${base} has no merge-base with HEAD; pass a ref this branch descends from`
       : '--fast needs a merge-base with origin/main or main and found none; run `git fetch origin main` or pass --base <ref>');
   }
-  const files = gitOut(repoRoot, ['diff', '--name-only', '--diff-filter=ACMRT', '-z', sha]).split('\0').filter(Boolean).map(posixPath);
+  const files = gitOutputOf(gitDiff(['--name-only', '--diff-filter=ACMRT', '-z', sha], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 }), 'git diff').split('\0').filter(Boolean).map(posixPath);
   return { base: sha, files };
 }
 

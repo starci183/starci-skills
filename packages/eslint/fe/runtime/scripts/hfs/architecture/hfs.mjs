@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { gitOutput } from '../../api/git/lib.mjs';
+import { lsFiles } from '../../api/git/ls-files.mjs'; import { revParseQuery } from '../../api/git/rev-parse-query.mjs'; import { configGet } from '../../api/git/config-get.mjs'; import { gitOutputOf } from '../../lib/git.mjs';
 import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
@@ -99,7 +99,7 @@ function slotTestChildren(resolver) {
  */
 function ownsGitTopLevel(root) {
   try {
-    const top = gitOutput(['rev-parse', '--show-toplevel'], { cwd: root }).trim();
+    const top = gitOutputOf(revParseQuery(['--show-toplevel'], { cwd: root }), 'git rev-parse --show-toplevel').trim();
     const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
     return same(fs.realpathSync(path.resolve(top)), fs.realpathSync(path.resolve(root)));
   } catch {
@@ -112,8 +112,8 @@ function gitPaths(root) {
   try {
     // An empty index is still a Git tree. Falling back to disk in that case would count
     // untracked build output as repository content.
-    gitOutput(['rev-parse', '--is-inside-work-tree'], { cwd: root });
-    const out = gitOutput(['ls-files', '--cached', '-z', '--', '.'], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+    gitOutputOf(revParseQuery(['--is-inside-work-tree'], { cwd: root }), 'git rev-parse --is-inside-work-tree');
+    const out = gitOutputOf(lsFiles(['--cached', '-z', '--', '.'], { cwd: root, maxBuffer: 256 * 1024 * 1024 }), 'git ls-files');
     return out.split('\0').filter(Boolean);
   } catch {
     return null;
@@ -331,10 +331,9 @@ const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
 /** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
 function hooksPathNotRedirected({ root, finding }) {
   if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
-  let value = '';
-  try {
-    value = gitOutput(['config', '--local', '--get', 'core.hooksPath'], { cwd: root }).trim();
-  } catch { return { status: 'checked' }; } // key not set: nothing is redirected
+  const set = configGet(root, 'core.hooksPath', { local: true });
+  if (!set.ok) return { status: 'checked' }; // key not set: nothing is redirected
+  const value = set.stdout;
   if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
     finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
   return { status: 'checked' };

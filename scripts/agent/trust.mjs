@@ -43,7 +43,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runNode } from '../api/node/run-node.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { runGit } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { renameOver } from '../api/fs/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -111,13 +111,13 @@ export const projectTargets = (dir) => ({
  * that is no git checkout, or a file git already tracks, is left alone. Returns {file, state} or null.
  */
 export function excludeFromGit(dir, file) {
-  const topOut = runGit(['rev-parse', '--show-toplevel'], { cwd: dir });
-  const excludeOut = runGit(['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { cwd: dir });
+  const topOut = revParseQuery(['--show-toplevel'], { cwd: dir });
+  const excludeOut = revParseQuery(['--path-format=absolute', '--git-path', 'info/exclude'], { cwd: dir });
   if (topOut?.status !== 0 || excludeOut?.status !== 0) return null;
   const top = String(topOut.stdout).trim();
   const rel = path.relative(top, file).split(path.sep).join('/');
   if (!rel || rel.startsWith('..')) return null;
-  if (runGit(['ls-files', '--error-unmatch', '--', rel], { cwd: top })?.status === 0) return { file: rel, state: 'tracked' };
+  if (lsFiles(['--error-unmatch', '--', rel], { cwd: top })?.status === 0) return { file: rel, state: 'tracked' };
   const target = String(excludeOut.stdout).trim();
   const line = '/' + rel;
   let text = '';
@@ -151,13 +151,13 @@ export function codexTrustPaths(cwd) {
   const out = [path.resolve(cwd)];
   const git = (...args) => {
     try {
-      const r = runGit(args, { dir: cwd, timeout: 10000 });
+      const r = revParseQuery(args, { dir: cwd, timeout: 10000 });
       return r.status === 0 ? r.stdout.trim() : null;
     } catch { return null; }
   };
-  const top = git('rev-parse', '--show-toplevel');
+  const top = git('--show-toplevel');
   if (top) out.push(path.resolve(top));
-  const common = git('rev-parse', '--path-format=absolute', '--git-common-dir');
+  const common = git('--path-format=absolute', '--git-common-dir');
   if (common && path.basename(common) === '.git') out.push(path.resolve(path.dirname(common)));
   const seen = new Set();
   return out.filter((p) => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });

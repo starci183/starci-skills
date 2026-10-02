@@ -42,7 +42,7 @@ test('a command shown under an explicit prohibition is not a finding', async () 
     'Never delete a tree recursively (`rm -r`/`-rf`, `rmdir /s`, `rd /s`, `Remove-Item -Recurse` and its aliases; RECURSIVE_DELETE).',
     'no raw terminal create (RAW_TERMINAL_CREATE) and no headless agent CLI (`codex exec`, `claude -p`/`--print`, `devin -p`).',
     'Do not run `git worktree add <dir>` yourself; the runtime makes the tree.',
-    'Use safeRemoveTree instead of `rm -rf <dir>`.',
+    'Use safeRemove instead of `rm -rf <dir>`.',
     '`git worktree add <dir>` is refused for every op (WORKTREE_NOT_OPS).',
     'Kh\u00f4ng bao gi\u1edd ch\u1ea1y `rm -rf node_modules` trong worktree.',
   ];

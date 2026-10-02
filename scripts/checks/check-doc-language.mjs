@@ -24,7 +24,8 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { documentLanguageHits, isDocument, secondLanguageHits } from '../lib/language.mjs';
 import { BUNDLES } from '../hfs/sync-runtime.mjs';
 import { isMain } from '../lib/is-main.mjs';
-import { gitResult } from '../api/git/lib.mjs';
+import { lsFiles } from '../api/git/ls-files.mjs';
+import { gitResultOf } from '../lib/git.mjs';
 
 /** The runtime folders whose documents are read; the repository root's own Markdown is read too. */
 export const RUNTIME_DOCUMENT_ROOTS = Object.freeze(['knowledge', 'docs', 'modules', 'packages', 'examples', 'skills', 'ui']);
@@ -36,7 +37,7 @@ export function runtimeDocuments(root = skillRoot) {
   const out = [];
   // A git-ignored file is not a document of the repository (the owner's local config.yaml, scratch files): only tracked
   // and untracked-but-not-ignored files are judged. Outside a git work tree (an installed copy) every file is judged.
-  const listed = gitResult(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root });
+  const listed = gitResultOf(lsFiles(['--cached', '--others', '--exclude-standard', '-z'], { cwd: root }));
   const inRepository = listed.ok ? new Set(listed.stdout.split('\0').filter(Boolean)) : null;
   const walk = (rel) => {
     const abs = path.join(root, ...rel.split('/'));

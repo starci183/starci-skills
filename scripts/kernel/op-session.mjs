@@ -31,7 +31,8 @@ import { parseJson } from '../lib/json.mjs';
 import { latestContractOf } from '../machine/contract-version.mjs';
 import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
-import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
+import { terminalShow } from '../api/orca/terminal-show.mjs';
+import { TERMINAL_GONE_CODES } from '../lib/orca-terminal.mjs';
 
 // A worker's session file exists before the op-dispatched event lands (the
 // terminal launch precedes prompt send and attestation), so the identity
