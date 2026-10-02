@@ -33,6 +33,7 @@ import {
 } from "../helpers/hfs-cli-fixture.mjs";
 
 const MANIFEST = loadSlotManifest();
+const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const PRESETS = {
   sonarExclusions: ["**/node_modules/**", "fe/**"],
   coverageSources: ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts"],
@@ -398,6 +399,25 @@ test("upgrade plan is ordered, printable and byte-for-byte read-only; apply exec
       `tests/${directory} is empty: no placeholder or invented spec`,
     );
   }
+});
+
+test("the committed lite example has a read-only, additions-only full upgrade plan", async () => {
+  const root = path.join(ROOT, "examples", "lite-app");
+  assert.ok(fs.existsSync(path.join(root, "hfs.json")), "examples/lite-app is present");
+  const before = contents(root);
+  const plan = await upgradeEdition({ root, to: "full", plan: true, presets: PRESETS });
+  assert.deepEqual(contents(root), before, "planning the example changes no byte");
+  assert.ok(plan.length > 0, "the full edition has additions to make");
+  const managed = new Set(["hfs.json", "sonar-project.properties", ".husky/pre-commit", ".husky/pre-push", ".github/workflows/ci.yml", ".github/workflows/images.yml", ".gitignore", "package.json", "package-lock.json"]);
+  for (const step of plan) {
+    if (step.op === "add") {
+      assert.equal(before[step.path], undefined, `${step.path} is a new full-edition path`);
+      continue;
+    }
+    assert.ok(managed.has(step.path), `${step.op} touches only a managed declaration: ${step.path}`);
+  }
+  const product = /^(?:supabase\/(?:migrations|types)\/|be\/src\/(?:features|modules)\/|fe\/apps\/[^/]+\/src\/)/;
+  assert.deepEqual(plan.filter(step => product.test(step.path)), [], "the plan never replaces lite product source");
 });
 
 test("the full-edition override judges a lite tree without writing it, and the applied structure has no slot, forbidden or monorepo finding", async (t) => {

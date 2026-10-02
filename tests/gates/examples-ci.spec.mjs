@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, examplesCiMain, exampleApps, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
+import { APP_QUALITY_FILES, CODECOV, WORKFLOW, appCoverageScope, appQualityTargets, checkExamplesCi, coverageExampleApps, examplesCiMain, exampleApps, exampleHasTests, exampleImages, renderCodecov } from '../../scripts/checks/check-examples-ci.mjs';
 import { readProperties } from '../../scripts/gates/sonar-local.mjs';
 import { coverageScopeOf, coverageTargetOf } from '../../scripts/gates/sonar-gate.mjs';
 import { braceVariants, globExpression } from '../../scripts/lib/glob.mjs';
@@ -17,12 +17,14 @@ const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.
 
 test('the repository: every example app is in the derived matrix and has a flag; the check is clean', () => {
   const apps = exampleApps(ROOT);
-  assert.deepEqual(apps, ['ecommerce-app', 'shape-slot']);
+  assert.deepEqual(apps, ['ecommerce-app', 'lite-app', 'shape-slot']);
   for (const app of apps) assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'examples', app, 'hfs.json'), 'utf8')).kind, 'app');
   assert.ok(!apps.includes('starcistacks-services'), 'a folder without an app hfs.json is not an app');
   assert.deepEqual(checkExamplesCi(ROOT).findings, []);
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
-  assert.deepEqual(flags.map((flag) => flag.name), apps);
+  assert.deepEqual(flags.map((flag) => flag.name), coverageExampleApps(ROOT));
+  assert.equal(exampleHasTests('lite-app', ROOT), false);
+  assert.equal(fs.existsSync(path.join(ROOT, 'examples', 'lite-app', 'codecov.yml')), false);
   const workflow = parseYaml(fs.readFileSync(path.join(ROOT, WORKFLOW), 'utf8'));
   assert.equal(workflow.jobs.app.strategy.matrix.app, '${{ fromJSON(needs.apps.outputs.apps) }}');
   for (const gone of ['example-unit.yml', 'todo-app-example.yml', 'todo-app-live-e2e.yml']) assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', gone)), `${gone} is folded in`);
@@ -30,18 +32,21 @@ test('the repository: every example app is in the derived matrix and has a flag;
 
 test('the root codecov flag of each app is its own codecov.yml scope under examples/<app>/ (one source, no drift)', () => {
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
-  for (const app of exampleApps(ROOT)) {
+  for (const app of coverageExampleApps(ROOT)) {
     const own = parseYaml(fs.readFileSync(path.join(ROOT, 'examples', app, 'codecov.yml'), 'utf8')).coverage.status.project.default.paths;
     const flag = flags.find((entry) => entry.name === app);
     assert.deepEqual(flag.paths, own.map((glob) => `examples/${app}/${glob}`), `${app}: root flag = the app's own codecov.yml paths`);
     assert.deepEqual(flag.paths, appCoverageScope(app, ROOT));
   }
+  const liteSonar = readProperties(path.join(ROOT, 'examples', 'lite-app', 'sonar-project.properties'));
+  assert.equal('sonar.coverage.inclusions' in liteSonar, false);
+  assert.equal('sonar.coverage.exclusions' in liteSonar, false);
   const rules = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.default_rules.statuses;
   assert.deepEqual(rules.map((rule) => [rule.type, rule.target]), [['project', '100%'], ['patch', '100%']]);
 });
 
 test('every executable be file of each example is a service or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
-  for (const app of exampleApps(ROOT)) {
+  for (const app of coverageExampleApps(ROOT)) {
     const dir = path.join(ROOT, 'examples', app);
     const props = readProperties(path.join(dir, 'sonar-project.properties'));
     assert.ok(!('sonar.coverage.inclusions' in props), `${app}: Sonar has no coverage inclusions`);
@@ -78,10 +83,12 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
   const upload = steps.find((entry) => String(entry.uses ?? '').startsWith('codecov/codecov-action@'));
   assert.equal(upload.with.flags, '${{ matrix.app }}');
   assert.match(upload.if, /env\.CODECOV_TOKEN != ''/);
+  assert.match(upload.if, /steps\.policy\.outputs\.tests == 'true'/);
   assert.ok(steps.some((entry) => /CODECOV_TOKEN is not set/.test(String(entry.run ?? '')) && /env\.CODECOV_TOKEN == ''/.test(entry.if)), 'a missing token is said in the log');
   assert.ok(steps.some((entry) => String(entry.uses ?? '').startsWith('SonarSource/sonarqube-scan-action')));
   assert.ok(steps.some((entry) => /no Sonar server is configured/.test(String(entry.run ?? ''))));
   assert.ok(steps.findIndex((entry) => entry.run === 'npm test -- --ci') < steps.indexOf(upload));
+  assert.match(steps.find((entry) => entry.run === 'npm test -- --ci').if, /steps\.policy\.outputs\.tests == 'true'/);
   const at = (run) => steps.findIndex((entry) => entry.run === run);
   assert.ok(at('npm run codegen --silent') >= 0 && at('npm run codegen --silent') < at('npm run typecheck') && at('npm run typecheck') < at('npm run build:fe'), 'codegen runs before the type-check and the fe build');
 });
@@ -137,10 +144,11 @@ test('a hand-written matrix, a per-example workflow, an automatic e2e step and a
   assert.deepEqual(codes(root), ['EXAMPLES_CI_STRAY_WORKFLOW']);
 });
 
-test('every image of every example is derived from its hfs.json (one per be and fe app) and the images job builds from that output without pushing', (t) => {
+test('every deployable image is derived from hfs.json (full be+fe, lite be only) and the images job builds it without pushing', (t) => {
   assert.deepEqual(exampleImages(ROOT).map((image) => `${image.app}:${image.file}`), [
     'ecommerce-app:be/apps/identity/Dockerfile', 'ecommerce-app:be/apps/order/Dockerfile', 'ecommerce-app:be/apps/billing/Dockerfile', 'ecommerce-app:be/apps/cli/Dockerfile',
     'ecommerce-app:fe/apps/landing/Dockerfile', 'ecommerce-app:fe/apps/app/Dockerfile',
+    'lite-app:be/apps/api/Dockerfile', 'lite-app:be/apps/cli/Dockerfile',
     'shape-slot:be/apps/core/Dockerfile', 'shape-slot:be/apps/cli/Dockerfile', 'shape-slot:fe/apps/shape-slot/Dockerfile',
   ]);
   const root = fixture(t, ['alpha']);

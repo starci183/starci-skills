@@ -1,0 +1,3 @@
+# Lite secrets have encrypted twins only under .starcistacks/<environment>/secrets.
+# Set a project-owned age recipient before encrypting the first secret.
+creation_rules: []

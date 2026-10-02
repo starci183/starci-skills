@@ -1,14 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveRepoDeclaration } from "../runtime/scripts/hfs/slots.mjs";
+import { parseYaml } from "../runtime/engine/yaml.mjs";
 import { imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError } from "./service.mjs";
+import { jsonText, packageJsonText } from "./app.mjs";
 
 const read = (relative) =>
   fs
     .readFileSync(path.join(TEMPLATES_DIR, ...relative.split("/")), "utf8")
     .replace(/\r\n/g, "\n");
-const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
+const PINS_FILE = path.join(import.meta.dirname, "..", "runtime", "knowledge", "hfs", "canon-pins.yaml");
 
 /** Lite has no test world, so the existing cli tree is selected without its colocated full-edition specs. */
 export const selectLiteCliEntries = (entries) =>
@@ -38,7 +40,9 @@ export const runDbPush = (): Promise<void> =>
         const command = process.platform === "win32" ? "npm.cmd" : "npm"
         const child = spawn(command, ["run", "db:push"], { stdio: "inherit" })
         child.once("error", reject)
-        child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(\`db:push exited \${code ?? "without a status"}\`)))
+        child.once("exit", (code) =>
+            code === 0 ? resolve() : reject(new Error(\`db:push exited \${code ?? "without a status"}\`)),
+        )
     })
 
 @SubCommand({ name: "run", description: "Push the pending Supabase migrations" })
@@ -58,14 +62,8 @@ import type { SqlText } from "@modules/platform/database"
 
 const SEED_FILE = "supabase/seed.sql"
 
-const assertSeedText = (_text: string): asserts _text is SqlText => {
-    // The brand is compile-time only; the tracked seed is reviewed and no runtime value is interpolated into it.
-}
-
-const seedText = (text: string): SqlText => {
-    assertSeedText(text)
-    return text
-}
+/** Brands the tracked, reviewed seed file; no runtime value is interpolated into it. */
+const seedText = (text: string): SqlText => text as SqlText
 
 @SubCommand({ name: "run", description: "Run the tracked Supabase seed through the application role" })
 /** \`cli seed run\`: executes the one tracked seed through the shared least-privilege EntityManager. */
@@ -79,6 +77,15 @@ export class RunSeedsCli extends CommandRunner {
         if (text.trim() !== "") await this.manager.query(text)
     }
 }
+`;
+
+const SEED_MODULE = `import { Module } from "@nestjs/common"
+import { SeedCli } from "./seed.cli"
+import { RunSeedsCli } from "./subs/run.cli"
+
+@Module({ providers: [SeedCli, RunSeedsCli] })
+/** The lite seed group: the command and its one tracked Supabase seed runner. */
+export class SeedModule {}
 `;
 
 /**
@@ -139,7 +146,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
     ],
     [
       "be/src/features/cli/seed/seed.module.ts",
-      read("be/skeleton/src/features/cli/seed/seed.module.ts"),
+      SEED_MODULE,
     ],
     ["be/src/features/cli/seed/subs/run.cli.ts", SEED_RUN],
   ];
@@ -159,6 +166,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
   files.push([image.path, image.content]);
 
   const nestFile = path.join(root, "be", "nest-cli.json");
+  const packageFile = path.join(root, "package.json");
   if (!fs.existsSync(nestFile))
     throw new ScaffoldError(
       "HFS_ADD_CLI_NEST_CONFIG",
@@ -174,12 +182,20 @@ export function ensureLiteCli({ root, manifest, repo }) {
       sourceRoot: "apps/cli/src",
     },
   };
+  if (!fs.existsSync(packageFile))
+    throw new ScaffoldError("HFS_ADD_NOT_AN_APP", "add cli needs the app root package.json");
+  const packageManifest = JSON.parse(fs.readFileSync(packageFile, "utf8"));
+  const pin = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins?.["nest-commander"]?.version;
+  if (typeof pin !== "string" || pin === "")
+    throw new ScaffoldError("HFS_ADD_CANON_PIN_MISSING", "add cli needs the nest-commander canon pin");
+  packageManifest.dependencies = { ...(packageManifest.dependencies ?? {}), "nest-commander": pin };
   for (const [relative, body] of files) {
     const target = path.join(root, ...relative.split("/"));
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, body);
   }
-  fs.writeFileSync(nestFile, json(nest));
-  fs.writeFileSync(declarationFile, json(declaration));
+  fs.writeFileSync(nestFile, jsonText(nest));
+  fs.writeFileSync(declarationFile, jsonText(declaration));
+  fs.writeFileSync(packageFile, packageJsonText(packageManifest));
   return files.map(([relative]) => relative);
 }

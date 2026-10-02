@@ -7,6 +7,7 @@ import {
 } from "../runtime/scripts/hfs/slots.mjs";
 import { imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
+import { jsonText, packageJsonText } from "./app.mjs";
 
 const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
@@ -18,7 +19,6 @@ const listFiles = (dir, base = dir) =>
       : [path.relative(base, full).split(path.sep).join("/")];
   });
 
-const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const fill = (text, values, file) =>
   text.replace(/\{\{(project|app|appPascal)\}\}/g, (whole, key) => {
     if (values[key] === undefined)
@@ -104,7 +104,7 @@ export function addApp({ root, name }) {
       body:
         fs
           .readFileSync(path.join(appTemplates, "package.json.tpl"), "utf8")
-          .replace("{{packageJson}}", json(workspacePackage).trim()) + "\n",
+          .replace("{{packageJson}}", packageJsonText(workspacePackage).trimEnd()),
     },
     {
       relative: `${targetBase}/tsconfig.json`,
@@ -150,8 +150,8 @@ export function addApp({ root, name }) {
       fs.writeFileSync(target, file.body);
       created.push(target);
     }
-    fs.writeFileSync(declarationFile, json(declaration));
-    fs.writeFileSync(packageFile, json(rootPackage));
+    fs.writeFileSync(declarationFile, jsonText(declaration));
+    fs.writeFileSync(packageFile, packageJsonText(rootPackage));
   } catch (error) {
     for (const file of [...created].reverse())
       if (fs.existsSync(file)) fs.rmSync(file);

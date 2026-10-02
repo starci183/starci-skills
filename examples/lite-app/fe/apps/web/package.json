@@ -1,0 +1,23 @@
+{
+  "name": "@lite-app/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "hfs lint --workspace .",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@heroui/react": "3.2.6",
+    "@heroui/styles": "3.2.6",
+    "@starci/grammar": "0.8.2",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.2",
+    "next": "16.1.6",
+    "next-intl": "4.13.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}

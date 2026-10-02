@@ -15,7 +15,7 @@ const bootstrap = async (): Promise<void> => {
         httpSecurity: parseHttpSecurityConfig(env),
         database: parsePrimaryDatabaseConfig(env),
     }
-    const app = await NestFactory.create(AppModule.register(options))
+    const app = await NestFactory.create(AppModule.register(options), { rawBody: true })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()
     await app.listen(options.server.port)

@@ -48,7 +48,7 @@ const bundledPins = () => parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
  * A JSON file as prettier prints it (the app's format check judges every file the scaffold writes): an object one key per line, an
  * array of plain values on one line, any other array one item per line.
  */
-function jsonText(value) {
+export function jsonText(value) {
   const print = (item, indent) => {
     const inner = `${indent}  `;
     if (Array.isArray(item)) {
@@ -64,6 +64,9 @@ function jsonText(value) {
   };
   return `${print(value, '')}\n`;
 }
+
+/** A package.json as Prettier prints it (notably, package workspaces stay one entry per line). */
+export const packageJsonText = value => `${JSON.stringify(value, null, 2)}\n`;
 
 /**
  * The apps a new app starts with: on the be side the `core` api app and the `cli` app over one `primary` connection, two Next apps
@@ -258,6 +261,7 @@ const liteBaseFile = (scope, rel) => {
   return !rel.startsWith('apps/cli/')
     && !rel.startsWith('src/features/cli/')
     && !rel.startsWith('src/modules/domain/note/')
+    && rel !== 'src/modules/platform/database/connection-source.client.ts'
     && !rel.startsWith('src/tests/')
     && !rel.endsWith('.spec.ts');
 };
@@ -336,13 +340,13 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
   const timestamp = now().toISOString().replace(/\D/g, '').slice(0, 14);
   const files = [
     { path: 'hfs.json', content: jsonText(declaration) },
-    { path: 'package.json', content: jsonText(pkg) },
+    { path: 'package.json', content: packageJsonText(pkg) },
     { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/tsconfig.json`, content: jsonText(nextAppTsconfig()) })),
-    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: jsonText(feAppManifest(name, entry.name, pins, app.edition)) })),
+    ...app.sides.fe.apps.map(entry => ({ path: `fe/apps/${entry.name}/package.json`, content: packageJsonText(feAppManifest(name, entry.name, pins, app.edition)) })),
     ...imageFiles(app),
     ...(app.edition === 'lite' ? [] : Object.keys(FE_PACKAGES).flatMap(pkg => [
-      { path: `fe/packages/${name}-${pkg}/package.json`, content: jsonText(fePackageManifest(name, pkg, pins)) },
+      { path: `fe/packages/${name}-${pkg}/package.json`, content: packageJsonText(fePackageManifest(name, pkg, pins)) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.json`, content: jsonText(fePackageTsconfig()) },
       { path: `fe/packages/${name}-${pkg}/tsconfig.build.json`, content: jsonText(fePackageBuildTsconfig()) },
     ])),

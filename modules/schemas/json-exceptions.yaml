@@ -104,6 +104,51 @@ exceptions:
   - path: examples/ecommerce-app/turbo.json
     reason: >
       The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+  - path: examples/lite-app/.starcistacks/dev/environment.json
+    reason: >
+      The lite example's checked development environment descriptor; the stack tooling reads JSON.
+  - path: examples/lite-app/be/nest-cli.json
+    reason: >
+      Nest CLI monorepo map inside the lite-app back end; the Nest toolchain reads JSON.
+  - path: examples/lite-app/be/tsconfig.build.json
+    reason: >
+      TypeScript build config inside the lite-app back end; tsc reads JSON (with comments).
+  - path: examples/lite-app/be/tsconfig.json
+    reason: >
+      TypeScript toolchain config inside the lite-app back end; tsc reads JSON (with comments).
+  - path: examples/lite-app/fe/apps/landing/package.json
+    reason: >
+      npm workspace manifest of the lite-app landing front end; npm requires JSON.
+  - path: examples/lite-app/fe/apps/landing/src/modules/i18n/messages/vi.json
+    reason: >
+      i18n message catalog inside the lite-app landing source; next-intl consumes JSON.
+  - path: examples/lite-app/fe/apps/landing/tsconfig.json
+    reason: >
+      TypeScript toolchain config inside the lite-app landing front end; tsc reads JSON (with comments).
+  - path: examples/lite-app/fe/apps/web/package.json
+    reason: >
+      npm workspace manifest of the lite-app product front end; npm requires JSON.
+  - path: examples/lite-app/fe/apps/web/src/modules/i18n/messages/vi.json
+    reason: >
+      i18n message catalog inside the lite-app product source; next-intl consumes JSON.
+  - path: examples/lite-app/fe/apps/web/tsconfig.json
+    reason: >
+      TypeScript toolchain config inside the lite-app product front end; tsc reads JSON (with comments).
+  - path: examples/lite-app/fe/tsconfig.json
+    reason: >
+      TypeScript toolchain config inside the lite-app front end; tsc reads JSON (with comments).
+  - path: examples/lite-app/hfs.json
+    reason: >
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the lite-app example; the architecture machine reads hfs.json as JSON.
+  - path: examples/lite-app/package-lock.json
+    reason: >
+      npm lockfile of the lite-app root; npm writes JSON by contract.
+  - path: examples/lite-app/package.json
+    reason: >
+      npm package manifest of the lite-app root; the npm toolchain requires JSON.
+  - path: examples/lite-app/turbo.json
+    reason: >
+      The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
   - path: examples/shape-slot/be/nest-cli.json
     reason: >
       Nest CLI monorepo map inside the shape-slot back end; the nest toolchain reads JSON.

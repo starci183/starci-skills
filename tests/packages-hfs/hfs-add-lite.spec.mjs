@@ -49,6 +49,16 @@ const repo = () => {
     path.join(root, "hfs.json"),
     `${JSON.stringify(declaration, null, 2)}\n`,
   );
+  fs.writeFileSync(path.join(root, "package.json"), '{"dependencies":{}}\n');
+  fs.mkdirSync(path.join(root, "be", "apps", "api", "src"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "be", "apps", "api", "src", "app.module.ts"),
+    'import { Module } from "@nestjs/common"\n\n@Module({})\nexport class AppModule {\n    static register() {\n        return {\n            module: AppModule,\n            imports: [\n            ],\n        }\n    }\n}\n',
+  );
+  fs.writeFileSync(
+    path.join(root, "be", "apps", "api", "src", "main.ts"),
+    'import { NestFactory } from "@nestjs/core"\nimport { parseHttpSecurityConfig } from "@modules/platform/http-security"\n\nconst env = {}\nconst options = { httpSecurity: parseHttpSecurityConfig(env) }\nvoid NestFactory.create(AppModule.register(options))\n',
+  );
   return root;
 };
 const has = (root, relative) =>
@@ -75,6 +85,13 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   const migration = "supabase/migrations/20261002123456_orders.sql";
   assert.deepEqual(result.created, [
     migration,
+    "be/src/modules/domain/orders/index.ts",
+    "be/src/modules/domain/orders/orders.module.ts",
+    "be/src/modules/domain/orders/orders.module-definition.ts",
+    "be/src/modules/domain/orders/orders.options.ts",
+    "be/src/modules/domain/orders/orders.service.ts",
+    "be/src/modules/domain/orders/persistence/orders.rows.ts",
+    "be/src/modules/domain/orders/persistence/orders.sql.ts",
     "fe/apps/web/src/modules/db/orders/read-orders.ts",
     "fe/apps/web/src/modules/db/orders/write-orders.ts",
   ]);
@@ -91,6 +108,9 @@ test("add table writes one policy-complete migration, FE db modules, and regener
     read(root, "fe/apps/web/src/modules/db/orders/write-orders.ts"),
     /const principal = await getPrincipal\(\)/,
   );
+  assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /InjectPrimaryEntityManager/);
+  assert.match(read(root, "be/src/modules/domain/orders/persistence/orders.sql.ts"), /sql`SELECT id FROM public\.orders/);
+  assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
@@ -253,4 +273,37 @@ test("add cli bootstraps the optional lite app, Supabase migrate/seed groups, an
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
+});
+
+test("add cli migrate bootstraps the built-in lite groups without a domain service", () => {
+  const root = repo();
+  fs.mkdirSync(path.join(root, "be"), { recursive: true });
+  fs.writeFileSync(path.join(root, "be", "nest-cli.json"), `${JSON.stringify({ projects: { api: { type: "application", root: "apps/api", entryFile: "main", sourceRoot: "apps/api/src" } } }, null, 2)}\n`);
+  const result = addKind({ repoRoot: root, noun: "cli", name: "migrate" });
+  assert.ok(result.created.includes("be/apps/cli/src/main.ts"));
+  assert.ok(result.created.includes("be/src/features/cli/migrate/subs/run.cli.ts"));
+  assert.ok(result.created.includes("be/src/features/cli/seed/subs/run.cli.ts"));
+  assert.deepEqual(result.registered, { patterns: [], kinds: ["cli"] });
+  assert.match(JSON.parse(read(root, "package.json")).dependencies["nest-commander"], /^3\./);
+  assert.throws(() => addKind({ repoRoot: root, noun: "cli", name: "migrate" }), error => error?.code === "HFS_ADD_EXISTS");
+});
+
+test("lite add api emits HTTP, and api plus webhook transports are composed in the API app", () => {
+  const root = repo();
+  const api = addKind({ repoRoot: root, noun: "api", name: "bookings", options: { service: "BookingsService=@modules/domain/bookings" } });
+  assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings.controller.ts"));
+  assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings-http.module.ts"));
+  assert.equal(api.created.some(file => file.includes("/graphql/")), false);
+  assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsHttpModule/);
+  const webhook = addKind({ repoRoot: root, noun: "webhook", name: "calendar", options: { service: "CalendarsService=@modules/domain/calendars" } });
+  assert.ok(webhook.created.includes("be/src/features/webhooks/calendar/transport/http/calendar-http.module.ts"));
+  assert.equal(webhook.created.some(file => file.endsWith(".spec.ts")), false);
+  const app = read(root, "be/apps/api/src/app.module.ts");
+  assert.match(app, /import \{ BookingsHttpModule \} from "@features\/api\/bookings"/);
+  assert.match(app, /import \{ CalendarHttpModule \} from "@features\/webhooks\/calendar"/);
+  assert.match(app, /imports: \[\s+CalendarHttpModule,\s+BookingsHttpModule,/);
+  const main = read(root, "be/apps/api/src/main.ts");
+  assert.match(main, /parseWebhookProviderConfig/);
+  assert.match(main, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);
+  assert.match(main, /rawBody: true/);
 });

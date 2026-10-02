@@ -70,6 +70,7 @@ test('the lite managed set has no test or coverage world and carries the databas
 
   const hookText = `${targets['.husky/pre-commit'].content}\n${targets['.husky/pre-push'].content}`;
   assert.doesNotMatch(hookText, /test:affected|jest|playwright|vitest/);
+  assert.match(targets['.gitignore'].content, /^supabase\/\.temp\/$/m);
   const ci = parseYaml(targets['.github/workflows/ci.yml'].content);
   assert.ok(ci.jobs['db-types']);
   assert.match(String(ci.jobs['db-types'].if), /migrations/);
@@ -117,6 +118,16 @@ test('the full managed render of both examples is the committed one (every manag
     assert.deepEqual(checkTargets(path.join(ROOT, folder), targets).filter(result => result.status !== 'ok'), [], folder);
     assert.equal(aggregateHash(renderTargets({ ...hfs, edition: 'full' }, PRESETS, { manifest: MANIFEST, sonarKey })), aggregateHash(targets), `${folder} explicit full`);
   }
+});
+
+test('the committed lite example is the lite managed render with no coverage target', () => {
+  const folder = 'examples/lite-app';
+  const hfs = JSON.parse(fs.readFileSync(path.join(ROOT, folder, 'hfs.json'), 'utf8'));
+  assert.equal(hfs.edition, 'lite');
+  const sonarKey = /^sonar.projectKey=(.+)$/m.exec(fs.readFileSync(path.join(ROOT, folder, 'sonar-project.properties'), 'utf8'))[1];
+  const targets = renderTargets(hfs, PRESETS, { manifest: MANIFEST, sonarKey });
+  assert.equal(targets.some(target => target.path === 'codecov.yml'), false);
+  assert.deepEqual(checkTargets(path.join(ROOT, folder), targets).filter(result => result.status !== 'ok'), [], folder);
 });
 
 test('the one Sonar gate document carries a readable lite gate with no coverage conditions', () => {

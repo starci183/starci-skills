@@ -75,7 +75,12 @@ export function targetsOf(scope, { edition = 'full', manifest = loadSlotManifest
       listed.push({ path: file, template, mode: MODE_OF_GROUP[group] ?? 'file', slot: slot.id });
     }
   }
-  return [...listed, ...(scope === APP_SCOPE ? UNLISTED_TARGETS.map(target => ({ ...target })) : [])];
+  const unlisted = scope === APP_SCOPE
+    ? UNLISTED_TARGETS.map(target => edition === 'lite' && target.path === '.gitignore'
+      ? { ...target, template: 'app/gitignore-lite' }
+      : { ...target })
+    : [];
+  return [...listed, ...unlisted];
 }
 
 const lf = text => text.replace(/\r\n/g, '\n');

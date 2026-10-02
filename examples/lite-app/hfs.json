@@ -1,0 +1,44 @@
+{
+  "hfs": 2,
+  "kind": "app",
+  "edition": "lite",
+  "project": "lite-app",
+  "sides": {
+    "be": {
+      "apps": [
+        {
+          "name": "api",
+          "kind": "api"
+        },
+        {
+          "name": "cli",
+          "kind": "cli"
+        }
+      ],
+      "kinds": ["api", "cli", "webhooks"],
+      "connections": [
+        {
+          "name": "primary",
+          "envPrefix": "PRIMARY_DB",
+          "owner": "api",
+          "isolation": "schema",
+          "provider": "supabase"
+        }
+      ],
+      "patterns": ["webhooks"]
+    },
+    "fe": {
+      "apps": [
+        {
+          "name": "web",
+          "kind": "next"
+        },
+        {
+          "name": "landing",
+          "kind": "next"
+        }
+      ],
+      "reads": ["be/contracts/", "supabase/types/"]
+    }
+  }
+}

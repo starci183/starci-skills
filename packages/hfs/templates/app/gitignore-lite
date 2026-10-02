@@ -1,0 +1,34 @@
+{{> common/gitignore.base}}
+# Supabase CLI state is local Docker metadata, never application source.
+supabase/.temp/
+# be: the schema Nest writes when it boots GraphQL
+schema.gql
+# fe: Next build output and its generated type file
+.next/
+next-env.d.ts
+# .starcistacks custody at the app root: modules/schemas/stacks-layout.yaml custody.gitignoreRules, in order. Only the
+# declaration, runbooks, key lists, seeds, the rendered environment, the infra definitions and sealed *.enc are tracked.
+.starcistacks/**
+!.starcistacks/**/
+!.starcistacks/**/KEYS.md
+!.starcistacks/**/.gitkeep
+!.starcistacks/application-stacks.yaml
+!.starcistacks/*/README.md
+!.starcistacks/*/environment.json
+!.starcistacks/*/seeds/**
+!.starcistacks/*/infra/metadata.json
+!.starcistacks/*/infra/compose/**
+!.starcistacks/*/infra/k8s/**
+!.starcistacks/*/infra/terraform/**
+.starcistacks/*/infra/**/.env
+.starcistacks/*/infra/**/.env.*
+.starcistacks/*/infra/**/*.env
+.starcistacks/*/infra/**/*.key
+.starcistacks/*/infra/**/*.pem
+.starcistacks/*/infra/**/*.tfvars
+.starcistacks/*/infra/terraform/.terraform/
+.starcistacks/*/infra/terraform/*.tfstate
+.starcistacks/*/infra/terraform/*.tfstate.*
+.starcistacks/*/infra/terraform/files/
+.starcistacks/*/infra/terraform/*.tar.gz
+!.starcistacks/**/*.enc

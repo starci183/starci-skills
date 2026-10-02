@@ -14,6 +14,7 @@ const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
 const timestampOf = (now) =>
   new Date(now()).toISOString().replace(/\D/g, "").slice(0, 14);
 const snakeOf = (name) => name.replaceAll("-", "_");
+const singularOf = (name) => (name.endsWith("s") ? name.slice(0, -1) : name);
 const camelOf = (name) => {
   const pascal = pascalOf(name);
   return pascal[0].toLowerCase() + pascal.slice(1);
@@ -49,6 +50,27 @@ function removeEmptyParents(file, stop) {
   }
 }
 
+function wireApiModule(root, app, name) {
+  const relative = `be/apps/${app}/src/app.module.ts`;
+  const file = path.join(root, ...relative.split("/"));
+  if (!fs.existsSync(file))
+    throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in ${relative}, which does not exist`);
+  const symbol = `${pascalOf(name)}Module`;
+  const importLine = `import { ${symbol} } from "@modules/domain/${name}"`;
+  const lines = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n").split("\n");
+  const lastImport = lines.reduce((last, line, index) => (line.startsWith("import ") ? index : last), -1);
+  const imports = lines.findIndex((line) => /^\s*imports: \[$/.test(line));
+  if (lastImport < 0 || imports < 0)
+    throw new ScaffoldError("HFS_ADD_WIRE_INVALID", `add table could not find the imports array in ${relative}`);
+  if (!lines.includes(importLine)) {
+    lines.splice(lastImport + 1, 0, importLine);
+    const shiftedImports = imports > lastImport ? imports + 1 : imports;
+    const indent = /^(\s*)/.exec(lines[shiftedImports])?.[1] ?? "";
+    lines.splice(shiftedImports + 1, 0, `${indent}    ${symbol}.register({ isGlobal: true }),`);
+  }
+  fs.writeFileSync(file, `${lines.join("\n").replace(/\n+$/, "")}\n`);
+}
+
 /**
  * Adds one Supabase table migration and, with `fe`, one typed reader/writer pair to every declared Next app.
  * `emitTypes` returns the generated database.types.ts text; false is the explicit `--no-types` seam.
@@ -67,11 +89,8 @@ export function addTable({
     );
   const manifest = loadSlotManifest();
   const repo = readRepoDeclaration(manifest, root);
-  if (
-    !repo.sides?.be?.connections?.some(
-      (connection) => connection.provider === "supabase",
-    )
-  ) {
+  const connection = repo.sides?.be?.connections?.find((candidate) => candidate.provider === "supabase");
+  if (!connection) {
     throw new ScaffoldError(
       "HFS_ADD_TABLE_PROVIDER",
       "add table needs a back-end connection whose provider is supabase",
@@ -103,12 +122,22 @@ export function addTable({
     table: snakeOf(name),
     Name: pascalOf(name),
     nameCamel: camelOf(name),
+    upper: snakeOf(name).toUpperCase(),
+    singular: singularOf(name),
+    Singular: pascalOf(singularOf(name)),
   };
   const planned = [
     {
       relative: `supabase/migrations/${stamp}_${name}.sql`,
       body: template("be/table/migration.sql.tpl", values),
     },
+    { relative: `be/src/modules/domain/${name}/index.ts`, body: template("be/table/index.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/${name}.module.ts`, body: template("be/table/module.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/${name}.module-definition.ts`, body: template("be/table/module-definition.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/${name}.options.ts`, body: template("be/table/options.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/${name}.service.ts`, body: template("be/table/service.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/persistence/${name}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
+    { relative: `be/src/modules/domain/${name}/persistence/${name}.sql.ts`, body: template("be/table/sql.ts.tpl", values) },
   ];
   if (fe) {
     const apps =
@@ -143,6 +172,15 @@ export function addTable({
       "HFS_ADD_EXISTS",
       `table ${name} already exists: ${clash.join(", ")}`,
     );
+  const owner = repo.sides.be.apps.find((app) => app.name === connection.owner && app.kind === "api");
+  if (!owner)
+    throw new ScaffoldError("HFS_ADD_NO_API_OWNER", `add table needs the Supabase connection owner ${connection.owner} to be a declared api app`);
+  const ownerFile = path.join(root, "be", "apps", owner.name, "src", "app.module.ts");
+  if (!fs.existsSync(ownerFile))
+    throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in be/apps/${owner.name}/src/app.module.ts, which does not exist`);
+  const ownerBefore = fs.readFileSync(ownerFile, "utf8");
+  const typesFile = path.join(root, ...dbTypesPath.split("/"));
+  const typesBefore = fs.existsSync(typesFile) ? fs.readFileSync(typesFile) : null;
   const created = [];
   try {
     for (const file of planned) {
@@ -159,7 +197,11 @@ export function addTable({
         fs.writeFileSync(target, generated);
       }
     }
+    wireApiModule(root, owner.name, name);
   } catch (error) {
+    fs.writeFileSync(ownerFile, ownerBefore);
+    if (typesBefore === null) fs.rmSync(typesFile, { force: true });
+    else fs.writeFileSync(typesFile, typesBefore);
     for (const file of [...created].reverse()) {
       if (fs.existsSync(file)) fs.rmSync(file);
       removeEmptyParents(file, root);

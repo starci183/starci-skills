@@ -17,7 +17,6 @@ import {
   checkTargets,
   imageFiles,
   loadHfs,
-  loadPresets,
   render,
   renderTargets,
   writeTargets,
@@ -47,6 +46,15 @@ const TEST_DIRECTORIES = Object.freeze([
   "be/src/tests/e2e",
   "be/src/tests/contract",
 ]);
+// Upgrade must render the full managed files before it can add/install the full-only Jest preset. These are the preset's two
+// public sync inputs; once apply resolves the new dependency, normal full sync reads them from @starci/jest-preset again.
+const UPGRADE_PRESETS = Object.freeze({
+  sonarExclusions: "**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**",
+  coverageSources: Object.freeze([
+    "src/**/*.service.ts",
+    "src/features/cli/**/*.cli.ts",
+  ]),
+});
 const STANDARD_CLI_FILES = Object.freeze([
   "src/features/cli/index.ts",
   "src/features/cli/migrate/migrate.cli.ts",
@@ -222,7 +230,7 @@ async function model({ root, to, presets, manifest }) {
   const full = fullEditionDeclaration(declaration, manifest);
   const pins = parseYaml(fs.readFileSync(PINS_FILE, "utf8")).pins;
   const upgradedPackage = pinnedPackage(root, pins);
-  const resolvedPresets = presets ?? (await loadPresets(PACKAGE_ROOT, "full"));
+  const resolvedPresets = presets ?? UPGRADE_PRESETS;
   const managed = renderTargets(full, resolvedPresets, { manifest });
   const packageTarget = managed.find(
     (target) => target.path === "package.json",
