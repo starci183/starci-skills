@@ -191,10 +191,13 @@ test('a redraw that does not address an owner note fails DRAW_FEEDBACK_UNADDRESS
   // Every note in the brief and passed by the critic: the owner is asked again, round 2.
   p.draw('v3', { brief: briefBlock(p.dir, { shape: SHAPE }).text, checks: ids.map((id) => ({ id, pass: true })) });
   assert.deepEqual(feedbackFindings(p.dir), []);
-  const again = drawReviewQuestion(p.dir);
+  const again = drawReviewQuestion(p.dir, { lang: 'en' });
   assert.equal(again.review.round, 2);
   assert.deepEqual(again.review.addresses, ids);
   assert.match(again.text, /Round 2; this redraw addresses your notes/);
+  const againVi = drawReviewQuestion(p.dir, { lang: 'vi' });
+  assert.deepEqual([againVi.review.round, againVi.review.addresses], [2, ids]);
+  assert.match(againVi.text, /Vòng 2; bản vẽ lại này xử lý các ghi chú/, 'the round-2 block is present in the owner language too');
 });
 
 test('the owner accept promotes the drawing into brand.direction.golden with its receipt; an automatic answer never does', async (t) => {
@@ -254,9 +257,10 @@ test('a product-direction note persists into brand.direction.learned as proposed
   const ids = p.read().ui.review.feedback.rounds[0].notes.map((n) => n.id);
   p.draw('v3', { brief: briefBlock(p.dir).text, checks: ids.map((id) => ({ id, pass: true })) });
   applyDrawReview(p.dir, p.receipt(drawReviewQuestion(p.dir), { dispatchId: 'ctx_review_2' }), { write: true });
-  const dq = directionReviewQuestion(p.work, { archetype: 'list' });
+  const dq = directionReviewQuestion(p.work, { archetype: 'list', lang: 'en' });
   assert.deepEqual(dq.review.learned, [learned[0].id]);
   assert.match(dq.text, /Rulings learned from your draw feedback/);
+  assert.match(directionReviewQuestion(p.work, { archetype: 'list', lang: 'vi' }).text, /Quy tắc rút ra từ góp ý vẽ của chủ dự án/, 'the learned block is present in the owner language too');
   const dirReceipt = path.join(p.work, 'kernel-evidence', WF, 'serve-ask', 'answer-direction.json');
   fs.writeFileSync(dirReceipt, JSON.stringify({ schema: 'starci/ask-answer@1', workflowId: WF, dispatchId: 'ctx_dir', opId: 'brand.decide', optionIndex: 0, answeredBy: 'owner', at: '2026-09-27T13:00:00.000Z', review: dq.review }));
   applyDirectionReview(p.work, dirReceipt, { write: true });
