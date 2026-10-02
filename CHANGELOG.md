@@ -11,6 +11,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
   - `be/apps/<app>/Dockerfile` and `fe/apps/<app>/Dockerfile` are required per declared app (slot `repo.app-image`), built from the app root. `hfs scaffold app` writes them from `templates/<side>/image/<kind>` (api, worker, cli, Next).
   - The `.dockerignore` (slot `app.dockerignore`, app root) and `.github/workflows/images.yml` (slot `app.ci-images`, builds every image, never pushes) are managed by `hfs sync`.
   - New rules R139 `HFS_DOCKER_BUILD_CONTEXT`, R140 `HFS_DOCKER_STAGES`, R141 `HFS_DOCKER_ENTRY`, R142 `HFS_DOCKER_BASE_PIN` and R143 `HFS_DOCKER_SECRETS` (ids provisional). The canon is `knowledge/hfs/docker.md`. A Next app sets `output: "standalone"`.
+  - The managed root scripts `docker:build:<app>` and `docker:build` build one image or every image, one at a time, never pushing.
 
 - Lane MONO U1: every app is a monorepo, even a single one.
   - The app root `package.json` declares the npm workspaces `fe/apps/*` and `fe/packages/*`, `packageManager` npm and turbo (pin 2.11.6).

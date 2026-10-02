@@ -34,6 +34,8 @@ monorepo of `be/apps/<app>`, and an npm-workspaces monorepo of `fe/apps/<app>` a
   `node fe/apps/<app>/server.js`. `NEXT_PUBLIC_*` values are the one kind of build argument (they are published to every browser by design).
 - The Dockerfile is app-owned: scaffold writes it once, the app edits it (a system package, a build argument), and the rules judge its
   structure. The `.dockerignore` and `.github/workflows/images.yml` are managed (drift is `HFS_MANAGED_FILE_DRIFT`).
+- The root scripts `docker:build:<app>` (the exact command the header states, tag `<project>/<app>:dev`) and `docker:build` (every image, one after the other)
+  are managed by `hfs sync`; none pushes.
 - CI builds every image on pull requests and on main, path-filtered per app (`images.yml`: a matrix of image, Dockerfile and paths), and
   never pushes. Publishing an image is the product's decision.
 

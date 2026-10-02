@@ -176,7 +176,9 @@ export function coverageExclusions(presets, manifest = loadSlotManifest()) {
  * fe script runs the fe app's workspace (@<project>/<app>): through turbo for dev (so the packages it imports are built first) and
  * through npm `-w` for start. be: `dev:be` runs the one api app from source and restarts it on change (`dev:be:<app>` each, with
  * several), `start:<app>` runs a built api, worker or cli app, `migrate` the migrate app (`migrate:<app>` with several). fe:
- * `dev:fe` runs the one Next app in development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one.
+ * `dev:fe` runs the one Next app in development (`dev:fe:<app>` each, with several), `start:<app>` serves a built one. Images:
+ * `docker:build:<app>` builds the image of one app (the exact command its Dockerfile header states, tag `<project>/<app>:dev`) and
+ * `docker:build` builds every image, one after the other, never pushing.
  */
 export function appScripts(app) {
   const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
@@ -189,11 +191,15 @@ export function appScripts(app) {
   const built = entry => `node be/dist/apps/${entry.name}/src/main.js`;
   const workspace = entry => feAppPackageName(app.project, entry.name);
   const dev = entry => `npm run codegen --silent && turbo run dev --filter=${workspace(entry)}`;
+  const images = [...be.map(entry => ({ side: 'be', entry })), ...fe.map(entry => ({ side: 'fe', entry }))];
+  const imageCommand = ({ side, entry }) => `docker build -f ${dockerfilePath(side, entry.name)} -t ${app.project}/${entry.name}:dev .`;
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
     ...(fe.length === 1 ? [line('dev:fe', dev(fe[0]))] : fe.map(entry => line(`dev:fe:${entry.name}`, dev(entry)))),
     ...be.map(entry => line(entry.kind === 'migrate' ? migrateName(entry) : `start:${entry.name}`, built(entry))),
     ...fe.map(entry => line(`start:${entry.name}`, `npm run start -w ${workspace(entry)}`)),
+    line('docker:build', images.map(image => `npm run docker:build:${image.entry.name}`).join(' && ')),
+    ...images.map(image => line(`docker:build:${image.entry.name}`, imageCommand(image))),
   ].join('\n    ');
 }
 
