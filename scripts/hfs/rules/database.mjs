@@ -38,7 +38,9 @@
 //                           block declares them - the config states nothing the app did not declare.
 //   DB_TYPES_DRIFT      (L09) the committed database.types.ts equals the text `emitTypes()` regenerates now; the
 //                           emit is injected (chunk E wires it to contract:emit) and the rule is silent without it.
-import { gitRunner } from '../../api/git/lib.mjs';
+import { lsTree } from '../../api/git/ls-tree.mjs';
+import { mergeBase } from '../../api/git/merge-base.mjs';
+import { show } from '../../api/git/show.mjs';
 import { withoutGitLocalEnv } from '../../lib/git.mjs';
 import { found, readJson, readText } from './read.mjs';
 import { parsePlpgsqlBody, parseSql } from '../sql/pg-parse.mjs';
@@ -156,6 +158,16 @@ export function migrationStamp(text) {
   const date = new Date(stamp);
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
     && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second ? stamp : null;
+}
+
+/** The three git reads L02 makes, through the api/git call files: (args, {cwd}) -> {ok, stdout}; a spec injects a fake of the same shape. */
+function defaultGit(args, { cwd }) {
+  const [verb, ...rest] = args;
+  const env = withoutGitLocalEnv(process.env);
+  if (verb === 'merge-base') { const sha = mergeBase(cwd, rest[0], rest[1]); return { ok: sha !== null, stdout: sha ?? '' }; }
+  const call = verb === 'ls-tree' ? lsTree : show;
+  const r = call(rest, { cwd, env, maxBuffer: 64 * 1024 * 1024 });
+  return { ok: !r.error && r.status === 0, stdout: r.stdout };
 }
 
 /** run one git verb through the injected runner; answers {ok, stdout}. */
@@ -608,7 +620,7 @@ export async function checkDatabase({ repoRoot, files, base, git, edition, supab
   // The rules also judge a full-edition app the moment a connection declares provider: supabase (design 3.8 note).
   const supabaseConnection = ['be', 'fe'].some((side) => (declaration?.sides?.[side]?.connections ?? []).some((c) => c?.provider === 'supabase'));
   if (!migrations.length && !hasConfig && !files.includes(TYPES_FILE) && !declared && !supabaseConnection && (edition ?? declaration?.edition) !== 'lite') return findings;
-  const run = git ?? ((args, opts) => gitRunner()(args, { env: withoutGitLocalEnv(process.env), ...opts }));
+  const run = git ?? defaultGit;
 
   // L08: the config is read first - its [api] schemas decide the exposed schemas L03 and L06 judge against.
   let config = null;
