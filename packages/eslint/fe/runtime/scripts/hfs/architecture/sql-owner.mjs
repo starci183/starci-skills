@@ -2,17 +2,18 @@ import path from 'node:path';
 import { analyzeSql, HOLE } from './sql-tokens.mjs';
 import { machineKit } from './machine-ast.mjs';
 import { contextModelOf } from './context-map.mjs';
+import { supabaseTablesOf } from './supabase-tables.mjs';
 
 /**
  * R86 `sql-owner` (BE_SQL_TABLE_OWNER). Every `sql` tagged template (the tag declared in platform/database) of a
  * `<name>.sql.ts` file in a capability's `persistence/` is read with the tokenizer of sql-tokens.mjs and judged against the
- * entities of the whole program:
- *   - it writes (INSERT INTO, UPDATE, DELETE FROM, MERGE INTO, TRUNCATE) only tables the file's own capability declares
- *     with `@Entity("<table>")` in its persistence;
+ * schema authority of the whole program:
+ *   - it writes (INSERT INTO, UPDATE, DELETE FROM, MERGE INTO, TRUNCATE) only tables the file's own capability declares;
  *   - it reads (FROM, JOIN, USING) only tables of its own CONTEXT (the connection its capability's arrays are registered on): its own
  *     capability's, or those of a same-context capability its owner may import (the tier matrix, through `resolver.importAllowed`
  *     to the table owner's public entry); a table of another context is refused (cross-context data comes only by events);
- *   - every table it names is declared by some entity;
+ *   - every table it names is declared by some entity under TypeORM authority, or by the generated
+ *     `Database['public']['Tables']` contract under Supabase authority;
  *   - a SELECT carries LIMIT, or constrains the primary key or a unique key of its first table with `=`, or selects only
  *     aggregates without GROUP BY.
  * Table positions that hold a `${...}` substitution (SqlIdent) are dynamic; they are counted in the coverage and judged by
@@ -92,11 +93,28 @@ export function entitiesOf(kit, graph) {
   return { tables, unreadable };
 }
 
+const capabilityTable = root => path.posix.basename(root).replaceAll('-', '_').toLowerCase();
+
+/** Supabase declarations, with an owner when the generated table name matches a capability's persistence folder. */
+function supabaseDeclarations(graph, appRoot) {
+  const generated = supabaseTablesOf(appRoot);
+  const tables = new Map([...generated].map(table => [table, { table, owner: null, rel: null, uniqueSets: [] }]));
+  for (const file of graph.files.values()) {
+    if (file.slot !== 'be.persistence' || !file.owner) continue;
+    const key = capabilityTable(file.owner.root);
+    const declaration = tables.get(key);
+    if (declaration && declaration.owner === null) tables.set(key, { ...declaration, owner: file.owner.root, rel: file.rel });
+  }
+  return tables;
+}
+
 export function checkSqlOwner(input) {
-  const { graph } = input;
+  const { config, graph } = input;
   const kit = machineKit(input);
   const { ts, resolver } = kit;
-  const { tables, unreadable } = entitiesOf(kit, graph);
+  const supabase = resolver.ruleParams().schemaAuthority === 'supabase';
+  const entityDeclarations = supabase ? { tables: new Map(), unreadable: 0 } : entitiesOf(kit, graph);
+  const tables = supabase ? supabaseDeclarations(graph, config.packageRoot) : entityDeclarations.tables;
   const model = contextModelOf(kit, graph);
   const violations = [];
   let templates = 0;
@@ -122,23 +140,36 @@ export function checkSqlOwner(input) {
       };
       const result = analyzeSql(text, { uniqueSetsOf: table => tables.get(table.toLowerCase())?.uniqueSets ?? null });
       dynamic += result.dynamic;
+      const ownTable = capabilityTable(file.owner.root);
       for (const write of result.writes) {
-        const entity = tables.get(write.table.toLowerCase());
-        if (!entity) report(`SQL writes table ${write.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: write.table });
-        else if (entity.owner !== file.owner.root) report(`SQL in ${file.owner.root} writes table ${write.table}, owned by ${entity.owner}; a capability writes only the tables of its own entities, call the owner's public API instead.`, { table: write.table, tableOwner: entity.owner });
+        const declaration = tables.get(write.table.toLowerCase());
+        if (!declaration) {
+          report(supabase
+            ? `SQL writes table ${write.table}, which Database['public']['Tables'] does not declare; regenerate supabase/types/database.types.ts from the migrations.`
+            : `SQL writes table ${write.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: write.table });
+        } else if (supabase && write.table.toLowerCase() !== ownTable) {
+          report(`SQL in ${file.owner.root} writes table ${write.table}${declaration.owner ? `, owned by ${declaration.owner}` : ''}; under Supabase schema authority a capability writes only its own table (${ownTable}), named for that capability.`, { table: write.table, ...(declaration.owner ? { tableOwner: declaration.owner } : {}) });
+        } else if (!supabase && declaration.owner !== file.owner.root) {
+          report(`SQL in ${file.owner.root} writes table ${write.table}, owned by ${declaration.owner}; a capability writes only the tables of its own entities, call the owner's public API instead.`, { table: write.table, tableOwner: declaration.owner });
+        }
       }
       for (const read of result.reads) {
-        const entity = tables.get(read.table.toLowerCase());
-        if (!entity) { report(`SQL reads table ${read.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: read.table }); continue; }
-        if (entity.owner === file.owner.root) continue;
-        const ownContext = model.contextOfCapability(file.owner.root);
-        const tableContext = model.contextOfCapability(entity.owner);
-        if (ownContext && tableContext && ownContext !== tableContext) {
-          report(`SQL in ${file.owner.root} (context ${ownContext}) reads table ${read.table}, owned by ${entity.owner} (context ${tableContext}); a context reads and writes only its own context's tables, so a cross-context JOIN or subquery is refused. Keep a local copy fed by the other context's events (a reactor), or read a projection.`, { table: read.table, tableOwner: entity.owner, context: ownContext, tableContext });
+        const declaration = tables.get(read.table.toLowerCase());
+        if (!declaration) {
+          report(supabase
+            ? `SQL reads table ${read.table}, which Database['public']['Tables'] does not declare; regenerate supabase/types/database.types.ts from the migrations.`
+            : `SQL reads table ${read.table}, which no @Entity declares; declare the entity in the owning capability's persistence/entities.`, { table: read.table });
           continue;
         }
-        const verdict = resolver.importAllowed(file.rel, `${entity.owner}/index.ts`);
-        if (!verdict.allowed) report(`SQL in ${file.owner.root} reads table ${read.table}, owned by ${entity.owner}, which ${file.owner.root} may not import (${verdict.reason}); read it through the owner's public API.`, { table: read.table, tableOwner: entity.owner, reason: verdict.reason });
+        if (!declaration.owner || declaration.owner === file.owner.root) continue;
+        const ownContext = model.contextOfCapability(file.owner.root);
+        const tableContext = model.contextOfCapability(declaration.owner);
+        if (ownContext && tableContext && ownContext !== tableContext) {
+          report(`SQL in ${file.owner.root} (context ${ownContext}) reads table ${read.table}, owned by ${declaration.owner} (context ${tableContext}); a context reads and writes only its own context's tables, so a cross-context JOIN or subquery is refused. Keep a local copy fed by the other context's events (a reactor), or read a projection.`, { table: read.table, tableOwner: declaration.owner, context: ownContext, tableContext });
+          continue;
+        }
+        const verdict = resolver.importAllowed(file.rel, `${declaration.owner}/index.ts`);
+        if (!verdict.allowed) report(`SQL in ${file.owner.root} reads table ${read.table}, owned by ${declaration.owner}, which ${file.owner.root} may not import (${verdict.reason}); read it through the owner's public API.`, { table: read.table, tableOwner: declaration.owner, reason: verdict.reason });
       }
       for (const select of result.selects) {
         if (select.bounded || (select.table && !tables.has(select.table.toLowerCase()))) continue;
@@ -147,5 +178,6 @@ export function checkSqlOwner(input) {
       return true;
     });
   }
-  return { violations, coverage: { status: 'checked', entities: tables.size, unreadableEntities: unreadable, templates, dynamicIdentifiers: dynamic, foreignTags } };
+  return { violations, coverage: { status: 'checked', entities: entityDeclarations.tables.size, unreadableEntities: entityDeclarations.unreadable,
+    ...(supabase ? { supabaseTables: tables.size } : {}), templates, dynamicIdentifiers: dynamic, foreignTags } };
 }

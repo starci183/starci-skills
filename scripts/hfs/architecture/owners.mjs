@@ -75,7 +75,12 @@ export function checkOwners(config, context) {
         message: `Owner ${owner.id} public entry is outside the configured TypeScript programs, so its boundary cannot be checked.` });
       continue;
     }
-    for (const entryFile of [sourceFile, ...owner.declared.map(file => sourceFiles.get(file)).filter(Boolean)]) {
+    const publicFiles = new Set([
+      sourceFile,
+      ...owner.declared.map(file => sourceFiles.get(file)).filter(Boolean),
+      ...[...actionEntries].filter(file => isInside(owner.root, file)).map(file => sourceFiles.get(file)).filter(Boolean),
+    ]);
+    for (const entryFile of publicFiles) {
       for (const statement of entryFile.statements) if (context.ts.isExportDeclaration(statement) && !statement.exportClause) {
         violations.push({
           ruleId: 'ARCH_OWNER_EXPORT_STAR',

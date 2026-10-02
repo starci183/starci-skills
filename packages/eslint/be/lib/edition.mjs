@@ -31,11 +31,15 @@ const inactive = (rule) => Object.freeze({ ...rule, create: () => ({}) })
  * prove the generic filtering independently of generated copies.
  */
 export const pluginForEdition = ({ plugin, hfs, catalog }) => {
-    if ((hfs?.edition ?? "full") === "full" && catalog === undefined) return plugin
+    const edition = hfs?.edition === undefined ? "full" : hfs.edition
+    if (edition !== "full" && edition !== "lite") {
+        throw new RangeError(`Unknown HFS edition ${JSON.stringify(edition)}; expected "full" or "lite"`)
+    }
+    if (edition === "full" && catalog === undefined) return plugin
     const loaded = catalog ?? bundledCatalog()
     const rules = Object.fromEntries(Object.entries(plugin.rules).map(([id, rule]) => [
         id,
-        loaded.enforcerJudgedIn("eslint-be", id, hfs?.edition ?? "full") ? rule : inactive(rule),
+        loaded.enforcerJudgedIn("eslint-be", id, edition) ? rule : inactive(rule),
     ]))
     return Object.freeze({ ...plugin, rules: Object.freeze(rules) })
 }
