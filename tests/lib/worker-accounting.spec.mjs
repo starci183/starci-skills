@@ -60,7 +60,7 @@ test('activeWorkersAllRuns: only a listing over every Run counts; a bound or fai
   assert.equal(activeWorkersAllRuns({ list: () => { throw Error('ENOENT'); } }), null);
 });
 
-test('releasePlan: release only a reclaimable, verifiable worker whose nextAction is worker-release of itself', () => {
+test('releasePlan: release a reclaimable worker (liveness live, exited or unverifiable) whose nextAction is worker-release of itself', () => {
   const plan = Object.fromEntries(releasePlan([
     row('ok', { argv: releaseArgv('ok') }),
     row('live', { liveness: 'live', argv: releaseArgv('live') }),
@@ -72,7 +72,7 @@ test('releasePlan: release only a reclaimable, verifiable worker whose nextActio
     row('active', { terminalState: 'active', liveness: 'live' }),
     row('retained', { terminalState: 'retained' }),
   ]).map((d) => [d.dispatchId, d.verdict]));
-  assert.deepEqual(plan, { ok: 'release', live: 'release', unv: 'refuse', missing: 'refuse', stop: 'refuse', other: 'refuse', unknown: 'refuse', active: 'keep', retained: 'keep' });
+  assert.deepEqual(plan, { ok: 'release', live: 'release', unv: 'release', missing: 'refuse', stop: 'refuse', other: 'refuse', unknown: 'refuse', active: 'keep', retained: 'keep' });
 });
 
 test('workerTerminalHandles names every terminal Orca has not released; worktreePathOf reads Orca\'s worktree id', () => {

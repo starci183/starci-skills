@@ -292,7 +292,7 @@ const workerRow = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', l
 });
 const ranView = () => ({ ...view(), jobs: view().jobs.map((j) => ({ ...j, task: { taskId: `task-${j.jobId}`, runId: 'run_a', closed: true } })) });
 
-test('agents collector: Orca\'s reclaimable workers are released per nextAction, Run by Run; unverifiable and release_unknown are reported, never touched', async () => {
+test('agents collector: Orca\'s reclaimable workers are released per nextAction, Run by Run (unverifiable liveness included: alpha5 1.6); release_unknown and another next action are reported, never touched', async () => {
   const rows = [workerRow('ctx_ok'), workerRow('ctx_unv', { liveness: 'unverifiable' }), workerRow('ctx_unk', { terminalState: 'release_unknown' }),
     workerRow('ctx_other', { next: 'stop' }), workerRow('ctx_live', { terminalState: 'active', liveness: 'live', next: 'none' }), workerRow('ctx_foreign', { run: 'run_owner' })];
   const asked = [], released = [];
@@ -305,10 +305,11 @@ test('agents collector: Orca\'s reclaimable workers are released per nextAction,
   const items = Object.fromEntries(plan.items.filter((i) => i.class === 'worker').map((i) => [i.target, i]));
   assert.deepEqual(Object.keys(items).sort(), ['ctx_ok', 'ctx_other', 'ctx_unk', 'ctx_unv']);
   assert.equal(items.ctx_ok.verdict, 'collect');
-  for (const id of ['ctx_unv', 'ctx_unk', 'ctx_other']) assert.deepEqual([id, items[id].verdict, items[id].code], [id, 'refuse', 'WORKER_RELEASE_REFUSED']);
+  assert.equal(items.ctx_unv.verdict, 'collect', 'a settled worker whose liveness Orca cannot verify is released like any other (E1)');
+  for (const id of ['ctx_unk', 'ctx_other']) assert.deepEqual([id, items[id].verdict, items[id].code], [id, 'refuse', 'WORKER_RELEASE_REFUSED']);
   const live = await runGc({ apply: true, only: ['agents'], now: T, deps });
-  assert.deepEqual(released, ['ctx_ok']);
-  assert.equal(live.counts.agents, 2, 'one release and one close of the settled op terminal no worker row covers');
+  assert.deepEqual(released.sort(), ['ctx_ok', 'ctx_unv']);
+  assert.equal(live.counts.agents, 3, 'two releases and one close of the settled op terminal no worker row covers');
   assert.ok(!live.items.some((i) => i.target === 'term_ctx_ok' && i.action === 'close-terminal'), 'a worker Orca accounts for is never closed by tab');
 });
 
@@ -333,10 +334,10 @@ test('op-settled whose worker Orca holds reclaimable: released through worker-re
   const unv = controller({ view: ranView(), deps: { workers: async () => ({ ok: true, workers: [workerRow('ctx_op', { handle: 'term_op', liveness: 'unverifiable' })] }) } }).c;
   const { ctx: ctx2, calls: calls2 } = ctxOf('active');
   await unv.reconcile('gc:job:todo-app-be:op-1', ctx2);
-  assert.equal(calls2.run.length, 0, 'unverifiable: neither released nor closed by tab (Orca accounts for it)');
+  assert.deepEqual(calls2.run.map(([, a]) => a.slice(0, 3)), [['scripts/api/orca/worker-release.mjs', '--dispatch', 'ctx_op']], 'unverifiable: released through worker-release like any settled worker, never closed by tab');
 });
 
-test('unverifiable workers are never released: the sweep raises ONE owner incident listing each handle, Run and age', async () => {
+test('unverifiable settled workers are released by the sweep and raise no owner incident (the list is empty after one pass)', async () => {
   const settledView = () => ({ ...ranView(), jobs: ranView().jobs.map((j) => (j.jobId === 'op-1' ? { ...j, handles: ['term_op'], updatedAt: T - 3 * 3_600_000 } : j)) });
   const rows = [workerRow('ctx_a', { handle: 'term_op', liveness: 'unverifiable' }), workerRow('ctx_b', { liveness: 'unverifiable' }), workerRow('ctx_ok')];
   const released = [];
@@ -345,14 +346,6 @@ test('unverifiable workers are never released: the sweep raises ONE owner incide
   const { c } = controller({ deps: { sweep: sweepWith(gcd), recordSweep: async () => {}, recordRun: async () => 1, settings: { sweepMs: 1_800_000 } } });
   const { ctx, calls } = ctxOf('active');
   await c.reconcile('gc:sweep', ctx);
-  assert.deepEqual(released, ['ctx_ok'], 'only the verifiable worker is released');
-  const owner = calls.decisions.filter((d) => d.idempotencyKey === 'gc-unverifiable-workers');
-  assert.equal(owner.length, 1, 'one incident for all of them');
-  assert.equal(owner[0].decider, 'owner');
-  assert.match(owner[0].summary, /2 settled worker\(s\).*term_op \(Run run_a, 3h\).*term_ctx_b \(Run run_a, age unknown\)/);
-  assert.deepEqual(owner[0].evidence.map((e) => e.ref), ['worker:ctx_a', 'worker:ctx_b']);
-  const quiet = controller({ deps: { sweep: sweepWith({ ...gcd, workers: () => ({ ok: true, workers: [workerRow('ctx_ok')] }) }), recordSweep: async () => {}, recordRun: async () => 1, settings: { sweepMs: 1_800_000 } } }).c;
-  const { ctx: ctx2, calls: calls2 } = ctxOf('active');
-  await quiet.reconcile('gc:sweep', ctx2);
-  assert.ok(!calls2.decisions.some((d) => d.idempotencyKey === 'gc-unverifiable-workers'), 'no unverifiable worker, no incident');
+  assert.deepEqual(released.sort(), ['ctx_a', 'ctx_b', 'ctx_ok'], 'every settled worker is released, the unverifiable ones included');
+  assert.ok(!calls.decisions.some((d) => d.idempotencyKey === 'gc-unverifiable-workers'), 'no owner incident for them');
 });

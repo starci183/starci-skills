@@ -21,9 +21,9 @@
 // Collectors:
 //   agents    Orca's own worker accounting (orchestration worker-list, scripts/api/orca/worker-list.mjs), read Run by
 //             Run for every Orca Run the ledgers and the Supervisor's jobs name and paged past 100 rows: a worker Orca
-//             holds as reclaimable (settled, terminal not released) whose liveness is live or exited and whose literal
+//             holds as reclaimable (settled, terminal not released) whose liveness is live, exited or unverifiable and whose literal
 //             nextAction is `worker-release --dispatch <id>` is released (worker-release archives its output, then
-//             closes only that terminal). A row whose liveness is unverifiable, whose next action is anything else, or
+//             closes only that terminal). A row with no liveness verdict, whose next action is anything else, or
 //             whose release Orca could not confirm (release_unknown) is reported and never touched (lib/
 //             worker-accounting.mjs releasePlan). A terminal the ledgers bind to a settled job, an ended workflow or a
 //             finished [Worker] job that Orca does not account for as a worker is closed and verified; a terminal Orca
