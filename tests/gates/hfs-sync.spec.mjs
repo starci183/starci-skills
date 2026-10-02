@@ -54,7 +54,7 @@ describe('the template renderer', () => {
     const files = walk(path.join(ROOT, 'packages', 'hfs', 'templates'));
     const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
     assert.deepEqual(appCliTemplateFindings({ files, read }), []);
-    const bad = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => 'npx starci app hygiene\n' });
+    const bad = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => `${['npx', 'hfs', 'work-hygiene'].join(' ')}\n` });
     assert.deepEqual(bad.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
     const wrongGroup = appCliTemplateFindings({ files: ['packages/hfs/templates/app/hook'], read: () => 'starci runtime check\n' });
     assert.deepEqual(wrongGroup.map((finding) => [finding.code, finding.line]), [['RT_CLI_APP_ONLY_TEMPLATES', 1]]);
