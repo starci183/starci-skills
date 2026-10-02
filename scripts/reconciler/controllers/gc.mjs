@@ -114,6 +114,7 @@ const liveDeps = {
   worktreeSettings: async () => (await import('../../machine/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
   hostResources: async () => (await import('../../machine/host-resources.mjs')).hostResourcesFor({}),
+  closeWorker: async (args) => (await import('../../machine/worker-close.mjs')).closeWorker(args),
   lesson: async (args) => (await import('../../machine/lessons.mjs')).recordLeftover(args),
   removeStaging: async (args) => (await import('../../supervisor/workers.mjs')).removeStaging(args),
   stagingExists: async (job) => Boolean(job?.staging?.path) && fs.existsSync(job.staging.path),
@@ -198,7 +199,8 @@ export function createGcController(overrides = {}) {
 
   /** One worker close (release, terminal close, process verify) of a reclaimable worker Orca names (the engine's shadow gate records it instead in shadow). */
   async function releaseWorker(ctx, d, { entity }) {
-    const r = await ctx.run('node', ['scripts/machine/worker-close.mjs', '--dispatch', d.dispatchId], { timeoutMs: 120_000 });
+    // In process, active mode only (shadow records the would-close): the one close path takes seconds and no command line of its own.
+    const r = ctx.mode === 'active' ? await deps.closeWorker({ dispatch: d.dispatchId, retryRelease: true }) : { ok: true, shadow: true };
     const released = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
     ctx.log('reconciler.gc.release', `${released ? 'released' : ctx.mode === 'active' ? 'release FAILED' : 'would release'} worker ${d.dispatchId} of ${entity}`, { controller: NAME, dispatch: d.dispatchId, terminal: d.terminalHandle, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     if (released) await deps.lesson({ klass: 'worker', count: 1, examples: [`${d.dispatchId} ${d.terminalHandle ?? ''} (${entity}, released by the GC controller after its event)`] });

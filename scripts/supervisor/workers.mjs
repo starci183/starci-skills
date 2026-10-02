@@ -473,7 +473,7 @@ export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.no
   let r;
   try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }
   catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
-  const record = { handle, ...(dispatch ? { dispatch } : {}), ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
+  const record = { handle, ...(dispatch ? { dispatch } : {}), ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.pending ? { pending: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
     ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
   try {
     m.transaction(() => {

@@ -19,10 +19,9 @@
 //
 // Verify cannot run (Orca unreachable, the process table or the environments unreadable, no process carries the handle): nothing is killed and
 // the answer is `unverifiable`, left for the sweep. A caller inside the terminal it would close (a worker filing its own report) does not close
-// or verify it. Dispatcher and coordinator terminals are not workers: they never come through here.
-//
-//   node scripts/machine/worker-close.mjs --dispatch <dispatch id> [--stop-first] [--retry-release] [--delay-ms <ms>] [--owner <tag>]
-// prints the result as JSON and exits 0 when the release was ok.
+// or verify it, and spawns nothing: the close stays PENDING in the runtime state the host-side controller owns (the Supervisor job without a proven
+// terminalClosed, the `worker-terminal-unclosed` event) and the next sweep tick calls closeWorker in-process. Dispatcher and coordinator terminals
+// are not workers: they never come through here. closeWorker is the only export a caller needs; the CLI exposes it as a catalog verb.
 import { allocationMs } from '../../engine/config.mjs';
 import { killTree } from '../api/process/kill-tree.mjs';
 import { processEnv } from '../api/process/process-env.mjs';
@@ -30,12 +29,8 @@ import { processList } from '../api/process/process-list.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
-import { arg, flag } from '../lib/cli-arg.mjs';
 import { readEnv } from '../lib/env.mjs';
-import { isMain } from '../lib/is-main.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { spawnDetached } from '../api/process/spawn-detached.mjs';
-import { fileURLToPath } from 'node:url';
 import { closeAndVerify } from './close-verify.mjs';
 import { supLog } from './sup-log.mjs';
 
@@ -156,8 +151,6 @@ export function closeWorker({ dispatch, handle = null, stopFirst = false, retryR
 }
 
 
-const selfFile = fileURLToPath(import.meta.url);
-const SELF_RELEASE_DELAY_MS = 2500;
 const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && env[HANDLE_ENV] === handle;
 
 /** Fence and release worker `dispatch` through closeWorker (worker-stop first on the caller's proof, then release, close, verify). {dispatch, ok, stop, release, ...}. */
@@ -168,29 +161,12 @@ export function stopAndRelease(dispatch, { env = process.env, deps = {} } = {}) 
 }
 
 /**
- * Release worker `dispatch` from a caller that may be running inside its terminal `handle` (a worker filing its own report): inline
- * stopAndRelease for another worker, a detached releaser (this file's CLI) for the caller's own.
+ * Release worker `dispatch` from a caller that may be running inside its terminal `handle` (a worker filing its own report): inline stopAndRelease for
+ * another worker. For the caller's own terminal nothing is done here and nothing is spawned: {ok: false, pending: true}, the close stays pending in the
+ * runtime state and the host-side sweep closes it in-process on its next tick (a closed terminal would end this very process).
  */
-export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = process.env, delayMs = SELF_RELEASE_DELAY_MS, inline = stopAndRelease, spawnFn = spawnDetached } = {}) {
+export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = process.env, inline = stopAndRelease } = {}) {
   if (!dispatch) return null;
   if (!isOwnTerminal(handle, env)) return { ...inline(dispatch), handle, owner };
-  try {
-    const child = spawnFn(process.execPath, [selfFile, '--dispatch', dispatch, '--stop-first', '--delay-ms', String(delayMs), '--owner', owner],
-      { detached: true, stdio: 'ignore', windowsHide: true, env });
-    child.unref?.();
-    return { dispatch, handle, ok: true, detached: true, pid: child.pid ?? null, owner };
-  } catch (error) {
-    return { dispatch, handle, ok: false, detached: true, owner, error: String(error?.message ?? error) };
-  }
-}
-
-if (isMain(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const dispatch = arg(argv, 'dispatch');
-  if (!dispatch) { console.error('use: worker-close.mjs --dispatch <dispatch id> [--stop-first] [--retry-release]'); process.exit(2); }
-  const delay = Number(arg(argv, 'delay-ms'));
-  if (Number.isFinite(delay) && delay > 0) sleepSync(Math.min(delay, 60_000));
-  const out = { ...closeWorker({ dispatch, stopFirst: flag(argv, 'stop-first'), retryRelease: flag(argv, 'retry-release') }), owner: arg(argv, 'owner') ?? 'runtime' };
-  console.log(JSON.stringify(out));
-  process.exit(out.ok ? 0 : 1);
+  return { dispatch, handle, ok: false, pending: true, reason: 'the caller runs inside the worker terminal', owner };
 }

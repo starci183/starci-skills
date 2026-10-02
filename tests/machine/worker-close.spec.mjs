@@ -143,3 +143,42 @@ test('processEnv reads the environment of a real process: the handle a child inh
   assert.equal(row.values.ORCA_TERMINAL_HANDLE, 'term_spec_probe');
   assert.equal(rows.find((r) => r.pid === process.pid).values.ORCA_TERMINAL_HANDLE ?? null, process.env.ORCA_TERMINAL_HANDLE ?? null);
 });
+
+// A [Worker] filing its own report runs INSIDE the terminal that a close would end. Nothing is spawned for it: the close stays pending in the
+// Supervisor's own state (the job keeps no proven terminalClosed, a worker-terminal-unclosed event records the pending close) and the host-side
+// sweep, outside that terminal, closes it in process on its next tick (tests/supervisor/reconciler-gc.spec.mjs proves the sweep side).
+test('a worker closing from inside its own terminal: the close is recorded pending, spawns nothing, and the next sweep tick closes and verifies it', async (t) => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { withMachine } = await import('../../engine/db/machine.mjs');
+  const { createJob, closeWorkerTerminal, jobOf, openWorkerHandles } = await import('../../scripts/supervisor/workers.mjs');
+  const { releaseSelfSafe } = await import('../../scripts/machine/worker-close.mjs');
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-worker-pending-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(base, 'machine.sqlite') };
+  withMachine((m) => {
+  const { job } = createJob(m, { cluster: 'pending-close', title: 'pending close', files: ['scripts/a.mjs'] });
+  m.db.prepare("UPDATE sup_jobs SET status='running' WHERE job_id=?").run(job.job_id);
+  m.db.prepare("UPDATE sup_jobs SET payload_json=json_set(payload_json,'$.dispatch',?) WHERE job_id=?").run(DISPATCH, job.job_id);
+  m.startSupAttempt({ jobId: job.job_id });
+  const attempt = m.latestSupAttempt(job.job_id).attempt_id;
+  m.updateSupAttempt(attempt, { terminalHandle: HANDLE });
+
+  const own = (dispatch, handle, o) => releaseSelfSafe(dispatch, handle, { ...o, env: { ORCA_TERMINAL_HANDLE: HANDLE }, inline: () => assert.fail('never closed inline from inside the terminal') });
+  const first = closeWorkerTerminal(m, { jobId: job.job_id, env: { ORCA_TERMINAL_HANDLE: HANDLE }, release: own });
+  assert.deepEqual([first.ok, first.pending, first.reason], [false, true, 'the caller runs inside the worker terminal']);
+  assert.equal(jobOf(m, job.job_id).payload.terminalClosed, undefined, 'the close is not recorded as done');
+  assert.ok(openWorkerHandles(m).has(HANDLE), 'the terminal still counts as held, so the sweep sees it');
+  const events = m.db.prepare("SELECT kind, payload_json FROM sup_events WHERE entity_id=? ORDER BY rowid").all(job.job_id);
+  assert.ok(events.some((e) => e.kind === 'worker-terminal-unclosed' && JSON.parse(e.payload_json).pending === true), 'the pending close is recorded');
+
+  // The next tick runs outside that terminal: the same close now runs in process, through closeWorker, and is recorded as proven.
+  const closed = [];
+  const tick = (dispatch, handle, o) => releaseSelfSafe(dispatch, handle, { ...o, env: {}, inline: (d) => { closed.push(d); return closeWorker({ dispatch: d, stopFirst: true, env: {}, deps: world().deps }); } });
+  const second = closeWorkerTerminal(m, { jobId: job.job_id, env: {}, release: tick });
+  assert.deepEqual(closed, [DISPATCH]);
+  assert.equal(second.ok, true);
+  assert.equal(jobOf(m, job.job_id).payload.terminalClosed.ok, true, 'recorded as closed once proven');
+  }, { env });
+});
