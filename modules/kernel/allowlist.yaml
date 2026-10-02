@@ -515,8 +515,6 @@ dead-script-entries:
     reason: "validator CLI of work records (docs); a spec reads it"
   - path: scripts/guards/git-hooks.mjs
     reason: "generated runtime hook installer with no current code importer; the CLI lane's `starci runtime link` verb is its future reader"
-  - path: scripts/guards/release-record.mjs
-    reason: "the L4 record of a release (written by the release cut, read by the pre-push gate of the hooks): the release cut of the GOVERNANCE lane is its future importer"
 
 # Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
 export-used: []

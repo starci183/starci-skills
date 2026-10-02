@@ -144,10 +144,15 @@ test('the command guard hook refuses the incident\'s worktree and link commands 
   assert.equal(hook({ tool_name: 'exec', tool_input: { command: 'git clean -fd', workdir: repo }, cwd: scratch }, handle).status, 2);
   assert.equal(fs.existsSync(nowhere), false, 'nothing was made');
   for (const [tool, command] of [['Bash', 'git status --short'], ['Bash', 'echo "never ln -s or git reset --hard"'], ['PowerShell', 'Write-Output guarded-ok'],
-    ['PowerShell', `New-Item -ItemType Directory -Path '${path.join(scratch, 'plain')}'`], ['Bash', 'grep -rn mklink docs'], ['Bash', 'git commit -q -m "a; b" -- src/a.txt']]) {
+    ['PowerShell', `New-Item -ItemType Directory -Path '${path.join(scratch, 'plain')}'`], ['Bash', 'grep -rn mklink docs'], ['Bash', 'git status --short -- src/a.txt']]) {
     const r = hook({ tool_name: tool, tool_input: { command }, cwd: repo }, handle);
     assert.equal(r.status, 0, `${command}: ${r.stderr}`);
   }
+  // An op never commits raw (R223): a commit whose message only mentions a separator is refused as RIGHTS_GIT_COMMIT, naming `starci git commit`.
+  const commit = hook({ tool_name: 'Bash', tool_input: { command: 'git commit -q -m "a; b" -- src/a.txt' }, cwd: repo }, handle);
+  assert.equal(commit.status, 2);
+  assert.match(commit.stderr, /RIGHTS_GIT_COMMIT/);
+  assert.match(commit.stderr, /starci git commit/);
   // A terminal with no guard bound (the Kernel, the owner) is never refused; neither is a tool that runs no command.
   assert.equal(hook({ tool_name: 'Bash', tool_input: { command: 'git reset --hard HEAD~1' }, cwd: repo }, 'term_kernel-unbound').status, 0);
   assert.equal(hook({ tool_name: 'Read', tool_input: { file_path: 'x' }, cwd: repo }, handle).status, 0);

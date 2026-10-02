@@ -56,7 +56,9 @@ require-flag:
 # File mutations inside the worktree: allowed here; the file rights (R224 protected zone, op never writes the runtime checkout)
 # judge the targets.
 scoped-write: [mkdir, cp, mv, rm, rmdir, touch, tee, install, truncate, copy, move, del, erase, ren, rename, new-item, ni, set-content, sc, add-content, ac, out-file, remove-item, ri,
-  copy-item, cpi, move-item, mi, clear-content, clc, rename-item, rni, mklink-none]
+  copy-item, cpi, move-item, mi, clear-content, clc, rename-item, rni, mklink-none,
+  # process control: a kill by PID of a process the agent started passes here; the older guard rules (PROCESS_KILL_BY_NAME, process-query kills) refuse the rest
+  kill, taskkill, stop-process, spps, tasklist, ps, get-process, gps, printenv]
 git:
   # read-only subcommands
   read: [status, log, diff, show, rev-parse, ls-files, ls-tree, cat-file, blame, grep, describe, shortlog, rev-list, merge-base, for-each-ref, name-rev, ls-remote, show-ref,

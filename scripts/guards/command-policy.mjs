@@ -25,7 +25,8 @@ const INTRINSIC_READ = new Set(['ls', 'dir', 'cat', 'type', 'head', 'tail', 'wc'
   'seq', 'md5sum', 'sha1sum', 'sha256sum', 'shasum', 'cksum', 'od', 'xxd', 'hexdump', 'jq', 'yq', 'column', 'nl', 'rev', 'tac', 'fold', 'fmt', 'join', 'paste']);
 
 /** True only for a program whose every form is intrinsically read-only. */
-export const intrinsicPolicyRead = (command) => INTRINSIC_READ.has(programName(command?.program));
+// A PowerShell drive path like env: lists the whole environment (ls env:, dir env:, cat env:): never the hot path, the ENV_DUMP rule judges it.
+export const intrinsicPolicyRead = (command) => INTRINSIC_READ.has(programName(command?.program)) && !(command?.args ?? []).some((a) => /env:/i.test(String(a)));
 
 /** Load and parse the command policy once per runtime root. An unreadable or invalid file is cached as policy null. */
 export function loadCommandPolicy({ root = SKILL_ROOT, read = (file) => fs.readFileSync(file, 'utf8') } = {}) {

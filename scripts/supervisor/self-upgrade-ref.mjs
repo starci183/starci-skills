@@ -67,3 +67,6 @@ export function withSelfUpgradeRef(result, { root = SKILL_ROOT, id, write = writ
     ? { ...result, selfUpgradeRef: receipt.ref }
     : { ...result, selfUpgradeRef: receipt?.ref ?? fallback, selfUpgradeRefError: String(receipt?.error ?? 'git update-ref failed').slice(0, 500) };
 }
+
+/** The describe() fragment of a land result that carries a self-upgrade ref receipt: '; self-upgrade ref refs/self-upgrade/<id>' (and its failure), or an empty string. */
+export const selfUpgradeNote = (r) => (r.selfUpgradeRef ? `; self-upgrade ref ${r.selfUpgradeRef}${r.selfUpgradeRefError ? ` FAILED: ${r.selfUpgradeRefError}` : ''}` : '');
