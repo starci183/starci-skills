@@ -8,7 +8,6 @@
         { "name": "identity", "kind": "api" },
         { "name": "order", "kind": "api" },
         { "name": "billing", "kind": "worker" },
-        { "name": "order-worker", "kind": "worker" },
         { "name": "migrate", "kind": "migrate" }
       ],
       "connections": [

@@ -351,7 +351,7 @@ state check) and a message that runs out of attempts waits in the dead letters. 
 other's events, never an in-process event: the failure is an event whose contract declares `compensates: "<event>"` and its
 consumer undoes that step. Every consumed event is named by an e2e spec that boots the real apps through `useTestWorld`, and the
 spec of a saga step also names the compensated event, so it drives the whole flow (R132). See `docs/microservices.md` and the
-`ecommerce-app` example (`order`, `billing`, `order-worker`).
+`ecommerce-app` example (`identity`, `order`, `billing`).
 
 ## 6. Frontend
 

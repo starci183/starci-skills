@@ -32,7 +32,6 @@ import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
 import type { BillingAppOptions } from "../../../apps/billing/src/billing.options"
-import type { OrderWorkerAppOptions } from "../../../apps/order-worker/src/order-worker.options"
 import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
@@ -47,10 +46,7 @@ export const KEYCLOAK_SIGN_IN_CLIENT = "identity-api"
 export const KEYCLOAK_ADMIN_CLIENT = "identity-admin"
 
 /** The wiring of the ecommerce world: its three apps and their three connections. */
-export type EcommerceWiring = WorldWiring<
-    "identity" | "order" | "billing" | "order-worker",
-    "identity" | "order" | "billing"
->
+export type EcommerceWiring = WorldWiring<"identity" | "order" | "billing", "identity" | "order" | "billing">
 
 /** The entities the identity connection maps. */
 export const IDENTITY_ENTITIES: DatabaseConnectionOptions["entities"] = accountEntities
@@ -167,13 +163,6 @@ export const billingOptions = (w: EcommerceWiring): BillingAppOptions => ({
     database: billingDatabase(w),
     messaging: messagingOptionsOf(w),
     invoice: { maxTotalMinorUnits: BILLING_LIMIT_MINOR_UNITS },
-})
-
-/** The options of the order worker: the order database and queues of the run, and the receipt bucket the shared order capability composes. */
-export const orderWorkerOptions = (w: EcommerceWiring): OrderWorkerAppOptions => ({
-    database: orderDatabase(w),
-    messaging: messagingOptionsOf(w),
-    receiptStorage: receiptStorageOptionsOf(w),
 })
 
 /** The platform base of a modules world: clock, logging and both connections, as the app roots register them. */

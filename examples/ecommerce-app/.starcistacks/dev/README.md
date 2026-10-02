@@ -2,7 +2,7 @@
 
 The dev environment for the second example product: the three shared stateful components
 (Postgres on 5501, Redis on 6448, Keycloak on 8149 with the `ecommerce` realm, MinIO on 9069 for the receipts) run under Compose; the two services run on the host against
-them (the billing and order workers consume the order and billing events from Redis queues). Postgres carries one database per connection (`ecommerce_identity`, `ecommerce_order`, `ecommerce_billing`, created by
+them (the billing service and the order service consume each other's events from Redis queues). Postgres carries one database per connection (`ecommerce_identity`, `ecommerce_order`, `ecommerce_billing`, created by
 `../infra/compose/initdb`). Every runtime value reaches the services through their environment; the keys are
 listed in `runtime/env/KEYS.md`, and `../infra/metadata.json` stays the resolved port map the frontend reads.
 

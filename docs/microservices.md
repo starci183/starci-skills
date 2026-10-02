@@ -65,7 +65,7 @@ command reads it.
 A saga is a chain of services reacting to each other's events; the canon has no in-process event (R87). The failure of a step is an
 event whose contract declares `compensates: "<event of the step it undoes>"`, and the consumer of that event undoes the step
 in one transaction. In the example, `order.placed` starts the billing service's invoice; when the invoice is above the limit
-`billing.invoice-rejected` (which compensates `order.placed`) makes the order worker cancel the order, release its stock and refund
+`billing.invoice-rejected` (which compensates `order.placed`) makes the order service cancel the order, release its stock and refund
 its payment.
 
 ## Specs
@@ -77,7 +77,7 @@ Sibling services run as real apps in the world, never as fakes; a third-party Sa
 
 ## The reference example
 
-`examples/ecommerce-app` runs five back-end apps: `identity` and `order` (GraphQL, calling each other), `billing` (consumes
-`order.placed`, records an invoice, announces a rejection), `order-worker` (consumes `billing.invoice-rejected`, the compensating
-step) and `migrate`. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
+`examples/ecommerce-app` runs four back-end apps: `identity` and `order` (GraphQL, calling each other), `billing` (consumes
+`order.placed`, records an invoice, announces a rejection) and `migrate`; the order service also consumes `billing.invoice-rejected`, the compensating
+step of its saga. Its e2e specs `billing/order-placed` and `order/invoice-rejected` prove the asynchronous path, the redelivery and
 the compensation on the real stack; `integration/messaging` proves the queue adapter against Redis.

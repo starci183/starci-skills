@@ -11,4 +11,3 @@ include:
   - identity.yaml
   - order.yaml
   - billing.yaml
-  - order-worker.yaml

@@ -30,10 +30,6 @@ components:
     image: ecommerce-app/billing:1.0.0
     role: service
     compose: infra/compose/billing.yaml
-  order-worker:
-    image: ecommerce-app/order-worker:1.0.0
-    role: service
-    compose: infra/compose/order-worker.yaml
 environments:
   dev:
     status: supported

@@ -40,6 +40,7 @@ import {
     MessagingModule,
 } from "@modules/integrations/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
+import { CancellationMessageModule } from "@features/cancellation"
 import { CheckoutGraphqlModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
 import type { OrderAppOptions } from "./order.options"
@@ -118,6 +119,7 @@ export class AppModule {
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,
+                CancellationMessageModule,
             ],
             providers: [
                 { provide: APP_FILTER, useClass: ErrorsFilter },

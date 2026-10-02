@@ -710,7 +710,7 @@ slots:
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.schedule
     profiles: [be]
@@ -721,7 +721,7 @@ slots:
     requires: ["<feature>-schedule.module.ts"]
     allows: ["<job>.job.ts"]
     tests: none
-    composedBy: [worker]
+    composedBy: [api, worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.websocket
     profiles: [be]

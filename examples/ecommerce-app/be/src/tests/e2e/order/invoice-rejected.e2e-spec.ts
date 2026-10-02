@@ -8,15 +8,15 @@ import { useTestWorld } from "../../world/use-test-world"
 /**
  * The order saga with its compensation, end to end on the real services: a buyer places an order whose total is above what
  * the billing service invoices (`order.placed`), the billing worker records a rejected invoice and announces
- * `billing.invoice-rejected`, and the order worker, the compensating step, cancels the order, gives the stock of its lines
+ * `billing.invoice-rejected`, and the order service, whose message transport is the compensating step, cancels the order, gives the stock of its lines
  * back and refunds its payment. A confirmation replayed with the same key announces the order again; billing announces the
- * rejection again; the order worker finds the order already cancelled and changes nothing, so the stock comes back once: a
+ * rejection again; the order service finds the order already cancelled and changes nothing, so the stock comes back once: a
  * second rejected order proves the repeated rejection was consumed before it (the queue is ordered).
  *
  * Run: npm run test:e2e -- order/invoice-rejected
  */
 describe("billing.invoice-rejected compensates order.placed", () => {
-    const world = useTestWorld({ apps: ["identity", "order", "billing", "order-worker"] })
+    const world = useTestWorld({ apps: ["identity", "order", "billing"] })
 
     beforeAll(async () => {
         await productBuilder(world.db.order).build({ id: "sku-yacht", priceMinorUnits: 200_000, stock: 3 })

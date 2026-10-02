@@ -4,7 +4,7 @@ A small real shop: one StarCi app, two NestJS services in `be/` and two Next.js 
 
 ## Overview
 
-The back end runs two NestJS APIs (`be/apps/identity`, `be/apps/order`), two workers (`be/apps/billing` consumes `order.placed` and invoices the order; `be/apps/order-worker` consumes `billing.invoice-rejected` and compensates the order) and one migrate app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
+The back end runs three services (`be/apps/identity`, `be/apps/order`, `be/apps/billing`: billing consumes `order.placed` and invoices the order, the order service consumes `billing.invoice-rejected` and compensates the order) and one migrate app, each service with its own Dockerfile and a pinned image in the stack, following the locked BE
 convention: CQRS handlers, GraphQL doors that only dispatch the bus, one injected `EntityManager` per database, outcomes for
 expected refusals and one error family per capability.
 
@@ -41,7 +41,7 @@ the root, whose workspaces are the front end's packages (`fe/packages/*`). The d
 - `be/src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,
   i18n, logging, clock, primitives (Outcome), probes, inbox (event dedupe), messaging (BullMQ queues over Redis).
 - `be/src/modules/integrations`: cache (Redis), identity-api and order-api (each service calls the other over GraphQL).
-- `be/contracts/<service>/`: the vendored contract of each service: `schema.graphql` for its GraphQL, `events.json` for the messages it publishes (`apps/<service>/src/events.ts`); a worker lists what it reads in `apps/<app>/src/consumes.ts`. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order worker cancel the order, release its stock and refund its payment.
+- `be/contracts/<service>/`: the vendored contract of each service: `schema.graphql` for its GraphQL, `events.json` for the messages it publishes (`apps/<service>/src/events.ts`); a worker lists what it reads in `apps/<app>/src/consumes.ts`. The order saga: `order.placed` (order) starts the invoice in billing; `billing.invoice-rejected` (compensates `order.placed`) makes the order service cancel the order, release its stock and refund its payment.
 - Unit specs exist only as `<name>.service.spec.ts` beside each `<name>.service.ts`. `be/src/tests`: `fixtures/builders/<area>.builder.ts` (test data), `e2e/` and `integration/` (the real world), `world/` (test infrastructure).
 - `fe/apps/landing/src`: the public marketing app; `fe/apps/shop/src`: the authenticated shop app. The front end has no tests.
 - `fe/packages/ecommerce-api`: the wire client, the `Outcome` union and the back-end projection reader.

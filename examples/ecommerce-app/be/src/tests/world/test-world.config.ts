@@ -10,7 +10,6 @@ import { EnvSource } from "@modules/platform/config"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
-import { AppModule as OrderWorkerApp } from "../../../apps/order-worker/src/app.module"
 import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
@@ -22,7 +21,6 @@ import {
     RECEIPTS_BUCKET,
     billingOptions,
     identityOptions,
-    orderWorkerOptions,
     orderOptions,
     platformBase,
 } from "./test-apps.options"
@@ -58,7 +56,6 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },
         order: { module: OrderApp, operations: ECOMMERCE_OPERATIONS, options: orderOptions },
         billing: { module: BillingApp, listen: false, options: billingOptions },
-        "order-worker": { module: OrderWorkerApp, listen: false, options: orderWorkerOptions },
     },
     migrate: {
         module: migrateMain,
