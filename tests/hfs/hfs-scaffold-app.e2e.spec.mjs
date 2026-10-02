@@ -85,7 +85,8 @@ test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, 
   };
   step('npm run typecheck', ['run', 'typecheck']);
   step('npm run lint', ['run', 'lint']);
-  step('npm run test', ['test'], { timeout: 900_000 });
+  // Jest's default cache lives in the OS temp root, which this suite keeps empty: the app's run keeps it inside the fixture.
+  step('npm run test', ['test', '--', `--cacheDirectory=${path.join(into, '.jest-cache')}`], { timeout: 900_000 });
   step('npm run build:be', ['run', 'build:be']);
   assert.ok(fs.existsSync(path.join(app, 'be', 'dist', 'apps', 'cli', 'src', 'main.js')), 'the cli app is built');
 
