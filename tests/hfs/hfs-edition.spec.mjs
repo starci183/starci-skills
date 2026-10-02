@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkRepo } from '../../scripts/hfs/check.mjs';
-import { HfsSlotsError, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
+import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, resolveRepoDeclaration } from '../../scripts/hfs/slots.mjs';
 
 // The edition mechanism (L01, manifest 2.1.0): hfs.json names `edition: full|lite` (absent means full), and lite is the same
 // manifest filtered (a slot's `editions`, `litePresence` and `lite` overlay), never a second engine. Full is the byte-for-byte
@@ -205,4 +205,37 @@ test('L01: a clean lite app produces no edition finding', (t) => {
   const files = ['package.json', 'be/src/features/api/orders/index.ts', 'fe/apps/web/src/app/[locale]/page.tsx'];
   const findings = checkRepo({ repoRoot, declaration: app({ edition: 'lite', be: { ...BE, kinds: ['api', 'cli'] } }), files, tree: false }).findings;
   assert.equal(findings.some((f) => f.code.startsWith('HFS_EDITION')), false, JSON.stringify(findings.filter((f) => f.code.startsWith('HFS_EDITION'))));
+});
+
+// ------------------------------------------------------------------------------- the rule catalog and the one findings filter
+
+test('rule catalog: `editions` names the rules lite does not judge; a rule without it is judged by both', () => {
+  const catalog = loadRuleCatalog();
+  const fullOnly = catalog.rules.filter((r) => r.editions && !r.editions.includes('lite')).map((r) => r.id);
+  for (const id of ['R47', 'R48', 'R98', 'R102', 'R155', 'R167', 'R173', 'R151', 'R160', 'R169', 'R177']) assert.ok(fullOnly.includes(id), `${id} is full only`);
+  for (const id of ['R10', 'R11', 'R34', 'R35', 'R74', 'R97', 'R147', 'R156', 'R174', 'R180']) assert.ok(!fullOnly.includes(id), `${id} stays in lite (relaxed by slot data, not dropped)`);
+  assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'lite'), false);
+  assert.equal(catalog.judgedIn('BE_TEST_TOPOLOGY', 'full'), true);
+  assert.equal(catalog.judgedIn('FE_NO_TESTS', 'lite'), true);
+  assert.equal(catalog.judgedIn('HFS_REPO_UNREADABLE', 'lite'), true, 'a code outside the catalog is always judged');
+  assert.throws(() => loadRuleCatalog({ text: fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8').replace('editions: [full]', 'editions: [basic]') }), (e) => e.code === 'HFS_RULES_INVALID');
+});
+
+test('checkRepo: the one findings filter drops the codes of rules the edition does not judge, and only for that edition', () => {
+  const files = ['hfs.json', 'be/src/tests/world/test-world.config.ts', 'be/jest.config.js'];
+  const lite = checkRepo({ repoRoot: root, declaration: app({ edition: 'lite' }), files, tree: false });
+  assert.ok(lite.findings.some((f) => f.code === 'HFS_FORBIDDEN_PRESENT'), 'the forbidden test tree is a finding of lite');
+  assert.ok(!lite.findings.some((f) => f.code === 'BE_TEST_TOPOLOGY'), 'a code of a full-only rule is not reported under lite');
+});
+
+test('hfs.json supabase block: the auth posture is declared data (jwtExpiry 3600 at most), unknown keys refused', () => {
+  const manifest = loadSlotManifest();
+  const withBlock = (supabase) => ({ ...app({ edition: 'lite' }), supabase });
+  const good = { enableSignup: false, jwtExpiry: 3600, siteUrl: 'http://localhost:3000', redirectUrls: ['http://localhost:3000/auth/callback'], forceRls: ['public.audit'] };
+  assert.equal(resolveRepoDeclaration(manifest, withBlock(good)).edition, 'lite');
+  assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(withBlock(good)))), true);
+  for (const bad of [{ jwtExpiry: 7200 }, { enableSignup: 'no' }, { redirectUrls: 'x' }, { surprise: true }, 'x']) {
+    assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(withBlock(bad)))), false, `schema accepted ${JSON.stringify(bad)}`);
+    refusal(() => resolveRepoDeclaration(manifest, withBlock(bad)), 'HFS_DECLARATION_INVALID');
+  }
 });

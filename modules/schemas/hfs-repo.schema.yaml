@@ -42,6 +42,19 @@ $defs:
         type: string
         pattern: '^[a-z][a-z0-9-]*$'
         description: Binds .workspaces/projects/<project>/work.json.
+      supabase:
+        type: object
+        additionalProperties: false
+        description: >-
+          The auth posture the app declares for its Supabase project (L08): supabase/config.toml must equal what is stated here (a
+          key left out is not compared), and `jwtExpiry` is 3600 at most. `forceRls` lists the tables a definer role owns, which
+          also need `force row level security`.
+        properties:
+          enableSignup: {type: boolean}
+          jwtExpiry: {type: integer, minimum: 1, maximum: 3600}
+          siteUrl: {type: string, minLength: 1}
+          redirectUrls: {type: array, items: {type: string, minLength: 1}}
+          forceRls: {type: array, items: {type: string, minLength: 1}}
       browser:
         const: true
         description: "The app has a browser journey (slot app.browser at the app root; browser/playwright.config.ts, browser/journeys/*.ts and browser/stack.mjs; the managed script test:browser). Left out when it has none. A front end itself has no tests (FE_NO_TESTS); the journey is the product, not the front end."

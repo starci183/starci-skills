@@ -50,7 +50,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../runtime/scripts/lib/is-main.mjs';
-import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
+import { checkDatabase, checkRepository, explainPath, trackedFiles } from '../runtime/scripts/hfs/check.mjs';
 import { secretMain } from '../runtime/scripts/hfs/secret.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
@@ -144,7 +144,7 @@ async function runCheck({ repoRoot, fast = false, base, only, presets, prettier 
   const tracked = trackedFiles(repoRoot);
   // Managed files of the root and both sides, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier
   // through the app's own install (R19, never under --fast).
-  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
+  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...await checkDatabase({ repoRoot, files: tracked, base }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
   // R23 against the be side itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
   let contracts = null;
   let be = null;

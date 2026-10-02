@@ -84,6 +84,12 @@ $defs:
         uniqueItems: true
         items: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
         description: The rule's own code first, then any sub-check codes that report the same rule.
+      editions:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {enum: [full, lite]}
+        description: The editions that judge this rule (default both). A rule that names editions without lite is not judged in a lite app, and its finding codes are dropped by the one findings filter (checkRepo and checkRepository); an app cannot opt out of a rule, it can only pick an edition (R16, R17).
       enforcers:
         type: array
         minItems: 1

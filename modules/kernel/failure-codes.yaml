@@ -14037,3 +14037,83 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
   nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
   owner: runtime-core
   kind: check-finding
+
+DB_MIGRATION_SHAPE:
+  title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"
+  title_vi: "Migration sai hình dạng hoặc bị sửa"
+  meaning_vi: "`<path>` vi phạm luật migration: tên phải là `<ts14>_<kebab>.sql`, stamp là thời điểm UTC thật không ở tương lai, migration mới xếp sau mọi migration trên base, và migration đã lên base là bất biến (sửa hay xoá đều là finding)."
+  causes_vi:
+    - "Vi phạm luật L02: `supabase/migrations/<ts14>_<kebab>.sql`; stamp tăng nghiêm ngặt so với base; file đã lên base không được đổi."
+  nextStep_vi: "Tạo migration mới bằng `supabase migration new`, không sửa/đổi tên/xoá migration đã lên base; nếu cần đổi nội dung, viết migration mới."
+  owner: op-retry
+  kind: check-finding
+
+DB_RLS_REQUIRED:
+  title: "Every `create table` in an exposed schema is followed by `enable row level security` in the same migration"
+  title_vi: "Bảng trong schema public thiếu RLS"
+  meaning_vi: "`<path>` tạo bảng trong schema exposed (`public` và `[api] schemas` của config.toml) mà không có `alter table ... enable row level security` ngay trong cùng migration; bảng khai báo `forceRls` cần cả `force row level security`."
+  causes_vi:
+    - "Vi phạm luật L03: mọi `create table`/`create table as` trong schema exposed phải có enable (và force khi hfs.json `supabase.forceRls` khai báo) trong cùng migration; partition con và bảng temp được miễn."
+  nextStep_vi: "Viết `alter table <schema>.<table> enable row level security;` ngay sau create trong cùng migration; không dùng vòng lặp dynamic SQL."
+  owner: op-retry
+  kind: check-finding
+
+DB_DYNAMIC_DDL:
+  title: "No dynamic SQL builds DDL - every statement a migration runs is visible to the parser"
+  title_vi: "DDL động trong migration"
+  meaning_vi: "`<path>` có `EXECUTE`/dynamic `FOR`/`OPEN` trong DO block hoặc function build create/alter/drop table|policy|function hay grant/revoke, hoặc một dynamic statement mà parser không đọc được."
+  causes_vi:
+    - "Vi phạm luật L04: DDL viết tường minh từng câu; dynamic DDL làm L03/L05/L06 không quyết định được bằng AST."
+  nextStep_vi: "Viết thẳng các câu create/alter/drop/grant (codemod sinh nếu cần lặp); dynamic SQL chỉ còn DML thuần."
+  owner: op-retry
+  kind: check-finding
+
+DB_POLICY_SHAPE:
+  title: "Policies are named `<table>_<role>_<action>`, write/FOR ALL never uses (true), anon/public only on `for select` `*_public_read`, no grant to anon without that policy, never `service_role`"
+  title_vi: "Policy sai hình dạng"
+  meaning_vi: "`<path>` có policy vi phạm L05: write hoặc FOR ALL với using (true)/with check (true), `to anon`/`to public` ngoài FOR SELECT `*_public_read`, select using (true) không hậu tố `_public_read`, tên sai `<table>_<role>_<action>`, grant tới anon/public không có policy `_public_read` kèm, hoặc grant tới `service_role`."
+  causes_vi:
+    - "Vi phạm luật L05: service_role vượt RLS nên không bao giờ được grant; anon chỉ đọc qua policy `_public_read` được khai báo."
+  nextStep_vi: "Đổi tên policy theo `<table>_<role>_<action>`, thay using (true) trên write bằng điều kiện thật, bỏ grant tới service_role/anon hoặc thêm policy `<table>_public_read` cho select."
+  owner: op-retry
+  kind: check-finding
+
+DB_DEFINER_SAFE:
+  title: "A `security definer` function pins `search_path`, lives outside exposed schemas (or is revoked from public in the same migration), declares a return type, and interpolates parameters only through `format('%I/%L')`"
+  title_vi: "Function security definer không an toàn"
+  meaning_vi: "`<path>` có function `security definer` thiếu `set search_path` (trên create hoặc `alter function` cùng migration - `from current` không tính), nằm trong schema exposed mà không `revoke execute ... from public`, không khai báo return type, hoặc build dynamic SQL qua tham số không qua `format('%I/%L')`."
+  causes_vi:
+    - "Vi phạm luật L06: search_path không pin là lỗ hổng leo quyền; `security invoker` được miễn."
+  nextStep_vi: "Thêm `set search_path = ''` (hoặc danh sách schema cố định), chuyển function sang schema `private` hoặc `revoke execute on function ... from public, anon`, và chỉ interpolate qua `format('%I'/'%L')`."
+  owner: op-retry
+  kind: check-finding
+
+DB_STORAGE_POLICY:
+  title: "A bucket insert declares `public = false` (true only for an id ending `_public`), `file_size_limit`, `allowed_mime_types`, and a `storage.objects` policy naming its `bucket_id` in the same migration"
+  title_vi: "Bucket storage thiếu khai báo hoặc policy"
+  meaning_vi: "`<path>` insert vào `storage.buckets` thiếu `public`/`file_size_limit`/`allowed_mime_types`, đặt `public = true` cho id không kết thúc `_public`, hoặc không có policy trên `storage.objects` nhắc `bucket_id` của nó trong cùng migration."
+  causes_vi:
+    - "Vi phạm luật L07: bucket là private mặc định; giới hạn size/mime và policy objects đi cùng khai báo bucket."
+  nextStep_vi: "Khai báo đủ `public = false`, `file_size_limit`, `allowed_mime_types` và viết `create policy ... on storage.objects ... (bucket_id = '<id>')` trong cùng migration."
+  owner: op-retry
+  kind: check-finding
+
+DB_CONFIG_POLICY:
+  title: "`supabase/config.toml` holds no literal credential (`env(NAME)` only), `auth.jwt_expiry <= 3600`, and signup/site_url/redirects equal the hfs.json `supabase` block"
+  title_vi: "config.toml lệch policy"
+  meaning_vi: "`<path>` (supabase/config.toml) chứa giá trị literal dưới key credential (secret|password|token|client_id|*_key trừ anon/publishable), `auth.jwt_expiry` quá 3600, hoặc `enable_signup`/`site_url`/`additional_redirect_urls` khác với block `supabase` mà hfs.json khai báo."
+  causes_vi:
+    - "Vi phạm luật L08: secret trong config.toml viết `env(NAME)`; jwt_expiry tối đa 3600; posture auth là fact được check, không phải claim trong doc."
+  nextStep_vi: "Đổi credential thành `env(TEN_BIEN)`, hạ `jwt_expiry` về <= 3600, và chỉnh hfs.json `supabase` hoặc config.toml cho khớp nhau."
+  owner: op-retry
+  kind: check-finding
+
+DB_TYPES_DRIFT:
+  title: "`supabase/types/database.types.ts` is committed and equals what `contract:emit` regenerates from the migrations"
+  title_vi: "database.types.ts lệch với migrations"
+  meaning_vi: "`supabase/types/database.types.ts` chưa được commit, hoặc khác với text mà `contract:emit` sinh lại từ migrations hiện tại (hoặc emit thất bại). Pattern giống R23 HFS_CONTRACT_SNAPSHOT_DRIFT."
+  causes_vi:
+    - "Vi phạm luật L09: file types là artefact sinh; commit bản mới nhất, không sửa tay."
+  nextStep_vi: "Chạy `npm run contract:emit` và commit `supabase/types/database.types.ts` kết quả."
+  owner: op-retry
+  kind: check-finding

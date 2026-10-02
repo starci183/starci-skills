@@ -24,6 +24,7 @@
 //   FE_NO_TESTS                   (R97, hfs-rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
 //   HFS_EDITION_FORBIDDEN_PRESENT (L01, hfs-rules/edition.mjs) under edition lite: a test script, dependency or tool config in a
 //                                 package.json or the tree, or a declared worker app, event pattern or trigger kind lite does not have
+//   DB_MIGRATION_SHAPE ... DB_TYPES_DRIFT (R213-R216, rules/database.mjs, async: passed in as extraFindings) the Supabase migrations, policies, definer functions, buckets, config.toml and generated types
 //   BE_SPEC_PLACEMENT             (R102, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
 //   HFS_REPO_LOCAL_CHECK          (R103, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
 //   HFS_LINT_SUPPRESSION_FILE     (R104, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
@@ -55,7 +56,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from './architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadRuleCatalog, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './slots.mjs';
 import { allowsFile } from './allows.mjs';
 import { RUNTIME_KIND } from './manifest-shape.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
@@ -77,6 +78,8 @@ import { checkAppRoot, trackedTreeView } from './architecture/hfs.mjs';
 import { testTopologyFindings } from './rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 import { editionFindings } from './rules/edition.mjs';
+// The database rules (R213-R216) read SQL through a WASM parser, so they are async: `hfs check` calls them beside the other emitters and passes the findings in as `extraFindings`.
+export { checkDatabase } from './rules/database.mjs';
 
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
@@ -96,6 +99,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
   'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'HFS_PEER_INTEGRATION_MISSING', 'BE_INTEGRATION_SPEC_MISSING', 'FE_GRAPHQL_CONTRACT', 'FE_NO_TESTS', 'HFS_MONO_WORKSPACES', 'HFS_MONO_FE_WORKSPACE', 'HFS_MONO_NEST_PROJECTS', 'HFS_MONO_WORKSPACE_DEP', 'BE_CLI_REQUIRED', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG', 'HFS_SERVICE_PLACEMENT', 'HFS_IMAGE_UNPINNED', 'HFS_SERVICE_STACK_DECLARATION', 'HFS_EVENT_CONTRACT', 'BE_ASYNC_SPEC_MISSING', 'BE_SAGA_STEP_COMPENSATION', 'BE_SAGA_STATE_VERSIONED', 'BE_SAGA_EVENT_CONTRACT', 'BE_SAGA_CONSUMER_DEDUPE', 'BE_EVENT_CLASS_CONTRACT', 'BE_PATTERN_SPEC_MISSING', 'BE_CONTRACT_BREAKING', 'BE_KIND_DECLARATION', 'BE_KIND_EMPTY', 'HFS_DOCKER_BUILD_CONTEXT', 'HFS_DOCKER_STAGES', 'HFS_DOCKER_ENTRY', 'HFS_DOCKER_BASE_PIN', 'HFS_DOCKER_SECRETS', 'BE_SAGA_E2E_MISSING',
   'HFS_EDITION_FORBIDDEN_PRESENT',
+  'DB_MIGRATION_SHAPE', 'DB_RLS_REQUIRED', 'DB_DYNAMIC_DDL', 'DB_POLICY_SHAPE', 'DB_DEFINER_SAFE', 'DB_STORAGE_POLICY', 'DB_CONFIG_POLICY', 'DB_TYPES_DRIFT',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -204,6 +208,17 @@ function summarize(findings) {
     info: findings.filter((f) => f.level === 'info').length,
     byCode,
   };
+}
+
+/**
+ * THE edition filter of findings: a finding whose code belongs, through the rule catalog, to a rule the app's edition does not
+ * judge (rules.yaml `editions`) is dropped. Codes outside the catalog (refusals, machine codes without a rule) stay. This is the
+ * only place the edition touches a finding; no check below it knows the edition.
+ */
+function judgedFindings(findings, edition, root) {
+  if (edition === 'full') return findings;
+  const catalog = loadRuleCatalog({ root });
+  return findings.filter((finding) => catalog.judgedIn(finding.code, edition));
 }
 
 /** The tree findings of R03: empty directories, ghost siblings, untracked entries outside an ignored slot. */
@@ -345,7 +360,8 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   if (tree) findings.push(...treeFindings({ repoRoot, resolver }));
 
   // The app-root tree check reports machine codes: their why is read with the check's own.
-  const finished = withWhy(findings, { ...why, ...readWhy(root, [...new Set(findings.map((f) => f.code).filter((code) => !why[code]))]) });
+  const judged = judgedFindings(findings, repo.edition ?? 'full', root);
+  const finished = withWhy(judged, { ...why, ...readWhy(root, [...new Set(judged.map((f) => f.code).filter((code) => !why[code]))]) });
   const counts = summarize(finished);
   const apps = repo.profile === APP_SCOPE ? SIDES.flatMap((side) => repo.sides[side].apps.map((app) => ({ ...app, side }))) : repo.apps;
   return { ok: counts.error === 0, repoRoot, manifest: manifest.version, profile: repo.profile, apps, tracked: tracked.length, findings: finished, counts };
@@ -405,7 +421,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
     found.push(...run.findings);
   }
   const why = readWhy(root, [...new Set(found.map((f) => f.code))]);
-  const findings = [...slotResult.findings, ...withWhy(found, why)];
+  const findings = [...slotResult.findings, ...withWhy(judgedFindings(found, repo.edition ?? 'full', root), why)];
   const counts = summarize(findings);
   const ran = runs.filter((info) => info.status === 'ran');
   return {
