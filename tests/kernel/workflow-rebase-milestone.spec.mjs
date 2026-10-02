@@ -110,7 +110,7 @@ test('a conflict: the branch stays, its head is preserved, one rebase-conflict D
   const onto = commit(fx.repo, 'be/a.ts', A.replace('l1', 'main1'));
   const before = git(fx.dir, 'rev-parse', 'HEAD');
   const r = milestoneRebase(fx.ctx, { workflowId: WF, opId: 'op-be-1' });
-  assert.deepEqual([r.due, r.why, r.rebased], [true, 'overlap', false]);
+  assert.deepEqual([r.due, r.why, r.rebased], [true, 'overlap', false], JSON.stringify(r));
   assert.deepEqual(r.conflict.files, ['be/a.ts']);
   assert.equal(r.conflict.preservedRef, milestoneRefOf(WF, onto));
   assert.match(r.conflict.preservedRef, new RegExp(`^refs/heads/preserved/${WF}/rebase-${onto.slice(0, 12)}$`));

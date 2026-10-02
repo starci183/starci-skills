@@ -73,7 +73,7 @@ export function milestoneRebase(ctx, { workflowId, opId }) {
     if (r.ok) return { ...policy, rebased: !r.already, onto: r.onto, head: r.head, behind, overlap };
     if (r.code !== 'workflow-rebase-conflict') return { ...policy, rebased: false, onto, error: r.code, detail: r.detail ?? null, files: r.files ?? [] };
     const preservedRef = milestoneRefOf(workflowId, onto);
-    const kept = git(updateRef, rec.path, [preservedRef, head]);
+    const kept = updateRef(rec.path, preservedRef, head);
     const escalation = escalateRebaseConflict(ctx, { workflowId, onto, head, files: r.files, preservedRef });
     return { ...policy, rebased: false, onto, head, conflict: { files: r.files, preservedRef: kept.ok ? preservedRef : null, escalation } };
   } catch (error) {
