@@ -5,8 +5,8 @@
 // Orca call. Every agent the spec starts is stopped and released in its own teardown; it never resets or touches
 // another Run.
 //   E3  the no-op agent runs scripts/api/orca/send.mjs with its own ids - the exact path `api report` uses to send
-//       worker_done - then: does the Dispatch settle (worker-show state succeeded), and is a later task-update of its Task
-//       refused (it is, only when Orca settled the Task)?
+//       worker_done - then: does the Dispatch settle (worker-show state succeeded), and does Orca itself read the Task
+//       completed (task-list, read BEFORE any update: Orca accepts a later same-state task-update, so a refusal proves nothing)?
 //   E1  worker-release on a settled Claude, Codex and Devin worker: does any agent process remain afterwards?
 // The result of a run is printed as one JSON line per smoke (SMOKE-E3 / SMOKE-E1) for the lane report.
 import test from 'node:test';
@@ -18,7 +18,7 @@ import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
 import { workerRelease } from '../../scripts/api/orca/worker-release.mjs';
-import { taskUpdate } from '../../scripts/api/orca/task-update.mjs';
+import { orcaRun, jsonOf } from '../../scripts/api/orca/lib.mjs';
 import { processList as listHostProcesses } from '../../scripts/api/process/process-list.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -63,16 +63,16 @@ async function until(read, done, ms = 240_000) {
 }
 const teardown = (dispatchId) => { workerStop({ dispatch: dispatchId }); return workerRelease({ dispatch: dispatchId }); };
 
-test('E3: worker_done settles the Task; a later task-update is refused', { skip, timeout: 600_000 }, async () => {
+test('E3: worker_done settles the Dispatch and Orca completes its Task', { skip, timeout: 600_000 }, async () => {
   const a = await startNoop('claude', 'e3');
   try {
     const shown = await until(() => workerShow({ dispatch: a.dispatchId }), (r) => SETTLED.includes(r.state));
     diagnose('e3', a);
-    const afterUpdate = taskUpdate({ id: a.taskId, status: 'completed', run: a.runId });
-    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, laterTaskUpdateOk: afterUpdate.ok, laterTaskUpdateError: afterUpdate.error ?? null };
+    const listed = jsonOf(orcaRun(['orchestration', 'task-list', '--run', a.runId, '--json']).stdout);
+    const out = { dispatchStateAfterOrchSend: shown?.state ?? null, taskStatusAfterWorkerDone: (listed?.result?.tasks ?? []).find((t) => t.id === a.taskId)?.status ?? null };
     console.log(`SMOKE-E3 ${JSON.stringify(out)}`);
     assert.equal(out.dispatchStateAfterOrchSend, 'succeeded', 'send.mjs worker_done did not settle the Dispatch');
-    assert.equal(out.laterTaskUpdateOk, false, 'task-update after worker_done was accepted: Orca did not settle the Task');
+    assert.equal(out.taskStatusAfterWorkerDone, 'completed', 'Orca did not complete the Task when the worker_done settled the Dispatch');
   } finally { teardown(a.dispatchId); }
 });
 
