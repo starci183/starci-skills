@@ -44,7 +44,7 @@ import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { stopAndRelease } from '../machine/close-verify.mjs';
+import { stopAndRelease } from '../machine/worker-close.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';

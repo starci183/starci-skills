@@ -9,7 +9,6 @@ export const INFRASTRUCTURE_CODES = Object.freeze({
   HFS_SYNC_DRIFT: 'scripts/gates/hfs-sync.mjs',
   HFS_SYNC_HFS_INVALID: 'scripts/gates/hfs-sync.mjs',
   HFS_SYNC_PRESET_MISSING: 'scripts/gates/hfs-sync.mjs',
-  HFS_SYNC_COVERAGE_SCOPE: 'scripts/gates/hfs-sync.mjs',
   HFS_SYNC_SONAR_KEY: 'scripts/gates/hfs-sync.mjs',
   HFS_SYNC_TEMPLATE_VARIABLE: 'scripts/gates/hfs-sync.mjs',
   HFS_SYNC_TEMPLATE_MISSING: 'scripts/gates/hfs-sync.mjs',

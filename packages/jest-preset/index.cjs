@@ -12,20 +12,29 @@ const { builder } = require("./builders.cjs")
 const { fakeIds, FakeIds } = require("./ids.cjs")
 
 /**
- * Coverage is measured where logic runs: every service (the one place business logic lives, owner-locked unit standard) and
- * every cli command of the cli feature root (`src/features/cli/**` + `/*.cli.ts`: an action runner, R149). Handlers, resolvers,
- * controllers and consumers are thin, and helpers called by a service are covered through the service's own spec, so the
- * services and the cli commands under `src` are the whole denominator and every file in it must reach 100 on every metric.
- * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
- * (`sonar.coverage.exclusions` holds every other file, rendered by starci app sync) and its quality gate holds coverage at 100 on those files.
+ * Coverage is measured where logic runs: every file `<name>.<role>.ts` of a LOGIC role (service, policy, projection, guard, mapper, client, ...)
+ * inside the roots the slot manifest marks `coverage: required` (the modules of the back end: domain, integrations, platform, projections).
+ * The features (handlers, resolvers, controllers, consumers, processors, steps, sagas, cli commands) are thin by rule (BE_FEATURE_THIN) and are
+ * never measured. The scope is NOT written here: `starci app sync` renders it from the manifest (scripts/hfs/coverage-scope.mjs) into the repository's
+ * jest.config.js as `starciJestConfig({ coverage: { roots, roles, excludes } })`, and the same derivation renders Sonar's
+ * `sonar.coverage.exclusions` and the Codecov paths and components, so the three can never disagree. Every measured file must reach 100 on every metric.
+ * The unit run also writes `coverage/lcov.info`: Sonar and Codecov import it.
  */
-const COVERAGE_SOURCES = ["src/**/*.service.ts", "src/features/cli/**/*.cli.ts"]
-const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]
+const COVERAGE_EXCLUDES = ["**/dist/**", "**/coverage/**"]
 /** The four metrics, each held at 100 per file. */
 const COVERAGE_THRESHOLD = Object.freeze({ lines: 100, branches: 100, functions: 100, statements: 100 })
 
-function collectCoverageFrom() {
-  return [...COVERAGE_SOURCES, ...COVERAGE_EXCLUDES.map((glob) => `!${glob}`)]
+/** The glob one measured root stands for: every file of a logic role below it. */
+function rootGlob(root, roles) {
+  return `${root}**/*.${roles.length === 1 ? roles[0] : `{${roles.join(",")}}`}.ts`
+}
+
+/**
+ * jest's `collectCoverageFrom` of a coverage scope `{ roots, roles, excludes }`: the glob of every root, then the none directories inside a
+ * root (`excludes`, each a glob that ends in `**`) and the generated folders as negations.
+ */
+function collectCoverageFrom(coverage) {
+  return [...coverage.roots.map((root) => rootGlob(root, coverage.roles)), ...[...coverage.excludes, ...COVERAGE_EXCLUDES].map((glob) => `!${glob}`)]
 }
 
 /** Sonar `sonar.exclusions`: specs, e2e specs, dist and coverage output are not analysed at all. */
@@ -81,8 +90,8 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
 /**
  * The whole jest config of a Nest repository: projects `unit` (colocated `<name>.spec.ts`), `integration`
  * (`src/tests/integration/<capability>/<name>.integration-spec.ts`), `e2e` (`src/tests/e2e/<area>/<name>.e2e-spec.ts`) and
- * `contract` (`src/tests/contract/<provider>/<name>.contract-spec.ts`). It takes no options: the repository's `jest.config.js` is a managed file
- * (R05), rendered by `starci app sync` as `module.exports = require("@starci/jest-preset").starciJestConfig()`.
+ * `contract` (`src/tests/contract/<provider>/<name>.contract-spec.ts`). It takes ONE option, the coverage scope: the repository's `jest.config.js` is a managed file
+ * (R05), rendered by `starci app sync` as `module.exports = require("@starci/jest-preset").starciJestConfig({ coverage: { roots, roles, excludes } })`, the scope derived from the slot manifest.
  *
  * The managed scripts select one project each (`test` = unit, `test:integration`, `test:e2e`, `test:contract`); the
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
@@ -90,7 +99,7 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
  * run their spec files up to `min(--maxWorkers, slots)` at once, each in a worker process of its own bound to one data slot
  * of the test world (`world-runner.cjs`; a slot's data is reset when a file boots, so no two files ever share a slot); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
- * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
+ * Coverage is collected from the logic roles of the measured roots only (`coverage` option), with a per-file threshold of 100 on lines, branches, functions and
  * statements: the `test` script runs the unit project with `--coverage`, fails below it and writes `coverage/lcov.info` for Sonar. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
@@ -102,25 +111,68 @@ function hasTestWorld(root) {
   return require("node:fs").existsSync(require("node:path").join(root, "src", "tests", "world", "global-setup.ts"))
 }
 
+/** Every alternative a `{a,b}` pattern spells, braces expanded left to right. */
+function braceVariants(value) {
+  const match = /{([^{}]+)}/.exec(value)
+  return match ? match[1].split(",").flatMap((part) => braceVariants(`${value.slice(0, match.index)}${part}${value.slice(match.index + match[0].length)}`)) : [value]
+}
+
+/** The anchored RegExp of one brace-free glob over a posix path: `**` spans directories, `*` and `?` stay inside a segment. */
+function globRegExp(glob) {
+  let source = ""
+  for (let i = 0; i < glob.length; i += 1) {
+    const c = glob[i]
+    if (c === "*" && glob[i + 1] === "*") {
+      i += 1
+      if (glob[i + 1] === "/") {
+        i += 1
+        source += "(?:.*/)?"
+      } else source += ".*"
+    } else if (c === "*") source += "[^/]*"
+    else if (c === "?") source += "[^/]"
+    else source += /[.+^${}()|[\]\\]/.test(c) ? `\\${c}` : c
+  }
+  return new RegExp(`^${source}$`)
+}
+
 /**
- * True when the repository at `root` holds a file of the coverage source `glob` (`<dir>/**` + `/*.<role>.ts`): jest refuses a
- * threshold key that matches no covered file, and a back end may have no cli command yet, so a role without files gets no key
- * (its files, once added, are measured and held at 100 like every other).
+ * True when the repository at `root` holds a file the coverage glob matches: jest refuses a threshold key that matches no covered file,
+ * and a back end may have no file of a measured root yet (no projection, no integration), so a root without files gets no key (its files,
+ * once added, are measured and held at 100 like every other).
  */
 function hasCoverageSubjects(root, glob) {
   const fsx = require("node:fs")
   const pathx = require("node:path")
-  const base = glob.slice(0, glob.indexOf("**")).replace(/\/$/, "")
-  const suffix = glob.slice(glob.lastIndexOf("*") + 1)
+  const base = glob.slice(0, Math.max(0, glob.search(/[*?{]/))).replace(/[^/]*$/, "")
+  const patterns = braceVariants(glob).map(globRegExp)
   const walk = (dir) => {
     let entries
-    try { entries = fsx.readdirSync(dir, { withFileTypes: true }) } catch { return false }
-    return entries.some((entry) => (entry.isDirectory() ? !["node_modules", "dist", "coverage"].includes(entry.name) && walk(pathx.join(dir, entry.name)) : entry.name.endsWith(suffix)))
+    try {
+      entries = fsx.readdirSync(pathx.join(root, dir), { withFileTypes: true })
+    } catch {
+      return false
+    }
+    return entries.some((entry) => {
+      const rel = `${dir}${entry.name}`
+      if (entry.isDirectory()) return !["node_modules", "dist", "coverage"].includes(entry.name) && walk(`${rel}/`)
+      return patterns.some((pattern) => pattern.test(rel))
+    })
   }
-  return walk(pathx.join(root, base))
+  return walk(base)
 }
 
-function starciJestConfig() {
+/** The scope `{ roots, roles, excludes }` of an options object, or a refusal: the scope is rendered by `starci app sync`, never defaulted. */
+function coverageOf(options) {
+  const coverage = options?.coverage
+  const list = (value) => Array.isArray(value) && value.every((item) => typeof item === "string" && item.length > 0)
+  if (!coverage || !list(coverage.roots) || !list(coverage.roles) || !coverage.roles.length || !list(coverage.excludes)) {
+    throw new Error("starciJestConfig({ coverage: { roots, roles, excludes } }) needs the coverage scope starci app sync renders from the slot manifest; run \"npx starci app sync --write\"")
+  }
+  return coverage
+}
+
+function starciJestConfig(options) {
+  const coverage = coverageOf(options)
   const shared = {
     preset: "ts-jest",
     testEnvironment: "node",
@@ -143,9 +195,9 @@ function starciJestConfig() {
   return {
     testTimeout: 120_000,
     coverageProvider: "v8",
-    collectCoverageFrom: collectCoverageFrom(),
-    // A glob key is applied to every matching file on its own: each service file must reach 100, not the average.
-    coverageThreshold: Object.fromEntries(COVERAGE_SOURCES.filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
+    collectCoverageFrom: collectCoverageFrom(coverage),
+    // A glob key is applied to every matching file on its own: each measured file must reach 100, not the average.
+    coverageThreshold: Object.fromEntries(coverage.roots.map((root) => rootGlob(root, coverage.roles)).filter((glob) => hasCoverageSubjects(process.cwd(), glob)).map((glob) => [`./${glob}`, { ...COVERAGE_THRESHOLD }])),
     coverageDirectory: "coverage",
     // lcov is what Sonar imports (coverage/lcov.info); text-summary and text are what the developer reads.
     coverageReporters: ["text-summary", "text", "lcov"],
@@ -186,8 +238,8 @@ module.exports = {
   fakeIds,
   FakeIds,
   collectCoverageFrom,
+  rootGlob,
   sonarExclusions,
-  COVERAGE_SOURCES,
   hasCoverageSubjects,
   COVERAGE_EXCLUDES,
   COVERAGE_THRESHOLD,

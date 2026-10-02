@@ -8,8 +8,8 @@
 //     leave them to Orca's accounting);
 //   - worktreePathOf / activeWorkerOn: the lane-owner rule (an active worker whose worktree is the lane).
 // Only Orca's own nextAction argv decides the action (owner rule: never write ourselves what Orca has). A SETTLED worker
-// whose liveness Orca cannot verify (`unverifiable`) is released like any other: its terminal is Orca-reclaimable, and live
-// smoke E1 showed worker-release leaves no agent process of the terminal (alpha5 item 1.6); a row with NO liveness verdict
+// whose liveness Orca cannot verify (`unverifiable`) is released like any other (through scripts/machine/worker-close.mjs, which
+// also closes its terminal and proves its process tree gone): its terminal is Orca-reclaimable; a row with NO liveness verdict
 // is still never acted on.
 import { pathKey, sameOrUnder } from './path-key.mjs';
 

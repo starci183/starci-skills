@@ -8,8 +8,8 @@
 // side (be, fe) for a side slot, whose files land under that side's folder. Two targets are not whole files of a managedBy slot
 // and are listed in this module: the marked block of the root .gitignore, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
-// exclusions and the one coverage scope (sonar.coverage.exclusions, its complement, and the codecov.yml paths alike), the jest
-// preset the app installs for its be side. `--check` compares the sha256 of the rendered content with the
+// exclusions, the jest preset the app installs for its be side and the one coverage scope derived from the slot manifest
+// (scripts/hfs/coverage-scope.mjs: the be/jest.config.js scope, sonar.coverage.exclusions and the codecov.yml paths and components). `--check` compares the sha256 of the rendered content with the
 // file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
 // only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, the npm workspaces fe/apps/* and fe/packages/*,
@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
+import { codecovPaths, coverageComponents, jestCoverage, sonarCoverageExclusions } from '../runtime/scripts/hfs/coverage-scope.mjs';
 import { APP_SCOPE, SIDES, loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/hfs/slots.mjs';
 import { feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
 import { DEFAULT_PORT, NODE_IMAGE, dockerfilePath } from '../runtime/scripts/hfs/rules/docker.mjs';
@@ -102,10 +103,7 @@ export function render(text, vars, readTemplate = readBundled) {
   });
 }
 
-/**
- * What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions and the coverage sources
- * (`COVERAGE_SOURCES`, the globs jest collects coverage from): { sonarExclusions, coverageSources }.
- */
+/** What the app's sync reads from the jest preset it installs for its be side: the Sonar exclusions ({ sonarExclusions }). */
 export async function loadPresets(root) {
   const name = '@starci/jest-preset';
   const require = createRequire(path.join(root, 'package.json'));
@@ -115,59 +113,48 @@ export async function loadPresets(root) {
   } catch {
     throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
-  const preset = require(resolved);
-  return { sonarExclusions: preset.sonarExclusions(), coverageSources: [...preset.COVERAGE_SOURCES] };
+  return { sonarExclusions: require(resolved).sonarExclusions() };
 }
 
 /** Where the be unit run writes the lcov report (jest `coverageDirectory` coverage under be/, reporter lcov), from the app root. */
 const LCOV_REPORT = 'be/coverage/lcov.info';
 
+const SOURCE_FILE = /\.[cm]?ts$/;
+const SOURCE_SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
+
 /**
- * THE coverage scope of an app, from the app root: the preset's coverage sources on the be side (`be/src/**` + `/*.service.ts`).
- * It is the one source of the codecov.yml status paths and, through coverageExclusions, of Sonar's coverage scope, so the two
- * can never drift; fe/ is outside it (a front end has no tests).
+ * The be source of the app at `root` the coverage components read: { files, read }, `files` be-relative posix paths of every `*.ts` file under
+ * be/apps and be/src (build output and dependencies skipped) and `read` their text. An app with no be folder has no files.
  */
-export function coverageScope(presets) {
-  const sources = presets?.coverageSources;
-  if (!Array.isArray(sources) || !sources.length) throw new SyncError('HFS_SYNC_PRESET_MISSING', '@starci/jest-preset gives no COVERAGE_SOURCES: the coverage scope cannot be rendered');
-  return sources.map(glob => `be/${glob}`);
+export function appSource(root) {
+  const files = [];
+  const walk = dir => {
+    let entries;
+    try { entries = fs.readdirSync(path.join(root, 'be', dir), { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) { if (!SOURCE_SKIPPED.has(entry.name)) walk(rel); } else if (SOURCE_FILE.test(entry.name)) files.push(rel);
+    }
+  };
+  for (const dir of ['apps', 'src']) walk(dir);
+  return { files: files.sort(), read: file => fs.readFileSync(path.join(root, 'be', file), 'utf8') };
 }
 
-const COVERED_SUFFIX = /\*\.([a-z][a-z0-9-]*)\.ts$/;
-const asGlob = (text) => String(text).replace(/<[^>]+>/g, '*');
-
 /**
- * Sonar's coverage scope of an app as `sonar.coverage.exclusions` globs: the COMPLEMENT of coverageScope. SonarQube has no
- * coverage inclusions and its globs have no negation, so every executable file that is not a coverage source is excluded:
- *   - every be source role of the slot manifest's closed suffix vocabulary (ruleParams.be.suffixes, R89) other than the
- *     roles the coverage sources name (`service`), as `be/**` + `/*.<role>.ts`;
- *   - every be file name outside that vocabulary a be slot declares (`main.ts`, `index.ts`, `connection.ts`, the migrations,
- *     the test world's files, dto/ and kit/ files), as `be/<slot path>/<name>` with each `<placeholder>` a `*`;
- *   - all of fe/ (a front end has no tests).
- * The result is sorted and has no duplicate. A coverage source that is not `<dir>/**` + `/*.<role>.ts` is refused: its
- * complement cannot be written in Sonar's globs.
+ * The Codecov `individual_components` entries of components [{ id, name, paths }]: one `component_id` block each, `prefix` ahead of every path
+ * (the app folder in the runtime repository) and `ids` mapping a component id to its name there.
  */
-export function coverageExclusions(presets, manifest = loadSlotManifest()) {
-  const covered = new Set(coverageScope(presets).map(glob => {
-    const role = COVERED_SUFFIX.exec(glob)?.[1];
-    if (!role) throw new SyncError('HFS_SYNC_COVERAGE_SCOPE', `coverage source ${glob} is not <dir>/**/*.<role>.ts: Sonar's coverage exclusions cannot express its complement`);
-    return role;
-  }));
-  const suffixes = manifest.ruleParams?.be?.suffixes ?? [];
-  const isRole = new RegExp(`\\.(?:${suffixes.map(s => s.replace(/[-]/g, '\\-')).join('|')})\\.ts$`);
-  const globs = new Set(suffixes.filter(role => !covered.has(role)).map(role => `be/**/*.${role}.ts`));
-  for (const slot of manifest.slots) {
-    if (!slot.profiles.includes('be') || slot.presence === 'forbidden') continue;
-    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
-      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
-      for (const name of braceVariants(entry)) {
-        if (isRole.test(asGlob(name).replace(/\*/g, 'x'))) continue;
-        for (const dir of braceVariants(slot.path)) globs.add(`be/${asGlob(dir)}${asGlob(name)}`.replace(/\/\/+/g, '/'));
-      }
-    }
-  }
-  globs.add('fe/**');
-  return [...globs].sort();
+export function componentsYaml(components, { prefix = '', ids = id => id } = {}) {
+  return components.map(component => [`    - component_id: ${ids(component.id)}`, `      name: ${ids(component.name)}`, '      paths:', ...component.paths.map(glob => `        - ${JSON.stringify(prefix + glob)}`)].join('\n')).join('\n');
+}
+
+/** The managed be/jest.config.js option text of a coverage scope { roots, roles, excludes }, laid out exactly as prettier lays it out (width 120, indent 4). */
+export function jestCoverageSource(coverage) {
+  const list = (key, items) => {
+    const one = `        ${key}: [${items.map(item => JSON.stringify(item)).join(', ')}],`;
+    return one.length <= 120 ? one : [`        ${key}: [`, ...items.map(item => `            ${JSON.stringify(item)},`), '        ],'].join('\n');
+  };
+  return ['{', list('roots', coverage.roots), list('roles', coverage.roles), list('excludes', coverage.excludes), '    }'].join('\n');
 }
 
 /**
@@ -254,7 +241,7 @@ export function imageFiles(app) {
 }
 
 /** Every value a template of `scope` can name, derived from hfs.json and the presets. */
-export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest()) {
+export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest(), source = { files: [], read: () => '' }) {
   const fe = app.sides.fe;
   const packages = opensPackages(fe);
   return {
@@ -269,8 +256,10 @@ export function variables(app, scope, presets, sonarKey, manifest = loadSlotMani
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**'].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    coverageExclusions: scope === APP_SCOPE ? coverageExclusions(presets, manifest).join(',') : '',
-    codecovPaths: scope === APP_SCOPE ? coverageScope(presets).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
+    jestCoverage: scope === 'be' ? jestCoverageSource(jestCoverage(manifest)) : '',
+    coverageExclusions: scope === APP_SCOPE ? sonarCoverageExclusions(manifest).join(',') : '',
+    codecovPaths: scope === APP_SCOPE ? codecovPaths(manifest).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
+    codecovComponents: scope === APP_SCOPE ? componentsYaml(coverageComponents(manifest, { ...source, apps: app.sides.be.apps })) : '',
     tsconfigPaths: ['be/tsconfig.json', ...fe.apps.map(entry => `fe/apps/${entry.name}/tsconfig.json`), ...(packages ? ['fe/packages/*/tsconfig.json'] : [])].join(','),
     styleGlob: STYLE_GLOB,
     imageMatrix: imageMatrix(app),
@@ -295,11 +284,11 @@ function parseScripts(text) {
  * its folder); a scripts target also carries `scripts`, the parsed block. `sonarKey` is the key the be side's stack declaration
  * names; without one the key is the project.
  */
-export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundled, manifest = loadSlotManifest() } = {}) {
+export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundled, manifest = loadSlotManifest(), source } = {}) {
   const app = validateHfs(hfs, manifest);
   const hasTemplate = name => { try { return readTemplate(name) !== undefined; } catch { return false; } };
   return SCOPES.flatMap(scope => {
-    const vars = variables(app, scope, presets, sonarKey, manifest);
+    const vars = variables(app, scope, presets, sonarKey, manifest, source);
     return targetsOf(scope, { manifest, hasTemplate }).map(target => {
       const body = render(readTemplate(target.template), vars, readTemplate);
       const where = onSide(scope, target.path);
@@ -394,7 +383,7 @@ export function loadHfs(root) {
 export async function renderRepo(root, { presets, parseYaml } = {}) {
   const hfs = loadHfs(root);
   const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
-  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey }) };
+  return { hfs, targets: renderTargets(hfs, presets ?? await loadPresets(root), { sonarKey, source: appSource(root) }) };
 }
 
 /** `starci app sync --check | --write [--cwd <dir>]` at the app root; returns 0 clean, 1 drift, 2 usage. */

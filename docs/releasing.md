@@ -15,11 +15,12 @@ Review source changes and test failures. Do not weaken validators to produce a g
 ## Example apps: CI and the local Sonar dashboard
 
 The root `.github/workflows/examples.yml` runs every example app (the matrix is derived from `examples/*/hfs.json` of kind app,
-`scripts/checks/check-examples-ci.mjs`): typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the app's flag (the root
-`codecov.yml`, one flag per app, 100 on the project and the patch), the be build and the fe build (turbo, the packages first) and the Sonar gate on push and pull request; a second job `images`
-builds the Docker image of every be and fe app of every example (its matrix is `check-examples-ci.mjs --images`, derived from the apps of each `hfs.json`) and never pushes. Coverage is one scope: the services
-and the cli commands under `be/src` (the jest preset's `COVERAGE_SOURCES`), shared by every be app, so one flag per example covers identity, order, billing and cli; the fe has no tests. The root flag, each
-example's own `codecov.yml` and the complement in its `sonar-project.properties` are all rendered from the source preset by `starci runtime check --only examples-ci -- --write` (`npm run check` refuses drift);
+`scripts/checks/check-examples-ci.mjs`): typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the app's flag (the example's
+`codecov.yml`, the measured roots held at 100 on the project and the patch plus one component per service app and one `platform`, each at 100), the be build and the fe build (turbo, the packages first) and the Sonar gate on push and pull request; a second job `images`
+builds the Docker image of every be and fe app of every example (its matrix is `check-examples-ci.mjs --images`, derived from the apps of each `hfs.json`) and never pushes. Coverage is one scope: the files of
+the `ruleParams.be.logicRoles` roles inside the `coverage: required` slots (the logic of `be/src/modules/**`), derived once from the slot manifest by `scripts/hfs/coverage-scope.mjs` and shared by every be
+app, so the one scope covers every service; the fe has no tests. Each example's `codecov.yml`, its `be/jest.config.js` and the complement
+in its `sonar-project.properties` are all rendered from the one derivation by `starci runtime check --only examples-ci -- --write` (`npm run check` refuses drift, R204);
 integration and e2e start the docker stack and run only through its `workflow_dispatch` (input `layers`), because e2e runs manually
 only. The coverage upload authenticates with GitHub's OIDC token (`use_oidc: true`, job permission `id-token: write`), so no repository secret exists to forget and no upload step skips silently (rule CI_UPLOAD_NOT_SILENT); the owner activates the repository on Codecov once. Before a release, run the local dashboard gate
 per example app against the local SonarQube after `npm test` and a project scan:
@@ -29,7 +30,7 @@ starci gate sonar scan --cwd examples/<app> --project-gate --wait
 starci gate sonar dashboard --cwd examples/<app>
 ```
 
-It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every service is at 100 coverage.
+It fails unless bugs, code smells and vulnerabilities are 0, every hotspot is reviewed and every measured file of the coverage scope is at 100.
 
 ## Pre-workflow readiness
 

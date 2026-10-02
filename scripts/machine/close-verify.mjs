@@ -28,8 +28,8 @@
 // Internal entry: spawned by scripts/kernel/kernel-watchdog.mjs; not invoked directly.
 // Args: --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log].
 //
-// A worker's agent process needs no kill-and-read-back here: `worker-release` alone ends it (live smoke E1, 2026-10-02), so a close
-// is proven by the terminal alone.
+// A WORKER's release goes through scripts/machine/worker-close.mjs (release, this terminal close, and a proof that no process of the terminal's
+// shell tree remains): `worker-release` alone does not end every agent (a released cursor worker kept running). This file proves a terminal's close.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -40,8 +40,6 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { processList } from '../api/process/process-list.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
-import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
 import { isMain } from '../lib/is-main.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -143,41 +141,9 @@ export function closeSelfSafe(handle, { owner = 'runtime', env = process.env, de
   }
 }
 
-/** Fence and release worker `dispatch` (worker-stop, then worker-release, which archives its output). {dispatch, ok, stop, release}. */
-export function stopAndRelease(dispatch, { stop = workerStop, release = workerRelease } = {}) {
-  let stopped, released;
-  try { stopped = stop({ dispatch }); } catch (error) { stopped = { ok: false, error: String(error?.message ?? error) }; }
-  try { released = release({ dispatch }); } catch (error) { released = { ok: false, error: String(error?.message ?? error) }; }
-  return { dispatch, ok: released?.ok === true, stop: { ok: stopped?.ok === true, error: stopped?.error ?? null }, release: { ok: released?.ok === true, error: released?.error ?? null } };
-}
-
-/**
- * Release worker `dispatch` from a caller that may be running inside its terminal `handle` (a worker filing its own
- * report): inline stopAndRelease for another worker, a detached releaser (this file's CLI) for the caller's own.
- */
-export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, inline = stopAndRelease, spawnFn = spawnDetached } = {}) {
-  if (!dispatch) return null;
-  if (!isOwnTerminal(handle, env)) return { ...inline(dispatch), handle, owner };
-  try {
-    const child = spawnFn(process.execPath, [selfFile, '--dispatch', dispatch, '--delay-ms', String(delayMs), '--owner', owner],
-      { detached: true, stdio: 'ignore', windowsHide: true, env });
-    child.unref?.();
-    return { dispatch, handle, ok: true, detached: true, pid: child.pid ?? null, owner };
-  } catch (error) {
-    return { dispatch, handle, ok: false, detached: true, owner, error: String(error?.message ?? error) };
-  }
-}
-
 if (isMain(import.meta.url)) {
   const argv = process.argv.slice(2);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
-  if (value('dispatch')) {
-    const delay = Number(value('delay-ms'));
-    if (Number.isFinite(delay) && delay > 0) sleepSync(Math.min(delay, 60_000));
-    const released = { ...stopAndRelease(value('dispatch')), owner: value('owner') ?? 'runtime' };
-    console.log(JSON.stringify(released));
-    process.exit(released.ok ? 0 : 1);
-  }
   const handle = value('terminal');
   if (!handle) { console.error('use: close-verify.mjs --terminal <handle> [--delay-ms <ms>] [--owner <tag>] [--log] [--json]'); process.exit(2); }
   const delay = Number(value('delay-ms'));

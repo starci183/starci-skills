@@ -4,8 +4,8 @@ title: Reactors
 purpose: |-
   Given a fact another context announced that this context must remember or act on, who listens? A reactor: a feature of kind
   `reactors` under `features/reactors/<reactor>/` that consumes events of another context and either keeps a local copy of what
-  this context needs (the payment status inside order) or triggers a projection recompute. It is a thin door: it dispatches a command,
-  the domain service of its own context does the work in one transaction.
+  this context needs (the payment status inside order) or triggers a projection recompute. It is a thin door (R203 `BE_FEATURE_THIN`):
+  it maps the delivery and dispatches one command, and the domain service of its own context does the work in one transaction.
 appliesTo:
   - backend
 family: be
@@ -23,10 +23,11 @@ rules:
   - id: BE-REACTORS-1
     title: A reactor consumes events and dispatches commands
     kind: mandatory
-    hfsRules: [R153, R80]
+    hfsRules: [R153, R80, R203]
     requirement: |-
       A reactor holds `transport/message/<event>.consumer.ts` (implementing `EventConsumer<E>` with `readonly event = <Event>Event`),
-      `<reactor>-message.module.ts` and an `application/` of plain CQRS. `handle(delivery)` dispatches one command and forwards
+      `<reactor>-message.module.ts` and an `application/` of plain CQRS. The consumer is thin (R203 `BE_FEATURE_THIN`):
+      `handle(delivery)` maps the delivery and dispatches one command, forwarding
       `delivery.eventId`; the domain service the command reaches claims the event id in `platform/inbox` inside its own transaction,
       so a redelivery is a no-op.
     rationale: |-
@@ -39,6 +40,7 @@ rules:
       automated:
         - BE_EVENT_CONSUMER_SHAPE
         - BE_INBOX_DEDUPE_MISSING
+        - BE_FEATURE_THIN
       manual: []
     relatedExamples: [event-bus]
   - id: BE-REACTORS-2

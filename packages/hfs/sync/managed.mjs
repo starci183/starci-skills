@@ -19,8 +19,12 @@
 //                                 configuration, and a package.json that carries a tool configuration key (`eslintConfig`, `stylelint`,
 //                                 `prettier`, `lint-staged`, `jest`). Forbidden tool-config files (.eslintrc*, .eslintignore, a second
 //                                 eslint.config.*) are refused by hfs-check through the slot manifest under the same code.
+//   HFS_COVERAGE_SCOPE_DRIFT (R204)
+//                                 a file that states the coverage scope no longer states what the slot manifest derives (the `coverage` field of
+//                                 knowledge/hfs/slots.yaml through scripts/hfs/coverage-scope.mjs): be/jest.config.js, codecov.yml, or the
+//                                 `sonar.coverage.exclusions` line of sonar-project.properties. The scope is never edited by hand.
 //   HFS_SONAR_CONFIG (R11)        sonar-project.properties differs from its render (the render names no host URL, sources and tests that
-//                                 do not overlap, the `sonar.exclusions` of the jest preset (a back end), the be lcov with the services as the coverage scope, the ESLint report and the
+//                                 do not overlap, the `sonar.exclusions` of the jest preset (a back end), the be lcov with the logic of be/src/modules as the coverage scope, the ESLint report and the
 //                                 HFS import files Sonar reads), or the stack declaration names a quality gate other than the one
 //                                 gate of knowledge/sonar-gate.yaml (bundled in the runtime copy). One edit is one finding.
 //   HFS_TS_STRICT (R22)           the root tsconfig.json drift (either profile), named by flag (ts-strict.mjs) instead of by hash.
@@ -34,6 +38,10 @@ import { TS_STRICT_FILE, tsStrictFindings } from './ts-strict.mjs';
 // The managed one-liners whose difference from the render is the proof that no rule is off, warned or redefined (R17).
 const ONE_LINER_FILES = new Set(['eslint.config.mjs', 'stylelint.config.mjs']);
 const SONAR_PROPERTIES_FILE = 'sonar-project.properties';
+// The files whose whole content is a statement of the coverage scope, and the one line of the Sonar file that is (R204).
+const COVERAGE_SCOPE_FILES = new Set(['be/jest.config.js', 'codecov.yml']);
+const SONAR_COVERAGE_LINE = 'sonar.coverage.exclusions=';
+const statesCoverageScope = result => COVERAGE_SCOPE_FILES.has(result.path) || (result.path === SONAR_PROPERTIES_FILE && String(result.difference?.expected ?? '').startsWith(SONAR_COVERAGE_LINE));
 const SONAR_GATE_FILE = new URL('../runtime/knowledge/sonar-gate.yaml', import.meta.url);
 const MAX_SCANNED_BYTES = 1024 * 1024;
 const RULE_FILE = /\.[cm]?[jt]s$/;
@@ -80,9 +88,9 @@ function driftFindings(repoRoot, targets) {
         continue;
       }
     }
-    const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(path.posix.basename(result.path)) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
+    const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(path.posix.basename(result.path)) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : statesCoverageScope(result) ? 'HFS_COVERAGE_SCOPE_DRIFT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
-    const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
+    const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : code === 'HFS_COVERAGE_SCOPE_DRIFT' ? ', so it no longer states the coverage scope derived from the slot manifest' : ''}`;
     findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx starci app sync --write"` });
   }
   return findings;

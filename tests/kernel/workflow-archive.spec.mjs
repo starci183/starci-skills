@@ -84,7 +84,10 @@ test('archive stops a running workflow: asks retired, open jobs dropped, Kernel 
   assert.deepEqual([running.managedWorker?.dispatchId,running.managedWorker?.custody?.state],[OP_TERM,'released'],'the dropped worker is released and recorded');
   const argv=calls();
   assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='orchestration worker-release'&&a.includes(OP_TERM)),'the worker is released with worker-release');
-  assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='terminal close'&&a.includes(OP_TERM)),false,'no tab close is issued for a managed worker');
+  // A release is not trusted to end the agent: the runtime closes the released worker's terminal itself (scripts/machine/worker-close.mjs), after the release.
+  const heads=argv.map(a=>a.slice(0,2).join(' '));
+  assert.ok(argv.some(a=>a.slice(0,2).join(' ')==='terminal close'&&a.includes(OP_TERM)),'the released worker terminal is closed');
+  assert.ok(heads.lastIndexOf('terminal close')>heads.lastIndexOf('orchestration worker-release'),'the close follows the release');
   assert.equal(argv.some(a=>a.slice(0,2).join(' ')==='orchestration task-update'),false,'archive closes no Task: the Task of an op belongs to Orca');
   const closes=argv.filter(a=>a.slice(0,2).join(' ')==='terminal close');
   assert.ok(closes.at(-1).includes(KERNEL_TERM),'the Kernel terminal is closed, and closed last');

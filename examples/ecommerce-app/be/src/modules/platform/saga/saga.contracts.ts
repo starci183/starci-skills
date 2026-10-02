@@ -24,12 +24,28 @@ export interface SagaRun {
     readonly correlationId: string
 }
 
+/** The step of a saga a compensation undoes, as the `Compensating` log names it: its name and the event it puts on the wire. */
+export interface SagaStepRef {
+    /** The name of the step. */
+    readonly name: string
+    /** The event the step puts on the wire. */
+    readonly event: string
+}
+
+/** The compensation of one step: the run that undoes it. */
+export interface SagaCompensation {
+    /** Undoes the step for the run of the correlation id; it runs once per run, resumed after a crash. */
+    run(correlationId: string): Promise<void>
+}
+
 /** What compensating a saga needs. */
 export interface CompensateSagaParams extends SagaRun {
     /** The id of the delivered event that reports the failure; a redelivery of it changes nothing. */
     readonly eventId: string
-    /** Undoes the completed steps, in reverse order; it runs once per saga, resumed after a crash. */
-    readonly compensate: () => Promise<void>
+    /** The step whose failure this event reports, named in the log of the compensation. */
+    readonly step: SagaStepRef
+    /** The compensation that undoes the completed steps, in reverse order. */
+    readonly compensation: SagaCompensation
 }
 
 /** What completing a saga needs. */
@@ -43,6 +59,8 @@ export type FindSagaResult = SagaState | null
 
 /** The persisted state of one saga as the store reads it. */
 export interface SagaState {
+    /** What the run is about: the id of the thing it orchestrates (an order id). */
+    readonly correlationId: string
     /** The status. */
     readonly status: SagaStatus
     /** The fence: every transition moves it by one and names the version it read, so two transitions never both win. */

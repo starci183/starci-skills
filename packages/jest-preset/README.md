@@ -4,14 +4,18 @@ The jest config of a Nest repository and the one shared unit-test double kit (`m
 
 ```js
 // jest.config.js (a managed file: `starci app sync` renders it, `starci app check` compares it; do not edit)
-module.exports = require("@starci/jest-preset").starciJestConfig()
+module.exports = require("@starci/jest-preset").starciJestConfig({
+  coverage: { roots, roles, excludes },
+})
 ```
 
-`starciJestConfig()` takes no options: a repository has no jest setting to tune, so the file above is the whole config.
+The only option is `coverage`: the measured scope `starci app sync` derives once from the slot manifest
+(`scripts/hfs/coverage-scope.mjs`, R204 `HFS_COVERAGE_SCOPE_DRIFT`) — the measured roots, the roles a measured file carries
+and the exclusions. A repository has no other jest setting to tune.
 
 ## What it sets
 
-- **Four projects, one per test kind**: `unit` (`**/*.spec.ts`, which by the unit standard means one `<name>.service.spec.ts` beside each `*.service.ts`; `clearMocks`; the Outcome matchers are installed through `setupFilesAfterEnv`; ignores
+- **Four projects, one per test kind**: `unit` (`**/*.spec.ts`, which by the unit standard means one `<name>.<role>.spec.ts` beside each spec-required subject — a `*.service.ts`, a `*.cli.ts` of `src/features/cli` — and beside any other measured logic file that chooses one; `clearMocks`; the Outcome matchers are installed through `setupFilesAfterEnv`; ignores
   `src/tests/{world,integration,e2e,contract}/`), `integration` (`src/tests/integration/**/*.integration-spec.ts`), `e2e`
   (`src/tests/e2e/**/*.e2e-spec.ts`) and `contract` (`src/tests/contract/**/*.contract-spec.ts`). The last three compile against
   `src/tests/tsconfig.json`, start the one test world through `globalSetup`/`globalTeardown`
@@ -27,23 +31,24 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
   there; its own option is deprecated). Types are checked once, by `typecheck` (unit specs included) and `typecheck:tests`
   (`src/tests/tsconfig.json`), and `test:integration`/`test:e2e`/`test:contract` run `typecheck:tests` first, so no world spec
   runs on code that does not type-check.
-- **Coverage of the unit-tested roles only, per-file 100.** `collectCoverageFrom` is `src/**/*.service.ts` and `src/features/cli/**/*.cli.ts` minus `src/tests/**`, `dist` and
-  `coverage`, and `coverageThreshold` holds `{ lines: 100, branches: 100, functions: 100, statements: 100 }` on each coverage source: `./src/**/*.service.ts` and the cli commands `./src/features/cli/**/*.cli.ts`,
-  a glob key that applies to each file on its own, so every service and cli command must reach 100 on every metric (an average never passes). The
+- **Coverage of the measured logic, per-file 100.** `collectCoverageFrom` is one glob per `coverage.roots` entry covering `<root>/**/*.{<roles>}.ts`
+  (the `ruleParams.be.logicRoles` of the rendered scope), minus its `excludes`, `dist` and `coverage`, and `coverageThreshold` holds
+  `{ lines: 100, branches: 100, functions: 100, statements: 100 }` on each of those globs — a glob key applies to each file on its own, so every file of a
+  `ruleParams.be.logicRoles` role inside a measured slot must reach 100 on every metric (an average never passes). The
   managed `test` script runs the unit project with `--coverage` and fails below it. Coverage is measured by v8, which counts the
   real source. The unit project overlays `isolatedModules: false` and `importHelpers: true` on the repository tsconfig (ts-jest merges an
   inline `tsconfig` object over the `tsconfig.json` it finds): with `isolatedModules` on, TypeScript emits an unreachable
   `typeof Dep !== "undefined" ? Dep : Object` guard per class-typed constructor parameter, and inlined decorator helpers carry branches
   of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary`,
   `text` and `lcov`: the run writes `coverage/lcov.info` under the repository (be/) root.
-- **Sonar and Codecov import that lcov, scoped to the unit-tested roles.** `starci app sync` renders `sonar.coverage.exclusions` (the complement of the coverage sources: SonarQube has no coverage inclusions) and the `codecov.yml`
-  status paths from `COVERAGE_SOURCES` on the be side (`be/src/**/*.service.ts` and `be/src/features/cli/**/*.cli.ts`), so jest, Sonar and Codecov measure the same files;
+- **Sonar and Codecov import that lcov, scoped to the same measured files.** `starci app sync` renders `sonar.coverage.exclusions` (the complement of the measured files: SonarQube has no coverage inclusions) and the `codecov.yml`
+  status paths and components from the one derivation (`scripts/hfs/coverage-scope.mjs`), so jest, Sonar and Codecov measure the same files;
   the Sonar gate holds coverage at 100 overall, on new code and per file. `sonarExclusions()` still renders `sonar.exclusions`
   (`**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**`). There is no coverage exclusion list.
 
 ## The unit standard in one page
 
-Only services and cli commands are unit-tested, through `Test.createTestingModule`, with the doubles of this package and nothing else:
+Every spec-required file is unit-tested beside its subject — a `*.service.ts`, a cli command of `src/features/cli` — through `Test.createTestingModule`, with the doubles of this package and nothing else, and any other measured logic file may carry the same spec beside it:
 
 ```ts
 import { Test } from "@nestjs/testing"

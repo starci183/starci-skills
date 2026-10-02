@@ -1206,6 +1206,18 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
   owner: op-retry
   kind: check-finding
 
+HFS_COVERAGE_SCOPE_DRIFT:
+  title: "A file states a coverage scope the slot manifest does not derive"
+  title_vi: "Tệp nêu phạm vi độ phủ khác với phạm vi suy ra từ slot manifest"
+  meaning_vi: "Phạm vi độ phủ (những tệp nào bị đo 100% từng tệp) chỉ có một nguồn: trường `coverage: required|none` của từng slot be trong knowledge/hfs/slots.yaml cùng ruleParams.be.logicRoles, qua scripts/hfs/coverage-scope.mjs. Ba nơi dùng phạm vi đó đều do starci app sync sinh: be/jest.config.js (ngưỡng từng tệp), dòng sonar.coverage.exclusions của sonar-project.properties và codecov.yml (đường dẫn cùng các component theo từng service app và platform). `<detail>` nêu tệp đã lệch khỏi bản sinh; không ai được sửa tay phạm vi này."
+  causes_vi:
+    - "Sửa tay be/jest.config.js, codecov.yml hoặc dòng sonar.coverage.exclusions để đo ít tệp hơn hoặc thêm ngoại lệ"
+    - "Đổi trường coverage của slot hoặc ruleParams.be.logicRoles nhưng chưa chạy lại starci app sync"
+    - "Thêm service app hoặc capability mới nên các component của codecov.yml đã cũ"
+  nextStep_vi: "Chạy `npx starci app sync --write` để sinh lại ba tệp từ slot manifest; muốn đổi phạm vi thì đổi trường `coverage` của slot (và ruleParams.be.logicRoles) trong .claude runtime, không sửa tệp sinh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_DECLARATION_INVALID:
   title: "hfs.json missing or invalid"
   title_vi: "hfs.json thiếu hoặc sai định dạng"
@@ -1818,11 +1830,12 @@ HFS_SLOT_UNDECLARED:
   kind: check-finding
 
 HFS_SONAR_CONFIG:
-  title: "Sonar config is generated, with no host URL, importing the be lcov with the services as the only coverage scope"
+  title: "Sonar config is generated, with no host URL, importing the be lcov with the logic of be/src/modules as the coverage scope"
   title_vi: "Cấu hình Sonar lệch"
-  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra và nhập báo cáo độ phủ lcov của be, chỉ tính các service."
+  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra và nhập báo cáo độ phủ lcov của be, chỉ tính phần logic của be/src/modules (phạm vi suy ra từ slot manifest)."
   causes_vi:
     - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không phải service (SonarQube không có coverage inclusions; starci app sync sinh phần bù từ COVERAGE_SOURCES và bộ hậu tố của slot manifest, gồm cả fe/**) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không bị đo (SonarQube không có coverage inclusions; starci app sync sinh phần bù từ trường coverage của slot và ruleParams.be.logicRoles qua scripts/hfs/coverage-scope.mjs, gồm cả fe/**; lệch dòng này là HFS_COVERAGE_SCOPE_DRIFT) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry

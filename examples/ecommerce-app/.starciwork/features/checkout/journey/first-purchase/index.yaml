@@ -13,10 +13,8 @@ requiresProof:
     required: true
   requirements:
     forEach: requirements
-blockedBy:
-  - {record: gap.checkout.live-proof, because: "The journey needs the live uat run that gap.checkout.live-proof still owes."}
 change:
-  rev: 1
-  kind: initial
-  at: 2026-10-02T10:00:00.000Z
-  reason: The example's end-to-end path across its two features, the journey the uat run walks.
+  rev: 2
+  kind: clarifying
+  at: 2026-10-02T15:30:00.000Z
+  reason: blockedBy on gap.checkout.live-proof lifted - that gap is done at rev 4, closed by uat.checkout.place-order, so the journey no longer waits on it.

@@ -3,7 +3,7 @@ id: be.background
 title: Backend background work
 purpose: |-
   Given work that runs without a request (a schedule, a sweep, event or queue consumption, retry), where does it live and which
-  process runs it? Background work is a transport that dispatches one command, composed by the api app that owns it or by a worker app scaled apart. Events travel
+  process runs it? Background work is a thin transport (R203 `BE_FEATURE_THIN`) that dispatches one command, composed by the api app that owns it or by a worker app scaled apart. Events travel
   through event-bus.yaml and jobs through queues.yaml; this topic keeps the rule that a runner must exist.
 appliesTo:
   - backend

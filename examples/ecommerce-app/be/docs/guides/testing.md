@@ -1,9 +1,11 @@
 # Testing the ecommerce-app back end
 
-Only services are unit tested. Every business rule lives in a `*.service.ts` file, and each service has exactly one colocated
-`<name>.service.spec.ts`. Handlers, resolvers, controllers, mappers, guards and modules have no unit spec: a handler maps
-its input and calls one method of one service, a resolver or controller dispatches one bus message, so nothing is left in
-them to test. The apps only compose; the e2e world proves they boot.
+Unit specs sit beside their subjects. Every `*.service.ts` owes its colocated `<name>.service.spec.ts` and each cli command
+its `<name>.cli.spec.ts` (the spec-required roles of `ruleParams.be.unitRoles`); any other logic file of `src/modules/**` —
+a policy, a guard, a mapper, a client, a projection — may carry `<name>.<role>.spec.ts` beside it, and this app writes them.
+Each of those files owes 100 percent coverage per file. Feature files (handlers, resolvers, controllers, consumers,
+processors) are thin (R203 `BE_FEATURE_THIN`): they map their input and make one delegating call, so nothing is left in them
+to unit-test, and they are never measured. The apps only compose; the e2e world proves they boot.
 
 | Check      | Command             |
 | ---------- | ------------------- |
@@ -15,9 +17,11 @@ them to test. The apps only compose; the e2e world proves they boot.
 
 ## Unit suite
 
-`npm test` is `jest --selectProjects unit --coverage`. Coverage is collected from `src/**/*.service.ts` only and every file
-must reach 100 percent lines, branches, functions and statements; jest exits non-zero below that. The run writes
-`be/coverage/lcov.info`; Sonar and Codecov import it with the services as the only coverage scope and hold each at 100.
+`npm test` is `jest --selectProjects unit --coverage`. Coverage is measured per file on the logic of `src/modules/**`: every
+file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot must reach 100 percent lines, branches,
+functions and statements (`be/jest.config.js` is the render `starci app sync` writes from the one derivation,
+`scripts/hfs/coverage-scope.mjs`; R204); jest exits non-zero below that. The run writes `be/coverage/lcov.info`; Sonar and
+Codecov import it with the same measured scope and hold each file at 100.
 
 A service spec builds its subject from a testing module that provides exactly the constructor dependencies and nothing else:
 
@@ -43,7 +47,9 @@ Doubles come from the root of `@starci/jest-preset`:
 
 Assertions check results (`toBeRefused`, `toSucceedWith`, returned values, thrown domain error codes) and state (what was
 written: `expect(em.save).toHaveBeenCalledWith(...)`, commits and rollbacks). Test names are English and start with a verb.
-Pure helpers such as the checkout policy and the row mappers have no spec: their branches are covered through the service specs.
+A measured file without a spec of its own — a free helper with no role, covered through the specs of the files that call it —
+still owes the same 100 percent per file; this app chooses a colocated spec for each of its policies, guards, mappers and
+clients.
 
 The canonical example in this tree is `OrderService.placeOrder` (`src/modules/domain/order/order.service.spec.ts`): a refusal
 that never touches the database, a replayed key that returns the first order and writes nothing, and the place path with the

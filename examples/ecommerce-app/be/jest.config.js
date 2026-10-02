@@ -1,1 +1,37 @@
-module.exports = require("@starci/jest-preset").starciJestConfig()
+module.exports = require("@starci/jest-preset").starciJestConfig({
+    coverage: {
+        roots: [
+            "src/modules/domain/*/",
+            "src/modules/integrations/*/",
+            "src/modules/platform/*/",
+            "src/modules/projections/*/",
+        ],
+        roles: [
+            "service",
+            "policy",
+            "projection",
+            "guard",
+            "mapper",
+            "client",
+            "filter",
+            "interceptor",
+            "processor",
+            "step",
+            "saga",
+            "saga-step",
+            "compensation",
+            "consumer",
+            "webhook",
+        ],
+        excludes: [
+            "src/modules/domain/*/errors/**",
+            "src/modules/domain/*/messages/**",
+            "src/modules/domain/*/persistence/**",
+            "src/modules/integrations/*/errors/**",
+            "src/modules/integrations/*/messages/**",
+            "src/modules/platform/*/messages/**",
+            "src/modules/platform/*/persistence/**",
+            "src/modules/projections/*/persistence/**",
+        ],
+    },
+})

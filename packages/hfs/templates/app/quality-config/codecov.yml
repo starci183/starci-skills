@@ -1,7 +1,8 @@
 {{header}}
-# The be unit run's lcov ({{lcovReport}}), uploaded by the managed CI workflow. Coverage is the services' alone: the status
-# paths are the one coverage scope whose complement starci app sync renders into sonar.coverage.exclusions, held at 100 on the project and on
-# the patch. fe/ is outside coverage (a front end has no tests).
+# The be unit run's lcov ({{lcovReport}}), uploaded by the managed CI workflow. Coverage is the logic of be/src/modules/**: the status
+# paths are the measured roots of the one coverage scope (derived from the slot manifest's `coverage` field; its complement is rendered into
+# sonar.coverage.exclusions and its roots into be/jest.config.js), held at 100 on the project and on the patch, and each component (one per
+# service app, plus platform) is held at 100 too. fe/ and be/src/features are outside coverage (features are thin by rule; a front end has no tests).
 codecov:
   require_ci_to_pass: true
 coverage:
@@ -18,5 +19,16 @@ coverage:
         threshold: 0%
         paths:
 {{codecovPaths}}
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 100%
+        threshold: 0%
+      - type: patch
+        target: 100%
+        threshold: 0%
+  individual_components:
+{{codecovComponents}}
 ignore:
   - "fe/**"

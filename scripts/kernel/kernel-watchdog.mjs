@@ -35,7 +35,7 @@ import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { stopAndRelease } from '../machine/close-verify.mjs';
+import { stopAndRelease } from '../machine/worker-close.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { readJsonFile, jsonFromStdout } from '../lib/json.mjs';

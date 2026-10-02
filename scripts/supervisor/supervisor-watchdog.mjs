@@ -162,10 +162,10 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
 /* ------------------------------------------------------------ the pass */
 
 async function hostDeps() {
-  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config, { workerShow }, { workerStop }, { workerRelease }] = await Promise.all([
+  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config, { workerShow }, { workerStop }, { closeWorker }] = await Promise.all([
     import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../lib/terminal-liveness.mjs'),
     import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('../../engine/config.mjs'),
-    import('../api/orca/worker-show.mjs'), import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs')]);
+    import('../api/orca/worker-show.mjs'), import('../api/orca/worker-stop.mjs'), import('../machine/worker-close.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };
   const outputAge = (handle) => {
     try { return liveness.outputAgeOf(terminalShow({ terminal: handle })?.terminal?.lastOutputAt).outputAgeMs; } catch { return null; }
@@ -173,7 +173,7 @@ async function hostDeps() {
   return {
     list: () => terminalList({ includeVisualLayouts: true }), tabTitles: tabTitlesOf,
     rename: (terminal, title) => terminalRename({ terminal, title }),
-    show: (dispatch) => workerShow({ dispatch }), stop: (dispatch) => workerStop({ dispatch }), release: (dispatch) => workerRelease({ dispatch }),
+    show: (dispatch) => workerShow({ dispatch }), stop: (dispatch) => workerStop({ dispatch }), release: (dispatch) => closeWorker({ dispatch }),
     screen, settleMs: host.DEATH_SETTLE_MS, outputAge,
     // Escape (no Enter) leaves an input row that targets a subagent before the wake is typed.
     escape: (handle) => { try { return terminalSend({ terminal: handle, text: '\u001b', enter: false }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } },

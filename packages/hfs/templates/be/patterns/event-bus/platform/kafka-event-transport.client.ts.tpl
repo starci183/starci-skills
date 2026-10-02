@@ -1,14 +1,23 @@
 import { Injectable } from "@nestjs/common"
 import type { OnApplicationShutdown } from "@nestjs/common"
-import { Kafka, logLevel } from "kafkajs"
-import type { Admin, Consumer, IHeaders, Producer } from "kafkajs"
 import { InjectIds } from "@modules/platform/ids"
 import type { Ids } from "@modules/platform/ids"
 import type { Probe } from "@modules/platform/probes"
 import { EventBusError, EventBusErrorCode } from "./errors/event-bus.error"
-import { InjectEventBusOptions } from "./event-bus.decorators"
+import { InjectEventBusOptions, InjectKafkaFactory } from "./event-bus.decorators"
 import type { EventBusOptions } from "./event-bus.options"
-import type { EventSubscription, EventTransport, InboundMessage, OutboundMessage } from "./event-transport.port"
+import type {
+    EventSubscription,
+    EventTransport,
+    InboundMessage,
+    KafkaAdmin,
+    KafkaConsumer,
+    KafkaDriver,
+    KafkaFactory,
+    KafkaMessageHeaders,
+    KafkaProducer,
+    OutboundMessage,
+} from "./event-transport.port"
 
 /** How long a read of a whole topic may take before it is given up. */
 const READ_DEADLINE_MS = 15_000
@@ -26,7 +35,7 @@ interface TopicEnds {
 }
 
 /** The text headers of a message. */
-const headersOf = (headers: IHeaders | undefined): Record<string, string> =>
+const headersOf = (headers: KafkaMessageHeaders | undefined): Record<string, string> =>
     Object.fromEntries(
         Object.entries(headers ?? {}).flatMap(([name, value]) =>
             value === undefined ? [] : [[name, Array.isArray(value) ? textOf(value[0]) : textOf(value)] as const],
@@ -35,7 +44,8 @@ const headersOf = (headers: IHeaders | undefined): Record<string, string> =>
 
 @Injectable()
 /**
- * The Kafka adapter of the event transport and the health probe of the broker; the only file that imports the broker library.
+ * The Kafka adapter of the event transport and the health probe of the broker; the driver is built by the injected factory,
+ * whose default the module composes, so the client holds logic only.
  * One producer sends every outbound message, one consumer of the app's group reads the registered topics, and a short-lived
  * consumer of its own group reads a whole topic for the operator calls.
  */
@@ -43,21 +53,21 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     /** The name the health report lists this probe under. */
     readonly name = "event-bus"
 
-    private readonly kafka: Kafka
-    private producer: Producer | null = null
-    private consumer: Consumer | null = null
-    private admin: Admin | null = null
+    private readonly kafka: KafkaDriver
+    private producer: KafkaProducer | null = null
+    private consumer: KafkaConsumer | null = null
+    private admin: KafkaAdmin | null = null
 
     constructor(
         @InjectEventBusOptions() private readonly options: EventBusOptions,
+        @InjectKafkaFactory() factory: KafkaFactory,
         @InjectIds() private readonly ids: Ids,
     ) {
-        this.kafka = new Kafka({
+        this.kafka = factory.create({
             clientId: options.groupId,
             brokers: [...options.brokers],
             connectionTimeout: options.timeoutMs,
             requestTimeout: options.timeoutMs,
-            logLevel: logLevel.NOTHING,
         })
     }
 
@@ -175,7 +185,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     }
 
     /** The end offsets of the topic; a topic that does not exist yet answers no partitions and the cause. */
-    private async endsOf(admin: Admin, topic: string): Promise<TopicEnds> {
+    private async endsOf(admin: KafkaAdmin, topic: string): Promise<TopicEnds> {
         try {
             return { ends: await admin.fetchTopicOffsets(topic), cause: null }
         } catch (cause) {
@@ -184,7 +194,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     }
 
     /** Deletes the consumer group of a read; a group the broker already dropped is not a failure of the read. */
-    private async dropGroup(admin: Admin, groupId: string): Promise<unknown> {
+    private async dropGroup(admin: KafkaAdmin, groupId: string): Promise<unknown> {
         try {
             await admin.deleteGroups([groupId])
             return null
@@ -194,7 +204,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     }
 
     /** Disconnects a client that was opened; the failure of a client that is already gone is the answer, not an error of the shutdown. */
-    private async close(client: Pick<Producer, "disconnect"> | null): Promise<unknown> {
+    private async close(client: Pick<KafkaProducer, "disconnect"> | null): Promise<unknown> {
         try {
             await client?.disconnect()
             return null
@@ -203,7 +213,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
         }
     }
 
-    private async producerOf(): Promise<Producer> {
+    private async producerOf(): Promise<KafkaProducer> {
         if (this.producer === null) {
             const producer = this.kafka.producer({ allowAutoTopicCreation: true })
             await producer.connect()
@@ -212,7 +222,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
         return this.producer
     }
 
-    private async adminOf(): Promise<Admin> {
+    private async adminOf(): Promise<KafkaAdmin> {
         if (this.admin === null) {
             const admin = this.kafka.admin()
             await admin.connect()

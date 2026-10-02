@@ -66,6 +66,20 @@ export function reachableFrom(root, entry, { cache = new Map(), readFile } = {})
   return seen;
 }
 
+const QUOTED_PATH = /['"`]((?:examples|packages|knowledge|modules)\/[\w./@-]+?)\/?['"`]/g;
+const QUOTED_SEGMENTS = /['"`](examples|packages|knowledge|modules)['"`]((?:\s*,\s*['"`][\w.@-]+['"`])+)/g;
+const QUOTED_WORD = /['"`]([\w.@-]+)['"`]/g;
+/**
+ * The repository trees a test names as DATA (a path string `'packages/hfs/templates'` or path segments `'examples', 'ecommerce-app', 'be'`): a spec that reads
+ * a template tree or an example app depends on every file below it, though it imports none of them.
+ */
+export function dataRefsOf(text) {
+  const out = new Set();
+  for (const m of text.matchAll(QUOTED_PATH)) out.add(m[1]);
+  for (const m of text.matchAll(QUOTED_SEGMENTS)) out.add([m[1], ...[...m[2].matchAll(QUOTED_WORD)].map((p) => p[1])].join('/'));
+  return [...out];
+}
+
 /**
  * The specs (repository-relative paths) whose import graph reaches any changed file. `specs` is the list of spec paths to
  * consider; `changed` the repository-relative changed files. A changed spec selects itself.
@@ -74,7 +88,15 @@ export function specsDependingOn(root, changed, specs, { readFile } = {}) {
   const wanted = new Set(changed.map(posix));
   const cache = new Map();
   return specs.filter((spec) => {
-    for (const file of reachableFrom(root, spec, { cache, readFile })) if (wanted.has(file)) return true;
+    const reached = reachableFrom(root, spec, { cache, readFile });
+    for (const file of reached) if (wanted.has(file)) return true;
+    // data trees named by the spec and by its test helpers (tests/**): every changed file below one of them selects the spec
+    for (const file of reached) {
+      if (!file.startsWith('tests/')) continue;
+      let text;
+      try { text = (readFile ?? ((p) => fs.readFileSync(p, 'utf8')))(path.join(root, file)); } catch { continue; }
+      for (const ref of dataRefsOf(text)) for (const changedFile of wanted) if (changedFile === ref || changedFile.startsWith(ref + '/')) return true;
+    }
     return false;
   });
 }

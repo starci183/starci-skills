@@ -58,8 +58,8 @@ reads:
   - id: unit-kit
     path: packages/jest-preset/README.md + knowledge/patterns/be/test.yaml + <app>/be/jest.config.js
     purpose:
-      en: "The unit standard the run is judged on: services are the unit subjects, one <name>.service.spec.ts beside each be/src/**/*.service.ts, the subject built by Test.createTestingModule over exactly its constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock<T>()) and the Outcome matchers, and the preset's per-file coverage threshold of 100 on lines, branches, functions and statements for every *.service.ts."
-      vi: "Chuẩn unit mà lần chạy được chấm theo: chỉ service được test unit, mỗi be/src/**/*.service.ts có một <name>.service.spec.ts bên cạnh, đối tượng dựng bằng Test.createTestingModule trên đúng các phụ thuộc constructor với bộ đôi của @starci/jest-preset (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock<T>()) và các matcher Outcome, và ngưỡng phủ theo từng tệp của preset là 100 cho lines, branches, functions và statements của mọi *.service.ts."
+      en: "The unit standard the run is judged on: the spec-required roles of ruleParams.be.unitRoles are the unit subjects (one <name>.service.spec.ts beside each *.service.ts, one <name>.cli.spec.ts beside each cli command of be.cli), any other ruleParams.be.logicRoles file of a coverage: required slot may carry its <name>.<role>.spec.ts beside it and owes 100 per file either way, the subject built by Test.createTestingModule over exactly its constructor dependencies with the @starci/jest-preset kit doubles (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock<T>()) and the Outcome matchers, and the preset's per-file coverage threshold of 100 on lines, branches, functions and statements for every measured file (R204)."
+      vi: "Chuẩn unit mà lần chạy được chấm theo: các vai trò bắt buộc spec của ruleParams.be.unitRoles là đối tượng unit (một <name>.service.spec.ts bên cạnh mỗi *.service.ts, một <name>.cli.spec.ts bên cạnh mỗi lệnh cli của be.cli), mọi tệp ruleParams.be.logicRoles khác trong slot coverage: required có thể có <name>.<role>.spec.ts bên cạnh và dù sao cũng chịu mức phủ 100 mỗi tệp, đối tượng dựng bằng Test.createTestingModule trên đúng các phụ thuộc constructor với bộ đôi của @starci/jest-preset (mockEntityManager, fakeTransaction, fakeCache, fakeLock, recordingEventBus, recordingQueueOutbox, FakeClock, fakeIds, mock<T>()) và các matcher Outcome, và ngưỡng phủ theo từng tệp của preset là 100 cho lines, branches, functions và statements của mọi tệp được đo (R204)."
 writes:
   - id: node
     path: N/index.yaml
@@ -93,8 +93,8 @@ writes:
     path: STARCI_JOB_SCRATCH/unit-run.json
     schema: starci/unit-run@1
     content:
-      en: "The unit run summary (scripts/gates/unit-run.mjs): the run's exit, totals and failures, and per service its coverage, its spec and the kit judgment of that spec."
-      vi: "Tóm tắt lần chạy unit (scripts/gates/unit-run.mjs): exit, tổng số và lỗi của lần chạy, và cho từng service độ phủ, spec và đánh giá bộ công cụ của spec đó."
+      en: "The unit run summary (scripts/gates/unit-run.mjs): the run's exit, totals and failures, and per subject — a spec-required unit role or a measured file of the coverage scope — its role, its coverage, its spec and the kit judgment of that spec."
+      vi: "Tóm tắt lần chạy unit (scripts/gates/unit-run.mjs): exit, tổng số và lỗi của lần chạy, và cho từng đối tượng — vai trò unit bắt buộc spec hay tệp được đo của phạm vi phủ — vai trò, độ phủ, spec và đánh giá bộ công cụ của spec đó."
 steps:
   - reads: [op-loop, unit-kit]
     writes: [read-digest]
@@ -114,13 +114,13 @@ steps:
   - reads: [repo, unit-kit]
     writes: [evidence, unit-run]
     action:
-      en: "Run the full unit suite through the runtime's unit runner: starci gate unit --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. It runs the managed npm test unfiltered (the unit project with --coverage) with jest's JSON report and a json-summary coverage report in a private temp directory, and records per service its four coverage percentages, its spec beside it and the kit judgment of that spec (Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a new of the subject forbidden). Capture stdout, stderr, exit code and duration. Never run e2e, never edit source or specs, never retry to turn a red run green; a flake is re-run once inside the record and both runs are kept."
-      vi: "Chạy toàn bộ bộ unit qua bộ chạy unit của runtime: starci gate unit --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. Nó chạy npm test được quản lý không lọc (dự án unit với --coverage) kèm báo cáo JSON của jest và báo cáo phủ json-summary trong thư mục tạm riêng, rồi ghi cho từng service bốn tỉ lệ phủ, spec bên cạnh và đánh giá bộ công cụ của spec đó (bắt buộc Test.createTestingModule; cấm jest.mock, overrideProvider, Date.now(), process.env và new đối tượng). Giữ stdout, stderr, exit code và thời gian. Không bao giờ chạy e2e, không sửa mã hay spec, không thử lại để biến lần chạy đỏ thành xanh; lần chập chờn được chạy lại một lần trong bản ghi và giữ cả hai lần."
+      en: "Run the full unit suite through the runtime's unit runner: starci gate unit --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. It runs the managed npm test unfiltered (the unit project with --coverage) with jest's JSON report and a json-summary coverage report in a private temp directory, and records per subject — a spec-required unit role or a measured file of the coverage scope — its four coverage percentages, its spec beside it and the kit judgment of that spec (Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a new of the subject forbidden). Capture stdout, stderr, exit code and duration. Never run e2e, never edit source or specs, never retry to turn a red run green; a flake is re-run once inside the record and both runs are kept."
+      vi: "Chạy toàn bộ bộ unit qua bộ chạy unit của runtime: starci gate unit --root <app> --out $STARCI_JOB_SCRATCH/unit-run.json. Nó chạy npm test được quản lý không lọc (dự án unit với --coverage) kèm báo cáo JSON của jest và báo cáo phủ json-summary trong thư mục tạm riêng, rồi ghi cho từng đối tượng — vai trò unit bắt buộc spec hay tệp được đo của phạm vi phủ — bốn tỉ lệ phủ, spec bên cạnh và đánh giá bộ công cụ của spec đó (bắt buộc Test.createTestingModule; cấm jest.mock, overrideProvider, Date.now(), process.env và new đối tượng). Giữ stdout, stderr, exit code và thời gian. Không bao giờ chạy e2e, không sửa mã hay spec, không thử lại để biến lần chạy đỏ thành xanh; lần chập chờn được chạy lại một lần trong bản ghi và giữ cả hai lần."
   - reads: [target, repo, unit-kit]
     writes: [node, evidence]
     action:
-      en: "Read the result back - totals and failures grouped by spec file, and per service its coverage and kit findings - and report done only when the whole suite ran and passed, every service is at 100 on each metric with its spec beside it, and every service spec is on the kit; failed (class product, with the failing files, the services below 100 and the off-kit specs named for test.author or the build op) otherwise; blocked when the suite could not run. Never self-advance and never repair the failing source or spec here."
-      vi: "Đọc lại kết quả - tổng số và lỗi theo từng tệp spec, cùng độ phủ và phát hiện bộ công cụ của từng service - và chỉ báo done khi cả bộ đã chạy và đạt, mọi service đạt 100 ở mỗi chỉ số với spec bên cạnh, và mọi spec service theo đúng bộ công cụ; ngược lại báo failed (class product, nêu tệp lỗi, service dưới 100 và spec sai chuẩn cho test.author hoặc op build); báo blocked khi bộ test không chạy được. Không tự chuyển bước và không sửa mã hay spec lỗi ở đây."
+      en: "Read the result back - totals and failures grouped by spec file, and per subject its coverage and kit findings - and report done only when the whole suite ran and passed, every measured file of the coverage scope is at 100 on each metric, every spec-required subject has its spec beside it, and every such spec is on the kit; failed (class product, with the failing files, the measured files below 100 and the off-kit specs named for test.author or the build op) otherwise; blocked when the suite could not run. Never self-advance and never repair the failing source or spec here."
+      vi: "Đọc lại kết quả - tổng số và lỗi theo từng tệp spec, cùng độ phủ và phát hiện bộ công cụ của từng đối tượng - và chỉ báo done khi cả bộ đã chạy và đạt, mọi tệp được đo của phạm vi phủ đạt 100 ở mỗi chỉ số, mọi đối tượng bắt buộc spec có spec bên cạnh, và mọi spec đó theo đúng bộ công cụ; ngược lại báo failed (class product, nêu tệp lỗi, tệp được đo dưới 100 và spec sai chuẩn cho test.author hoặc op build); báo blocked khi bộ test không chạy được. Không tự chuyển bước và không sửa mã hay spec lỗi ở đây."
   - reads: [op-loop]
     writes: [gate-proof]
     action:
@@ -144,8 +144,8 @@ proofs:
       vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
   - id: unit-kit
     requirement:
-      en: "starci kernel settle re-reads the attached unit-run.json (runtime check op-proof, proof unit-kit): a done without it (op-unit-proof-missing), with a red or empty run (op-unit-run-red), with a service below 100 on any metric or without its spec (op-unit-coverage-below) or with a service spec off the kit (op-unit-kit-violation) is refused."
-      vi: "starci kernel settle tự đọc lại unit-run.json đính kèm (check op-proof, proof unit-kit): done thiếu nó (op-unit-proof-missing), có lần chạy đỏ hoặc rỗng (op-unit-run-red), có service dưới 100 ở bất kỳ chỉ số nào hoặc thiếu spec (op-unit-coverage-below) hoặc có spec service sai bộ công cụ (op-unit-kit-violation) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached unit-run.json (runtime check op-proof, proof unit-kit): a done without it (op-unit-proof-missing), with a red or empty run (op-unit-run-red), with a measured file below 100 on any metric or a spec-required subject without its spec (op-unit-coverage-below) or with a required spec off the kit (op-unit-kit-violation) is refused."
+      vi: "starci kernel settle tự đọc lại unit-run.json đính kèm (check op-proof, proof unit-kit): done thiếu nó (op-unit-proof-missing), có lần chạy đỏ hoặc rỗng (op-unit-run-red), có tệp được đo dưới 100 ở bất kỳ chỉ số nào hay đối tượng bắt buộc spec thiếu spec (op-unit-coverage-below) hoặc có spec bắt buộc sai bộ công cụ (op-unit-kit-violation) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: UNIT_RUNNER_MISSING
@@ -174,7 +174,7 @@ policy:
     surface: delivered-source
     command: test
     suite: whole-unit-suite-only
-    coverage: per-service-100-on-every-metric
+    coverage: per-measured-file-100-on-every-metric
     kit: Test.createTestingModule-constructor-deps-and-jest-preset-doubles
     e2e: never
     productCode: unchanged

@@ -1,25 +1,22 @@
 import { Injectable } from "@nestjs/common"
 import { PLACE_ORDER_SAGA } from "@modules/domain/order"
-import { InjectLogger } from "@modules/platform/logging"
-import type { Logger } from "@modules/platform/logging"
 import { InjectSagaService } from "@modules/platform/saga"
 import type { SagaService, SagaTransition } from "@modules/platform/saga"
 import type { FindPlaceOrderSagaResult } from "./place-order.saga-state"
-import { PlaceOrderSagaLogEvent } from "./place-order.saga.log-events"
 import { ReserveOrderCompensation } from "./compensations/reserve-order.compensation"
 import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
 
 @Injectable()
 /**
  * The orchestrator of the place-order saga: the list of its steps and, for each, the compensation that undoes it. It decides
- * nothing: the state machine and the version fence are `platform/saga`'s, the work of each compensation is a command. The run
- * starts in the transaction that places the order (the domain writes the state and announces `order.placed` there) and ends
- * when billing answers: an issued invoice completes it, a rejected one compensates every step in reverse order.
+ * nothing: the state machine, the version fence and the `Compensating` log are `platform/saga`'s, the work of each
+ * compensation is a command. The run starts in the transaction that places the order (the domain writes the state and
+ * announces `order.placed` there) and ends when billing answers: an issued invoice completes it, a rejected one compensates
+ * every step in reverse order.
  */
 export class PlaceOrderSagaService {
     constructor(
         @InjectSagaService() private readonly sagas: SagaService,
-        @InjectLogger() private readonly logger: Logger,
         private readonly reserveOrder: ReserveOrderStep,
         private readonly reserveOrderCompensation: ReserveOrderCompensation,
     ) {}
@@ -30,21 +27,14 @@ export class PlaceOrderSagaService {
             saga: PLACE_ORDER_SAGA,
             correlationId: orderId,
             eventId,
-            compensate: () => {
-                this.logger.info(PlaceOrderSagaLogEvent.Compensating, {
-                    step: this.reserveOrder.name,
-                    event: this.reserveOrder.event,
-                    orderId,
-                })
-                return this.reserveOrderCompensation.run(orderId)
-            },
+            step: this.reserveOrder,
+            compensation: this.reserveOrderCompensation,
         })
     }
 
     /** Where the run of an order stands, or null when the order never started one. */
-    async stateOf(orderId: string): Promise<FindPlaceOrderSagaResult> {
-        const state = await this.sagas.state({ saga: PLACE_ORDER_SAGA, correlationId: orderId })
-        return state === null ? null : { correlationId: orderId, ...state }
+    stateOf(orderId: string): Promise<FindPlaceOrderSagaResult> {
+        return this.sagas.state({ saga: PLACE_ORDER_SAGA, correlationId: orderId })
     }
 
     /** Completes the run of an order after the event that reports its last step done; the store takes the delivery through the inbox. */

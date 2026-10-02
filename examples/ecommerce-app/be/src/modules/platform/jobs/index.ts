@@ -1,6 +1,7 @@
 export { JOBS_ERROR_KINDS } from "./errors/jobs.error"
 export { parseJobsConfig } from "./jobs.config"
 export type { JobsConfig } from "./jobs.config"
+export { isRunKey } from "./jobs.contracts"
 export type { ClaimedJob, RunKey } from "./jobs.contracts"
 export { InjectJobClaims, InjectJobProcessorRegistry } from "./jobs.decorators"
 export { JobsModule } from "./jobs.module"

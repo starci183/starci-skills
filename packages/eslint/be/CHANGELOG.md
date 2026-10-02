@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New: `feature-thin` (R203 `BE_FEATURE_THIN`, law `feature-thin`): a feature-tier file of a role of `ruleParams.be.thinRoles` (handler, resolver, controller, consumer, processor, step, saga, saga-step, compensation, webhook, gateway, subscription, cli, mapper, the saga orchestrator service) maps its parameters and makes ONE delegating call into modules/, with no branch, loop, ternary, try, throw or computation. The slot manifest copy gains `coverage` on every tracked be slot and `ruleParams.be.logicRoles` and `thinRoles`.
+- Changed: `unit-test-colocated` also allows `<name>.<role>.spec.ts` beside a logic role (policy, client, guard, mapper, ...) inside a slot whose coverage is required; the spec stays required only for the roles of `ruleParams.be.unitRoles`, and the texts say so.
 - Changed: `no-repository-class` (R83) accepts `platform/saga` as a platform persistence capability (state of a saga run with its version fence).
 - New: `service-isolation` (R168 `BE_SERVICE_ISOLATION`, new law `service-isolation`): a file of a service app imports no file of a sibling service app. The slot manifest copy gains `be.contract.events` and `events.ts`/`consumes.ts` in the api and worker app slots.
 - New: `no-ambient-id` (R142 `BE_AMBIENT_ID`): `randomUUID` of Node's crypto, the `uuid` generators `v1`/`v4`/`v6`/`v7`, `nanoid` and `ulid` are used only inside `platform/ids`, specs included; code asks the `Ids` port and specs use `fakeIds()`.

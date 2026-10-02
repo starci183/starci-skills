@@ -187,12 +187,12 @@ test('test-world over every attached summary: each required project is owed, and
 
 function unitApp(t, { spec = 'Test.createTestingModule({ providers: [OrderService] })' } = {}) {
   const app = tmp(t, 'starci-op-proof-unit-');
-  put(app, 'be/src/features/order/order.service.ts', 'export class OrderService { run() { return 1 } }\n');
-  if (spec !== null) put(app, 'be/src/features/order/order.service.spec.ts', `import { Test } from "@nestjs/testing"\nconst m = await ${spec}\n`);
+  put(app, 'be/src/modules/domain/order/order.service.ts', 'export class OrderService { run() { return 1 } }\n');
+  if (spec !== null) put(app, 'be/src/modules/domain/order/order.service.spec.ts', `import { Test } from "@nestjs/testing"\nconst m = await ${spec}\n`);
   put(app, 'be/src/tests/world/kit.service.ts', 'export class KitService {}\n');
   return app;
 }
-const fullCoverage = (app) => ({ total: {}, [path.join(app, 'be/src/features/order/order.service.ts')]: Object.fromEntries(['lines', 'branches', 'functions', 'statements'].map((m) => [m, { pct: 100 }])) });
+const fullCoverage = (app) => ({ total: {}, [path.join(app, 'be/src/modules/domain/order/order.service.ts')]: Object.fromEntries(['lines', 'branches', 'functions', 'statements'].map((m) => [m, { pct: 100 }])) });
 const unitSummary = (app, coverage, run = greenUnitRun().run) => {
   const s = { schema: UNIT_RUN_SCHEMA, at: 'x', root: app, run, services: judgeServices(app, coverage, unitKitRules(ROOT)), findings: [] };
   return { ...s, findings: unitFindings(s) };
@@ -202,12 +202,12 @@ test('unit-kit: missing, red run, coverage below 100, spec missing and an off-ki
   assert.equal(codeOf(judgeUnitRun(null)), 'op-unit-proof-missing');
   const app = unitApp(t);
   const green = unitSummary(app, fullCoverage(app));
-  assert.deepEqual(green.services.map((s) => s.path), ['be/src/features/order/order.service.ts'], 'services under be/src/tests are not unit subjects');
+  assert.deepEqual(green.services.map((s) => s.path), ['be/src/modules/domain/order/order.service.ts'], 'services under be/src/tests are not unit subjects');
   assert.equal(judgeUnitRun(green).status, 'pass');
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, failed: 1, exit: 1 }))), 'op-unit-run-red');
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, fullCoverage(app), { ...greenUnitRun().run, total: 0 }))), 'op-unit-run-red');
   const partial = fullCoverage(app);
-  partial[path.join(app, 'be/src/features/order/order.service.ts')].branches.pct = 87.5;
+  partial[path.join(app, 'be/src/modules/domain/order/order.service.ts')].branches.pct = 87.5;
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, partial))), 'op-unit-coverage-below');
   assert.equal(codeOf(judgeUnitRun(unitSummary(app, {}))), 'op-unit-coverage-below', 'a service the run never measured is below 100');
   const noSpec = unitApp(t, { spec: null });

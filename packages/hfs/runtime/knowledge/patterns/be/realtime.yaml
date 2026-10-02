@@ -83,9 +83,10 @@ rules:
   - id: BE-REALTIME-2
     title: A realtime door reads and pushes, it never writes
     kind: mandatory
-    hfsRules: [R185, R90]
+    hfsRules: [R185, R90, R203]
     requirement: |-
-      The only value a realtime door injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
+      A realtime door is thin (R203 `BE_FEATURE_THIN`): it maps the subscription or the message and makes one delegating call
+      to the hub. The only value it injects is the `RealtimeHub` of `platform/realtime` (`subscribe(topic)` returns an async
       iterable of frames, `publish(topic, frame)` pushes one; a topic is a typed `RealtimeTopic<T>` built by the owning domain
       contract, never a string written in a door). No `EntityManager`, `CommandBus`, `QueryBus`, event bus, queue or
       service of `modules/domain` is injected: a domain service may write, so it is not provably read-only. The data a client
@@ -111,6 +112,7 @@ rules:
       automated:
         - BE_REALTIME_WRITES
         - BE_INFRA_OWNER
+        - BE_FEATURE_THIN
       manual:
         - Confirm the frame type carries only what the principal may see.
     relatedExamples: [realtime]

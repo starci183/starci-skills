@@ -104,7 +104,9 @@ test('the Dispatch a killed launch created is released by reconcile --dead-worke
   assert.deepEqual([body.managedWorker?.dispatchId,body.managedWorker?.release?.ok,body.managedWorker?.custody?.state],['ctx_killed',true,'released'],r.stdout);
   const verbs=fx.orcaCalls().map(a=>a.slice(0,2).join(' '));
   assert.ok(verbs.includes('orchestration worker-release'),verbs.join(', '));
-  assert.equal(verbs.filter(v=>v==='terminal close').length,0,'nothing is closed by hand');
+  // The release is not trusted to end the agent: the runtime then closes the killed launch's terminal through its one close path, and only that one.
+  assert.ok(verbs.indexOf('terminal close')>verbs.lastIndexOf('orchestration worker-release'),'the terminal is closed after the release');
+  assert.ok(fx.orcaCalls().filter(a=>a.slice(0,2).join(' ')==='terminal close').every(a=>a.includes('term-orphan')),'only the launch terminal is closed');
 });
 
 test('settle of a leased job releases the Dispatch its launch created',t=>{

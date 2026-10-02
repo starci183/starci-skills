@@ -1,7 +1,5 @@
-/** What one expiry sweep takes. */
+/** What one expiry sweep takes: the raw payload of the job tick, read by the order payment service. */
 export interface ExpireOverdueRequest {
-    /** Orders pending for at least this long, in milliseconds, expire. */
-    readonly olderThanMs: number
-    /** The most orders the sweep expires. */
-    readonly limit: number
+    /** The payload the scheduler wrote on the job, as delivered. */
+    readonly payload: object
 }
