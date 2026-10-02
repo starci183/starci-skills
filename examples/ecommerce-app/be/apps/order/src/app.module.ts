@@ -46,9 +46,11 @@ import { RealtimeModule } from "@modules/platform/realtime"
 import { SagaModule, sagaEntities, sagaMigrations } from "@modules/platform/saga"
 import { CheckoutGraphqlModule, CheckoutMessageModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
+import { OrderSummaryModule, orderSummaryEntities, orderSummaryMigrations } from "@modules/projections/order-summary"
 import { OrderPaidLoyaltyMessageModule } from "@features/reactors/order-paid-loyalty"
 import { OrderPaymentStatusMessageModule } from "@features/reactors/order-payment-status"
 import { OrderStatusPushMessageModule } from "@features/reactors/order-status-push"
+import { OrderSummaryProjectionMessageModule } from "@features/reactors/order-summary-projection"
 import { OrderStatusRealtimeModule } from "@features/realtime/order-status"
 import type { OrderAppOptions } from "./order.options"
 
@@ -106,6 +108,7 @@ export class AppModule {
                                 ...cartEntities,
                                 ...orderEntities,
                                 ...loyaltyEntities,
+                                ...orderSummaryEntities,
                                 ...inboxEntities,
                                 ...sagaEntities,
                             ],
@@ -114,6 +117,7 @@ export class AppModule {
                                 ...cartMigrations,
                                 ...orderMigrations,
                                 ...loyaltyMigrations,
+                                ...orderSummaryMigrations,
                                 ...inboxMigrations,
                                 ...sagaMigrations,
                             ],
@@ -130,6 +134,7 @@ export class AppModule {
                 InboxModule.register({ isGlobal: true }),
                 RealtimeModule.register({ isGlobal: true }),
                 LoyaltyModule.register({ isGlobal: true }),
+                OrderSummaryModule,
                 SagaModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
@@ -145,6 +150,7 @@ export class AppModule {
                 OrderPaymentStatusMessageModule,
                 OrderPaidLoyaltyMessageModule,
                 OrderStatusPushMessageModule,
+                OrderSummaryProjectionMessageModule,
                 OrderStatusRealtimeModule,
             ],
             providers: [

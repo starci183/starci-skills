@@ -26,6 +26,7 @@ import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modul
 import { HttpModule } from "@modules/platform/http"
 import { inboxEntities } from "@modules/platform/inbox"
 import { sagaEntities } from "@modules/platform/saga"
+import { orderSummaryEntities } from "@modules/projections/order-summary"
 import type { MessagingOptions } from "@modules/platform/messaging"
 import { LoggingModule } from "@modules/platform/logging"
 import type { CacheOptions } from "@modules/integrations/cache"
@@ -61,6 +62,7 @@ export const ORDER_ENTITIES: DatabaseConnectionOptions["entities"] = [
     ...cartEntities,
     ...orderEntities,
     ...loyaltyEntities,
+    ...orderSummaryEntities,
     ...inboxEntities,
     ...sagaEntities,
 ]
