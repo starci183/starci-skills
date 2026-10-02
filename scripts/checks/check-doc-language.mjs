@@ -79,7 +79,7 @@ export function readSourcePending(root = skillRoot) {
 /** The tracked source files of a runtime checkout (repository-relative POSIX paths). */
 export function runtimeSourceFiles(root = skillRoot) {
   const bundles = new Set(Object.keys(BUNDLES));
-  const listed = gitResult(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root });
+  const listed = gitResultOf(lsFiles(['--cached', '--others', '--exclude-standard', '-z'], { cwd: root }));
   const inRepository = listed.ok ? new Set(listed.stdout.split('\0').filter(Boolean)) : null;
   const out = [];
   const walk = (rel) => {

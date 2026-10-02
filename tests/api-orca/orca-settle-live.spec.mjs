@@ -12,14 +12,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { orcaStatus } from '../../scripts/api/orca/status.mjs';
+import { status as orcaStatus } from '../../scripts/api/orca/status.mjs';
 import { startAgent } from '../../scripts/agent/lib.mjs';
-import { workerOutput } from '../../scripts/api/orca/worker-read.mjs';
+import { workerOutput } from '../../scripts/machine/worker-output.mjs';
 import { workerShow } from '../../scripts/api/orca/worker-show.mjs';
 import { workerStop } from '../../scripts/api/orca/worker-stop.mjs';
 import { workerRelease } from '../../scripts/api/orca/worker-release.mjs';
 import { taskUpdate } from '../../scripts/api/orca/task-update.mjs';
-import { listHostProcesses } from '../../scripts/api/process/process-list.mjs';
+import { processList as listHostProcesses } from '../../scripts/api/process/process-list.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const AGENTS = ['claude', 'codex', 'devin'];

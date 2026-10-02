@@ -8,7 +8,8 @@
 // {dispatch, type}: a lost receipt is settled by request-show and one replay, never a second worker_done.
 // Returns {ok, outcome, result, request, errorCode, error, hostUnavailable}.
 import path from 'node:path';
-import { orcaCall, arg } from './lib.mjs';
+import { orcaCall } from './lib.mjs';
+import { arg } from '../../lib/cli-arg.mjs';
 
 export function send({ taskId, dispatchId, from, outcome, reportPath = null, subject = null }) {
   if (!['succeeded', 'failed'].includes(outcome)) throw new Error(`worker_done --outcome must be succeeded|failed, got '${outcome}'`);

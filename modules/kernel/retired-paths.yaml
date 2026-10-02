@@ -966,6 +966,7 @@ moved:
   - {from: scripts/lib/test-secrets.mjs, to: scripts/uat/test-secret.mjs + scripts/lib/sops-envelope.mjs + scripts/api/sops/lib.mjs, movedIn: C2a, quiesced: false}
   - {from: scripts/api/orca/orch-check.mjs, to: scripts/api/orca/check.mjs, movedIn: C2a, quiesced: true}
   - {from: scripts/api/orca/orch-reply.mjs, to: scripts/api/orca/reply.mjs, movedIn: C6, quiesced: true}
+  - {from: scripts/checks/failure-codes.not-codes, to: modules/kernel/failure-codes.not-codes, movedIn: C4, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here, in the commit that deletes the symbol.
 retiredSymbols:
   - {symbol: dispatchShow, replacedBy: 'the worker-start receipt result.worker.agentTerminalHandle, else worker-show result.dispatch.assigneeHandle (lane A)'}
