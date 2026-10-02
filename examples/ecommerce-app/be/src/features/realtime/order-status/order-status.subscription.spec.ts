@@ -1,7 +1,6 @@
 import { mock } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { orderStatusTopic } from "@modules/domain/order"
-import type { OrderStatusFrame } from "@modules/domain/order"
 import { REALTIME_HUB } from "@modules/platform/realtime"
 import type { RealtimeHub } from "@modules/platform/realtime"
 import { OrderStatusSubscription } from "./order-status.subscription"
@@ -13,12 +12,12 @@ const build = async (hub: RealtimeHub) => {
     return moduleRef.get(OrderStatusSubscription)
 }
 
-const emptyStream = (): AsyncIterable<OrderStatusFrame> => (async function* () {})()
+const emptyStream = <T>(): AsyncIterable<T> => (async function* () {})()
 
 describe("OrderStatusSubscription", () => {
     describe("orderStatusChanged", () => {
         it("subscribes the client to the topic of its own principal and order and returns the hub stream", async () => {
-            const frames = emptyStream()
+            const frames = emptyStream<never>()
             const hub = mock<RealtimeHub>({ subscribe: jest.fn(() => frames) })
             const door = await build(hub)
 
@@ -30,7 +29,7 @@ describe("OrderStatusSubscription", () => {
         })
 
         it("subscribes another principal to another topic, so it cannot receive the first buyer's frames", async () => {
-            const hub = mock<RealtimeHub>({ subscribe: jest.fn(() => emptyStream()) })
+            const hub = mock<RealtimeHub>({ subscribe: jest.fn(() => emptyStream<never>()) })
             const door = await build(hub)
 
             door.orderStatusChanged({ id: "b-2", roles: ["member"] }, { orderId: "o-1" })

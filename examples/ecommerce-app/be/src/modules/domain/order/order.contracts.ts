@@ -1,6 +1,7 @@
 import type { EntityManager } from "typeorm"
 import type { CartLine } from "@modules/domain/cart"
 import type { ProductView } from "@modules/domain/catalog"
+import type { OrderStatus } from "./order-status.contracts"
 
 /** One priced line of a checkout plan: the catalog unit price captured at evaluation time. */
 export interface CheckoutLine {
@@ -26,8 +27,8 @@ export interface CheckoutPlan {
 export interface PlacedOrder {
     /** The order id. */
     readonly orderId: string
-    /** The lifecycle state: an order that confirmed and was later cancelled keeps answering as a replay with `cancelled`. */
-    readonly status: "pending" | "paid" | "cancelled"
+    /** The lifecycle state: an order that confirmed and later was cancelled or expired keeps answering as a replay with that state. */
+    readonly status: OrderStatus
     /** The order total in minor units. */
     readonly totalMinorUnits: number
     /** The currency. */
