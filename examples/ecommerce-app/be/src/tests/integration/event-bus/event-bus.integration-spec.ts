@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { EVENT_BUS } from "@modules/platform/event-bus"
 import type { EventBus } from "@modules/platform/event-bus"
+import { OrderError, OrderErrorCode } from "@modules/domain/order"
 import { ProbePingEvent } from "../../fixtures/events/probe-ping.event"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { DUPLICATE_OUTBOX_ROW, OUTBOX_OF_EVENT } from "../../fixtures/persistence/e2e-verification.sql"
@@ -27,13 +28,15 @@ describe("event bus (integration)", () => {
         const kept = eventId()
         const lost = eventId()
 
-        await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(kept, { note: "kept" }), manager))
+        await world.db.order.transaction((manager) =>
+            bus().publish(ProbePingEvent.create(kept, { note: "kept" }), manager),
+        )
         await expect(
             world.db.order.transaction(async (manager) => {
                 await bus().publish(ProbePingEvent.create(lost, { note: "lost" }), manager)
-                throw new Error("the change failed after the publish")
+                throw new OrderError({ code: OrderErrorCode.PlacementFailed })
             }),
-        ).rejects.toThrow("the change failed")
+        ).rejects.toThrow("ORDER_PLACEMENT_FAILED")
 
         expect(await readRows(world.db.order, OUTBOX_OF_EVENT, [kept])).toEqual([
             expect.objectContaining({ event_name: "probe.ping" }),
@@ -87,7 +90,9 @@ describe("event bus (integration)", () => {
         behavior.attempts.length = 0
         const id = eventId()
 
-        await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(id, { note: "doomed" }), manager))
+        await world.db.order.transaction((manager) =>
+            bus().publish(ProbePingEvent.create(id, { note: "doomed" }), manager),
+        )
 
         const letters = await world.waitFor("the event is in the dead letters", async () => {
             const found = (await bus().deadLetters(ProbePingEvent)).filter((letter) => letter.eventId === id)
@@ -95,7 +100,12 @@ describe("event bus (integration)", () => {
         })
         expect(behavior.attempts).toEqual([1, 2, 3, 4, 5])
         expect(letters).toEqual([
-            expect.objectContaining({ eventName: "probe.ping", eventId: id, reason: "the probe refuses", attempts: 5 }),
+            expect.objectContaining({
+                eventName: "probe.ping",
+                eventId: id,
+                reason: "ORDER_PLACEMENT_FAILED",
+                attempts: 5,
+            }),
         ])
 
         behavior.failing = false
@@ -113,7 +123,9 @@ describe("event bus (integration)", () => {
         const behavior = world.resolve(ProbeBehavior)
         behavior.attempts.length = 0
         const id = eventId()
-        await world.db.order.transaction((manager) => bus().publish(ProbePingEvent.create(id, { note: "twice" }), manager))
+        await world.db.order.transaction((manager) =>
+            bus().publish(ProbePingEvent.create(id, { note: "twice" }), manager),
+        )
         await world.db.order.query(DUPLICATE_OUTBOX_ROW, [id])
 
         await world.waitFor("the consumer saw the event twice", () =>

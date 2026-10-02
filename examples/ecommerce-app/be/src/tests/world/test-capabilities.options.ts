@@ -39,9 +39,14 @@ export const CACHE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 
 /** The event bus over the run's Kafka and the outbox of the order database (publisher, relay, consumer registry), the inbox of the billing database, and the consumer of the probe event. */
 export const EVENT_BUS_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
-    (w) => EventBusModule.register({ isGlobal: true, ...eventBusOptionsOf(w, "probe"), connection: ORDER_ENTITY_MANAGER }),
+    (w) =>
+        EventBusModule.register({
+            isGlobal: true,
+            ...eventBusOptionsOf(w, "probe"),
+            connections: [ORDER_ENTITY_MANAGER],
+        }),
     () => InboxModule.register({ isGlobal: true }),
-    () => ProbeConsumerModule,
+    () => ({ module: ProbeConsumerModule }),
 ]
 
 /** The realtime hub of one app instance: the push channel of the realtime kind. */

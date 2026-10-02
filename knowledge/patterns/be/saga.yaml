@@ -34,7 +34,7 @@ files:
     suffix: saga-state
     role: 'The typed state of a run, with `status` and `version: number`, the fence.'
     rules: [R150]
-  - path: be/src/features/<feature>/saga/steps/<step>.step.ts
+  - path: be/src/features/<feature>/saga/steps/<step>.saga-step.ts
     slot: be.feature.saga.steps
     suffix: step
     role: 'One step. Names its event (`readonly event = "<name>"`) and dispatches one command.'
@@ -73,7 +73,7 @@ rules:
     kind: mandatory
     hfsRules: [R149]
     requirement: |-
-      A saga is `be/src/features/<feature>/saga/` with `<saga>.saga.service.ts`, `steps/<step>.step.ts` and
+      A saga is `be/src/features/<feature>/saga/` with `<saga>.saga.service.ts`, `steps/<step>.saga-step.ts` and
       `compensations/<step>.compensation.ts`: every step has a compensation of the same name and every compensation a step,
       and the orchestrator imports every step and every compensation of its folder. The folders are slots enabled by the
       declared pattern; a saga folder in a product that does not declare `patterns: ["saga"]` is `HFS_SLOT_NOT_ENABLED`.
@@ -83,7 +83,7 @@ rules:
     cases:
       - id: case-1
         when: A new step
-        write: 'saga/steps/reserve-order.step.ts and saga/compensations/reserve-order.compensation.ts, both imported by place-order.saga.service.ts.'
+        write: 'saga/steps/reserve-order.saga-step.ts and saga/compensations/reserve-order.compensation.ts, both imported by place-order.saga.service.ts.'
     verification:
       automated:
         - BE_SAGA_STEP_COMPENSATION

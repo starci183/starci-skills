@@ -4,23 +4,25 @@ import type { PlaceOrderData } from "../../fixtures/e2e-views.contracts"
 import { readRows, readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import {
     CANCELLED_ORDER,
+    DUPLICATE_OUTBOX_ROW,
     INVOICES_OF_ORDER,
+    OUTBOX_OF_EVENT,
     PLACE_ORDER_SAGA_STATE,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
-/** How many 250 ms polls the order database stays down while the compensation retries against it (two backoffs of the queue pass). */
+/** How many 250 ms polls the order database stays down while the compensation retries against it (the first backoffs of the retry topic pass). */
 const OUTAGE_POLLS = 10
 
 /**
  * The place-order saga with its compensation, end to end on the real services: a buyer places an order whose total is above
  * what the billing service invoices (`order.placed`), billing records a rejected invoice and announces
  * `billing.invoice-rejected`, and the order service, whose message transport is the compensating step, cancels the order, gives
- * the stock of its lines back, settling the saga run as compensated. A confirmation replayed with the
- * same key announces the order again; billing announces the rejection again; the saga finds the run settled and changes
- * nothing, so the stock comes back once. The second path injects the failure: the order database is cut while the rejection is
- * delivered, the compensation fails on its first deliveries, the queue retries them with its backoff and the run settles once
- * the database is back.
+ * the stock of its lines back, settling the saga run as compensated. Both events are then delivered a second time (a second
+ * outbox row of the same event id, in the order and the billing database); billing and the saga find the event claimed or the
+ * run settled and change nothing, so the stock comes back once. The second path injects the failure: the order database is cut
+ * while the rejection is delivered, the compensation fails on its first deliveries, the retry topic redelivers them with its
+ * backoff and the run settles once the database is back.
  *
  * Run: npm run test:e2e -- order/billing-invoice-rejected
  */
@@ -68,10 +70,15 @@ describe("billing.invoice-rejected compensates order.placed", () => {
         expect(settled).toEqual({ status: "compensated", version: 3 })
         expect(await readStock(world.db.order, "sku-yacht")).toBe(6)
 
-        const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", {
-            variables: { input: { idempotencyKey: "saga-flow-1" } },
-        })
-        expect(replayed.data?.placeOrder).toMatchObject({ orderId: first.orderId, replayed: true })
+        await world.db.order.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
+        await world.db.billing.query(DUPLICATE_OUTBOX_ROW, [first.orderId])
+        for (const database of [world.db.order, world.db.billing]) {
+            await world.waitUntil(
+                "the relay sends the duplicate",
+                () => readRows(database, OUTBOX_OF_EVENT, [first.orderId]),
+                (rows) => rows.length === 2 && rows.every((row) => row.sent),
+            )
+        }
 
         const second = await placeYacht(buyer, "saga-flow-2")
         await cancelled(second.orderId)
@@ -82,7 +89,7 @@ describe("billing.invoice-rejected compensates order.placed", () => {
         ])
     })
 
-    it("resumes the compensation on the queue retry after the order database was down while the rejection arrived", async () => {
+    it("resumes the compensation on the retry topic after the order database was down while the rejection arrived", async () => {
         const session = await world.signedInPerson("saga-outage")
         const buyer = world.apps.order.api.bearing(session.sessionToken)
         const placed = await placeYacht(buyer, "saga-outage-1")

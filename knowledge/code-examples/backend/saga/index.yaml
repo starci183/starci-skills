@@ -19,7 +19,7 @@ files:
     role: 'The orchestrator (a service, unit-tested beside it): place, compensate, complete, stateOf. It decides nothing; the state machine is the store''s.'
   - path: place-order.saga-state.ts
     role: The typed persisted state of a run, with its status and its version fence.
-  - path: reserve-order.step.ts
+  - path: reserve-order.saga-step.ts
     role: One step, naming its event ("order.placed") and dispatching one command.
   - path: reserve-order.compensation.ts
     role: The compensation of that step, naming the failure event ("billing.invoice-rejected") and dispatching one command.

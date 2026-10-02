@@ -14,6 +14,6 @@ export interface EventBusOptions {
     readonly relayBatch: number
     /** The deadline of one broker call. */
     readonly timeoutMs: number
-    /** The token of the shared entity manager of the connection that holds the outbox of the app. */
-    readonly connection: InjectionToken
+    /** The tokens of the shared entity managers of the connections that hold an outbox of the app: the relay reads each of them. */
+    readonly connections: ReadonlyArray<InjectionToken>
 }

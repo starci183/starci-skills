@@ -108,8 +108,6 @@ export class InvoiceService {
 
     /** The outcome of a recorded invoice. */
     private outcomeOf(row: InvoiceEntity): Outcome<InvoiceView, InvoiceErrorCode.OverLimit> {
-        return row.status === "issued"
-            ? ok(toView(row))
-            : refused(InvoiceErrorCode.OverLimit, { orderId: row.orderId })
+        return row.status === "issued" ? ok(toView(row)) : refused(InvoiceErrorCode.OverLimit, { orderId: row.orderId })
     }
 }

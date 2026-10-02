@@ -13,7 +13,16 @@ import type { EventSubscription, EventTransport, InboundMessage, OutboundMessage
 const READ_DEADLINE_MS = 15_000
 
 /** The text of a header value or message field the library hands over as a buffer or text. */
-const textOf = (value: Buffer | string | null | undefined): string => (value === null || value === undefined ? "" : value.toString())
+const textOf = (value: Buffer | string | null | undefined): string =>
+    value === null || value === undefined ? "" : value.toString()
+
+/** The end offsets of a topic as the broker answers them; a topic it does not know has none and the failure rides along. */
+interface TopicEnds {
+    /** The partitions with their low and high offsets. */
+    readonly ends: ReadonlyArray<{ readonly partition: number; readonly low: string; readonly high: string }>
+    /** Why the broker did not answer; null when it did. */
+    readonly cause: unknown
+}
 
 /** The text headers of a message. */
 const headersOf = (headers: IHeaders | undefined): Record<string, string> =>
@@ -58,7 +67,11 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
                     topic,
                     messages: messages
                         .filter((message) => message.topic === topic)
-                        .map((message) => ({ key: message.key, value: message.value, headers: { ...message.headers } })),
+                        .map((message) => ({
+                            key: message.key,
+                            value: message.value,
+                            headers: { ...message.headers },
+                        })),
                 })),
             })
         })
@@ -90,7 +103,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     async lag(topic: string): Promise<number> {
         return this.run("lag", async () => {
             const admin = await this.adminOf()
-            const ends = await admin.fetchTopicOffsets(topic).catch(() => [])
+            const { ends } = await this.endsOf(admin, topic)
             const committed = await admin.fetchOffsets({ groupId: this.options.groupId, topics: [topic] })
             const acknowledged = new Map(
                 (committed[0]?.partitions ?? []).map((entry) => [entry.partition, Number(entry.offset)] as const),
@@ -106,7 +119,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
     async read(topic: string): Promise<ReadonlyArray<InboundMessage>> {
         return this.run("read", async () => {
             const admin = await this.adminOf()
-            const ends = await admin.fetchTopicOffsets(topic).catch(() => [])
+            const { ends } = await this.endsOf(admin, topic)
             const expected = ends.reduce((sum, end) => sum + (Number(end.high) - Number(end.low)), 0)
             if (expected === 0) return []
             const groupId = `${this.options.groupId}.read.${randomUUID()}`
@@ -134,7 +147,7 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
                 await Promise.race([complete, this.wait(READ_DEADLINE_MS)])
             } finally {
                 await reader.disconnect()
-                await admin.deleteGroups([groupId]).catch(() => undefined)
+                await this.dropGroup(admin, groupId)
             }
             return found.sort((a, b) => a.partition - b.partition || Number(a.offset) - Number(b.offset))
         })
@@ -154,9 +167,36 @@ export class KafkaEventTransportClient implements EventTransport, Probe, OnAppli
 
     /** Disconnects the producer, the consumer and the admin client. */
     async onApplicationShutdown(): Promise<void> {
-        await Promise.all(
-            [this.producer, this.consumer, this.admin].map((client) => client?.disconnect().catch(() => undefined)),
-        )
+        for (const client of [this.producer, this.consumer, this.admin]) await this.close(client)
+    }
+
+    /** The end offsets of the topic; a topic that does not exist yet answers no partitions and the cause. */
+    private async endsOf(admin: Admin, topic: string): Promise<TopicEnds> {
+        try {
+            return { ends: await admin.fetchTopicOffsets(topic), cause: null }
+        } catch (cause) {
+            return { ends: [], cause }
+        }
+    }
+
+    /** Deletes the consumer group of a read; a group the broker already dropped is not a failure of the read. */
+    private async dropGroup(admin: Admin, groupId: string): Promise<unknown> {
+        try {
+            await admin.deleteGroups([groupId])
+            return null
+        } catch (cause) {
+            return cause
+        }
+    }
+
+    /** Disconnects a client that was opened; the failure of a client that is already gone is the answer, not an error of the shutdown. */
+    private async close(client: Pick<Producer, "disconnect"> | null): Promise<unknown> {
+        try {
+            await client?.disconnect()
+            return null
+        } catch (cause) {
+            return cause
+        }
     }
 
     private async producerOf(): Promise<Producer> {

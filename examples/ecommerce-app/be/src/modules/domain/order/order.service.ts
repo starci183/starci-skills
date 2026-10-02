@@ -29,7 +29,6 @@ import type {
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
-import { ReceiptService } from "./receipt.service"
 import type { OrderCountRow, OrderIdRow } from "./persistence/order.rows"
 import { CANCEL_ORDER_IF_PENDING, COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
@@ -46,7 +45,6 @@ export class OrderService {
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
         @InjectCartService() private readonly cart: CartService,
         @InjectCatalogService() private readonly catalog: CatalogService,
-        private readonly receipts: ReceiptService,
         @InjectEventBus() private readonly bus: EventBus,
         @InjectSagaService() private readonly sagas: SagaService,
     ) {}
@@ -65,11 +63,20 @@ export class OrderService {
         const products = await this.catalog.byIds({ ids: lines.map((line) => line.productId) })
         const evaluation = evaluateCheckout(lines, products)
         if (evaluation.kind === "refused") return evaluation
-        const placed = await this.entityManager.transaction((manager) =>
-            this.confirm({ manager, personId, plan: evaluation.value, idempotencyKey }),
-        )
-        // The receipt is archived after the commit: the order never waits on, or fails with, the object storage.
-        if (!placed.replayed) await this.receipts.archive(placed.orderId)
+        const placed = await this.entityManager.transaction(async (manager) => {
+            const confirmed = await this.confirm({ manager, personId, plan: evaluation.value, idempotencyKey })
+            if (!confirmed.replayed) {
+                await this.bus.publish(
+                    OrderPlacedEvent.create({
+                        orderId: confirmed.orderId,
+                        personId,
+                        totalMinorUnits: confirmed.totalMinorUnits,
+                    }),
+                    manager,
+                )
+            }
+            return confirmed
+        })
         return ok(placed)
     }
 
@@ -145,10 +152,6 @@ export class OrderService {
         )
         await this.cart.clear({ manager, personId })
         await this.sagas.begin({ manager, saga: PLACE_ORDER_SAGA, correlationId: orderId })
-        await this.bus.publish(
-            OrderPlacedEvent.create({ orderId, personId, totalMinorUnits: plan.totalMinorUnits }),
-            manager,
-        )
         return {
             orderId,
             status: "pending",

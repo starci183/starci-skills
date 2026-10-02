@@ -4,10 +4,11 @@ import { InjectInbox } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { InjectEventConsumerRegistry } from "@modules/platform/event-bus"
 import type { EventConsumer, EventConsumerRegistry, EventDelivery } from "@modules/platform/event-bus"
+import { OrderError, OrderErrorCode } from "@modules/domain/order"
 import { ProbePingEvent } from "../fixtures/events/probe-ping.event"
 
-/** What the probe consumer does with a delivery, set by the spec that drives it. */
 @Injectable()
+/** What the probe consumer does with a delivery, set by the spec that drives it. */
 export class ProbeBehavior {
     /** True while every delivery fails. */
     failing = false
@@ -30,7 +31,7 @@ export class ProbePingConsumer implements EventConsumer<ProbePingEvent> {
     /** Records the attempt; a failing probe throws, otherwise the first claim of the event id records the effect. */
     async handle(delivery: EventDelivery<ProbePingEvent>): Promise<void> {
         this.behavior.attempts.push(delivery.attempt)
-        if (this.behavior.failing) throw new Error("the probe refuses")
+        if (this.behavior.failing) throw new OrderError({ code: OrderErrorCode.PlacementFailed })
         if (await this.inbox.claim("probe", delivery.eventId)) this.behavior.effects.push(delivery.event.payload.note)
     }
 }

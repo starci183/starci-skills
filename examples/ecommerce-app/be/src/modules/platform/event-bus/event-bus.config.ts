@@ -2,7 +2,7 @@ import type { EnvSource } from "@modules/platform/config"
 import type { EventBusOptions } from "./event-bus.options"
 
 /** What the app's `main.ts` reads for the bus; the connection token is the app root's choice. */
-export type EventBusConfig = Omit<EventBusOptions, "connection">
+export type EventBusConfig = Omit<EventBusOptions, "connections">
 
 /** Reads the event bus options: the brokers and the group are required, the rest are tunables with literal defaults. */
 export const parseEventBusConfig = (env: EnvSource): EventBusConfig => ({

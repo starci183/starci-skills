@@ -5,7 +5,7 @@ import { SAGA_SERVICE } from "@modules/platform/saga"
 import type { SagaService } from "@modules/platform/saga"
 import { ReserveOrderCompensation } from "./compensations/reserve-order.compensation"
 import { PlaceOrderSagaService } from "./place-order.saga.service"
-import { ReserveOrderStep } from "./steps/reserve-order.step"
+import { ReserveOrderStep } from "./steps/reserve-order.saga-step"
 
 const placed = {
     kind: "ok",

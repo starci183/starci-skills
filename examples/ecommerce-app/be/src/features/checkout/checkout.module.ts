@@ -11,7 +11,7 @@ import { PlaceOrderHandler } from "./application/place-order.handler"
 import { ReserveOrderHandler } from "./application/reserve-order.handler"
 import { ReserveOrderCompensation } from "./saga/compensations/reserve-order.compensation"
 import { PlaceOrderSagaService } from "./saga/place-order.saga.service"
-import { ReserveOrderStep } from "./saga/steps/reserve-order.step"
+import { ReserveOrderStep } from "./saga/steps/reserve-order.saga-step"
 
 @Module({
     providers: [

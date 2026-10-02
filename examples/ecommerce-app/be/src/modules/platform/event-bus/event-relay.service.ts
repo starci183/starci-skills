@@ -5,7 +5,7 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { InjectEventBusManager, InjectEventBusOptions, InjectEventTransport } from "./event-bus.decorators"
+import { InjectEventBusOptions, InjectEventRelayManagers, InjectEventTransport } from "./event-bus.decorators"
 import { EventBusLogEvent } from "./event-bus.log-events"
 import type { EventBusOptions } from "./event-bus.options"
 import type { EventTransport, OutboundMessage } from "./event-transport.port"
@@ -22,7 +22,7 @@ const messageOf = (row: OutboxRow): OutboundMessage => ({
 
 @Injectable()
 /**
- * The relay of the outbox: it reads the rows that wait on the connection of the app, in the order they were written, hands them
+ * The relay of the outbox: it reads the rows that wait on each connection of the app, in the order they were written, hands them
  * to the broker and marks them sent in the same transaction. A row that is not committed is not visible to the relay, so nothing
  * leaves for a rolled-back change; a crash between the send and the mark sends the row again, which the consumers absorb
  * through their inbox. The loop runs from the start of the app to its shutdown and pauses only when the outbox is empty.
@@ -33,24 +33,20 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
 
     constructor(
         @InjectEventBusOptions() private readonly options: EventBusOptions,
-        @InjectEventBusManager() private readonly manager: EntityManager,
+        @InjectEventRelayManagers() private readonly managers: ReadonlyArray<EntityManager>,
         @InjectEventTransport() private readonly transport: EventTransport,
         @InjectClock() private readonly clock: Clock,
         @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** One pass: sends the oldest waiting rows (at most the batch size) and answers how many it sent. */
-    relay(): Promise<number> {
-        return this.manager.transaction(async (tx) => {
-            const rows: Array<OutboxRow> = await tx.query(SELECT_WAITING_ROWS, [this.options.relayBatch])
-            if (rows.length === 0) return 0
-            await this.transport.send(rows.map(messageOf))
-            await tx.query(MARK_ROWS_SENT, [rows.map((row) => row.id), this.clock.now()])
-            return rows.length
-        })
+    /** One pass over every connection: sends the oldest waiting rows of each (at most the batch size) and answers how many it sent. */
+    async relay(): Promise<number> {
+        let sent = 0
+        for (const manager of this.managers) sent += await this.relayOf(manager)
+        return sent
     }
 
-    /** Starts the relay loop. */
+    /** Starts the relay loop over the outbox of every connection the options name. */
     onApplicationBootstrap(): void {
         this.running = true
         this.loop = this.run()
@@ -60,6 +56,16 @@ export class EventRelayService implements OnApplicationBootstrap, OnApplicationS
     async onApplicationShutdown(): Promise<void> {
         this.running = false
         await this.loop
+    }
+
+    private relayOf(manager: EntityManager): Promise<number> {
+        return manager.transaction(async (tx) => {
+            const rows: Array<OutboxRow> = await tx.query(SELECT_WAITING_ROWS, [this.options.relayBatch])
+            if (rows.length === 0) return 0
+            await this.transport.send(rows.map(messageOf))
+            await tx.query(MARK_ROWS_SENT, [rows.map((row) => row.id), this.clock.now()])
+            return rows.length
+        })
     }
 
     private async run(): Promise<void> {

@@ -101,7 +101,7 @@ export class AppModule {
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 InboxModule.register({ isGlobal: true }),
-                EventBusModule.register({ isGlobal: true, ...options.eventBus, connection: BILLING_ENTITY_MANAGER }),
+                EventBusModule.register({ isGlobal: true, ...options.eventBus, connections: [BILLING_ENTITY_MANAGER] }),
                 InvoiceModule.register({ isGlobal: true, ...options.invoice }),
                 PaymentModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
