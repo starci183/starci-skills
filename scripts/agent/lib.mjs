@@ -395,8 +395,8 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   if (takesModel && !model) model = card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
-  // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.
-  try { trust = orca.trust({ agent: provider, cwd: worktree, ...(!takesModel && model ? { model } : {}) }); }
+  // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).
+  try { trust = orca.trust({ agent: provider, cwd: worktree }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
   // A new worktree (`worktree: 'new-child' | 'new-top-level'`) carries Orca's creation flags (--repo, --base-branch,
   // --name, --setup); an existing worktree takes none (Orca refuses them there).

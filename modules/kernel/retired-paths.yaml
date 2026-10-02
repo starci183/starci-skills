@@ -979,6 +979,9 @@ retiredSymbols:
   - {symbol: reapAgentProcess, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
   - {symbol: reapIfStillLive, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
   - {symbol: quitWorkerTerminal, replacedBy: 'worker-release of the managed Dispatch (no command-terminal job is live any more)'}
+  - {symbol: orcaAgents, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1); the GC keeps its orphan-agent sweep'}
+  - {symbol: reapOrphaned, replacedBy: 'nothing: worker-release alone ends the agent (live smoke E1)'}
+  - {symbol: modelPin, replacedBy: 'nothing: Devin ignores a project config pin and Orca refuses a launch-time model for it (live probe E7)'}
   - {symbol: custodyOf, replacedBy: 'custodyOfRelease: the release receipt state, not a terminal read-back'}
   - {symbol: closeDeadWorkerTerminal, replacedBy: 'releaseDeadWorker: the dead worker Dispatch is released'}
   - {symbol: releaseWorkerOnReport, replacedBy: 'nothing: the op worker_done and the settle worker-release end the worker'}

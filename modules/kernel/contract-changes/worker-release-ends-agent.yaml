@@ -11,7 +11,7 @@ summary: >-
   release is not ok the exact terminal is read back (disconnected or gone proves release). A dead worker's Dispatch is released once per
   attempt (event dead-worker-released). A dispatch killed mid-launch records its Dispatch id beside its terminal
   (payload.launchTerminal.dispatchId) and settle and reconcile --dead-worker release it. releaseSettled promotes only on a managed release
-  proof. close-verify --tree stays for terminals not released through worker-release (Kernel self-close, GC sweep): E1 did not cover them.
+  proof. Lane ORCA2 then deleted close-verify `--tree` (`tree`, `orcaAgents`, `reapOrphaned`) and the agent census of the tick GC (supervisor/gc.mjs), and the Devin model pin of writeDevinProfile (live probe E7: Devin ignores a project config pin, Orca refuses a launch-time model for it); the GC's orphan-agent and orphan-shell sweeps stay as the safety net for a terminal closed another way.
   New failure code: managed-unproven.
 paths:
   - scripts/kernel/cli.mjs
@@ -19,3 +19,8 @@ paths:
   - scripts/kernel/settle/job-settle.mjs
   - modules/kernel/api-commands/reconcile.yaml
   - modules/kernel/failure-codes.yaml
+  - scripts/machine/close-verify.mjs
+  - scripts/supervisor/gc.mjs
+  - scripts/agent/trust.mjs
+  - scripts/agent/lib.mjs
+  - scripts/api/process/kill-tree.mjs

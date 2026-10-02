@@ -113,7 +113,7 @@ test('closeAndVerify takes the proof from terminal wait --for exit; polling term
 
 test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the Claude desktop app', async () => {
   const { orphanProcesses } = await import('../../scripts/supervisor/gc.mjs');
-  const { isAgentProcess, orcaAgents } = await import('../../scripts/machine/close-verify.mjs');
+  const { isAgentProcess } = await import('../../scripts/machine/close-verify.mjs');
   const D = `${F}Orca/daemon-host/1/Orca.exe`;
   const table = [
     { pid: 1, ppid: 0, name: 'Orca.exe', exe: D, created: 1 },
@@ -127,7 +127,6 @@ test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the 
   ];
   assert.equal(isAgentProcess(table[3]), true);
   assert.equal(isAgentProcess(table[7]), false);
-  assert.deepEqual([...orcaAgents(table).keys()], [4]);
   const plan = orphanProcesses({ table, now: 1_000_000, minAgeMs: 10, listedCount: 2 });
   assert.deepEqual(plan.map((p) => [p.pid, p.kind]), [[6, 'orphan-agent'], [2, 'orphan-shell']]);
 });

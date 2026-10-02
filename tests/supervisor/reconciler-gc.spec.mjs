@@ -107,7 +107,7 @@ function gcDeps(closes) {
   return { list: () => listed, read: () => ({ ok: true, screen: '' }), procs: async () => [], table: () => [], sup: () => ({ seat: null, jobs: [], leases: [] }),
     ledgers: () => [view()], git: () => ({ ok: true, stdout: '' }), landBusy: async () => false, sweepTmp: async () => ({ ok: true, skipped: [], deleted: [] }),
     fsx: { list: () => [], move: () => { throw Error('no move in a spec'); }, remove: () => { throw Error('no remove'); } },
-    readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }),
+    readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true,
     workers: () => ({ ok: true, workers: [] }), activeWorkers: () => [] };
 }
 
