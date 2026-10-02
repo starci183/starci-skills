@@ -1,8 +1,8 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
 
 /** Creates the loyalty_entries table of the order database. */
-export class CreateLoyaltyEntries1789800007000 implements MigrationInterface {
-    name = "CreateLoyaltyEntries1789800007000"
+export class CreateLoyaltyEntries1789800009000 implements MigrationInterface {
+    name = "CreateLoyaltyEntries1789800009000"
 
     /** Creates the table. */
     async up(queryRunner: QueryRunner): Promise<void> {
