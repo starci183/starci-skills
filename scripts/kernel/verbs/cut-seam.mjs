@@ -1,6 +1,7 @@
 // api cut-seam: split from cli.mjs.
 import { OP_ROLE } from '../../guards/op-caller.mjs';
 import { csvList, getWorkflow, jobOpOf, jobPayloadOf } from './shared/rows.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, digestInterfaceFiles, isSeamCut, seamStateOf } from '../seam-policy.mjs';
 
@@ -36,7 +37,8 @@ export default {
       if (internals.SETTLED.includes(job.status) && job.status !== 'succeeded') throw Object.assign(new Error(`${args.job} is ${job.status}: a failed seam attempt publishes nothing; its retry does`), { code: 'cut-seam-settled' });
       const files = csvList(args.files);
       if (!files.length) throw Object.assign(new Error('cut-seam --publish-interface needs --files <interface files, csv>'), { code: 'cut-seam-files-missing' });
-      const digests = digestInterfaceFiles({ repo, payload, files });
+      // The seam writes its interface in the workflow worktree (scripts/machine/workflow-tree.mjs), not the ledger checkout.
+      const digests = digestInterfaceFiles({ repo: workflowWorktreeOf({ env: process.env }, job.workflow_id)?.path ?? repo, payload, files });
       ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_INTERFACE_EVENT,
         payload: { op, cutId: String(cut.id), files: digests, summary: args.summary ?? null, by: caller.role }, createdAt: now }));
       const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), files: digests };

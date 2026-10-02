@@ -160,6 +160,7 @@ import {
   seamReconcileOf, seamStateOf, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf,
   canonConformancePolicy,
 } from './seam-policy.mjs';
+import { preservedRefOf } from './preserved-ref.mjs';
 import { destinationsOf } from './progress-rca.mjs';
 import {
   LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, insertLogRows,
@@ -3171,12 +3172,11 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
 }
 const CANON_FOLLOW_UP_REASON = 'canon-follow-up';
 const CANON_FOLLOW_UP_LIMIT = 3;
-const REPORT_COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
 /**
  * Settle's own next step for a canon slice (code.refactor params.canonFamilies, not its canon-wire leg) that
  * settled blocked with a filed report (cut-seam.mjs canonSettleFollowUpOf): ONE follow-up attempt of the same
- * ordinal --retry-of it - a continuation from its commit (params.resumeFrom, kernelEdit.continuationOf, so the
- * unit counts it) when it committed, owning the relocation grants its report names - and the shared-root,
+ * ordinal --retry-of it - a continuation from its preserved work (params.resumeFrom = preserved/<wf>/<job>,
+ * kernelEdit.continuationOf, so the unit counts it) when the runtime preserved some, owning the relocation grants its report names - and the shared-root,
  * config and public-entry files it needs go to the cut's queued canon-wire leg (widened), or a new wire leg
  * after the follow-up. Bounded by CANON_FOLLOW_UP_LIMIT per ordinal; a retry the Kernel already queued wins.
  * Records result_json.nextStep {kind: canon-follow-up}. Null when there is nothing to do.
@@ -3203,19 +3203,15 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
     return { jobId: queuedWire.job_id, widened: add };
   }
   const created = enqueueFollowOn(ledger, job, { reason: 'canon-wire', of: job.job_id, after, title: `code.refactor: canon-wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`,
-    repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
+    repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '' } } });
   return created?.jobId ? { jobId: created.jobId, created: true } : wire;
 }
-// The admission commit a slice's gate measured against (`gate.mjs ... --base <sha>` in its report's checks).
-const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
-  .map((check) => /--base\s+([0-9a-f]{7,40})\b/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
 function canonSettleFollowUp(ledger, job, payload, envelope) {
   const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
   const manifest = cutManifestOf(db, { workflowId: wf, op, cut: payload.cut, ownJobId: job.job_id });
-  const commit = REPORT_COMMIT_RE.exec([envelope?.summary, envelope?.blocker?.detail].join(' '))?.[1] ?? null;
   let sharedRoots = [];
   try { sharedRoots = canonConformancePolicy().sharedRoots; } catch { /* no shared roots: the wire carries only contested relocations and config files */ }
-  const plan = canonSettleFollowUpOf({ payload, report: envelope, manifest, destinations: destinationsOf(envelope, payload.owned_paths ?? []), commit, sharedRoots });
+  const plan = canonSettleFollowUpOf({ payload, report: envelope, manifest, destinations: destinationsOf(envelope, payload.owned_paths ?? []), preserved: preservedRefOf(db, job.job_id), sharedRoots });
   if (!plan) return null;
   const record = (step) => {
     const result = jobResult(db, job.job_id) ?? {};
@@ -3232,18 +3228,18 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   if (follow?.jobId && follow.reason !== 'retry-exists') {
     const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(follow.jobId);
     const next = jobPayloadOf(row);
-    const params = { ...(next.params ?? {}), ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom, admissionBase: String(payload.params?.admissionBase || admissionBaseOfReport(envelope) || '') } : {}) };
+    const params = { ...(next.params ?? {}), ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom } : {}) };
     const note = [
-      plan.resumeFrom ? `Continuation of ${job.job_id}: its commit ${plan.resumeFrom} already landed the in-ceiling part - bring it in (params.resumeFrom) and finish what its report left open; never redo it.` : `Follow-up of ${job.job_id}, which blocked ${plan.blocker ?? ''}: its report is your starting point.`,
+      plan.resumeFrom ? `Continuation of ${job.job_id}: the runtime preserved its in-ceiling work as ${plan.resumeFrom} - apply it to your owned paths first (git diff ${plan.resumeFrom}^ ${plan.resumeFrom} -- <owned paths> | git apply) and finish what its report left open; never redo it.` : `Follow-up of ${job.job_id}, which blocked ${plan.blocker ?? ''}: its report is your starting point.`,
       plan.grants.length ? `You now also own the relocation destinations ${plan.grants.join(', ')}.` : null,
-      plan.wire.length ? `The canon-wire leg owns ${plan.wire.join(', ')}: a finding that needs one of them is owedToWire [{path, finding}] - fix everything else, commit, and report done; never block on it.` : 'A finding that needs a shared-root, config or public-entry file outside your owned paths is owedToWire [{path, finding}]: report done with it listed, never blocked.',
+      plan.wire.length ? `The canon-wire leg owns ${plan.wire.join(', ')}: a finding that needs one of them is owedToWire [{path, finding}] - fix everything else and report done; never block on it.` : 'A finding that needs a shared-root, config or public-entry file outside your owned paths is owedToWire [{path, finding}]: report done with it listed, never blocked.',
     ].filter(Boolean).join(' ');
     next.owned_paths = [...new Set([...(next.owned_paths ?? []), ...plan.grants])];
     next.params = params;
-    next.kernelEdit = { ...(next.kernelEdit ?? {}), unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, commits: [plan.resumeFrom] } : { retryOf: job.job_id }) };
+    next.kernelEdit = { ...(next.kernelEdit ?? {}), unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, preserved: plan.resumeFrom } : { retryOf: job.job_id }) };
     next.kernelOverride = { ...(next.kernelOverride ?? {}), notes: [...(next.kernelOverride?.notes ?? []), note] };
     updateJob(db, { jobId: follow.jobId, payload: next });
-    if (plan.resumeFrom) ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: follow.jobId, commit: plan.resumeFrom, via: 'settle' } });
+    if (plan.resumeFrom) ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: follow.jobId, preserved: plan.resumeFrom, via: 'settle' } });
   }
   let wire = null;
   if (plan.wire.length) {

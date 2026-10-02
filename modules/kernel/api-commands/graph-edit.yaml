@@ -2,8 +2,8 @@
 # (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is api redesign).
 purpose: >-
   Edit this workflow's own queued units, logged and reversible: drop units whose paths are absent, widen a
-  unit inside its repository, add ONE serial wire unit for shared files, continue a partial commit as a
-  continuation unit, retry a failed unit with a CHANGED shape, reorder (--after), split or merge a few units,
+  unit inside its repository, add ONE serial wire unit for shared files, continue a failed unit's preserved work
+  (preserved/<wf>/<job>) as a continuation unit, retry a failed unit with a CHANGED shape, reorder (--after), split or merge a few units,
   set a unit's override (notes, commandTimeoutMs, difficulty, model, effort), start a fresh canon-scan and
   re-cut a canon cut's remaining units from it (the goal's own cut method), or undo an edit. The work graph
   (scripts/work/work-graph.mjs) and the leg plan stay the ops'.

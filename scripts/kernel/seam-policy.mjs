@@ -28,6 +28,7 @@ import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { preservedRefOf } from './preserved-ref.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
@@ -365,25 +366,23 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
 }
 
 /**
- * The redo of a slice that settled blocked or failed after committing: the same op, cut ordinal and owned
- * paths as a new attempt --retry-of it, with params.resumeFrom = the head its indexed patch recorded (the
- * committed work it keeps) and params.admissionBase = the first attempt's admission base (the gate
- * --base, so the kept commit is still measured). Null when the job indexed no committed patch.
+ * The redo of a slice that settled blocked or failed with work: the same op, cut ordinal and owned paths as a new
+ * attempt --retry-of it, with params.resumeFrom = its preserved ref (preservedRefOf), which the redo applies to its
+ * owned paths before its first edit. Null when the runtime preserved no work of it.
  */
 export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
   const row = db.prepare('SELECT job_id,workflow_id,op_id,status,payload_json FROM jobs WHERE job_id=?').get(jobId);
   if (!row) return null;
   const payload = payloadOf(row);
-  const indexed = db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='artifacts-indexed' ORDER BY seq DESC LIMIT 1").get(jobId);
-  const patch = parseJson(indexed?.payload_json ?? '', {})?.patch ?? null;
-  if (!patch?.head) return null;
-  const params = { resumeFrom: String(patch.head), admissionBase: String(payload.params?.admissionBase || patch.base || patch.head) };
+  const preserved = preservedRefOf(db, jobId);
+  if (!preserved) return null;
+  const params = { resumeFrom: preserved };
   const owned = [...new Set([...(payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean), ...extraPaths])];
   const cut = payload.cut;
   const command = `api enqueue --workflow ${row.workflow_id} --op ${row.op_id} --paths ${owned.join(',')}`
     + (cut?.id != null ? ` --cut-id ${cut.id} --cut-ordinal ${cut.ordinal} --cut-total ${cut.total}` : '')
     + ` --retry-of ${row.job_id} --params '${JSON.stringify(params)}'`;
-  return { jobId: row.job_id, status: row.status, ...params, patch: patch.path ?? null, owned, command };
+  return { jobId: row.job_id, status: row.status, ...params, owned, command };
 }
 
 /**
@@ -445,14 +444,14 @@ const PUBLIC_ENTRY_RE = /\/index\.[cm]?[jt]sx?$/;
  * What settle does with a canon slice (params.canonFamilies, not the canon-wire leg) that settled blocked or
  * failed WITH a filed report, so a partial or scope-bound slice is never a dead end (one canon cut had
  * 14 slices block on shared-change after committing in-ceiling work, and nothing requeued them):
- *   - `resumeFrom`: the commit it left (its report head, else a commit its report names) - the follow-up is a
- *     continuation from it, never a redo;
+ *   - `resumeFrom`: its preserved ref (`preserved`, preservedRefOf) - the follow-up is a continuation from that work,
+ *     never a redo;
  *   - `grants`: relocation destinations its report names outside its paths that no sibling ordinal holds -
  *     the follow-up owns them;
  *   - `wire`: shared-root/config/public-entry files and destinations a sibling holds - the canon-wire leg's.
  * Pure over its inputs; null when the slice is no canon slice or there is nothing to follow up.
  */
-export function canonSettleFollowUpOf({ payload, report, manifest = null, destinations = [], commit = null, sharedRoots = [] }) {
+export function canonSettleFollowUpOf({ payload, report, manifest = null, destinations = [], preserved = null, sharedRoots = [] }) {
   const params = payload?.params ?? {};
   if (!payload?.cut || !String(params.canonFamilies ?? '').trim() || params.canonWire === true) return null;
   if (!report || !['blocked', 'failed'].includes(String(report.outcome))) return null;
@@ -478,11 +477,10 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
     if (siblings.some((p) => overlaps(target, p))) wire.push(dest);
     else grants.push(target);
   }
-  const head = /^[0-9a-f]{7,40}$/i.test(String(report.head ?? '')) ? String(report.head) : (commit ?? null);
   const blocker = String(report.blocker?.kind ?? '');
   // Every blocked canon slice gets its bounded follow-up (settle caps it per ordinal): a block on a brief or
   // binding misreading is retried on the fixed runtime, never left a dead end (fe-canon a77 ordinal 15).
-  return { resumeFrom: head, grants: [...new Set(grants)], wire: [...new Set(wire)], blocker: blocker || null };
+  return { resumeFrom: preserved ?? null, grants: [...new Set(grants)], wire: [...new Set(wire)], blocker: blocker || null };
 }
 
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
@@ -507,7 +505,7 @@ async function main(argv) {
     try {
       const extraPaths = String(flag('paths') ?? '').split(',').map((p) => p.trim()).filter(Boolean);
       const plan = canonRedispatchOf(ledger.db, flag('job'), { extraPaths });
-      console.log(JSON.stringify(plan ?? { jobId: flag('job'), command: null, reason: 'no committed patch indexed for this job: redo it as a plain --retry-of' }, null, 2));
+      console.log(JSON.stringify(plan ?? { jobId: flag('job'), command: null, reason: 'the runtime preserved no work of this job: redo it as a plain --retry-of' }, null, 2));
       return 0;
     } finally { ledger.close(); }
   }

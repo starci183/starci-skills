@@ -7006,12 +7006,12 @@ continue-exists:
   nextStep_vi: "Lệnh bị từ chối; theo dõi việc tiếp nối đang có thay vì tạo mới."
   owner: supervisor
   kind: verb-refusal
-continue-no-commit:
-  title: "Nothing committed to continue"
-  title_vi: "Không có commit để tiếp nối"
-  meaning_vi: "Báo cáo của việc không ghi commit nào nên không có công việc đã commit để tiếp nối."
+continue-no-preserved-work:
+  title: "No preserved work to continue"
+  title_vi: "Không có công việc được giữ lại để tiếp nối"
+  meaning_vi: "Khi việc này settle hỏng hoặc bị chặn, runtime không giữ lại công việc nào (không có ref preserved/<workflow>/<job>) nên không có gì để tiếp nối."
   causes_vi:
-    - "Việc hỏng trước khi commit"
+    - "Việc hỏng trước khi viết tệp nào trong các đường dẫn nó sở hữu"
   nextStep_vi: "Lệnh bị từ chối; với việc hỏng, thử lại với hình dạng việc khác thay vì tiếp nối."
   owner: supervisor
   kind: verb-refusal
@@ -8993,7 +8993,6 @@ parity-no-base:
   title_vi: "Thiếu mốc commit gốc để đối chiếu"
   meaning_vi: "Bộ chốt không có mốc commit lúc nhận việc, nên không đo được sự khác biệt do thợ gây ra."
   causes_vi:
-    - "Job không có params.admissionBase"
     - "Báo cáo không khai --base cho gate.mjs"
   nextStep_vi: "Bộ chốt không tự kết luận xanh; Kernel xử lý, hoặc thợ nộp lại báo cáo có khai mốc gốc."
   owner: op-retry

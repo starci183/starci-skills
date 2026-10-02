@@ -65,7 +65,7 @@ test('families, base and eligibility', () => {
   assert.equal(checkFamilyOf({ name: 'vitest', command: 'npx vitest run' }), null);
   assert.equal(checkFamilyOf({ name: 'starci-validate-strict', command: 'node .claude/bin/starci.mjs validate X --strict' }), null);
   assert.equal(sliceBaseOf(sliceItem('abc1234', [])), 'abc1234');
-  assert.equal(sliceBaseOf({ payload: { params: { admissionBase: 'def5678' } }, report: {} }), 'def5678');
+  assert.equal(sliceBaseOf({ payload: { params: { admissionBase: 'def5678' } }, report: {} }), null, 'no admissionBase param: the base is what the checks measured against');
   assert.equal(sliceBaseOf({ payload: { params: {} }, report: { checks: [] } }), null);
   assert.equal(parityEligible(sliceItem('a', [])), true);
   assert.equal(parityEligible({ ...sliceItem('a', []), payload: { params: { canonFamilies: 'all' } } }), false, 'a wire leg (no cut) is not a slice');
