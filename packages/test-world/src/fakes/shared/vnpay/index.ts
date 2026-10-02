@@ -21,7 +21,7 @@ import {
     paymentClient,
     secretFor,
 } from "../payment-kit"
-import type { PaymentClient } from "../payment-kit"
+import type { PaymentClient, PaymentWebhookOptions } from "../payment-kit"
 import { VNPAY_INVALID_SIGNATURE_PAGE, VNPAY_TRANSACTION_STATUS, vnpayApiError } from "./fixtures"
 import type { VnpayTransactionView } from "./payloads"
 import { vnpayQuerydrResponse, vnpayRefundResponse, vnpayResultParams } from "./payloads"
@@ -38,7 +38,7 @@ export * from "./payloads"
 export * from "./signature"
 
 /** What `vnpayFake` is declared with. */
-export interface VnpayOptions {
+export interface VnpayOptions extends PaymentWebhookOptions {
     /** The merchant code the app is configured with (default: a run-stable random one, exposed as `values.tmnCode`). */
     readonly tmnCode?: string
     /** The hash secret the app signs with (default: run-stable random, `values.hashSecret`). */
@@ -333,5 +333,5 @@ export const vnpayFake = defineHttpFake<VnpayClient, VnpayOptions | undefined, V
             return delivery
         },
     },
-    client: (bridge: FakeBridge, base: FakeClient): VnpayClient => paymentClient(bridge, base),
+    client: (bridge: FakeBridge, base: FakeClient, options: VnpayOptions | undefined): VnpayClient => paymentClient(bridge, base, options),
 })

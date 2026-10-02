@@ -19,7 +19,7 @@ import { FakeControlRejected } from "../../framework/failures"
 import { defineHttpFake } from "../../framework/http-fake"
 import type { FakeHttpReply, FakeHttpRequest, HttpFakeContext } from "../../framework/http-fake"
 import { DeliveryBook, appUrl, controlNumber, controlRecord, controlString, normalizePath, paymentClient, secretFor } from "../payment-kit"
-import type { PaymentClient } from "../payment-kit"
+import type { PaymentClient, PaymentWebhookOptions } from "../payment-kit"
 import { SEPAY_ERROR_BAD_REQUEST, SEPAY_ERROR_NOT_FOUND, SEPAY_ERROR_UNAUTHORIZED } from "./fixtures"
 import type { DelayedSettleParams, SepayIntent, SettleParams } from "./payloads"
 import { sepayCreateResponse, sepayIntentWebhook, sepayTransactionPending, sepayTransactionSettled, sepayTransactionWebhook } from "./payloads"
@@ -35,7 +35,7 @@ const DEFAULT_WEBHOOK_PATH = "/webhooks/sepay"
 const DEFAULT_PERIOD_MS = 30 * 86_400_000
 
 /** What `sepayFake` is declared with. */
-export interface SepayOptions {
+export interface SepayOptions extends PaymentWebhookOptions {
     /** The API key the app authenticates its calls with (default: random, `values.apiKey`). */
     readonly apiKey?: string
     /** The secret the fake signs its webhook with (default: random, `values.webhookSecret`). */
@@ -301,13 +301,14 @@ export const sepayFake = defineHttpFake<SepayClient, SepayOptions | undefined, S
             return context.state.book.deliver({ ...last, headers: { ...last.headers, ...signed(context, last.body, webhookSecretOf(context), ageMs) } })
         },
     },
-    client: (bridge: FakeBridge, base: FakeClient): SepayClient => {
-        const shared: Base = paymentClient(bridge, base)
+    client: (bridge: FakeBridge, base: FakeClient, declared: SepayOptions | undefined): SepayClient => {
+        const shared: Base = paymentClient(bridge, base, declared)
+        const target = (): string => bridge.webhookTarget(declared?.webhookApp)
         return {
             ...shared,
-            settle: (params) => bridge.call("settle", { ...params, deliverTo: bridge.webhookTarget() }),
-            fail: (params) => bridge.call("fail", { ...params, deliverTo: bridge.webhookTarget() }),
-            replayWebhook: (reference, options) => bridge.call("replay-webhook", { reference, ...(options ?? {}), deliverTo: bridge.webhookTarget() }),
+            settle: (params) => bridge.call("settle", { ...params, deliverTo: target() }),
+            fail: (params) => bridge.call("fail", { ...params, deliverTo: target() }),
+            replayWebhook: (reference, options) => bridge.call("replay-webhook", { reference, ...(options ?? {}), deliverTo: target() }),
         }
     },
 })

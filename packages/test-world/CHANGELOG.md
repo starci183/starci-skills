@@ -20,6 +20,9 @@
 - Changed: extensions are created in `public` of each database.
 - Added: `apps.<name>.rawBody` (default false): the world creates that app with Nest's `rawBody`, as a `main.ts` that verifies
   signed webhooks over the exact body (`request.rawBody`) does.
+- Added: `webhookApp` on the four payment fakes (sepay, payos, momo, vnpay): the declared app whose listener receives their
+  webhooks, for a world with several listening apps (default unchanged: the first listening app). An HTTP fake's `client`
+  now receives the declared options.
 - Added: GraphQL subscriptions in the test API. `api.subscribe(operation, { variables, timeoutMs })` (and on any bound caller,
   `api.as(token).subscribe(...)`) opens a graphql-ws (`graphql-transport-ws`) subscription at the app's GraphQL path on
   Node's own WebSocket (no new dependency), with the caller's bearer as `connectionParams.authorization`. The handle has

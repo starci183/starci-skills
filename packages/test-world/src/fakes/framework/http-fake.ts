@@ -105,7 +105,8 @@ export interface HttpFakeSpec<TClient extends FakeClient, TOptions, TState> {
     /** Extra control actions by name. */
     readonly controlActions?: Readonly<Record<string, HttpFakeControlAction<TState, TOptions>>>
     /** Extends the base client (`failNext`, `requests`, `reset`) with the fake's own methods. */
-    readonly client?: (bridge: FakeBridge, base: FakeClient) => TClient
+    /** The typed handle of the fake; it gets the declared options too (a payment fake reads `webhookApp` there). */
+    readonly client?: (bridge: FakeBridge, base: FakeClient, options: TOptions) => TClient
 }
 
 /** The base client every fake handle starts from. */
@@ -220,7 +221,7 @@ export const defineHttpFake = <TClient extends FakeClient = FakeClient, TOptions
         kind: "http",
         client: (bridge) => {
             const base = createBaseClient(bridge)
-            return spec.client === undefined ? (base as TClient) : spec.client(bridge, base)
+            return spec.client === undefined ? (base as TClient) : spec.client(bridge, base, options as TOptions)
         },
         start: async (start): Promise<FakeInstance> => {
             const resolved = options as TOptions

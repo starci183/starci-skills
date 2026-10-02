@@ -14,7 +14,7 @@ import { FakeControlRejected } from "../../framework/failures"
 import { defineHttpFake } from "../../framework/http-fake"
 import type { FakeHttpReply, FakeHttpRequest, HttpFakeContext } from "../../framework/http-fake"
 import { DeliveryBook, appUrl, controlNumber, controlRecord, controlString, normalizePath, paymentClient, secretFor } from "../payment-kit"
-import type { PaymentClient } from "../payment-kit"
+import type { PaymentClient, PaymentWebhookOptions } from "../payment-kit"
 import {
     PAYOS_ERROR_BAD_REQUEST,
     PAYOS_ERROR_INVALID_SIGNATURE,
@@ -32,7 +32,7 @@ export * from "./payloads"
 export * from "./signature"
 
 /** What `payosFake` is declared with. */
-export interface PayosOptions {
+export interface PayosOptions extends PaymentWebhookOptions {
     /** `x-client-id` the app sends (default: random, `values.clientId`). */
     readonly clientId?: string
     /** `x-api-key` the app sends (default: random, `values.apiKey`). */
@@ -317,5 +317,5 @@ export const payosFake = defineHttpFake<PayosClient, PayosOptions | undefined, P
             return delivery
         },
     },
-    client: (bridge: FakeBridge, base: FakeClient): PayosClient => paymentClient(bridge, base),
+    client: (bridge: FakeBridge, base: FakeClient, options: PayosOptions | undefined): PayosClient => paymentClient(bridge, base, options),
 })

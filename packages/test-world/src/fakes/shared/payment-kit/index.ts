@@ -105,6 +105,15 @@ export const appUrl = (deliverTo: string, path: string): string => `${deliverTo.
 /** A path option normalised to start with `/`. */
 export const normalizePath = (path: string): string => (path.startsWith("/") ? path : `/${path}`)
 
+/** What every payment fake is declared with besides its protocol options. */
+export interface PaymentWebhookOptions {
+    /**
+     * The declared app whose listener receives the webhooks (default: the first listening app of the world). Name it when the
+     * world boots several listening apps and the webhook door lives in one of them.
+     */
+    readonly webhookApp?: string
+}
+
 /** The methods every payment fake handle has, over the provider's own parameter types. */
 export interface PaymentClient<TIntent, TSettle, TFail, TDelay> extends FakeClient {
     /** What the app created at the gateway, with amounts, references and status. */
@@ -125,14 +134,18 @@ export interface PaymentClient<TIntent, TSettle, TFail, TDelay> extends FakeClie
 export const paymentClient = <TIntent, TSettle extends object, TFail extends object, TDelay extends object>(
     bridge: FakeBridge,
     base: FakeClient,
-): PaymentClient<TIntent, TSettle, TFail, TDelay> => ({
-    ...base,
-    intents: () => bridge.call("intents"),
-    deliveries: () => bridge.call("deliveries"),
-    settle: (params) => bridge.call("settle", { ...params, deliverTo: bridge.webhookTarget() }),
-    fail: (params) => bridge.call("fail", { ...params, deliverTo: bridge.webhookTarget() }),
-    delayWebhook: async (params) => {
-        await bridge.call("delay-webhook", { ...params, deliverTo: bridge.webhookTarget() })
-    },
-    replayWebhook: (reference) => bridge.call("replay-webhook", { reference, deliverTo: bridge.webhookTarget() }),
-})
+    options: PaymentWebhookOptions | undefined,
+): PaymentClient<TIntent, TSettle, TFail, TDelay> => {
+    const target = (): string => bridge.webhookTarget(options?.webhookApp)
+    return {
+        ...base,
+        intents: () => bridge.call("intents"),
+        deliveries: () => bridge.call("deliveries"),
+        settle: (params) => bridge.call("settle", { ...params, deliverTo: target() }),
+        fail: (params) => bridge.call("fail", { ...params, deliverTo: target() }),
+        delayWebhook: async (params) => {
+            await bridge.call("delay-webhook", { ...params, deliverTo: target() })
+        },
+        replayWebhook: (reference) => bridge.call("replay-webhook", { reference, deliverTo: target() }),
+    }
+}
