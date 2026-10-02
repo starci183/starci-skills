@@ -1,0 +1,55 @@
+schema: work/layout-tree@1
+id: shell
+kind: shell
+state: todo
+rev: 1
+origin: planned
+productLocale:
+  default: vi
+  fallback: vi
+  locales:
+    - vi
+breakpoints:
+  - name: desktop
+    width: 1440
+    height: 900
+  - name: mobile
+    width: 390
+    height: 844
+themes:
+  - light
+apps:
+  - name: web
+    root: fe/apps/web
+    appDir: fe/apps/web/src/app
+    framework: next-app-router
+    localeParam: locale
+    nodes:
+      - id: /
+        parent: null
+        segment: /
+        segmentKind: root
+        url: /
+        origin: planned
+      - id: /[locale]
+        parent: /
+        segment: "[locale]"
+        segmentKind: dynamic
+        url: /[locale]
+        origin: planned
+        files:
+          layout:
+            path: fe/apps/web/src/app/[locale]/layout.tsx
+          page:
+            path: fe/apps/web/src/app/[locale]/page.tsx
+          loading:
+            path: fe/apps/web/src/app/[locale]/loading.tsx
+          error:
+            path: fe/apps/web/src/app/[locale]/error.tsx
+          not-found:
+            path: fe/apps/web/src/app/[locale]/not-found.tsx
+        layout:
+          component: AppLayout
+          chrome: visible
+          state: todo
+          rev: 1

@@ -1,0 +1,25 @@
+project_id = "{{project}}"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "env(SITE_URL)"
+additional_redirect_urls = []
+enable_signup = false
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = false
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
