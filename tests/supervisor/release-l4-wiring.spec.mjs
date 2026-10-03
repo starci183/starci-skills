@@ -278,7 +278,7 @@ test('L4: the runtime spec step runs on the example installs with STARCI_REQUIRE
 test('L4: a lite app is planned without the test scripts it cannot have, a full app that lacks one is absent and fails the row, and the edition comes from hfs.json', (t) => {
   const base = tmp(t, 'lite');
   fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
-  const lite = ['typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'];
+  const lite = ['codegen', 'typecheck', 'lint', 'format:check', 'build:be', 'build:fe', 'docker:build'];
   const full = [...lite, 'typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e'];
   for (const [name, edition, scripts] of [['tiny', 'lite', lite], ['big', undefined, full.filter((s) => s !== 'test:e2e')]]) {
     const dir = path.join(base, 'examples', name);
@@ -290,10 +290,10 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
   assert.deepEqual(exampleApps(base).map((a) => [a.name, a.edition]), [['big', 'full'], ['tiny', 'lite']]);
   const plan = planL4(base, { runtimeRoot: base });
   const rows = (app) => plan.steps.filter((s) => s.name.startsWith(`${app}: npm run `)).map((s) => [s.name.replace(`${app}: npm run `, ''), s.absent ?? false]);
-  assert.deepEqual(rows('tiny'), lite.map((s) => [s, false]), 'the lite row has the six scripts and no absent step');
+  assert.deepEqual(rows('tiny'), lite.map((s) => [s, false]), 'the lite row has the seven scripts and no absent step');
   assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
-  assert.equal(rows('big').length, 11);
-  assert.deepEqual(scriptsOf({ edition: 'full' }).length, 11);
+  assert.equal(rows('big').length, 12);
+  assert.deepEqual(scriptsOf({ edition: 'full' }).length, 12);
 });
 
 test('evidence rule: the log readers know the passed tests of both reporters and the part of the container log one step printed', () => {

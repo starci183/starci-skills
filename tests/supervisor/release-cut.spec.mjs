@@ -169,7 +169,7 @@ test('the L4 row: the runtime suite and check, every example script (lint, tsc, 
   const plan = planL4(base, { runtimeRoot: base });
   const names = plan.steps.map((s) => s.name);
   for (const expected of ['shop: npm run lint', 'shop: npm run typecheck', 'shop: npm run test', 'shop: npm run test:e2e', 'shop: npm run docker:build', 'shop: npm run build:be']) assert.ok(names.includes(expected), expected);
-  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
+  assert.deepEqual(plan.steps.filter((s) => s.absent).map((s) => s.name).sort(), ['shop: npm ci', 'shop: npm run build:be', 'shop: npm run build:fe', 'shop: npm run codegen', 'shop: npm run docker:build', 'shop: npm run format:check', 'shop: npm run test:contract', 'shop: npm run test:integration', 'shop: npm run typecheck:tests']);
   assert.deepEqual(plan.proofs, ['shop: sonar']);
   const ran = [];
   const out = (await runL4(base, { plan, step: (s, o) => { ran.push([s.name, o.cwd]); return { ok: true, log: 'x.log', ms: 1, text: '﹣ draw-layer (1ms) # no browser\n' }; }, proofs: {}, parity: null }));

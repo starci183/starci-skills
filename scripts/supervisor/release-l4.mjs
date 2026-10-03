@@ -22,7 +22,7 @@ import { sonarSupplier } from './release-l4-sonar.mjs';
 /** The only skips a release may keep: tests that need a browser the host may lack, matched by name. */
 const BROWSER_SKIPS = Object.freeze(['draw-render', 'draw-rationale', 'draw-layer']);
 const INFRASTRUCTURE = /\b(?:docker|postgres(?:ql)?|supabase|kafka|redis|minio|keycloak|compose|stack|orca|port|socket|network|database|infrastructure|unavailable|not installed|not reachable)\b/i;
-const EXAMPLE_SCRIPTS = Object.freeze(['typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
+const EXAMPLE_SCRIPTS = Object.freeze(['codegen', 'typecheck', 'typecheck:tests', 'lint', 'format:check', 'test', 'test:contract', 'test:integration', 'test:e2e', 'build:be', 'build:fe', 'docker:build']);
 /** A lite app holds no tests (lite holds no tests): its row is the full row without them; the lite scaffold e2e inside the spec run is its behaviour proof. */
 const LITE_NO_SCRIPTS = Object.freeze(['typecheck:tests', 'test', 'test:contract', 'test:integration', 'test:e2e']);
 export const scriptsOf = (app) => (app.edition === 'lite' ? EXAMPLE_SCRIPTS.filter((script) => !LITE_NO_SCRIPTS.includes(script)) : EXAMPLE_SCRIPTS);
