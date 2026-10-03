@@ -297,8 +297,8 @@ slots:
     tests: none
   - id: runtime.db
     profiles: [runtime]
-    # The ONLY node:sqlite openers and blob-store writers. No api import: a value a store needs from git is passed in.
-    path: "engine/db/{ledger,machine,blob,authorizer}.mjs"
+    # Store connection owners and their schema and receipt modules. No api import: a value a store needs from git is passed in.
+    path: "engine/db/{ledger,machine,machine-schema,provider-reservations,blob,authorizer}.mjs"
     presence: required
     tracked: tracked
     tier: db
