@@ -1,0 +1,13 @@
+id: hfs-target-typescript-sql
+effectiveAt: 2026-10-03T20:09:38Z
+summary: >-
+  Generated Supabase table declarations use the compiler qualified by the checked repository's
+  architecture context. The standalone HFS entry imports before target compiler qualification.
+  The table reader retains AST parsing, schema ownership, per-app caching and fail-closed
+  generated-contract handling; target compiler failures remain owned by the architecture loader.
+reach: new-legs
+paths:
+  - scripts/hfs/architecture/supabase-tables.mjs
+  - scripts/hfs/architecture/sql-owner.mjs
+  - tests/hfs-architecture/architecture-sql-owner.spec.mjs
+  - modules/kernel/contract-changes/hfs-target-typescript-sql.yaml

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { archFixture, runArch, findings, databaseFiles, entityFiles } from '../helpers/hfs-arch-be-fixture.mjs';
-import { appDeclaration } from '../helpers/hfs-arch-fixture.mjs';
+import { appDeclaration, ts } from '../helpers/hfs-arch-fixture.mjs';
 import { analyzeSql, tokenizeSql } from '../../scripts/hfs/architecture/sql-tokens.mjs';
 
 // R86 sql-owner (BE_SQL_TABLE_OWNER): the SQL of `<name>.sql.ts` writes only its own capability's tables, reads only tables of
@@ -129,7 +130,19 @@ export const PEEK = sql\`SELECT id FROM public.orders LIMIT 1\`;
 `,
     },
   });
-  const report = runArch(root);
+  const typesFile = path.resolve(root, '../supabase/types/database.types.ts');
+  const parsedTypes = [];
+  const compiler = new Proxy(ts, {
+    get(target, property, receiver) {
+      if (property === 'createSourceFile') return (...args) => {
+        if (path.resolve(args[0]) === typesFile) parsedTypes.push(args[1]);
+        return target.createSourceFile(...args);
+      };
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const report = runArch(root, { injectedTypeScript: compiler });
+  assert.deepEqual(parsedTypes, [databaseTypes], 'the supplied compiler parses the real generated contract once');
   const hits = findings(report, 'BE_SQL_TABLE_OWNER');
   const by = text => hits.filter(item => item.message.includes(text));
   assert.equal(by('writes table audit_events').length, 1, JSON.stringify(hits, null, 1));

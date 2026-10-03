@@ -1,24 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 
-const typescript = createRequire(import.meta.url)('typescript');
 const CACHE = new Map();
 
 /** A static TypeScript property name, as emitted by `supabase gen types typescript`. */
-const propertyName = name => (typescript.isIdentifier(name) || typescript.isStringLiteralLike(name) ? name.text : null);
+const propertyName = (typescript, name) => (typescript.isIdentifier(name) || typescript.isStringLiteralLike(name) ? name.text : null);
 
 /** The type-literal members below property `name`, or null when the generated shape is not statically readable. */
-const propertyMembers = (members, name) => {
-  const property = members.find(member => typescript.isPropertySignature(member) && propertyName(member.name) === name);
+const propertyMembers = (typescript, members, name) => {
+  const property = members.find(member => typescript.isPropertySignature(member) && propertyName(typescript, member.name) === name);
   return property?.type && typescript.isTypeLiteralNode(property.type) ? property.type.members : null;
 };
 
 /**
- * The lower-case keys of `Database['public']['Tables']` in Supabase's generated TypeScript contract.
+ * The lower-case keys of `Database['public']['Tables']`, parsed with the architecture context's target compiler.
  * An absent, malformed or unreadable contract proves no table. The result is cached once per app root.
  */
-export function supabaseTablesOf(appRoot) {
+export function supabaseTablesOf(appRoot, typescript) {
   const root = path.resolve(appRoot);
   if (CACHE.has(root)) return CACHE.get(root);
   const tables = new Set();
@@ -28,11 +26,11 @@ export function supabaseTablesOf(appRoot) {
     if (source.parseDiagnostics.length === 0) {
       const database = source.statements.find(statement => typescript.isTypeAliasDeclaration(statement) && statement.name.text === 'Database');
       const databaseMembers = database && typescript.isTypeLiteralNode(database.type) ? database.type.members : null;
-      const publicMembers = databaseMembers ? propertyMembers(databaseMembers, 'public') : null;
-      const tableMembers = publicMembers ? propertyMembers(publicMembers, 'Tables') : null;
+      const publicMembers = databaseMembers ? propertyMembers(typescript, databaseMembers, 'public') : null;
+      const tableMembers = publicMembers ? propertyMembers(typescript, publicMembers, 'Tables') : null;
       if (tableMembers) for (const member of tableMembers) {
         if (!typescript.isPropertySignature(member)) continue;
-        const name = propertyName(member.name);
+        const name = propertyName(typescript, member.name);
         if (name) tables.add(name.toLowerCase());
       }
     }

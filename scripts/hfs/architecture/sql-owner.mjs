@@ -96,8 +96,8 @@ export function entitiesOf(kit, graph) {
 const capabilityTable = root => path.posix.basename(root).replaceAll('-', '_').toLowerCase();
 
 /** Supabase declarations, with an owner when the generated table name matches a capability's persistence folder. */
-function supabaseDeclarations(graph, appRoot) {
-  const generated = supabaseTablesOf(appRoot);
+function supabaseDeclarations(graph, appRoot, ts) {
+  const generated = supabaseTablesOf(appRoot, ts);
   const tables = new Map([...generated].map(table => [table, { table, owner: null, rel: null, uniqueSets: [] }]));
   for (const file of graph.files.values()) {
     if (file.slot !== 'be.persistence' || !file.owner) continue;
@@ -114,7 +114,7 @@ export function checkSqlOwner(input) {
   const { ts, resolver } = kit;
   const supabase = resolver.ruleParams().schemaAuthority === 'supabase';
   const entityDeclarations = supabase ? { tables: new Map(), unreadable: 0 } : entitiesOf(kit, graph);
-  const tables = supabase ? supabaseDeclarations(graph, config.packageRoot) : entityDeclarations.tables;
+  const tables = supabase ? supabaseDeclarations(graph, config.packageRoot, ts) : entityDeclarations.tables;
   const model = contextModelOf(kit, graph);
   const violations = [];
   let templates = 0;
