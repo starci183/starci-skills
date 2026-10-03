@@ -13,6 +13,7 @@ reach: new-legs
 paths:
   - engine/db/machine.mjs
   - engine/db/machine-connection.mjs
+  - knowledge/hfs/runtime-slots.yaml
   - tests/engine-db/machine-observer.spec.mjs
   - docs/ledger-db.md
   - modules/kernel/contract-changes/machine-ui-observer.yaml
