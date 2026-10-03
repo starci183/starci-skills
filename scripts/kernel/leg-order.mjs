@@ -1,6 +1,6 @@
 // leg-order.mjs — which pending earlier-leg jobs do NOT hold a later leg in the approved order.
 //
-// api status reads a queued job `dependency` while a plan ancestor still has a job in flight or
+// starci kernel status reads a queued job `dependency` while a plan ancestor still has a job in flight or
 // queued (cli.mjs queuedBecauseOf). One kind of pending row is not a predecessor in that sense:
 //
 //   gate-waits-on-job

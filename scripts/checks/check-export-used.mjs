@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-export-used.mjs - an export is used somewhere (smell S5-01; part of `npm run check`).
-//   node scripts/checks/check-export-used.mjs [--json]
+//   starci runtime check --only export-used [--json]
 //
 // RT_EXPORT_UNUSED: a name that a runtime source file (`.mjs` under scripts/, engine/, modules/, bin/, ext/, ui/ and the
 // packages without the generated runtime copies) exports, and that no OTHER tracked text file mentions, is dead surface:

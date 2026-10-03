@@ -112,7 +112,7 @@ properties:
     minItems: 1
     uniqueItems: true
     description: "Real running-page captures, cited - each a blob of the interface.implement attempt that took it
-      (filed from STARCI_JOB_SCRATCH/captures with api report), never a file under this record's assets/ (agent data,
+      (filed from STARCI_JOB_SCRATCH/captures with starci kernel report), never a file under this record's assets/ (agent data,
       ARCHITECTURE-DB §5.1). A capture's markup is cited under the same stem (<stem>.html). An implementation asset
       never carries a `generation` record - that is what tells a capture and a designed direction apart regardless of
       prose provenance, and a generation-bearing asset here is refused."
@@ -127,10 +127,10 @@ properties:
         artifact:
           type: integer
           minimum: 1
-          description: The job_artifacts id api report returned for the file (optional; the sha256 is the citation).
+          description: The job_artifacts id starci kernel report returned for the file (optional; the sha256 is the citation).
         name:
           $ref: "urn:work:common:1#/$defs/prose"
-          description: The artifact name api report returned (attachments/captures/<file>), whose extension says what
+          description: The artifact name starci kernel report returned (attachments/captures/<file>), whose extension says what
             the file is.
         role:
           $ref: "urn:work:common:1#/$defs/slug"

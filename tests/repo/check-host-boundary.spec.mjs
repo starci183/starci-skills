@@ -73,9 +73,10 @@ test('a wrapper importing its own runner is the sanctioned path',t=>{
   assert.equal(run(root).status,0);
 });
 
-test('prose telling an agent to run an orca command is red, prose about orca is not',t=>{
+test('raw orca is red, starci orca and prose about orca are clean',t=>{
   const root=fixture(t,{
     'skills/workflow-chat/SKILL.md':'Read the terminal with `orca terminal send --terminal <h> --text "go" --enter --json`.\n',
+    'modules/kernel/api.yaml':'read: `starci orca terminal-send --terminal <h> --text go`\n',
     'modules/ops/ops/interface.draw.yaml':"action: 'the kernel never runs the orca call itself — scripts/agent/lib.mjs does'\n",
   });
   const r=run(root);
@@ -84,10 +85,11 @@ test('prose telling an agent to run an orca command is red, prose about orca is 
     'an English sentence naming orca is not a command line');
 });
 
-test('a node path that is not a wrapper is red; the wrapper path is not',t=>{
+test('a node path that is not a wrapper is red; wrapper and starci forms are clean',t=>{
   const root=fixture(t,{'init/AGENTS.md':
-    'Run `node .claude/scripts/api/orca/terminal-read.mjs --terminal <h>` to read a screen.\n'+
-    'Never `node .claude/scripts/orca-cli.mjs terminal read`.\n'});
+    'Run `starci orca terminal-read --terminal <h>` to read a screen.\n'+
+    'Never `node .claude/scripts/orca-cli.mjs terminal read`.\n'+
+    'Use `starci orca terminal-read --terminal <h>` instead.\n'});
   const r=run(root);
   assert.equal(r.status,1);
   assert.deepEqual(rules(r.report),['init/AGENTS.md:2 node-orca-path']);

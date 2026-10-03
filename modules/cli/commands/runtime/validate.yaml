@@ -1,0 +1,29 @@
+group: runtime
+verb: validate
+owner: runtime
+summary: read-only Work record/tree validation — structure, consistency, artifacts, schemas
+impl:
+  script: scripts/work/validate/work-validate.mjs
+positional:
+  - name: target
+    required: true
+flags:
+  - name: strict
+    type: boolean
+    summary: also compile every record against its named JSON schema
+  - name: owned
+    type: list
+    summary: judge only this path slice; out-of-scope refusals move to outOfScope (repeatable)
+exit:
+  "0": clean
+  "1": refused findings
+  "2": bad usage or missing target
+json: always
+examples:
+  - starci runtime validate .starciwork
+  - starci runtime validate <work-root> --strict --owned <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci validate

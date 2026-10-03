@@ -109,5 +109,5 @@ writes:
     read-only (openLedgerReader). Its own state is machine.sqlite (engine/db/machine.mjs); its log rows go to machine_logs.
     Every real mutation is journaled in `engine_actions` (full result, stdout and stderr as blobs) (intent -> running -> done|failed); a stale intent/running
     row becomes `unknown` and is re-evaluated from the ledger, never replayed (DESIGN §7.6).
-  decisionItems: ctx.openDecision -> scripts/machine/decisions.mjs openDecision (lane rc-decisions, `api decisions --open`), schema starci/decision-item@1 (DESIGN §10.3)
+  decisionItems: ctx.openDecision -> scripts/machine/decisions.mjs openDecision (lane rc-decisions, `starci kernel decisions --open`), schema starci/decision-item@1 (DESIGN §10.3)
   violations: runtime-invariant-violated events (DESIGN §8.8), written by the SLA layer

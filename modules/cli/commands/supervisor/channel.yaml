@@ -1,0 +1,29 @@
+group: supervisor
+verb: channel
+owner: runtime
+summary: register, inspect, and answer the Supervisor owner-message channel
+impl:
+  script: scripts/supervisor/channel.mjs
+positional:
+  - {name: action, enum: [register, heartbeat, inbox, reply, wait], required: true, variadic: false}
+flags:
+  - {name: id, type: string, required: true, summary: Supervisor channel id}
+  - {name: label, type: string, summary: display label for a registered channel}
+  - {name: repos, type: string, summary: comma-separated repositories for the channel}
+  - {name: force, type: boolean, summary: override the normal channel ownership guard}
+  - {name: peek, type: boolean, summary: leave inbox messages unread}
+  - {name: text, type: string, summary: inline reply text}
+  - {name: text-file, type: string, summary: file containing reply text}
+  - {name: to, type: string, summary: inbox message id to answer}
+  - {name: timeout-ms, type: number, summary: maximum inbox wait in milliseconds}
+exit: {"0": channel action completed, "1": channel action refused or failed, "2": bad usage, "124": inbox wait timed out}
+json: flag
+examples:
+  - starci supervisor channel register --id main --label Supervisor
+  - starci supervisor channel inbox --id main --peek
+  - starci supervisor channel reply --id main --text <text> --to <message-id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/channel.mjs
+  - node .claude/scripts/supervisor/channel.mjs

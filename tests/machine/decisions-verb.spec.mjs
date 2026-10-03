@@ -1,4 +1,4 @@
-// decisions-verb.spec.mjs — `api decisions` and its store (scripts/machine/decisions.mjs; lane rc-decisions,
+// decisions-verb.spec.mjs — `starci kernel decisions` and its store (scripts/machine/decisions.mjs; lane rc-decisions,
 // reconciler DESIGN §10.3 / §11.3): open is idempotent on its key, a second claimer is refused, resolve honours
 // allowedVerbs, escalate hands a Kernel DI to the Supervisor, a supervisor-ruling supersedes the Kernel's live DIs.
 import test from 'node:test';
@@ -84,7 +84,7 @@ test('resolve: allowedVerbs hold, a resolved DI is closed, the resolution names 
   claimDecision(ledger, di.id, { by: `kernel:${WF}`, now: 1 });
   assert.throws(() => resolveDecision(ledger, di.id, { by: 'kernel:other', verb: 'settle --verdict fail', now: 2 }), { code: 'decision-held-by-other' });
   assert.throws(() => resolveDecision(ledger, di.id, { by: `kernel:${WF}`, verb: 'nudge --job x', now: 2 }), { code: 'decision-verb-not-allowed' });
-  const done = resolveDecision(ledger, di.id, { by: `kernel:${WF}`, verb: 'api settle --job op-x-1 --verdict fail', decisionId: 'dec-1', now: 3 });
+  const done = resolveDecision(ledger, di.id, { by: `kernel:${WF}`, verb: 'starci kernel settle --job op-x-1 --verdict fail', decisionId: 'dec-1', now: 3 });
   assert.equal(done.status, 'resolved');
   assert.deepEqual({ by: done.resolution.by, decisionId: done.resolution.decisionId }, { by: `kernel:${WF}`, decisionId: 'dec-1' });
   assert.throws(() => resolveDecision(ledger, di.id, { by: `kernel:${WF}`, verb: 'settle', now: 4 }), { code: 'decision-closed' });
@@ -141,7 +141,7 @@ test('the SLA ladder: past dueAt one reminder, past dueAt x2 a Supervisor DI (pl
   assert.equal(readSupervisor((m) => m.supEvents({ kind: 'sup-decision-opened', limit: -1 }).length, 0, { env }), 1);
 });
 
-test('api decisions is an extension verb: open, list and claim through the CLI', (t) => {
+test('starci kernel decisions is an extension verb: open, list and claim through the CLI', (t) => {
   const { repo, ledger } = repoWithLedger(t);
   ledger.close();
   const run = (...args) => spawnSync(process.execPath, [API, 'decisions', '--repo', repo, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, env: { ...process.env, NODE_NO_WARNINGS: '1' } });
@@ -164,7 +164,7 @@ test('a controller-shaped DI with ledger supervisor lands in machine.sqlite sup_
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const di = { schema: 'starci/decision-item@1', kind: 'cap-starved', decider: 'supervisor', ledger: 'supervisor', workflowId: 'wf-prio',
     idempotencyKey: 'cap-starved:wf-prio:2026-09-28T09:00:00.000Z', entity: { type: 'workflow', id: 'wf-prio' }, summary: 'priority workflow held 0 of 2 reserve slots for 40 min',
-    evidence: [{ ref: 'throttle:ok' }], options: [{ key: 'ram-cap-prioritize', verb: 'node scripts/supervisor/ram-cap.mjs prioritize --workflow wf-prio', recommended: true }],
+    evidence: [{ ref: 'throttle:ok' }], options: [{ key: 'ram-cap-prioritize', verb: 'starci supervisor ram-cap prioritize --workflow wf-prio', recommended: true }],
     allowedVerbs: ['ram-cap prioritize', 'ram-cap unprioritize'], openedBy: 'resource-controller', escalateTo: 'owner', dueAt: 5_000 + 600_000 };
   const r = await openDecision(null, di, { env, now: 5_000 });
   assert.equal(r.ok, true, JSON.stringify(r.json));

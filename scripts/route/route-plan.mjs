@@ -15,11 +15,11 @@
 //           edges, split rules and the INTENT/SCOPE/ORDER ambiguity ladder from
 //           legality.yaml (INTENT -> a provision.ask leg, never a guess)
 //
-// CLI:
-//   node scripts/route/route-plan.mjs --target "feature.A: exists proven" [--state <.starciwork dir>] [--surface ui|api]
-//   node scripts/route/route-plan.mjs --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
-//   node scripts/route/route-plan.mjs --text "build the enrolment screen" [--state <dir>]
-//   [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
+// Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+// Args: --target "feature.A: exists proven" [--state <.starciwork dir>] [--surface ui|api]
+//       --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
+//       --text "build the enrolment screen" [--state <dir>]
+//       [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
 //   --state is the impact-analysis SURVEY (define-goal always passes it): a goal naming a surveyed feature is an EXTEND, plans only the
 //   delta and keeps its backend lane; the plan carries an `impact` block. --work reads only the records legality.yaml settledOutOfBand names (a
 //   settled brand record drops brand.decide); --state is the full SURVEY.
@@ -49,8 +49,8 @@ const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..
 // ---------------------------------------------------------------- args -----
 
 function usage(code) {
-  console.error(`use: node scripts/route/route-plan.mjs
-    (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --text "<prompt>")
+  console.error(`Internal entry: spawned by scripts/goal/define-goal.mjs; not invoked directly.
+args: (--target "<var>: <state>" [--target ...] | --target-json '<json>' | --text "<prompt>")
     [--state <.starciwork dir>] [--simulate] [--surface ui|api]
     [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]`);
   process.exit(code);
@@ -933,7 +933,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   }
   // handover.review: the owner's acceptance closes every chain, after every
   // other leg (modules/ops/ops/handover.review.yaml; legality.yaml
-  // producesVocabulary 'handover: approved'). api finish refuses a workflow
+  // producesVocabulary 'handover: approved'). starci kernel finish refuses a workflow
   // the owner has not approved, so no chain is complete without it.
   if (legs.size && !legs.has(HANDOVER_OP)) {
     const others = [...legs.values()];
@@ -1203,7 +1203,7 @@ function main() {
     .sort((a, b) => (pos.get(a[0]) - pos.get(b[0])) || (pos.get(a[1]) - pos.get(b[1])));
 
   // The owner's config.yaml specs switches, read on every plan (no restart): a leg whose op only tests a class
-  // that is off stays in the chain - so `api run-deferred-tests` can run it later - but is marked deferred.
+  // that is off stays in the chain - so `starci kernel run-deferred-tests` can run it later - but is marked deferred.
   const specs = ownerSpecs(skillRoot);
   const result = {
     status: findings.some(f => f.rule === 'verify-after-implement') ? 'illegal' : 'ok',

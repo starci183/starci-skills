@@ -245,7 +245,7 @@ export function applyDirectionReview(work, receiptFile, { write = false } = {}) 
 }
 
 function brandDirectionMain(argv = []) {
-  const usage = 'Usage: node scripts/work/brand-direction.mjs <status|question|apply> --work <tree> [--archetype <name>] [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: starci work brand-direction <status|question|apply> --work <tree> [--archetype <name>] [--lang en|vi] [--receipt <answer.json> --write] [--json]\n';
   return reviewMain(argv, {
     targetFlag: '--work', usage, tag: 'brand-direction',
     status: (work) => {

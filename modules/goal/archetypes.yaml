@@ -125,11 +125,11 @@ archetypes:
   - id: greenfield-scaffold
     signals:
       note: >-
-        Create new base repositories: toolchain, generated hooks and CI (hfs sync), the
-        first source tree (hfs sync --init: platform config, logging and errors and the health endpoint for a back
+        Create new base repositories: toolchain, generated hooks and CI (starci app sync), the
+        first source tree (starci app scaffold <name>: platform config, logging and errors and the health endpoint for a back
         end, the next-intl [locale] shell and the health route for a front end) — source setup with no
         business. The stack is fixed by CONTEXT.md and the toolchain by
-        the @starci presets and `hfs sync`, so no decide leg precedes it.
+        the @starci presets and `starci app sync`, so no decide leg precedes it.
       phrases: [scaffold*, base repo, base repository, repository baseline, repo baseline, greenfield, khởi tạo repo, dựng repo, dựng base repo, tạo repo mới, bootstrap the repo*]
       excludes: [$buildIntent]
     supersedes: [spec-foundation, feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]

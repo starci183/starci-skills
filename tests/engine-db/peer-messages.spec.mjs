@@ -199,7 +199,7 @@ test('a pending peer message makes the frontier actionable and the ack returns i
     fx.ok(['status','--workflow',LOGIN]),
   ]);
   assert.deepEqual([status.frontier.state,status.frontier.actionable,status.frontier.peerMessageKeys],['peer-message',true,[key]]);
-  assert.match(status.frontier.reason,/api inbox/);
+  assert.match(status.frontier.reason,/starci kernel inbox --workflow <id>/);
   assert.match(status.frontier.reason,/--ack <key> --disposition/);
   assert.deepEqual(status.peerMessages.map(m=>[m.key,m.from,m.kind]),[[key,LOGIN,'heads-up']]);
   assert.equal(status.inboxPending,1);

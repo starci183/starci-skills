@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// ledger-hygiene.mjs — the standalone report of scripts/housekeeping/hk-orphan-ledgers.mjs's two findings (COOK-BRIEF F4
+// starci runtime ledger-hygiene — the standalone report of scripts/housekeeping/hk-orphan-ledgers.mjs's two findings (COOK-BRIEF F4
 // handover, incident 2026-09-30): orphan ledgers in the state root, and legacy .starciwork/runtime.sqlite stores in
 // a bound repository. Both are report-only by default; `--apply` archives the orphan ledgers found (never deletes)
 // and never touches a file inside a repository — the legacy-store finding stays report-only always, so the owner
 // removes those files by hand (owner ruling: no legacy).
 //
-//   node scripts/housekeeping/ledger-hygiene.mjs [--apply] [--json]
+//   starci runtime ledger-hygiene [--apply] [--json]
 //
-// This is the same detection `node scripts/housekeeping/housekeeping.mjs --only orphanledgers [--apply]` runs as
+// This is the same detection `starci runtime housekeeping --only orphanledgers [--apply]` runs as
 // part of the full sweep; use this instead for a one-shot health check that also names the legacy stores
 // `/start --check` (scripts/reconciler/start.mjs) already warns about, without running the whole housekeeping pass.
 // Exit codes: 0 clean, 1 findings remain (a dry run, or an --apply run that could not clear every orphan), 2 bad
@@ -45,7 +45,7 @@ async function main(argv) {
   const apply = argv.includes('--apply');
   const json = argv.includes('--json');
   const unknown = argv.filter((a) => a.startsWith('--') && !['--apply', '--json'].includes(a));
-  if (unknown.length) { process.stderr.write(`unknown flag(s): ${unknown.join(' ')}\nusage: node scripts/housekeeping/ledger-hygiene.mjs [--apply] [--json]\n`); return 2; }
+  if (unknown.length) { process.stderr.write(`unknown flag(s): ${unknown.join(' ')}\nusage: starci runtime ledger-hygiene [--apply] [--json]\n`); return 2; }
   const report = await ledgerHygieneReport({ apply });
   if (json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   else {

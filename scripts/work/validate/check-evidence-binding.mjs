@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Internal entry: spawned by scripts/work/validate/work-validate.mjs; not invoked directly.
+// Args: --work <.starciwork root> [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -52,7 +54,8 @@ import {sha256File} from '../../../engine/digest.mjs';
 
 const CODES = ['EVIDENCE_PATH_MISSING', 'EVIDENCE_DIGEST_MISMATCH', 'EVIDENCE_OLDER_THAN_SOURCE', 'EVIDENCE_ASSERTED_NOT_OBSERVED'];
 
-const HELP = `Usage: node scripts/work/validate/check-evidence-binding.mjs --work <.starciwork root> [--json]
+const HELP = `Internal entry: spawned by scripts/work/validate/work-validate.mjs; not invoked directly.
+args: --work <.starciwork root> [--json]
 
 Proves that every \`state: done\` leaf's evidence still binds to the source it claims to prove.
 Findings: ${CODES.join(', ')}.

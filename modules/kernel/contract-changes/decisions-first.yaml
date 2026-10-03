@@ -15,7 +15,7 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/decisions-first.yaml
-  - modules/kernel/api-commands/decisions.yaml
+  - modules/cli/commands/kernel/decisions.yaml
   - modules/kernel/kernel-prompt.md
   - scripts/reconciler/decisions.mjs
   - scripts/kernel/api-verbs/decisions.mjs

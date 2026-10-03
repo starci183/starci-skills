@@ -1,4 +1,4 @@
-// api peers: split from cli.mjs; output and validation remain stable.
+// starci kernel peers: split from cli.mjs; output and validation remain stable.
 import { verbWorkflow, workflowVerb } from './shared/rows.mjs';
 import { currentLegOf, peerMessageOf, peerMessageRows, peerOpenJobsOf, peerWorkflowsOf } from './shared/peer-waits.mjs';
 import { dependenciesOf, dependencyGraph, shortWorkflow } from '../dependency-graph.mjs';

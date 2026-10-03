@@ -58,7 +58,7 @@ versioning:
 #   pattern     the design pattern whose declaration (hfs.json sides.<side>.patterns) enables this opt-in slot; a path in the slot of an
 #               undeclared pattern is HFS_SLOT_NOT_ENABLED, and a declared pattern's proof scenarios are ruleParams.be.patternScenarios.
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
-#   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
+#   managedBy   the template directory starci app sync renders this slot's files from. The slot path then lists literal files
 #               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
 #               the managed file list lives here and nowhere in code. A difference is HFS_MANAGED_FILE_DRIFT (a
 #               back end's tsconfig.json: HFS_TS_STRICT when a flag or an option was added).
@@ -265,7 +265,7 @@ ruleParams:
       reactors: [event-bus]
       jobs: [fenced-job, queue]
       cli: []
-    # hfs add <noun> <name>: the pattern topic (knowledge/patterns/be/<topic>.yaml) whose files tree is generated, the path variable of the
+    # starci app add <noun> <name>: the pattern topic (knowledge/patterns/be/<topic>.yaml) whose files tree is generated, the path variable of the
     # instance, what it registers in hfs.json, the options it needs (--<option>), the other nouns generated with it under the same name (a job is
 # the consumer of its queue, so `also: [queue]`) and the defaults of the other variables ("@name" = the name).
     addKinds:
@@ -313,7 +313,7 @@ slots:
   - id: app.task-graph
     profiles: [app]
     # The turbo task graph of the app (build, dev, lint, typecheck over the fe workspaces; build depends on ^build and caches
-    # .next and dist): rendered by hfs sync from templates/app/task-graph/turbo.json, judged for drift by hfs check. turbo needs
+    # .next and dist): rendered by starci app sync from templates/app/task-graph/turbo.json, judged for drift by starci app check. turbo needs
     # it beside the root package.json and lockfile.
     path: turbo.json
     presence: required
@@ -337,7 +337,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by hfs sync (templates/app/gitignore)
+    rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by starci app sync (templates/app/gitignore)
   - id: app.tool-config
     profiles: [app]
     path: "{.editorconfig,.nvmrc}"
@@ -410,7 +410,7 @@ slots:
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: app.ci-images
     profiles: [app]
-    # Builds every image of the app (one matrix entry per declared app, path-filtered), never pushes: rendered by hfs sync.
+    # Builds every image of the app (one matrix entry per declared app, path-filtered), never pushes: rendered by starci app sync.
     path: ".github/workflows/images.yml"
     presence: required
     tracked: tracked
@@ -420,7 +420,7 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT]
   - id: app.dockerignore
     profiles: [app]
-    # The one build-context filter of every image (the context is the app root): rendered by hfs sync; it keeps secrets and build output out.
+    # The one build-context filter of every image (the context is the app root): rendered by starci app sync; it keeps secrets and build output out.
     path: .dockerignore
     presence: required
     tracked: tracked
@@ -450,7 +450,7 @@ slots:
   - id: app.scripts
     profiles: [app]
     # The app's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which
-    # `hfs scaffold app` writes. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`,
+    # `starci app scaffold` writes. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`,
     # a local eslint plugin: HFS_REPO_LOCAL_CHECK) and anything that re-implements a canon check is not an operational script and has no place here.
     path: "scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}"
     presence: optional
@@ -555,7 +555,7 @@ slots:
     goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar and Codecov configuration, scripts/, .starciwork, .starcistacks and .sops.yaml per app"
   - id: be.tool-config
     profiles: [be]
-    # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
+    # Managed files (starci app sync renders them, starci app check compares them): the whole tool configuration of a back end. Each is
     # a reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/be.json and adds the
     # three path aliases and excludes the world, integration, e2e and contract trees (fixtures stay in the root program: unit
     # specs import them); tsconfig.build.json puts an overlay preset after it and adds only the path-relative options a
@@ -593,7 +593,7 @@ slots:
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: fe.tool-config
     profiles: [fe]
-    # Managed files (hfs sync renders them, hfs check compares them): the tool configuration of a front end. Each is a
+    # Managed files (starci app sync renders them, starci app check compares them): the tool configuration of a front end. Each is a
     # reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/next.json and only
     # names the preset and nothing else (each app's own tsconfig.json, in fe.app.next, carries its aliases and include; there is
     # no test tsconfig: a front end has no tests, FE_NO_TESTS); eslint.config.mjs is the one-line starciFeConfig call;
@@ -647,7 +647,7 @@ slots:
   - id: repo.app-image
     profiles: [be, fe]
     # One image per app: every declared app has its own Dockerfile (apps/<app>/Dockerfile), built from the APP ROOT (the folder with
-    # the one package.json). It is app-owned (hfs scaffold writes it once from templates/<side>/image) and judged by the docker rules.
+    # the one package.json). It is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged by the docker rules.
     # A Dockerfile anywhere else is owned by no slot.
     path: "apps/<app>/Dockerfile"
     presence: required
@@ -727,7 +727,7 @@ slots:
     tier: none
     tests: none
     coverage: none
-    why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand); CI fails when the emitted file differs (a contract, not a build artefact)
+    why: emitted by `npm run contract:emit` (`starci app emit`, never written by hand); CI fails when the emitted file differs (a contract, not a build artefact)
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.openapi
     profiles: [be]
@@ -737,7 +737,7 @@ slots:
     tier: none
     tests: none
     coverage: none
-    why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
+    why: emitted by `npm run contract:emit` (`starci app emit`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.events
     profiles: [be]
@@ -747,7 +747,7 @@ slots:
     tier: none
     tests: none
     coverage: none
-    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
+    why: the async contract of a service (`starci/event-contract@1`), emitted by `npm run contract:emit` (`starci app emit`, never written by hand) from the typed event classes of `src/modules/events/<service>/`; the consumers of its events rely on it (R166 HFS_EVENT_CONTRACT)
     rules: [HFS_EVENT_CONTRACT]
   - id: be.contract.events.pin
     profiles: [be]
@@ -1631,10 +1631,10 @@ slots:
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:
   - scripts/hfs/slots.mjs                  # the loader every consumer below goes through
-  - scripts/hfs/check.mjs                  # hfs check: HFS_SLOT_* / tracked / external, the side view per side
+  - scripts/hfs/check.mjs                  # starci app check: HFS_SLOT_* / tracked / external, the side view per side
   - scripts/hfs/architecture.mjs            # tiers, direction matrix, cycles, reachability
   - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
   - packages/eslint/fe starciFeConfig({hfs})
   - packages/stylelint                         # @starci/stylelint-canon: colour and brand allowances from fe.modules.brand
-  - packages/hfs/sync                          # renders managedBy templates (hfs sync) and judges them (hfs check)
+  - packages/hfs/sync                          # renders managedBy templates (starci app sync) and judges them (starci app check)
   - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why

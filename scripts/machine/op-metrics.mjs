@@ -25,7 +25,7 @@
 // Failure classes are this file's own; a sibling classification (owed.mjs patterns, actions.mjs classes) reads
 // them by `failureClassOf`, never re-derives them.
 //
-// STUCK SLA. Every wait a running workflow holds gets an age (`stuckOf`, called by `api status`, which owns the
+// STUCK SLA. Every wait a running workflow holds gets an age (`stuckOf`, called by `starci kernel status`, which owns the
 // frontier it reads): owner-gate (an open owner gate, a pending owner ask, or an autopilot supervisor-gate), peer-wait, dependency, retry-cap (a
 // retry route fired its limit and handed the job to an owner gate), deferred-settle (a consumed report not settled,
 // or a settle held behind a wait), queued-ready (a queued job nothing holds), throttled (pool-full, circuit-open,
@@ -38,8 +38,8 @@
 // counts); `trendLine` compares the newest with the one closest to trendMs earlier and the owner digest
 // (stall-alert.mjs ownerDigest) carries that one line.
 //
-//   node scripts/machine/op-metrics.mjs [--repo <path>]... [--window-ms <ms>] [--by op|workflow] [--json]
-//   node scripts/machine/op-metrics.mjs --trend [--json]      the newest snapshots and the trend line
+//   starci machine op-metrics [--repo <path>]... [--window-ms <ms>] [--by op|workflow] [--json]
+//   starci machine op-metrics --trend [--json]      the newest snapshots and the trend line
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullJson } from '../../engine/db/machine.mjs';
@@ -286,7 +286,7 @@ const firstJobEventAt = (db, jobId, kinds) => Number(db.prepare(
 const ASK_NAMED = /\bask\b|\bctx_[0-9a-f]{12}\b|\bserve-ask\b/i;
 
 /**
- * Every wait of one workflow with its age, severity and the owner of the next action, from what `api status`
+ * Every wait of one workflow with its age, severity and the owner of the next action, from what `starci kernel status`
  * already projected: `ownerGates` / `peerWaits` (open incidents), `queued` (frontier.queued with queuedBecause and
  * blockedBy), `heldSettle` (frontier.heldSettleJobs), `settleReady` (job ids whose report is consumed and not
  * settled), `awaitingOwner` (status.awaitingOwner). `jobs` are the workflow's job rows (read when omitted). Returns
@@ -349,7 +349,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   for (const jobId of settleReady) {
     const job = jobRow.get(jobId);
     push({ kind: 'deferred-settle', cause: 'settle-ready', jobId, opId: job?.op_id ?? null, since: firstJobEventAt(db, jobId, ['report-consumed', 'report-filed']) ?? Number(job?.updated_at),
-      owner: 'kernel', detail: 'report consumed, not settled: api check + api settle' });
+      owner: 'kernel', detail: 'report consumed, not settled: starci kernel record-checks + starci kernel settle' });
   }
   // Who moves each queued job: a job a gate or wait holds is that item's owner; a dependency is whoever moves the
   // job it waits on (followed through the chain), so N dependants of one held job are ONE item naming that owner.

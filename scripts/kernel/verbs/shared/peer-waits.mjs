@@ -4,10 +4,10 @@
 // Collab Kernel that needed the Login workflow's phone verification asked the
 // owner who should build it, two workflows edited overlapping areas, and a
 // repo-wide migration was owned by no workflow. Peers now talk through the
-// ledger inbox (kind peer-message): `api notify` writes one pending row per
+// ledger inbox (kind peer-message): `starci kernel notify` writes one pending row per
 // target, the target's status frontier is actionable until its Kernel reads
-// `api inbox` and acks each row with a disposition the sender can read back,
-// and `api enqueue` sends an automatic heads-up when a new job's owned_paths
+// `starci kernel inbox` and acks each row with a disposition the sender can read back,
+// and `starci kernel enqueue` sends an automatic heads-up when a new job's owned_paths
 // overlap an open job of a peer. These are Kernel verbs; an op never sends.
 //
 // PEER RULE: every other workflow of the same ledger that is phase running,
@@ -91,7 +91,7 @@ export const writePeerMessage = (ledger, { from, to, kind, subject, body, replyT
     payload: { to, key, kind, subject, replyTo, ...(extra.auto ? { auto: extra.auto } : {}) } });
   return { to, key, kind, subject };
 };
-/* A workflow's open peer-wait incidents (api incident --kind peer-wait). A wait whose peer is no
+/* A workflow's open peer-wait incidents (starci kernel incident --kind peer-wait). A wait whose peer is no
  * longer running can never be met by it, so it is the Kernel's move again (frontier.peerWaitsDead). */
 export const PEER_WAIT = 'peer-wait';
 export const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,op_id,last_progress,updated_at FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId)
@@ -107,7 +107,7 @@ export const openPeerWaits = (db, workflowId) => db.prepare("SELECT incident_id,
       holds: Array.isArray(payload.holds) && payload.holds.length ? payload.holds : [row.op_id].filter(Boolean),
       detail: payload.detail ?? String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, ''),
       untilMessage: payload.untilMessage === true, refs: Array.isArray(payload.refs) ? payload.refs : [],
-      // A typed release condition: the wait is met when the named shared foundation lands (api foundation --land).
+      // A typed release condition: the wait is met when the named shared foundation lands (starci kernel foundation --land).
       untilFoundation: typeof payload.untilFoundation === 'string' ? payload.untilFoundation : null,
       // A typed release on the peer's product land (--until-landed <wf>@<repository>).
       untilLanded: typeof payload.untilLanded === 'string' ? payload.untilLanded : null,
@@ -143,7 +143,7 @@ export const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subjec
     workflowId: waiter, transition: 'peer-wait-message',
     lines: [
       `Peer ${peer} sent ${kind} ${key} (${subject}), which peer-wait ${waits.map((wait) => wait.incidentId).join(', ')} waits on${resolved.length ? `; ${resolved.join(', ')} resolved by it` : ''}.`,
-      'Re-read canonical api status and api inbox now; verify the prerequisite the wait named actually holds before you enqueue the held work, ack the message, and resolve any wait still open once its proof holds (or record a new peer-wait when it does not).',
+      'Re-read canonical starci kernel status and starci kernel inbox now; verify the prerequisite the wait named actually holds before you enqueue the held work, ack the message, and resolve any wait still open once its proof holds (or record a new peer-wait when it does not).',
     ],
   });
   return { waits: waits.map((wait) => wait.incidentId), resolved, wake: wake.action };
@@ -167,7 +167,7 @@ export const releaseTypedWaits = (ledger, { repo, workflowId = null, wake = fals
         workflowId: waiter, transition: 'incident-auto-resolved',
         lines: [
           `Every typed condition of ${mine.map((r) => `${r.incidentId} (${r.kind ?? '-'}${r.holds.length ? `, held ${r.holds.join(', ')}` : ''})`).join(', ')} holds: ${mine.flatMap((r) => r.evidence).join('; ').slice(0, 600)}.`,
-          'The runtime resolved the wait and released what it held. Re-read canonical api status now: route and dispatch the released work, or check and settle a released settle, then continue the approved frontier.',
+          'The runtime resolved the wait and released what it held. Re-read canonical starci kernel status now: route and dispatch the released work, or check and settle a released settle, then continue the approved frontier.',
         ],
       }).action;
     } catch (error) { action = `kernel-wake-failed: ${String(error?.message ?? error).slice(0, 120)}`; }
@@ -191,8 +191,8 @@ export const blockingHeadsUp = (ledger, { self, blocking, now = Date.now() }) =>
       const subject = `${entry.workflows.length} workflow(s) wait on ${entry.jobId} (${entry.opId ?? '-'})`;
       const body = `${entry.jobId} (${entry.opId ?? '-'}) is still queued in ${self.workflow_id} while ${entry.workflows.join(', ')} wait on it `
         + `(${entry.via.map((v) => `${v.workflowId} via ${v.via} ${v.ref}`).join('; ')}), the oldest for ${entry.waitedMinutes} minutes. `
-        + 'Dispatch it before other queued work (api status frontier.blockingOthers; frontier.queued already ranks it first). If it cannot run yet, '
-        + 'tell the waiting workflows why (api notify --kind heads-up), then ack this message with what you did.';
+        + 'Dispatch it before other queued work (starci kernel status frontier.blockingOthers; frontier.queued already ranks it first). If it cannot run yet, '
+        + 'tell the waiting workflows why (starci kernel notify --kind heads-up), then ack this message with what you did.';
       ledger.transaction(() => { sent.push(writePeerMessage(ledger, { from, to: self.workflow_id, kind: 'heads-up', subject, body, refs: [entry.jobId, ...refs],
         extra: { auto: BLOCKING_HEADS_UP_AUTO, blockingJob: entry.jobId, waitingWorkflows: entry.workflows }, now })); });
     }
@@ -261,7 +261,7 @@ export const peerOverlapHeadsUp = (ledger, { self, jobId, op, ownedPaths, now = 
     const body = `${self.title ?? self.workflow_id} (${self.workflow_id}) enqueued ${op} as ${jobId} owning ${ownedPaths.join(', ')}. `
       + `It overlaps ${fresh.map((hit) => `${hit.jobId} (${hit.op ?? '-'}) ${hit.path}`).join('; ')}. `
       + 'The path lease serializes the writes and nothing is blocked. If the two changes conflict in intent or in a shared contract, '
-      + `agree the order or the owner of the change with ${self.workflow_id} (api notify --kind reply --reply-to <this key>), then ack this message with what you decided.`;
+      + `agree the order or the owner of the change with ${self.workflow_id} (starci kernel notify --kind reply --reply-to <this key>), then ack this message with what you decided.`;
     messages.push(writePeerMessage(ledger, { from: self, to: peer.workflow_id, kind: 'heads-up', subject, body,
       refs: [jobId, ...peerJobs], extra: { auto: 'enqueue-overlap', overlapPairs: pairs }, now }));
   }

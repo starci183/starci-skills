@@ -33,14 +33,14 @@ test('the workspace and runtime rules that already had a guard still refuse (one
 
 test('a uat op never starts a test world; any other op may', async () => {
   for (const op of ['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']) {
-    const v = await verdict('node .claude/scripts/gates/test-world-run.mjs --root fe --project e2e', { owned: null, op });
+    const v = await verdict('starci gate test-world --root fe --project e2e', { owned: null, op });
     assert.equal(v?.code, 'UAT_TEST_WORLD', op);
     assert.match(v.reason, new RegExp(op.replace(/\./g, '\\.')));
     assert.match(v.remedy, /real|dev stack/);
   }
-  assert.equal((await verdict('node scripts/gates/test-world-run.mjs --root be', { owned: null, op: 'test.author' }))?.code ?? null, null, 'a test op runs its world');
+  assert.equal((await verdict('starci gate test-world --root be', { owned: null, op: 'test.author' }))?.code ?? null, null, 'a test op runs its world');
   assert.equal((await verdict('node scripts/gates/env-health.mjs --root be', { owned: null, op: 'uat.verify' }))?.code ?? null, null, 'the dev stack check passes');
-  assert.equal((await verdict('node scripts/gates/test-world-run.mjs', { owned: null }))?.code ?? null, null, 'a guard that names no op');
+  assert.equal((await verdict('starci gate test-world', { owned: null }))?.code ?? null, null, 'a guard that names no op');
 });
 
 test('the job guard file names the op, so the op-family rules can read it', (t) => {

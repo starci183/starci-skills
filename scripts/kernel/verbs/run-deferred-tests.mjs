@@ -1,4 +1,4 @@
-// api run-deferred-tests: split from cli.mjs.
+// starci kernel run-deferred-tests: split from cli.mjs.
 import { verbWorkflow, workflowVerb } from './shared/rows.mjs';
 import { DEFERRAL_KINDS, deferredTestsOf, ownerSpecs, requeueDeferredTests } from '../../route/spec-deferral.mjs';
 
@@ -13,6 +13,6 @@ export default workflowVerb('run-deferred-tests', ({ ledger, args, emit, interna
     emit(out, [
       `run-deferred-tests ${workflowId}${kind ? ` --kind ${kind}` : ''}: ${args['dry-run'] ? `would re-queue ${pending.length}` : `re-queued ${requeued.length}`} deferred test leg(s)`,
       ...(args['dry-run'] ? pending : requeued).map((item) => `  ${item.jobId} ${item.op} a${item.attempt} (${item.reason})`),
-      ...(requeued.length ? ['  next: api status, then route and dispatch each (they run even while the switch is still off)'] : []),
+      ...(requeued.length ? ['  next: starci kernel status, then route and dispatch each (they run even while the switch is still off)'] : []),
     ].join('\n'), args.json);
 });

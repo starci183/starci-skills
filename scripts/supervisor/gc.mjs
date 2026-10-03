@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// gc.mjs — the Supervisor's garbage collection (owner, 2026-09-28: "why doesn't the supervisor delete the workers,
+// starci supervisor gc — the Supervisor's garbage collection (owner, 2026-09-28: "why doesn't the supervisor delete the workers,
 // the ops are so full of garbage!!! there has to be a garbage collection"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
 //
-//   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp] [--json]
-//                                  [--plan] [--holder <name>] [--trigger <name>]
+//   starci supervisor gc [--dry-run] [--apply] [--only agents,shells,lanes,tmp] [--json]
+//                        [--plan] [--holder <name>] [--trigger <name>]
 //
 // --plan is a dry run that writes NOTHING (no seen-state, no machine-log rows, no lessons): the reconciler's gc controller
 // runs its shadow sweep this way. --holder names the host-lock holder of an --apply run, --trigger the run's trigger. The
@@ -733,7 +733,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     // The live owners of a lane: Orca's active workers over every Run (null when Orca is down or answers for one Run).
     const laneWorkers = (deps.activeWorkers ?? (() => activeWorkersAllRuns()))();
     // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
-    // (node scripts/machine/worktrees.mjs resume): the same stop mark as the worktree GC.
+    // (starci machine worktrees resume): the same stop mark as the worktree GC.
     const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
     const cursor = (deps.laneCursor ?? readLaneCursor)(env);
     const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, workers: laneWorkers, cursor, clock: deps.clock ?? Date.now });
@@ -858,7 +858,7 @@ export function parseArgs(argv = []) {
 
 if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
+  if (!args.ok) { console.error(`use: starci supervisor gc [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   const language = ownerLanguage();
   // --plan: no seen-state, no log rows, no lessons; --holder: the host-lock holder of an apply (deps other than holder drop the lock, so name only it)
   const deps = args.plan ? { writeState: () => {}, log: () => {}, lesson: () => null } : args.holder ? { holder: args.holder } : {};

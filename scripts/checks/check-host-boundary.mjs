@@ -154,7 +154,7 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       lines.forEach((line,i)=>{
         const command=line.match(COMMAND_POSITION);
         if(command&&(!verbs||verbs.has(command[1])))
-          flag(file,i+1,'orca-command',`tells the reader to run \`orca ${command[1]}\` — name ${WRAPPER_DIR}/<verb>.mjs instead`);
+          flag(file,i+1,'orca-command',`tells the reader to run \`orca ${command[1]}\` — use \`starci orca <verb>\` instead`);
         for(const m of line.matchAll(NODE_PATH)){
           if(!/(?:^|\/)scripts\/api\/orca\/[a-z][a-z-]*\.mjs$/.test(m[1].replace(/^[^a-zA-Z]*/,'')))
             flag(file,i+1,'node-orca-path',`names \`node ${m[1]}\`, which is not a ${WRAPPER_DIR}/<verb>.mjs wrapper`);
@@ -168,7 +168,7 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
 }
 
 function hostBoundaryMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: node scripts/checks/check-host-boundary.mjs [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: starci runtime check --only host-boundary -- [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
   const result=findHostBoundaryViolations({root});

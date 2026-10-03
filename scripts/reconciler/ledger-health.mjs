@@ -10,8 +10,9 @@
 // A failed quick_check is the LEDGER_CORRUPT clock plus a DI for the Supervisor (controllers/host.mjs). Restore is
 // manual and owner-approved (copy a backup over the ledger with every writer stopped); nothing here restores.
 //
-//   node scripts/reconciler/ledger-health.mjs --check --file <ledger> [--json]
-//   node scripts/reconciler/ledger-health.mjs --backup --ledger-id <id> --file <ledger> [--dir <d>] [--keep <n>] [--json]
+// Internal entry: spawned by scripts/reconciler/controllers/host.mjs; not invoked directly.
+// Args: --check --file <ledger> [--json]
+//       --backup --ledger-id <id> --file <ledger> [--dir <d>] [--keep <n>] [--json].
 // --backup writes a file, so the Host controller reaches it only through ctx.run (recorded, not run, in shadow).
 import fs from 'node:fs';
 import path from 'node:path';

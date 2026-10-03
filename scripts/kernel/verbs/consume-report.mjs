@@ -1,4 +1,4 @@
-// api consume-report: split from cli.mjs.
+// starci kernel consume-report: split from cli.mjs.
 import { markReportConsumed } from '../../../engine/db/ledger.mjs';
 
 export default {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // shell-conformance.mjs — every drawn and built screen sits inside the product's REAL layout tree.
 //
-//   node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]
+//   starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]
 //
 // The shell record (.starciwork/shell/index.yaml) is the layout tree, work/layout-tree@1: the frontend's
 // Next.js app/ directory scanned into one node per segment (scripts/work/layout-tree.mjs), each layout with
@@ -38,7 +38,7 @@
 //                  area share and the nearest brand token; PRIMARY_ABSENT when that colour stands in for the
 //                  brand primary. Owner 2026-09-24: a product part drew its primary in blue, the brand is red.
 //
-// Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
+// Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci runtime validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
 // lack (no binding, no route, a stale rev) as suspects, never refusals.
 import fs from 'node:fs';
@@ -194,7 +194,7 @@ function checkShellRecord(workRoot, shell, { verifySource = true, driftLevel = '
         // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
         // string another workflow adds is not drift (inc-13f6af8494bf).
         const drift = scan ? sourceDrift(tree, scan) : null;
-        if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
+        if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, inApp(name, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')})`) + ` - brand.decide re-runs starci work layout-tree scan --work <.starciwork> --write and re-captures what moved`));
       }
     }
   }
@@ -374,7 +374,7 @@ function checkComposites(workRoot, uiFile, record, shell, { mode, level, records
   const assets = assetsOf(record);
   const composites = assets.filter((a) => a.composite && typeof a.composite === 'object');
   const generated = generatedDrawingsOf(assets).filter((a) => a.role !== 'direction-content' && !a.composite);
-  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - a drawing is only the slot content; place it with node scripts/work/compose-direction.mjs`));
+  for (const a of generated) out.push(finding(level.missing, 'COMPOSITE_MISSING', at, `${a.path} is a generated direction with no composite block - a drawing is only the slot content; place it with starci work compose-direction`));
   const loader = (id) => records.get(id) ?? null;
   for (const a of composites) {
     const c = a.composite;
@@ -566,7 +566,7 @@ function implementationPaletteFindings(workRoot, implFile, ctx = paletteContext(
 const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, record: readRecord(file) })).filter(({ record }) => record?.schema === UI_SCHEMA);
 
 /**
- * What `starci validate` reports for every ui record under `root`: records drawn before the layout tree (no
+ * What `starci runtime validate` reports for every ui record under `root`: records drawn before the layout tree (no
  * binding, no route, a stale rev) are suspects; a declared route/surface/overlay that does not
  * hold together is refused. Composite pixels are not re-derived here - that is the op proof's.
  */
@@ -641,11 +641,11 @@ function admittedAdvisory(argv) {
 
 export function shellConformanceMain(argv = []) {
   const admitted = admittedAdvisory(argv);
-  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (api op-contract --json admission.admittedAt)\n' };
+  if (!admitted.ok) return { exitCode: 2, text: '--admitted-at takes an ISO date-time or epoch milliseconds (starci kernel op-contract --json admission.admittedAt)\n' };
   argv = admitted.rest;
   const args = argv.filter((a) => a !== '--json');
   if (args.includes('--help') || args.includes('-h') || args.length !== 1) {
-    return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: node scripts/work/ui/shell-conformance.mjs <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };
+    return { exitCode: args.length === 1 ? 0 : 2, text: 'Usage: starci work shell-conformance <work-root | shell-dir | ui-record-dir | impl-record-dir> [--json]\n\nHolds the layout tree (.starciwork/shell/index.yaml, work/layout-tree@1), every ui record\'s route, surface, ancestors and composites, and an implementation\'s app/ files to the real frontend. Exit 0 is clean, 1 lists refusals, 2 is a bad argument.\n' };
   }
   if (!fs.existsSync(args[0])) return { exitCode: 2, text: `${args[0]}: target does not exist\n` };
   const result = checkShellConformance(args[0], { advisoryCodes: admitted.codes });

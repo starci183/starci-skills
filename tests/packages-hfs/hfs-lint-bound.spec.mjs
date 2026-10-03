@@ -1,5 +1,5 @@
 // 3.3: the typed ESLint run never reads types from above the app root (packages/hfs/lint/bound-sys.cjs). typescript-eslint's
-// projectService builds its host from tsserver.sys and takes no host option, so `hfs lint` preloads a bounded `sys`.
+// projectService builds its host from tsserver.sys and takes no host option, so `starci app lint` preloads a bounded `sys`.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -73,7 +73,7 @@ test('the preload binds a real process\'s TypeScript when STARCI_LINT_BOUND is s
     { cwd: PACKAGES, encoding: 'utf8', env: unset }).stdout), { own: [true, true], leak: [true, true] }, 'unbound: nothing is patched');
 });
 
-test('hfs lint starts ESLint with the bound preload and the app root, and no other linter (passing and violating)', async () => {
+test('starci app lint starts ESLint with the bound preload and the app root, and no other linter (passing and violating)', async () => {
   const dir = tmp();
   fs.writeFileSync(path.join(dir, 'hfs.json'), appDeclarationText('be', { apps: DEFAULT_APPS.be }));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true }));

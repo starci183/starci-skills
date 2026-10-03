@@ -1,0 +1,35 @@
+group: release
+verb: publish
+owner: runtime
+summary: plan or perform the owner-run package publication sequence
+impl: {module: scripts/supervisor/release-publish-flow.mjs, export: releasePublishFlow}
+effect: publish
+roles: [release, owner]
+conventions:
+  - plan mode is read-only and reports registry blockers, canon rebind drift and example pin drift
+  - publication uses the existing clean proof, leaf-first order, registry confirmation and shasum verification
+  - after publication the flow rebinds code patterns, re-pins and installs examples, syncs them and proves every binding
+  - publication never commits, pushes or tags; release cut owns those effects
+flags:
+  - {name: publish, type: boolean, summary: perform the plan instead of reading it}
+  - {name: npm-user, type: string, summary: required logged-in npm account for publication}
+  - {name: poll-minutes, type: number, default: 15, summary: registry confirmation deadline per package}
+  - {name: pre-land-ref, type: string, summary: require HEAD to equal this pre-land commit}
+  - {name: expect-sha, type: string, summary: require the release worktree HEAD to equal this freeze commit}
+  - {name: examples, type: list, summary: example apps to re-pin and prove (default is every discovered app example)}
+positional: []
+exit:
+  "0": plan is clear or publication completed
+  "1": a plan blocker, publication, rebind, example or binding step failed
+  "2": bad usage or environment
+json: starci/release-publish-flow@1
+examples:
+  - starci release publish
+  - starci release publish --publish --npm-user <name> --expect-sha <sha>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/release-publish.mjs
+  - node .claude/scripts/gates/release-publish.mjs
+  - npm run release:publish
+  - bash publish-final.sh

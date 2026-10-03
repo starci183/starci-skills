@@ -1,11 +1,11 @@
-// api lifecycle — pause, stop and resume a workflow (Q14; DBTREE workflow_transitions + lifecycle_changes).
+// starci kernel lifecycle — pause, stop and resume a workflow (Q14; DBTREE workflow_transitions + lifecycle_changes).
 //
 //   lifecycle --workflow <wf> --pause  --by owner|supervisor|kernel --reason <t>   running -> paused
 //   lifecycle --workflow <wf> --stop   --by owner|supervisor        --reason <t>   awaiting-approval|queued|running|paused -> stopped
 //   lifecycle --workflow <wf> --resume --by owner|supervisor        --reason <t>   paused -> running (owner or Supervisor)
 //                                                                                 stopped -> queued (the OWNER only)
 //
-// A paused or stopped workflow takes no new job (api enqueue) and launches none (api dispatch); an op already running
+// A paused or stopped workflow takes no new job (starci kernel enqueue) and launches none (starci kernel dispatch); an op already running
 // finishes and settles. Paused is a hold anyone accountable may lift; stopped is the owner's: only the owner resumes it,
 // and no controller ever does (MB-08). Every move is one lifecycle_changes row + the phase, in one transaction
 // (engine/db/ledger.mjs changeWorkflowPhase).

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // terminal-rename.mjs — the calls.yaml `terminal-rename` call as a callable function.
-//   node scripts/api/orca/terminal-rename.mjs --terminal <handle> --title <text>
+// Internal entry: spawned by scripts/agent/lib.mjs; not invoked directly.
+// Args: --terminal <handle> --title <text>
 // Used after managed worker-start because creation display-name flags are not
 // applicable to a fresh agent terminal inside an existing worktree.
 import { orcaCall } from './lib.mjs';

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A user-facing, event-driven bridge around a prepared Playwright UAT session.
 // It never opens runtime.sqlite and never decides Work state. The surrounding
-// dispatched operation cites the write-once receipt in its ordinary api report.
+// dispatched operation cites the write-once receipt in its ordinary starci kernel report.
 
 import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
@@ -420,7 +420,7 @@ export async function waitSession({requestPath,receiptPath,after=0}={}){
 
 const parseArgs=argv=>{const out={};for(let i=0;i<argv.length;i++){const token=argv[i];if(!token.startsWith('--'))continue;const key=token.slice(2);out[key]=argv[i+1]&&!argv[i+1].startsWith('--')?argv[++i]:true;}return out;};
 const print=value=>process.stdout.write(`${JSON.stringify(value,null,2)}\n`);
-const use=()=>{console.error('use: node scripts/uat/assisted-runner.mjs <inspect|start|status|wait|signal|run> --request <absolute request.yaml> --receipt <absolute new receipt.yaml> [--after n] [--value ok|fail|cancel]');process.exit(2);};
+const use=()=>{console.error('use: starci uat assisted-runner <inspect|start|status|wait|signal|run> --request <absolute request.yaml> --receipt <absolute new receipt.yaml> [--after n] [--value ok|fail|cancel]');process.exit(2);};
 
 async function interactive(args){
   let state=startSession({requestPath:args.request,receiptPath:args.receipt});print(state);

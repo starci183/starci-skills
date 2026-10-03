@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
- * `node scripts/hfs/sync-runtime.mjs` in `dir`, but only when its --check reports drift: the copies stay on disk
+ * `starci release sync-runtime` in `dir`, but only when its --check reports drift: the copies stay on disk
  * untouched when they are already fresh. Returns the exit status (0 when the copies are what the generator writes).
  */
 export function ensureRuntimeCopies({ dir = root } = {}) {

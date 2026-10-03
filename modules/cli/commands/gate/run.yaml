@@ -1,0 +1,27 @@
+group: gate
+verb: run
+owner: runtime
+summary: run the measured product or document gate
+impl: {script: scripts/gates/gate.mjs}
+flags:
+  - {name: root, type: string, summary: application root}
+  - {name: base, type: string, summary: explicit gate base commit}
+  - {name: main, type: string, summary: main reference used by the merge guard}
+  - {name: changed, type: list, summary: explicit files in the operation slice}
+  - {name: tests, type: string, summary: test pattern for the operation slice}
+  - {name: out, type: string, summary: write the gate report to this file}
+  - {name: scope, type: enum, enum: [code, docs], default: code, summary: gate scope}
+  - {name: tree, type: string, summary: work tree read by the document profile}
+exit:
+  "0": gate is clean
+  "1": findings remain
+  "2": a machine could not run or usage was invalid
+json: always
+examples:
+  - starci gate run --root <app> --changed be/src/app.service.ts --out gate.json
+  - starci gate run --scope docs --tree <app>/.starciwork --out doc-gate.json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/gate.mjs
+  - node .claude/scripts/gates/gate.mjs

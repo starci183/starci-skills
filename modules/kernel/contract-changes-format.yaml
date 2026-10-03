@@ -6,7 +6,7 @@
 #
 # Owner, 2026-09-24: a contract change is never rolled onto running work. A running or already
 # settled leg is judged and checked against the contract it was ADMITTED under (the contracts row
-# api dispatch filed, with its recorded version: scripts/machine/contract-version.mjs); new legs use
+# starci kernel dispatch filed, with its recorded version: scripts/machine/contract-version.mjs); new legs use
 # the current contract. Each entry is one change that ADDED checks or finding codes, or that
 # must reach in-flight work:
 #
@@ -15,21 +15,21 @@
 #   commit         the runtime commit that landed it (provenance)
 #   summary        one line: what changed
 #   ops            the ops the change governs; empty or absent means every op
-#   adds.checks    check names (api check `name`) the change introduced: red for an older leg is an
+#   adds.checks    check names (starci kernel record-checks `name`) the change introduced: red for an older leg is an
 #                  advisory suspect, never a refusal
 #   adds.codes     finding codes the change introduced (a check entry's `codes`, and
 #                  shell-conformance --admitted-at): the same, per code
 #   reach          new-legs (default): only legs admitted after effectiveAt carry it.
-#                  follow-up: in-flight work must get it too - api status lists every older leg of
+#                  follow-up: in-flight work must get it too - starci kernel status lists every older leg of
 #                  followUp.ops as contractFollowUps and the Kernel enqueues followUp.op for each
-#                  (api enqueue --contract-change <id> --follow-up-of <job> [--after <job>]); the
+#                  (starci kernel enqueue --contract-change <id> --follow-up-of <job> [--after <job>]); the
 #                  running leg is never held
 #   followUp       {op, ops, detail} for reach follow-up
 #   safetyCritical true only when an older leg must meet the change too (a security or data-loss
 #                  fix): the one case where it is not advisory
 #   paths          the Source files the change edited (knowledge/**, modules/schemas/**,
 #                  modules/models/code-patterns.yaml; a directory covers what is inside it). A settled
-#                  leg that read one of them before effectiveAt is NOT stale: api status lists it as
+#                  leg that read one of them before effectiveAt is NOT stale: starci kernel status lists it as
 #                  advisory sourceDrift naming this change (and, for reach follow-up, the owed legs
 #                  in contractFollowUps). A Source edit no change names shows as UNREGISTERED drift.
 #

@@ -1,0 +1,15 @@
+group: app
+verb: scaffold
+owner: "@starci/hfs"
+summary: create a full or lite StarCi app repository from the canonical skeleton (--edition)
+impl: null
+positional:
+  - {name: name, required: true, variadic: false}
+flags:
+  - {name: into, type: string, summary: parent directory in which the named app is created}
+exit: {"0": app created, "2": refusal or bad usage}
+json: none
+examples: ['starci app scaffold demo', 'starci app scaffold demo --into projects']
+editions: [full, lite]
+since: 1.0.0
+removed: ['hfs scaffold app', 'npx hfs scaffold app']

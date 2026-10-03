@@ -4,7 +4,7 @@
 // agents they start are children of that terminal's Run. Without both the spec prints one SKIPPED line and makes no
 // Orca call. Every agent the spec starts is stopped and released in its own teardown; it never resets or touches
 // another Run.
-//   E3  the no-op agent runs scripts/api/orca/send.mjs with its own ids - the exact path `api report` uses to send
+//   E3  the no-op agent runs scripts/api/orca/send.mjs with its own ids - the exact path `starci kernel report` uses to send
 //       worker_done - then: does the Dispatch settle (worker-show state succeeded), and does Orca itself read the Task
 //       completed (task-list, read BEFORE any update: Orca accepts a later same-state task-update, so a refusal proves nothing)?
 //   E1  worker-release on a settled Claude, Codex and Devin worker: does any agent process remain afterwards?

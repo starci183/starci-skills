@@ -3,10 +3,10 @@
 // (scripts/connectors/ask-gateway.mjs) and records the public base URL the
 // Telegram notifier links to (docs/connectors.md).
 //
-//   node scripts/connectors/tunnel.mjs start       launch the manager detached
-//   node scripts/connectors/tunnel.mjs run         run the manager in the foreground
-//   node scripts/connectors/tunnel.mjs status | stop
-//   node scripts/connectors/tunnel.mjs dry-run     print the cloudflared command and the generated config
+//   starci connect tunnel start       launch the manager detached
+//   starci connect tunnel run         run the manager in the foreground
+//   starci connect tunnel status | stop
+//   starci connect tunnel dry-run     print the cloudflared command and the generated config
 //
 // Mode (config.yaml connectors.cloudflare.mode):
 //   quick — `cloudflared tunnel --url http://127.0.0.1:<port>`: a random
@@ -366,7 +366,7 @@ async function main() {
     process.on('SIGINT', stop); process.on('SIGTERM', stop); process.on('exit', managed.release);
     return;
   }
-  console.error('usage: tunnel.mjs start|run|status|stop|dry-run [--port <n>]'); process.exit(2);
+  console.error('usage: starci connect tunnel start|run|status|stop|dry-run [--port <n>]'); process.exit(2);
 }
 
 if (isMain(import.meta.url)) main();

@@ -25,7 +25,7 @@ benchmark/
   (an owner-approved change that has not landed yet sits in `approvedChange` until it does). Its
   `publicBenchmarks` values stay `null` until a public source is cited for them with url, publication date and
   retrieval date. Never invent, estimate or recall a number.
-- **snapshots/** hold the raw `node scripts/agent/model-scorecard.mjs --json` shape, unchanged: repos, window,
+- **snapshots/** hold the raw `starci debug run model-scorecard --json` shape, unchanged: repos, window,
   job count, duration sources, errors, and per pool x op kind the jobs, pass/fail/blocked rates, rework
   and median duration. Snapshots are **append-only**. A snapshot is
   never edited, re-generated or deleted, even when it later proves misleading. The correction goes into a
@@ -41,8 +41,8 @@ benchmark/
    `--repo` it takes the Work owner of every `.workspaces/projects/<p>/work.json` binding that holds a ledger:
 
    ```sh
-   node scripts/agent/benchmark-snapshot.mjs --since-hours 72
-   node scripts/agent/benchmark-snapshot.mjs --since-hours 72 --repo ../nivo-backend --repo ../mia-mia-backend
+   starci runtime benchmark-snapshot --since-hours 72
+   starci runtime benchmark-snapshot --since-hours 72 --repo ../nivo-backend --repo ../mia-mia-backend
    ```
 
    It writes `benchmark/snapshots/<today>-<N>h.json` and prints a short per-pool delta against the newest

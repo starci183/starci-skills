@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-specs.mjs - a spec asserts behaviour, and a skipped test says why (smell S10-01 and S10-03; part of `npm run check`).
-//   node scripts/checks/check-specs.mjs [--json]
+//   starci runtime check --only specs [--json]
 //
 // Every tracked `.spec.mjs` / `.test.mjs` of the runtime (tests/, packages/*, no generated runtime copies) is parsed with the
 // TypeScript compiler and judged:

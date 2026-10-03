@@ -1,0 +1,44 @@
+group: supervisor
+verb: bridge
+owner: runtime
+summary: inspect and govern cross-workflow dependencies and shared ownership
+impl:
+  script: scripts/supervisor/bridge.mjs
+positional:
+  - {name: action, enum: [detect, list, bridge, rewire, transfer, revise, designate], required: true, variadic: false}
+flags:
+  - {name: repo, type: list, summary: product ledger owner path}
+  - {name: start, type: boolean, summary: start a newly defined bridging workflow}
+  - {name: dry-run, type: boolean, summary: return the plan without writing}
+  - {name: no-notify, type: boolean, summary: suppress Kernel notices}
+  - {name: request-only, type: boolean, summary: record a revision request without applying it}
+  - {name: owner-ok, type: boolean, summary: record owner approval when autopilot is disabled}
+  - {name: dependents, type: string, summary: comma-separated dependent workflow ids}
+  - {name: foundation, type: string, summary: shared foundation name}
+  - {name: goal, type: string, summary: bridging workflow goal text}
+  - {name: reason, type: string, summary: reason for the governance action}
+  - {name: blocker, type: string, summary: workflow currently blocking dependents}
+  - {name: title, type: string, summary: bridging workflow title}
+  - {name: kind, type: enum, enum: [layout-tree, brand, grammar, module, contract, baseline, scaffold, other], default: other, summary: foundation kind}
+  - {name: waits, type: string, summary: comma-separated wait incident ids}
+  - {name: paths, type: string, summary: comma-separated owned paths}
+  - {name: finding, type: string, summary: dependency finding key}
+  - {name: bridge, type: string, summary: bridging record id}
+  - {name: record, type: string, summary: work record path to transfer}
+  - {name: to, type: string, summary: destination workflow id}
+  - {name: merge-into, type: string, summary: destination foundation name}
+  - {name: workflow, type: string, summary: workflow id to revise}
+  - {name: text, type: string, summary: revised goal text}
+  - {name: lead, type: string, summary: workflow designated to lead shared work}
+  - {name: waiter, type: string, summary: workflow that continues waiting}
+  - {name: releases, type: string, summary: comma-separated incidents to release}
+exit: {"0": action completed, "1": governance action refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor bridge detect --repo <path>
+  - starci supervisor bridge list --repo <path> --json
+  - starci supervisor bridge rewire --repo <path> --bridge <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/bridge.mjs

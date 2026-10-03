@@ -50,7 +50,7 @@
 //                               data-asset-slot="<id>", or a slot the drawing's asset-request.md does not request
 //                               (scripts/work/asset-slot.mjs).
 //
-//   node scripts/work/draw/draw-dna.mjs <render.html> [--family starci] [--proposals <file>] [--json]
+//   starci work draw-dna <render.html> [--family starci] [--proposals <file>] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -644,7 +644,7 @@ function dnaFindingsOfFile(file, { family = DEFAULT_FAMILY, proposalFiles = null
 
 async function main(argv) {
   const file = argv.find((a) => !a.startsWith('--') && /\.html?$/i.test(a));
-  if (!file) { process.stderr.write('use: node scripts/work/draw/draw-dna.mjs <render.html> [--family starci] [--proposals <file>] [--json]\n'); return 2; }
+  if (!file) { process.stderr.write('use: starci work draw-dna <render.html> [--family starci] [--proposals <file>] [--json]\n'); return 2; }
   const at = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
   const { assetRequestIdsFor } = await import('../asset-slot.mjs');
   const findings = dnaFindingsOfFile(path.resolve(file), { family: at('--family') ?? DEFAULT_FAMILY, proposalFiles: at('--proposals') ? [path.resolve(at('--proposals'))] : null,

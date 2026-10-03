@@ -25,7 +25,7 @@ const fakeGit = ({ branch = 'main', dirty = [], ahead = 2, heads = ['aaa111'] } 
 
 const greenStep = () => ({ ok: true, exit: 0, ms: 5, log: 'l.log', text: '' });
 
-// The managed scripts every app carries (hfs sync writes them from this template); {{appScripts}} is the per-app run lines.
+// The managed scripts every app carries (starci app sync writes them from this template); {{appScripts}} is the per-app run lines.
 const MANAGED = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'packages', 'hfs', 'templates', 'app', 'package-scripts', 'package.json'), 'utf8')
   .replace(/^\s*\{\{appScripts\}\}\s*$/m, '').replace(/\{\{\w+\}\}/g, 'x')).scripts;
 

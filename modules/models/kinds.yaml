@@ -379,7 +379,7 @@ kinds:
     operator: backend.scaffold
     readOnly: false
     # Greenfield: there is no owning code to read. The stack is fixed and the toolchain comes from
-    # the @starci presets and `hfs sync`; settled design is read only for layout and dependencies beyond it.
+    # the @starci presets and `starci app sync`; settled design is read only for layout and dependencies beyond it.
     reads: [srs, sds, decision]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
@@ -397,7 +397,7 @@ kinds:
     readOnly: false
     # Greenfield interface: grammar and brand are required inputs because the first markup is
     # written in the installed grammar with settled tokens - a scaffold cannot invent either. The
-    # toolchain comes from the @starci presets and `hfs sync`. The first source tree realises the planned layout tree
+    # toolchain comes from the @starci presets and `starci app sync`. The first source tree realises the planned layout tree
     # (`shell`) - one app/ directory per planned node - and it re-scans that record from the source it just
     # created (scripts/work/layout-tree.mjs scan), so the layouts drawings were composited into and the
     # layouts that ship are one; brand.decide then takes the real captures.
@@ -576,7 +576,7 @@ kinds:
   # after every other leg (scripts/route/route-plan.mjs) and the kernel enqueues it for a chain approved
   # before it existed. It proves nothing new and builds nothing; it writes the handover package as
   # evidence and asks the owner. Its ask has three closed options - approve, feedback, question - and
-  # the three handover routes below say what each answer does. `api finish` refuses a workflow without
+  # the three handover routes below say what each answer does. `starci kernel finish` refuses a workflow without
   # the owner's approval (scripts/kernel/handover.mjs handoverGateOf).
   handover.review:
     family: prove
@@ -639,7 +639,7 @@ kinds:
   # breakpoint and theme with the slot measured, or (planned) drawn by its accepted surface-layout ui
   # record. `interface.draw` STARTS FROM TODO (owner ruling 2026-09-29): a missing shell or an unsettled layout is
   # never a refusal, the draw op scans, draws or captures and settles the parents first, then draws its screens.
-  # Who draws the shared parents is `api dispatch`'s decision (scripts/kernel/shell-foundation.mjs, foundation
+  # Who draws the shared parents is `starci kernel dispatch`'s decision (scripts/kernel/shell-foundation.mjs, foundation
   # `shell`): the first draw claims it, another workflow's draw waits (queuedBecause foundation-wait) and a stalled
   # owner opens a Supervisor Decision Item; settle lands the foundation when the tree is settled. Three machines hold
   # it in code: that foundation gate; a cut's non-seam ordinals wait
@@ -1127,7 +1127,7 @@ routes:
     limit: 2
     then: retry
     purpose: |-
-      A worker that ended without a report is the same operation again; api route moves each retry off the
+      A worker that ended without a report is the same operation again; starci kernel route moves each retry off the
       pools its lineage died on (scripts/kernel/lineage-route.mjs), so the third death is not another round
       but an owner gate. A death the host caused (a terminal wipe) retries without counting.
   - id: red-gate-repairs-the-build
@@ -1246,9 +1246,9 @@ routes:
     then: retry
     purpose: |-
       The owner approved the package: handover.review runs once more, reads the approval and files done,
-      and `api settle --verdict pass` records the handover-approved event from the answer receipt. A
+      and `starci kernel settle --job <id> --verdict pass` records the handover-approved event from the answer receipt. A
       receipt whose answeredBy is not the owner never approves, and serve-ask refuses a delegated approve
-      outright; `api finish` then closes the workflow.
+      outright; `starci kernel finish` then closes the workflow.
   - id: handover-feedback-repairs-the-build
     on: {outcome: ask, answer: feedback}
     from: handover.review
@@ -1307,7 +1307,7 @@ routes:
     limit: 2
     then: retry
     purpose: |-
-      The stack under test was not up. The same op runs again, and api dispatch runs the environment pre-step
+      The stack under test was not up. The same op runs again, and starci kernel dispatch runs the environment pre-step
       (scripts/uat/env-health.mjs) before it launches, so the re-run starts on a proven-ready stack or stays queued
       behind an [environment] incident; it is never charged to the product.
   - id: failed-tool-error-retries

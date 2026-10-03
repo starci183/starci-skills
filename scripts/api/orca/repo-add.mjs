@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP P2: registration is Orca's; it runs only on repo_not_found inside the runtime's create.
 // repo-add.mjs — the calls.yaml `repo-add` call as a callable function.
-//   node scripts/api/orca/repo-add.mjs --path <repo>
+// Internal entry: spawned by scripts/machine/worktree-orca.mjs; not invoked directly.
+// Args: --path <repo>
 // Registers a git repository with Orca (idempotent). Returns {ok, repoId, error}.
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';

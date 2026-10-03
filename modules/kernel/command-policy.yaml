@@ -19,16 +19,13 @@ roles:
   # the only refs a coordinator or the supervisor may push (backup namespace, explicit refspecs)
   backup-roles: [coordinator, supervisor]
   backup-ref: '^refs/backup/\S+$'
-# The runtime's own verbs: the surface every other path is steered to. `api` and `hfs` are the pre-CLI spellings; the CLI lane
-# removes them when it lands the unified catalog.
-runtime: [starci, api, hfs]
-# The kernel's transitional entry (node scripts/kernel/cli.mjs <verb>); removed with the CLI catalog.
-node-scripts: [scripts/kernel/cli.mjs]
+# The runtime's own verbs: the surface every other path is steered to.
+runtime: [starci]
 # Release path: refused to every bound role.
 release:
   verbs: [cut, publish]
   scripts: [release:cut, release:publish]
-  use: starci release cut (owner-approved; bumps, runs the full suite once, tags and pushes main with its tag atomically)
+  use: starci release cut is owner-approved and moves main plus its tag; starci release publish publishes packages from that release
 # Programs that cannot change state, with any arguments.
 read: [ls, dir, cat, type, head, tail, wc, uniq, cut, tr, diff, cmp, comm, rg, grep, egrep, fgrep, echo, printf, pwd, cd, pushd, popd, which, where, whoami, hostname,
   stat, file, realpath, readlink, dirname, basename, date, true, false, test, '[', expr, sleep, seq, basename, md5sum, sha1sum, sha256sum, shasum, cksum, od, xxd, hexdump,
@@ -87,67 +84,68 @@ git:
     am: {code: RIGHTS_GIT_SYNC, use: starci git sync}
     apply: {code: RIGHTS_GIT_SYNC, use: starci git sync}
     stash: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    worktree: {code: RIGHTS_GIT_SYNC, use: starci git sync (a worktree is created and removed by the runtime, never by hand)}
-    branch: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    update-ref: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    gc: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    reflog: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    config: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    remote: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    notes: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    submodule: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    init: {code: RIGHTS_GIT_SYNC, use: starci git sync}
-    clone: {code: RIGHTS_GIT_SYNC, use: starci git sync}
+    worktree: {code: RIGHTS_GIT_SYNC, use: starci worker start creates a dispatched worktree; starci machine worktrees-clean removes landed worktrees}
+    branch: {code: RIGHTS_GIT_SYNC, use: starci worker start creates the lane branch and its dispatched worktree}
+    update-ref: {code: RIGHTS_GIT_SYNC, use: starci git sync is the only lane ref integration; other ref edits are owner-only}
+    gc: {code: RIGHTS_GIT_SYNC, use: starci machine worktrees-clean performs the runtime-owned safe cleanup; repository GC is owner-only}
+    reflog: {code: RIGHTS_GIT_SYNC, use: starci git sync is the only lane ref integration; reflog mutation is owner-only}
+    config: {code: RIGHTS_GIT_SYNC, use: starci git sync carries the lane synchronization convention; configuration writes are owner-only}
+    remote: {code: RIGHTS_GIT_SYNC, use: starci git sync uses the configured repository; remote mutation is owner-only}
+    notes: {code: RIGHTS_GIT_SYNC, use: starci git sync is the lane integration path; notes mutation is owner-only}
+    submodule: {code: RIGHTS_GIT_SYNC, use: starci git sync is the lane integration path; submodule mutation is owner-only}
+    init: {code: RIGHTS_GIT_SYNC, use: starci worker start creates the runtime-owned checkout; repository creation is owner-only}
+    clone: {code: RIGHTS_GIT_SYNC, use: starci worker start creates the runtime-owned checkout; cloning is owner-only}
 npm:
   programs: [npm, pnpm, yarn, bun]
   read: [view, v, info, show, ls, list, la, ll, outdated, explain, why, root, prefix, bin, help, search, whoami, ping, '-v', '--version', 'config get', 'config list', pack-dry]
   deny:
-    publish: {code: RIGHTS_NPM_PUBLISH, use: starci release cut (packages are published once per release from the release commit)}
-    unpublish: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
-    deprecate: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
-    dist-tag: {code: RIGHTS_NPM_PUBLISH, use: starci release cut}
-    ci: {code: RIGHTS_NPM_CI_UNLOCKED, use: 'the runtime installs dependencies under the host lock (starci gate run, starci app sync); a manual npm ci is the owner''s'}
-    install: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run); a manual install is the owner''s'}
-    i: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
-    add: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: a new dependency is a canon pin (knowledge/hfs/canon-pins.yaml)'}
-    update: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: dependency versions are canon pins'}
-    uninstall: {code: RIGHTS_RAW_TOOL, use: 'ask the owner: dependency versions are canon pins'}
-    test: {code: RIGHTS_RAW_TOOL, use: 'starci gate unit --root <app> (the op gate selects the specs of the change)'}
-    t: {code: RIGHTS_RAW_TOOL, use: 'starci gate unit --root <app>'}
-    run: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app> (or the starci app verb of the script: starci app lint, starci app sync)'}
-    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app>'}
+    publish: {code: RIGHTS_NPM_PUBLISH, use: starci release cut authorizes the release; starci release publish publishes its packages once}
+    unpublish: {code: RIGHTS_NPM_PUBLISH, use: starci release publish is the only package-publication path; unpublishing is owner-only}
+    deprecate: {code: RIGHTS_NPM_PUBLISH, use: starci release publish is the only package-publication path; deprecation is owner-only}
+    dist-tag: {code: RIGHTS_NPM_PUBLISH, use: starci release publish is the only package-publication path; dist-tag mutation is owner-only}
+    pack: {code: RIGHTS_RAW_TOOL, use: starci release cut creates release artifacts; ad hoc package archives are owner-only}
+    ci: {code: RIGHTS_NPM_CI_UNLOCKED, use: starci npm ci installs dependencies under the host lock in the caller's own worktree}
+    install: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
+    i: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
+    add: {code: RIGHTS_RAW_TOOL, use: starci npm install adds exact-pinned dependencies and is limited to lead or owner}
+    update: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
+    uninstall: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path using canon pins}
+    test: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
+    t: {code: RIGHTS_RAW_TOOL, use: starci test run --level L1|L2 in the runtime or starci gate unit --root <app> in an app}
+    run: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
+    run-script: {code: RIGHTS_RAW_TOOL, use: 'starci test run runs tests; use starci check run, starci lint run, starci typecheck run, starci app stack, or starci gate run for other scripts'}
     start: {code: RIGHTS_RAW_TOOL, use: 'starci app stack'}
-    exec: {code: RIGHTS_RAW_TOOL, use: 'starci gate run --root <app>'}
-    link: {code: RIGHTS_RAW_TOOL, use: 'a link is never made by an agent'}
-    rebuild: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
-    prune: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
-    dedupe: {code: RIGHTS_RAW_TOOL, use: 'the runtime installs dependencies under the host lock (starci gate run)'}
+    exec: {code: RIGHTS_RAW_TOOL, use: 'starci check run, starci lint run, starci typecheck run, or starci gate run for that tool'}
+    link: {code: RIGHTS_RAW_TOOL, use: starci npm install is the dependency path; an agent never makes a package link}
+    rebuild: {code: RIGHTS_RAW_TOOL, use: starci npm ci rebuilds the exact lockfile install under the host lock}
+    prune: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path; agents do not prune packages}
+    dedupe: {code: RIGHTS_RAW_TOOL, use: starci npm install is the owner-controlled dependency-change path; agents do not dedupe packages}
 # Side-effecting tools with no read form: refused whole, each with the starci verb to use.
 raw-tools:
-  docker: {use: 'starci app stack (the stack of the app: up, down, status)'}
-  docker-compose: {use: 'starci app stack'}
-  podman: {use: 'starci app stack'}
+  docker: {use: 'starci docker up, starci docker down, starci docker build, or starci docker ps; a release image proof is starci release images'}
+  docker-compose: {use: 'starci docker up, starci docker down, starci docker build, or starci docker ps'}
+  podman: {use: 'starci docker up, starci docker down, starci docker build, or starci docker ps'}
   kubectl: {use: 'starci app stack'}
   k3d: {use: 'starci app stack'}
-  supabase: {use: 'starci app stack (the local Supabase stack of a lite app)'}
+  supabase: {use: "starci supabase start, starci supabase stop, or starci supabase status for the app's own stack"}
   gh: {use: 'starci release cut (the GitHub release is created from the CHANGELOG section of the tag); anything else is the owner''s'}
-  schtasks: {use: 'starci reconciler task (the scheduled task of the runtime)'}
+  schtasks: {use: 'starci task register, starci task show, or starci task list for runtime scheduled tasks'}
   shutdown: {use: 'ask the owner: a worker never shuts the host down'}
   reboot: {use: 'ask the owner: a worker never reboots the host'}
-  jest: {use: 'starci gate unit --root <app>'}
-  vitest: {use: 'starci gate unit --root <app>'}
-  mocha: {use: 'starci gate unit --root <app>'}
-  playwright: {use: 'starci gate run --root <app> (the e2e proof of the app)'}
-  cypress: {use: 'starci gate run --root <app>'}
-  pytest: {use: 'starci gate unit --root <app>'}
+  jest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
+  vitest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
+  mocha: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
+  playwright: {use: starci test run in the runtime or starci gate run --root <app> for the app's e2e proof}
+  cypress: {use: starci test run in the runtime or starci gate run --root <app> for the app's e2e proof}
+  pytest: {use: starci test run in the runtime or starci gate unit --root <app> in an app}
   turbo: {use: 'starci gate run --root <app>'}
   nest: {use: 'starci gate run --root <app>'}
-  curl: {use: 'ask the owner or use the starci verb of the service (a worker does not call the network by hand)'}
-  wget: {use: 'ask the owner or use the starci verb of the service'}
+  curl: {use: 'ask the owner or use the service catalog command; a worker does not call the network by hand'}
+  wget: {use: 'ask the owner or use the service catalog command'}
   ssh: {use: 'ask the owner'}
   scp: {use: 'ask the owner'}
 # Orca: reads pass; every mutation goes through the runtime verbs.
 orca:
   read: [check, worker-show, worker-list, worker-read, inbox, run-show, run-list, task-show, task-list, status, list, read, show, tail, get, wait-none]
   groups-read: [terminal, worktree, repo, orchestration]
-  use: 'starci kernel / starci supervisor / starci orca verbs (dispatch, report, worker start and release are runtime verbs)'
+  use: starci worker start, starci worker show, starci worker read, starci worker list, starci worker stop, starci worker release, or starci worker close

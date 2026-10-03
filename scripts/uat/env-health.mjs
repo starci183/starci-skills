@@ -8,7 +8,7 @@
 // GET /health/live answered 404 on a healthy API - each attempt spent its first half restarting
 // servers by hand and none of that reached the ledger as an environment fact.
 //
-//   check  --repo <ledger repo> (--env <id|resource.yaml>[,...] | --paths <owned paths json|csv>)
+//   starci gate env-health check --repo <ledger repo> [--env <id|resource.yaml>[,...] | --paths <owned paths json|csv>]
 //          [--restart] [--probe-timeout-ms N] [--ready-timeout-ms N] [--json]
 //      Resolves the work/resource@1 environment(s) - by id, or from the refs of the uat/e2e records
 //      the paths name - and runs every declared probe. Per service it reports a state:
@@ -25,10 +25,10 @@
 //      A hung listener is killed only when it is that registered server or its command line runs
 //      inside one of the workspace's repository roots - never a foreign process.
 //      Exit 0 every service ready (probe-drift included), 3 not ready, 2 bad arguments.
-//   serve  --env <id> --service <name> --cwd <dir> [--repo <ledger repo>] [--url <probe url>] -- <command...>
+//   starci gate env-health serve --env <id> --service <name> --cwd <dir> [--repo <ledger repo>] [--url <probe url>] -- <command...>
 //      Starts one server detached, records it in the registry (machine.sqlite env_servers; its output
 //      kept as a blob, log_sha) and waits for its probe. A later `check --restart` restarts it.
-//   status  prints the registry.
+//   starci gate env-health status  prints the registry.
 //
 // The JSON is starci/env-health@1: {ready, class: ready|environment, hardBlock, environments[{id,
 // services[{service, url, expect, state, ready, status?, discovered?, listener?, action?, remedy?}]}],
@@ -40,7 +40,6 @@ import path from 'node:path';
 import { probe as probeUrl } from '../api/http/probe.mjs';
 import { portListener } from '../api/process/port-listener.mjs';
 import { spawnDetached } from '../api/process/spawn-detached.mjs';
-import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/db/machine.mjs';
 import { launchFor } from './launch.mjs';
@@ -270,7 +269,7 @@ async function checkEnvironment(doc, { restart = false, roots = [], probeTimeout
         remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` });
       continue;
     }
-    const how = start ? `node ${fileURLToPath(import.meta.url)} check --restart ...` : `node ${fileURLToPath(import.meta.url)} serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
+    const how = start ? 'starci gate env-health check --restart ...' : `starci gate env-health serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
     services.push({ ...row, state, ready: false, ...(listener ? { listener } : {}), ...(actions.length ? { action: actions.join('; ') } : {}),
       remedy: `${name} is ${state} at ${url}: start it with ${how} (serve registers it, so the next pre-step restarts it itself)` });
   }
@@ -354,7 +353,7 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
     const logSha = judgeServer(args.env, args.service, waited.ready, env);
     return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, logSha, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
   }
-  return emit({ ok: false, error: 'usage: env-health.mjs check|serve|status (see header)' }, EXIT_USAGE);
+  return emit({ ok: false, error: 'usage: starci gate env-health check|serve|status (see header)' }, EXIT_USAGE);
 }
 
 if (isMain(import.meta.url)) process.exitCode = await envHealthMain(process.argv.slice(2));

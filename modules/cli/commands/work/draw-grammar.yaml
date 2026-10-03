@@ -1,0 +1,16 @@
+group: work
+verb: draw-grammar
+owner: runtime
+summary: resolve the grammar package used by a drawing
+impl: {script: scripts/work/draw-grammar.mjs}
+flags:
+  - {name: product, type: string, required: true, summary: product app directory whose grammar install is resolved}
+  - {name: file, type: string, summary: draw source file the grammar must type-check against}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist], summary: grammar source preference, default: auto}
+  - {name: grammar-dist, type: string, summary: package root of the runtime-built grammar}
+exit: {"0": grammar resolved, "1": no grammar resolved for the drawing, "2": bad usage}
+json: flag
+examples: ['starci work draw-grammar --product <app> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-grammar.mjs']

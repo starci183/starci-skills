@@ -93,8 +93,8 @@ It listens for the signed webhook of the bank transfer notifier (`POST /webhooks
 | `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | `secrets/minio-env.enc` |
 | `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | `secrets/minio-env.enc` |
 
-DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expected at `runtime/env/demo.agekey`. `hfs secret show`
-reads its members (`hfs secret list` names them), which are written to `runtime/env/keycloak.env`, which Compose reads and git never tracks; `secrets/minio-env.enc`
+DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expected at `runtime/env/demo.agekey`. `starci app secret show`
+reads its members (`starci app secret list` names them), which are written to `runtime/env/keycloak.env`, which Compose reads and git never tracks; `secrets/minio-env.enc`
 likewise gives `runtime/env/minio.env`.
 
 ## cli (`apps/cli`)

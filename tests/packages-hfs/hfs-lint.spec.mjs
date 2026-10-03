@@ -1,4 +1,4 @@
-// hfs lint (packages/hfs/lint/run.mjs): the ONE lint entry over a hermetic temp repository with a fake ESLint install and injected
+// starci app lint (packages/hfs/lint/run.mjs): the ONE lint entry over a hermetic temp repository with a fake ESLint install and injected
 // hfsCheck / trackedFiles. The fake eslint is a package with a `bin` that prints a fixed json result array.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ const fakeLinter = (side, name, output, stream = 'stdout') => {
   fs.writeFileSync(path.join(pkg, 'bin.js'), `process.${stream}.write(${JSON.stringify(JSON.stringify(output))});\n`);
 };
 /**
- * A temp app (hfs lint runs at the app root, the folder of a kind: app hfs.json): `messages` are the ESLint messages on
+ * A temp app (starci app lint runs at the app root, the folder of a kind: app hfs.json): `messages` are the ESLint messages on
  * be/src/a.ts (null: no ESLint install at all). The fe side lints clean and has a clean stylelint.
  */
 const repoWith = (messages) => {
@@ -78,10 +78,10 @@ test('a missing ESLint install is exit 2 with an error, never a pass', async () 
   assert.match(report.errors[0], /eslint is not installed/);
 });
 
-test('a crashed hfs check is exit 2, not a pass', async () => {
+test('a crashed starci app check is exit 2, not a pass', async () => {
   const { report, exit } = await run(repoWith([]), [], async () => { throw new Error('boom'); });
   assert.equal(exit, 2);
-  assert.match(report.errors[0], /hfs check could not run: boom/);
+  assert.match(report.errors[0], /starci app check could not run: boom/);
 });
 
 test('the merged sonar document holds the rules of both engines, sorted', async () => {

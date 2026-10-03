@@ -43,7 +43,7 @@ topics:
   - id: repo.tooling
     title: Tooling
     path: tooling.yaml
-    decides: Thin configs into canon packages per side, generated files from hfs sync at the app root, one machine at every gate, no inline configuration, e2e outside automatic gates
+    decides: Thin configs into canon packages per side, generated files from starci app sync at the app root, one machine at every gate, no inline configuration, e2e outside automatic gates
     rules: REPO-TOOLING-1 … REPO-TOOLING-6
   - id: repo.formatter
     title: Formatter

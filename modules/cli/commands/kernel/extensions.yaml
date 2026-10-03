@@ -1,0 +1,30 @@
+# The contract of `starci kernel extensions` (scripts/kernel/verbs/extensions.mjs). One file per extension verb:
+# what `commands.<verb>` of modules/kernel/api.yaml would hold (scripts/kernel/api-extensions.mjs).
+group: kernel
+verb: extensions
+owner: runtime
+summary: "list the file-based kernel extensions: verbs, status fields, boolean flags, load problems"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - extensions
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+exit:
+  "0": every extension loaded
+  "1": an extension failed to load (listed as PROBLEM)
+  "2": "bad usage: unknown flag"
+json: flag
+examples:
+  - starci kernel extensions --repo <path>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api extensions
+  - node scripts/kernel/cli.mjs extensions
+purpose: "List the file-based starci kernel extensions: the verbs of scripts/kernel/verbs/, the status fields
+  of scripts/kernel/status/, the boolean flags of scripts/kernel/api-boolean-flags.txt and the
+  extension verbs' own flags, and every module that failed to load. Read-only; opens no ledger."

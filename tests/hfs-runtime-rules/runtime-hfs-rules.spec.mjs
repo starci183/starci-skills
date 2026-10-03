@@ -181,10 +181,10 @@ test('RT_RETIRED_PRESENT: a migration comment that names a retired symbol is a s
   assert.deepEqual(retiredFindings(ctx({ 'engine/db/migrations/runtime/0001-init.sql': sql['engine/db/migrations/runtime/0001-init.sql'] })), []);
 });
 
-const PINNED_FILES = ['bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
+const PINNED_FILES = ['packages/cli/bin/starci.mjs', 'scripts/kernel/cli.mjs', 'scripts/kernel/start-workflow.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/reconciler/boot.mjs', 'scripts/guards/command-guard.mjs', 'scripts/guards/seat-tools.mjs'];
 
 test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesced: true, is refused', () => {
-  const gone = pinnedFindings(ctxOf({}, { files: PINNED_FILES.filter((p) => p !== 'scripts/reconciler/boot.mjs') }));
+  const gone = pinnedFindings(ctxOf({}, { files: PINNED_FILES.filter((p) => p !== 'packages/cli/bin/starci.mjs') }));
   assert.deepEqual(codesOf(gone), ['RT_PINNED_PATH_MOVED']);
   const loose = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES, 'scripts/api/orca/worker-go.mjs'], retiredPaths: { moved: [{ from: 'scripts/api/orca/worker-start.mjs', to: 'scripts/api/orca/worker-go.mjs', quiesced: false }] } }));
   assert.deepEqual(codesOf(loose), ['RT_PINNED_PATH_MOVED'], 'a pinned pattern (scripts/api/orca/<call>.mjs) moves only quiesced');
@@ -192,7 +192,7 @@ test('RT_PINNED_PATH_MOVED: a pinned path that is gone, or moved without quiesce
 
 test('RT_PINNED_PATH_MOVED: every pinned path present, or one moved with the workers quiesced, is clean', () => {
   assert.deepEqual(pinnedFindings(ctxOf({}, { files: PINNED_FILES })), []);
-  const moved = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES.filter((p) => p !== 'scripts/reconciler/boot.mjs'), 'scripts/reconciler/start-boot.mjs'], retiredPaths: { moved: [{ from: 'scripts/reconciler/boot.mjs', to: 'scripts/reconciler/start-boot.mjs', quiesced: true }] } }));
+  const moved = pinnedFindings(ctxOf({}, { files: [...PINNED_FILES.filter((p) => p !== 'packages/cli/bin/starci.mjs'), 'packages/cli/bin/starci-next.mjs'], retiredPaths: { moved: [{ from: 'packages/cli/bin/starci.mjs', to: 'packages/cli/bin/starci-next.mjs', quiesced: true }] } }));
   assert.deepEqual(moved, []);
 });
 

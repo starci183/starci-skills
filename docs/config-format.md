@@ -94,7 +94,7 @@ route is the `sol-think` order - Sol first, Opus as overflow - resolved by `scri
 
 `parallel.gear` is the only knob for how wide one operation runs. It is an integer that indexes the
 agent table in `modules/models/runtimes.yaml` `allocation.slicing.size`, whose keys are the classes
-`api estimate` assigns a measured write closure:
+`starci kernel estimate` assigns a measured write closure:
 
 | size | what it is | agents at each declared gear |
 | --- | --- | --- |
@@ -111,10 +111,10 @@ other unknown key, and an absent `parallel` block means the first declared gear
 Three rules hold at every gear:
 
 1. **`s` and `m` operations are always one agent.** The table applies to `l` and `xl` only.
-2. **A gear never raises a ceiling.** It raises only what `api estimate` *requests*. A pool's
+2. **A gear never raises a ceiling.** It raises only what `starci kernel estimate` *requests*. A pool's
    `registry.yaml` `pools.<pool>.maxParallel`, the workers' `maxParallelOps` and the workflow's `budgets.maxOps`
    all clamp it afterwards, and the lowest one admits.
-3. **Requested is not achievable.** `api estimate` returns `agentsRequested` from this table and
+3. **Requested is not achievable.** `starci kernel estimate` returns `agentsRequested` from this table and
    `agentsAchievable` after the closure's disjoint path partition bounds it — a two-directory
    closure runs two agents however high the gear is, and `reason` says so.
 
@@ -201,7 +201,7 @@ no restart.
 What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
 
 - `defer-leg` (test.author, e2e.verify; a test.author leg is e2e when every owned path is an e2e path) - never
-  dispatched. `api enqueue`, `api route` and `api dispatch` settle its queued job `succeeded` with result
+  dispatched. `starci kernel enqueue`, `starci kernel route` and `starci kernel dispatch` settle its queued job `succeeded` with result
   `{verdict: deferred, deferred: {kind, reason: specs.<class>=false, at, via}}` and a `tests-deferred` event: no
   lease, no dispatch, no attempt spent. Nothing waits on it: plan ancestors, the dependency gate and nextActions
   skip it, and a deferred queued job is a dispatch nextAction whatever held it.
@@ -213,8 +213,8 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
 - `not-counted` (review.verify, handover.review) - the gate does not count those tests or that coverage; `api
   coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).
 
-`api status` lists `testsDeferred {off, jobs, planned}` and a `tests deferred` line (legs carry `deferred`);
-`api plan` and `route-plan.mjs` mark deferred legs. `api run-deferred-tests --workflow <id> [--kind unit|e2e|integration]
+`starci kernel status` lists `testsDeferred {off, jobs, planned}` and a `tests deferred` line (legs carry `deferred`);
+`starci kernel plan` and `route-plan.mjs` mark deferred legs. `starci kernel run-deferred-tests --workflow <id> [--kind unit|e2e|integration]
 [--dry-run]` is "test later": it re-queues the deferred jobs on their same attempt with `payload.specsForced`, and
 they then run their whole brief even while the switch is still off.
 

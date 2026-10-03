@@ -1,0 +1,29 @@
+group: docker
+verb: up
+owner: runtime
+summary: start one application stack and wait for its declared healthchecks
+impl: {module: scripts/machine/docker-stack.mjs, export: dockerUp}
+effect: host
+roles: [worker, lead, coordinator, owner]
+conventions:
+  - the Compose project is starci-<project>-<stack> and every created resource carries starci.project=<project>
+  - published ports come from the project's 41000-44999 block and never use 3000, 3100, 54320-54329 or 55321-55327
+  - never touch containers of another project (the protected local installation) or ports 3000 and 3100
+  - clean up with `starci docker down`
+flags:
+  - {name: env, type: string, default: dev, summary: environment directory below .starcistacks}
+  - {name: wait-seconds, type: number, default: 120, summary: maximum healthcheck wait in seconds}
+  - {name: build, type: boolean, summary: rebuild service images before starting}
+positional:
+  - {name: stack, required: true, variadic: false}
+exit:
+  "0": "the stack is healthy"
+  "1": "Docker or a healthcheck failed"
+  "2": "usage or Docker ownership policy was refused"
+json: starci/docker-up@1
+examples:
+  - starci docker up api
+  - starci docker up api --env dev --wait-seconds 180 --build --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

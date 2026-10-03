@@ -1,0 +1,31 @@
+group: gate
+verb: env-health
+owner: runtime
+summary: inspect and manage the served environment used by verification
+impl: {script: scripts/uat/env-health.mjs}
+positional:
+  - {name: action, enum: [check, serve, status], required: true, variadic: false}
+  - {name: command, required: false, variadic: true}
+flags:
+  - {name: repo, type: string, summary: repository holding the environment ledger (check needs it)}
+  - {name: env, type: list, summary: environment ids or resource files}
+  - {name: paths, type: list, summary: owned paths used to resolve environments}
+  - {name: restart, type: boolean, summary: restart a down or hung owned service}
+  - {name: probe-timeout-ms, type: number, summary: timeout for one health probe}
+  - {name: ready-timeout-ms, type: number, summary: deadline for service readiness}
+  - {name: service, type: string, summary: service name to register and start}
+  - {name: url, type: string, summary: health probe URL for the service}
+exit:
+  "0": requested environment action is ready
+  "2": bad usage
+  "3": environment is not ready
+json: always
+examples:
+  - starci gate env-health status
+  - starci gate env-health check --repo <repo> --env local --restart
+  - starci gate env-health serve --env local --service api --cwd <checkout> -- npm start
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/uat/env-health.mjs
+  - node .claude/scripts/uat/env-health.mjs

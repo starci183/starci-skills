@@ -3,7 +3,7 @@
 // and print ONE green/red checklist. Owner ask 2026-09-29; skill skills/start/SKILL.md, the ONE start
 // skill (owner ruling 2026-09-30: the `restart` skill is gone; `boot.mjs --restart` stays the engine-only lever).
 //
-//   node scripts/reconciler/start.mjs [--check] [--json] [--wait <sec>] [--no-build] [--retire-stale-ledgers]
+//   starci reconciler up [--check] [--json] [--wait <sec>] [--no-build] [--retire-stale-ledgers]
 //                                     [--set-profile <operational|observe>]
 //
 // Order of an apply run:
@@ -183,7 +183,7 @@ export function applyProfileText(text, profile = PROFILE) {
 
 /** The config profile rows. `conf` is reconcilerConfig(); `raw` the config's own reconciler block. Pure. */
 export function profileItems(conf, raw) {
-  const fix = 'node scripts/reconciler/start.mjs --set-profile operational (writes that one block to config.yaml, backup kept)';
+  const fix = 'starci reconciler up --set-profile operational (writes that one block to config.yaml, backup kept)';
   if (!conf.enabled) return [red('config', 'profile', 'reconciler config', 'reconciler.enabled is not true: no controller runs', fix)];
   if (conf.profile !== PROFILE) {
     const shadow = REQUIRED_ACTIVE.filter((n) => conf.controllers[n]?.mode !== 'active');
@@ -213,9 +213,9 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
   const l = s.leader;
   const items = [];
   const shadowed = safeShadowOf(s);
-  if (!l.fresh) items.push(red('engine', 'engine', 'reconciler engine', l.holder ? `stale: leader ${l.holder} pid ${l.pid} heartbeat ${l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s`} old` : 'not running', 'node scripts/reconciler/start.mjs'));
+  if (!l.fresh) items.push(red('engine', 'engine', 'reconciler engine', l.holder ? `stale: leader ${l.holder} pid ${l.pid} heartbeat ${l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s`} old` : 'not running', 'starci reconciler up'));
   else items.push(green('engine', 'engine', 'reconciler engine', `leader ${l.holder} pid ${l.pid} epoch ${l.epoch} heartbeat ${Math.round(l.ageMs / 1000)}s ago${l.draining ? ' (draining a reload)' : ''}`));
-  items.push(engineIsSafe(s) ? red('engine', 'safe-mode', 'engine safe mode', `${safeIsCrashLoop ? 'running --safe: a real crash loop is on record (every controller is forced shadow)' : 'running --safe (every controller forced shadow) without a crash loop behind it'}${shadowed.length ? `; configured active but running shadow: ${shadowed.join(', ')}` : ''}`, 'node scripts/reconciler/start.mjs (restarts it normally)')
+  items.push(engineIsSafe(s) ? red('engine', 'safe-mode', 'engine safe mode', `${safeIsCrashLoop ? 'running --safe: a real crash loop is on record (every controller is forced shadow)' : 'running --safe (every controller forced shadow) without a crash loop behind it'}${shadowed.length ? `; configured active but running shadow: ${shadowed.join(', ')}` : ''}`, 'starci reconciler up (restarts it normally)')
     : green('engine', 'safe-mode', 'engine safe mode', 'normal mode'));
   for (const name of Object.keys(s.modes)) {
     const m = s.modes[name];
@@ -223,7 +223,7 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
     const required = REQUIRED_ACTIVE.includes(name);
     const shown = `${m.effective}${m.configured !== m.effective ? ` (configured ${m.configured})` : ''}`;
     if (required) items.push(m.effective === 'active' ? green('controllers', `mode:${name}`, `controller ${name}`, shown) : red('controllers', `mode:${name}`, `controller ${name}`, `${shown}, start needs active`,
-      m.configured === 'active' ? 'the engine is not running it yet: node scripts/reconciler/start.mjs' : 'node scripts/reconciler/start.mjs --set-profile operational'));
+      m.configured === 'active' ? 'the engine is not running it yet: starci reconciler up' : 'starci reconciler up --set-profile operational'));
     else items.push(m.effective === 'off' && want !== 'off' ? warn('controllers', `mode:${name}`, `controller ${name}`, `${shown}, profile expects ${want}`) : green('controllers', `mode:${name}`, `controller ${name}`, shown, { required: false }));
   }
   return items;
@@ -231,7 +231,7 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
 
 function slaItems(s) {
   const open = s.violations?.open ?? 0;
-  return [open ? warn('sla', 'violations', 'open violations / SLA', `${open} open violation(s) of ${s.violations.clocks ?? open} SLA clock(s): see the Supervisor digest`, 'node scripts/reconciler/boot.mjs --status')
+  return [open ? warn('sla', 'violations', 'open violations / SLA', `${open} open violation(s) of ${s.violations.clocks ?? open} SLA clock(s): see the Supervisor digest`, 'starci reconciler status')
     : green('sla', 'violations', 'open violations / SLA', `0 violated of ${s.violations?.clocks ?? 0} SLA clock(s)`, { required: false })];
 }
 
@@ -259,10 +259,10 @@ function serviceItems(probes, { publicUrl = null, config = null } = {}) {
     const detail = p.ok ? `up${d.status ? ` (HTTP ${d.status}` : ''}${d.ms != null ? `${d.status ? ', ' : ' ('}${d.ms}ms` : ''}${d.status || d.ms != null ? ')' : ''}${p.name === 'harness-tunnel' && publicUrl ? ` ${publicUrl}` : ''}`
       : `down: ${d.error ?? d.status ?? d.verdict ?? (d.value ? (d.value.health?.problems?.[0] ?? (d.value.running === false ? 'not running' : JSON.stringify(d.value).slice(0, 120))) : 'no answer')}`;
     if (p.name.startsWith('sched-task:')) return p.ok ? green('services', p.name, `scheduled task ${p.name.slice(11)}`, `exists (${d.status ?? 'ok'})`, { required: false })
-      : warn('services', p.name, `scheduled task ${p.name.slice(11)}`, p.unmanaged ? 'missing (unmanaged)' : 'not healthy', 'node scripts/reconciler/boot.mjs --install-task --apply (the owner)');
+      : warn('services', p.name, `scheduled task ${p.name.slice(11)}`, p.unmanaged ? 'missing (unmanaged)' : 'not healthy', 'starci task register reconciler --apply (the owner)');
     if (p.ok) return green('services', p.name, label, detail);
     if (!serviceWanted(p.name, config)) return green('services', p.name, label, 'off in config.yaml connectors (not required)', { required: false });
-    return red('services', p.name, label, detail, p.name === 'orca' ? 'open Orca yourself, then run start again (start never launches a GUI app)' : `node scripts/reconciler/services.mjs --start ${p.name}`);
+    return red('services', p.name, label, detail, p.name === 'orca' ? 'open Orca yourself, then run start again (start never launches a GUI app)' : 'the reconciler Host controller manages this service; run starci reconciler start');
   });
 }
 
@@ -270,9 +270,9 @@ function serviceItems(probes, { publicUrl = null, config = null } = {}) {
 function supervisorItem({ mode, statusJson, startJson = null }) {
   if (mode !== 'kernel') return green('seats', 'supervisor', 'Supervisor seat', 'chat mode: the owner\'s desktop chat is the Supervisor (nothing to start)');
   const h = statusJson?.health;
-  if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'node scripts/supervisor/start-supervisor.mjs --json');
+  if (startJson && startJson.ok === false) return red('seats', 'supervisor', 'Supervisor seat', `start-supervisor: ${startJson.action ?? 'failed'}${startJson.error || startJson.reason ? ` - ${String(startJson.error ?? startJson.reason).slice(0, 160)}` : ''}`, 'starci supervisor start --json');
   if (h?.live) return green('seats', 'supervisor', 'Supervisor seat', `live${h.terminal ? ` (${h.terminal})` : ''}${h.starting ? ', starting' : ''}`);
-  return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'node scripts/supervisor/start-supervisor.mjs --json');
+  return red('seats', 'supervisor', 'Supervisor seat', h ? `not live: ${h.reason ?? 'unknown'}` : 'status unreadable', 'starci supervisor start --json');
 }
 
 /** A Kernel seat row from a watchdog `--once --json` answer. Pure. */
@@ -282,7 +282,7 @@ function kernelSeatItem({ ledger, workflowId, answer, seatState }) {
   const action = answer?.action ?? null;
   if (seatState === 'live' && answer?.ok !== false) return green('seats', id, name, `live (${action ?? 'ok'})`);
   return red('seats', id, name, `${seatState ?? 'unknown'}${action ? ` (${action})` : ''}${answer?.error ? `: ${String(answer.error).slice(0, 120)}` : ''}`,
-    `node scripts/kernel/kernel-watchdog.mjs --repo <repo> --workflow ${workflowId} --once --repair --json`);
+    `starci machine kernel-watchdog --repo <repo> --workflow ${workflowId} --once --repair --json`);
 }
 
 /* ------------------------------------------------------------ the read-only gather */
@@ -308,17 +308,17 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from <archive root>/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'starci runtime machine-db (initialises it) or restore from <archive root>/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from <archive root>/ledger-backups, owner-approved)')
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'restore the ledger from <archive root>/ledger-backups with every writer stopped (owner-approved)')
     : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
-  push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
+  push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'starci reconciler up --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
   const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
-  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/housekeeping/ledger-hygiene.mjs)')
+  push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, starci runtime ledger-hygiene)')
     : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   push(await worktreeItems({ env, repos: ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot) }));
   const pinBad = pinProblems(configuredPins(config));
@@ -330,12 +330,12 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   push(profileItems(reconcilerConfig({ config }), raw));
   const s = status({ env });
   const plan = crashLoopPlan(safeRun(() => crashLoopRecord({ env, windowMs: reconcilerNumbers().crashLoop.windowMs }), { starts: [] }), { max: reconcilerNumbers().crashLoop.max, windowMs: reconcilerNumbers().crashLoop.windowMs });
-  push(s.ok ? engineItems(s, { safeIsCrashLoop: plan.looping }) : red('engine', 'engine', 'reconciler engine', `status unreadable: ${s.error}`, 'node scripts/reconciler/boot.mjs --status'), s.ok ? slaItems(s) : []);
+  push(s.ok ? engineItems(s, { safeIsCrashLoop: plan.looping }) : red('engine', 'engine', 'reconciler engine', `status unreadable: ${s.error}`, 'starci reconciler status'), s.ok ? slaItems(s) : []);
   // services
   const probes = await probeServices();
   push(serviceItems(probes, { publicUrl: safeRun(() => servicePorts().harnessPublicUrl, null), config }));
   const ui = uiBuildState();
-  push(ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'node scripts/reconciler/start.mjs (runs npm run build in ui/)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason));
+  push(ui.stale ? red('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason, 'starci reconciler up (rebuilds the harness UI)') : green('services', 'ui-build', 'harness UI build (ui/dist)', ui.reason));
   // seats
   const mode = safeRun(() => supervisorMode({ env, config }), DEFAULT_SUPERVISOR_MODE);
   if (mode === 'kernel' && seats && orcaProbe.ok) {
@@ -357,13 +357,13 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
 async function worktreeItems({ env = process.env, repos = [], counts = null } = {}) {
   let rows;
   try { rows = counts ?? (await import('../machine/worktrees.mjs')).worktreeCounts({ env, repos: [SKILL_ROOT, ...(await import('../kernel/target-repo.mjs')).boundRepoRoots(repos)] }); }
-  catch (error) { return [warn('preflight', 'worktrees', 'worktrees per repo', `unreadable: ${String(error?.message ?? error).slice(0, 200)}`, 'node scripts/reconciler/start.mjs --check again')]; }
+  catch (error) { return [warn('preflight', 'worktrees', 'worktrees per repo', `unreadable: ${String(error?.message ?? error).slice(0, 200)}`, 'starci reconciler up --check again')]; }
   if (!rows.length) return [green('preflight', 'worktrees', 'worktrees per repo', 'no runtime worktree', { required: false })];
   return rows.map((r) => {
     const id = `worktrees:${path.basename(r.repoRoot)}`, name = `worktrees ${path.basename(r.repoRoot)}`;
     const detail = `${r.live}/${r.cap} runtime, ${r.linked} linked${r.orphans.length ? `, ${r.orphans.length} orphan(s): ${r.orphans.slice(0, 3).map((o) => `${o.path} (${o.why})`).join('; ')}` : ''}`;
     return r.over || r.orphans.length
-      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: node scripts/machine/worktrees.mjs gc')
+      ? red('preflight', id, name, detail, 'the reconciler GC controller (key gc:worktrees, always active) preserves and removes them; to run it now: starci machine worktrees gc')
       : green('preflight', id, name, detail);
   });
 }

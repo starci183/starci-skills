@@ -1,0 +1,4 @@
+group: supabase
+summary: operate one app's isolated local Supabase stack
+owner: runtime
+since: 1.0.0-alpha.4

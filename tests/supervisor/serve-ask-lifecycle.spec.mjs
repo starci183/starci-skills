@@ -125,8 +125,8 @@ test('--review reads an ask; it never retires one',async t=>{
 
 // A StarCi Next Kernel sat an hour on an ask-reserve (inc-2558dd227dfd): status
 // said re-serve with serve-ask.mjs, but the Kernel may mutate only through
-// cli.mjs. `api serve-ask` launches the same form detached.
-test('api serve-ask launches the form for a filed ask and refuses one that was never filed',async t=>{
+// cli.mjs. `starci kernel serve-ask` launches the same form detached.
+test('starci kernel serve-ask launches the form for a filed ask and refuses one that was never filed',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAskReport(ledger,{dispatchId:'ctx_api'});
@@ -150,7 +150,7 @@ test('api serve-ask launches the form for a filed ask and refuses one that was n
 
 // A StarCi Next brand ask asked the owner to rule on 0.4.13 contrast values
 // that grammar 0.5.0 then fixed (inc-6886d1399989); retire-ask closes it.
-test('api retire-ask closes an obsolete ask so it is no longer open, and needs a reason',async t=>{
+test('starci kernel retire-ask closes an obsolete ask so it is no longer open, and needs a reason',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAskReport(ledger,{dispatchId:'ctx_stale'});

@@ -12,5 +12,5 @@ reach: new-legs
 paths:
   - modules/kernel/failure-codes.yaml
   - engine/migrations/runtime/0004-attempt-why.sql
-  - modules/kernel/api-commands/status.yaml
+  - modules/cli/commands/kernel/status.yaml
   - modules/kernel/contract-changes/attempt-why.yaml

@@ -1,4 +1,4 @@
-// hfs-scaffold-app.spec.mjs - `hfs scaffold app demo` makes the one shape of a StarCi product, and `hfs lint` at its root judges it
+// hfs-scaffold-app.spec.mjs - `starci app scaffold demo` makes the one shape of a StarCi product, and `starci app lint` at its root judges it
 // with both canons: ESLint with the BE canon over be/ only and with the FE canon over fe/ only, stylelint over fe/, the app check.
 // A fresh scaffold has 0 findings and 0 tool errors; a violation planted on each side is reported by its own side's canon alone, and
 // every path a finding names, in its path and in its message, is app-relative. The scaffold also type-checks with its own root
@@ -53,7 +53,7 @@ const lintGate = gate('scaffold lint', skipReason);
 
 /** The checkout's @starci packages as a registry, started once by the first test that scaffolds and stopped after the file. */
 let registry = null;
-/** `hfs scaffold app demo --into <into>` with the real lock step, the @starci scope resolved from this checkout. */
+/** `starci app scaffold demo --into <into>` with the real lock step, the @starci scope resolved from this checkout. */
 async function scaffold(into) {
   registry ??= startSourceCanonRegistry();
   return scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: (await registry).lock });
@@ -285,7 +285,7 @@ test('a scaffolded app has one Dockerfile per app, the managed .dockerignore and
   for (const secret of ['.starcistacks', '**/.env', '.secrets', 'node_modules']) assert.ok(ignore.includes(secret), `.dockerignore excludes ${secret}`);
 });
 
-test('hfs scaffold app writes the app shape and hfs lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
+test('starci app scaffold writes the app shape and starci app lint at its root finds nothing, each side judged by its own canon', { skip: lintGate.skip, timeout: 600_000 }, async (t) => {
   if (lintGate.required) assert.fail(lintGate.required);
   const into = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-scaffold-app-'));
   const app = path.join(into, 'demo');

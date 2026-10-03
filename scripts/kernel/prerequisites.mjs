@@ -1,5 +1,5 @@
 // prerequisites.mjs — the machine-checkable half of an op's prerequisites,
-// evaluated by `api dispatch` before anything is reserved or launched. Only
+// evaluated by `starci kernel dispatch` before anything is reserved or launched. Only
 // data is read: a manifest read marked `mustExist` whose path the job's binding
 // resolves, and - for a read marked `designDrawn` (interface.implement reads.draws) -
 // that the ui record each bound implementation record proves has a settled interface.draw (the hard design gate:
@@ -101,7 +101,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
       : item.kind === 'direction-unaccepted'
         ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
       : `${op} has an unmet prerequisite (${item.kind})`));
-  return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
+  return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run starci kernel dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
 }
 
 /**

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// owed.mjs — what the running workflows wait on the SUPERVISOR for.
+// starci supervisor owed — what the running workflows wait on the SUPERVISOR for.
 //
 // Owner, 2026-09-24: "the supervisor must handle the conflicts, fix grammar, fix lint, identify the
 // out-of-scope workflow problems ... are they all to be fixed? ... because leaving workflows
@@ -37,10 +37,10 @@
 // verifies the fix and tells the owning Kernel to resolve the incident; `open` means the supervisor
 // fixes it now (modules/supervisor/supervise.yaml step owed).
 //
-//   node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]
-//   node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--force] [--json]
-//   node scripts/supervisor/owed.mjs unack --item <key> [--json]
-//   node scripts/supervisor/owed.mjs acks [--json]
+//   starci supervisor owed [--repo <path>]... [--workflow <id>]... [--all] [--json]
+//   starci supervisor owed ack --item <key> --commits <sha,...> --reason <text> [--force] [--json]
+//   starci supervisor owed unack --item <key> [--json]
+//   starci supervisor owed acks [--json]
 //
 // Read-only over the product ledgers: they are opened with inspectLedger, git is read with `git log`.
 // poll.mjs prints the OWED lines every cycle; the Workers controller opens their Decision Items.
@@ -122,7 +122,7 @@ export const labelsOf = (kind, text) => LABEL_RULES.filter(([, test]) => test(St
 /** What the supervisor does about one OWED item, by what it is (the owner's grant: fix it, never ask). */
 export function actionOf(item) {
   const wf = item.workflowId, id = item.incidentId;
-  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: api incident --workflow ${wf} --resolve ${id} --by supervisor --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
+  if (item.fixedBy) return `verify ${item.fixedBy.sha.slice(0, 9)} fixed it, then tell ${wf}'s Kernel: starci kernel incident --workflow ${wf} --resolve ${id} --by supervisor --detail "fixed by .claude ${item.fixedBy.sha.slice(0, 9)}: <what changed>" (else fix it now)`;
   const l = new Set(item.labels ?? []);
   if (item.pattern) {
     switch (item.pattern) {
@@ -396,7 +396,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         (SELECT settle_json FROM op_attempts a WHERE a.job_id=jobs.job_id ORDER BY attempt_id DESC LIMIT 1) AS result_json,
         created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id`).all(wf)
         .map((j) => withPayload(j));
-      // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain,
+      // An attempt settled peer-blocked (starci kernel settle: every red check was a peer's change) is not a failure of the chain,
       // nor one whose settle spent no business retry (engine/admission.mjs retryDisposition: a host terminal wipe's
       // retryClass environment, a proven no-effect launch, an owner answer).
       const notAFailure = new Set(jobs.filter((j) => j.status === 'failed' && (parse(j.result_json)?.peerBlocked || !retryDisposition(j).consumesBusinessRetry)).map((j) => j.job_id));
@@ -498,7 +498,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       const groups = new Map();
       for (const r of rejects) {
         const p = parse(r.payload_json);
-        // A write set another job's lease still owns is a wait, not a launcher failure: api dispatch
+        // A write set another job's lease still owns is a wait, not a launcher failure: starci kernel dispatch
         // now leaves such a job queued path-lease, and refusals recorded before that change do not
         // count either. Real launcher/host failures (any other reserve reason) still do.
         if (isLeaseOverlapRefusal(p)) continue;
@@ -528,7 +528,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         put(wf, 'reroute-loop', r.job, r.since, `queued job ${r.job} routed ${r.n} times without a dispatch`, { jobs: [r.job], lastFailureAt: r.last });
       }
     } catch { /* no events */ }
-    // Settled work that really owes work (api status staleOperations): an owner-declared breaking change or an
+    // Settled work that really owes work (starci kernel status staleOperations): an owner-declared breaking change or an
     // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
     // counts (work-ownership.mjs).
     try {
@@ -627,10 +627,10 @@ export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), 
 /* ------------------------------------------------------------ CLI */
 
 const USAGE = [
-  'use: node scripts/supervisor/owed.mjs [--repo <path>]... [--workflow <id>]... [--all] [--json]',
-  '     node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text> [--repo <path>]... [--force] [--json]',
-  '     node scripts/supervisor/owed.mjs unack --item <key> [--json]',
-  '     node scripts/supervisor/owed.mjs acks [--json]',
+  'use: starci supervisor owed [--repo <path>]... [--workflow <id>]... [--all] [--json]',
+  '     starci supervisor owed ack --item <key> --commits <sha,...> --reason <text> [--repo <path>]... [--force] [--json]',
+  '     starci supervisor owed unack --item <key> [--json]',
+  '     starci supervisor owed acks [--json]',
 ].join('\n');
 
 /** Every classified item across `repos` (read-only handles): {repos, items}. */

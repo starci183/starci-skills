@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // task-update.mjs — the calls.yaml `task-update` call as a callable function.
-//   node scripts/api/orca/task-update.mjs --id <task_id> --status <status> [--result <json>] [--run <run_id>] [--from <handle>]
+// Internal entry: spawned by scripts/kernel/launch-smoke.mjs; not invoked directly.
+// Args: --id <task_id> --status <status> [--result <json>] [--run <run_id>] [--from <handle>]
 // Returns {ok, taskId, status} — taskId is result.task.id. --result is JSON;
 // objects are serialized by orcaCall. Settle and finish use it to close the
 // operation Task they opened, so a job that ends leaves no open Task in the

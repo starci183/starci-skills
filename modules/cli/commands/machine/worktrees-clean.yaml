@@ -1,0 +1,28 @@
+group: machine
+verb: worktrees-clean
+owner: runtime
+summary: remove clean lane worktrees already merged into local main
+impl: {module: scripts/machine/worktrees-clean.mjs, export: worktreesClean}
+effect: local-write
+roles: [coordinator, owner]
+conventions:
+  - this verb is separate from the existing machine worktrees counts, gc and resume inspector
+  - only non-primary worktrees under STARCI_LANES_ROOT or the derived starci-lanes root are candidates
+  - a candidate branch must be merged into local main and have no uncommitted tracked change
+  - every path is inspected with lstat and links are removed as links before Git or Orca removes the worktree
+  - --dry-run prints the exact selected worktrees and changes nothing
+flags:
+  - {name: dry-run, type: boolean, summary: print eligible removals without changing worktrees}
+  - {name: only, type: string, summary: "limit candidates by branch, directory name or lanes-relative glob"}
+positional: []
+exit:
+  "0": every eligible worktree was removed or reported by dry-run
+  "1": a dirty, unmerged or failed worktree was refused
+  "2": usage or lanes-root discovery was refused
+json: starci/worktrees-clean@1
+examples:
+  - starci machine worktrees-clean --dry-run
+  - starci machine worktrees-clean --only 'lane/dv-*' --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: [bash cleanup-worktrees.sh]

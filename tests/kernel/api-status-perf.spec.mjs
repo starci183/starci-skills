@@ -11,7 +11,7 @@ import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { KERNEL_REV_ACKED_EVENT } from '../../scripts/kernel/runtime-rev.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
-// api status took 26-31 s per workflow under load (8 s idle) on the live nivo ledger: nearly all of it process
+// starci kernel status took 26-31 s per workflow under load (8 s idle) on the live nivo ledger: nearly all of it process
 // starts. runtime-rev.mjs re-resolved the current runtime rev once per running job and re-diffed the same commit
 // pair on every call, two typed waits naming the same --until-commit target ran the same git reads twice, and the
 // Orca reads of every worker terminal ran one after another. Status now memoises read-only git reads (within the
@@ -131,7 +131,7 @@ const stable = (value) => (Array.isArray(value) ? value.map(stable)
 const duplicates = (list) => [...new Set(list.filter((item, index) => list.indexOf(item) !== index))];
 const pinnedGitReads = (reads) => reads.filter((argv) => /\b[0-9a-f]{40}\b/.test(argv) && /\b(rev-parse|diff|show)\b/.test(argv));
 
-test('api status runs no git read twice in one call, and a repeat call runs none of its commit-pinned reads', (t) => {
+test('starci kernel status runs no git read twice in one call, and a repeat call runs none of its commit-pinned reads', (t) => {
   const fx = fixture(t);
   const cold = fx.status();
   assert.equal(cold.out.kernelRev.stale, true, 'the fixture is a stale Kernel: runtime-rev diffs A..B');
@@ -155,7 +155,7 @@ test('api status runs no git read twice in one call, and a repeat call runs none
   assert.deepEqual(warm.out.workers.map((w) => [w.jobId, w.terminalHandle, w.connected]), [['job-d1', 'term_w1', true], ['job-d2', 'term_w2', true]]);
 });
 
-test('api status output is identical with the memo off, cold and warm', (t) => {
+test('starci kernel status output is identical with the memo off, cold and warm', (t) => {
   const fx = fixture(t);
   fx.restore(); const off = fx.status({ STARCI_STATUS_MEMO: 'off' });
   fx.restore(); const cold = fx.status();

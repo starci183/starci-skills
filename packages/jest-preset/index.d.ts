@@ -12,7 +12,7 @@ export { FakeClock } from "./clock"
 export { fakeIds, FakeIds } from "./ids"
 export { RefusalReason } from "./matchers"
 
-/** The coverage scope `hfs sync` renders from the slot manifest: the measured roots (a directory pattern per measured slot, a placeholder folder written as a star), the logic roles measured in them and the directories inside a root that are never measured (each ending in a double star). */
+/** The coverage scope `starci app sync` renders from the slot manifest: the measured roots (a directory pattern per measured slot, a placeholder folder written as a star), the logic roles measured in them and the directories inside a root that are never measured (each ending in a double star). */
 export interface StarciCoverageScope {
   readonly roots: readonly string[]
   readonly roles: readonly string[]

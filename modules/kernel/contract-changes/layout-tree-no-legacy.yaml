@@ -10,7 +10,7 @@ paths:
   - modules/schemas/work-layout-tree.schema.yaml
   - modules/schemas/index.yaml
   - modules/kernel/dispatch.yaml
-  - modules/kernel/api-commands/incident.yaml
+  - modules/cli/commands/kernel/incident.yaml
   - modules/ops/ops/brand.decide.yaml
   - modules/ops/ops/interface.audit.yaml
   - modules/ops/ops/interface.draw.yaml

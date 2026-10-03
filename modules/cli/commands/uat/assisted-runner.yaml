@@ -1,0 +1,23 @@
+group: uat
+verb: assisted-runner
+owner: runtime
+summary: inspect and run a prepared assisted UAT request
+impl: {script: scripts/uat/assisted-runner.mjs}
+positional:
+  - {name: action, enum: [inspect, start, status, wait, signal, run], required: true, variadic: false}
+flags:
+  - {name: request, type: string, required: true, summary: absolute path of the prepared request YAML}
+  - {name: receipt, type: string, required: true, summary: absolute path of the new receipt YAML}
+  - {name: after, type: number, summary: wait until the session revision is past this number}
+  - {name: value, type: enum, enum: [ok, fail, cancel], summary: signal to send to the waiting session}
+  - {name: actor, type: string, summary: "who sends the signal (default is the user)"}
+exit: {"0": action completed, "1": the request was refused or the session failed, "2": bad usage}
+json: always
+examples:
+  - starci uat assisted-runner inspect --request <request.yaml> --receipt <receipt.yaml>
+  - starci uat assisted-runner signal --request <request.yaml> --receipt <receipt.yaml> --value ok
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/uat/assisted-runner.mjs
+  - node .claude/scripts/uat/assisted-runner.mjs

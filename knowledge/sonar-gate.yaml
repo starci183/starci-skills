@@ -20,7 +20,7 @@ gate:
 newCode:
   # Coverage of the measured logic files only (the `ruleParams.be.logicRoles` roles of the `coverage: required` slots). The be unit run writes coverage/lcov.info (@starci/jest-preset coverageReporters lcov) and the
   # managed sonar-project.properties imports it (sonar.javascript.lcov.reportPaths=be/coverage/lcov.info) with
-  # sonar.coverage.exclusions = the complement of the measured files (SonarQube has no coverage inclusions), rendered by hfs sync from the one derivation scripts/hfs/coverage-scope.mjs (be/jest.config.js and codecov.yml
+  # sonar.coverage.exclusions = the complement of the measured files (SonarQube has no coverage inclusions), rendered by starci app sync from the one derivation scripts/hfs/coverage-scope.mjs (be/jest.config.js and codecov.yml
   # are rendered from it too; a hand edit of any of them is R204 HFS_COVERAGE_SCOPE_DRIFT). The feature tier, declaration files, tests and
   # fe/ are never coverage targets, so coverage on these conditions is the coverage of the modules' logic alone.
   coverage:
@@ -40,11 +40,11 @@ newCode:
     metric: new_security_hotspots_reviewed
     minReviewedPercent: 100
     unreviewedMax: 0
-# The whole code, not only the new code. Every finding of the HFS canon reaches Sonar through ONE entry, `hfs lint`
+# The whole code, not only the new code. Every finding of the HFS canon reaches Sonar through ONE entry, `starci app lint`
 # (packages/hfs, contract changes hfs-sonar-import and hfs-lint-entry), which writes ONE file, reports/lint.sonar.json
-# (`npm run lint -- --sonar reports/lint.sonar.json`), named by sonar.externalIssuesReportPaths; the gate holds the open-issue count of
+# (`starci app lint --sonar reports/lint.sonar.json`), named by sonar.externalIssuesReportPaths; the gate holds the open-issue count of
 # the whole project at zero. The file carries three engines:
-#   starci-hfs   the repository findings of `hfs check` (managed files, tree, pins, CI, contracts; the rule id is the finding code)
+#   starci-hfs   the repository findings of `starci app check` (managed files, tree, pins, CI, contracts; the rule id is the finding code)
 #   eslint       ESLint's json over the repository (the BE and FE canon plugins alike, per-file and project-graph rules)
 #   stylelint    stylelint's json over the style glob (front ends)
 # The engines share ONE placement rule (a finding on a file Sonar does not index is filed on the first source file); Sonar's own
@@ -103,7 +103,7 @@ reasoning: |
   overall issues 0 and overall duplication 3: the server gate is also the owner's definition of done for the HFS canon:
   a repository that carries any open ESLint, stylelint or HFS finding is not green, whatever the age of the line. The
   op slice keeps judging changed lines (an op cannot fix a repository's whole backlog); the dashboard and CI show the
-  whole-project condition. Adopting a repository therefore means clearing its imported findings, which `hfs check`,
+  whole-project condition. Adopting a repository therefore means clearing its imported findings, which `starci app check`,
   eslint and stylelint already demand at land.
   hotspots 0 unreviewed: a hotspot is a question the author must answer; on changed lines it is answered in the
   same slice.

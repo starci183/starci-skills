@@ -19,13 +19,13 @@
 schema: starci/hfs-rules@2
 version: 2.0.0
 gates:
-  pre-commit: the managed .husky/pre-commit at the app root - hfs work-hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
-  pre-push: typecheck, lint (hfs lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
-  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, hfs lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at api settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
+  pre-commit: the managed .husky/pre-commit at the app root - starci app hygiene (staged .starciwork and .starcistacks paths, secrets guard), typecheck, ESLint per side and stylelint on the staged files, prettier --check, the unit specs the staged files touch
+  pre-push: typecheck, lint (starci app lint), format:check and the unit specs affected since origin/main; runs every pre-commit rule again
+  settle: the op gate scripts/gates/gate.mjs over the op's changed files (merge guard, starci app lint --changed, codegen, tsc, the slice's specs; only findings new against the workflow's previous checkpoint block), re-read at starci kernel settle, which refuses a red done; a green settle commits the op's checkpoint on wf-<workflowId>
   land: the workflow's finish, the only time main is touched - gate.mjs over the whole workflow branch against its merge-base with main, the merge guard, review.verify of the exact head that lands, the branch rebased onto main, then main fast-forwarded and pushed
-  ci: GitHub Actions runs the same pinned hfs lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
+  ci: GitHub Actions runs the same pinned starci app lint, format:check, typecheck, unit with the per-file coverage threshold, build:be and build:fe, then the Sonar scan and gate
   sonar: Sonar quality gate (knowledge/sonar-gate.yaml) - the imported lint findings, duplication, cognitive complexity and the coverage of the logic of be/src/modules at 100
-  runtime: "`starci check` (npm run check) of the StarCi runtime repository itself: scripts/checks/check-runtime.mjs runs node --check, scripts/hfs/runtime-check.mjs with knowledge/hfs/runtime-slots.yaml, and the retained self-checks"
+  runtime: "`starci runtime check` (npm run check) of the StarCi runtime repository itself: scripts/checks/check-runtime.mjs runs node --check, scripts/hfs/runtime-check.mjs with knowledge/hfs/runtime-slots.yaml, and the retained self-checks"
 enforcerKinds:
   eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
   eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
@@ -144,7 +144,7 @@ rules:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/hfs/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
-    law: "CI runs the pinned `hfs lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky."
+    law: "CI runs the pinned `starci app lint` (`npm run lint`), and a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
@@ -1066,7 +1066,7 @@ rules:
       - {kind: eslint-be, id: tests-keep-constraints}
   - id: R101
     code: "BE_TEST_BUILDER_ARRANGES"
-    law: "A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `jest`, `@jest/globals`) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`)."
+    law: "A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `@jest/globals` or the Jest namespace) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`)."
     kinds: [lint]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TEST_BUILDER_ARRANGES"]
@@ -1313,7 +1313,7 @@ rules:
       - {kind: hfs, id: monorepo, at: scripts/hfs/rules/monorepo.mjs}
   - id: R144
     code: "HFS_MONO_FE_WORKSPACE"
-    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: hfs lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
+    law: "Every fe app `fe/apps/<app>` is an npm workspace: its `package.json` is named `@<project>/<app>`, is private, declares its own runtime dependencies and has exactly the scripts `build: next build`, `dev: next dev`, `lint: starci app lint --workspace .`, `start: next start` and `typecheck: tsc --noEmit`; every fe package `fe/packages/<pkg>` is private with `build`, `typecheck` and the same workspace `lint` script."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_MONO_FE_WORKSPACE"]
@@ -1491,7 +1491,7 @@ rules:
       - {kind: hfs, id: services-stack-declaration, at: scripts/hfs/rules/services.mjs}
   - id: R166
     code: "HFS_EVENT_CONTRACT"
-    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `hfs emit-contracts` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
+    law: "The async contract between services is vendored under `be/contracts/<service>/events.json` (`starci/event-contract@1`, emitted by `starci app emit` from the literal `EVENTS` table of `be/apps/<service>/src/events.ts`, never written by hand) and equals that table; an event that undoes the step of another declares `compensates: \"<event>\"` and the named event must exist in a contract; a consumer declares what it reads in the literal `CONSUMES` table of `be/apps/<app>/src/consumes.ts` (service, event, version), every entry must exist in the provider's vendored snapshot at the same version, and a missing or stale snapshot, an unknown event or a version mismatch is a finding."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_EVENT_CONTRACT"]
@@ -1595,7 +1595,7 @@ rules:
       - {kind: eslint-be, id: context-platform-tables}
   - id: R179
     code: "BE_KIND_DECLARATION"
-    law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `hfs add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
+    law: "`hfs.json` `sides.be.kinds` lists exactly the trigger kinds (api, webhooks, realtime, saga, reactors, jobs, cli) the back end uses: a kind in use that is not declared, a declared kind with no feature, a declared kind whose patterns (`ruleParams.be.kindPatterns`, e.g. jobs needs fenced-job and queue) are missing from `sides.be.patterns`, and a declared kind whose platform capabilities (the tier-platform slots naming those patterns) are not tracked are each a finding. A kind is declared only when it is used; `starci app add <noun> <name>` creates the first member, the platform capabilities it needs and the registration."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["BE_KIND_DECLARATION"]
@@ -1659,7 +1659,7 @@ rules:
       - {kind: eslint-be, id: realtime-topic-scope}
   - id: R187
     code: "HFS_DOCKER_BUILD_CONTEXT"
-    law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
+    law: "Every app image is built from the app root: the header comment of an app's Dockerfile states `starci docker build <app>` for its own path, and no COPY or ADD source leaves the build context (a `..` segment or an absolute path)."
     kinds: [check]
     gates: [settle, land, ci]
     failureCodes: ["HFS_DOCKER_BUILD_CONTEXT"]
@@ -1742,6 +1742,51 @@ rules:
     failureCodes: ["RT_PROSE_RESTATES_SLOTS"]
     enforcers:
       - {kind: runtime, id: prose-restates, at: scripts/hfs/runtime-rules/prose-restates.mjs}
+  - id: R197
+    code: "RT_RETIRED_CLI_CALL"
+    law: "No tracked file invokes a command the unified CLI removed: the retired kernel, hfs, test-stack and top-level runtime spellings listed in the `removed` fields of the catalog and in the dispatcher table; those fields, changelogs and contract-change history are exempt."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_RETIRED_CLI_CALL"]
+    enforcers:
+      - {kind: runtime, id: retired-cli, at: scripts/checks/check-retired-cli.mjs}
+  - id: R198
+    code: "RT_CLI_CATALOG_DRIFT"
+    law: "Every generated output of the unified CLI catalog (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) equals what scripts/cli/gen-catalog.mjs writes from modules/cli/commands."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_CATALOG_DRIFT"]
+    enforcers:
+      - {kind: runtime, id: cli-catalog-drift, at: scripts/cli/gen-catalog.mjs}
+  - id: R199
+    code: "RT_CLI_VERB_PARITY"
+    law: "The CLI catalog of modules/cli/commands and the implementation agree: every catalog verb has a handler and a doc, every kernel verb module and cli.mjs dispatch case has a catalog file, and every --flag a verb module names (usage, required, api-boolean-flags.txt) is a catalog flag."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_VERB_PARITY"]
+    enforcers:
+      - {kind: runtime, id: cli-parity, at: scripts/checks/check-cli-parity.mjs}
+  - id: R200
+    code: "RT_CLI_APP_ONLY_TEMPLATES"
+    law: "Managed app templates and their generated runtime copies invoke product actions only through `starci app <verb>`; retired hfs and test-stack commands, and any other starci group, are forbidden there."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["RT_CLI_APP_ONLY_TEMPLATES"]
+    enforcers:
+      - {kind: runtime, id: cli-app-only-templates, at: scripts/hfs/runtime-rules/app-cli-templates.mjs}
+  - id: R201
+    code: "CLI_ONLY_ENTRY"
+    law: "Every action enters runtime code through `starci <group> <verb>`: tracked prompts, docs, skills, knowledge files, configs, CI files, hooks and scheduled-task registrations do not bypass the catalog through direct runtime scripts or package-script wrappers; the dispatcher and the specs' own spawn helpers are the declared exceptions."
+    scope: runtime
+    kinds: [check]
+    gates: [land, runtime]
+    failureCodes: ["CLI_ONLY_ENTRY"]
+    enforcers:
+      - {kind: runtime, id: cli-only-entry, at: scripts/checks/check-cli-only-entry.mjs}
   - id: R202
     code: "CI_UPLOAD_NOT_SILENT"
     law: "A coverage upload of a CI workflow never skips or fails silently: every step that uses codecov/codecov-action, in a root workflow, an example workflow or a template workflow of packages/hfs, authenticates by OIDC (`use_oidc: true`, with `permissions: id-token: write` on the job or the workflow), sets `fail_ci_if_error: true`, has no `continue-on-error`, and has no `if` that reads a secret or CODECOV_TOKEN, so a missing token can never turn the upload into a skipped step."
@@ -1903,11 +1948,6 @@ retired:
   - {id: R218, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R219, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R220, reason: "reserved for a lane that has not landed yet (SMELL-FIX R206+, LITE R212-R220, COVERAGE R203-R204 landed); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R197, reason: "reserved for the CLI lane (RT_RETIRED_CLI_CALL); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R198, reason: "reserved for the CLI lane (RT_CLI_CATALOG_DRIFT); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R199, reason: "reserved for the CLI lane (RT_CLI_VERB_PARITY); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R200, reason: "reserved for the CLI lane (RT_CLI_APP_ONLY_TEMPLATES); the id returns to the catalog when that lane lands, never a rule of this block"}
-  - {id: R201, reason: "reserved for the CLI lane (CLI_ONLY_ENTRY); the id returns to the catalog when that lane lands, never a rule of this block"}
   - {id: R66, reason: "FE_E2E_SHAPE retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R67, reason: "FE_SPEC_QUALITY retired with eslint-canon-fe 7.0.0: a front end has no tests by standard"}
   - {id: R123, reason: "RT_PENDING_STALE retired with the pending list itself: ruleParams.runtime.pending and its pending-ratchet enforcer are gone; nothing ratchets a tolerated-finding list"}

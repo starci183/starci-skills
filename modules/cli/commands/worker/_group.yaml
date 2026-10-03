@@ -1,0 +1,4 @@
+group: worker
+summary: start, inspect and completely close supervised Orca workers
+owner: runtime
+since: 1.0.0-alpha.4

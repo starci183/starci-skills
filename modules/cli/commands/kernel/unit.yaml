@@ -1,0 +1,62 @@
+# The contract of `starci kernel unit` (scripts/kernel/verbs/unit.mjs): the work units of a workflow and their try budgets.
+group: kernel
+verb: unit
+owner: runtime
+summary: the work units and their try budgets; only the owner or Supervisor raises one
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - unit
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+  - name: unit
+    type: string
+    summary: one work unit; every unit of the workflow when omitted
+  - name: raise-budget
+    type: number
+    summary: new try budget, an integer above the current one (needs --unit, --by and --ref)
+  - name: by
+    type: enum
+    enum:
+      - owner
+      - supervisor
+    summary: who raises the budget; required with --raise-budget
+  - name: ref
+    type: string
+    summary: decision item or incident that asked for the raise; required with --raise-budget
+exit:
+  "0": shown or raised
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel unit --repo <path> --workflow <workflow>
+  - starci kernel unit --repo <path> --workflow <workflow> --unit <unit> --raise-budget 4 --by owner --ref <ref>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api unit
+  - node scripts/kernel/cli.mjs unit
+purpose: "Every op job is a try of exactly one work unit (scripts/kernel/units.mjs; DBTREE
+  work_units): one op, one subject key (cut id#ordinal, params.subject, else the digest of its
+  records or owned paths) and one goal revision. A unit has a try budget (default 5, Q13); api
+  enqueue, graph-edit and the failure routes refuse a try past it (unit-try-budget-exhausted). This
+  verb shows the units and lets the owner or the Supervisor raise one budget, always with who and
+  why - never a Kernel."
+reads: work_units of the workflow
+writes: "with --raise-budget: work_units.try_budget, budget_raised_by, budget_raised_ref and one
+  unit-budget-raised event (engine/db/ledger.mjs raiseTryBudget); nothing else"
+returns: "{ok, workflowId, units:[{unitId, op, subjectKey, state, tries, budget, exhausted,
+  currentJobId, reopen?}]} | {ok, workflowId, unitId, from, tryBudget, by, ref, tries}"
+refusals:
+  workflow-unknown: the workflow is not in this ledger
+  unit-unknown: --unit names no work unit of the workflow
+  unit-budget-raiser: --by is neither owner nor supervisor (Q13)
+  unit-budget-unexplained: --ref is missing
+  unit-budget-invalid: the new budget is not an integer above the current one

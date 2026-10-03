@@ -2,7 +2,7 @@
 // check-module-yaml.mjs — every YAML file under modules/ and knowledge/ parses with the one
 // reader the runtime uses (engine/yaml.mjs). The same break reached knowledge/**/*.yaml (be/test.yaml,
 // 2026-09-29) and only the land gate caught it, so knowledge/ is parsed here too.
-//   node scripts/checks/check-module-yaml.mjs [--json]
+//   starci runtime check --only module-yaml -- [--json]
 // A supervisor edit left modules/ops/_common.yaml unparseable (an unquoted
 // ": " inside a plain scalar) and `npm run check` stayed green, because only
 // op manifests were parsed; ops and kernels read that document live. Exit 0 is

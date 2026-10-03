@@ -1,0 +1,40 @@
+group: workflow
+verb: start
+owner: runtime
+summary: claim the oldest queued goal and boot its one long-lived Kernel agent
+impl:
+  script: scripts/kernel/start-workflow.mjs
+flags:
+  - name: repo
+    type: string
+    summary: "repository whose .starciwork ledger holds the queue (default: the working directory)"
+  - name: goal
+    type: string
+    summary: explicit workflow_id to boot instead of the oldest queued
+  - name: agent
+    type: string
+    summary: override the routed kernel agent
+  - name: launched-by
+    type: enum
+    enum: [watchdog, supervisor]
+    default: supervisor
+    summary: provenance of an automated start
+  - name: plan
+    type: boolean
+    summary: resolve and report the launch without starting anything
+exit:
+  "0": kernel booted or already live
+  "1": refusal or launch failure
+  "2": bad usage
+  "3": the previous Kernel dispatch is still alive
+  "75": Orca is not answering (host unavailable)
+json: flag
+examples:
+  - starci workflow start
+  - starci workflow start --repo <path> --goal <workflow_id>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci start
+  - node scripts/kernel/start-workflow.mjs

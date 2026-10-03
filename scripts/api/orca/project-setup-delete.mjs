@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // project-setup-delete.mjs — the calls.yaml `project-setup-delete` call as a callable function.
-//   node scripts/api/orca/project-setup-delete.mjs --setup <setup-id>
+// Internal entry: spawned by scripts/machine/worktree-orca.mjs; not invoked directly.
+// Args: --setup <setup-id>
 // Removes a project host setup. A repo-backed setup's id is the repo id `repo add` answered, and deleting it removes the
 // repository registration (Orca has no `repo rm`): a live spec that registered a throwaway repository removes it here.
 // Returns {ok, error, errorCode, hostUnavailable}.

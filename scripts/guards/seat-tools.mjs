@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guardsRoot } from './guards-root.mjs';
+import { readInput } from './hook-io.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 
@@ -24,14 +25,13 @@ export function seatToolDecision({ handle, toolName, root = skillRoot }) {
   return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents bypass [Worker] jobs, leases and the land gate - queue a [Worker] job instead (modules/supervisor/supervisor-prompt.md).` };
 }
 
-if (isMain(import.meta.url)) {
-  let input = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk) => { input += chunk; });
-  process.stdin.on('end', () => {
-    let toolName = null;
-    try { toolName = JSON.parse(input)?.tool_name ?? null; } catch { /* no decision on unreadable input */ }
-    const decision = seatToolDecision({ handle: readEnv('ORCA_TERMINAL_HANDLE'), toolName });
-    if (decision) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: decision.reason } }));
-  });
+/** Exported hook entry for the published CLI's in-process guard fast path. */
+export async function main({ stdin = process.stdin, stdout = process.stdout, env = process.env, root = skillRoot } = {}) {
+  let toolName = null;
+  try { toolName = JSON.parse(await readInput(stdin))?.tool_name ?? null; } catch { return 0; }
+  const decision = seatToolDecision({ handle: readEnv('ORCA_TERMINAL_HANDLE', env), toolName, root });
+  if (decision) stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: decision.reason } })}\n`);
+  return 0;
 }
+
+if (isMain(import.meta.url)) process.exitCode = await main();

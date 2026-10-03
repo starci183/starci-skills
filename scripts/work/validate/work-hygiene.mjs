@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // work-hygiene.mjs — the parse, scoped-validate and secret checks a product repo's Work files owe before they are
-// committed (the pre-commit hook scripts/guards/hook-install.mjs installs) and before an op settles (api settle).
-//   node scripts/work/validate/work-hygiene.mjs staged --repo <root> [--json]     the staged files of <root>, from the index
-//   node scripts/work/validate/work-hygiene.mjs files  --repo <root> [--json] <file>...   the named files, from disk
+// committed (the pre-commit hook scripts/guards/hook-install.mjs installs) and before an op settles (starci kernel settle).
+//   starci work hygiene staged --repo <root> [--json]     the staged files of <root>, from the index
+//   starci work hygiene files  --repo <root> [--json] <file>...   the named files, from disk
 // Two failure classes slipped through on 2026-09-29: YAML the runtime loader cannot parse (a ": " inside a plain
 // scalar) was committed to a product .starciwork, and literal usernames/passwords sat in accounts.yaml files with no
 // check to flag them. Three checks, read-only, scoped to the files given (never the whole tree, never e2e):
@@ -231,6 +231,6 @@ if (isMain(import.meta.url)) {
     else { process.stderr.write('Usage: work-hygiene.mjs staged|files --repo <root> [--json] [<file>...]\n'); process.exit(2); }
   } catch (error) { process.stderr.write(`work-hygiene: ${error.message}\n`); process.exit(2); }
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else if (!result.ok) process.stderr.write(`starci work guard: refused - ${result.findings.length} finding(s) in the staged Work files (${fileURLToPath(import.meta.url).split(/[\\/]/).slice(-3).join('/')}); fix them and commit again\n${formatFindings(result)}\n`);
+  else if (!result.ok) process.stderr.write(`starci work hygiene: refused - ${result.findings.length} finding(s) in the staged Work files (${fileURLToPath(import.meta.url).split(/[\\/]/).slice(-3).join('/')}); fix them and commit again\n${formatFindings(result)}\n`);
   process.exit(result.ok ? 0 : 1);
 }

@@ -1,0 +1,19 @@
+group: work
+verb: draw-source
+owner: runtime
+summary: validate a drawing source and its fixture bindings
+impl: {script: scripts/work/draw/draw-source.mjs}
+positional:
+  - {name: source, required: true, variadic: false}
+flags:
+  - {name: fixture, type: list, summary: "props fixture JSON to type-check against; repeatable"}
+  - {name: product, type: string, summary: "product app directory (default is the source directory)"}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist], summary: grammar source preference, default: auto}
+  - {name: grammar-dist, type: string, summary: package root of the runtime-built grammar}
+  - {name: rationale, type: string, summary: rationale JSON file to check the layout values against}
+exit: {"0": the source is clean, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-source <X.draw.tsx> --product <app> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-source.mjs']

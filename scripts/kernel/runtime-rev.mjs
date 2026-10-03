@@ -4,17 +4,17 @@
 // so a later runtime change (grammar, knowledge, prompts, op manifests) never reached a running Kernel
 // without a restart (nine Kernels were restarted that day). Instead the runtime tells it what to re-read:
 //   - the runtime revision is the runtime root's git HEAD (contract-version.mjs runtimeShaOf);
-//   - the Kernel records the revision it has read with `api kernel-ack-rev` (event runtime-rev-acked);
+//   - the Kernel records the revision it has read with `starci kernel kernel-ack-rev` (event runtime-rev-acked);
 //     start-workflow records the boot revision the same way (source boot);
 //   - every Kernel wake carries `Runtime rev <short-sha>` (revWakeLine) and, when the acked revision is
 //     behind, the kernel-relevant files that changed in between (KERNEL_REV_PATHS) plus the
 //     contract-change entry files added in between, one line each - or, past REV_DIFF_MAX_FILES or
 //     for a revision git no longer knows, "re-read kernel-prompt.md and driver-loop.yaml in full";
-//   - until the Kernel acks the current revision, api enqueue / dispatch of a leg whose op contract
+//   - until the Kernel acks the current revision, starci kernel enqueue / dispatch of a leg whose op contract
 //     (contractFilesOf: its brief, _common, the verdict contract, the schemas and checks it cites, the
 //     op prompt builder) or a contract change scoped to that op changed in between is refused
 //     kernel-rev-stale (opRevStale); every other leg is unaffected;
-//   - api settle compares the revision a leg was dispatched under (contracts.context_json.contract
+//   - starci kernel settle compares the revision a leg was dispatched under (contracts.context_json.contract
 //     runtimeSha) with the current one and WARNs op-rev-drift when that op's contract files changed
 //     in between (opRevDrift) - never a refusal.
 // A workflow with no runtime-rev-acked event yet (a Kernel booted before this module) is `unacked`: its
@@ -23,7 +23,7 @@
 // Runtime churn (2026-09-28: ~12 .claude lands in 90 min each made the fe-canon Kernel re-read and ack): a new
 // runtime rev asks the Kernel to re-read (kernelRev.stale, the wake line, the reread next action) ONLY when the land
 // touched the Kernel's own contract - KERNEL_CONTRACT_FILES (kernel-prompt.md, driver-loop.yaml, api.yaml,
-// api-commands/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
+// cli/commands/kernel/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
 // contract change with reach new-legs|follow-up that applies to it (its ops, an every-op change, or its paths in
 // that set). Every other land (reconciler, ui, gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code
 // silently. Coalescing: a re-read that touches no KERNEL_CONTRACT_FILES waits until REV_ACK_COALESCE_MS after the
@@ -46,10 +46,10 @@ export const KERNEL_REV_STALE = 'kernel-rev-stale';
 export const KERNEL_REV_UNKNOWN = 'kernel-rev-unknown';
 export const OP_REV_DRIFT = 'op-rev-drift';
 /** The runtime paths a Kernel's contract is read from (a directory covers what is inside it). */
-const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
+const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/cli/commands/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
 /** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
-const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/kernel/api-commands', 'modules/kernel/owner-rulings.yaml']);
+const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/cli/commands/kernel', 'modules/kernel/owner-rulings.yaml']);
 /** A re-read of op contracts / contract changes alone is asked at most once per this window after the last ack. */
 const REV_ACK_COALESCE_MS = 30 * 60_000;
 /** Contract changes with these reaches can require a Kernel re-read. */
@@ -98,7 +98,7 @@ const changesAt = (root, rev) => {
         const everyOp = !ops.length && (Boolean(c.adds?.checks?.length || c.adds?.codes?.length) || c.safetyCritical === true);
         const paths = Array.isArray(c.paths) ? c.paths.filter((p) => typeof p === 'string') : [];
         const out = { id: c.id, summary: clipLine(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
-        // reach and paths ride non-enumerable: the wake and api status keep their shape.
+        // reach and paths ride non-enumerable: the wake and starci kernel status keep their shape.
         Object.defineProperty(out, 'reach', { value: typeof c.reach === 'string' ? c.reach : null, enumerable: false });
         Object.defineProperty(out, 'paths', { value: paths, enumerable: false });
         return out;
@@ -140,7 +140,7 @@ function latestRevAck(db, workflowId) {
 }
 
 /**
- * api status kernelRev: {current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount,
+ * starci kernel status kernelRev: {current, acked, ackedAt, ackSource, stale, unacked?, full?, files[], fileCount,
  * changes[]}. stale: the acked revision is behind and a kernel-relevant file or a contract change moved
  * in between (a revision git cannot compare is stale and full). `files` is capped at REV_DIFF_MAX_FILES;
  * the whole list rides as the non-enumerable `allFiles` for the gate.
@@ -213,7 +213,7 @@ export function opRevStale(state, op, { root = revRootOf() } = {}) {
   return files.length || changes.length ? { files, changes } : null;
 }
 
-const ackCommand = (workflowId, rev) => `api kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev)}`;
+const ackCommand = (workflowId, rev) => `starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${shortRev(rev)}`;
 
 /** The one sentence a Kernel wake carries about the runtime revision (no newline); null without a revision. */
 export function revWakeLine(state, workflowId) {

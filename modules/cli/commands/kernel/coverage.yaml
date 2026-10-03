@@ -1,0 +1,50 @@
+# The contract of `starci kernel coverage` (scripts/kernel/verbs/coverage.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.coverage (lane slim-04).
+group: kernel
+verb: coverage
+owner: runtime
+summary: "show every FR, shape and proof case of the workflow's scope as proven, stale or missing"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - coverage
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+exit:
+  "0": success
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel coverage --repo <path> --workflow <workflow>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api coverage
+  - node scripts/kernel/cli.mjs coverage
+purpose: "Every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing."
+reads: the workflow's scope - its latest work graph's FRs and XBase#state shapes, the FR and ui
+  records its jobs bound, each ui record's ui.shapes and its applicable knowledge/ui proof cases
+  (scripts/work/ui/ui-proof-brief.mjs buildBrief) - and every job_artifacts row with its
+  artifact_proofs claims and dependency digests
+writes: nothing — pure projection
+returns:
+  schema: starci/proof-coverage@1
+  summary: "{proven, stale, missing, total, mustOwed}"
+  mustOwed: "[{kind, id, status}] — must-haves not proven: an FR whose requiresProof has a required kind"
+  items: "[{kind: fr|shape|case, id, must, requires?[], record?, status: proven|stale|missing,
+    evidence:[{jobId, op, attempt, path, kind, sha256, codeSha, state: fresh|stale|unbaselined,
+    changed?[]}]}] — proven: fresh (or unbaselined) evidence exists; stale: every piece of evidence
+    depends on a path whose digest moved; missing: none"
+  errors: "[{record, error}] — a ui record whose proof cases could not be listed"
+refusals:
+  workflow-unknown: no workflows row for --workflow
+usedBy: handover.review (its package lists what is not proven) and starci kernel report, which refuses a
+  handover ask while a must-have is missing or stale; the ui reads it

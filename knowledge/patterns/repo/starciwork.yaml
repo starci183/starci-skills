@@ -61,7 +61,7 @@ rules:
         - HFS_STACKS_IN_SIDE
         - HFS_PROOF_COMMAND_FILE_MISSING
       manual:
-        - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
+        - starci runtime validate <app>/.starciwork passes.
     relatedExamples: []
   - id: REPO-WORK-2
     title: Agent data is never tracked

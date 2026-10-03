@@ -2,7 +2,7 @@
 //
 // Keys:
 //   host:boot                     the boot order of DESIGN 7.7, once per HOST boot (schedules host/boot, MB-01) and when Orca comes back
-//                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
+//                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, starci kernel reconcile
 //                                 --orphan-kernel-jobs per ledger, then the seats. Seat keys wait for it.
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
@@ -18,7 +18,7 @@
 //                                 closes the old seat once, and a terminal Orca reads disconnected but still lists
 //                                 (a persisted tab) is no proof it is gone. The retry is close-verify.mjs --tree,
 //                                 proof is 'gone' or a listing without the handle, and on proof the incident is
-//                                 resolved --by supervisor through api incident. Retries back off (STALE_RETRY_MS
+//                                 resolved --by supervisor through starci kernel incident. Retries back off (STALE_RETRY_MS
 //                                 doubling to STALE_RETRY_MAX_MS); STALE_ESCALATE_TRIES failures -> one DI.
 //   seat:supervisor               scripts/supervisor/supervisor-watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
 //                                 Both seat kinds carry a TURN BUDGET (turnStep): busy in one turn (its spinner timer)
@@ -136,11 +136,11 @@ const argOf = (cmd, name) => {
   const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
 };
-const RUNTIME_LOOP = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i;
+const RUNTIME_LOOP = /(?:[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)|(?:^|\s)starci\s+workflow\s+(start)(?=\s|$))/i;
 
 /**
- * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs whose --repo no managed
- * ledger owns, whose workflow no managed ledger runs, older than minAgeMs. A process with no --repo (the
+ * Orphan runtime loops: watchdog.mjs / start-workflow.mjs / serve-ask.mjs or `starci workflow start`, whose --repo no managed ledger owns and whose workflow no managed ledger runs, older than
+ * minAgeMs. A process with no --repo (the
  * Supervisor's watchdog) and a listed repo are never orphans. Pure.
  */
 export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs, exclude = [] }) {
@@ -156,7 +156,7 @@ export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs
     if (workflowId && runningWorkflows.has(workflowId)) continue;
     const ageMs = p.created ? now - p.created : 0;
     if (!p.created || ageMs < minAgeMs) continue;
-    out.push({ pid: p.pid, script: `${m[1]}.mjs`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
+    out.push({ pid: p.pid, script: m[1] ? `${m[1]}.mjs` : `starci workflow ${m[2]}`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
   }
   return out;
 }

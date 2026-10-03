@@ -35,10 +35,10 @@ export function checkExampleDerived(workRoot, problems) {
     if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
   }
   const result = runDerive(workRoot, {write: false});
-  if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`node scripts/example/example-derive.mjs --work ${workRoot} --write\` to refresh it`);
+  if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`starci work example-derive --work ${workRoot} --write\` to refresh it`);
 
   const critiqueResult = runCritique(workRoot, {write: false});
-  if (!critiqueResult.ok) problems.push(`${workRoot}/_derived/critique.yaml or critique.md is missing or stale; run \`node scripts/example/example-critique.mjs --work ${workRoot} --write\` to refresh them`);
+  if (!critiqueResult.ok) problems.push(`${workRoot}/_derived/critique.yaml or critique.md is missing or stale; run \`starci work example-critique --work ${workRoot} --write\` to refresh them`);
 
   for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(workRoot, file).replaceAll('\\', '/');

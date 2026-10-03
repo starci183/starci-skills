@@ -1,0 +1,27 @@
+group: docker
+verb: ps
+owner: runtime
+summary: list StarCi-labelled containers with ports and health
+impl: {module: scripts/machine/docker-stack.mjs, export: dockerPs}
+effect: read
+roles: [worker, lead, coordinator, owner]
+conventions:
+  - the default view lists only containers carrying the starci.project label and their published ports
+  - --all may show a protected foreign container tagged foreign but never grants authority to mutate it
+  - published ports come from the project's 41000-44999 block
+  - never touch containers of another project (the protected local installation) or ports 3000 and 3100
+  - clean up with `starci docker down`
+flags:
+  - {name: all, type: boolean, summary: include stopped StarCi containers and visible protected foreign containers}
+positional: []
+exit:
+  "0": "the container view was printed"
+  "1": "Docker could not list containers"
+  "2": "bad usage"
+json: starci/docker-ps@1
+examples:
+  - starci docker ps
+  - starci docker ps --all --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

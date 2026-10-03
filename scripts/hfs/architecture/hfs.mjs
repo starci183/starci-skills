@@ -509,7 +509,7 @@ export function checkHfs(config) {
 
 /**
  * The HFS tree check of the app root (`resolver` is the app's): the README, the root entries the app-root slots allow and require,
- * the automatic gates (hooks, the root scripts they call, the workflows) and the hooks path. `hfs check` runs it once per app; the
+ * the automatic gates (hooks, the root scripts they call, the workflows) and the hooks path. `starci app check` runs it once per app; the
  * machine runs checkHfs once per side folder.
  */
 export function checkAppRoot({ root, resolver, tree = treeView(root) }) {

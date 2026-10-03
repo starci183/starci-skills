@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // telegram.mjs — tells the owner about an owner ask over a Telegram bot
 // (docs/connectors.md). The one send point is the KERNEL's ask path:
-// `api serve-ask` (scripts/kernel/ask-server.mjs parkAsk) calls notifyAsk()
+// `starci kernel serve-ask` (scripts/kernel/ask-server.mjs parkAsk) calls notifyAsk()
 // when an ask is parked; only an approval ask is pushed, a credential ask waits
 // under the bridge's /creds (serve-ask.mjs askClassOf). The message carries
 // the workflow, the question and its numbered options, and ONE inline button "Generate URL" — never a link:
@@ -18,11 +18,11 @@
 // answers by replying (telegram-bridge.mjs, draw-feedback.mjs). Nothing else is sent: no op progress, no incidents,
 // no finish, and never from the supervisor.
 //
-//   node scripts/connectors/telegram.mjs notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id> [--repo <path>]
+//   starci connect telegram notify --ledger <runtime.sqlite> --workflow <id> --dispatch <id> [--repo <path>]
 //       (re-)send the notice of one open ask (deduped: an ask with an open notice is not sent again)
-//   node scripts/connectors/telegram.mjs sweep          delete the notices of asks that closed, drop dead links
-//   node scripts/connectors/telegram.mjs discover-chat   getUpdates -> chat ids (id, type, name only)
-//   node scripts/connectors/telegram.mjs test            one test message to connectors.telegram.chatId
+//   starci connect telegram sweep          delete the notices of asks that closed, drop dead links
+//   starci connect telegram discover-chat   getUpdates -> chat ids (id, type, name only)
+//   starci connect telegram test            one test message to connectors.telegram.chatId
 //
 // Messages are plain text in config.yaml `language` (vi, else en). The link a
 // served form gets is its nonce path on the public tunnel host
@@ -436,7 +436,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
 
 /**
  * Take one ask off the chat once it no longer waits: answered (serve-ask on submit, auto-accept) or
- * retired (api retire-ask, a superseding ask). Every message that shows it is DELETED (owner,
+ * retired (starci kernel retire-ask, a superseding ask). Every message that shows it is DELETED (owner,
  * 2026-09-24: "delete it once answered"); one Telegram refuses to delete is edited to say it was answered,
  * with the question kept and no link or button. Never throws; an ask with no message (or Telegram
  * off) is a no-op. Returns {ok, reason, deleted:[ids], edited:[ids], failed:[ids]}; a failed one
@@ -591,7 +591,7 @@ async function main() {
     const result = await sendMessage({ token, chatId: telegram.chatId, text: textFor(config.language).test, apiBase });
     out(result); if (!result.ok) process.exitCode = 1; return;
   }
-  console.error('usage: telegram.mjs notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
+  console.error('usage: starci connect telegram notify --ledger <file> --workflow <id> --dispatch <id> [--repo <path>] | sweep | discover-chat | test');
   process.exit(2);
 }
 

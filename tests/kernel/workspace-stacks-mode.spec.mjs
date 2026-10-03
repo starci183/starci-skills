@@ -25,7 +25,7 @@ test('workspace.manage owns the .starcistacks tree through its stacks mode', () 
   }
   const proof = stacks.proofs.find(p => p.id === 'stacks-conformant');
   assert.ok(proof && fs.existsSync(path.join(ROOT, proof.check)), 'the proof cites the stacks check on disk');
-  assert.match(proof.requirement.en, /stacks check/);
+  assert.match(proof.requirement.en, /starci gate starcistacks <repo-root>/);
 });
 
 test('the stacks mode is a kernel-set param: the kernel may select it, a goal leg may not', () => {

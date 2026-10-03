@@ -10,7 +10,7 @@
 //     caller's work;
 //   - a flush never runs while this process holds a ledger write transaction (ledgerTransactionDepth): it waits for the
 //     next tick instead of waiting on a lock its own thread holds;
-//   - `write()` (api log, settle, a read's sync) flushes its rows before it returns, so the caller's own rows are
+//   - `write()` (starci kernel log, settle, a read's sync) flushes its rows before it returns, so the caller's own rows are
 //     durable (committed to the WAL) when it exits; queued rows are flushed on process exit too. A commit never waits
 //     for another writer's fsync (synchronous=NORMAL in WAL fsyncs at checkpoint, not per commit);
 //   - an SQLite authorizer on the connection refuses any INSERT/UPDATE/DELETE outside logs, log_cursors and

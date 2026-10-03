@@ -3,7 +3,7 @@
 // Orca's terminal-send receipt is not proof either way: a provider that is
 // running a turn queues the typed text and Orca answers agent_prompt_stalled
 // (calls.yaml terminal-send), and agent_prompt_blocked is followed by one
-// Enter-only send (scripts/api/orca/terminal-send.mjs enterRetry). `api nudge`
+// Enter-only send (scripts/api/orca/terminal-send.mjs enterRetry). `starci kernel nudge`
 // reported terminal-send-failed for wakes that sat on the worker's screen
 // (inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f part 2). The frame
 // read before the send and the frames read after it decide:
@@ -45,7 +45,7 @@
 // 2026-09-25: 'check status' no key could clear, an empty box on screen): it is recorded as the note
 // draftNote 'draft-stale' (staleDraft: its text), never refused, and the wake is typed as if the box
 // were empty; the frames read after the send ignore that same stale text, and the delivery proof
-// stays the backstop. `staleDrafts` names drafts a caller already probed stale (api nudge).
+// stays the backstop. `staleDrafts` names drafts a caller already probed stale (starci kernel nudge).
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalShow } from '../api/orca/terminal-show.mjs';
@@ -103,7 +103,7 @@ const shellRefusal = (after, text, before, extra) => {
 const isLost = (proof) => proof?.delivery === 'unproven' && proof.screenState === 'turn-idle';
 
 /**
- * The receipt/event fields a proven wake adds (api nudge, the transition wake,
+ * The receipt/event fields a proven wake adds (starci kernel nudge, the transition wake,
  * the watchdog, the ask-answered wake):
  * {delivery, evidence, sendErrorCode?, enterRetried?, splitRetried?, splitOutcome?}.
  */
@@ -318,9 +318,9 @@ const kernelAttemptOf = (db, workflowId) => {
   const attempt = parseJson(db.prepare("SELECT payload_json FROM jobs WHERE job_id=? AND kind='kernel'").get(`kernel-${workflowId}`)?.payload_json)?.hierarchy?.attempt;
   return Number.isInteger(attempt) ? attempt : null;
 };
-/** The sentence every Kernel wake ends with: the seat it is for, which the Kernel checks against `api status` (kernel.attempt, kernel.you). */
+/** The sentence every Kernel wake ends with: the seat it is for, which the Kernel checks against `starci kernel status` (kernel.attempt, kernel.you). */
 export const wakeIdentity = (workflowId, attempt) =>
-  `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: api status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
+  `Runtime wake for Kernel attempt ${attempt} of ${workflowId}: starci kernel status --workflow ${workflowId} shows kernel.attempt ${attempt} and kernel.you true on your terminal.`;
 /**
  * `text`, then the runtime-rev sentence (runtime-rev.mjs revWakeLine: `Runtime rev <short-sha>` and, when the
  * Kernel's acked rev is behind, what to re-read and ack), then the seat's wakeIdentity - which always ends the

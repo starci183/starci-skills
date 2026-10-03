@@ -1,0 +1,22 @@
+group: runtime
+verb: link
+owner: runtime
+summary: point the per-user StarCi launcher at a live runtime checkout
+impl:
+  script: packages/cli/src/runtime-link.mjs
+flags:
+  - name: root
+    type: string
+    summary: runtime checkout to link; defaults to the nearest runtime root above cwd
+exit:
+  "0": runtime record and shim written
+  "1": filesystem error
+  "2": bad usage or the selected directory is not a runtime root
+json: flag
+examples:
+  - starci runtime link
+  - starci runtime link --root <runtime-checkout>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed: []

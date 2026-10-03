@@ -73,7 +73,7 @@ rules:
     cases:
       - id: case-1
         when: A new event
-        write: 'modules/events/order/order-placed.event.ts with eventName "order.placed" and version 1, then `npm run contract:emit` so be/contracts/order/events.json lists it.'
+        write: 'modules/events/order/order-placed.event.ts with eventName "order.placed" and version 1, then `starci app emit` so be/contracts/order/events.json lists it.'
     verification:
       automated:
         - BE_EVENT_CLASS_CONTRACT

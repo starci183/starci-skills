@@ -2,7 +2,7 @@
 // pack.mjs — context cutting as a function (wave m7).
 //
 // Context assembly is a deterministic function:
-// `node scripts/context/pack.mjs --op <id>` returns the mandatory read list,
+// `buildContext({ opId: <id> })` returns the mandatory read list,
 // the brief's declared reads with placeholders flagged, the resolved owned
 // write set and the actual files it currently holds on disk — plus a rendered
 // packet.md, the exact text the op must be told to read, in load order.
@@ -14,8 +14,8 @@
 //     so the [Op] prompt carries the resolved MANDATORY READS list, not just
 //     "read CONTEXT.md".
 //
-// CLI:
-//   node scripts/context/pack.mjs --op <id> [--records a,b] [--state <.starciwork>]
+// Internal entry: spawned by scripts/kernel/dispatch-op.mjs; not invoked directly.
+// Args: --op <id> [--records a,b] [--state <.starciwork>]
 //       [--repo <path>] [--out <file>] [--json]
 //
 //   --repo    runtime/skill root to resolve against (default: this repo —
@@ -292,7 +292,8 @@ export function renderPromptReads(context) {
   return lines;
 }
 
-const { usage, parseArgs } = opCli(`use: node scripts/context/pack.mjs --op <id>
+const { usage, parseArgs } = opCli(`Internal entry: spawned by scripts/kernel/dispatch-op.mjs; not invoked directly.
+args: --op <id>
     [--records a,b] [--state <.starciwork dir>] [--repo <runtime root>]
     [--out <packet file>] [--json]`, {
   '--repo': (o, take) => { o.repo = take(); },

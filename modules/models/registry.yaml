@@ -93,7 +93,7 @@ pools:
   # Devin has no machine-readable account headroom equivalent to Orca's provider windows. Owner-assigned
   # capacity: 10 parallel lanes, opened by the owner's default grant (config.yaml allocation.grants
   # devin-agent=10@implement+verify+write applies to every workflow; once config.yaml declares a grants list,
-  # `api route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed
+  # `starci kernel route` rejects a grant-gated pool that list does not open). The CLI's auth/readiness and observed
   # launch/refusal status are the live capacity signal on top of this cap. swe-2-max is a medium+ agent: no
   # easy or insane pin, and the easy tier does not list the pool.
   devin-agent:
@@ -144,7 +144,7 @@ orchestration:
   # separate approvals engine or policy file.
   approvalMode: entry-skill-owner-ok
   dispatch: An entry skill claims a queued goal and spawns that workflow's one long-lived kernel agent
-    (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `api dispatch --spawn`
+    (scripts/kernel/start-workflow.mjs). The kernel is the sole workflow-state writer; `starci kernel dispatch --spawn`
     launches one isolated agent per ready operation in the workflow's one worktree, using the first eligible target in
     that operation's chain. The kernel never implements, repairs or tests on behalf of an operation agent.
 targets:

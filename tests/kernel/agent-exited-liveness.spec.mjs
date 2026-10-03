@@ -14,7 +14,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // A nudge was typed into a DEAD op terminal.
 // Its agent had exited and left a bare PowerShell prompt, and
 // PowerShell ran the wake text as a command. A frame that ENDS in a bare shell prompt is agent-exited:
-// every wake path refuses to type into it and api status reads the worker dead.
+// every wake path refuses to type into it and starci kernel status reads the worker dead.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 // The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
 process.env.STARCI_SLEEP_SCALE??='0.02';
@@ -26,7 +26,7 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=
 
 // A captured Codex op whose agent exited mid-turn. The
 // spinner residue ("Working", "Running hook") is still on screen; the last row is the shell prompt.
-const DEAD_CODEX=['',`• Ran node '${APPDIR}\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
+const DEAD_CODEX=['',`• Ran node '${APPDIR}\\.claude\\packages\\cli\\bin\\starci.mjs' runtime validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
@@ -163,7 +163,7 @@ const APP_TRANSCRIPT=['    … +18 lines (ctrl + t to view transcript)','      }
   '• Working (10m 46s • esc to interrupt) · 1 background terminal running · /ps to','view · /stop to close',
   '› Ask Codex to do anything'];
 const APP_PS=`PS ${BE}>`;
-const APP_WAKE='Operation liveness wake for durable job op-architecture.decide-e64bfaaea3 (architecture.decide) attempt 11. Your accepted contract remains running but no durable report is filed. Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report. Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.';
+const APP_WAKE='Operation liveness wake for durable job op-architecture.decide-e64bfaaea3 (architecture.decide) attempt 11. Your accepted contract remains running but no durable report is filed. Re-read the exact contract with starci kernel op-contract, continue only inside its existing authority, and file exactly one starci kernel report. Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.';
 const wrap80=line=>{const rows=[];for(let i=0;i<line.length;i+=80)rows.push(line.slice(i,i+80));return rows;};
 const APP_AFTER=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`),'At line:1 char:366',
   '+ ... . Report done, partial, failed, ask or blocked truthfully; do not wai ...',
@@ -249,7 +249,7 @@ test('nudge: a wake a shell received names the same recovery as every dead-worke
   const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId]);
   assert.notEqual(nudged.status,0);
   assert.match(nudged.stdout,/a shell received the wake/);
-  assert.match(nudged.stdout,new RegExp(`run api reconcile --job ${fx.jobId} --dead-worker --settle-failed`),nudged.stdout);
+  assert.match(nudged.stdout,new RegExp(`run starci kernel reconcile --job ${fx.jobId} --dead-worker --settle-failed`),nudged.stdout);
 });
 
 test('nudge: the residue frame (prompt over the footer) is refused before anything is typed',t=>{

@@ -152,7 +152,7 @@ const slotStatus=({env=process.env}={})=>({store:machineFileFor(env),limit:maxCo
 
 // An op's run records into its own folder (playwright-recording.mjs defaultRecordRoot), which settle indexes as its proof.
 async function runHolding(command,{recordDir=defaultRecordRoot()}={}){
-  if(!command.length){console.error('use: node scripts/uat/uat-slots.mjs run [--record-dir <dir>] -- <command...>');process.exit(2);}
+  if(!command.length){console.error('use: starci uat slots run [--record-dir <dir>] -- <command...>');process.exit(2);}
   const slot=await acquireUatSlot({runId:`run-${process.pid}`,onQueued:({position,limit})=>console.error(`[uat-slots] queued: position ${position}, ${limit} slots busy`)});
   for(const sig of ['SIGINT','SIGTERM','SIGBREAK'])process.on(sig,()=>{slot.release();process.exit(130);});
   const recording=withRecording(command,{cwd:process.cwd(),outputDir:recordingDirUnder(path.resolve(recordDir))});
@@ -170,5 +170,5 @@ if(isMain(import.meta.url)){
     const record=rest[0]==='--record-dir'?rest[1]:null,args=record?rest.slice(2):rest;
     await runHolding(args[0]==='--'?args.slice(1):args,record?{recordDir:record}:{});
   }
-  else{console.error('use: node scripts/uat/uat-slots.mjs <status|run [--record-dir <dir>] -- <command...>>');process.exit(2);}
+  else{console.error('use: starci uat slots <status|run [--record-dir <dir>] -- <command...>>');process.exit(2);}
 }

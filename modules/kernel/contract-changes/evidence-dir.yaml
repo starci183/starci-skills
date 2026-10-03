@@ -6,7 +6,7 @@ paths:
   - scripts/kernel/op-prompt.mjs
   - knowledge/patterns/repo/folder.yaml
   - knowledge/repository-baseline.yaml
-  - modules/kernel/api-commands/reconcile.yaml
+  - modules/cli/commands/kernel/reconcile.yaml
   - modules/kernel/kernel-prompt.md
   - modules/kernel/verdict-contract.yaml
   - modules/ops/_common.yaml

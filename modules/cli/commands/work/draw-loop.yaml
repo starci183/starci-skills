@@ -1,0 +1,34 @@
+group: work
+verb: draw-loop
+owner: runtime
+summary: render, score, inspect, finish, or verify an iterative drawing loop
+impl: {script: scripts/work/draw-loop.mjs}
+positional:
+  - {name: command, enum: [round, status, finish, verify], required: true, variadic: false}
+flags:
+  - {name: ui, type: string, summary: ui record directory of the drawing}
+  - {name: html, type: string, summary: HTML drawing source for a round}
+  - {name: source, type: string, summary: X.draw.tsx drawing source for a component round}
+  - {name: fixture, type: list, summary: "props fixture JSON; <width>=<file> sets one width; repeatable"}
+  - {name: product, type: string, summary: product app directory of the drawing source}
+  - {name: css, type: list, summary: "product global stylesheet for a component round; repeatable"}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist], summary: grammar source preference, default: auto}
+  - {name: grammar-dist, type: string, summary: package root of the runtime-built grammar}
+  - {name: base, type: string, summary: XBase the drawing is of}
+  - {name: state, type: string, summary: flow state the drawing shows}
+  - {name: viewports, type: string, summary: comma list of WxH viewports to render}
+  - {name: repo, type: string, summary: product repository root}
+  - {name: out, type: string, summary: "loop directory (round creates it; status and finish read it)"}
+  - {name: family, type: string, summary: grammar family to measure against}
+  - {name: drawer, type: string, summary: model provider that critiques or draws}
+  - {name: no-full-page, type: boolean, summary: skip the full-page capture}
+  - {name: no-critic, type: boolean, summary: skip the independent critic}
+  - {name: parts, type: string, summary: directory of the final part renders for finish}
+  - {name: prompt, type: string, summary: brief prompt file recorded with the finished drawing}
+  - {name: force, type: boolean, summary: finish even when the best round is not the last}
+exit: {"0": "round recorded, status shown, loop passed or record verified", "1": finish was blocked or verify refused a render source, "2": bad usage}
+json: flag
+examples: ['starci work draw-loop status --out <loop-dir> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-loop.mjs']

@@ -16,7 +16,7 @@
 //                 back a repo refused again at the same head (exponential backoff), so an identical refusal escalates once.
 // Every periodic key is claimed in the durable `schedules` table (scripts/reconciler/schedules.mjs, MB-01).
 //   workers:metrics every metricsEveryMs: the op-health snapshot (scripts/machine/op-metrics.mjs aggregate over every
-//                 product ledger + the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics
+//                 product ledger + the stuck waits of the cached starci kernel status) recorded as ONE supervisor-op-metrics
 //                 event - the trend line of the digest and of `op-metrics.mjs` reads these (the deleted tick wrote them).
 //                 Telemetry, not an action: recorded in shadow too, like the SLA clocks.
 //   workers:direct  every directEveryMs, only in the exclusive land-gate mode (config.yaml supervisor.landGate.mode): each
@@ -116,7 +116,7 @@ export function planDeps({ graphs = [], now, settings = DEFAULTS, language = own
       evidence: via.map((e) => tr('{from} waits on {to}', { from: e.from, to: e.to }) + (e.via ? tr(' via {via}', { via: e.via }) : '')),
       options: [
         { key: 'seam-stub', title: tr('Publish a seam stub so one branch keeps running'), recommended: true },
-        { key: 'bridge', verb: 'node scripts/supervisor/bridge.mjs', title: tr('Supervisor bridge: transfer or assign the owner of the shared need') },
+        { key: 'bridge', verb: 'starci supervisor bridge', title: tr('Supervisor bridge: transfer or assign the owner of the shared need') },
         { key: `lower-priority:${cycle[cycle.length - 1]}`, title: tr('Lower the priority of branch {branch}', { branch: cycle[cycle.length - 1] }) },
       ],
     }));
@@ -316,7 +316,7 @@ export async function reconcileWorkers(key, ctx, { settings = workersSettings(),
       }
       return out;
     });
-    // The stuck waits come from the cached api status (ctx.status, shared by every controller; never a fresh spawn per pass).
+    // The stuck waits come from the cached starci kernel status (ctx.status, shared by every controller; never a fresh spawn per pass).
     const stuck = [];
     for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
     const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);

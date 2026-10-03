@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  GUIDANCE_CODE, isGuidanceFile, sentencesOf, commandSpans, excusedBy, textFindings, markdownUnits, scanGuidance,
+  GUIDANCE_CODE, isGuidanceFile, commandSpans, excusedBy, textFindings, markdownUnits, scanGuidance,
 } from '../../scripts/checks/check-guidance-commands.mjs';
+import { sentencesOf } from '../../scripts/lib/tracked-text-scan.mjs';
 
 // Agent-facing guidance never tells an agent to run a command the command guard refuses (RT_GUIDANCE_REFUSED_COMMAND).
 // The defect: supervise.yaml told the Supervisor to open "an Opus lane (git worktree add ...)" while the guard refuses
@@ -70,10 +71,10 @@ test('the sentence is the unit: a prohibition in the next sentence does not excu
 
 test('allowed commands are never findings, whatever the sentence', async () => {
   for (const text of [
-    'Land with `node scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`.',
+    'Land with `starci supervisor land --commit <sha> --lane <lane> --specs touching --json`.',
     'Remove one junction with `cmd /c rmdir <path>` and one file with `rm <file>`.',
     'Start it with `orca orchestration worker-start --agent claude --worktree path:<dir> --spec "<brief>"`.',
-    'Run `node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>`, then end only your own PID (`taskkill /PID <pid>`).',
+    'Run `starci supervisor workers stage --self --name <slug> --files <csv>`, then end only your own PID (`taskkill /PID <pid>`).',
   ]) assert.deepEqual(await textFindings(text), [], text);
 });
 

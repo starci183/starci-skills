@@ -1,0 +1,23 @@
+# Global flags and in-process commands of the unified starci CLI, spelled once
+# here (design.md). Flags are parsed before the verb; a verb yaml never repeats them.
+# --cwd replaces --repo/--root of the hfs (app) verbs; kernel verbs keep their own
+# documented --repo <path> (the managed repository, a different meaning).
+schema: starci/cli-global-flags@1
+commands: [explain]
+flags:
+  - name: json
+    type: boolean
+    summary: machine output; forwarded to handlers that declare a json mode
+  - name: cwd
+    type: string
+    summary: working directory the handler runs in (replaces --repo/--root of app verbs)
+  - name: quiet
+    type: boolean
+    summary: suppress human-readable chatter
+  - name: help
+    type: boolean
+    summary: print the help of the command
+  - name: edition
+    type: enum
+    enum: [full, lite]
+    summary: app edition, full or lite; where an app is created or judged (scaffold, check, upgrade)

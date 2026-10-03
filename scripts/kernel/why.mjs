@@ -318,7 +318,7 @@ export function whyOfOp(ledger, workflowId, opId, options) {
  * The Kernel's own notes of a workflow, oldest first: decisions (events kernel-decision, closed by kernel-decision-result)
  * and proposals for shared .claude (events kernel-proposal). [{kind:'decision'|'proposal', id, at, status, headline, ...}].
  * Table events (entity_type 'decision' | 'kernel-proposal', entity_id = the note id, payload_json), so the UI reads them
- * without api status.
+ * without starci kernel status.
  */
 export function kernelNotesOf(ledger, workflowId, { limit = 50 } = {}) {
   const db = handleDb(ledger);

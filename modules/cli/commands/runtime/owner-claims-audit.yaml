@@ -1,0 +1,18 @@
+group: runtime
+verb: owner-claims-audit
+owner: runtime
+summary: audit owner-decision claims and owner-gates in runtime ledgers
+impl:
+  script: scripts/housekeeping/owner-claims-audit.mjs
+flags:
+  - {name: repo, type: string, required: true, summary: comma-separated product ledger owner paths}
+  - {name: workflow, type: string, summary: workflow id to audit}
+exit: {"0": no unsupported owner claims, "1": findings exist, "2": bad usage or an unreadable ledger}
+json: flag
+examples:
+  - starci runtime owner-claims-audit --repo <repo>
+  - starci runtime owner-claims-audit --repo <repo>[,<repo>...] --workflow <id> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/housekeeping/owner-claims-audit.mjs

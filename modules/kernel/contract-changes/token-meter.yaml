@@ -14,5 +14,5 @@ reach: new-legs
 paths:
   - modules/models/registry.yaml
   - modules/schemas/index.yaml
-  - modules/kernel/api-commands/usage.yaml
+  - modules/cli/commands/kernel/usage.yaml
   - modules/kernel/contract-changes/token-meter.yaml

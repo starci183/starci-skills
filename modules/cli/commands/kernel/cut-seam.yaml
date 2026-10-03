@@ -1,0 +1,94 @@
+group: kernel
+verb: cut-seam
+owner: runtime
+summary: "publish a cut seam's interface, release its siblings on a stub, or reconcile a stub sibling"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - cut-seam
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: publish-interface
+    type: boolean
+    summary: "mode: the seam job publishes its interface files; needs --job and --files"
+  - name: release
+    type: boolean
+    summary: "mode: the Kernel releases a cut to run on a stub now; needs --workflow, --op, --cut-id, --reason"
+  - name: reconcile
+    type: boolean
+    summary: "mode: record the re-verify of a stub sibling against the landed seam; needs --job and --exit-code"
+  - name: job
+    type: string
+    summary: seam job (--publish-interface) or sibling job (--reconcile)
+  - name: files
+    type: string
+    summary: comma list of the interface files the seam publishes
+  - name: summary
+    type: string
+    summary: one-line description of the published interface
+  - name: workflow
+    type: string
+    summary: workflow id
+  - name: op
+    type: string
+    summary: op of the cut (--release)
+  - name: cut-id
+    type: string
+    summary: cut id (--release)
+  - name: reason
+    type: string
+    summary: why the cut is released early (--release)
+  - name: exit-code
+    type: number
+    summary: exit code of the sibling re-verify (--reconcile)
+  - name: command
+    type: string
+    summary: the re-verify command that was run (--reconcile)
+  - name: evidence
+    type: string
+    summary: path of the re-verify evidence (--reconcile)
+exit:
+  "0": recorded
+  "1": refused or failed (not a seam, no stub, seam already passed, unknown job)
+  "2": "bad usage: no mode, a mode flag is missing, or a flag has no value"
+json: flag
+examples:
+  - starci kernel cut-seam --repo <path> --publish-interface --job <job> --files <files>
+  - starci kernel cut-seam --repo <path> --release --workflow <workflow> --op <op> --cut-id <cut> --reason <reason>
+  - starci kernel cut-seam --repo <path> --reconcile --job <job> --exit-code 0
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api cut-seam
+  - node scripts/kernel/cli.mjs cut-seam
+reads: the job row(s) of the cut (ordinal 1 attempts not retired before dispatch), the seam-* events
+  of the cut, and for --publish-interface the named files in the repository
+  (scripts/kernel/seam-policy.mjs)
+writes: "exactly one event, never a job row: --publish-interface -> seam-interface-published {op,
+  cutId, files:[{path, sha256, bytes}], summary, by} on the seam job (every sibling ordinal is
+  released to build against it: status seamStub mode interface); --release -> seam-released {op,
+  cutId, reason, seamJobId, seamStatus} (siblings run on a stub now: mode released); --reconcile ->
+  seam-reconciled {op, cutId, exitCode, via: reconcile, command, evidence, seamJobId} on the sibling
+  (the cut-seam-reconcile result; red owes a retry of that ordinal). starci kernel settle writes
+  seam-reconciled itself (via settle-checks for a stub sibling passing after its seam passed, via
+  full-regression-final for every stub sibling still owed when the pass closes the set)"
+returns: "{ok:true, mode, jobId?, workflowId, op, cutId, files?|seamJobId?, exitCode?}"
+refuses:
+  - "cut-seam-mode: not exactly one of --publish-interface|--release|--reconcile"
+  - "op-context-refused: an operation may only publish its OWN seam interface"
+  - "cut-seam-not-seam: --publish-interface on a job that is not ordinal 1 of a cut of more than one"
+  - "cut-seam-settled: a failed/cancelled seam attempt publishes nothing"
+  - "cut-seam-files-missing | seam-interface-path-invalid | seam-interface-outside-seam |
+    seam-interface-file-missing: the files must be committed, workspace-relative and inside the seam
+    job's owned paths"
+  - "cut-seam-unknown | cut-seam-passed: --release of a cut with no seam job, or whose seam already
+    passed"
+  - "cut-seam-not-sibling | cut-seam-no-stub | cut-seam-not-passed | cut-seam-exit-code |
+    cut-seam-not-landed: --reconcile is for a passed sibling that ran on a stub, with an integer
+    exit code, once its seam passed"
+usedBy: the seam op itself (--publish-interface of its own job, the backend.implement /
+  interface.implement contract-first step); the Kernel for --release (a seam stuck behind a wait or
+  being re-cut) and --reconcile (driver-loop.yaml enqueue.seamContractFirst)

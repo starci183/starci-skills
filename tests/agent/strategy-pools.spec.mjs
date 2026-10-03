@@ -13,7 +13,7 @@ import {kindOrder} from '../../scripts/agent/models.mjs';
 // Owner decision 2026-09-25 ("lock decide to claude/codex"): strategy kinds - every kind whose order is
 // think, decide or plan - run only on claude-agent or codex-agent. Owner routing 2026-09-26 adds the kernel
 // calls' sol-think order to that frontier-only contract (Sol first, Opus overflow). Route walks that order;
-// api dispatch launches only inside the kind's order at its tier, whatever names the pool (--model, the
+// starci kernel dispatch launches only inside the kind's order at its tier, whatever names the pool (--model, the
 // persisted route, the unrouted default).
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -104,7 +104,7 @@ const refused=(fx,r,jobId,{model,allowed=FRONTIER})=>{
   return out;
 };
 
-test('api dispatch --model refuses a hand pool for a decide kind and names the allowed pools',t=>{
+test('starci kernel dispatch --model refuses a hand pool for a decide kind and names the allowed pools',t=>{
   const fx=fixture(t);
   fx.seed({jobId:'job-decide-hand',payload:{model:'claude-agent',modelId:'claude-opus-5-5',difficulty:'medium'}});
   const dry=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-hand','--model','devin-agent','--json');
@@ -114,17 +114,17 @@ test('api dispatch --model refuses a hand pool for a decide kind and names the a
   assert.match(out.detail,/--model devin-agent is outside business\.decide's think order at hard \[claude-agent, codex-agent\]/);
 });
 
-test('api dispatch refuses the unrouted default and a persisted route outside the order',t=>{
+test('starci kernel dispatch refuses the unrouted default and a persisted route outside the order',t=>{
   const fx=fixture(t);
   fx.seed({jobId:'job-unrouted',opId:'request.analyze',payload:{}});
   const unrouted=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-unrouted','--spawn','--json'),'job-unrouted',{model:'devin-agent'});
-  assert.match(unrouted.detail,/the unrouted default devin-agent .*re-run api route --job job-unrouted/);
+  assert.match(unrouted.detail,/the unrouted default devin-agent .*re-run starci kernel route --job job-unrouted/);
   fx.seed({jobId:'job-stale-route',opId:'scope.define',payload:{model:'devin-agent',modelId:'swe-2-max',difficulty:'hard'}});
   const stale=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-stale-route','--spawn','--json'),'job-stale-route',{model:'devin-agent'});
-  assert.match(stale.detail,/the persisted route devin-agent .*re-run api route --job job-stale-route/);
+  assert.match(stale.detail,/the persisted route devin-agent .*re-run starci kernel route --job job-stale-route/);
 });
 
-test('api dispatch --model inside the order launches that pool at the kind\'s tier',t=>{
+test('starci kernel dispatch --model inside the order launches that pool at the kind\'s tier',t=>{
   const fx=fixture(t);
   // An unrouted think job measured medium: codex launches Sol, the hard-floor pin, never Luna.
   fx.seed({jobId:'job-decide-codex',payload:{difficulty:'medium'}});

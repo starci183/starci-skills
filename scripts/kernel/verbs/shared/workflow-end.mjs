@@ -1,4 +1,4 @@
-// api-lib/workflow-end.mjs — the teardown both ways a workflow ends run (`api finish`, `api archive`;
+// api-lib/workflow-end.mjs — the teardown both ways a workflow ends run (`starci kernel finish`, `starci kernel archive`;
 // split out of cli.mjs, lane slim-06): the Kernel seat released, the ledger retained, the Kernel
 // terminal closed last. An op's Orca Task is never closed here: it settles with the op's own
 // worker_done (or the Dispatch fence settle issues). The worker release helpers stay in cli.mjs

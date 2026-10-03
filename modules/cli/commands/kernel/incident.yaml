@@ -1,0 +1,287 @@
+group: kernel
+verb: incident
+owner: runtime
+summary: raise, resolve or attach typed release conditions to a workflow incident
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - incident
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: kind
+    type: string
+    summary: incident kind, e.g. peer-wait or shared-blocker (raise)
+  - name: detail
+    type: string
+    summary: "what happened (raise; optional on resolve and attach)"
+  - name: op
+    type: string
+    summary: op the incident concerns
+  - name: holds
+    type: string
+    summary: comma list of op or job ids the incident holds
+  - name: peer
+    type: string
+    summary: workflow waited on (--kind peer-wait)
+  - name: refs
+    type: string
+    summary: comma list of refs of the wait (--kind peer-wait)
+  - name: resolve
+    type: string
+    summary: id of the incident to resolve
+  - name: by
+    type: enum
+    summary: who resolves it
+    enum:
+      - kernel
+      - owner
+      - supervisor
+  - name: owner-answer
+    type: string
+    summary: comma list of owner-answered dispatch ids backing the resolution
+  - name: introduced-by
+    type: string
+    summary: comma list of commits that introduced the blocker (shared-blocker)
+  - name: introducer
+    type: string
+    summary: workflow that introduced the blocker (shared-blocker)
+  - name: fix
+    type: string
+    summary: the fix the introducer owes (shared-blocker)
+  - name: attach
+    type: string
+    summary: "id of an open incident to type with --until-* conditions"
+  - name: until-record
+    type: list
+    summary: "release when the record reaches the state: <path>[@state|>=rev]"
+  - name: until-job
+    type: list
+    summary: "release when the job settles: <jobId>[:settled|succeeded]"
+  - name: until-message
+    type: list
+    summary: "release on a peer message: <peer>[:kind]; a bare flag needs --kind peer-wait"
+  - name: until-commit
+    type: list
+    summary: "release when the ref or path lands: <repo>:<ref-or-path>"
+  - name: until-incident
+    type: list
+    summary: "release when the incident resolves: <id>[:resolved]"
+  - name: until-foundation
+    type: list
+    summary: "release when the foundation lands: <name>"
+  - name: until-landed
+    type: list
+    summary: "release when the workflow lands its product: <workflowId>@<repository>"
+exit:
+  "0": raised, resolved or attached
+  "1": refused or failed (unknown or not-open incident, wrong kind combination)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel incident --repo <path> --workflow <workflow> --kind <kind> --detail <detail>
+  - starci kernel incident --repo <path> --workflow <workflow> --resolve <incident> --by kernel
+  - starci kernel incident --repo <path> --workflow <workflow> --attach <incident> --until-job <job>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api incident
+  - node scripts/kernel/cli.mjs incident
+reads: the workflows row for --workflow
+supervisorGate: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish;
+  scripts/kernel/autopilot-run.mjs): nothing waits on the owner mid-flow. --kind owner-gate on an
+  autopilot workflow is recorded as kind supervisor-gate (payload rerouted {from, to}); settle's
+  retry cap and an environment blocker open one (settle.nextStep kind supervisor-gate, with the
+  attempts' evidence); starci kernel status re-routes any older open owner-gate. A supervisor-gate holds its
+  jobs like an owner gate (queuedBecause supervisor-gate; route/dispatch refuse with reason
+  supervisor-gate; holds ['*'] - a spent autopilot budget - holds every queued job) and is the
+  Supervisor's: scripts/supervisor/poll.mjs lists it, the Supervisor fixes the runtime/process cause
+  (lands to .claude) or decides the retry and resolves it --by supervisor; nextActions then names
+  the retry. supervisorExtraBudget gates per node group, then the leg is deferred (settle.nextStep
+  kind deferred); a gate unresolved past supervisorGateTimeoutMs defers what it holds."
+ownerGate: "--kind owner-gate parks work on a step only the owner can drive (an assisted OAuth run,
+  a consent screen, a merchant choice). --holds lists the ops or job ids it holds; without it, --op
+  is held. While the incident is open, status reports each held queued job queuedBecause owner-gate
+  (so the frontier is not actionable on them and the watchdog does not wake the Kernel), and route
+  and dispatch refuse it with reason owner-gate. When the owner's step lands (the receipt exists,
+  the ask is answered), the Kernel runs --resolve (--owner-answer <dispatchId> for the answered ask,
+  else --by kernel|supervisor: ownerClaim below) and the jobs are ready again. Free prose such as
+  \"[owner-gate-pending]\" in --detail holds only the incident's --op; name the rest in --holds. A
+  held job whose report the Kernel already consumed is a settle deferred behind the gate (status
+  frontier.heldSettleJobs), not settle-ready work"
+peerWait: "--kind peer-wait --peer <workflowId> records a typed, durable wait on a PEER workflow:
+  the next step (--holds ops or job ids, else --op) cannot pass its preflight until that peer lands
+  something - installs a dependency, writes a record (a brand.decide job once waited on a peer's
+  Grammar 0.5.0 install). --peer must be a running peer of this workflow (the notify PEER RULE);
+  --refs names the peer messages or jobs the wait is about; --until-message lets the peer's next
+  message resolve it. While it is open, held queued jobs read queuedBecause peer-wait, route and
+  dispatch refuse them with reason peer-wait, a held job whose report was consumed but not settled
+  is a settle deferred behind the wait (frontier.heldSettleJobs, not settle-ready: the Kernel
+  settles it once the wait resolves), a job queued behind either through its dependency chain is
+  parked behind the wait (frontier.queued[].parkedBehind), and with nothing else to move the
+  frontier reads `peer-wait` (not actionable), so the watchdog lets the Kernel sleep. A message from
+  the peer (starci kernel notify) wakes the Kernel and, with --until-message, resolves the wait; otherwise the
+  Kernel re-checks the prerequisite and runs --resolve. A wait whose peer stops running is
+  frontier.peerWaitsDead (actionable). scripts/supervisor/stall.mjs judges each wait: PEER-WAIT
+  while the peer runs and moves, STALE-PEER-WAIT when the peer finished, its release showed up (a
+  typed wait: every until condition holds, or one can no longer hold, evaluated like the runtime at
+  the retry lineage head; an untyped wait: every job its text or refs name settled after it, at its
+  lineage head), or the peer is idle past the stall threshold too; a pending message from the peer
+  is UNREAD-PEER. incident-raised carries {peer, untilMessage, refs}"
+sharedBlocker: "--kind shared-blocker [--introduced-by <commit>,... | --introducer <workflowId>]
+  [--fix <text>] raises a blocker several workflows hit (a served-app boot failure, a broken shared
+  module) AND routes it to the workflow whose code introduced it (scripts/kernel/introducer.mjs
+  resolveIntroducer: the named --introducer; else the workflow whose op report filed the commit as
+  its head; else a workflow id, then a cut id, then a conventional-commit scope in the commit
+  message; a finished introducer hands it to its running successor of the same title). The
+  introducer gets a typed peer message kind `follow-up` {refs [incidentId, commit], followUp
+  {incidentId, commit, via, introducedBy}} carrying the blocker and --fix, and its Kernel is woken;
+  it repairs the code as its own defect and notifies the reporter, who then resolves the incident.
+  Unresolved, self-introduced or not a running peer, nothing is sent and the answer's sharedBlocker
+  {routed:false, why} says so: the supervisor assigns an owner. A routed blocker is a TYPED wait of
+  the reporter (gate-conditions.mjs sharedBlockerUntil): until [{job <owner>:succeeded}] on each job
+  of the introducer the --detail/--fix names or that owns a file the --introduced-by commit changed,
+  taken at its retry-lineage head (a head that succeeded before the raise is the introducer, not the
+  repair), else [{message <introducer>:reply}]; recorded as shared-blocker-routed.until and released
+  by the runtime like any --until-* (an explicit --until-* on the raise wins; a blocker routed
+  before this reads the same, derived from its text) - never OWED on the supervisor. Event
+  'shared-blocker-routed' records either answer. Victims no longer each wait for the owner to pick a
+  repairer."
+foundationWait: "--kind peer-wait --until-foundation <name> is the typed wait on a SHARED FOUNDATION
+  (starci kernel foundation): its release condition is the landing - a typed condition of
+  scripts/kernel/gate-conditions.mjs (until [{type:'foundation', name}], also recorded as
+  untilFoundation), so an already-open wait is typed onto a foundation with --attach <incidentId>
+  --until-foundation <name> (an owner-gate that was really a peer dependency included), and the
+  typed release re-checks it every status. --peer defaults to the foundation's owner (a different
+  --peer is refused foundation-peer-mismatch); an unregistered foundation is refused
+  foundation-unknown, a landed one foundation-landed (nothing to wait for), an unowned one
+  foundation-unowned (nothing would land it). The waiter becomes a dependent. `starci kernel foundation --land
+  <name>` resolves every such wait in the ledger and wakes its Kernel;
+  frontier.peerWaits[].untilFoundation names it. Everything else is a peer-wait"
+resolve: --resolve <incidentId> sets that open incident's status to resolved and appends events
+  'incident-resolved' {detail, by, ownerAnswer?}; resolving a resolved incident changes nothing and
+  returns changed:false. It is also how a superseded incident leaves survey.incidentsOpen
+ownerClaim: "A resolution states who resolved it: --by kernel|owner|supervisor (default kernel; for
+  an owner-gate / owner-gate-pending the default is owner). It needs a VERIFIED owner answer when
+  its --detail claims an owner decision (owner confirmed / approved / accepted / ruled / answered,
+  owner's approval, \"Owner answer relayed\", the Vietnamese equivalents of owner confirmed /
+  project owner confirmed / teacher approved / owner approved / owner confirmation, accented or not)
+  or it resolves as the owner: --owner-answer <dispatchId> (or an ask id cited in --detail) names an
+  ask whose ask-answered event AND starci/ask-answer@1 receipt both say answeredBy owner - the check
+  handover.mjs makes for the handover approval. Otherwise it refuses owner-claim-unproven and writes
+  nothing: keep the incident open and raise or keep an owner ask, or resolve --by kernel|supervisor
+  stating what landed. incident-resolved records ownerAnswer {dispatchId, workflowId, receiptPath}.
+  scripts/machine/owner-claim.mjs; past incidents were resolved \"Owner confirmed\" with no owner
+  answer)"
+ownerClaimLint: "starci kernel status carries two lints, each key present only when non-empty:
+  frontier.ownerGatesNotOwnerWork [{incidentId, kind, marker, detail}] - an open owner-gate whose
+  own text says it is not the owner's step (RUNTIME LIMIT, runtime defect, deferred settle, \"not
+  the owner's job\", waits on the supervisor). The gate is the only mechanism that holds jobs, so
+  the raise is not refused; the runtime defect itself goes to the supervisor as --kind
+  source-runtime-defect and the gate resolves --by kernel|supervisor. frontier.ownerClaimsUnproven
+  [{incidentId, kind, resolvedAt, by, claim, reason}] - past resolutions of this workflow whose
+  owner claim no owner answer backs; read-only, history is never rewritten (node
+  `starci runtime owner-claims-audit --repo <repo>` lists a whole ledger). grammarProposals
+  [{name, file, jobId, opId, filedAt, status: proposed, complete}], present only when non-empty: the
+  grammar proposals interface.draw filed (grammar-proposal-filed) that no grammar lane has resolved
+  (grammar-proposal-resolved) - the owner's to decide through the draw-review ask, never accepted
+  automatically drawReviews [{record, recordPath, state (awaiting-owner|redraw-owed|accepted|idle),
+  awaitingOwner, redrawOwed {dispatchId, jobId, notes}, rounds [{round, dispatchId, jobId, askedAt,
+  state, decision, answeredBy, answeredAt, golden, parts, notes}], shapes [{shape, round, parts,
+  openNotes [{id, text, round, class, addressed, reasons}], addressed, unaddressed, golden
+  (golden|accepted|none)}]}], present only when non-empty: the owner's image review board
+  (scripts/work/draw-feedback.mjs drawReviewBoard) - every ui record a draw-review ask of this
+  workflow showed, its review rounds, the owner's open notes and whether the current drawing
+  addresses each. knowledgeChangeRequests [{noteId, target, text, record, requestedAt, status}] -
+  draw notes classified knowledge, for the supervisor / runtime owner. assetSlotsOwed [{key, id, ui,
+  html, request, requested, jobId, opId, owedAt}], present only when non-empty: the artwork slots
+  (data-asset-slot placeholders, requested in asset-request.md) an interface.draw or interface.asset
+  settle recorded as asset-slot-owed and no later settle recorded asset-slot-filled
+  (data-asset-sha256 naming the bytes of its src; scripts/work/asset-slot.mjs). While any is open
+  and no interface.asset job is queued or in flight, nextActions carries a dispatch of op
+  interface.asset with slots[] - the owed artwork is generated by interface.asset, never reused ad
+  hoc (owner ruling 2026-09-27). starci kernel settle of those ops returns the slots it recorded as
+  assetSlotsOwed / assetSlotsFilled"
+typedRelease: "Machine-checkable release conditions (scripts/kernel/gate-conditions.mjs), on any
+  kind and repeatable, ALL of which must hold: --until-record <path>[@<state>|>=<rev>] (the file, or
+  a directory's index.yaml, relative to --repo or absolute, exists; with @state its top-level state
+  equals, with >=rev the record's OWN revision is at least - its top-level rev where the family
+  declares one (brand, layout-tree), else change.rev (ui-screen, contract and every other work
+  record); a nested binding such as a ui-screen's brand.rev or shell.rev is never read, and the
+  evidence names change.rev when that is the source), --until-job <jobId>[:settled|succeeded] (any
+  job of the ledger settled pass or fail, the default, or succeeded; a CANCELLED job is not settled
+  - the condition follows the job that replaced it, a later same-op job that retries it or holds its
+  cut ordinal, and stays unmet while there is none; a FAILED job is followed to the retry that names
+  it retry.retryOf/resumeOf, so the wait is on the unit's newest attempt and reads unmeetable only
+  while nothing retries it; gate-conditions.mjs lineageHeadOf, which --after and the cut seam in
+  frontier.queued follow too), --until-message <peer>[:<kind>] (a peer message from <peer>, of
+  <kind>, reached this workflow after the wait was raised; a BARE --until-message keeps its
+  peer-wait meaning), --until-commit <repo>:<ref-or-path> (the ref resolves to a commit, or the path
+  is committed at that repo's HEAD), --until-incident <incidentId>[:resolved], --until-foundation
+  <name> (the shared foundation landed: starci kernel foundation; incident.foundationWait), --until-landed
+  <workflowId>@<repository> (that workflow's product work reached the repository's main: it is
+  finished, or its workflow-landed event names that repository (a workflow lands into main once, at
+  starci kernel finish: workflow-checkpoint.mjs finishWorkflow); on a peer-wait the named workflow is the peer
+  and the wait reads untilLanded - the cross-workflow hold of FE-writing legs behind a restructure,
+  contract change fe-hold-until-landed). They are stored on 'incident-raised' as until:[{type,...}].
+  The runtime evaluates them read-only on every starci kernel status (so every watchdog tick), before route
+  and dispatch read the gates, after every settle (ledger-wide, waking each released Kernel) and
+  after every notify (the target's), and resolves the incident once all hold: events
+  'incident-resolved' {detail, by:until-conditions, evidence[]} and 'incident-auto-resolved' {kind,
+  until, holds, evidence[]}. That releases the queued jobs and deferred settles it held (status
+  frontier.autoResolved; the frontier turns actionable and the watchdog wakes the Kernel). A
+  condition already met at raise resolves the incident in the same call (status:resolved,
+  autoResolved). A job, incident or message peer the conditions name must exist (until-job-unknown /
+  until-incident-unknown / until-message-peer-unknown). An incident raised without typed conditions
+  carries none and only the Kernel resolves it. Owner-only conditions (an ask answered, a consent
+  given) have no typed form and stay owner-driven. The Kernel attaches typed conditions whenever the
+  release is checkable (driver-loop.yaml tick.drive.typedRelease)"
+attach: "--attach <incidentId> --until-<type> <spec> ... types an OPEN incident of this workflow
+  without re-raising it: appends 'incident-conditions-attached' {until, detail}, whose until
+  replaces any earlier set, and evaluates at once (resolved when already met). This is how a
+  free-text gate raised without typed conditions becomes machine-checked; its holds, kind and text
+  are unchanged. Returns {ok:true, incidentId, workflowId, status, until, autoResolved?}"
+writes: "one incidents row per call {incident_id, workflow_id, op_id, attempts:0, status:'open',
+  last_progress:'[<kind>] <detail>'} + events 'incident-raised' {kind, detail, opId}. Each call
+  opens its own row: recognising that two escalations carry identical evidence, and therefore that
+  the retry budget is spent, is the kernel's reading of `survey.incidentsOpen` (driver-loop.yaml
+  retry-budget-exhausted)"
+returns: "{ok:true, incidentId, workflowId, kind, status:open|resolved, holds?, peer?,
+  untilMessage?, refs?, until?, autoResolved?}  |  resolve: {ok:true, incidentId, workflowId,
+  status:resolved, changed}  |  attach: {ok:true, incidentId, workflowId, status, until,
+  autoResolved?}"
+refuses:
+  - workflow-unknown: no workflows row
+  - incident-unknown: --resolve names no incident on this workflow
+  - peer-wait-peer-missing: --kind peer-wait without --peer
+  - peer-wait-kind-mismatch: --peer or --until-message with a kind other than peer-wait
+  - "peer-self / peer-unknown / peer-not-running / peer-not-shared-source: --peer is this workflow,
+    no workflow of this ledger, finished or archived, or shares no source root (notify refuses the
+    same)"
+  - until-invalid: a malformed --until-<type> value (an unknown job state, a --until-commit without
+      <repo>:<target>, a --until-incident state other than resolved)
+  - "until-job-unknown / until-incident-unknown / until-message-peer-unknown: a typed condition
+    names no job, no incident or no other workflow of this ledger"
+  - until-missing: --attach without any --until-<type> condition
+  - incident-not-open: --attach names an incident that is no longer open
+usedBy: plan divergence, retry budgets past their limit, unreconciled op deaths — anything the
+  driver may not decide alone (driver-loop.yaml escalation.mustAskOwner)
+providerCircuits: "resolving an incident never clears a provider-health circuit: the two are
+  separate facts. A circuit clears on expiry, on a rotated credential, by starci kernel provider-health
+  --recover, or - a quota circuit - by a passing provider-health --quota-probe"
+outageCircuits: "a worker whose screen shows a row matching its provider card's
+  quotaExhausted.screen (a \"Quota exhausted: ...\" row or an \"[API Error: ...]\" row naming a
+  quota code) or capacityExhausted.screen (Devin: \"Protocol error (...): We are currently
+  experiencing capacity issues ...\"), while its turn is not active, carries providerOutage
+  {provider, failureKind, source, match} in starci kernel status workers and opens that provider's
+  provider-health circuit with that failureKind (step worker-screen, events provider-unavailable
+  {source: worker-screen}); starci kernel status lists it in outageCircuits [{provider, failureKind, jobId,
+  match, expiresAt}]. Not again while a circuit of that kind is open, nor for output no newer than
+  the last observation of that kind or its recovery. starci kernel observe does the same for the one job it
+  reads (outageCircuit)"

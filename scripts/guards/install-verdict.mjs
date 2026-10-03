@@ -28,7 +28,7 @@ export async function installVerdict({ program, args, cwd, guard, deps }) {
 }
 
 // The Kernel never reads Orca's mailbox itself: `orchestration check --ack` consumes deliveries before the ledger records
-// them, so it reads through `api messages` / `api questions` and the runtime's api drains (lane MAILC). Ops and
+// them, so it reads through `starci kernel messages` / `starci kernel questions` and the runtime's api drains (lane MAILC). Ops and
 // [Worker]s keep `check`: Orca's worker protocol has them read their own Run's deliveries (modules/host/orca/api.yaml
 // operationAgent), and no ledger record depends on those.
 export function kernelMailboxVerdict(program, args, guard) {
@@ -37,5 +37,5 @@ export function kernelMailboxVerdict(program, args, guard) {
   if (words[0] !== 'orchestration' || words[1] !== 'check') return null;
   return { code: 'KERNEL_ORCA_CHECK', command: ['orca', ...args].join(' ').slice(0, 200),
     reason: 'the Kernel never runs orca orchestration check: its --ack consumes deliveries before the ledger records them',
-    remedy: 'read messages with `node <api> messages --repo <repo> --workflow <id>` and questions with `api questions`; the runtime drains the mailbox' };
+    remedy: 'read messages with `starci kernel messages --repo <repo> --workflow <id>` and questions with `starci kernel questions`; the runtime drains the mailbox' };
 }

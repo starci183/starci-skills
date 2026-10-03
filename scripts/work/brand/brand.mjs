@@ -1031,11 +1031,11 @@ export function formatBrandChecks(result){
 }
 
 /**
- * `node scripts/work/brand/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]`.
+ * `starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]`.
  * Exit 0 when no check failed, 1 when one did or the input is broken (no brand record, an unknown stage).
  */
 export function brandMain(argv=[]){
-  const usage='Usage: node scripts/work/brand/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]\n';
+  const usage='Usage: starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]\n';
   if(argv.includes('--help'))return {exitCode:0,text:usage};
   const valueOf=flag=>{const at=argv.indexOf(flag);return at>=0?argv[at+1]:undefined;};
   const flagged=new Set(['--source','--stage','--grammar-root'].flatMap(flag=>{const at=argv.indexOf(flag);return at>=0?[at,at+1]:[];}));

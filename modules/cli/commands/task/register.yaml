@@ -1,0 +1,27 @@
+group: task
+verb: register
+owner: runtime
+summary: print or apply one runtime scheduled-task registration
+impl: {module: scripts/machine/task-verbs.mjs, export: taskRegister}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - without --apply the exact PowerShell registration is printed for review and no host state changes
+  - registration is idempotent, per-user and limited-privilege; it never needs administrator rights
+  - task actions invoke starci through the current user's .starci/bin shim
+flags:
+  - {name: apply, type: boolean, summary: register or update the task after reviewing the default output}
+positional:
+  - {name: name, enum: [harness-tunnel, reconciler], required: true, variadic: false}
+exit: {"0": registration printed or applied, "1": Task Scheduler registration failed, "2": bad usage or unknown task name}
+json: starci/task-register@1
+examples:
+  - starci task register reconciler
+  - starci task register harness-tunnel --apply --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - starci harness install-task
+  - starci reconciler install-task
+  - node scripts/reconciler/tunnel-task.mjs --install-task
+  - node scripts/reconciler/boot.mjs --install-task

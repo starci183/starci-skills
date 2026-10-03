@@ -28,7 +28,7 @@ kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: 
 # operation asks for the `l.agents[gear]` agents, an extra-long (`xl`) one for
 # `xl.agents[gear]`; `s` and `m` operations are always one agent. Declared gears
 # are allocation.slicing.gears — an undeclared value fails closed. Absent means
-# the first declared gear. A gear raises only what `api estimate` requests; it
+# the first declared gear. A gear raises only what `starci kernel estimate` requests; it
 # never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
 parallel: {gear: 1}
 # supervisor — the optional chat digest cadence. pollIntervalMs controls
@@ -64,7 +64,7 @@ delegation: null
 budgets:
   maxOps: null       # max concurrent dispatched ops one workflow may hold open;
                      # route/dispatch refuse `max-ops` at min(this, maxParallelOps)
-# allocation — how `api route` spreads jobs over the runtime pools (scripts/agent/models.mjs selectPool).
+# allocation — how `starci kernel route` spreads jobs over the runtime pools (scripts/agent/models.mjs selectPool).
 #   mode: adaptive (the only mode). Gates always apply first: role, difficulty pin, host tools, quota/auth,
 #     provider circuit, running < maxParallel. Each kind walks its modules/models/runtimes.yaml order
 #     (docs/config-format.md Model routing); the shares never move a kind outside its order.
@@ -123,7 +123,7 @@ models:
 #   cloudflare.access: whether a Cloudflare Access application guards `hostname` (informational; false
 #     prints a warning). Recommended for anything beyond yes/no decisions.
 #   telegram.enabled / chatId: the owner's chat with the bot (BotFather token in botTokenEnv). Send the
-#     bot /start, then `node scripts/connectors/telegram.mjs discover-chat` prints the chat id.
+#     bot /start, then `starci connect telegram discover-chat` prints the chat id.
 #   telegram.exposeCredentialAsks: false keeps a credential/secret ask off the public link — the message
 #     says to answer it on this machine and carries only the localhost link, and the gateway refuses it.
 connectors:
@@ -192,7 +192,7 @@ reconciler:
 #     test.author legs are never dispatched; review/handover gates do not count unit tests or coverage.
 #   e2e: false - e2e.verify legs and e2e test authoring are never dispatched; uat.verify is not e2e.
 #   A leg that is not dispatched settles `deferred: specs.<class>=false` with no attempt spent and the workflow
-#   proceeds past it; api status lists testsDeferred and `api run-deferred-tests --workflow <id> [--kind unit|e2e]`
+#   proceeds past it; starci kernel status lists testsDeferred and `starci kernel run-deferred-tests --workflow <id> [--kind unit|e2e]`
 #   runs them later. Read on every wake: flipping a switch needs no restart.
 # roots — where this host keeps the archive and the lane worktrees, when the owner moves them off the state root.
 # Both keys are optional absolute directories; env STARCI_ARCHIVE_ROOT / STARCI_LANES_ROOT win over them, and an

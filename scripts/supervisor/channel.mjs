@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// channel.mjs — the supervisor's side of the Telegram command bridge
+// starci supervisor channel — the supervisor's side of the Telegram command bridge
 // (scripts/supervisor/telegram-bridge.mjs, docs/connectors.md "Command bridge").
 // The owner chats with the bot; the bridge files each message in this
 // supervisor's inbox; the supervisor reads it here and answers through the bot.
 //
-//   node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>] [--force]
+//   starci supervisor channel register --id <id> --label <text> [--repos <csv>] [--force]
 //       id 'main' is the Supervisor's channel (config.yaml supervisor.mode, scripts/machine/home.mjs):
 //       chat (default) - the owner's desktop chat session owns it: it registers with no ORCA_TERMINAL_HANDLE
 //         (its CLAUDE_CODE_SESSION_ID is recorded as the channel's chat session); an Orca terminal ([Kernel],
@@ -12,21 +12,21 @@
 //       kernel - the [Supervisor] kernel's: it registers only from an Orca terminal (ORCA_TERMINAL_HANDLE,
 //         recorded as the channel's terminal) and, while the supervisor seat names a terminal, only from that
 //         one (--force overrides); an external chat session relays through tell.mjs
-//   node scripts/supervisor/channel.mjs heartbeat --id <id>
+//   starci supervisor channel heartbeat --id <id>
 //       both also make sure the bridge runs (ensureTelegramBridge)
-//   node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]
+//   starci supervisor channel inbox --id <id> [--json] [--peek]
 //       prints the unread messages and marks them read (--peek leaves them unread).
 //       For 'main' only its owner may mark them read - chat mode: the registered chat session (no Orca
 //       terminal; the recorded chat session when there is one); kernel mode: the [Supervisor] seat's terminal.
 //       --peek stays open to every other reader.
-//   node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
+//   starci supervisor channel reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
 //       sends "[<label>] <text>" to the owner's chat, as a reply to that inbox message's
 //       Telegram message; split into parts over 3900 characters. Only a message that came from Telegram is
 //       answered on Telegram: one the runtime filed (from: 'desktop' through scripts/supervisor/tell.mjs, or
 //       'stall-alert', 'land-gate') is answered locally - the reply is only recorded and the item marked read.
 //       A reply with no --to always goes to Telegram (how an escalation reaches the owner).
 //       Every reply is recorded in machine.sqlite sup_messages (direction out; tell.mjs --read shows it).
-//   node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]
+//   starci supervisor channel wait --id <id> [--timeout-ms <n>]
 //       blocks until an unread message exists (sup_messages, polled), prints one line per unread message
 //       ("TELEGRAM <inboxId>: <first 200 chars>") and exits 0; exits 124 on timeout.
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
@@ -149,9 +149,9 @@ export function drainRefusal({ id, terminal = null, session = undefined, seatTer
     const record = registered !== undefined ? registered : getSupervisor(id, env);
     const peek = '(inbox --peek reads without marking)';
     if (terminal) return `channel '${SUPERVISOR_ID}' is drained by the owner's chat session only (config.yaml supervisor.mode chat), not the Orca terminal ${terminal} ${peek}`;
-    if (!record) return `channel '${SUPERVISOR_ID}' is not registered: the chat registers it first (channel.mjs register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+    if (!record) return `channel '${SUPERVISOR_ID}' is not registered: the chat registers it first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
     const recordTerminal = registeredTerminal !== undefined ? registeredTerminal : record.terminal ?? null;
-    if (recordTerminal) return `channel '${SUPERVISOR_ID}' is still registered to the Orca terminal ${recordTerminal}: register it from the chat first (channel.mjs register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
+    if (recordTerminal) return `channel '${SUPERVISOR_ID}' is still registered to the Orca terminal ${recordTerminal}: register it from the chat first (starci supervisor channel register --id ${SUPERVISOR_ID} --label <text>) ${peek}`;
     const caller = session !== undefined ? session : chatSessionOf(env);
     if (record.session && caller !== record.session) return `channel '${SUPERVISOR_ID}' is drained by the chat session ${record.session} only, not ${caller ?? 'a session with no CLAUDE_CODE_SESSION_ID'} (re-register from this chat to take it over) ${peek}`;
     return null;
@@ -209,7 +209,7 @@ async function main() {
   const fail = (error, code = 2) => { console.error(JSON.stringify({ ok: false, error })); process.exitCode = code; };
   const id = typeof args.id === 'string' ? args.id : null;
   if (!verb || !Object.hasOwn(VERB_FLAGS, verb)) {
-    console.error('usage: channel.mjs register --id <id> --label <text> [--repos <csv>] | heartbeat --id <id> | inbox --id <id> [--json] [--peek]\n'
+    console.error('usage: starci supervisor channel register --id <id> --label <text> [--repos <csv>] | heartbeat --id <id> | inbox --id <id> [--json] [--peek]\n'
       + '       | reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>] | wait --id <id> [--timeout-ms <n>]');
     process.exitCode = 2; return;
   }
@@ -229,7 +229,7 @@ async function main() {
   }
   if (verb === 'heartbeat') {
     const record = heartbeatSupervisor(id);
-    if (!record) return fail(`supervisor ${id} is not registered: run channel.mjs register first`, 1);
+    if (!record) return fail(`supervisor ${id} is not registered: run starci supervisor channel register first`, 1);
     out({ ok: true, id, heartbeatAt: record.heartbeatAt, unread: readInbox(id).filter((item) => !item.read).length, bridge: ensureTelegramBridge() }); return;
   }
   if (verb === 'inbox') {

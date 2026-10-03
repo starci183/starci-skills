@@ -1,4 +1,4 @@
-// draw-loop-settle.mjs — what api settle re-runs for an interface.draw pass (owner ruling 2026-09-27: the draw loop's
+// draw-loop-settle.mjs — what starci kernel settle re-runs for an interface.draw pass (owner ruling 2026-09-27: the draw loop's
 // machine metrics are re-run by the runtime at settle, never trusted as self-reported). Every ui record the pass binds
 // (scripts/work/draw/draw-acceptance.mjs judges which) has each live part re-rendered from its render source and every
 // machine metric re-run (scripts/work/draw-loop.mjs verifyRecordParts). A failure is DRAW_METRICS_FAILED, a metric

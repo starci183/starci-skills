@@ -19,7 +19,7 @@ to unit-test, and they are never measured. The apps only compose; the e2e world 
 
 `npm test` is `jest --selectProjects unit --coverage`. Coverage is measured per file on the logic of `src/modules/**`: every
 file of a `ruleParams.be.logicRoles` role inside a `coverage: required` slot must reach 100 percent lines, branches,
-functions and statements (`be/jest.config.js` is the render `hfs sync` writes from the one derivation,
+functions and statements (`be/jest.config.js` is the render `starci app sync` writes from the one derivation,
 `scripts/hfs/coverage-scope.mjs`; R204); jest exits non-zero below that. The run writes `be/coverage/lcov.info`; Sonar and
 Codecov import it with the same measured scope and hold each file at 100.
 

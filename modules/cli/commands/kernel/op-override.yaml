@@ -1,0 +1,52 @@
+# The contract of `starci kernel op-override` (scripts/kernel/verbs/op-override.mjs): a per-workflow local op variant.
+group: kernel
+verb: op-override
+owner: runtime
+summary: store an additive override of one op for this workflow
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - op-override
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+  - name: op
+    type: string
+    summary: op to override (required with --set or --clear; narrows the shown list otherwise)
+  - name: set
+    type: string
+    summary: JSON object of additive override fields (notes, commandTimeoutMs, difficulty, model, effort)
+  - name: clear
+    type: boolean
+    summary: remove the op's override
+  - name: decision
+    type: string
+    summary: owner decision id that authorises a --set or --clear
+exit:
+  "0": stored or shown
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel op-override --repo <path> --workflow <workflow>
+  - starci kernel op-override --repo <path> --workflow <workflow> --op <op> --set '{"notes":["..."]}' --decision <decision>
+  - starci kernel op-override --repo <path> --workflow <workflow> --op <op> --clear --decision <decision>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api op-override
+  - node scripts/kernel/cli.mjs op-override
+purpose: Store an additive override of one op for THIS workflow (notes, commandTimeoutMs,
+  difficulty, model, effort); starci kernel dispatch renders it into every later packet of that op
+  (context.kernel_override). The shared manifest is never touched - a shared fix is a
+  kernel-proposal.
+refusals:
+  override-key-refused: any key but notes, commandTimeoutMs, difficulty, model, effort (never checks,
+    writes, steps, gates)
+  override-weakens-gate: a note telling the op to skip, disable, relax or bypass a check
+kernelOnly: true

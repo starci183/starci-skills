@@ -1,0 +1,27 @@
+group: worker
+verb: list
+owner: runtime
+summary: list supervised workers or working-agent counts by worktree lane
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerListVerb}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - use --by-lane to see how many agents of each type work in each worktree
+flags:
+  - {name: run, type: string, summary: limit workers to one Orca Run}
+  - {name: by-lane, type: boolean, summary: group working agents by worktree path and agent type}
+  - {name: active, type: boolean, summary: list only workers whose terminal state is active}
+  - {name: worktree, type: string, summary: limit rows to one registered worktree path}
+positional: []
+exit:
+  "0": "workers listed"
+  "1": "Orca data could not be read"
+  "2": "bad usage"
+json: starci/worker-list@1
+examples:
+  - starci worker list --active
+  - starci worker list --by-lane
+  - starci worker list --run <run-id> --worktree <path>
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

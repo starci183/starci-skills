@@ -1,4 +1,4 @@
-// The managed-file findings of `hfs check` (BE-CONVENTION 1.17, 3.1 principle 4): the rendered set of `hfs sync`, compared
+// The managed-file findings of `starci app check`: the rendered set of `starci app sync`, compared
 // with the tracked repository, and the tool configuration nothing may add to it.
 //   HFS_MANAGED_FILE_DRIFT (R05)  a managed file that exists but differs from its render: tsconfig*.json (but see R22),
 //                                 jest.config.js (back end), .prettierrc, .prettierignore, husky hooks, both workflows and sonar
@@ -91,7 +91,7 @@ function driftFindings(repoRoot, targets) {
     const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(path.posix.basename(result.path)) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : statesCoverageScope(result) ? 'HFS_COVERAGE_SCOPE_DRIFT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
     const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : code === 'HFS_COVERAGE_SCOPE_DRIFT' ? ', so it no longer states the coverage scope derived from the slot manifest' : ''}`;
-    findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx hfs sync --write"` });
+    findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx starci app sync --write"` });
   }
   return findings;
 }

@@ -1,4 +1,4 @@
-// api reconcile: recover a fenced launch or handle one typed recovery mode.
+// starci kernel reconcile: recover a fenced launch or handle one typed recovery mode.
 import path from 'node:path';
 import { recordWhy } from '../why-record.mjs';
 import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/db/ledger.mjs';
@@ -30,7 +30,7 @@ export default {
   if (args['release-worker']) return reconcileReleaseWorker(ledger, args, job, repo);
   if (args['dead-worker']) return reconcileDeadWorker(ledger, args, job, repo);
   if (job.status === 'effect_unknown' && parseJson(job.result_json ?? '', {})?.reason === 'dead-worker-fenced') {
-    throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and api settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
+    throw Object.assign(new Error(`job ${jobId} was fenced by --dead-worker on effect evidence (${(parseJson(job.result_json, {})?.evidence ?? []).join(', ')}); no host proof can requeue it - inspect the evidence and starci kernel settle it fail or blocked, then retry as a new attempt`), { code: 'dead-worker-fenced' });
   }
   const payload = jobPayloadOf(job);
   // A requeued job waits queued or ready (running -> ready after a dead worker, H13).

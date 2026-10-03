@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // progress-report.mjs — the supervisor's periodic progress report, sent to the
 // owner's Telegram.
-//   node scripts/supervisor/progress-report.mjs [--repo <path>]... [--send] [--json]
+//   starci supervisor report [--repo <path>]... [--send] [--json]
 // Owner, 2026-09-23: "every 10 minutes the supervisor draws a progress table with the
 // estimate of what is left and sends it over telegram", then, on the first terse table:
 // "too simple, write everything out clearly". So each workflow gets a readable section in
@@ -10,7 +10,7 @@
 // approval questions (with a link only while a form serves; forms are served on
 // demand from the ask's Telegram button or /asks), what is stuck, and a finish
 // time. Credential asks are one count line pointing at /creds, never listed.
-// Owner asks still reach Telegram only from the kernel (api serve-ask); this
+// Owner asks still reach Telegram only from the kernel (starci kernel serve-ask); this
 // is the supervisor's status digest. Ledgers are read read-only.
 import path from 'node:path';
 import { isMain } from '../lib/is-main.mjs';
@@ -39,7 +39,7 @@ const legLabel = (op, language) => opLabel(op, language);
 // themselves are declared once in scripts/lib/example-refs.mjs (R206).
 const ALIASES = WORKFLOW_ALIASES;
 const baseName = (wf) => wf.replace(/^wf-/, '').replace(/-mu[a-z0-9]{6,}$/, '');
-// The workflow's display name (api rename / define-goal: workflows.display_name) when the ledger has one,
+// The workflow's display name (starci kernel rename / define-goal: workflows.display_name) when the ledger has one,
 // else the older alias, else the goal slug.
 const displayName = (wf, names = null, tr = (s) => s) => names?.get(wf) ?? tr(ALIASES[baseName(wf)] ?? baseName(wf));
 /** workflow_id -> display_name for the workflows of `db` that have one. */
@@ -62,7 +62,7 @@ const publicBaseOf = (config) => {
 /**
  * Jobs of one workflow that are DONE but held: the worker filed its report, the Kernel consumed it,
  * and an open peer-wait or owner-gate incident naming the job (--holds, else --op) keeps its settle
- * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "nobody messages
+ * open - starci kernel status frontier.heldSettleJobs. The owner saw nothing of them: "nobody messages
  * when a job finishes or gets stuck" (2026-09-25; a product's op-integration.verify-25532858e7 sat done behind peer-wait
  * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
  * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).

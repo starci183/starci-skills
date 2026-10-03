@@ -121,19 +121,19 @@ test('each implicated file is own, a peer\'s commit, a peer\'s in-flight change 
   });
 });
 
-test('api check records a peer-attributed red gate peerBlocked; settle spends no business attempt on it', (t) => {
+test('starci kernel record-checks records a peer-attributed red gate peerBlocked; settle spends no business attempt on it', (t) => {
   const fx = fixture(t);
   const checks = JSON.stringify({ checks: [
     { name: 'container', exitCode: 0, command: 'npm run test:container' },
     { name: 'test:ci', exitCode: 1, command: 'npm run test:ci', failing: ['src/pod/pod.controller.spec.ts:123', 'src/pod/pod.controller.ts'] },
   ] });
-  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', checks]);
+  const recorded = fx.okSettler(['record-checks', '--job', 'job-self', '--checks', checks]);
   assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, peerBlocked: 1 });
   assert.deepEqual(recorded.peerBlocked.map((c) => c.name), ['test:ci']);
   assert.equal(recorded.peerBlocked[0].peers[0].commit, fx.peerSha);
 
   // A caller-supplied peerBlocked is dropped: only the api attributes.
-  const forged = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const forged = fx.okSettler(['record-checks', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'container', exitCode: 0 },
     { name: 'test:ci', exitCode: 1, peerBlocked: { peers: [] }, failing: ['src/self/own.ts'] },
   ] })]);
@@ -148,7 +148,7 @@ test('api check records a peer-attributed red gate peerBlocked; settle spends no
   assert.equal(entry.attribution.class, 'peer');
   assert.ok(entry.peerBlocked?.peers?.length, 'the recorded run keeps the api-computed peer-block');
 
-  fx.okSettler(['check', '--job', 'job-self', '--checks', checks]);
+  fx.okSettler(['record-checks', '--job', 'job-self', '--checks', checks]);
   const settled = fx.ok(['settle', '--job', 'job-self', '--verdict', 'blocked']);
   assert.deepEqual(settled.peerBlocked.checks, ['test:ci']);
   assert.match(settled.peerBlocked.routes[0], /--kind shared-blocker --introduced-by/);
@@ -166,7 +166,7 @@ test('retry accounting: peer-blocked is free only off a pass and only when the a
 
 // Strict validate of login/ui stayed red on DATA_STATUS_DRAWN
 // in ui/session-ending records outside the job's owned paths that nothing had touched; three attempts were spent on it.
-test('an untouched Work record outside the owned paths is foreign debt: api check records it advisory', (t) => {
+test('an untouched Work record outside the owned paths is foreign debt: starci kernel record-checks records it advisory', (t) => {
   const fx = fixture(t);
   commit(fx.repo, { '.starciwork/features/login/ui/session-ending/index.yaml': 'schema: work/ui-screen@1\n' }, 'old record', Date.now() - 2 * DAY);
   commit(fx.repo, { '.starciwork/features/peer/ui/touched/index.yaml': 'schema: work/ui-screen@1\n' }, `peer record (${PEER})`, Date.now() - 1_000);
@@ -185,7 +185,7 @@ test('an untouched Work record outside the owned paths is foreign debt: api chec
     // A git read that fails never calls a file foreign.
     assert.equal(attributeRedGate(db, { repo: fx.repo, job, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'], git: () => ({ ok: false, stdout: '' }) }).class, 'unknown');
   });
-  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const recorded = fx.okSettler(['record-checks', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'validate-own', exitCode: 0 },
     { name: 'validate-strict', exitCode: 1, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'] },
   ] })]);
@@ -236,10 +236,10 @@ test('failing files are read from a red check\'s own text when it names no list'
   assert.deepEqual(failingFromText('typecheck evidence in composition-r4/typecheck.txt'), []);
 });
 
-test('api check attributes a red Kernel check on the files its evidence names', (t) => {
+test('starci kernel record-checks attributes a red Kernel check on the files its evidence names', (t) => {
   const fx = fixture(t);
   preexisting(fx);
-  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const recorded = fx.okSettler(['record-checks', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'unit', exitCode: 0, command: 'npm run test:unit -- src/self' },
     { name: 'peer-typecheck-failure-confirmed', exitCode: 2, command: 'npm run typecheck',
       evidence: "src/peer/broken.spec.ts(2,7): error TS18046: 'malformed' is of type 'unknown' - peer file, outside owned paths" },

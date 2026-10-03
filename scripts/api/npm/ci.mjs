@@ -3,8 +3,8 @@
 // node_modules through a junction or a symlink (RT_NODE_MODULES_LINK); a scratch or staging tree installs its own.
 import { npmSpawn } from './lib.mjs';
 
-/** {ok, status, stderr} of the install in `cwd` (a directory holding package.json and package-lock.json). */
-export const ci = (cwd, { timeout = 900_000 } = {}) => {
-  const r = npmSpawn(['ci', '--prefer-offline', '--no-audit', '--no-fund'], { cwd, timeout });
+/** {ok, status, stderr} of the install in `cwd` (a directory holding package.json and package-lock.json); `workspaces` limits it to those workspaces. */
+export const ci = (cwd, { timeout = 900_000, workspaces = [] } = {}) => {
+  const r = npmSpawn(['ci', '--prefer-offline', '--no-audit', '--no-fund', ...workspaces.flatMap((name) => ['--workspace', name])], { cwd, timeout });
   return { ok: !r.error && r.status === 0, status: r.status ?? null, stderr: String(r.stderr ?? r.error?.message ?? '').trim() };
 };

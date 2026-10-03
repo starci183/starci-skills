@@ -1,6 +1,6 @@
 // rebase-milestone.mjs - the milestone policy of a workflow worktree (WFWT2 2.1): whether main has moved enough that the
 // workflow branch is rebased onto it now, mid-workflow, instead of only at the finish. Pure: the facts are read by
-// scripts/kernel/workflow-settle.mjs milestoneRebase, the one caller (api settle, after a green checkpoint).
+// scripts/kernel/workflow-settle.mjs milestoneRebase, the one caller (starci kernel settle, after a green checkpoint).
 //   not-idle        another op of the workflow is live in the worktree: a rebase needs a clean tracked tree and would move
 //                   the checkpoint its gate is measured against. Never due.
 //   up-to-date      main's tip is already in the branch. Not due.

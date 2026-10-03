@@ -22,6 +22,8 @@ not-codes:
     reason: "YAML scalar type name, not an error code"
   - literal: COMMON_GRAMMAR_COMPONENTS
     reason: "name of a registry constant in the grammar package, not a code"
+  - literal: COMP_CWORD
+    reason: "bash completion variable the generated starci completion script reads, not a code"
   - literal: ENGINE_SCHEMA
     reason: "constant naming the engine protocol marker (starci/engine@1), not an emitted code"
   - literal: GLOBAL_ANALYSIS_TOKEN
@@ -247,10 +249,10 @@ json-exceptions:
         (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
     - path: examples/ecommerce-app/be/contracts/billing
       reason: >
-        The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
+        The vendored async contract of the billing service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/billing/src/events.ts`, never written by hand; JSON by the contract format (R151).
     - path: examples/ecommerce-app/be/contracts/order
       reason: >
-        The vendored async contract of the order service (`starci/event-contract@1`), emitted by `hfs emit-contracts` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
+        The vendored async contract of the order service (`starci/event-contract@1`), emitted by `starci app emit` from `apps/order/src/events.ts`, never written by hand; JSON by the contract format (R151).
     - path: examples/ecommerce-app/fe/packages/ecommerce-api
       reason: >
         npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
@@ -334,7 +336,7 @@ json-exceptions:
         npm package manifest of the ecommerce-app root; the npm toolchain requires JSON.
     - path: examples/ecommerce-app/turbo.json
       reason: >
-        The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+        The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
     - path: examples/shape-slot/be/nest-cli.json
       reason: >
         Nest CLI monorepo map inside the shape-slot back end; the nest toolchain reads JSON.
@@ -368,7 +370,7 @@ json-exceptions:
       reason: npm package manifest of the shape-slot root; the npm toolchain requires JSON.
     - path: examples/shape-slot/turbo.json
       reason: >
-        The managed turbo task graph rendered by hfs sync; turbo reads only JSON.
+        The managed turbo task graph rendered by starci app sync; turbo reads only JSON.
     - path: hfs.json
       reason: >
         HFS declaration of the runtime repository itself (kind runtime, modules/schemas/hfs-repo.schema.yaml); the slot loader
@@ -381,6 +383,9 @@ json-exceptions:
       reason: npm lockfile; package managers require JSON filename and syntax.
     - path: package.json
       reason: npm package manifest; Node/npm require JSON filename and syntax.
+    - path: packages/cli/package.json
+      reason: >
+        npm package manifest of the @starci/cli dispatcher package; the npm toolchain requires JSON.
     - path: packages/eslint/be/fixtures/typed/tsconfig.json
       reason: >
         TypeScript project for the typed-lint fixture of @starci/eslint-canon-be; typescript-eslint reads a JSON tsconfig.
@@ -513,8 +518,6 @@ dead-script-entries:
     reason: "validator CLI (docs/verify-proof.md); a spec reads it"
   - path: scripts/work/validate/work-change.mjs
     reason: "validator CLI of work records (docs); a spec reads it"
-  - path: scripts/guards/git-hooks.mjs
-    reason: "generated runtime hook installer with no current code importer; the CLI lane's `starci runtime link` verb is its future reader"
 
 # Reserved: the export-to-reader exceptions of the symbol-graph check land here; shrink-only once populated.
 export-used: []

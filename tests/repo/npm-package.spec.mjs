@@ -26,6 +26,10 @@ test('actual npm tarball installs a runnable source command without development 
   // Exercise npm's real files/gitignore rules, not a hand-copied installed tree: the payload is the
   // declared source tree, exactly what `files` publishes.
   const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+  const cliPkg=JSON.parse(fs.readFileSync(path.join(root,'packages/cli/package.json'),'utf8'));
+  assert.equal(pkg.bin,undefined,'the runtime package does not own an npm bin');
+  assert.deepEqual(cliPkg.bin,{starci:'./bin/' + 'starci.mjs'},'@starci/cli owns the only starci npm bin');
+  assert.ok(pkg.files.includes('packages/cli/'),'the runtime package carries packages/cli');
   for(const name of ['package.json','.gitignore'])fs.copyFileSync(path.join(root,name),path.join(source,name));
   // files[] ends with the `!` negations npm subtracts after the positive entries. Subtracting them
   // while copying yields the same tarball without first duplicating the working tree's
@@ -49,8 +53,21 @@ test('actual npm tarball installs a runnable source command without development 
   const receipt=JSON.parse(packed.stdout)[0];
   const shipped=new Set(receipt.files.map(file=>file.path));
   assert.equal([...shipped].some(file=>file.startsWith('.dist')),false,'no compiled bundle is shipped');
-  for(const file of ['bin/starci.mjs','scripts/install/install.mjs','scripts/kernel/cli.mjs','engine/db/ledger.mjs','scripts/gates/stacks-gate.mjs'])
+  for(const file of [
+    'packages/cli/bin/starci.mjs',
+    'packages/cli/src/catalog.generated.mjs',
+    'packages/cli/completions/starci.bash',
+    'scripts/cli/main.mjs',
+    'modules/cli/commands/_global.yaml',
+    'scripts/install/install.mjs',
+    'scripts/kernel/cli.mjs',
+    'engine/db/ledger.mjs',
+    'scripts/gates/stacks-gate.mjs',
+  ])
     assert.ok(shipped.has(file),`npm tarball must ship ${file}`);
+  assert.equal([...shipped].some(file=>file.startsWith('tests/')),false,'npm tarball must not ship tests');
+  assert.equal([...shipped].some(file=>file.split('/').includes('node_modules')),false,'npm tarball must not ship node_modules');
+  assert.equal([...shipped].some(file=>file.split('/').includes('.starciwork')),false,'npm tarball must not ship .starciwork');
   for(const dead of ['cli/','hosts/','execution/','workflows/','contracts/','approvals/','specifications/','upgrades/','legacy/','fixtures/'])
     assert.equal([...shipped].some(file=>file.startsWith(dead)),false,`npm tarball must not ship ${dead}`);
   fs.writeFileSync(path.join(target,'package.json'),'{}\n');
@@ -59,7 +76,7 @@ test('actual npm tarball installs a runnable source command without development 
   const deployed=path.join(target,'node_modules/starci');
   assert.equal(fs.existsSync(path.join(deployed,'node_modules/yaml')),false);
   // The entry dispatcher must load and answer a read-only verb with no dev dependencies installed.
-  const probe=spawnSync(process.execPath,[path.join(deployed,'bin/starci.mjs'),'version'],{cwd:target,encoding:'utf8',windowsHide:true});
+  const probe=spawnSync(process.execPath,[path.join(deployed,'packages/cli/bin/starci.mjs'),'runtime','version'],{cwd:target,encoding:'utf8',windowsHide:true});
   assert.equal(probe.status,0,probe.stderr);
   assert.ok(probe.stdout.trim().length>0,'version prints the installed package version');
   assert.doesNotMatch(probe.stderr,/ERR_MODULE_NOT_FOUND|Cannot find/);

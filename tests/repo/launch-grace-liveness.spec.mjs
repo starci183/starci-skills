@@ -10,7 +10,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // worker's Task, so status read a 20-40 s old managed worker turn-idle and listed it nudge-ready;
 // the nudge landed in front of the arriving Task. For allocation.liveness.launchGraceMs after its
 // latest op-dispatched event a managed worker whose screen still reads an idle prompt is `starting`:
-// never nudge-ready, and `api nudge` skips it worker-starting typing nothing. A command-terminal
+// never nudge-ready, and `starci kernel nudge` skips it worker-starting typing nothing. A command-terminal
 // dispatch has already proven its prompt's submission before op-dispatched was written, so it keeps
 // no grace; a staged paste is nudge-ready at any age. And per the Supervisor ruling on
 // inc-f1d014518dc3, a nudge never appends a wake to input text the runtime cannot prove is its own:

@@ -19,7 +19,7 @@ const validOp = () => ({
   reads: [{ id: 'target', path: '.starciwork/features/<feature>/index.yaml', purpose: { en: 'Read the selected record, its scope and its refs.' } }],
   writes: [{ id: 'evidence', path: 'evidence/**', content: { en: 'Retain the observed bytes and their provenance.' } }],
   steps: [{ reads: ['target'], writes: ['evidence'], action: { en: 'Read the selected record and retain what was observed.' } }],
-  proofs: [{ id: 'binding', requirement: { en: '`starci validate` passes and every cited path exists.' } }],
+  proofs: [{ id: 'binding', requirement: { en: '`starci runtime validate` passes and every cited path exists.' } }],
   blockers: [{ code: 'DECLARED_DEPENDENCY_UNMET', condition: { en: 'A declared prerequisite is absent.' } }],
   route: { nodeKinds: ['business'], phase: ['verify'], intent: ['sample'] },
 });

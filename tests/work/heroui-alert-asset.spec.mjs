@@ -2,7 +2,7 @@
 // glyph left of the title, title in the tone colour, the grammar Button secondary as its action - no tone fill, no
 // IconTile: DRAW_ALERT_ANATOMY); a Meter track is the HeroUI h-2 (8px) track across the full width of its band, its
 // segments equal with small gaps (DRAW_METER_TRACK); artwork is an interface.asset slot, never reused ad hoc
-// (DRAW_ASSET_SLOT_UNDECLARED, scripts/work/asset-slot.mjs, api status assetSlotsOwed + an interface.asset nextAction);
+// (DRAW_ASSET_SLOT_UNDECLARED, scripts/work/asset-slot.mjs, starci kernel status assetSlotsOwed + an interface.asset nextAction);
 // the Nivo seed direction records the owner's stated choices without accepting them.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -223,7 +223,7 @@ test('a done ui record with an owed artwork slot is refused ASSET_SLOT_UNFILLED'
   assert.match(owed[0], /overview-mascot.*placeholder/);
 });
 
-test('api status lists assetSlotsOwed and proposes an interface.asset leg for them', async (t) => {
+test('starci kernel status lists assetSlotsOwed and proposes an interface.asset leg for them', async (t) => {
   const { openLedger, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
   const repo = tmp(t);
   const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -240,7 +240,7 @@ test('api status lists assetSlotsOwed and proposes an interface.asset leg for th
   assert.ok(action, JSON.stringify(body.nextActions));
   assert.equal(action.kind, 'dispatch');
   assert.deepEqual(action.slots, ['.starciwork/features/modules/ui/dashboard#overview-mascot']);
-  assert.match(action.reason, /api enqueue --op interface\.asset --paths \.starciwork\/features\/modules\/ui\/dashboard/);
+  assert.match(action.reason, /starci kernel enqueue --op interface\.asset --paths \.starciwork\/features\/modules\/ui\/dashboard/);
 });
 
 test('the runtime text says the real HeroUI Alert everywhere: no "tone fill", secondary Button, full-width h-2 Meter, asset slots', () => {

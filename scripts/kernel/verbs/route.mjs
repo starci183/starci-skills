@@ -1,4 +1,4 @@
-// api route: choose and persist one pool for a queued operation.
+// starci kernel route: choose and persist one pool for a queued operation.
 import { updateJob } from '../../../engine/db/ledger.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
@@ -72,7 +72,7 @@ export default {
   const pools = regDoc?.pools ?? {};
   // The one merged view selectPool's helpers expect: allocation policy + pools.
   const rtMerged = { ...(rtDoc ?? {}), runtimes: pools };
-  // Pool load (poolLoadOf, shared with api status): running, leased and answering jobs hold their pool slot, and a
+  // Pool load (poolLoadOf, shared with starci kernel status): running, leased and answering jobs hold their pool slot, and a
   // routed-but-queued one while its route hold lasts, so sequential route calls in one fan-out see the workers filling
   // instead of piling every slice onto the first preferred pool. The job being routed holds nothing yet.
   const poolLoad = poolLoadOf(db, { excludeJobId: jobId });
@@ -121,7 +121,7 @@ export default {
   // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
   // the fan-out order (runtimes.yaml allocation.preference.scaffold, Devin first; owner decision 2026-09-25).
   const fanOut = isFanOutSlice(payload);
-  // A redesign leg (api redesign; runtimes.yaml allocation.redesign) routes as its strong-reasoning alias, so the op
+  // A redesign leg (starci kernel redesign; runtimes.yaml allocation.redesign) routes as its strong-reasoning alias, so the op
   // that re-cuts, re-scopes or re-plans from an RCA reasons on the plan/think pools whatever its usual order.
   const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
   const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity, runtimes: rtMerged,
@@ -144,7 +144,7 @@ export default {
     const detail = `${kind} needs host tool ${tools.join(', ')} (route.riskHints host-tool-required on modules/ops/ops/${kind}.yaml) and no agent in its ${decision.work ?? decision.role} order at ${decision.difficulty} [${decision.chain.join(', ')}] has it`
       + (avoided.length
         ? `; ${avoided.join(', ')} has it and is excluded by the goal's routing_bias avoid (the owner's). Only the owner changes that bias.`
-        : `; ${serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools'}. Raise api incident --kind tool-unavailable for the owner.`)
+        : `; ${serving.length ? `the agents that have it (${serving.map((h) => h.target).join(', ')}) are outside that order` : 'no agent card lists it under capabilities.hostTools'}. Raise starci kernel incident --kind tool-unavailable for the owner.`)
       + ' The job stays queued; never dispatch it on an agent without the tool.';
     const out = { ok: false, jobId, kind, difficulty: decision.difficulty, bias, ...routeFacts, reason: 'tool-unavailable', tools, holders: serving, detail };
     emit(out, `route REFUSED for ${jobId} (${kind}): tool-unavailable — ${detail}`, args.json);

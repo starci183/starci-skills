@@ -1,0 +1,441 @@
+group: kernel
+verb: status
+owner: runtime
+summary: the live status projection of a workflow (frontier, progress, waits)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - status
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow to project
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel status --repo <path> --workflow <workflow>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api status
+  - node scripts/kernel/cli.mjs status
+reads: workflows.phase + generation; jobs grouped by status; leases joined to live jobs; exact
+  running-operation terminal show receipts; and, for each queued job, what blocks it — the approved
+  plan (legs and derivedPlan.edges) on the latest goals row, the workflow's slot-holding operation
+  count against min(budgets.maxOps, maxParallelOps), the typed provider-health signal for its routed
+  pool, overlapping `path:<owned_path>` lease rows, and the pool's declared maxParallel; the
+  stale-input and source-drift projections survey.staleInput / survey.sourceDrift describe
+writes: "Status can resolve met typed waits, sweep autopilot asks and gates, renew leases of live
+  workers, and record provider outages observed on worker screens. Unless the workflow finished, it
+  drains the workflow's Orca Runs into the ledger first (the same drain as starci kernel questions,
+  scripts/kernel/verbs/shared/worker-messages.mjs: orchestration check, one ledger transaction, then
+  --ack). Its projection reflects those transitions in the same call."
+returns:
+  ok: true
+  title: "<the workflow's display name: workflows.display_name (starci kernel rename, define-goal), else the
+    goal slug, else the id> — a label; workflowId stays the key"
+  slug: <workflows.title, the goal slug>|null
+  phase: <workflows.phase>
+  ramThrottle: "the object {effectiveCap, heavyCap, lightCap, maxParallelOps, running, queued, mode,
+    since, why, capWhy, freeRamPct, cpuBusy, priority {weight, reserve}, throttled, line} - the
+    host's RAM-aware dispatch cap (scripts/machine/ram-throttle.mjs): min(maxParallelOps, the ops
+    that still fit in free RAM above allocation.resources.ramThrottle.hardFloorPct) across every
+    ledger of the host, the hysteresis mode (normal | heavy-paused | critical) and why, this
+    workflow's priority and the last throttled dispatch"
+  kernelNotes: "[{kind: decision|proposal, id, at, status, headline, ...}] - the Kernel's own notes of
+    this workflow, oldest first: its decisions (events kernel-decision, closed by
+    kernel-decision-result: status open|kept|reverted, observed) and its proposals for shared
+    .claude (events kernel-proposal: status, tier, files). Reader: scripts/kernel/why.mjs
+    kernelNotesOf."
+  why: "legs[].why is the owner-facing reason (starci/why@1, docs/why.md) of the latest attempt of
+    every leg that is not green: {headline (first key, one Vietnamese sentence), state, cause,
+    disagreement, next, owner, codes[], refs[]}; legs[].attempts[] lists every attempt of the op
+    that needed one (newest first, at most 6: attemptId, tryNo, verdict, endState, why);
+    frontier.why is {headline, op, state, next, owner, attemptId} of the most recently ended one.
+    The text is stored in op_attempts.why_json at settle / dispatch-reject time
+    (scripts/kernel/why-record.mjs) from modules/kernel/failure-codes.yaml."
+  archivedAt: <workflows.archived_at ms>|null — set by starci kernel archive; the Kernel watchdog ends on it and
+    never replaces the Kernel
+  frontier: "{state:finished|transition-ready|settle-ready|worker-dead|worker-question|worker-nudge-r\
+    eady|worker-wedged|peer-message|engaged|handover-answered|finish-ready|ask-reserve|awaiting-own\
+    er|supervisor-wait|peer-wait|handover-due|next-ready|orphaned-frontier|idle,actionable,openOper\
+    ations,readyOperations,staleOperations[],unconsumedReports,nudgeReadyJobs[],workerQuestionJobs[]
+    (jobs whose worker asked or escalated to the coordinator through Orca and waits: starci kernel questions,
+    then starci kernel reply each),askReserveDispatches[] (unanswered asks that never reached the owner - no
+    ask-notified on Telegram and no live serve-ask form; the Kernel parks each with serve-ask
+    --dispatch, and any entry makes the frontier actionable),askOnDemandDispatches[] (unanswered
+    asks the owner has on Telegram (ask-notified) with no live form: healthy, the owner serves the
+    form from the ask Generate URL button; never re-served, never
+    actionable),credentialAskDispatches[] (unanswered credential asks - serve-ask.mjs askClassOf;
+    they hold only the live-proof legs, so they park the frontier at awaiting-owner only when every
+    approved leg still owed is a live proof, else it reads what it would without
+    them),settleReadyJobs[] (jobs still running whose report was consumed but never settled: api
+    check + starci kernel settle each; a job an open owner-gate or peer-wait holds is listed under
+    heldSettleJobs instead),heldSettleJobs[] (settles the Kernel deferred behind a recorded wait -
+    frontier.heldSettleJobs),wedgedJobs[] (workers past scripts/lib/terminal-liveness.mjs
+    WEDGE_MINUTES on one shell command still showing no output, or back at a host dialog the runtime
+    already answered maxPerAttempt times on the attempt (liveness gate-loop); starci kernel nudge refuses each
+    worker-wedged or worker-gate-loop - starci kernel reconcile --job <id> --dead-worker --settle-failed quits
+    the agent and settles or requeues the attempt),deadWorkerJobs[] (running/answering jobs with no
+    filed report whose exact worker liveness is disconnected or gone, and leased jobs with no worker
+    past their lease deadline (liveness launch-abandoned: a dispatch killed mid-spawn) - after a
+    host reboot every op terminal is gone; frontier worker-dead, ranked after settle-ready and
+    before worker-question; starci kernel reconcile --dead-worker each),queued[],queuedCauses,reason} —
+    actionable is the single boolean the yield rule reads (driver-loop.yaml wait): true for every
+    state but finished, awaiting-owner (no open operation while an approval ask or owner gate is
+    open, or credential asks with only live proof owed: the answer wakes the Kernel), peer-wait
+    (frontier.peerWaits) and a bare engaged, and true for an engaged workflow that still holds
+    readyOperations (queued jobs to route/dispatch, effect_unknown launches to reconcile) or a
+    staleOperations row without heldBy"
+  nextActions: "[{kind:reread|retry|root-verify|dispatch|impact-check|supervisor-gate|owner-gate|wait,
+    op, jobId?, incidentId?, nodes?, final?, reason, label, displayName?}] (label: the op label,
+    modules/ops/_labels.yaml; displayName: the named job's `<op label> · <what> · <workflow name>`)
+    — the Kernel's next steps. reread (first, only while kernelRev.stale): re-read kernelRev.files
+    (or kernel-prompt.md and driver-loop.yaml in full), then starci kernel kernel-ack-rev; it makes the
+    frontier actionable. The rest in the order it runs them, from ledger rows only
+    (scripts/kernel/cli.mjs graphProjectionOf); empty once finished. retry: a failed job whose
+    settle recorded a nextStep and that nothing follows (no retry names it, its step queued nothing,
+    no later attempt of the same work succeeded) and no owner gate holds, or an answered ask -
+    enqueue it --retry-of jobId. root-verify / dispatch with jobId: a queued job that reads ready -
+    route and dispatch it (root-verify when it carries payload.rootVerify). dispatch without jobId:
+    a plan leg after the first reached one with no job whose plan ancestors all succeeded - enqueue
+    it, once per runnable work-graph node in `nodes` when the workflow has a work graph; a red
+    runnable node is a dispatch of the op that last wrote its owned paths, `nodes` naming it.
+    impact-check: a staleOperations row without heldBy, or a staleProofs row - a proof whose every
+    piece of evidence is stale re-runs only the check op that made it, as a new attempt.
+    supervisor-gate (autopilot): an open supervisor-gate incident - the Supervisor's step, never the
+    owner's; keep driving every other leg. owner-gate: an open owner-gate incident or a pending ask;
+    under autopilot only the end-of-flow owner step (the handover, its credential checklist). Under
+    autopilot a dispatch of provision.ask is proposed only as the end-of-flow credential checklist
+    (final:true, params.subject handover-credentials, question from starci kernel autopilot --checklist), an
+    autopilot-answered ask reads as a retry that applies its receipt, and an owner handover answer
+    that re-opened a provisional item (starci kernel autopilot --reopen) reads as a retry of that op alone.
+    wait: an in-flight job, a queued job something else holds, an open peer-wait. With no operation
+    open and a retry, root-verify, dispatch or impact-check listed, frontier.state is `next-ready`
+    (actionable) instead of orphaned-frontier, which then means the ledger names no next step. A
+    queued job or plan leg whose op the owner's config.yaml specs switches defer carries `deferred:
+    specs.<unit|e2e>=false` and its reason says its enqueue/route only records the deferral; plan
+    legs behind a deferred leg never wait on it"
+  testsDeferred: "{off:[unit|e2e], jobs:[{jobId, op, attempt, kind, reason, at, via}], planned:[{op,
+    reason}]} - the owner's \"test later\" list (scripts/route/spec-deferral.mjs): the legs the
+    config.yaml specs switches deferred (status succeeded, result verdict deferred, no attempt
+    spent) and the plan legs not yet enqueued that will be; starci kernel run-deferred-tests runs them. legs[]
+    of a deferred op carry `deferred` too"
+  kernelRev: "{current, acked, ackedAt, ackSource:boot|ack, stale, unacked?, full?, files[],
+    fileCount, changes[{id, summary, ops}]} (scripts/kernel/runtime-rev.mjs) — current is the
+    runtime root's git HEAD; acked the newest runtime-rev-acked event (boot records the boot rev,
+    starci kernel kernel-ack-rev the Kernel's). stale: acked is behind and a file under modules/kernel,
+    modules/ops, knowledge, modules/models or scripts/kernel/op-prompt.mjs changed in between, or a
+    contract-changes entry file was added (files capped at 12; full: more, or a rev git cannot
+    compare - re-read kernel-prompt.md and driver-loop.yaml in full). unacked: a Kernel that never
+    acked (booted before this): its wakes ask for one full re-read and an ack; nothing is gated for
+    it. Every Kernel wake carries the same `Runtime rev <short-sha>` sentence (wake-delivery.mjs
+    withWakeIdentity, before the seat identity)"
+  autopilot: "{on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath,
+    label: 'self-accepted provisionally', at}], deferred[{jobId, opId, reason, incidentId?, since}],
+    deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
+    credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars},
+    stubPath, owed, record?, reason?}], supervisorGates[{incidentId, opId, holds[], since}],
+    budget{used, caps, exceeded[]}, checklist?{due, jobId, items}, sweep?}
+    (scripts/kernel/autopilot-run.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
+    runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api
+    autopilot --sweep). Under autopilot: legs[].color adds green-provisional (label \"self-accepted
+    provisionally\": green resting on a provisional acceptance) and deferred; queued[].queuedBecause
+    adds supervisor-gate, deferred and deferred-to-handover (a live proof waiting for the handover
+    credential checklist); awaitingOwner[].answer adds deferred-to-handover (waits on nobody);
+    frontier state supervisor-wait (not actionable) when only supervisor gates hold what is left"
+  opRevDrift: "[{jobId, op, attempt, from, to, files[], at}] — the newest op-rev-drift events (api
+    settle): legs whose op contract changed on the runtime after they were dispatched. WARN only"
+  staleProofs: "[{jobId, op, attempt, items[], changed[]}] — claimed FRs, shapes and proof cases whose
+    every indexed artifact is stale (a dependency path's digest moved since it was indexed), grouped
+    by the newest job that proved one; an op with a job still open is left out
+    (scripts/kernel/proof-integrity.mjs staleProofsOf)"
+  workGraph: "{version, event, counts:{<color>:n}, frontier:[{id, domain, slice, color, lastOp}]} |
+    null — the latest work-graph version (scripts/work/work-graph-store.mjs workGraphStatus) with
+    its live colours and runnable nodes; null without one, when the leg skeleton alone drives the
+    workflow. With a work graph a queued business.decide or architecture.decide is held by an
+    ancestor of those two only when their owned paths share a domain"
+  legs: "[{op, label, color:green|yellow|red|gray, jobId, status}] (label: the op label) — every
+    approved plan leg, then every other op with a job, with its latest job. yellow: a job leased,
+    running, answering or effect_unknown; red: a failed job nothing follows, or a queued retry of a
+    failed one; yellow: a queued first attempt or an owner wait; green: a succeeded job; gray: no
+    job yet"
+  frontier.peerMessageKeys: "[<key>] — pending peer-message inbox rows addressed to this workflow (api
+    notify, the enqueue overlap heads-up). Any entry makes the frontier actionable, so the watchdog
+    wakes a turn-idle Kernel; the state reads `peer-message` when no report, settle, worker
+    question, idle or wedged worker comes first, and its reason says to read `starci kernel inbox` and ack
+    each key with a disposition. An ack (or finish) clears it"
+  peerMessages: "[{key, from, kind, subject, at}] — the same pending rows; empty once the workflow is finished"
+  stuck: "[{key, workflowId, kind, cause, jobId, opId, incidentId, since, ageMs, severity, owner,
+    blockedBy, count, detail}] (scripts/machine/op-metrics.mjs stuckOf) — every wait the workflow
+    holds with its age: kind owner-gate (an open owner gate, or a pending owner ask as cause
+    owner-ask) | peer-wait | dependency (one item per job waited on, count = its dependants) |
+    retry-cap (a retry route fired its limit into an owner gate) | deferred-settle (cause
+    settle-ready or held-<wait>) | queued-ready | throttled (cause pool-full, circuit-open, max-ops
+    or path-lease). severity ok | warn | critical against runtimes.yaml
+    allocation.opTelemetry.stuckSla; owner names who moves it next: owner | kernel |
+    peer:<workflowId> | supervisor. Critical first, then oldest. Empty once finished. Read-only: the
+    Supervisor tick turns warn/critical into owed actions"
+  opHealth: "{windowMs, totals, ops[]} | null (scripts/machine/op-metrics.mjs opMetrics, this workflow
+    only, over allocation.opTelemetry.windowMs) — per row {key, jobs, succeeded, failed, owner,
+    dropped, open, successRate, failureClasses[{class, n}], topFailureClass,
+    queueWait/runTime/settleTime {n, p50, p90} ms, attemptsPerNode {nodes, mean, max},
+    repeatedIdentical, deadWorkerRate, ownerWait {n, totalMs, p50}, throttle {n, totalMs, p50}}"
+  kernel: "{attempt, status, terminal, launch, launchedAt, launchedBy, you} | null — the Kernel seat:
+    its job attempt and terminal, the latest kernel-booted/-restarted/-adopted event and its
+    launcher (watchdog | supervisor), and `you`, true when the caller's ORCA_TERMINAL_HANDLE is the
+    seat's terminal. A launch prompt and every runtime wake name the attempt they are for; this is
+    where the Kernel checks them"
+  frontier.peerWaits: "[{incidentId, peer, peerPhase, holds[], detail, untilMessage, refs[], since}] —
+    the open peer-wait incidents (starci kernel incident --kind peer-wait): work whose preflight cannot pass
+    until a peer workflow lands something. The state reads `peer-wait`, NOT actionable, when no
+    report, settle, worker, peer message, handover move, re-serve or owner wait comes first and
+    every open operation is a queued job or a deferred settle (frontier.heldSettleJobs) a wait holds
+    (none open is the common case: the next approved leg is not enqueued yet). It stands after
+    awaiting-owner and before handover-due and orphaned-frontier; before it existed a brand.decide
+    job waiting on a peer's Grammar install sat at orphaned-frontier/actionable with zero open
+    operations, and the watchdog re-woke the Kernel for nothing. A peer message from the awaited
+    peer wakes the Kernel (starci kernel notify, peerWait) and the frontier reads peer-message. reason names
+    each wait, its peer and what it holds"
+  frontier.peerWaitsDead: "[<incidentId>] — peer waits whose peer is no longer running (finished,
+    archived, gone): the peer can never meet them, so any entry makes the frontier actionable and
+    reason tells the Kernel to re-check the prerequisite itself, then resolve the wait or raise what
+    is missing"
+  frontier.heldWorkerJobs: "[<jobId>] — the heldSettleJobs whose worker still holds its terminal and
+    path lease (worker held). The job is done - its report consumed - and only the wait holds the
+    settle, so the watchdog runs `starci kernel reconcile --job <id> --release-worker` for each under --repair
+    (the Kernel may run it first): the agent quits, the terminal closes, the path lease is released,
+    the job stays unsettled, and its later settle needs no live worker. Never actionable on its own
+    (an integration.verify job once sat with its terminal open through a peer-wait)."
+  frontier.heldSettleJobs: "[{jobId, opId, attempt, heldBecause:owner-gate|peer-wait,
+    blockedBy:{incident}|{incident, peer}, detail, worker:held|released|none, terminalHandle?}] —
+    settles deferred behind a recorded wait: a running/answering job whose report was consumed but
+    not settled, named by an open owner-gate or peer-wait incident in --holds (or, without --holds,
+    as its --op). Owner-gate is checked first, as for queued jobs. Such a job is NOT in
+    settleReadyJobs and does not make the frontier settle-ready or actionable; it counts like a held
+    queued job, so with nothing else to move the state reads `awaiting-owner` (owner gate) or
+    `peer-wait`, and reason says the settle is deferred behind the wait. Before it a cut-closing
+    settle deferred behind a peer's commit still read settle-ready ACTIONABLE, the watchdog woke the
+    Kernel every tick for nothing and the supervisor alerted STALLED. Resolving the wait (api
+    incident --resolve, or the peer's message for an --until-message wait) makes the job
+    settle-ready again: actionable, and the watchdog wakes the Kernel to check and settle it. api
+    settle itself is never refused for a held job"
+  handover: "{op:handover.review,
+    state:approved|running|awaiting-owner|answered|retired|due|not-started, due, inApprovedChain,
+    jobId, ask:{dispatchId, jobId, attempt, state, decision, answeredBy, byOwner, note,
+    receiptPath}|null, approvedSeq, lastBusinessSettleSeq, finishAllowed, finishRefusal?} — the
+    owner handover (scripts/kernel/handover.mjs handoverProjection; driver-loop.yaml handoverLoop).
+    With no operation open it decides three frontier states, each actionable: `handover-answered`
+    (the latest handover ask was answered and nothing acted on it yet; reason names the move per
+    decision) and `finish-ready` (a handover-approved event newer than the last business settle: run
+    starci kernel finish) stand before ask-reserve; `handover-due` (every approved leg other than the handover
+    holds a succeeded job, no current approval, no other answered ask left to re-enqueue) stands
+    before orphaned-frontier. A pending handover ask is `awaiting-owner` like any other ask"
+  frontier.staleOperations: "[{jobId, op, attempt, cut?, heldBy?, followUp?, breakingBy?[], paths[]}]
+    — staleInput grouped per job: settled work whose product Work inputs changed in a way that owes
+    work. A `followUp` row (every input a breaking change its owner declared; breakingBy names the
+    owners) is owed ONE follow-up leg: a new attempt of that op and cut ordinal only, never a
+    seam-first cascade and never a redo of other slices or peers. Any other row is re-dispatched as
+    a new attempt (driver-loop.yaml enqueue.cutExecution). A row with `heldBy` waits on its cut's
+    open seam ordinal and does not make the frontier actionable; `reason` names the rows without it
+    when no earlier cause claims it"
+  staleInput: as survey.staleInput (and staleInputError when the projection failed)
+  sourceDrift: as survey.sourceDrift
+  peerDrift: as survey.peerDrift
+  frontier.peerDrift: "present only when non-empty: {advisory:true, jobs, records:[{file, owner,
+    ownerBy, writers[], jobs, foreignWrite, breakingIgnored?}]} — peerDrift summarized per record
+    file. Never makes the frontier actionable and never enters `reason`: the Kernel never redoes
+    settled work because a peer rewrote a shared record; only the record's owner declaring the
+    change breaking owes work (frontier.staleOperations followUp)"
+  frontier.sourceDrift: "present only when non-empty: {advisory:true, jobs, paths:[{path, jobs,
+    changes[], followUp[], unregistered}]} — sourceDrift summarized per edited Source path. Never
+    makes the frontier actionable and never enters `reason`: the Kernel does not redo settled work
+    for it (what a follow-up change owes is frontier.contractFollowUps)"
+  frontier.queued: "[{jobId, opId, attempt, queuedBecause, blockedBy, detail, blocking?}] — one row
+    per queued job, the jobs other work waits on first (heaviest blocking weight first,
+    waiter-priority.mjs; such a row carries blocking {waiters, workflows[], weight, since}), the
+    rest in created order, naming why it is not running. `queuedBecause` is
+    owner-gate|peer-wait|dependency|dependency-failed|max-ops|circuit-open|path-lease|pool-full|hos\
+    t-resources-low|ready and `blockedBy` carries the id that holds it: {incident} for an owner
+    gate, {incident, peer} for a peer wait, {op, job} for a dependency, {ceiling, ceilingSource,
+    running} for max-ops, {provider, pool} for an open circuit, {path, job, op, expiresAt} for a
+    path lease (detail names the holder and its lease expiry: wait for it, never re-dispatch by
+    hand), {pool, running, maxParallel} for a full pool, {drive, freeDiskGb, freeRamPct} for
+    host-resources-low (the shortage, named so the owner knows what to free), and null for `ready`.
+    `ready` means nothing blocks it and the Kernel is the only thing left to move it. A `dependency`
+    row whose blocker chain ends in a job a recorded wait holds (queued owner-gate or peer-wait, or
+    its settle deferred - heldSettleJobs) also carries parkedBehind {heldBecause, incident, peer?,
+    via, settle?} and a detail clause (scripts/kernel/frontier-parked.mjs): behind a peer-wait or a
+    deferred settle it is the wait's to release like the held job and never makes the frontier
+    `engaged` (an ord-6 --after a peer-wait-held ord-3 once read engaged and the stall check
+    alerted); behind an owner-gate-held job it counts as open, like that job. Cut seams
+    (scripts/kernel/seam-policy.mjs): a queued seam (ordinal 1 of a cut of more than one) carries
+    seam {cutId, siblings} and ranks right after the foundation legs; a sibling ordinal its seam no
+    longer holds carries seamStub {mode, seamJobId, seamStatus, reason} (mode
+    interface|released|seam-failed|seam-slipped|timeout) and reads by its other causes - `ready`
+    when nothing else holds it - instead of dependency/dependency-failed on the seam. A still-held
+    sibling's detail names when allocation.cutSeam.maxSiblingWaitMs releases it"
+  frontier.queuedBecause precedence: "first cause that bites, in this order. A job whose payload.after
+    names a job, or whose cut seam (the latest job of the same op and cut id at ordinal 1 that was
+    not retired before dispatch - a dropped or goal-superseded row with no dispatch binding,
+    engine/admission.mjs retiredBeforeDispatch, is no seam) has not settled succeeded, is
+    `dependency` with blockedBy {op, job}: the kernel records a composition-first order with enqueue
+    --after instead of holding siblings in its head, and an unsettled seam holds the other ordinals.
+    A Work record in a job's owned_paths whose dependsOn names a record owned by another job of the
+    workflow is held the same way until one owner of that record succeeded. `owner-gate` — an open
+    incident of kind owner-gate names this job or its op in --holds (or, without --holds, as its
+    --op): a step only the owner drives holds it, and no admission check can clear that. Then
+    `peer-wait` — an open incident of kind peer-wait names this job or its op in --holds (or as its
+    --op): a peer workflow must land something first, and route and dispatch refuse it. Then
+    `dependency` — a plan ancestor of this op still has a job queued or in flight: goals.json
+    derivedPlan.edges [[fromLeg, toLeg]] (leg labels `op` or `op#instance`, followed transitively)
+    when the plan records them, else every earlier leg; a leg the edges do not lead from never holds
+    it, and an ancestor's job the Kernel ordered after this one with --after is not its predecessor
+    — the declared edge overrides the plan. Then the admission checks in the order route and
+    dispatch run them: `max-ops` (the workflow ceiling, refused before anything else),
+    `circuit-open` (the routed pool's provider credential is parked), `path-lease` (a live
+    capacity-1 `path:<owned_path>` lease overlaps this job's closure, both compared
+    repository-qualified (dispatch.writes) — row existence is the fence, expiry only a recovery
+    signal), `pool-full` (other holders of the routed pool already fill its maxParallel; this job's
+    own routed-but-queued row does not count against itself), `host-resources-low` (the host itself
+    is short: free disk on the drive holding %TEMP% and the repositories under runtimes.yaml
+    allocation.resources.minFreeDiskGb, or free RAM under minFreeRamPct — a machine-capacity wait
+    measured at status as at dispatch, independent of route; the watchdog runs housekeeping once
+    against it and the row clears to ready on its own). An unrouted job is never pool-full or
+    circuit-open — there is no pool to be full of"
+  frontier.queuedCauses: "{<cause>: <count>} — the same rows tallied by cause, omitting causes with no rows"
+  frontier.gateConditions: "[{incidentId, kind, holds[], since, until[], conditions:[{condition, met,
+    evidence, unmeetable?}], met, unmeetable[]}] — this workflow's open incidents that carry typed
+    release conditions (starci kernel incident --until-*, commands.incident.typedRelease), each condition
+    evaluated read-only on this call; present only when non-empty. Status first resolves every one
+    whose conditions ALL hold, so a row here is still pending; an incident without typed conditions
+    never appears and is never auto-resolved"
+  frontier.autoResolved: "[{incidentId, kind, holds[], evidence[]}] — present only when THIS status
+    call resolved typed waits (events 'incident-resolved' {by:until-conditions, evidence} +
+    'incident-auto-resolved'). What they held is already released in this same projection (queued
+    rows read ready, held settles settle-ready), so the frontier is actionable and the watchdog tick
+    that ran it wakes the Kernel"
+  frontier.gateConditionsUnmeetable: "[<incidentId>] — present when a typed condition can no longer
+    hold on its own (--until-job :succeeded on a job that settled failed or cancelled, a named job
+    or incident gone): any entry makes the frontier actionable and reason tells the Kernel to
+    re-point the wait (starci kernel incident --attach) or resolve it"
+  frontier.blockingOthers: "[{jobId, opId, status, waiters, workflows[], since, waitedMinutes, weight,
+    via:[{workflowId, via, ref, since}]}] — present only when non-empty: this workflow's open jobs
+    that OTHER workflows of the ledger wait on, heaviest first (scripts/kernel/waiter-priority.mjs).
+    A waiter is an open incident's typed --until-job naming the job (via until-job) or
+    --until-record naming a record it owns (until-record), an open owner-gate/peer-wait of another
+    workflow naming the job id in its text (gate-names), a pending peer request to this workflow
+    naming the job id, its op or a .starciwork record it owns (peer-request), or a queued job
+    declaring it --after (dependency: counted in weight and queued order, listed here only across
+    workflows). weight = sum over waiters of 1 + hours waited. When such a job is still QUEUED and
+    has blocked another workflow for BLOCKING_HEADS_UP_MS (15 minutes), status writes one heads-up
+    peer message into this workflow's inbox from the longest-waiting workflow (payload auto
+    blocking-waiters, blockingJob, waitingWorkflows; once per newly waiting workflow), so the
+    frontier reads peer-message and the watchdog wakes this Kernel to dispatch it first"
+  jobs: "{<status>: <count>} — jobs grouped by status
+    (queued|leased|running|answering|succeeded|failed|awaiting_owner|cancelled|effect_unknown); the
+    queued rows are the dispatch candidates"
+  failures: "{failed, awaitingOwner} — `failed` counts jobs.status failed only; a job settled
+    awaiting_owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure, and
+    its leg carries awaitingOwner:true"
+  awaitingOwner: "[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row
+    per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means
+    the Kernel re-enqueues the op now, `pending` means the owner has not answered"
+  activeLeases: "[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not
+    a capacity gift"
+  inboxPending: <n> — unclaimed inbox rows for this workflow
+  workerQuestions: "[{messageId, type, jobId, opId, attempt, question, options[], askedAt}] — pending
+    `question` and `escalation` messages a running worker sent its coordinator (Orca's preamble
+    tells it to ask), read from the ledger rows the drain wrote. Any entry makes the frontier
+    `worker-question` (actionable): the worker is blocked until `starci kernel reply` answers.
+    workerQuestionsError names a Run whose orchestration check failed"
+  cutSets: "[{op, id, total, passed[], open[], jobs:{<ordinal>:{jobId,status}}, closingOrdinal?,
+    closingJob?, closingCheck?}] — every cut set of the workflow with an ordinal whose latest job
+    has not settled succeeded. With exactly one open ordinal it names that ordinal as the closing
+    pass: its settle requires `full-regression-final` besides the slice checks (settle.cutSet), so
+    the Kernel runs the unchanged full gates over the whole set before that settle. Ordinals settle
+    out of order, so the closing ordinal is whichever is left, not the highest. seam? {jobId,
+    status, passed, failures, interface?:{files[{path,sha256,bytes}], publishedBy, at},
+    released?:{reason, at}, siblingsHeld?[], siblingsOnStub?[{jobId, mode}], reconcile?:{seamPassed,
+    seamJobId, pending[], owed[], green[], red[]}, recutPlan?:{cutId, op, seamJobId, failures,
+    featureRoot, seam[], wire[], steps[]}} is the seam's contract-first state
+    (scripts/kernel/seam-policy.mjs): each owed reconcile is a nextActions impact-check (seamDuty
+    reconcile), each red one a retry of that ordinal (reconcile-red), a recutPlan a retry of the
+    seam (recut) - all make the frontier actionable and are listed in frontier.seamDuties [{duty,
+    jobId, cutId}]. A queued seam's dispatch action carries seamDuty dispatch-seam and reads
+    \"dispatch seam now\""
+  contractFollowUps: "frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp,
+    detail, after}] - for each `reach: follow-up` change in modules/kernel/contract-changes/, the
+    newest leg of its followUp.ops (per cut ordinal) that was admitted before the change, runs or
+    succeeded, and has no follow-up recorded yet (the key is present only while one is owed). Each
+    owed leg is rework: its followUpOp leg reads red in `legs`, the work-graph nodes it covers read
+    red, and nextActions carries a dispatch {op: followUpOp, jobId, change, nodes?} naming the
+    enqueue. Any entry makes the frontier actionable: the Kernel enqueues followUpOp with
+    --contract-change <change> --follow-up-of <jobId> (--after <jobId> while it runs) and never
+    holds the running leg (driver-loop.yaml contractRollout)"
+  foundations: "{peers[], declared, none, owns:[{name, kind, state, version, owner, ownerRunning}],
+    needs:[...], required, advised, detail?} - this workflow's shared-foundation duty (api
+    foundations); required means starci kernel enqueue refuses its non-foundation legs until it declares.
+    frontier.queued lists foundation legs (queued[].foundation) first"
+  dependencies: "{waitsOn[], waitedBy[], edges:[{from, to, via, ref, strength, job?}], findings:[{key,
+    kind, summary, action, clearCut}], bridges:[{id, action, state, provisional, reason,
+    workflowId?, foundation?, blocker?, dependents?, ...}]} - present only when this workflow waits
+    on, or is waited on by, another live workflow, is named by a finding, or takes part in a
+    Supervisor bridge (scripts/kernel/dependency-graph.mjs, light: no work-graph or foreign-file
+    reads; modules/supervisor/bridging.yaml). Read-only: a finding is the Supervisor's to act on"
+  reports: "[{dispatch_id, op_id, attempt, outcome, consumed_at, created_at, job_id}] — filed op
+    reports; consumed_at NULL means awaiting kernel integration"
+  workers: "[{jobId,opId,terminalHandle,liveness:active|active-unclassified|wedged|staged-input|turn-\
+    idle|live-idle|interactive-gate|failed|disconnected|gone|unknown|starting|released|launching|la\
+    unch-abandoned,connected,writable,lastOutputAt,outputAgeMs,screenState,livenessReason?,launchGr\
+    ace?,errorCode?,observedAt}] — gone is a running Orca's typed refusal of the handle (errorCode
+    terminal_handle_stale: it names no terminal, as every handle after a host reboot); an
+    unreachable Orca reads unknown and never proves a worker dead. connected/writable proves
+    terminal availability; current frame proves turn activity; report/output age alone never proves
+    a live turn. An `active` frame is trusted only while output is recent: past runtimes.yaml
+    allocation.liveness.activeStaleMs with no output it reads liveness turn-idle with livenessReason
+    stale-active (screenState stays active), so the nudge frontier reaches it; an unknown output
+    time (a restarted Orca re-attaches its panes with an empty lastOutputAt) is never an age -
+    lastOutputAt and outputAgeMs read null (terminal-liveness.mjs outputAgeOf) and the active frame
+    is aged by its dispatch heartbeat instead, never stale without one; a worker whose Orca dispatch
+    heartbeat (worker-show lastHeartbeatAt) is younger than activeStaleMs reads active instead
+    (livenessReason heartbeat, heartbeatAgeMs): its terminal stopped rendering, its turn did not. A
+    nudge whose send Orca refuses terminal_not_writable records event op-worker-unwritable; until
+    the terminal prints or the dispatch heartbeats again the worker reads writable false, liveness
+    disconnected (livenessReason terminal-incarnation-stale, errorCode terminal_not_writable), and
+    reconcile --dead-worker closes its terminal without typing a quit. `staged-input` is an
+    unsubmitted paste in the input row: the classifier finds the input region by the text dispatch
+    delivered (contracts.context_json.delivery.text + the contract markdown) and the card's
+    submission.stagedPattern, and only rows ABOVE it can prove a turn - the pasted contract's own
+    \"Running\"/\"Working\"/\"esc to interrupt\" words never make it active. A staged-input worker
+    is nudge-ready. A managed worker whose latest op-dispatched event is younger than runtimes.yaml
+    allocation.liveness.launchGraceMs, with no nudge since, reads `starting` (livenessReason
+    launch-grace, launchGrace {dispatchedAt,ageMs,graceMs}) while its screen still shows an idle
+    prompt: worker-start returned before Orca injected the Task, so it is never nudge-ready; a
+    staged-input paste stays nudge-ready through the grace, and a command-terminal dispatch carries
+    none (its prompt's submission was already proven). `wedged` is a worker whose turn ran past
+    terminal-liveness.mjs WEDGE_MINUTES on one shell command with no output: not nudgeable, not a
+    dead-liveness state - it recovers only through reconcile --dead-worker --settle-failed. A
+    command whose tool block carries its own bound (a \"Timeout: 4m40s\" row, a \"Read shell\" poll
+    of a background shell, a Codex background terminal) is a tool still running and reads active
+    however long the turn: the spinner minutes are the turn's, not the command's. Provider frame
+    shapes come from the cards (modules/models/agents/<agent>.yaml liveness: busyPatterns - spinner,
+    elapsed-timer or interrupt-hint rows that make the frame active whatever its input row shows;
+    chromePatterns - rows between the spinner and the input row that are not an answer): a wrapped
+    Devin spinner block and Claude's \"◐ medium · /effort\" row read active. A leased job with no
+    worker bound reads `launching` until its lease deadline (jobs.deadline, dispatchLeaseTtlMs after
+    the lease) and `launch-abandoned` after it (leaseDeadline): a dispatch killed mid-spawn left it,
+    it is a dead worker, and reconcile --dead-worker requeues or settles it. `released` is a worker
+    released while its settle is held (reconcile --release-worker on a frontier.heldWorkerJobs job):
+    no host read, never nudge-ready or dead, its lease never renewed"
+refuses:
+  - workflow-unknown
+usedBy: the drive loops cheap per-tick poll (driver-loop.yaml drive.status)

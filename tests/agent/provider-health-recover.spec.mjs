@@ -3,7 +3,7 @@
 // Live defect: an auth circuit opened by a 401 from a STALE key kept rejecting its pool
 // for 24h after the key was rotated and the launch path fixed, because nothing but expiry cleared it. Now an auth
 // circuit records the fingerprint of the credential it rejected and reads closed once the credential in effect
-// differs, and `api provider-health --recover` lets the Kernel (only) clear it early.
+// differs, and `starci kernel provider-health --recover` lets the Kernel (only) clear it early.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

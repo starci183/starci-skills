@@ -1,0 +1,13 @@
+group: app
+verb: upgrade
+owner: "@starci/hfs"
+summary: upgrade a lite app to the full edition (--edition full); a full app is already current
+impl: null
+flags:
+  - {name: plan, type: boolean, summary: preview the upgrade without writing}
+exit: {"0": already full, "2": refusal or bad usage}
+json: none
+examples: ['starci app upgrade', 'starci app upgrade --edition full --plan']
+editions: [full, lite]
+since: 1.0.0
+removed: []

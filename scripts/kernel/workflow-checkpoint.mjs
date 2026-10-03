@@ -15,7 +15,7 @@
 //   preserveAndReset  an op failed or was blocked: its owned paths' work (and any foreign change) is kept as
 //                     preserved/<workflowId>/<op> (a snapshot commit) and put back on the last checkpoint.
 //   rebaseWorkflow    the workflow branch rebased onto main's tip (a milestone when main moved, and the finish); the checkpoint follows.
-//   (api settle runs these through scripts/kernel/workflow-settle.mjs: settleCheckpoint, the Work-record owner rule and
+//   (starci kernel settle runs these through scripts/kernel/workflow-settle.mjs: settleCheckpoint, the Work-record owner rule and
 //                     the milestone rebase.)
 //   finishWorkflow    main is touched only here, in this order: the full gate of the whole branch against its merge-base
 //                     with main, the merge guard, review.verify of the exact head that lands, the rebase (a rebase that

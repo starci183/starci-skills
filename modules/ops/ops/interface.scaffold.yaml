@@ -34,11 +34,11 @@ reads:
         framework/design refs, assertions. On a greenfield scaffold the node is absent — no workflow
         authors it before the first source tree exists."
   - id: baseline
-    path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `hfs sync` generates) + packages/ (the shared presets)
+    path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `starci app sync` generates) + packages/ (the shared presets)
     purpose:
       en: The Next.js stack every project uses and the toolchain the front end (`fe/`) of a new app carries from
-        its first commit (`hfs scaffold app` writes the root, `be/` and `fe/` at once) — configs that are thin calls into the @starci presets (tsconfig, prettier, canon
-        lint), and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci
+        its first commit (`starci app scaffold` writes the root, `be/` and `fe/` at once) — configs that are thin calls into the @starci presets (tsconfig, prettier, canon
+        lint), and the files that cannot extend, which `starci app sync` generates from hfs.json - husky, the ci
         workflow, .gitignore and sonar-project.properties. The front end has no tests, so no test config or runner under `fe/`.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
@@ -91,7 +91,7 @@ writes:
       en: The selected implementation scope node — created with its schema const when absent on a
         greenfield scaffold — carrying the realised source root, scaffolded paths and evidence the
         checks produced. It is one leaf at impl/<repository>/<name>/ (id impl.<feature>.<repository>.<name>);
-        no implementation record sits at impl/ or impl/<repository>/ (starci validate suspects
+        no implementation record sits at impl/ or impl/<repository>/ (starci runtime validate suspects
         PLACE_TOO_SHALLOW, --strict refuses the id). Its proves names the br/fr/nfr/ui records of its feature
         it realises; a baseline-only feature with none proves that feature's toolchain nfr record, which
         business.decide writes before the scaffold settles - never a parent implementation
@@ -138,7 +138,7 @@ writes:
     path: shared
     content:
       en: shared
-      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
+      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
     path: shared
     content:
@@ -148,8 +148,8 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run starci gate read --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map starci app explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy starci gate read --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà starci app explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - target
       - baseline
@@ -175,8 +175,8 @@ steps:
   - reads: [baseline, architecture, grammar, brand, shell]
     writes: [source]
     action:
-      en: "Scaffold through hfs, never by hand. A new app comes from hfs scaffold app <name> --into <parent> (the published @starci/hfs at its canon pin): the app root - one package.json for both sides with every dependency at its canon pin (knowledge/hfs/canon-pins.yaml), the lockfile npm resolves, hfs.json of kind app, README, CI, .husky, scripts/, .starcistacks/ and .starciwork/ - and the fe/ side with its managed configuration and first source tree. An existing app gains or refreshes its managed files only through hfs sync --write at the app root, and hfs check must report no managed-file finding; a generated file is never hand-written or edited, a dependency is never added to a side's own package.json (the app root holds the one manifest), and a value or a skeleton file hfs does not write is a named gap in the scaffold evidence, never an improvised choice. The first fe/ source tree is the scaffold's own: per app next.config.ts with next-intl, src/proxy.ts, the [locale] segment with its layout, page, error and not-found boundaries, global-error.tsx, modules/i18n with its vi catalog and the /health/live route; then the grammar-based theme wiring in globals.css and the minimal first shell. When a planned layout tree exists, the first source tree realises it - one app/ directory per planned node with its layout.tsx, route groups and @slots as planned, each visible layout built from its accepted surface-layout drawing, the navigation registry with its labels per locale, the default locale and the lockup. No behaviour beyond what the skeleton proves."
-      vi: "Dựng qua hfs, không bao giờ bằng tay. App mới đến từ hfs scaffold app <name> --into <thư mục cha> (@starci/hfs đã publish theo canon pin): gốc app - một package.json cho cả hai phía với mọi phụ thuộc theo canon pin (knowledge/hfs/canon-pins.yaml), lockfile do npm phân giải, hfs.json loại app, README, CI, .husky, scripts/, .starcistacks/ và .starciwork/ - cùng phía fe/ với cấu hình được quản lý và cây mã đầu tiên. App đã có chỉ thêm hoặc làm mới các tệp được quản lý qua hfs sync --write ở gốc app, và hfs check không được báo lỗi tệp quản lý nào; tệp sinh ra không bao giờ được viết hay sửa tay, không bao giờ thêm phụ thuộc vào package.json riêng của một phía (gốc app giữ manifest duy nhất), và giá trị hay tệp khung mà hfs không viết là khoảng trống được nêu trong bằng chứng scaffold, không bao giờ là lựa chọn tự chế. Cây mã fe/ đầu tiên là của chính scaffold: với mỗi app là next.config.ts với next-intl, src/proxy.ts, phân đoạn [locale] với layout, page, ranh giới error và not-found, global-error.tsx, modules/i18n với catalog vi và route /health/live; rồi nối theme dựa trên grammar trong globals.css và khung shell tối thiểu đầu tiên. Khi đã có cây layout dự kiến, cây mã đầu tiên hiện thực nó - mỗi nút dự kiến một thư mục app/ với layout.tsx, route group và @slot như dự kiến, mỗi layout hiển thị dựng từ bản vẽ surface-layout đã được chấp nhận, registry điều hướng với nhãn theo từng locale, locale mặc định và lockup. Không có hành vi nào ngoài những gì khung chứng minh."
+      en: "Scaffold through hfs, never by hand. A new app comes from starci app scaffold <name> --into <parent> (the published @starci/hfs at its canon pin): the app root - one package.json for both sides with every dependency at its canon pin (knowledge/hfs/canon-pins.yaml), the lockfile npm resolves, hfs.json of kind app, README, CI, .husky, scripts/, .starcistacks/ and .starciwork/ - and the fe/ side with its managed configuration and first source tree. An existing app gains or refreshes its managed files only through starci app sync --write at the app root, and starci app check must report no managed-file finding; a generated file is never hand-written or edited, a dependency is never added to a side's own package.json (the app root holds the one manifest), and a value or a skeleton file hfs does not write is a named gap in the scaffold evidence, never an improvised choice. The first fe/ source tree is the scaffold's own: per app next.config.ts with next-intl, src/proxy.ts, the [locale] segment with its layout, page, error and not-found boundaries, global-error.tsx, modules/i18n with its vi catalog and the /health/live route; then the grammar-based theme wiring in globals.css and the minimal first shell. When a planned layout tree exists, the first source tree realises it - one app/ directory per planned node with its layout.tsx, route groups and @slots as planned, each visible layout built from its accepted surface-layout drawing, the navigation registry with its labels per locale, the default locale and the lockup. No behaviour beyond what the skeleton proves."
+      vi: "Dựng qua hfs, không bao giờ bằng tay. App mới đến từ starci app scaffold <name> --into <thư mục cha> (@starci/hfs đã publish theo canon pin): gốc app - một package.json cho cả hai phía với mọi phụ thuộc theo canon pin (knowledge/hfs/canon-pins.yaml), lockfile do npm phân giải, hfs.json loại app, README, CI, .husky, scripts/, .starcistacks/ và .starciwork/ - cùng phía fe/ với cấu hình được quản lý và cây mã đầu tiên. App đã có chỉ thêm hoặc làm mới các tệp được quản lý qua starci app sync --write ở gốc app, và starci app check không được báo lỗi tệp quản lý nào; tệp sinh ra không bao giờ được viết hay sửa tay, không bao giờ thêm phụ thuộc vào package.json riêng của một phía (gốc app giữ manifest duy nhất), và giá trị hay tệp khung mà hfs không viết là khoảng trống được nêu trong bằng chứng scaffold, không bao giờ là lựa chọn tự chế. Cây mã fe/ đầu tiên là của chính scaffold: với mỗi app là next.config.ts với next-intl, src/proxy.ts, phân đoạn [locale] với layout, page, ranh giới error và not-found, global-error.tsx, modules/i18n với catalog vi và route /health/live; rồi nối theme dựa trên grammar trong globals.css và khung shell tối thiểu đầu tiên. Khi đã có cây layout dự kiến, cây mã đầu tiên hiện thực nó - mỗi nút dự kiến một thư mục app/ với layout.tsx, route group và @slot như dự kiến, mỗi layout hiển thị dựng từ bản vẽ surface-layout đã được chấp nhận, registry điều hướng với nhãn theo từng locale, locale mặc định và lockup. Không có hành vi nào ngoài những gì khung chứng minh."
   - reads:
       - repo
     writes: [source, evidence, firstRender]
@@ -188,7 +188,7 @@ steps:
       - shell
     writes: [shellNode, evidence]
     action:
-      en: Re-scan the layout tree from the source just created with `node scripts/work/layout-tree.mjs scan
+      en: Re-scan the layout tree from the source just created with `starci work layout-tree scan
         --work .starciwork --write` and keep its output as evidence - planned nodes turn origin repository,
         and every planned node the tree still holds is one this scaffold did not create. The visible
         layouts are then captured against the running app by the next interface.draw, before it draws the pages under them.
@@ -203,8 +203,8 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run starci gate run --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy starci gate run --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: scaffold-runs
     requirement:
@@ -226,8 +226,8 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: "The ci.yml and sonar-project.properties the baseline writes take the Sonar project key and host and the CI secret/variable names from the services block of the app's stack declaration (.starcistacks at the app root), and node scripts/gates/starcistacks.mjs <app> --new reports no refusal. When that declaration is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode stacks) - never an owner ask."
-      vi: "ci.yml và sonar-project.properties mà baseline viết lấy khóa dự án và host Sonar cùng tên secret/biến của CI từ khối services của khai báo stack của app (.starcistacks ở gốc app), và node scripts/gates/starcistacks.mjs <app> --new không báo từ chối nào. Khi khai báo đó nằm ngoài các đường dẫn op sở hữu, lệnh kiểm tra chạy không có --new và các nghi vấn STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING của nó được báo kèm việc tiếp theo nó nêu (workspace.manage chế độ stacks) - không bao giờ hỏi chủ sở hữu."
+      en: "The ci.yml and sonar-project.properties the baseline writes take the Sonar project key and host and the CI secret/variable names from the services block of the app's stack declaration (.starcistacks at the app root), and starci gate starcistacks <app> --new reports no refusal. When that declaration is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING suspects are reported with the follow-up it names (workspace.manage mode stacks) - never an owner ask."
+      vi: "ci.yml và sonar-project.properties mà baseline viết lấy khóa dự án và host Sonar cùng tên secret/biến của CI từ khối services của khai báo stack của app (.starcistacks ở gốc app), và starci gate starcistacks <app> --new không báo từ chối nào. Khi khai báo đó nằm ngoài các đường dẫn op sở hữu, lệnh kiểm tra chạy không có --new và các nghi vấn STACKS_SERVICES_MISSING / STACKS_DECLARATION_MISSING của nó được báo kèm việc tiếp theo nó nêu (workspace.manage chế độ stacks) - không bao giờ hỏi chủ sở hữu."
     check: scripts/gates/starcistacks.mjs
   - id: scope
     requirement:
@@ -242,8 +242,8 @@ proofs:
     check: scripts/work/ui/shell-conformance.mjs
   - id: op-gate
     requirement:
-      en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
-      vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+      en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
+      vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
 blockers:
   - code: SDS_MISSING
     condition:
@@ -277,7 +277,7 @@ policy:
       job uses this same approved interface.scaffold leg and goal binding, and the complete pairwise-disjoint path
       union (shared root config - package.json, lockfile, tsconfig, eslint config, hfs.json -
       in exactly one ordinal, normally the seam) was preflighted before the first slice launched.
-    permits: "A repository-wide gate (install, typecheck, lint:check, hfs lint, test, build)
+    permits: "A repository-wide gate (install, typecheck, lint:check, starci app lint, test, build)
       may remain nonzero after a NON-FINAL ordinal only for findings whose paths belong exclusively to
       not-yet-passed sibling ordinals of the same cut set. The current slice must pass the same gates
       scoped to its own owned paths, recorded as check cut-slice-postcondition; the full gate commands

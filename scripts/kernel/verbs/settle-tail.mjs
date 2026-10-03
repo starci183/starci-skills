@@ -1,6 +1,6 @@
-// api settle-tail — the settle's async tail for one settled job (owner ruling settle-runtime-service, 2026-09-28):
+// starci kernel settle-tail — the settle's async tail for one settled job (owner ruling settle-runtime-service, 2026-09-28):
 // session retention, the Telegram media sender, the input re-baseline and artifact indexing with its evidence copy and
-// typed logs. `api settle` queues it (<ledger dir>/settle-tail/<jobId>.json) and starts this verb detached, so the tail
+// typed logs. `starci kernel settle` queues it (<ledger dir>/settle-tail/<jobId>.json) and starts this verb detached, so the tail
 // can neither block nor fail the settle. A run that fails is logged (event settle-tail-failed) and left queued; the
 // settler (scripts/kernel/settle/job-settle.mjs retryDueTails) starts it again after allocation.settler.tail.retryMs, up
 // to maxAttempts. A run that succeeds removes the queue file (event settle-tail-done). Idempotent per job.
@@ -19,7 +19,7 @@ export default {
   verb: 'settle-tail',
   required: ['job'],
   kernelOnly: true,
-  usage: '  settle-tail --job <id> [--json]   run the async tail of a settled job (artifact index, evidence copy, session retention, input baseline); api settle queues it',
+  usage: '  settle-tail --job <id> [--json]   run the async tail of a settled job (artifact index, evidence copy, session retention, input baseline); starci kernel settle queues it',
   async run({ ledger, args, repo, emit, internals }) {
     const db = ledger.db, jobId = String(args.job);
     const file = path.join(tailDir(repo), `${slug(jobId)}.json`);

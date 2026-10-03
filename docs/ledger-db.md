@@ -112,7 +112,7 @@ live) — `v_decision_rows` keeps the ended workflow's resolved history (migrati
 | Outcome | `report_outcome` (the op's claim) apart from `verdict` (the runtime's), `settled_by`, `decision_id`, `failure_class`, `end_state` |
 | Usage | `tokens_in` (fresh + cache read + cache write), `tokens_out`, `cost_usd`, `usage_source` (`cli-transcript` measured, `unavailable` with `usage_reason`; per-model detail in `llm_usage`; NULL only until an ended attempt is decided, never estimated) |
 
-Token metering (`scripts/kernel/usage-record.mjs`, `api usage`): the numbers come from the agent CLI's own session file - Claude
+Token metering (`scripts/kernel/usage-record.mjs`, `starci kernel usage`): the numbers come from the agent CLI's own session file - Claude
 Code JSONL `message.usage`, Codex rollout `token_count` (`scripts/lib/llm-usage.mjs`); devin and any other
 agent are unavailable, and a terminal scrollback is never a source. `llm_usage` rows are normalized: `input_tokens` is fresh
 (non-cached) input, `output_tokens` includes reasoning, `reasoning_tokens` is that subset. An op attempt gets one row per model when it
@@ -194,6 +194,6 @@ workflow. Blob files leave only through the GC sweep above. Machine sample table
 ## 8. Refusal discipline
 
 `modules/kernel/api.yaml` names every refusal a write verb prints, and
-`scripts/checks/check-api-surface.mjs` holds the two in step. A trigger refusal
+`scripts/checks/check-cli-parity.mjs` holds the two in step. A trigger refusal
 (`workflow-transition-unrecorded`, `unit-try-budget-exhausted`, `unit-already-passed`, …) reaches the
 caller as a typed reason: a routed fact, never an exception to route around.

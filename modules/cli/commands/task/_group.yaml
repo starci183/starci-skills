@@ -1,0 +1,4 @@
+group: task
+summary: register and inspect the runtime's per-user Windows scheduled tasks
+owner: runtime
+since: 1.0.0-alpha.4

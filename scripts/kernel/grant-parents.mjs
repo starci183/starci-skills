@@ -1,5 +1,5 @@
 // A write grant must be satisfiable: the directory the worker writes into has to exist in the target repository.
-// `api enqueue` and `api dispatch` refuse (reason grant-parent-missing) an owned path whose directory - the
+// `starci kernel enqueue` and `starci kernel dispatch` refuse (reason grant-parent-missing) an owned path whose directory - the
 // path itself for a directory/glob grant, its parent for a file grant - is absent, and name the missing
 // directory and the closest one that exists (a grant under my-app/src/app when my-app keeps its router at
 // apps/app/src/app could never be met). A create-new-module grant is explicit: `--new-module <repo-relative

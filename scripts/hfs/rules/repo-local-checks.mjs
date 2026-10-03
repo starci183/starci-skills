@@ -20,7 +20,7 @@ export function repoLocalCheckFindings({ repoRoot, files }) {
   for (const file of files) {
     if (file.includes('node_modules/')) continue;
     if (LOCAL_RULE_FILE.test(file)) findings.push(found(REPO_LOCAL_CHECK, file, `${file} is a local lint rule or plugin; a repository keeps no rule of its own: the rule is proposed to the canon (@starci/eslint-canon-*) in the .claude runtime`));
-    else if (CHECK_SCRIPT.test(file)) findings.push(found(REPO_LOCAL_CHECK, file, `${file} is a check kept in the repository; every check lives in the .claude runtime (hfs check, the canons), so a repository has none to keep`));
+    else if (CHECK_SCRIPT.test(file)) findings.push(found(REPO_LOCAL_CHECK, file, `${file} is a check kept in the repository; every check lives in the .claude runtime (starci app check, the canons), so a repository has none to keep`));
     else if (file === 'package.json' || file.endsWith('/package.json')) {
       const pkg = readJson(repoRoot, file);
       for (const [name, command] of Object.entries(pkg?.scripts ?? {})) {

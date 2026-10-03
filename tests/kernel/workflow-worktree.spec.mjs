@@ -338,7 +338,7 @@ test('guardLaunch writes the workflow worktree into an op guard file', async (t)
   assert.equal(JSON.parse(fs.readFileSync(outside.receipt.jobFile, 'utf8')).workflowWorktree, null, 'no workflow worktree, no field value');
 });
 
-test('api dispatch passes the registered workflow worktree to the guard, and null when there is none', (t) => {
+test('starci kernel dispatch passes the registered workflow worktree to the guard, and null when there is none', (t) => {
   const { base, app, env, ctx } = fixture(t);
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'),
     { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));

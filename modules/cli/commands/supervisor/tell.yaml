@@ -1,0 +1,24 @@
+group: supervisor
+verb: tell
+owner: runtime
+summary: send a desktop message to the Supervisor or read its recent replies
+impl:
+  script: scripts/supervisor/tell.mjs
+positional:
+  - {name: text, required: false, variadic: true}
+flags:
+  - {name: wait, type: boolean, summary: wait for the Supervisor's reply}
+  - {name: timeout-ms, type: number, summary: reply wait timeout in milliseconds}
+  - {name: read, type: boolean, summary: read recent Supervisor replies}
+  - {name: since, type: string, summary: ISO time or relative age such as 30m}
+  - {name: limit, type: number, summary: maximum replies to return}
+exit: {"0": message sent or replies read, "2": bad usage, "124": reply wait timed out}
+json: flag
+examples:
+  - starci supervisor tell <text>
+  - starci supervisor tell <text> --wait
+  - starci supervisor tell --read --since 30m --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/tell.mjs

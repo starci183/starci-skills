@@ -1,0 +1,15 @@
+group: work
+verb: draw-acceptance
+owner: runtime
+summary: verify that drawn assets are accepted render shapes
+impl: {script: scripts/work/draw/draw-acceptance.mjs}
+flags:
+  - {name: repo, type: string, required: true, summary: product repository root}
+  - {name: job, type: string, summary: job id whose report files and owned paths are judged}
+  - {name: files, type: string, summary: comma list of bound files to judge instead of a job}
+exit: {"0": every bound asset accepted, "1": a bound asset was refused, "2": bad usage}
+json: flag
+examples: ['starci work draw-acceptance --repo <repo> --job <job> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-acceptance.mjs']

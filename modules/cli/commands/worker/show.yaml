@@ -1,0 +1,22 @@
+group: worker
+verb: show
+owner: runtime
+summary: show one supervised worker and Orca's exact liveness observation
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerShowVerb}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - address a worker by Dispatch id, never by its terminal title
+flags:
+  - {name: dispatch, type: string, required: true, summary: authoritative Orca Dispatch id}
+positional: []
+exit:
+  "0": "worker shown"
+  "1": "Orca could not read the worker"
+  "2": "bad usage"
+json: starci/worker-show@1
+examples:
+  - starci worker show --dispatch <dispatch-id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

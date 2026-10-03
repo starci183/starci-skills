@@ -2,7 +2,7 @@
 // release-proof.mjs - the release proof (schema starci/release-proof@1) release.deliver attaches before a publish or a deploy
 // (knowledge/op-gate.yaml proofs.release, contract change op-mechanism-proofs).
 //
-//   node scripts/gates/release-proof.mjs --repo <released repository> --base <first commit of the release range>^ [--main <ref>] [--out <file>]
+//   starci release proof --repo <released repository> --base <first commit of the release range>^ [--main <ref>] [--out <file>]
 //
 // Every step is required and none may be skipped:
 //   app-installs  scripts/gates/release-app-installs.mjs: the published hfs scaffolds an app, the app installs FRESH from the
@@ -13,7 +13,7 @@
 //   merge-guard   the gate's merge guard over base..HEAD of the released repository (scripts/gates/gate.mjs mergeGuard): a merge
 //                 that kept the lane side over a main change is red;
 //   check         `npm run check` of the runtime.
-// `api settle` re-reads the proof (scripts/kernel/gate-settle.mjs) and refuses a done release with a step missing, skipped or red.
+// `starci kernel settle` re-reads the proof (scripts/kernel/gate-settle.mjs) and refuses a done release with a step missing, skipped or red.
 // Exit 0 every step passed, 1 a step is red or skipped, 2 the proof could not be built.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,7 +45,7 @@ export function appInstallsStep({ runtime = runtimeRoot, node = defaultNode } = 
   const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
   const skipped = output.split(/\r?\n/).filter((l) => /\bSKIPPED:/.test(l));
   const status = run.error || run.status === null ? STEP_STATUS.toolFailed : skipped.length ? STEP_STATUS.skipped : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red;
-  return { id: 'app-installs', command: 'node scripts/gates/release-app-installs.mjs', exit: run.status ?? null, status,
+  return { id: 'app-installs', command: 'starci release app-installs', exit: run.status ?? null, status,
     detail: skipped.length ? `a proof skipped: ${skipped.slice(0, 3).join(' | ')}` : tail(output) };
 }
 
@@ -63,7 +63,7 @@ export function canonPinsStep({ repo, runtime = runtimeRoot, node = defaultNode 
   const runtimeResult = results[0];
   // The runtime judgment must have bound at least one code-pattern profile to its published canon by the content digest.
   const unbound = !broken && !(Number(runtimeResult.profiles) > 0);
-  return { id: 'canon-pins', command: `node scripts/checks/check-canon-pins.mjs --json${results.length > 1 ? ' (+ --repo <app>)' : ''}`, exit: Math.max(...results.map((r) => r.exit ?? 2)),
+  return { id: 'canon-pins', command: `starci runtime check --only canon-pins -- --json${results.length > 1 ? ' (+ --repo <app>)' : ''}`, exit: Math.max(...results.map((r) => r.exit ?? 2)),
     status: broken ? STEP_STATUS.toolFailed : red.length || unbound ? STEP_STATUS.red : STEP_STATUS.pass,
     profiles: runtimeResult.profiles, pins: runtimeResult.pins,
     detail: broken ? `check-canon-pins produced no JSON (${broken.label})` : unbound ? 'no code-pattern profile is bound to its canon content digest' : red.flatMap((r) => r.errors.map((e) => `${r.label}: ${e}`)).slice(0, 10).join(' | ') };
@@ -73,17 +73,17 @@ function mergeGuardStep({ repo, base, main = null }) {
   try {
     const from = resolveGateBase(repo, base);
     const guard = mergeGuard(repo, { base: from, mainTip: mainTipOf(repo, main) });
-    return { id: 'merge-guard', command: `gate.mjs mergeGuard ${from.slice(0, 12)}..HEAD`, exit: guard.errors.length ? 2 : guard.findings.length ? 1 : 0,
+    return { id: 'merge-guard', command: `starci gate run (merge guard ${from.slice(0, 12)}..HEAD)`, exit: guard.errors.length ? 2 : guard.findings.length ? 1 : 0,
       status: guard.errors.length ? STEP_STATUS.toolFailed : guard.findings.length ? STEP_STATUS.red : STEP_STATUS.pass, checked: guard.checked.length,
       detail: guard.errors.length ? guard.errors.join(' | ') : guard.findings.map((f) => f.message).slice(0, 5).join(' | ') };
   } catch (error) {
-    return { id: 'merge-guard', command: 'gate.mjs mergeGuard', exit: 2, status: STEP_STATUS.toolFailed, checked: 0, detail: String(error?.message ?? error) };
+    return { id: 'merge-guard', command: 'starci gate run (merge guard)', exit: 2, status: STEP_STATUS.toolFailed, checked: 0, detail: String(error?.message ?? error) };
   }
 }
 
 export function checkStep({ runtime = runtimeRoot, npm = defaultNpm } = {}) {
   const run = npm(['run', 'check'], { cwd: runtime });
-  return { id: 'check', command: 'npm run check', exit: run.status ?? null,
+  return { id: 'check', command: 'starci runtime check', exit: run.status ?? null,
     status: run.error || run.status === null ? STEP_STATUS.toolFailed : run.status === 0 ? STEP_STATUS.pass : STEP_STATUS.red, detail: tail(`${run.stdout ?? ''}\n${run.stderr ?? ''}`) };
 }
 

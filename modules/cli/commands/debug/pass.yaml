@@ -1,0 +1,27 @@
+group: debug
+verb: pass
+owner: runtime
+summary: run or maintain the debug loop; writes only its own debug-loop state
+impl:
+  script: scripts/reconciler/debug-pass.mjs
+positional:
+  - {name: action, enum: [setup, pass, claim, note, release, stop, status], required: true, variadic: false}
+flags:
+  - {name: snapshot, type: string, summary: saved core-watch snapshot for a pass}
+  - {name: child-timeout, type: number, summary: child call timeout in seconds}
+  - {name: token-window, type: number, summary: token-spike window in minutes}
+  - {name: token-spike, type: number, summary: token count that raises an alert}
+  - {name: key, type: string, summary: debug alert key}
+  - {name: lane, type: string, summary: lane fixing the alert}
+  - {name: reason, type: string, summary: reason no core fix is owed}
+exit: {"0": debug-loop state action completed, "1": state action failed, "2": bad usage}
+json: always
+examples:
+  - starci debug pass setup
+  - starci debug pass pass
+  - starci debug pass claim --key <alert> --lane <lane>
+  - starci debug pass status
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/debug-pass.mjs

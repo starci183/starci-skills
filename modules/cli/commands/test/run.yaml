@@ -1,0 +1,33 @@
+group: test
+verb: run
+owner: runtime
+summary: run the specs selected for one local ladder level
+impl: {module: scripts/machine/ladder-test.mjs, export: testRun}
+effect: host
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - Use L1 while working, L2 before asking for a land, and L3 when an IO slot changed.
+  - Never run the whole suite outside L4; L4 belongs to starci release cut and L5 belongs to CI.
+  - L2 and L3 need a clean committed tree, run the full check first, and hold the one host test lock.
+  - A red L2 or L3 selection is re-run once serially; a green re-run is recorded as a flake, never skipped.
+flags:
+  - {name: level, type: enum, enum: [L1, L2, L3, L4], required: true, summary: bounded local test level}
+  - {name: changed, type: list, summary: changed repository paths used for L1 selection}
+  - {name: against, type: string, default: main, summary: local main ref used for L2 and L3 selection}
+  - {name: spec, type: list, summary: explicit spec files at L1 only}
+  - {name: concurrency, type: number, default: 4, summary: node test file concurrency}
+  - {name: root, type: string, summary: repository root (default is the command cwd)}
+  - {name: release-cut, type: boolean, summary: confirm an owner or release-role L4 release-cut run}
+positional: []
+exit:
+  "0": "selected specs passed"
+  "1": "a check or spec was red"
+  "2": "usage or ladder policy refusal"
+json: starci/test-run@1
+examples:
+  - starci test run --level L1 --changed scripts/machine/ladder-test.mjs
+  - starci test run --level L2 --against main --json
+  - starci test run --level L3 --against main
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

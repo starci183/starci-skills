@@ -4,10 +4,10 @@
 //   ctx.now()                   epoch ms
 //   ctx.ledgers                 [{ledgerId, repo, file}] (sources.mjs ledgersOf)
 //   ctx.read(ledgerId, fn)      fn(db) over a read-only handle (openLedgerReader); null when the ledger is absent
-//   ctx.status(ledgerId, wf)    the cached `api status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
+//   ctx.status(ledgerId, wf)    the cached `starci kernel status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
 //   ctx.statusRead(ledgerId, wf) the same read as {value, failure}: failure names why it gave no value (statusFailureOf)
 //   ctx.api(ledgerId, verb, argv, {timeoutMs})
-//                               `node scripts/kernel/cli.mjs <verb> --repo <repo> ...argv --json` as a child with
+//                               `starci kernel <verb> --repo <repo> ...argv --json` as a child with
 //                               STARCI_ACTOR=reconciler/<controller> and STARCI_RECONCILER_EPOCH. In shadow it does NOT
 //                               run: one `reconciler.would` typed row, {ok: true, shadow: true}.
 //   ctx.run(cmd, args, {timeoutMs})  the same gate for a non-api actuator ('node' = this node; 'scripts/..' paths
@@ -117,7 +117,7 @@ export async function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT
 }
 
 /**
- * Why an `api status --json` child gave no value, or null when it did: {cause, error, code, timedOut, stderrHead}.
+ * Why an `starci kernel status --json` child gave no value, or null when it did: {cause, error, code, timedOut, stderrHead}.
  * cause is 'timeout' | 'spawn' | 'refused' (a typed {ok:false,error} answer, on stdout or on stderr: cli.mjs prints
  * its refusal JSON on stderr and exits 1, e.g. plan-edges-missing) | 'exit' (non-zero, no JSON) | 'no-json' (exit 0,
  * stdout carried no JSON line). Pure.
@@ -129,11 +129,11 @@ export function statusFailureOf(r, { timeoutMs = null } = {}) {
   const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
   const refusal = value && value.ok === false ? value : (() => { const j = lastJsonLine(stderr); return j && typeof j === 'object' && j.ok === false ? j : null; })();
   const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
-  if (r?.timedOut) return { cause: 'timeout', error: `api status timed out after ${timeoutMs ?? '?'}ms`, ...base };
-  if (r?.error) return { cause: 'spawn', error: clip(`api status did not spawn: ${r.error}`, 300), ...base };
-  if (refusal) return { cause: 'refused', error: clip(`api status refused (exit ${base.code ?? '?'}): ${refusal.error ?? refusal.code ?? 'ok:false'}`, 300), refusal: refusal.code ?? null, ...base };
-  if (base.code !== 0) return { cause: 'exit', error: clip(`api status exited ${base.code ?? '?'}${stderrHead ? `: ${stderrHead}` : ' with no stderr'}`, 300), ...base };
-  return { cause: 'no-json', error: clip(`api status exited 0 with no JSON on stdout${stderrHead ? ` (stderr: ${stderrHead})` : ''}`, 300), ...base };
+  if (r?.timedOut) return { cause: 'timeout', error: `starci kernel status timed out after ${timeoutMs ?? '?'}ms`, ...base };
+  if (r?.error) return { cause: 'spawn', error: clip(`starci kernel status did not spawn: ${r.error}`, 300), ...base };
+  if (refusal) return { cause: 'refused', error: clip(`starci kernel status refused (exit ${base.code ?? '?'}): ${refusal.error ?? refusal.code ?? 'ok:false'}`, 300), refusal: refusal.code ?? null, ...base };
+  if (base.code !== 0) return { cause: 'exit', error: clip(`starci kernel status exited ${base.code ?? '?'}${stderrHead ? `: ${stderrHead}` : ' with no stderr'}`, 300), ...base };
+  return { cause: 'no-json', error: clip(`starci kernel status exited 0 with no JSON on stdout${stderrHead ? ` (stderr: ${stderrHead})` : ''}`, 300), ...base };
 }
 
 /** The typed-log kinds a ctx.log row may carry as is; any other kind rides under reconciler.event (or .error). */
@@ -251,7 +251,7 @@ export function createCtx({
       if (hit && now() - hit.at < ttl) return hit.promise;
       const promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
         .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),
-          (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`api status threw: ${error?.message ?? error}`, 300) } }));
+          (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`starci kernel status threw: ${error?.message ?? error}`, 300) } }));
       shared.statusCache.set(id, { at: now(), promise });
       return promise;
     },
@@ -260,8 +260,8 @@ export function createCtx({
       if (!l) return { ok: false, error: `unknown ledger ${ledgerId}` };
       const list = [...argv.map(String)];
       if (!list.includes('--json')) list.push('--json');
-      if (mode !== 'active') return would(`api ${verb}`, list, { ledgerId });
-      return act(`api ${verb}`, list, () => spawnChild(process.execPath, [API_FILE, verb, '--repo', l.repo, ...list], { env: childEnv(), timeoutMs }), { ledgerId });
+      if (mode !== 'active') return would(`starci kernel ${verb}`, list, { ledgerId });
+      return act(`starci kernel ${verb}`, list, () => spawnChild(process.execPath, [API_FILE, verb, '--repo', l.repo, ...list], { env: childEnv(), timeoutMs }), { ledgerId });
     },
     /** In active: {ok, code, value (last JSON line), stdout, stderr, actionId}; in shadow {ok: true, shadow: true}. */
     async run(cmd, args = [], { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {

@@ -1,7 +1,7 @@
 // Readable names (owner request 2026-09-27): a workflow has a display name (workflows.display_name, set at
-// define-goal and by `api rename`), an op a Vietnamese label (modules/ops/_labels.yaml), and an op job the name
+// define-goal and by `starci kernel rename`), an op a Vietnamese label (modules/ops/_labels.yaml), and an op job the name
 // `<op label> · <what> · <workflow name>`. workflow_id, op_id and job_id stay the keys; the names are what
-// the [Kernel]/[Op] Orca tabs, api status, the supervisor digest, Telegram and the harness UI show.
+// the [Kernel]/[Op] Orca tabs, starci kernel status, the supervisor digest, Telegram and the harness UI show.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -108,7 +108,7 @@ const world = (t, fn) => withLedger(t, ({ root, repoRoot, machineHome, ledger })
   return fn({ repoRoot, ledger, run, calls });
 });
 
-test('api rename sets the display name, records workflow-renamed and renames the live Kernel and op tabs', (t) => world(t, ({ ledger, run, calls }) => {
+test('starci kernel rename sets the display name, records workflow-renamed and renames the live Kernel and op tabs', (t) => world(t, ({ ledger, run, calls }) => {
   const WF = 'wf-nivo-app-auth-abc12345';
   const dry = out(run(['rename', '--workflow', WF, '--title', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', '--dry-run']));
   assert.deepEqual([dry.dryRun, dry.changed, dry.kernelTerminal], [true, true, 'term-k']);
@@ -139,7 +139,7 @@ test('api rename sets the display name, records workflow-renamed and renames the
   assert.equal(jobDisplayNameOf(ledger.db, job), 'Ki\u1ec3m th\u1eed UAT · \u0110\u0103ng nh\u1eadp · Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c');
 }));
 
-test('api rename refuses a bad name, a bad --by, an unknown workflow and an op caller', (t) => world(t, ({ run, ledger }) => {
+test('starci kernel rename refuses a bad name, a bad --by, an unknown workflow and an op caller', (t) => world(t, ({ run, ledger }) => {
   const WF = 'wf-nivo-app-auth-abc12345';
   const bad = run(['rename', '--workflow', WF, '--title', ' ', '--no-terminals']);
   assert.notEqual(bad.status, 0); assert.match(bad.stderr, /rename-bad-title/);

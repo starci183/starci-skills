@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // terminal-send.mjs — the calls.yaml `terminal-send` call as a callable function.
-//   node scripts/api/orca/terminal-send.mjs --terminal <handle> (--text <t> | --text-file <f>) [--enter] [--wait-submit <s>] [--json]
+//   starci orca terminal-send --terminal <handle> (--text <t> | --text-file <f>) [--no-enter] [--wait-submit <s>] [--json]
 import fs from 'node:fs';
 import { orcaCall } from './lib.mjs';
 import { arg, flag } from '../../lib/cli-arg.mjs';

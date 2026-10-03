@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// telegram-bridge.mjs — the owner commands a supervisor by chatting with the
+// starci supervisor telegram-bridge — the owner commands a supervisor by chatting with the
 // Telegram bot (docs/connectors.md "Command bridge"). Several supervisor chats
 // may be registered at once; Telegram buttons pick which one the owner talks to.
 //
-//   node scripts/supervisor/telegram-bridge.mjs start    launch detached (idempotent; no-op when telegram is off)
-//   node scripts/supervisor/telegram-bridge.mjs run      run in the foreground
-//   node scripts/supervisor/telegram-bridge.mjs status | stop
+//   starci supervisor telegram-bridge start    launch detached (idempotent; no-op when telegram is off)
+//   starci supervisor telegram-bridge run      run in the foreground
+//   starci supervisor telegram-bridge status | stop
 //
 // One bridge per host (claimManager('telegram-bridge'): a machine.sqlite host
 // lock; its record is the connectors row 'telegram-bridge' {pid, startedAt},
@@ -35,7 +35,7 @@
 // `language` (vi, else en). The supervisor side is scripts/supervisor/channel.mjs.
 //
 // Owner asks on demand (owner, 2026-09-24: "serve the url only when asked"):
-// a kernel's `api serve-ask` only sends the question with a "Generate URL"
+// a kernel's `starci kernel serve-ask` only sends the question with a "Generate URL"
 // button (callback_data `ask:<16 hex>`, telegram.mjs askKeyOf). Pressing it
 // here answers the callback, launches scripts/kernel/ask-server.mjs for that ask
 // detached (--on-demand telegram; it hides its children's windows) unless its
@@ -653,7 +653,7 @@ export function createBridge({
  * Make sure one bridge runs on this host: a live bridge is left alone; telegram off (or a spec run
  * against the real Bot API, or STARCI_CONNECTORS_OFF=1) is a skip; otherwise `run` is launched
  * detached. `requireRegistered` (resume-all) also skips while no supervisor has ever registered, so
- * the bridge first starts from a supervisor's `channel.mjs register` and after that survives reboots.
+ * the bridge first starts from `starci supervisor channel register` and after that survives reboots.
  * Never throws: {ok, already|launched|skipped|wouldStart|error}.
  */
 export function ensureTelegramBridge({ env = process.env, config = undefined, root = configRoot, spawn = spawnDetached, dryRun = false, requireRegistered = false } = {}) {
@@ -750,7 +750,7 @@ function main() {
   }
   if (verb === 'start') { const r = ensureTelegramBridge(); out(r); if (!r.ok) process.exitCode = 1; return; }
   if (verb === 'run') return runMain();
-  console.error('usage: telegram-bridge.mjs start|run|status|stop'); process.exit(2);
+  console.error('usage: starci supervisor telegram-bridge start|run|status|stop'); process.exit(2);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === BRIDGE_FILE) main();

@@ -8,7 +8,7 @@ import { isFeTestPath } from '../rules/fe-no-tests.mjs';
  * Every tracked file of such a slot is matched against the `requires` and `allows` entries of its slot; a file no entry names is a
  * finding - `page.tsx` in a hooks domain, a `[lang]` segment under `app/`, a stray file beside a component or at a feature
  * root. A file that sits where the slot expects a folder (`hooks/useX.ts`, so the "domain" is a file name) is one too.
- * Files no slot owns are HFS_PATH_NO_SLOT's (`hfs check`), so together every front-end file is placed by exactly one slot and
+ * Files no slot owns are HFS_PATH_NO_SLOT's (`starci app check`), so together every front-end file is placed by exactly one slot and
  * named by it. A test path (a `.spec.tsx` or `.test.tsx` beside a component, a test directory or test tooling) is FE_NO_TESTS's
  * (R97, contract-change fe-no-tests): that rule is the one finding of such a file, so this check leaves it alone, as
  * HFS_PATH_NO_SLOT does (scripts/hfs/path-findings.mjs).

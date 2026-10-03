@@ -1,0 +1,19 @@
+group: reconciler
+verb: restart
+owner: runtime
+summary: stop the reconciler engine and ensure a new leader
+impl:
+  script: scripts/reconciler/boot.mjs
+  args: [--restart]
+flags: []
+exit:
+  "0": reconciler restarted
+  "1": reconciler could not restart
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler restart
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/boot.mjs --restart

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // draw-render.mjs — the capture interface.draw uses for code-native regions: the drawing is a real render, not an image model's guess.
 //
-//   node scripts/work/draw-render.mjs --html <file> --out <dir> --viewports 390x844,1440x900
+//   starci work draw-render --html <file> --out <dir> --viewports 390x844,1440x900
 //        [--full-page] [--name <base>] [--theme light|dark] [--json]
-//   node scripts/work/draw-render.mjs --component <module> --export <XBase> --props <fixture.json> [--css <file>]...
+//   starci work draw-render --component <module> --export <XBase> --props <fixture.json> [--css <file>]...
 //        --out <dir> --viewports 390x844,1440x900 [--full-page] [--name <base>] [--theme light|dark] [--json]
 //   [--trace]  also records a Playwright trace per viewport, <out>/<base>.trace.zip (screenshots + DOM snapshots), named in
 //        the record's trace field and indexed by job-artifacts.mjs as subkind playwright-trace. Off by default: a trace

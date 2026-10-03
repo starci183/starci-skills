@@ -12,7 +12,7 @@ import {jobResult} from '../../engine/db/ledger.mjs'; const DRIVE=path.parse(os.
 //   - a running job whose exact terminal is disconnected, or whose handle a
 //     live Orca no longer knows (terminal_handle_stale), makes the frontier
 //     'worker-dead' and actionable - it no longer reads a silent 'engaged';
-//   - api reconcile --dead-worker returns a provably no-effect attempt to
+//   - starci kernel reconcile --dead-worker returns a provably no-effect attempt to
 //     queued at the SAME attempt (no business attempt spent), releasing leases;
 //   - a filed report takes the ordinary consume/check/settle route, unwritten;
 //   - an uncommitted change or a commit on the owned paths fences it
@@ -182,7 +182,7 @@ test('a commit on the owned paths since dispatch fences the job even with a clea
 // stray PowerShell tab per dead op. The recovery now closes that terminal with its
 // tab, but only on fresh proof: disconnected, or a frame that ends in a bare shell prompt.
 // A captured Codex op whose agent exited mid-turn.
-const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
+const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude\\packages\\cli\\bin\\starci.mjs' runtime validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',

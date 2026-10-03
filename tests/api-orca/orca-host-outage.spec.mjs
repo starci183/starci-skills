@@ -213,7 +213,7 @@ test('watchdog: an Orca outage is host-unavailable, never a restart',t=>{
   const f=fixture(t);
   const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='orchestration worker-start').length;
   for(const more of [{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'},{STARCI_ORCA_COMMAND:MISSING_ORCA_COMMAND,STARCI_ORCA_ARGS:'[]'}]){
-    // api status/survey read only the ledger; the kernel probe is the Orca call that fails.
+    // starci kernel status/survey read only the ledger; the kernel probe is the Orca call that fails.
     const {status,result,stderr}=tick(f,more);
     assert.equal(status,0,stderr||JSON.stringify(result));
     assert.deepEqual([result.ok,result.action,result.terminal],[true,'host-unavailable',f.kernel],JSON.stringify(result));

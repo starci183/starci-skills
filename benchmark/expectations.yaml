@@ -55,7 +55,7 @@ history:
       crossFamily: reviewer's provider differs from the implementer's (allocation.frontier + allocation.hands); qwen reviews devin, devin reviews qwen
       interfaceAudit: review order; browser-dom holders are devin and codex, so a Devin-implemented UI is audited by codex (overflow)
       draw: codex-agent (unchanged)
-    followUp: node scripts/agent/benchmark-snapshot.mjs --since-hours 48
+    followUp: starci runtime benchmark-snapshot --since-hours 48
   - id: provider-qwen-removed
     date: 2026-09-29
     decidedBy: owner ("xóa qwen đi quá lỏ!! không mua nữa đâu, devin codex claude đủ r")

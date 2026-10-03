@@ -1,4 +1,4 @@
-// api cut-seam: split from cli.mjs.
+// starci kernel cut-seam: split from cli.mjs.
 import { OP_ROLE } from '../../guards/op-caller.mjs';
 import { csvList, getWorkflow, jobOpOf, jobPayloadOf } from './shared/rows.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
@@ -14,7 +14,7 @@ export default {
     if (modes.length !== 1) throw Object.assign(new Error('cut-seam needs exactly one of --publish-interface | --release | --reconcile'), { code: 'cut-seam-mode' });
     const mode = modes[0];
     if (caller.role === OP_ROLE && (mode !== 'publish-interface' || caller.jobId !== args.job)) {
-      throw Object.assign(new Error(`an operation may only publish its own seam interface (api cut-seam --publish-interface --job ${caller.jobId ?? '<own job>'}); --release and --reconcile are the Kernel's`), { code: 'op-context-refused' });
+      throw Object.assign(new Error(`an operation may only publish its own seam interface (starci kernel cut-seam --publish-interface --job ${caller.jobId ?? '<own job>'}); --release and --reconcile are the Kernel's`), { code: 'op-context-refused' });
     }
     const now = Date.now();
     if (mode === 'release') {
@@ -55,6 +55,6 @@ export default {
     ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: SEAM_RECONCILED_EVENT,
       payload: { op, cutId: String(cut.id), exitCode, via: 'reconcile', command: args.command ?? null, evidence: args.evidence ?? null, seamJobId: seam.passedJob }, createdAt: now }));
     const out = { ok: true, mode, jobId: job.job_id, workflowId: job.workflow_id, op, cutId: String(cut.id), exitCode, check: SEAM_RECONCILE_CHECK, seamJobId: seam.passedJob };
-    return emit(out, `cut-seam: ${SEAM_RECONCILE_CHECK} ${exitCode === 0 ? 'green' : 'RED'} for ${job.job_id} (ordinal ${cut.ordinal} of cut ${cut.id}) against seam ${seam.passedJob}${exitCode === 0 ? '' : '; redo that ordinal as a new attempt (api status nextActions)'}`, args.json);
+    return emit(out, `cut-seam: ${SEAM_RECONCILE_CHECK} ${exitCode === 0 ? 'green' : 'RED'} for ${job.job_id} (ordinal ${cut.ordinal} of cut ${cut.id}) against seam ${seam.passedJob}${exitCode === 0 ? '' : '; redo that ordinal as a new attempt (starci kernel status nextActions)'}`, args.json);
   },
 };

@@ -60,8 +60,8 @@ environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `be/doc
 
 The unit suite runs the service specs with coverage and fails when a `*.service.ts` file is below 100 percent lines,
 branches, functions or statements. From the parent `.claude` tree, run
-`node scripts/gates/canon-scan.mjs --root examples/ecommerce-app/be --json` and
-`node scripts/gates/starcistacks.mjs examples/ecommerce-app`.
+`starci gate canon-scan --root examples/ecommerce-app/be --json` and
+`starci gate starcistacks examples/ecommerce-app`.
 
 `npm run test:e2e` needs the declared Postgres, Redis, and application processes. The test kinds are unit
 `<name>.service.spec.ts` beside each service, integration `*.integration-spec.ts` under `be/src/tests/integration/` and e2e
@@ -69,8 +69,8 @@ branches, functions or statements. From the parent `.claude` tree, run
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook,
 default typecheck/lint or automatic CI job runs it (`npm run typecheck:tests` is its manual type check); in the runtime repository
 it runs through `workflow_dispatch` of `.github/workflows/examples.yml`. On push and pull request that workflow runs this app's
-typecheck (tsc over be, turbo over the fe workspaces), `hfs lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
-be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `hfs sync` renders; they
+typecheck (tsc over be, turbo over the fe workspaces), `starci app lint`, unit tests with coverage, the Codecov upload under the flag `ecommerce-app` (the root `codecov.yml`), the
+be build, the fe build (turbo) and the Sonar gate, and an `images` job that builds the image of every app (identity, order, billing, cli, landing, app) without pushing. The app's own `codecov.yml` and `ci.yml` are the app-repository form `starci app sync` renders; they
 run when the app is its own repository. Existing Work
 evidence retains its recorded revisions; the derived index reports stale proof where source or records changed.
 

@@ -1,0 +1,28 @@
+group: git
+verb: sync
+owner: runtime
+summary: merge local main into a clean lane with rerere enabled
+impl: {module: scripts/machine/git-sync.mjs, export: gitSync}
+effect: local-write
+roles: [lead, coordinator, owner]
+conventions:
+  - lanes merge the LOCAL main, never origin/main
+  - the tracked worktree must be clean; untracked files are left alone
+  - rerere records conflict resolutions so the same resolution can be replayed
+flags:
+  - {name: main-ref, type: string, default: main, summary: the local main ref to merge}
+  - {name: dry-run, type: boolean, summary: inspect the merge with merge-tree without changing the worktree}
+  - {name: abort-on-conflict, type: boolean, summary: abort a conflicted merge after reporting its paths}
+positional: []
+exit:
+  "0": "merged, already up to date or the dry run is clean"
+  "1": "dirty tree, conflict or Git failure"
+  "2": "invalid or remote-tracking main ref"
+json: starci/git-sync@1
+examples:
+  - starci git sync
+  - starci git sync --dry-run
+  - starci git sync --abort-on-conflict
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

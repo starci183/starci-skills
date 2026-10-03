@@ -1,0 +1,4 @@
+group: harness
+summary: start, stop, inspect or open the local StarCi harness
+owner: runtime
+since: 1.0.0-alpha.4

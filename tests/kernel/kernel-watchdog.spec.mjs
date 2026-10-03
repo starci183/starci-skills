@@ -129,7 +129,7 @@ test('a Claude Code star spinner with a timer is active; its idle prompt is not'
 // worker-nudge-ready and the nudges landed as queued messages.
 test('any Claude spinner row and a still-executing tool call are active; finished scrollback is not',()=>{
   const chrome=['─────','❯','─────','  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'];
-  const pre=['● Bash(node scripts/kernel/cli.mjs op-contract --job op-provision.ask-9a2c8f0c8d)',
+  const pre=['● Bash(starci kernel op-contract --job op-provision.ask-9a2c8f0c8d)',
     '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
   assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
@@ -171,16 +171,16 @@ test('watchdog wake transfers cadence ownership outside the Kernel model turn',(
   assert.doesNotMatch(prompt,/Runtime wake for Kernel attempt/,'no seat attempt known, no identity');
 });
 
-test('watchdog wake names the Kernel seat it is for, checkable with api status, and claims no approval',()=>{
+test('watchdog wake names the Kernel seat it is for, checkable with starci kernel status, and claims no approval',()=>{
   const prompt=buildWakePrompt('wf-example',2);
   assert.match(prompt,/^Watchdog liveness wake for wf-example: .*act on it now\./);
-  assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: api status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
+  assert.match(prompt,/Runtime wake for Kernel attempt 2 of wf-example: starci kernel status --workflow wf-example shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/);
   assert.doesNotMatch(prompt,/already approved|needs no confirmation/);
 });
 
 test('watchdog wakes a turn-idle Kernel only when status says the frontier is actionable',()=>{
   const supervise=fs.readFileSync(new URL('../../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
-  assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
+  assert.match(supervise,/starci machine kernel-watchdog --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
 });
 
 // Every watchdog imported the liveness classifier once, hours before the
@@ -296,9 +296,9 @@ const watchdogWorld = async (t, { jobs = [], events = [], tabTitle = null, signa
   return { root, repo, env, workflowId, tick, api, orcaCalls, kernelWakes, orcaState, eventsOf };
 };
 
-// The liveness wake a tick types is built from the api status read that same tick did: its seat
+// The liveness wake a tick types is built from the starci kernel status read that same tick did: its seat
 // attempt, its launcher and its runtime rev are the status values, not watchdog constants.
-test('a liveness tick types exactly the wake api status implies', async (t) => {
+test('a liveness tick types exactly the wake starci kernel status implies', async (t) => {
   const fx = await watchdogWorld(t);
   const { status, result, stderr } = fx.tick();
   assert.equal(status, 0, stderr);
@@ -309,7 +309,7 @@ test('a liveness tick types exactly the wake api status implies', async (t) => {
   assert.equal(wakes[0].text, result.nextWake ?? wakePromptOf(fx.workflowId, statusValue),
     'the typed wake is the wake built from the status read');
   assert.match(wakes[0].text, /Runtime wake for Kernel attempt 2 of wf-watchdog-e2e/,
-    'the Kernel attempt api status names rides in the wake');
+    'the Kernel attempt starci kernel status names rides in the wake');
 });
 
 // A Kernel idle at its prompt with nothing actionable for it (an owner-gate is open, the frontier
@@ -342,7 +342,7 @@ test('a repair tick renames a drifted Kernel tab title through Orca', async (t) 
 });
 
 // A seat whose signal names no worker Dispatch is replaced through start-workflow, launched-by the
-// watchdog: the kernel-restarted event and api status kernel.launchedBy name it.
+// watchdog: the kernel-restarted event and starci kernel status kernel.launchedBy name it.
 test('a repair replaces a seat with no worker under the watchdog launcher', async (t) => {
   const fx = await watchdogWorld(t, { signalValue: { terminal: KERNEL, host: 'orca', agent: 'claude', launch: 'worker' } });
   const { status, result, stderr, stdout } = fx.tick();

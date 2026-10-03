@@ -1,0 +1,14 @@
+group: work
+verb: render-proof
+owner: runtime
+summary: render a proof document for one Work record
+impl: {script: scripts/work/render-proof.mjs}
+flags:
+  - {name: work, type: string, required: true, summary: the .starciwork tree that holds the record}
+  - {name: record, type: string, required: true, summary: record id to render}
+exit: {"0": proof rendered, "1": render refused or the arguments were refused, "2": bad usage}
+json: none
+examples: ['starci work render-proof --work .starciwork --record <id>']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/render-proof.mjs']

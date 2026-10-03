@@ -1,5 +1,5 @@
 // foundations.mjs — the ledger-level registry of SHARED FOUNDATIONS across the workflows of one
-// ledger (api foundations / api foundation).
+// ledger (starci kernel foundations / starci kernel foundation).
 //
 // Owner, 2026-09-24: workflows that share one repository planned independently and discovered
 // their shared foundations mid-flight - the layout tree/shell, the brand, the @starci/grammar
@@ -7,7 +7,7 @@
 // record of who owned it (one product's Collab workflow held on Modules' shell rev; another's brand.decide
 // waited on its base-repos peer's Grammar install for 23h). A foundation is one row: an OWNER workflow, a state
 // (unclaimed -> claimed -> landed) and its dependents. Landing it notifies every dependent and
-// releases every typed wait on it (api incident --kind peer-wait --until-foundation <name>).
+// releases every typed wait on it (starci kernel incident --kind peer-wait --until-foundation <name>).
 //
 // Storage is the ledger's `foundations` table (one row per name; `detail` keeps the whole FOUNDATION_SCHEMA
 // record as JSON text: the row's columns carry kind, state, owner and version for SQL readers) and
@@ -66,7 +66,7 @@ export function claimFoundation(existing, { name, workflowId, ownerRunning, kind
   const record = existing ?? blank(name, now);
   const priorOwner = record.owner?.workflowId ?? null;
   if (priorOwner && priorOwner !== workflowId && ownerRunning) {
-    fail(`foundation ${name} is owned by running workflow ${priorOwner}; declare this workflow a dependent (api foundation --declare-dependent ${name}) or agree a handoff with that peer (api notify --kind handoff)`, 'foundation-owned', { owner: priorOwner });
+    fail(`foundation ${name} is owned by running workflow ${priorOwner}; declare this workflow a dependent (starci kernel foundation --declare-dependent ${name}) or agree a handoff with that peer (starci kernel notify --kind handoff)`, 'foundation-owned', { owner: priorOwner });
   }
   const reopen = record.state === 'landed' && (version == null || version !== record.version);
   let next = {
@@ -95,7 +95,7 @@ export function declareDependent(existing, { name, workflowId, detail = null, no
 
 /** Land a foundation: only its owner may, with the proof of what landed. */
 export function landFoundation(existing, { name, workflowId, proof, version = null, refs = [], now = Date.now() }) {
-  if (!existing) fail(`foundation ${name} is not registered; claim it first (api foundation --claim ${name})`, 'foundation-unknown');
+  if (!existing) fail(`foundation ${name} is not registered; claim it first (starci kernel foundation --claim ${name})`, 'foundation-unknown');
   if (existing.owner?.workflowId !== workflowId) {
     fail(`foundation ${name} is ${existing.owner ? `owned by ${existing.owner.workflowId}` : 'unclaimed'}; only its owner lands it (claim it first when its owner stopped running)`, 'foundation-not-owner', { owner: existing.owner?.workflowId ?? null });
   }

@@ -1,0 +1,16 @@
+group: app
+verb: new
+owner: "@starci/hfs"
+summary: create a canonical service, unit spec or app image definition
+impl: null
+positional:
+  - {name: kind, enum: [service, image, spec], required: true, variadic: false}
+  - {name: arguments, required: false, variadic: true}
+flags:
+  - {name: inject, type: list, summary: constructor binding as Decorator=module:Type or Class=module}
+exit: {"0": files created, "2": refusal or bad usage}
+json: none
+examples: ['starci app new service be/src/modules/domain/order order', 'starci app new image']
+editions: [full, lite]
+since: 1.0.0
+removed: ['hfs new', 'npx hfs new']

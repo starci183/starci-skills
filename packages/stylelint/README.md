@@ -4,7 +4,7 @@ The CSS half of the StarCi lint canon (HFS R61 `FE_STYLE_TOKEN_ONLY`). The TypeS
 `starci-fe/no-raw-brand-value` in `@starci/eslint-canon-fe`; both use one definition of a *raw brand value*
 (`lib/brand-value.mjs`: a hex colour, a colour function such as `rgb`/`hsl`/`oklch`/`color-mix`, or a `px` length).
 
-A repository's `stylelint.config.mjs` is the managed one-liner `hfs sync` renders (and `hfs check` compares, R05/R17):
+A repository's `stylelint.config.mjs` is the managed one-liner `starci app sync` renders (and `starci app check` compares, R05/R17):
 
 ```js
 import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"

@@ -28,7 +28,7 @@
 //   handover            handover.review stays the one owner gate: its ask carries the owner review ledger bundle
 //                       (autopilotBundle) - every provisional acceptance with its images, every deferred leg, every
 //                       deferred-to-handover proof, the autopilot decision log. An owner note on a provisional item
-//                       re-opens only that item (api autopilot --reopen, the owner's words from the verified
+//                       re-opens only that item (starci kernel autopilot --reopen, the owner's words from the verified
 //                       handover receipt) and the existing draw-feedback loop redraws it.
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
@@ -106,7 +106,7 @@ const latestEvent = (db, workflowId, kind) => db.prepare('SELECT seq,created_at,
 const eventsOf = (db, workflowId, kind) => db.prepare('SELECT seq,created_at,entity_id,payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(workflowId, kind)
   .map((row) => ({ seq: row.seq, at: row.created_at, entityId: row.entity_id, ...(parseJson(row.payload_json, {}) ?? {}) }));
 
-/** Whether autopilot drives this workflow: {on, source}. A ledger override (api autopilot --set) wins, then runtimes.yaml workflows.<id>, then enabled. */
+/** Whether autopilot drives this workflow: {on, source}. A ledger override (starci kernel autopilot --set) wins, then runtimes.yaml workflows.<id>, then enabled. */
 export function autopilotOf(db, workflowId, settings = autopilotSettings()) {
   const override = latestEvent(db, workflowId, AUTOPILOT_EVENTS.configured);
   if (override) {
@@ -497,7 +497,7 @@ export function openSupervisorGate(ledger, { workflowId, opId = null, holds = []
 }
 
 /**
- * One autopilot pass over a workflow (api status runs it on every read, so every watchdog tick; api autopilot
+ * One autopilot pass over a workflow (starci kernel status runs it on every read, so every watchdog tick; starci kernel autopilot
  * --sweep runs it on demand). Idempotent. Returns {on, answered[], deferred[], rerouted[], timedOut[], budget, supplied[]}.
  *   1. every pending ask is answered or deferred (autopilotAnswerAsk);
  *   2. every open owner-gate - under autopilot nothing but the handover waits on the owner - is re-routed to the
@@ -546,7 +546,7 @@ export function autopilotSweep({ ledger, repo, workflowId, settings = autopilotS
     const budget = budgetOf(db, workflowId, settings);
     out.budget = budget;
     if (budget.exceeded.length && !supervisorGatesOf(db, workflowId).some((g) => g.holds.includes('*'))) {
-      const detail = `autopilot budget spent (${budget.exceeded.map((k) => `${k} ${budget.used[k]} > ${budget.caps[k]}`).join(', ')}): Supervisor review - extend with api autopilot --extend-budget, then resolve --by supervisor`;
+      const detail = `autopilot budget spent (${budget.exceeded.map((k) => `${k} ${budget.used[k]} > ${budget.caps[k]}`).join(', ')}): Supervisor review - extend with starci kernel autopilot --extend-budget, then resolve --by supervisor`;
       const incidentId = openSupervisorGate(ledger, { workflowId, holds: ['*'], detail, evidence: budget });
       ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: AUTOPILOT_EVENTS.budget, payload: { ...budget, incidentId, by: AUTOPILOT_BY } });
     }
@@ -618,7 +618,7 @@ export function autopilotBundle(db, workflowId) {
     provisional, deferred, deferredToHandover, decisions, counts: { provisional: provisional.length, deferred: deferred.length, deferredToHandover: deferredToHandover.length, decisions: decisions.length } };
 }
 
-/** api status `autopilot` block. */
+/** starci kernel status `autopilot` block. */
 export function autopilotProjection(db, workflowId, { settings = autopilotSettings(), sweep = null } = {}) {
   const state = autopilotOf(db, workflowId, settings);
   if (!state.on) return { on: false, source: state.source, provisional: [], deferred: [], deferredToHandover: [] };
@@ -641,7 +641,7 @@ export function provisionalOps(db, workflowId) {
 }
 
 /**
- * Re-open one provisional acceptance from the owner's handover answer (api autopilot --reopen): the handover ask
+ * Re-open one provisional acceptance from the owner's handover answer (starci kernel autopilot --reopen): the handover ask
  * must be answered BY THE OWNER (owner-claim.mjs ownerAnswerProof - a fake owner claim is refused), and the owner's
  * note is copied from that verified receipt, never from the caller. Returns the event payload.
  */

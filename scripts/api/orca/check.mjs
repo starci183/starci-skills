@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // check.mjs — the calls.yaml `check` call as a callable function: Orca's consuming FIFO Delivery of a Run's
 // coordinator inbox (orchestration check).
-//   node scripts/api/orca/check.mjs --run <run_id> --terminal <coordinator_handle> [--ack <delivery_id>]
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: --run <run_id> --terminal <coordinator_handle> [--ack <delivery_id>]
 //
 // check returns the Run's oldest unacknowledged batch (up to 50 messages, every type): {ok, deliveryId, messages,
 // acked, error, errorCode, fenced, hostUnavailable}. With `ack` Orca first acknowledges that Delivery (idempotent: a

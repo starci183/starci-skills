@@ -49,7 +49,8 @@ export function probeAll(opts = {}) {
   return out;
 }
 
-// CLI: node scripts/agent/quota/index.mjs [provider|--all] -> JSON
+// Internal entry: spawned by scripts/agent/credential-probe.mjs; not invoked directly.
+// Args: [provider|--all] -> JSON.
 const entry = isMain(import.meta.url);
 if (entry) {
   const target = process.argv[2];

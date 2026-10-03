@@ -1,4 +1,4 @@
-// api dispatch: admit and launch an operation from its persisted route.
+// starci kernel dispatch: admit and launch an operation from its persisted route.
 import fs from 'node:fs';
 import path from 'node:path';
 import { transitionWorkflowToRunning, updateJob } from '../../../engine/db/ledger.mjs';
@@ -52,7 +52,7 @@ export default {
     const { skillRoot, SETTLED, queuedSeamsOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
-  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on api route.
+  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on starci kernel route.
   refuseKernelBias('dispatch', args);
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -178,7 +178,7 @@ export default {
   const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
   const allowed = launchOrder.chain ?? [];
   const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null
-    : `${args.model ? '--model' : payload.model ? 'the persisted route' : 'the unrouted default'} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchOrder.error ? ` (${launchOrder.error})` : ''}; ${args.model ? 'dispatch without --model or name a pool of that order' : `re-run api route --job ${jobId}`}. The job stays queued.`;
+    : `${args.model ? '--model' : payload.model ? 'the persisted route' : 'the unrouted default'} ${model.target} is outside ${op}'s ${launchOrder.orderKey ?? '?'} order at ${launchOrder.difficulty ?? '?'} [${allowed.join(', ')}]${launchOrder.error ? ` (${launchOrder.error})` : ''}; ${args.model ? 'dispatch without --model or name a pool of that order' : `re-run starci kernel route --job ${jobId}`}. The job stays queued.`;
   const briefAbs = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
   const briefExists = fs.existsSync(briefAbs);
   const lackingTools = missingHostTools({ pool: { provider: model.provider }, kind: op });
@@ -226,7 +226,7 @@ export default {
   // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
   // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.
   if (packet.context.cut) { let manifest = null; try { manifest = cutManifestOf(db, { workflowId: job.workflow_id, op, cut: payload.cut, ownJobId: jobId }); } catch { manifest = null; } if (manifest) packet.context.cut = { ...packet.context.cut, manifest }; }
-  // The Kernel's local, additive override of this op (api op-override, graph-edit params/continue, redesign).
+  // The Kernel's local, additive override of this op (starci kernel op-override, graph-edit params/continue, redesign).
   { const ko = kernelOverrideFor(db, job.workflow_id, op, payload); if (ko) packet.context.kernel_override = ko; }
   // The retry of a worker that died without a report resumes from what it left (scripts/kernel/resume-context.mjs).
   const resumeFrom = bestEffort(() => resumeContextOf(db, job));
@@ -251,7 +251,7 @@ export default {
   // ordinal, never a sibling slice (scripts/kernel/prior-failures.mjs).
   // plus the Supervisor's lessons whose signature names one of those checks (scripts/machine/lessons-file.mjs).
   const priorFailures = withLessons(priorAttemptFailures(db, { ...job, op_id: op }), { root: skillRoot });
-  // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and api report reads them
+  // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and starci kernel report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
   const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + workflowWorktreePromptRules(workflowTree);
@@ -315,7 +315,7 @@ export default {
   // default pool or a --model override can name an agent without a tool the op
   // cannot run without. That launch is a wasted dispatch; nothing is reserved.
   if (lackingTools.length) {
-    const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run api route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
+    const detail = `${model.target} (agent ${model.provider}) lacks host tool ${lackingTools.join(', ')} that ${op} requires (route.riskHints host-tool-required on modules/ops/ops/${op}.yaml). Re-run starci kernel route --job ${jobId} — it now selects only agents whose card lists the tool — then dispatch again${args.model ? ' without --model' : ''}. The job stays queued.`;
     emit({ ok: false, jobId, op, reason: 'tool-unavailable', tools: lackingTools, model: model.target, detail },
       `dispatch REFUSED for ${jobId} (${op}): tool-unavailable — ${detail}`, args.json);
     process.exit(1);

@@ -25,26 +25,25 @@ test('the tracked settings register the command guard once, for the shell and th
   assert.equal(group.hooks.length, 1);
   assert.equal(group.hooks[0].type, 'command');
   assert.equal(group.hooks[0].timeout, TOOL_GUARD_TIMEOUT_S);
-  assert.ok(groups.some((g) => g.matcher === 'Agent|Task' && g.hooks.some((h) => h.command.includes('scripts/guards/seat-tools.mjs'))), 'the seat-tools entry stays');
+  assert.ok(groups.some((g) => g.matcher === 'Agent|Task' && g.hooks.some((h) => h.command === 'starci guard seat-tools')), 'the seat-tools entry stays');
 });
 
-test('the tracked hook runs the guard\'s own entry point, the script trust.mjs registers for workers, by a root-relative path', () => {
+test('the tracked hook and worker trust use the guard CLI fast path without a script path', () => {
   const { command } = guardGroups[0].hooks[0];
-  assert.equal(command, toolGuardCommand('$CLAUDE_PROJECT_DIR/scripts/guards/command-guard.mjs'), 'same shape as the runtime writes it');
-  const script = /^node "\$CLAUDE_PROJECT_DIR\/(.+)"$/.exec(command)?.[1];
-  assert.equal(path.resolve(ROOT, script), GUARD);
+  assert.equal(command, toolGuardCommand(), 'same command as the runtime writes');
+  assert.equal(command, 'starci guard command');
   assert.doesNotMatch(command, /[A-Za-z]:[\\/]|\/Users\//, 'no absolute host path in a tracked file');
-  assert.equal(toolGuardCommand(GUARD), `node "${GUARD.replace(/\\/g, '/')}"`, 'the worker registration runs the same script');
+  assert.equal(toolGuardCommand(GUARD), 'starci guard command', 'the worker registration never persists a runtime script path');
 });
 
 // What an owner (or lane) session runs all day. With no guard bound the hook meets one rule only (install through a linked node_modules).
 const EVERYDAY = [
   ['git status', 'bash'], ['git diff --stat origin/main', 'bash'], ['npm run check', 'bash'], ['npm test', 'bash'], ['ls -la scripts', 'bash'], ['dir scripts', 'bash'],
-  ['node scripts/kernel/cli.mjs status', 'bash'], ['node scripts/lib/spec-deps.mjs . scripts/guards/command-guard.mjs', 'bash'],
+  ['starci kernel status', 'bash'], ['git log --oneline -5', 'bash'],
   ['echo "$HOME"', 'bash'], ['printenv PATH', 'bash'], ['env FOO=1 node -v', 'bash'], ['set -euo pipefail; echo ok', 'bash'],
   ['kill 4242', 'bash'], ['taskkill /PID 4242 /F', 'bash'], ['sleep 30 & pid=$!; kill $pid', 'bash'],
   ['Get-ChildItem scripts', 'powershell'], ['Get-Content package.json', 'powershell'], ['$env:PATH', 'powershell'], ['Get-Item Env:HOME', 'powershell'],
-  ['Stop-Process -Id 4242 -Force', 'powershell'], ['Get-Process -Id 4242', 'powershell'], ['node scripts/kernel/cli.mjs status', 'powershell'],
+  ['Stop-Process -Id 4242 -Force', 'powershell'], ['Get-Process -Id 4242', 'powershell'], ['starci kernel status', 'powershell'],
 ];
 
 const hook = (input, env) => spawnSync(process.execPath, [GUARD], { input: JSON.stringify(input), encoding: 'utf8', cwd: os.tmpdir(), env });

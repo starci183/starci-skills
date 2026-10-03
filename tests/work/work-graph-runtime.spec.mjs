@@ -1,4 +1,4 @@
-// With a work graph, `api status` reads its slices: workGraph names the runnable nodes, a leg's dispatch action
+// With a work graph, `starci kernel status` reads its slices: workGraph names the runnable nodes, a leg's dispatch action
 // lists them, a red node is a dispatch of the op that last wrote it, and business/architecture legs of different
 // domains stop holding each other. Without one the leg skeleton drives the workflow unchanged.
 import test from 'node:test';

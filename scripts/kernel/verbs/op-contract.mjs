@@ -1,4 +1,4 @@
-// api op-contract: split from cli.mjs.
+// starci kernel op-contract: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from './shared/rows.mjs';
 import { admittedContractOf, advisoryCodesFor, loadContractChanges } from '../../machine/contract-version.mjs';
@@ -32,7 +32,7 @@ export default {
     let row = read();
     // Dispatch commits the contract row together with status running, after the
     // terminal is up, the preamble sent and the model attested (~20s+); a worker
-    // whose first action is `api op-contract` lands inside that window and read
+    // whose first action is `starci kernel op-contract` lands inside that window and read
     // contract-missing for a row the Kernel saw seconds later (a product's Modules
     // inc-e09140ad9c22, WSPV inc-7f437d11edae). While the job is still leased,
     // wait for the dispatch to commit it instead of answering missing.

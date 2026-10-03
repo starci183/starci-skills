@@ -10,7 +10,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../../scripts/kernel/prerequisites.mjs';
 
-// api dispatch refuses `prerequisite-unmet` from data only: a manifest read
+// starci kernel dispatch refuses `prerequisite-unmet` from data only: a manifest read
 // marked mustExist that the job binding resolves but the repository lacks, and
 // the design gate (an implementation record whose proved ui record has no settled interface.draw).
 // Unknown is never unmet.
@@ -32,7 +32,7 @@ const write=(repo,rel,text)=>{fs.mkdirSync(path.dirname(path.join(repo,rel)),{re
 
 test('interface.audit declares its target operation record mustExist',()=>{
   const target=AUDIT.reads.find(r=>r.id==='target');
-  assert.equal(target.path,"packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (api op-contract)");
+  assert.equal(target.path,"packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (starci kernel op-contract)");
   assert.equal(target.mustExist,true);
 });
 
@@ -53,7 +53,7 @@ test('a missing mustExist record is unmet; a present one and an unresolved one a
   const missing=checkPrerequisites({brief,repo,payload:{records:['.starciwork/features/wspv'],owned_paths:['.starciwork/features/wspv/operations/audit-pay']}});
   assert.deepEqual(missing.unmet,[{kind:'record-missing',read:'target',path:'.starciwork/features/wspv/operations/audit-pay/index.yaml'}]);
   assert.match(prerequisiteDetail({op:'interface.audit',jobId:'job-1',unmet:missing.unmet}),
-    /reads \.starciwork\/features\/wspv\/operations\/audit-pay\/index\.yaml \(reads\.target, mustExist\).*api dispatch --job job-1 again.*stays queued/);
+    /reads \.starciwork\/features\/wspv\/operations\/audit-pay\/index\.yaml \(reads\.target, mustExist\).*starci kernel dispatch --job job-1 again.*stays queued/);
 
   write(repo,'.starciwork/features/wspv/operations/audit-pay/index.yaml','schema: work/implementation@1\n');
   assert.deepEqual(checkPrerequisites({brief,repo,payload:{owned_paths:['.starciwork/features/wspv/operations/audit-pay']}}).unmet,[]);
@@ -63,7 +63,7 @@ test('a missing mustExist record is unmet; a present one and an unresolved one a
   assert.equal(unbound.unknown[0].kind,'read-unbound');
 });
 
-test('api dispatch refuses prerequisite-unmet before the packet and before any Orca call',t=>{
+test('starci kernel dispatch refuses prerequisite-unmet before the packet and before any Orca call',t=>{
   const root=tmpRepo(t);
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
@@ -91,7 +91,7 @@ test('api dispatch refuses prerequisite-unmet before the packet and before any O
     assert.equal(out.unmet[0].kind,'design-not-settled');
     assert.equal(out.unmet[0].code,'DESIGN_NOT_SETTLED');
     assert.equal(out.unmet[0].ui,'ui.f.home');
-    assert.match(out.detail,/then run api dispatch --job job-audit-scope again/);
+    assert.match(out.detail,/then run starci kernel dispatch --job job-audit-scope again/);
   }
   assert.equal(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim():'','','nothing reached the host');
   const inspect=inspectLedger({file:ledgerFile});

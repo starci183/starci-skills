@@ -1,0 +1,26 @@
+group: npm
+verb: install
+owner: runtime
+summary: add exact dependencies from canon pins under the host lock
+impl: {module: scripts/machine/npm-install.mjs, export: npmInstall}
+effect: host
+roles: [lead, owner]
+conventions:
+  - bare package names resolve only from knowledge/hfs/canon-pins.yaml and never through a registry lookup
+  - explicit versions use exact x.y.z form and must agree with the canon pin when one exists
+  - installs always use --save-exact and report the package.json and package-lock.json diff stat
+flags:
+  - {name: dev, type: boolean, summary: save the packages as development dependencies}
+positional:
+  - {name: package, required: true, variadic: true}
+exit:
+  "0": "exact dependencies were installed"
+  "1": "npm, Git or the host lock failed"
+  "2": "the package or worktree was refused"
+json: starci/npm-install@1
+examples:
+  - starci npm install typescript
+  - starci npm install left-pad@1.3.0 --dev
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

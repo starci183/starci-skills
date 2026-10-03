@@ -3,7 +3,8 @@
 // worker-list.mjs — the calls.yaml `worker-list` call as a callable function: Orca's supervised worker
 // terminal resource accounting (orchestration worker-list), the authority on which worker terminal is
 // active, reclaimable, retained or released, and on each worker's liveness and next action.
-//   node scripts/api/orca/worker-list.mjs [--run <run_id>] [--terminal-state <state>] [--cursor <c>]
+// Internal entry: spawned by scripts/lib/worker-accounting.mjs; not invoked directly.
+// Args: [--run <run_id>] [--terminal-state <state>] [--cursor <c>]
 //
 // workerList reads one page ({ok, workers, counts, scope, page, error, hostUnavailable}); Orca returns at most 100
 // rows a page, newest first. Every page is scripts/machine/worker-list-all.mjs workerListAll.

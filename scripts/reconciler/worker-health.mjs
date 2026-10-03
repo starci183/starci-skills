@@ -10,12 +10,12 @@
 //                        reset hint, else backoff 30s -> 5min with jitter, then send "Retry: continue your task from
 //                        where you stopped."; a provider-rate-limited row for the Resource controller; DI after 30 min
 //   done-without-report  preview /Worked for .* done|Press enter to continue/ and no filed report: nudge "File your
-//                        report now with api report"; after 10 min -> api reconcile --dead-worker --settle-failed (the
+//                        report now with starci kernel report"; after 10 min -> starci kernel reconcile --dead-worker --settle-failed (the
 //                        failed-no-report path, whose salvage continues from the worker's commits)
 //   idle-at-prompt       no output for idleMs (5 min) and no filed report: nudge "Continue your task, or file your
-//                        report with api report if done." at most maxIdleNudges (2), then a DI
+//                        report with starci kernel report if done." at most maxIdleNudges (2), then a DI
 //   dead                 terminal gone (not listed nor shown) or exited, or the settler's sweep set the job condition
-//                        LeaseLive=False: api reconcile --dead-worker --settle-failed at once, once per job (H14: a dead
+//                        LeaseLive=False: starci kernel reconcile --dead-worker --settle-failed at once, once per job (H14: a dead
 //                        worker is settled within one probe, never left waiting for the Kernel's next turn)
 //
 // Nudges are staggered: at most one send per staggerMs (15 s) across all workers. The memory of each job (last output
@@ -25,8 +25,8 @@ const RATE_LIMITED = /rate[- ]?limit|Send a message to retry|Upgrade to .* for h
 const DONE_NO_REPORT = /Worked for .* done|Press enter to continue/i;
 export const NUDGE = Object.freeze({
   retry: 'Retry: continue your task from where you stopped.',
-  idle: 'Continue your task, or file your report with api report if done.',
-  report: 'File your report now with api report',
+  idle: 'Continue your task, or file your report with starci kernel report if done.',
+  report: 'File your report now with starci kernel report',
 });
 export const HEALTH_DEFAULTS = Object.freeze({
   everyMs: 30_000, idleMs: 300_000, maxIdleNudges: 2, staggerMs: 15_000, backoffMinMs: 30_000, backoffMaxMs: 300_000,

@@ -23,7 +23,7 @@
 //    main's packages/grammar/node_modules). Guard file or not. With a guard, also an npm clean install while another
 //    workflow's job is leased on the ledger (peerLeasedJobs).
 //  - the Kernel's mailbox: `orca orchestration check` from a guard of role kernel (KERNEL_ORCA_CHECK): its --ack
-//    consumes deliveries before the ledger records them; the Kernel reads through `api messages` / `api questions`
+//    consumes deliveries before the ledger records them; the Kernel reads through `starci kernel messages` / `starci kernel questions`
 //    and the runtime drains. Ops and [Worker]s keep it: Orca's worker protocol (modules/host/orca/api.yaml
 //    operationAgent) has them check their own Run's deliveries, which no ledger record depends on.
 //  - the environment: a command that writes the whole environment to output (env, printenv, bare set, export -p, declare -x,
@@ -65,6 +65,7 @@ import { nameKillVerdict, queryKillVerdict } from './process-kill-verdict.mjs';
 import { installLinkVerdict, installVerdict, kernelMailboxVerdict } from './install-verdict.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
+import { readInput } from './hook-io.mjs';
 import { boundGuard, boundSeat, fileWriteVerdict, gitSubOf, redirectTargetsOf, rightsRoleOf, runtimeRootOf, writeTargetsOf } from './rights.mjs';
 import { intrinsicPolicyRead, loadCommandPolicy, policyVerdict } from './command-policy.mjs';
 import { commandsOf, programOf } from './shell-commands.mjs';
@@ -399,35 +400,34 @@ export async function hookDecision(input, { env = process.env, root = skillRoot,
   return verdict ? { verdict, guard, cwd: call.cwd } : null;
 }
 
-if (isMain(import.meta.url)) {
-  let raw = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk) => { raw += chunk; });
-  process.stdin.on('end', async () => {
-    try {
-      // The common case - no guard, no seat, no claimed role and no package manager named - exits before anything heavier than two file reads.
-      const handle = readEnv('ORCA_TERMINAL_HANDLE');
-      const guard = boundGuard(handle);
-      const seat = guard ? null : boundSeat(handle);
-      if (!guard && !seat && !readEnv('STARCI_ROLE') && !NAMES_PACKAGE_MANAGER.test(raw)) process.exit(0);
-      const input = JSON.parse(raw);
-      const direct = input?.tool_input?.command;
-      // Intrinsically read-only one-program calls cannot meet an older guard rule or write a shell target. Avoid the full
-      // shell/environment parse and YAML load on this latency-critical path; compound/substituted/redirection text stays slow.
-      if (typeof direct === 'string' && direct.trim() && !/[;&|(){}<>\n\r`$]/.test(direct) && !/env:/i.test(direct)) {
-        const first = direct.trim().split(/\s+/, 1)[0];
-        if (intrinsicPolicyRead({ program: programOf(first) })) process.exit(0);
-      }
-      const decision = await hookDecision(input, { bindings: { guard, seat } });
-      if (!decision) process.exit(0);
-      const { refusalLines, logRefusal } = await import('./refusals.mjs');
-      const { tool, ...verdict } = decision.verdict;
-      process.stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
-      logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
-      process.exit(2);
-    } catch (e) {
-      process.stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);
-      process.exit(0);
+/** The hook entry, exported so the published CLI can dispatch it in-process without a second Node hop. */
+export async function main({ stdin = process.stdin, stderr = process.stderr, env = process.env, root = skillRoot } = {}) {
+  try {
+    const raw = await readInput(stdin);
+    // The common case - no guard, no seat, no claimed role and no package manager named - exits before anything heavier than two file reads.
+    const handle = readEnv('ORCA_TERMINAL_HANDLE', env);
+    const guard = boundGuard(handle, { root, env });
+    const seat = guard ? null : boundSeat(handle, { root, env });
+    if (!guard && !seat && !readEnv('STARCI_ROLE', env) && !NAMES_PACKAGE_MANAGER.test(raw)) return 0;
+    const input = JSON.parse(raw);
+    const direct = input?.tool_input?.command;
+    // Intrinsically read-only one-program calls cannot meet an older guard rule or write a shell target. Avoid the full
+    // shell/environment parse and YAML load on this latency-critical path; compound/substituted/redirection text stays slow.
+    if (typeof direct === 'string' && direct.trim() && !/[;&|(){}<>\n\r`$]/.test(direct) && !/env:/i.test(direct)) {
+      const first = direct.trim().split(/\s+/, 1)[0];
+      if (intrinsicPolicyRead({ program: programOf(first) })) return 0;
     }
-  });
+    const decision = await hookDecision(input, { env, root, bindings: { guard, seat } });
+    if (!decision) return 0;
+    const { refusalLines, logRefusal } = await import('./refusals.mjs');
+    const { tool, ...verdict } = decision.verdict;
+    stderr.write(`${refusalLines(tool, verdict).join('\n')}\n`);
+    logRefusal({ tool, via: 'pre-tool-use', ...verdict, jobId: decision.guard?.jobId ?? null, workflowId: decision.guard?.workflowId ?? null, cwd: decision.cwd });
+    return 2;
+  } catch (e) {
+    stderr.write(`starci guard: guard error (${e?.message ?? e}); passing the command through\n`);
+    return 0;
+  }
 }
+
+if (isMain(import.meta.url)) process.exitCode = await main();

@@ -83,7 +83,7 @@ INSERT OR IGNORE INTO workflow_transitions VALUES
   ('queued','running'),('queued','stopped'),
   ('running','paused'),('running','stopped'),('running','finished'),
   ('paused','running'),('paused','stopped'),
-  ('stopped','queued'),                          -- only the owner verb `api lifecycle --resume`; a controller NEVER does this (MB-08)
+  ('stopped','queued'),                          -- only the owner verb `starci kernel lifecycle --resume`; a controller NEVER does this (MB-08)
   ('stopped','archived'),('finished','archived');
 CREATE TABLE IF NOT EXISTS job_transitions(
   from_status TEXT NOT NULL, to_status TEXT NOT NULL, PRIMARY KEY(from_status,to_status)) STRICT;
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS workflows(
   finished_at         INTEGER,
   archived_at         INTEGER) STRICT;
 
--- lifecycle_changes: phase-change history, append-only (MB-08, G10). Sole writer: the `api lifecycle` verb
+-- lifecycle_changes: phase-change history, append-only (MB-08, G10). Sole writer: the `starci kernel lifecycle` verb
 -- (define-goal, start, pause, stop, resume, finish, archive) - same transaction as UPDATE workflows.phase.
 CREATE TABLE IF NOT EXISTS lifecycle_changes(
   change_id   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -813,7 +813,7 @@ CREATE TRIGGER IF NOT EXISTS events_delete_only_by_purge BEFORE DELETE ON events
     SELECT RAISE(ABORT,'events are append-only: only the owner-approved workflow purge deletes them');
   END;
 
--- logs: typed logs. Ops write via `api log` (no more log.jsonl in .starciwork); UI reads only.
+-- logs: typed logs. Ops write via `starci kernel log` (no more log.jsonl in .starciwork); UI reads only.
 -- 'debug' is NOT written to the DB by default (debug lives in the try's raw log blob); per-workflow opt-in keeps 14 days.
 CREATE TABLE IF NOT EXISTS logs(
   seq         INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -236,7 +236,7 @@ function seedDrawJob(p, { wf = 'wf-draw', jobId = 'job-draw-1', attempt = 1, dis
 const runApi = (...args) => spawnSync(process.execPath, [API, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
 const lastErr = (r) => { try { return JSON.parse(String(r.stderr).trim().split('\n').at(-1)); } catch { return null; } };
 
-test('api report refuses a done interface.draw that leaves a gating drawing unreviewed; an older leg reports as it was admitted', (t) => {
+test('starci kernel report refuses a done interface.draw that leaves a gating drawing unreviewed; an older leg reports as it was admitted', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const files = ['.starciwork/features/home/ui/app-layout/index.yaml', '.starciwork/features/home/ui/app-layout/assets/directions/default--page--desktop--light.content.png'];
@@ -305,7 +305,7 @@ test('serve-ask: the owner accepts in the form, the receipt keeps the review, an
 
 // Redundancy audit workui f14: the guard failed open - a record it could not read was skipped and a crash filed
 // the done report with owed []. What the guard cannot judge is named, and a new leg's done report is refused.
-test('api report refuses draw-review-unjudged when the guard cannot read a record the report reaches; an older leg is warned', (t) => {
+test('starci kernel report refuses draw-review-unjudged when the guard cannot read a record the report reaches; an older leg is warned', (t) => {
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   // A page nothing else is known to wait on, drawn in this report.
@@ -334,7 +334,7 @@ test('api report refuses draw-review-unjudged when the guard cannot read a recor
   seedDrawJob(p, { jobId: 'job-draw-2', attempt: 2, dispatchId: 'ctx_draw_2', admittedAt: Date.parse('2026-09-25T12:00:00+07:00') });
   const warned = runApi('report', '--repo', p.repo, '--job', 'job-draw-2', '--report', report, '--json');
   assert.equal(warned.status, 0, warned.stderr);
-  assert.match(warned.stderr, /api report WARNING: the draw review guard could not judge/);
+  assert.match(warned.stderr, /starci kernel report WARNING: the draw review guard could not judge/);
   // An unparseable layout tree, and a report's ui record that does not parse, are unjudged too.
   fs.rmSync(broken);
   const shellFile = path.join(p.work, 'shell', 'index.yaml');
@@ -423,7 +423,7 @@ test('an unrequested drawing is never auto-accepted; only the owner’s accept s
     assert.equal(record.ui.review.owner.answeredBy, 'owner');
     assert.deepEqual(record.ui.review.owner.parts.map((x) => x.sha256), question.review.parts.map((x) => x.sha256));
     assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
-    assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed, [], 'api report files the done interface.draw');
+    assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed, [], 'starci kernel report files the done interface.draw');
     assert.deepEqual(drawingAcceptance(record, dir), { accepted: true, reason: null });
     const node = nodeById(readApp(p), APP);
     assert.deepEqual(layoutSettlement(readApp(p), { ...node, layout: { ...node.layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons, []);

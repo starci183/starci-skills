@@ -15,7 +15,7 @@
 #   modules/kernel/api.yaml         — the scripts/kernel/cli.mjs command surface
 #                                  the kernel reasons through
 #   modules/goal/define-goal.yaml — the goal contract (starci/goal@1 record shape)
-#   modules/schemas/goal-plan.yaml — the api plan --file shape {legs:[{op,paths?,notes?}]}
+#   modules/schemas/goal-plan.yaml — the starci kernel plan --file shape {legs:[{op,paths?,notes?}]}
 #   engine/db/ledger.mjs           — the .starciwork/runtime.sqlite goal/job rows
 #   docs/workflow-kernel.md        — goal phase narrative
 #   skills/define-goal/SKILL.md    — the owner-only approval gate (exact `ok`)

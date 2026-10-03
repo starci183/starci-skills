@@ -5,7 +5,7 @@
 // Measured before it (supervisor bottleneck samples, 2026-09-27): free RAM sat at 10-13% of 68.6 GB for hours with
 // CPU at 45-90%, and backend.implement / interface.draw / uat.verify / brand.decide workers died mid-run with no
 // report. `maxParallelOps` (modules/models/runtimes.yaml, the owner's 20) stays the ceiling; at EVERY
-// `api dispatch --spawn` this module computes the effective cap under it from the host's real RAM and CPU
+// `starci kernel dispatch --spawn` this module computes the effective cap under it from the host's real RAM and CPU
 //
 //   effectiveCap = min(maxParallelOps, running + ops that still fit in free RAM above the hard floor)
 //

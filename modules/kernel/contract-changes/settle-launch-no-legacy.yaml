@@ -11,6 +11,6 @@ summary: >-
   (host-contract-drift or incompatible_runtime) and sends nothing; the plain terminal-send fallback is gone.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/settle.yaml
+  - modules/cli/commands/kernel/settle.yaml
   - modules/models/agents/devin.yaml
   - modules/kernel/contract-changes/settle-launch-no-legacy.yaml

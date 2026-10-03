@@ -252,7 +252,7 @@ test('every code the check can emit has a Vietnamese catalog entry, and the pack
     assert.match(why[code].titleVi, HAS_VIETNAMESE, code);
     assert.ok(why[code].whyVi.length > 20 && why[code].nextStepVi.length > 20, code);
   }
-  assert.deepEqual(driftOfRuntime(), [], 'run `node scripts/hfs/sync-runtime.mjs` after changing a copied runtime file');
+  assert.deepEqual(driftOfRuntime(), [], 'run `starci release sync-runtime` after changing a copied runtime file');
 });
 
 test('explain names the slot, tier, allowed imports and required tests of a path', () => {
@@ -283,7 +283,7 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
   assert.equal(clean.code, 0);
   assert.match(clean.out, /0 error findings/);
 
-  // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `hfs check` judges the paths no editor shows
+  // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `starci app check` judges the paths no editor shows
   const stray = repoOf(APP, (dir) => put(dir, 'be/src/stray/thing.json'));
   const bad = await cli(['check', '--repo', stray, '--json']);
   assert.equal(bad.code, 1);
@@ -315,7 +315,7 @@ test('the CLI: report-only backlog leaves the exit code 0; explain prints what i
   assert.equal((await cli(['explain', 'be/src/stray/x.ts', '--repo', dir])).code, 1);
   assert.equal((await cli(['explain', '--repo', dir])).code, 2);
 
-  assert.equal((await cli(['init', '--repo', dir])).code, 2, 'hfs init is gone: hfs scaffold app makes a new app');
+  assert.equal((await cli(['init', '--repo', dir])).code, 2, 'hfs init is gone: starci app scaffold makes a new app');
 });
 
 test('sync is delegated to the packaged sync command: an app without the generated files fails its --check', async () => {
@@ -406,9 +406,9 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
   assert.deepEqual(only(result, 'HFS_EMPTY_DIR'), []);
 });
 
-// ------------------------------------------------------------------------------------- the machine inside hfs check
+// ------------------------------------------------------------------------------------- the machine inside starci app check
 
-test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
+test('starci app check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
   const [finding] = only(result, 'HFS_REQUIRED_FILE_MISSING');
@@ -420,7 +420,7 @@ test('hfs check runs the architecture machine: its violation is a finding under 
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
   assert.equal(result.counts.byCode.HFS_REQUIRED_FILE_MISSING.count, 1);
-  assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a hfs check finding');
+  assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a starci app check finding');
 });
 
 test('a clean back end and a clean front end are clean to the machine too', () => {

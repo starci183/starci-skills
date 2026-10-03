@@ -4,13 +4,13 @@ summary: 'The contract-change registry is only the entry files under modules/ker
 reach: new-legs
 paths:
   - modules/kernel/contract-changes-format.yaml
-  - modules/kernel/api-commands/enqueue.yaml
+  - modules/cli/commands/kernel/enqueue.yaml
   - modules/schemas/index.yaml
   - modules/supervisor/supervise.yaml
   - modules/supervisor/worker-prompt.md
   - modules/kernel/retired-paths.yaml
-  - modules/kernel/api-commands/contract-release.yaml
-  - modules/kernel/api-commands/op-contract.yaml
-  - modules/kernel/api-commands/settle.yaml
-  - modules/kernel/api-commands/status.yaml
-  - modules/kernel/api-commands/survey.yaml
+  - modules/cli/commands/kernel/contract-release.yaml
+  - modules/cli/commands/kernel/op-contract.yaml
+  - modules/cli/commands/kernel/settle.yaml
+  - modules/cli/commands/kernel/status.yaml
+  - modules/cli/commands/kernel/survey.yaml

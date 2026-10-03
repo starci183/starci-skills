@@ -267,7 +267,7 @@ const codexRows = text => wrapRows(text, 76).map((row, i) => (i === 0 ? '› ' :
 const SCREEN_OF = r => r.dropStaged ? [String(r.screen), ...codexRows(r.prompt)].join('\n')
   : r.dropSubmitted ? [String(r.screen), ...codexRows(r.prompt), '• Working (2s • esc to interrupt)', '› Ask Codex to do anything'].join('\n')
   : r.stalledWake === 'queued'
-  ? ['● Bash(node scripts/kernel/cli.mjs op-contract)', '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)', '─────',
+  ? ['● Bash(starci kernel op-contract)', '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)', '─────',
     ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '─────', '  Press up to edit queued messages, Enter to send them immediately'].join('\n')
   : r.stalledWake === 'landed'
     ? [String(r.screen), ...wrapRows(r.prompt, 76).map((row, i) => (i === 0 ? '❯ ' : '  ') + row), '✻ Pondering… (2s · ↓ 12 tokens)', ...CLAUDE_CHROME].join('\n')

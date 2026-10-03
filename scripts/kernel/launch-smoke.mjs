@@ -7,7 +7,7 @@
 //                      the [Worker] is started by scripts/agent/start-worker.mjs startWorkerAgent from the
 //                      Supervisor's own terminal, in the Run that terminal creates and coordinates.
 //   op-critic          entry (0) -> [Kernel] (1) -> [Op] be (2) -> draw critic (3)
-//                      the [Op] is started the api dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
+//                      the [Op] is started the starci kernel dispatch way (scripts/agent/lib.mjs startAgent: run-create --from
 //                      <kernel terminal>, worker-start --spec --run --from); the critic by
 //                      scripts/work/draw-critic.mjs launchCriticWorker on its criticWorkspace placement, from the Op's
 //                      terminal.
@@ -34,13 +34,13 @@
 // controller to remove its worktree (when the workflow never finished, or the controller never removed it, it releases the
 // worktree through releaseWorkflowWorktree) and removes its own state directory. It prints one JSON result.
 //
-//   node scripts/kernel/launch-smoke.mjs --app-repo <app main checkout> [--entry <terminal>] [--timeout-ms <n>] [--out <file>]
+//   starci release launch-smoke --app-repo <app main checkout> [--entry <terminal>] [--timeout-ms <n>] [--out <file>]
 //     the smoke; the entry is the terminal it runs in (ORCA_TERMINAL_HANDLE) - the owner's chat or a plain shell,
 //     never an agent. The app repository is a SCRATCH app registered in Orca: the finish fast-forwards and pushes its
 //     main with the smoke's two files. The reconciler must run (its host-side controller removes the worktree). Exit 0
 //     when every path is ok, 1 otherwise, 2 with no entry terminal.
-//   node scripts/kernel/launch-smoke.mjs stage --as <role>   (a parent agent runs it in its terminal)
-//   node scripts/kernel/launch-smoke.mjs mark --as <role>    (every agent runs it: its result line)
+//   starci release launch-smoke stage --as <role>   (a parent agent runs it in its terminal)
+//   starci release launch-smoke mark --as <role>    (every agent runs it: its result line)
 // An agent's command names only its role: the smoke's state directory (under <os temp>/starci-launch-smoke/) is found
 // by the agent's own terminal, ORCA_TERMINAL_HANDLE (resolveState). A random path in a spec is one an agent can mistype
 // (the first live run: a Kernel dropped one character of it and its stage never ran).
@@ -69,7 +69,7 @@ const slash = (p) => String(p).replaceAll('\\', '/');
 
 /**
  * Each role: its depth under the entry, its parent role, its title; an op role also its side (be/fe) and whether its
- * no-op fails on purpose. `by: 'smoke'` is a role the smoke itself starts from its parent's terminal (the api dispatch
+ * no-op fails on purpose. `by: 'smoke'` is a role the smoke itself starts from its parent's terminal (the starci kernel dispatch
  * shape: the dispatcher names the Kernel terminal as --from) instead of the parent's stage.
  */
 export const ROLES = Object.freeze({
@@ -213,13 +213,13 @@ export function manifestDiff(before, after) {
 
 /** The no-op Task spec of `role`: a parent runs its stage (starting its children), every agent marks its result line. */
 export function noopSpec({ role, script = SCRIPT }) {
-  const node = (verb) => `node "${slash(script)}" ${verb} --as ${role}`;
+  const command = (verb) => `starci release launch-smoke ${verb} --as ${role}`;
   const report = '2. Then report worker_done exactly once, as your Orca worker preamble instructs: --outcome succeeded if the command exited 0, else --outcome failed.';
   const steps = CHILDREN[role]
-    ? [`1. Run exactly: ${node('stage')}`,
+    ? [`1. Run exactly: ${command('stage')}`,
       '   It starts more no-op agents and can take up to 3 minutes: give the command a timeout of at least 300 seconds (300000 ms) and wait for it to exit.',
       report]
-    : [`1. Run exactly: ${node('mark')}`, report];
+    : [`1. Run exactly: ${command('mark')}`, report];
   return [
     `This is a no-op launch smoke (${SMOKE_SCHEMA}); you are its ${ROLES[role].title}. Do exactly these steps and nothing else:`,
     ...steps,
@@ -643,7 +643,7 @@ async function main(argv) {
   const verb = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
   if (verb === 'mark' || verb === 'stage') {
     const role = argOf(argv, 'as');
-    if (!ROLES[role]) { console.error(`usage: launch-smoke.mjs ${verb} --as <${Object.keys(ROLES).join('|')}>`); return 2; }
+    if (!ROLES[role]) { console.error(`usage: starci release launch-smoke ${verb} --as <${Object.keys(ROLES).join('|')}>`); return 2; }
     const { state, error } = await resolveState({ role });
     if (!state) { console.log(JSON.stringify({ ok: false, role, error })); return 1; }
     const r = verb === 'mark' ? markResult({ role, state }) : await runStage({ role, state, orca: await defaultClient(), holdMs: 240000 });

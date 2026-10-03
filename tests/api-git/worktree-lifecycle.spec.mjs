@@ -5,7 +5,7 @@
 // scratch tree by createScratchWorktree, the GC reclaims whatever outlives its owner through the home that made it, and
 // every git removal goes through scripts/machine/worktree-git.mjs safeRemoveWorktree: links found without following one,
 // removed as links, zero asserted, only then `git worktree remove`, and the main checkout asserted untouched. The per-op
-// land is deleted (part B: the workflow lands at api finish); the reap is exercised on a tree the spec makes itself.
+// land is deleted (part B: the workflow lands at starci kernel finish); the reap is exercised on a tree the spec makes itself.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -99,7 +99,7 @@ test('snapshotCommit preserves tracked and untracked work and never a node_modul
   assert.equal(snapshotCommit(repo, git(repo, 'rev-parse', 'HEAD'), 'clean').dirty, false);
 });
 
-test('the workflow-landed event of api finish is what --until-landed reads', (t) => {
+test('the workflow-landed event of starci kernel finish is what --until-landed reads', (t) => {
   const { base, repo } = fixture(t);
   const ledgerRepo = path.join(base, 'ledger-ev');
   fs.mkdirSync(ledgerRepo);

@@ -142,9 +142,9 @@ producesVocabulary:
     workspace.manage:     ["workspace: managed"]
     task.execute:         ["task: executed"]
     # The final leg of every chain: route-plan appends it after every other leg,
-    # and api finish refuses a workflow without the owner's approval
+    # and starci kernel finish refuses a workflow without the owner's approval
     # (scripts/kernel/handover.mjs handoverGateOf). A chain approved before this
-    # leg existed carries none; the kernel enqueues it anyway, api plan counts a
+    # leg existed carries none; the kernel enqueues it anyway, starci kernel plan counts a
     # trailing handover.review as no divergence, and the finish gate forces it.
     handover.review:      ["handover: approved"]
   settledOutOfBand:  # a variable a Work record settles without a chain leg; route-plan --work reads the record (path relative to the Work root) and drops the producing leg when its state matches
@@ -164,7 +164,7 @@ forwardEdges:
   - id: draw-before-ui-build
     if: "any frontend/UI build leg is proposed (interface.implement)"
     thenRequired: "interface.draw done for that feature's ui node"
-    enforcement: designGate - the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none; api dispatch refuses interface.implement itself (prerequisite-unmet DESIGN_NOT_SETTLED, reads.draws designDrawn) until the ui record it proves has a settled interface.draw; interface.draw never waits for a layout - it starts from a todo shell and draws the parents itself 
+    enforcement: designGate - the kernel holds a frontend build until the feature's ui node is done and asks the user when the feature has none; starci kernel dispatch refuses interface.implement itself (prerequisite-unmet DESIGN_NOT_SETTLED, reads.draws designDrawn) until the ui record it proves has a settled interface.draw; interface.draw never waits for a layout - it starts from a todo shell and draws the parents itself
     why: "interface code is built against the drawing of its feature (modules/models/kinds.yaml implementation/frontend lane purpose)"
     illegal: "UI work without interface.draw first is ILLEGAL"
 

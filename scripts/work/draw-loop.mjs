@@ -33,7 +33,7 @@
 //          verbatim (generation.loop names this loop and round). Outcome `passed`, or `blocked` with the remaining
 //          failures of the best round - the worker then reports blocked with them, never pass
 //   verify --ui <ui-record-dir> --repo <product repo> [--json]
-//          what api settle runs: re-renders every live part of the record from its render source and re-runs every
+//          what starci kernel settle runs: re-renders every live part of the record from its render source and re-runs every
 //          machine metric itself (never the loop's self-reported numbers); exit 1 when one fails
 //
 // Machine metrics (each finding a code): the capture itself (DRAW_RENDER_RED: a missing font, horizontal overflow, a
@@ -236,7 +236,7 @@ const loopFileOf = (out) => path.join(out, 'loop.json');
 export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
   context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
-/** The manifest file finish writes beside the loop dir (<out>.bundle.json), so api report --attach carries it too. */
+/** The manifest file finish writes beside the loop dir (<out>.bundle.json), so starci kernel report --attach carries it too. */
 const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
 
 export function readLoop(out) {
@@ -763,11 +763,11 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
 // ---------------------------------------------------------------------------------------------------------
 
 const USAGE = `use:
-  node scripts/work/draw-loop.mjs round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--drawer <provider>] [--no-full-page] [--no-critic] [--json]
-  node scripts/work/draw-loop.mjs round --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir> [--css <file>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>] --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui <ui-record-dir>] [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
-  node scripts/work/draw-loop.mjs status --out <dir> [--json]
-  node scripts/work/draw-loop.mjs finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--drawer <provider>] [--no-critic] [--json]
-  node scripts/work/draw-loop.mjs verify --ui <ui-record-dir> --repo <product repo> [--json]
+  starci work draw-loop round --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--out <dir>] [--family starci] [--drawer <provider>] [--no-full-page] [--no-critic] [--json]
+  starci work draw-loop round --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir> [--css <file>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>] --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui <ui-record-dir>] [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
+  starci work draw-loop status --out <dir> [--json]
+  starci work draw-loop finish --out <dir> [--parts <dir>] [--prompt <brief.prompt.txt>] [--repo <product repo>] [--drawer <provider>] [--no-critic] [--json]
+  starci work draw-loop verify --ui <ui-record-dir> --repo <product repo> [--json]
 `;
 
 async function drawLoopMain(argv) {
@@ -781,7 +781,7 @@ async function drawLoopMain(argv) {
     const r = await runRound({ ui: flag(rest, '--ui'), html: flag(rest, '--html'),
       ...(component ? { source: flag(rest, '--source'), fixtures: fixturesByWidth(all('--fixture')), product: flag(rest, '--product'), css: all('--css'), grammar: flag(rest, '--grammar') ?? 'auto', grammarDist: flag(rest, '--grammar-dist') } : {}), base: flag(rest, '--base'), state: flag(rest, '--state'), viewports: parseViewports(flag(rest, '--viewports')),
       repo: path.resolve(flag(rest, '--repo')), out: flag(rest, '--out'), family: flag(rest, '--family'), fullPage: !rest.includes('--no-full-page'), critic: rest.includes('--no-critic') ? false : undefined, drawer: flag(rest, '--drawer') ?? undefined });
-    const next = r.stop ? `the loop stopped (${r.stop.reason}): node scripts/work/draw-loop.mjs finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
+    const next = r.stop ? `the loop stopped (${r.stop.reason}): starci work draw-loop finish --out ${r.out}` : 'fix the source against metrics.json and critique.json, then run round again';
     const lines = [`round ${r.round.n}: ${r.round.failures} machine failure(s)${r.round.codes.length ? ` [${r.round.codes.join(', ')}]` : ''}; beauty ${r.round.beauty ?? '-'}${r.critique?.error ? ` (critic: ${r.critique.error.slice(0, 160)})` : ''}; ${r.round.progress ? 'progress' : 'NO progress'}; best round ${r.loop.best}`,
       ...r.metrics.metrics.filter((m) => !m.ok).flatMap((m) => m.findings.slice(0, 3).map((f) => `  [${f.code}] ${f.detail.slice(0, 300)}`)),
       ...(r.critique?.verdict ? r.critique.verdict.checks.filter((c) => !c.pass).slice(0, 8).map((c) => `  critic ${c.id}: ${c.evidence}${c.fix ? ` -> ${c.fix}` : ''}`) : []),

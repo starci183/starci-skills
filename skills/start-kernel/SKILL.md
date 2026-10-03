@@ -65,7 +65,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   no --parent (the nested Run rule). Nothing is launched with terminal create.
 - **One worktree per workflow**: before the Kernel starts, the boot has
   Orca create the workflow worktree (Orca's worktree create call, name and
-  branch `wf-<workflowId>`, a real `npm ci` at the app root, no
+  branch `wf-<workflowId>`, a real `starci npm ci` at the app root, no
   `node_modules` junctions), then starts the Kernel in it with `worker-start
   --worktree <its path>`. Every op of the workflow runs in it: serially per side (`be/`,
   `fe/`), in parallel across sides. Ops never commit: a green op is a
@@ -84,7 +84,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   worker-show must report the exact requested model as the worker's effective
   model before the Kernel is recorded running.
 - A `finished` workflow's goal never re-enters the queue — starting it again is refused.
-- The kernel orchestrates only through `node .claude/scripts/kernel/cli.mjs <verb>`
+- The kernel orchestrates only through `starci kernel <verb>`
   (verbs: `.claude/modules/kernel/api.yaml`); its boundary and op lifecycle are
   `.claude/modules/kernel/driver-loop.yaml`. Hand it no op-level work and no
   direct-ledger instructions.

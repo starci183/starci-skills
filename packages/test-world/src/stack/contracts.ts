@@ -207,7 +207,7 @@ export interface StackLease {
     readonly since: string
 }
 
-/** What `starci-test-stack status` prints. */
+/** What `starci app stack status` prints. */
 export interface StackStatus {
     readonly home: string
     readonly containers: ReadonlyArray<StackContainerStatus>

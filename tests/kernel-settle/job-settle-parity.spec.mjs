@@ -33,7 +33,7 @@ const sliceItem = (base, checks, extra = {}) => ({
   jobId: 'op-code.refactor-aaa', workflowId: 'wf-x', op: 'code.refactor', attempt: 1, outcome: 'done', dispatchId: 'ctx_1',
   payload: { cut: { id: 'fe-canon', ordinal: 3, total: 9 }, params: { canonFamilies: 'all' }, owned_paths: ['src/slice'], ...(extra.payload ?? {}) },
   report: { checks: [
-    { name: 'gate-before', command: `node .claude/scripts/gates/gate.mjs --root R --base ${base} --changed a.ts`, exitCode: 2 },
+    { name: 'gate-before', command: `starci gate run --root R --base ${base} --changed a.ts`, exitCode: 2 },
     ...checks,
   ] },
 });
@@ -48,8 +48,8 @@ const seams = (root, over = {}) => ({
   ...over,
 });
 const RED = [
-  { name: 'canon-scan-repo-wide', command: 'node .claude/scripts/gates/canon-scan.mjs --root R --json', exitCode: 2 },
-  { name: 'gate-after', command: 'node .claude/scripts/gates/gate.mjs --root R --base B --changed a.ts', exitCode: 2 },
+  { name: 'canon-scan-repo-wide', command: 'starci gate canon-scan --root R --json', exitCode: 2 },
+  { name: 'gate-after', command: 'starci gate run --root R --base B --changed a.ts', exitCode: 2 },
   { name: 'tsc-app', command: 'cd R/apps/app && npx tsc --noEmit', exitCode: 2 },
   { name: 'git-scoped-commit', command: 'git commit -m x', exitCode: 0 },
 ];
@@ -57,13 +57,13 @@ const RED = [
 test('families, base and eligibility', () => {
   assert.equal(checkFamilyOf({ name: 'canon-scan-fix', command: 'node x/canon-scan.mjs --fix' }), 'canon');
   assert.equal(checkFamilyOf({ name: 'lint-gate-after', command: 'node x/gate.mjs --root R --base B' }), 'lint');
-  assert.equal(checkFamilyOf({ name: 'hfs-lint', command: 'npx hfs lint --format json' }), 'lint');
+  assert.equal(checkFamilyOf({ name: 'hfs-lint', command: 'npx starci app lint --format json' }), 'lint');
   assert.equal(checkFamilyOf({ name: 'eslint-owned', command: 'cd R && npx eslint src' }), 'lint');
   assert.equal(checkFamilyOf({ name: 'app-typecheck-after', command: 'npm run typecheck' }), 'tsc');
   assert.equal(checkFamilyOf({ name: 'tsc-landing-draft', command: 'cd R/apps/landing-draft && npx tsc --noEmit' }), 'tsc');
   assert.equal(checkFamilyOf({ name: 'git-diff-check', command: 'git diff --check HEAD~1' }), 'diff');
   assert.equal(checkFamilyOf({ name: 'vitest', command: 'npx vitest run' }), null);
-  assert.equal(checkFamilyOf({ name: 'starci-validate-strict', command: 'node .claude/bin/starci.mjs validate X --strict' }), null);
+  assert.equal(checkFamilyOf({ name: 'starci-validate-strict', command: 'starci runtime validate X --strict' }), null);
   assert.equal(sliceBaseOf(sliceItem('abc1234', [])), 'abc1234');
   assert.equal(sliceBaseOf({ payload: { params: { admissionBase: 'def5678' } }, report: {} }), null, 'no admissionBase param: the base is what the checks measured against');
   assert.equal(sliceBaseOf({ payload: { params: {} }, report: { checks: [] } }), null);
@@ -91,7 +91,7 @@ test('any new finding in the owned files goes to the Kernel', async () => {
     gating: [{ code: 'eslint/no-unused-vars', file: 'src/slice/a.ts', line: 1 }] }) }));
   assert.equal(lintNew.green, false); assert.equal(lintNew.reason, 'parity-lint-new');
   const unproven = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'unavailable', counts: { new: 0, preexisting: 0 },
-    gating: [{ code: 'GATE_TOOL_FAILED', message: 'hfs lint produced no report' }] }) }));
+    gating: [{ code: 'GATE_TOOL_FAILED', message: 'starci app lint produced no report' }] }) }));
   // H7: a lint gate that could not run a tool could not measure the slice - tooling, never the slice's red.
   assert.equal(unproven.reason, 'parity-checker-unavailable'); assert.equal(unproven.unavailable, true);
   const tscNew = await canonParityVerdict(item, seams(root, { tsc: async () => ({ ok: false, projects: [], newErrors: [{ file: 'src/other/b.ts', code: 'TS2305', message: 'no export', owned: false, count: 1, baseCount: 0 }] }) }));
@@ -107,7 +107,7 @@ test('an uncovered red, a red re-run or a missing base never settles', async () 
   assert.equal(vitest.reason, 'parity-uncovered');
   const unverifiable = await canonParityVerdict(sliceItem(base, [...RED, { name: 'build', command: 'npm run build', exitCode: 0 }]), seams(root));
   assert.equal(unverifiable.reason, 'parity-uncovered', 'a green claim nothing re-measures stays the Kernel\'s');
-  const strict = { name: 'starci-validate-strict', command: 'node .claude/bin/starci.mjs validate X --strict --json', exitCode: 0 };
+  const strict = { name: 'starci-validate-strict', command: 'starci runtime validate X --strict --json', exitCode: 0 };
   const rerunRed = await canonParityVerdict(sliceItem(base, [...RED, strict]), seams(root, { rerun: () => ({ exitCode: 1, ms: 1, tail: 'SCHEMA_VALIDATOR_UNAVAILABLE' }) }));
   assert.equal(rerunRed.reason, 'parity-rerun-red');
   const noBase = sliceItem(base, RED); noBase.report.checks = noBase.report.checks.slice(1);
@@ -120,7 +120,7 @@ test('lint parity maps the gate: exit 0 clean, 1 findings, 2 unavailable', async
   assert.equal((await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(0, { preexisting: 2 }) })).status, 'clean');
   const red = await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(1, { findings: [{ engine: 'eslint', rule: 'no-var', path: 'a.ts', line: 1, message: 'x' }] }) });
   assert.equal(red.ok, false); assert.equal(red.status, 'findings'); assert.equal(red.gating[0].code, 'eslint/no-var');
-  const down = await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(2, { errors: ['hfs lint produced no report'] }) });
+  const down = await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(2, { errors: ['starci app lint produced no report'] }) });
   assert.equal(down.status, 'unavailable'); assert.equal(down.gating[0].code, 'GATE_TOOL_FAILED');
   assert.equal((await lintParity({ root: '.', files: [], base: 'b', checker: gate(2) })).ok, true, 'no owned file: nothing to lint');
 });
@@ -225,15 +225,20 @@ test('owedToWire: findings left on owned paths pass only when declared, held by 
   assert.equal((await canonParityVerdict(noOwed, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }))).reason, 'cut-postcondition-red');
 });
 
-test('a NODE_PATH prefix is dropped before a declared runtime check is classified and re-run', async () => {
+test('a NODE_PATH prefix is dropped before either dispatcher form is classified and re-run', async () => {
   const { withoutNodePath } = await import('../../scripts/kernel/settle/canon-parity.mjs');
-  assert.equal(withoutNodePath(`NODE_PATH=${DRIVE}x/node_modules node .claude/bin/starci.mjs validate X --strict --json`), 'node .claude/bin/starci.mjs validate X --strict --json');
-  assert.equal(withoutNodePath(`$env:NODE_PATH='${DRIVE}x'; node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`), `node ${DRIVE}r/.claude/bin/starci.mjs validate X --json`);
+  assert.equal(withoutNodePath(`NODE_PATH=${DRIVE}x/node_modules starci runtime validate X --strict --json`), 'starci runtime validate X --strict --json');
+  const nodeCommand = `node ${DRIVE}r/.claude/packages/cli/bin/starci.mjs runtime validate X --json`;
+  assert.equal(withoutNodePath(`$env:NODE_PATH='${DRIVE}x'; ${nodeCommand}`), nodeCommand);
   assert.equal(withoutNodePath('FOO=1 node x.mjs'), 'FOO=1 node x.mjs');
+  const nodeClass = classifyCheck({ command: nodeCommand });
+  assert.equal(nodeClass.rel, 'packages/cli/bin/starci.mjs');
+  assert.deepEqual(nodeClass.argv, ['runtime', 'validate', 'X', '--json']);
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
-  const strict = { name: 'starci-validate-strict', command: `NODE_PATH=${DRIVE}x/node_modules node .claude/bin/starci.mjs validate X --strict --json`, exitCode: 0 };
+  const strict = { name: 'starci-validate-strict', command: `NODE_PATH=${DRIVE}x/node_modules starci runtime validate X --strict --json`, exitCode: 0 };
   let ran = null;
-  const v = await canonParityVerdict(sliceItem(base, [...RED, strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
+  const v = await canonParityVerdict(sliceItem(base, [strict]), seams(root, { rerun: (c) => { ran = c; return { exitCode: 0, ms: 1, tail: '' }; } }));
   assert.equal(v.green, true, JSON.stringify(v));
-  assert.deepEqual(ran.argv, ['validate', 'X', '--strict', '--json']);
+  assert.equal(ran.rel, 'packages/cli/bin/starci.mjs');
+  assert.deepEqual(ran.argv, ['runtime', 'validate', 'X', '--strict', '--json']);
 });

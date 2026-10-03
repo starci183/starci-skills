@@ -1,0 +1,23 @@
+group: supabase
+verb: status
+owner: runtime
+summary: show the app's Supabase endpoints and key names without secret values
+impl: {module: scripts/machine/supabase-stack.mjs, export: supabaseStatus}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - status reads only the project rooted at supabase/config.toml and never a protected foreign stack
+  - secret key names may be listed but their values never appear in text or JSON
+flags: []
+positional: []
+exit:
+  "0": "stack state was read including a stopped stack"
+  "1": "the Supabase CLI status read failed"
+  "2": "the app or project config was refused"
+json: starci/supabase-status@1
+examples:
+  - starci supabase status --cwd <app>
+  - starci supabase status --cwd <app> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

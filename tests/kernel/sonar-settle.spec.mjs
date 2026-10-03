@@ -50,7 +50,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
 });
 
 test('the gate judges coverage per service: one service below 100 fails, a non-service file is not part of the measure', () => {
-  // The scope is the one the managed sonar-project.properties renders (hfs sync: the complement of the measured scope derived from the slot manifest).
+  // The scope is the one the managed sonar-project.properties renders (starci app sync: the complement of the measured scope derived from the slot manifest).
   const scope=coverageScopeOf(readProperties(path.join(ROOT,'examples','ecommerce-app','sonar-project.properties')));
   assert.ok(scope.exclusions.includes('fe/**')&&scope.exclusions.includes('be/**/*.resolver.ts'));
   const minPercent=thresholdsOf(gate).coverageMinPercent;
@@ -188,7 +188,7 @@ test('an unavailable Sonar records the explicit why, tells the Supervisor once a
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM incidents WHERE status='open'").get().n,0,'a judged slice resolves the notice');
 });
 
-// ---- api settle, end to end ---------------------------------------------------------------------------------------
+// ---- starci kernel settle, end to end ---------------------------------------------------------------------------------------
 
 const checkout=t=>{
   const repo=tmp(t);
@@ -221,7 +221,7 @@ const seedImplement=(repo,git,{jobId,wf,summary,admittedAt,op='backend.implement
 const settle=(repo,jobId,verdict='pass')=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
 const read=(repo,fn)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
 
-test('api settle refuses a code-writing pass whose sonar.json is red, unavailable or absent, and passes a green one', t => {
+test('starci kernel settle refuses a code-writing pass whose sonar.json is red, unavailable or absent, and passes a green one', t => {
   const at=effectiveOf(SONAR_ENFORCE_CHANGE)+1000;
   const cases=[
     ['red',scan({outcome:'fail',slice:{failures:['1 open BLOCKER/CRITICAL issue(s) on changed lines']}}),'sonar-gate-red'],

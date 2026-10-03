@@ -7,7 +7,7 @@ summary: >-
   and resolves the workflow's open incidents; api finish runs only from running and resolves open incidents.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/archive.yaml
-  - modules/kernel/api-commands/dispatch.yaml
-  - modules/kernel/api-commands/finish.yaml
+  - modules/cli/commands/kernel/archive.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/finish.yaml
   - modules/kernel/contract-changes/a3-dispatch-archive-guards.yaml

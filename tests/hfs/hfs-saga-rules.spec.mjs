@@ -1,4 +1,4 @@
-// The saga pattern of `hfs check` (scripts/hfs/rules/saga.mjs): R169 BE_SAGA_STEP_COMPENSATION, R170 BE_SAGA_STATE_VERSIONED,
+// The saga pattern of `starci app check` (scripts/hfs/rules/saga.mjs): R169 BE_SAGA_STEP_COMPENSATION, R170 BE_SAGA_STATE_VERSIONED,
 // R171 BE_SAGA_EVENT_CONTRACT, R172 BE_SAGA_CONSUMER_DEDUPE, R173 BE_SAGA_E2E_MISSING, and the declared-pattern mechanism that enables
 // the saga slots (`patterns: ["saga"]` in hfs.json sides.be). Each rule has a violating and a passing tree.
 import test from 'node:test';

@@ -1,4 +1,4 @@
-// api rename — set the workflow's display name (workflow_id unchanged); the owner or the
+// starci kernel rename — set the workflow's display name (workflow_id unchanged); the owner or the
 // supervisor runs it, never a Kernel and never an op. One transaction sets
 // workflows.display_name and appends workflow-renamed {from, to, by, at}; then, best effort,
 // every live tab that shows the name is renamed through the host's terminal-rename call: the

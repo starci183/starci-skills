@@ -1,0 +1,17 @@
+group: app
+verb: lint
+owner: "@starci/hfs"
+summary: lint both app sides and report repository, ESLint and stylelint findings together
+impl: null
+flags:
+  - {name: changed, type: list, summary: app-relative files to judge (space-separated; not with --workspace)}
+  - {name: workspace, type: string, summary: one frontend workspace to judge}
+  - {name: fix, type: boolean, summary: let ESLint and stylelint apply safe fixes}
+  - {name: format, type: enum, enum: [text, json], default: text, summary: report format}
+  - {name: sonar, type: string, summary: write the Sonar Generic Issue Import report}
+exit: {"0": clean, "1": findings, "2": refusal or tool failure}
+json: starci/lint@1
+examples: ['starci app lint', 'starci app lint --workspace .', 'starci app lint --json']
+editions: [full, lite]
+since: 1.0.0
+removed: ['hfs lint', 'npx hfs lint']

@@ -1,0 +1,30 @@
+group: work
+verb: draw-render
+owner: runtime
+summary: render HTML or a drawing component at declared viewports
+impl: {script: scripts/work/draw-render.mjs}
+flags:
+  - {name: html, type: string, summary: "HTML file to render (exclusive with --component)"}
+  - {name: out, type: string, required: true, summary: directory the PNG captures and JSON records are written to}
+  - {name: viewports, type: string, required: true, summary: comma list of WxH viewports}
+  - {name: name, type: string, summary: "capture base name (default is the file name or export)"}
+  - {name: theme, type: enum, enum: [light, dark], summary: colour scheme to render with, default: light}
+  - {name: component, type: string, summary: product module that exports the drawing component}
+  - {name: export, type: string, summary: exported XBase to render}
+  - {name: props, type: string, summary: fixture JSON passed as props}
+  - {name: css, type: list, summary: "product global stylesheet; repeatable"}
+  - {name: state, type: string, summary: flow state slug that names the capture}
+  - {name: base, type: string, summary: XBase that names an --html capture}
+  - {name: rationale, type: string, summary: rationale JSON file for the capture}
+  - {name: product, type: string, summary: product app directory the component is bundled in}
+  - {name: grammar, type: enum, enum: [auto, product, claude-dist], summary: grammar source preference, default: auto}
+  - {name: grammar-dist, type: string, summary: package root of the runtime-built grammar}
+  - {name: harness-out, type: string, summary: directory to keep the bundled harness in}
+  - {name: full-page, type: boolean, summary: capture the full page}
+  - {name: trace, type: boolean, summary: write a Playwright trace beside the capture}
+exit: {"0": every capture is green, "1": a capture is red or the draw file was refused, "2": "bad usage or no Playwright, Chromium or esbuild"}
+json: flag
+examples: ['starci work draw-render --html <file> --out <dir> --viewports 390x844 --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-render.mjs']

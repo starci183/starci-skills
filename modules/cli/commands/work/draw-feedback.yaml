@@ -1,0 +1,22 @@
+group: work
+verb: draw-feedback
+owner: runtime
+summary: build, inspect, check, or classify drawing feedback
+impl: {script: scripts/work/draw-feedback.mjs}
+positional:
+  - {name: command, enum: [brief, status, check, classify], required: true, variadic: false}
+flags:
+  - {name: ui, type: string, required: true, summary: ui record directory holding the owner notes}
+  - {name: shape, type: string, summary: "XBase#state shape the brief is for"}
+  - {name: note, type: string, summary: owner note id to classify}
+  - {name: class, type: enum, enum: [product-direction, grammar, knowledge, one-off], summary: class to give the note}
+  - {name: target, type: string, summary: knowledge rule id or path the note belongs to}
+  - {name: as, type: enum, enum: [antiPattern, vocabulary, rubric], summary: learned kind for a product-direction note}
+  - {name: by, type: enum, enum: [kernel, critic], summary: who classified the note, default: kernel}
+  - {name: write, type: boolean, summary: "write the classification into the record; without it classify only reports"}
+exit: {"0": "brief or status printed, notes addressed or classified", "1": an owner note is unaddressed or the record failed, "2": bad usage}
+json: flag
+examples: ['starci work draw-feedback status --ui <record> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-feedback.mjs']

@@ -38,9 +38,9 @@ paths:
   - scripts/work/draw-critic.mjs
   - modules/host/orca/calls.yaml
   - modules/host/orca/api.yaml
-  - modules/kernel/api-commands/questions.yaml
-  - modules/kernel/api-commands/messages.yaml
-  - modules/kernel/api-commands/status.yaml
+  - modules/cli/commands/kernel/questions.yaml
+  - modules/cli/commands/kernel/messages.yaml
+  - modules/cli/commands/kernel/status.yaml
   - modules/kernel/failure-codes.yaml
   - CHANGELOG.md
   - tests/orchestration-question-bridge.spec.mjs

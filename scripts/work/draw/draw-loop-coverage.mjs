@@ -1,7 +1,7 @@
 // draw-loop-coverage.mjs — whether a drawn part came out of the draw loop (scripts/work/draw-loop.mjs, owner rulings
 // 2026-09-27): every live part of a ui record carries generation.loop {sha256, round} citing the loop bundle
 // (starci/draw-loop@1) that installed exactly its bytes. A part drawn outside the loop, or edited after the loop
-// installed it, is DRAW_LOOP_MISSING (run by scripts/work/draw/draw-quality.mjs, so by api settle).
+// installed it, is DRAW_LOOP_MISSING (run by scripts/work/draw/draw-quality.mjs, so by starci kernel settle).
 import fs from 'node:fs';
 import { bundleDir } from '../../../engine/db/blob.mjs';
 /** The loop.json of a generation.loop citation {sha256: <bundle manifest>, round}, materialized from the blob store; null when absent. */
@@ -44,7 +44,7 @@ export function loopCoverageFindings(recordDir, record, repo) {
   for (const p of livePartsOf(recordDir, record)) {
     const at = slash(path.relative(repo, p.png));
     const ref = p.asset.generation?.loop;
-    if (!ref?.sha256) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): node scripts/work/draw-loop.mjs round ... then finish, and record the asset entries it prints` }); continue; }
+    if (!ref?.sha256) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} was not drawn through the draw loop (no generation.loop): starci work draw-loop round ... then finish, and record the asset entries it prints` }); continue; }
     const loopFile = loopFileOfRef(ref);
     const loop = loopFile ? readJson(loopFile) : null;
     if (loop?.schema !== LOOP_SCHEMA) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} names the loop blob:${ref.sha256}, which is not a draw-loop bundle in the blob store` }); continue; }

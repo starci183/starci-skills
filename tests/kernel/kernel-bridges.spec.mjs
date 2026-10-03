@@ -72,7 +72,7 @@ const world = (t, { orca = false } = {}) => {
   return { root, repo, api, apiAsync, seed, read, workflow, unit, settleTo, writeOrca };
 };
 
-test('api messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
+test('starci kernel messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
   const w = world(t, { orca: true });
   w.workflow('wf-msg');
   w.seed((l) => {
@@ -98,7 +98,7 @@ test('api messages shows every orchestration message of the workflow\'s Runs, wi
   const done = out.messages.find((m) => m.id === 'm_done');
   assert.equal(done.jobId, 'op-code.refactor-aaaaaaaaaa');
   assert.match(done.handle, /information/);
-  assert.match(out.messages.find((m) => m.id === 'm_q').handle, /api reply/);
+  assert.match(out.messages.find((m) => m.id === 'm_q').handle, /starci kernel reply/);
   const second = json(w.api(['messages', '--workflow', 'wf-msg']).stdout);
   assert.equal(second.new, 0, 'what the Kernel read is remembered');
   // The Delivery was written into the ledger (the question as an inbox row, the rest as events) and only then acknowledged.

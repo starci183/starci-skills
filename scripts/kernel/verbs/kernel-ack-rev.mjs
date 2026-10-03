@@ -1,4 +1,4 @@
-// api kernel-ack-rev — the Kernel read the kernel files of runtime rev --rev (event
+// starci kernel kernel-ack-rev — the Kernel read the kernel files of runtime rev --rev (event
 // runtime-rev-acked, source ack; scripts/kernel/runtime-rev.mjs). Split out of cli.mjs
 // (lane slim-api); its help line stays in cli.mjs usage() (usageInCore).
 //
@@ -18,7 +18,7 @@ export default {
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     const rev = resolveRev(root, String(args.rev));
-    if (!rev) throw Object.assign(new Error(`${KERNEL_REV_UNKNOWN}: --rev ${args.rev} is not a commit of the runtime at ${root}; take it from the wake or api status kernelRev.current`), { code: KERNEL_REV_UNKNOWN });
+    if (!rev) throw Object.assign(new Error(`${KERNEL_REV_UNKNOWN}: --rev ${args.rev} is not a commit of the runtime at ${root}; take it from the wake or starci kernel status kernelRev.current`), { code: KERNEL_REV_UNKNOWN });
     const files = typeof args.files === 'string' ? args.files.split(',').map((item) => item.trim()).filter(Boolean) : [];
     const attempt = kernelSeatOf(db, workflowId)?.attempt ?? null;
     ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: wf.generation ?? 0, kind: KERNEL_REV_ACKED_EVENT,

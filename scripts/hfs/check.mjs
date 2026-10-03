@@ -1,4 +1,4 @@
-// hfs-check.mjs - the HFS app check, behind `hfs check | explain` (packages/hfs) and reusable by any
+// hfs-check.mjs - the HFS app check, behind `starci app check | explain` (packages/hfs) and reusable by any
 // runtime check. It reads three things and nothing else: the app's hfs.json, the slot manifest
 // (knowledge/hfs/slots.yaml through scripts/hfs/slots.mjs) and the pins (knowledge/hfs/canon-pins.yaml). It never
 // writes to the repository it inspects.
@@ -17,7 +17,7 @@
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
 //   HFS_PLAINTEXT_SECRET          (R06, hfs-rules/secrets.mjs) a plaintext secret file or value in a tracked file; a `.enc` that is no sops envelope
 //   HFS_STACKS_SHAPE              (R10, hfs-rules/stacks.mjs) a `.starcistacks` path outside the standard shape, or a Sonar owner that is not the host
-//   HFS_CI_MISSING_CANON          (R13, hfs-rules/pipeline.mjs) CI without the pinned `hfs check`, pre-push without typecheck or lint
+//   HFS_CI_MISSING_CANON          (R13, hfs-rules/pipeline.mjs) CI without the pinned `starci app check`, pre-push without typecheck or lint
 //   HFS_DEP_VERSION_SKEW          (R14, hfs-rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
@@ -44,7 +44,7 @@
 //   HFS_UNTRACKED_ROOT_ENTRY      an entry git neither tracks nor ignores, outside an `ignored` slot (R03)
 // A runtime repository (hfs.json kind runtime, judged with knowledge/hfs/runtime-slots.yaml) gets the per-path slot findings,
 // the required files and minimum instances and the tree findings only; scripts/hfs/runtime-check.mjs adds the runtime rules.
-// checkRepository() is the whole `hfs check`: checkRepo() plus the architecture machine (scripts/hfs/architecture.mjs, one
+// checkRepository() is the whole `starci app check`: checkRepo() plus the architecture machine (scripts/hfs/architecture.mjs, one
 // implementation; the published bundle carries a byte copy), its violations and errors reported as findings under their own
 // codes; `fast` limits both to the owners changed since the merge-base. Every finding carries its code and the Vietnamese why text of modules/kernel/failure-codes.yaml. Only `error`
 // findings fail the check.
@@ -78,7 +78,7 @@ import { feNoTestsFindings, isFeTestPath } from './rules/fe-no-tests.mjs';
 const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /**
- * The codes `hfs check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
+ * The codes `starci app check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
  * formatter): infrastructure refusals, never obligations, so no rule of knowledge/hfs/rules.yaml owns them.
  */
 export const REFUSAL_CODES = Object.freeze([
@@ -96,7 +96,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
 ]);
-/** Every code `hfs check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
+/** Every code `starci app check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
 export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort());
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const VAR = /<([a-z][a-z0-9-]*)>/g;
@@ -313,7 +313,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   const tracked = files ?? trackedFiles(repoRoot);
   const scoped = only ? new Set(only) : null;
   const findings = [];
-  // `hfs check` leaves to the lint canon the per-path findings that sit on an existing TypeScript file (hfs-path-findings.mjs).
+  // `starci app check` leaves to the lint canon the per-path findings that sit on an existing TypeScript file (hfs-path-findings.mjs).
   const keep = (list, scopeRoot) => (surface === 'check' ? list.filter((finding) => !(finding.origin === 'repo' && onLintSurface(scopeRoot, finding))) : list);
   if (repo.profile === APP_SCOPE) {
     const own = tracked.filter((file) => resolver.sideOf(file) === null);
@@ -370,7 +370,7 @@ function machineFindings(report) {
 }
 
 /**
- * The whole `hfs check` of one app: checkRepo() (the root and both sides: slots, pins, size, tree) and then the architecture machine
+ * The whole `starci app check` of one app: checkRepo() (the root and both sides: slots, pins, size, tree) and then the architecture machine
  * over each side folder (the side as the repository root it judges), its violations and errors merged in as findings with the
  * Vietnamese why of their codes and the side prefixed onto their paths. `fast` judges only what changed since the merge-base (`base`
  * names another ref): the per-path slot and pin checks on the changed paths, the machine on the owners of the changed source files

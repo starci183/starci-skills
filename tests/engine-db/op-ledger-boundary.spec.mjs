@@ -78,7 +78,7 @@ test('an op caller is refused every kernel verb; reads and its own report pass t
   const asOp={ORCA_TERMINAL_HANDLE:JSON.parse(d.stdout).managed.assignee};
   const kernelCalls=[
     ['settle','--job',fx.jobId,'--verdict','fail'],
-    ['check','--job',fx.jobId,'--checks','{"checks":[{"name":"x","exitCode":0}]}'],
+    ['record-checks','--job',fx.jobId,'--checks','{"checks":[{"name":"x","exitCode":0}]}'],
     ['enqueue','--workflow',fx.wf,'--op','docs.author','--paths','other/'],
     ['dispatch','--job',fx.otherJob],
     ['route','--job',fx.otherJob],

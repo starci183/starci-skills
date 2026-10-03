@@ -1,0 +1,19 @@
+group: reconciler
+verb: stop
+owner: runtime
+summary: stop the current reconciler engine leader
+impl:
+  script: scripts/reconciler/boot.mjs
+  args: [--stop]
+flags: []
+exit:
+  "0": reconciler stopped or was not running
+  "1": reconciler could not be stopped
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler stop
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/boot.mjs --stop

@@ -1,0 +1,14 @@
+group: app
+verb: explain
+owner: "@starci/hfs"
+summary: explain which HFS slot owns one app-relative path
+impl: null
+positional:
+  - {name: path, required: true, variadic: false}
+flags: []
+exit: {"0": path has one owner, "1": path is unowned or ambiguous, "2": refusal or bad usage}
+json: flag
+examples: ['starci app explain be/src/modules/domain/order/index.ts']
+editions: [full, lite]
+since: 1.0.0
+removed: ['hfs explain', 'npx hfs explain']

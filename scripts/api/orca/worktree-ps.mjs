@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP WT5: lane worktrees are listed by Orca; merged, clean and idle stay git facts.
 // worktree-ps.mjs — the calls.yaml `worktree-ps` call as a callable function.
-//   node scripts/api/orca/worktree-ps.mjs [--limit <n>]
+// Internal entry: spawned by scripts/machine/worktree-orca.mjs; not invoked directly.
+// Args: [--limit <n>]
 // Every worktree Orca knows across its covered hosts, with what the GC judges ownership and liveness by: the comment
 // (the runtime's ownership stamp), liveTerminalCount and lastActivityAt. A page that is truncated or omits a host proves
 // nothing about a tree it does not list (scripts/lib/orca-orphans.mjs psCoverage).

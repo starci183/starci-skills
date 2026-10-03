@@ -1,0 +1,17 @@
+group: runtime
+verb: ledger-hygiene
+owner: runtime
+summary: report orphan ledgers and legacy repository-local ledger stores
+impl:
+  script: scripts/housekeeping/ledger-hygiene.mjs
+flags:
+  - {name: apply, type: boolean, summary: archive orphan ledgers outside repositories}
+exit: {"0": no findings remain, "1": findings remain or archival failed, "2": bad usage}
+json: flag
+examples:
+  - starci runtime ledger-hygiene
+  - starci runtime ledger-hygiene --apply --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/housekeeping/ledger-hygiene.mjs

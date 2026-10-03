@@ -167,7 +167,7 @@ test('a form that answers non-2xx is stale, and an ask never served is unserved'
   });
 });
 
-// Owner, 2026-09-24: api serve-ask tells the owner on Telegram (ask-notified) and serves nothing
+// Owner, 2026-09-24: starci kernel serve-ask tells the owner on Telegram (ask-notified) and serves nothing
 // until the Generate URL button is pressed. Such an ask is healthy with no form.
 test('an ask notified on Telegram with no live form is on-demand, not unserved or dead; a live form stays live',async t=>{
   const url=await listen(t,(req,res)=>{res.writeHead(200);res.end('ok');});

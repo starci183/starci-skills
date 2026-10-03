@@ -8,9 +8,9 @@ must match. Do not depend on an arbitrary globally installed Playwright executab
 
 Before FE/UAT work, inspect the project's existing locked Playwright dependency and
 reuse its runner. Install dependencies with the project's package manager and lockfile,
-then run the local Playwright CLI (for example `npx --no-install playwright install chromium`).
-On Linux the corresponding `install --with-deps chromium` may require administrator
-permission; do not assume that permission or silently install system packages.
+then run the app's browser proof through `starci gate run --root <app> --tests <pattern>`.
+If the gate reports missing Linux browser prerequisites, provisioning them may require
+administrator permission; do not assume that permission or silently install system packages.
 
 If no runner exists, provision one explicitly in the authorized tooling scope with
 an exact Playwright version and a lockfile. Record the version and setup command.

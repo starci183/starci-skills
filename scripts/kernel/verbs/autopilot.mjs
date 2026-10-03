@@ -1,4 +1,4 @@
-// api autopilot: workflow autonomy controls.
+// starci kernel autopilot: workflow autonomy controls.
 import { createHash } from 'node:crypto';
 import { csvList, verbWorkflow, workflowVerb } from './shared/rows.mjs';
 import { AUTOPILOT_BY, AUTOPILOT_EVENTS, autopilotBundle, autopilotOf, autopilotProjection, autopilotSweep, credentialChecklist, deferredToHandoverOf, reopenProvisional } from '../autopilot-run.mjs';
@@ -12,7 +12,7 @@ export default workflowVerb('autopilot', ({ ledger, args, repo, emit }) => {
     const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };
     const append = (kind, payload, entityType = 'workflow', entityId = workflowId) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType, entityId, kind, payload }));
     const wake = (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-      `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] });
+      `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] });
     if (args.set != null) {
       const on = String(args.set).trim().toLowerCase();
       if (!['on', 'off'].includes(on)) throw Object.assign(new Error('autopilot --set takes on|off'), { code: 'set-invalid' });
@@ -48,7 +48,7 @@ export default workflowVerb('autopilot', ({ ledger, args, repo, emit }) => {
       const item = deferredToHandoverOf(db, workflowId).find((i) => i.dispatchId === key || i.key === key);
       if (!item) throw Object.assign(new Error(`${key} is no open deferred-to-handover item of ${workflowId}`), { code: 'deferral-unknown' });
       append(AUTOPILOT_EVENTS.released, { dispatchId: item.dispatchId, key: item.key, by, reason }, 'report', item.dispatchId ?? item.key);
-      emit({ ok: true, workflowId, released: item.key, dispatchId: item.dispatchId }, `released ${item.key}: it waits on the owner again${item.dispatchId ? ` - park it with api serve-ask --dispatch ${item.dispatchId}` : ''}`, args.json);
+      emit({ ok: true, workflowId, released: item.key, dispatchId: item.dispatchId }, `released ${item.key}: it waits on the owner again${item.dispatchId ? ` - park it with starci kernel serve-ask --dispatch ${item.dispatchId}` : ''}`, args.json);
       return;
     }
     if (args['defer-leg'] != null) {

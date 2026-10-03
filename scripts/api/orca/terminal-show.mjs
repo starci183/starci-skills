@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP T2: the PTY's connected/writable state; the death verdict belongs to worker-list, this read stays for the frame classifier and bare shells.
 // terminal-show.mjs — the calls.yaml `terminal-show` call as a callable function.
-//   node scripts/api/orca/terminal-show.mjs --terminal <handle>
+// Internal entry: spawned by scripts/kernel/close-op-terminal.mjs; not invoked directly.
+// Args: --terminal <handle>
 // Returns {ok, terminal, connected, writable} — the health primitives callers test.
 // errorCode is Orca's typed refusal (receipt error.code) when it answered one:
 // a running Orca that no longer knows a handle — every terminal after a host

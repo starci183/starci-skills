@@ -30,7 +30,7 @@ import { walkFiles } from '../lib/walk.mjs';
  * uncheckable claim is not a pass. `mascot-slot-missing` is advisory like the canon: a fail refuses, a
  * skip (a surface the brand does not allow the mascot on) does not.
  *
- * CLI (`node scripts/work/render-proof.mjs --work <path-to-.starciwork> --record <id>`) runs the same
+ * CLI (`starci work render-proof --work <path-to-.starciwork> --record <id>`) runs the same
  * proof for one implementation record regardless of its state, printing every refusal and exiting 1 when
  * any exist - the replayable command an evidence.yaml assertion names when it binds this proof.
  */

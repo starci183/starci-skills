@@ -17,16 +17,16 @@ it. `start` brings them back and shows, in one list, what is green and what is r
 workflow and never approves anything on the owner's behalf: a replacement Kernel resumes its already-approved workflow
 by itself. It never defines a goal and never starts a new workflow (that is `define-goal` / `start-kernel`).
 
-Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/reconciler/boot.mjs up`).
+Executable: `.claude/scripts/reconciler/start.mjs` (also `starci reconciler up`).
 
 ## Steps
 
 1. From the source host (the directory holding `.claude/`):
 
    ```
-   node .claude/scripts/reconciler/start.mjs            # bring everything up, then the checklist (exit 0 = all required green)
-   node .claude/scripts/reconciler/start.mjs --check    # the checklist only, changes nothing
-   node .claude/scripts/reconciler/start.mjs --json     # the same, machine readable
+   starci reconciler up            # bring everything up, then the checklist (exit 0 = all required green)
+   starci reconciler up --check    # the checklist only, changes nothing
+   starci reconciler up --json     # the same, machine readable
    ```
 
    Flags: `--wait <sec>` (how long to re-read until green, default 120), `--set-profile operational|observe` (the only
@@ -52,5 +52,5 @@ Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/r
    report counts. Do not run the fixes yourself except `start` again; a red config, build or Orca item is the owner's
    or the lane's to act on.
 
-There is no separate restart skill; `node .claude/scripts/reconciler/boot.mjs --restart` remains the
+There is no separate restart skill; `starci reconciler restart` remains the
 lever that only restarts the engine.

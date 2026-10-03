@@ -1,4 +1,4 @@
-// api survey: split from cli.mjs.
+// starci kernel survey: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW } from '../../machine/job-row.mjs';
 import { getWorkflow, goalJsonOf, jobPayloadOf, latestGoal } from './shared/rows.mjs';

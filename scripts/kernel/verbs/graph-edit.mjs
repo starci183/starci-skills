@@ -1,7 +1,7 @@
-// api graph-edit — the Kernel's LIGHT, logged and reversible edits of its own units (owner 2026-09-28: "ops draw the
+// starci kernel graph-edit — the Kernel's LIGHT, logged and reversible edits of its own units (owner 2026-09-28: "ops draw the
 // graph, the Kernel only makes light edits"). The work graph itself stays the ops' (scripts/work/work-graph.mjs: draw
 // scope.define, revise business/architecture/interface, cut work.author); the leg plan stays goal.revise's. A heavy
-// redesign is `api redesign` (dispatch the owning op with the RCA as its brief).
+// redesign is `starci kernel redesign` (dispatch the owning op with the RCA as its brief).
 //
 //   graph-edit --workflow <wf> --decision <id> --edit <kind> ...
 //     drop     --jobs <csv> --reason <t>               drop queued units (e.g. every owned path absent)
@@ -73,7 +73,7 @@ export default {
   verb: 'graph-edit',
   required: ['workflow', 'edit'],
   kernelOnly: true,
-  usage: '  graph-edit --workflow <id> --decision <id> --edit drop|widen|wire|continue|reorder|split|merge|params|scan|recut|undo ...   the Kernel\'s light, logged, reversible unit edits (modules/kernel/api-commands/graph-edit.yaml)',
+  usage: '  graph-edit --workflow <id> --decision <id> --edit drop|widen|wire|continue|reorder|split|merge|params|scan|recut|undo ...   the Kernel\'s light, logged, reversible unit edits (modules/cli/commands/kernel/graph-edit.yaml)',
   async run({ ledger, args, repo, emit }) {
     const db = ledger.db, wf = args.workflow, edit = String(args.edit), now = Date.now();
     if (!EDITS.includes(edit)) throw refuse(`--edit must be one of ${EDITS.join('|')}`, 'edit-invalid');
@@ -83,7 +83,7 @@ export default {
     const N = settingsN();
     const editId = newId('edit');
     const rec = { edit, decision: decision?.id ?? null, created: [], dropped: [], changed: [], reason: args.reason ?? null };
-    const bound = (n) => { if (n > N) throw refuse(`this edit touches ${n} units; a light edit touches at most ${N} (allocation.progress.maxUnitsPerEdit) - a bigger change is a redesign: api redesign --op work.author|scope.define|goal.revise`, 'edit-too-big'); };
+    const bound = (n) => { if (n > N) throw refuse(`this edit touches ${n} units; a light edit touches at most ${N} (allocation.progress.maxUnitsPerEdit) - a bigger change is a redesign: starci kernel redesign --op work.author|scope.define|goal.revise`, 'edit-too-big'); };
     const change = (job, patch) => {
       const before = Object.fromEntries(Object.keys(patch).map((k) => [k, job.payload[k] ?? null]));
       const payload = { ...job.payload, ...patch, kernelEdit: { ...(job.payload.kernelEdit ?? {}), lastEdit: editId } };
@@ -208,7 +208,7 @@ export default {
       const units = db.prepare("SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?").all(wf, args.op, String(args['cut-id'] ?? ''));
       if (!units.length) throw refuse(`no ${args.op} unit of cut ${args['cut-id']} in ${wf}`, 'cut-unknown');
       const sample = units.map((u) => ({ ...u, payload: JSON.parse(u.payload_json) })).find((u) => u.payload.params?.canonFamilies);
-      if (!sample) throw refuse(`cut ${args['cut-id']} is no canon cut (no params.canonFamilies): its re-cut belongs to work.author - api redesign --op work.author`, 'scan-not-canon');
+      if (!sample) throw refuse(`cut ${args['cut-id']} is no canon cut (no params.canonFamilies): its re-cut belongs to work.author - starci kernel redesign --op work.author`, 'scan-not-canon');
       const place = ownedPathPlacements({ op: sample.op_id, payload: sample.payload, ownedPaths: sample.payload.owned_paths.slice(0, 1), repo })[0];
       if (!place || place.unresolved || !place.role) throw refuse('the cut\'s repository does not resolve (project binding)', 'scan-root-unknown');
       const root = place.base;
@@ -226,7 +226,7 @@ export default {
         { cwd: skillRoot, detached: true, stdio: ['ignore', out, log] });
       child.unref();
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
-      human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: api graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
+      human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: starci kernel graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
     } else if (edit === 'recut') {
       // H6: a re-cut goes through the canon planner (scripts/kernel/seam-policy.mjs canonCutPlanOf): each slice owns its paths
       // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
@@ -315,9 +315,9 @@ export default {
     }
 
     recordKernel(ledger, { workflowId: wf, entityType: 'graph-edit', entityId: editId, kind: GRAPH_EDIT_KIND, repo, payload: rec,
-      msg: `graph-edit ${editId} ${edit}: ${human}`, markdown: `Graph edit **${editId}** (${edit})${decision ? ` for decision ${decision.id}` : ''}\n\n${human}\n\nCreated: ${rec.created.join(', ') || '-'}\nDropped: ${rec.dropped.join(', ') || '-'}\nChanged: ${rec.changed.map((c) => c.jobId).join(', ') || '-'}\n\nUndo: api graph-edit --workflow ${wf} --edit undo --undo ${editId}`,
+      msg: `graph-edit ${editId} ${edit}: ${human}`, markdown: `Graph edit **${editId}** (${edit})${decision ? ` for decision ${decision.id}` : ''}\n\n${human}\n\nCreated: ${rec.created.join(', ') || '-'}\nDropped: ${rec.dropped.join(', ') || '-'}\nChanged: ${rec.changed.map((c) => c.jobId).join(', ') || '-'}\n\nUndo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`,
       refs: [...rec.created, ...rec.dropped].map((j) => `job:${j}`) });
-    emit({ ok: true, workflowId: wf, editId, ...rec }, `${editId}: ${human}\n  undo: api graph-edit --workflow ${wf} --edit undo --undo ${editId}`, args.json);
+    emit({ ok: true, workflowId: wf, editId, ...rec }, `${editId}: ${human}\n  undo: starci kernel graph-edit --workflow ${wf} --edit undo --undo ${editId}`, args.json);
   },
 };
 

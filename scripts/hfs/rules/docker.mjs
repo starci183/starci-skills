@@ -1,6 +1,6 @@
 // docker.mjs - every app builds its own image: be/apps/<app>/Dockerfile and fe/apps/<app>/Dockerfile (slot repo.app-image, required per declared
 // app; a Dockerfile anywhere else is owned by no slot) built from the APP ROOT, which holds the one package.json and the managed .dockerignore.
-// The Dockerfile is app-owned (hfs scaffold writes it once from templates/<side>/image) and judged here, structurally, from its parsed
+// The Dockerfile is app-owned (starci app scaffold writes it once from templates/<side>/image) and judged here, structurally, from its parsed
 // instructions (scripts/lib/dockerfile.mjs), never by matching the text:
 //   HFS_DOCKER_BUILD_CONTEXT  the header comment states the app's own build command (`docker build -f <side>/apps/<app>/Dockerfile ... .`, the
 //                             context the app root) and no COPY or ADD source leaves the context (`..`, an absolute path)

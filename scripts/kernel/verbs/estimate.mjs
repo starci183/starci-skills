@@ -1,4 +1,4 @@
-// api estimate: split from cli.mjs.
+// starci kernel estimate: split from cli.mjs.
 import { normalizeOwnedPaths } from '../../../engine/admission.mjs';
 import { defaultParallelGear, loadConfig } from '../../../engine/config.mjs';
 import { agentsFor, countsOf, sizeOf, slicingContract } from '../../work/slice-estimate.mjs';

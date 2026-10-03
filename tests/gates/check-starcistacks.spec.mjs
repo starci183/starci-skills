@@ -160,7 +160,7 @@ test('the CLI exits 0 on suspects, 1 on refusals, 2 on usage', async (t) => {
   assert.equal(json.schema, 'starci/starcistacks-check@1');
 });
 
-test('api report refuses an ask for a declared credential and files any other ask', async (t) => {
+test('starci kernel report refuses an ask for a declared credential and files any other ask', async (t) => {
   const { spawnSync } = await import('node:child_process');
   const { ledgerFileFor, openLedger, inspectLedger } = await import('../../engine/db/ledger.mjs');
   const { product, host } = workspace(t);
@@ -178,7 +178,7 @@ test('api report refuses an ask for a declared credential and files any other as
   const enqueued = api('enqueue', '--repo', product, '--workflow', wf, '--op', op, '--paths', 'docs/ask', '--json');
   assert.equal(enqueued.status, 0, enqueued.stderr);
   const job = JSON.parse(enqueued.stdout).job_id;
-  // api report reads the report only from the attempt's scratch dir (op_attempts.scratch_dir).
+  // starci kernel report reads the report only from the attempt's scratch dir (op_attempts.scratch_dir).
   const scratch = path.join(product, '.starciwork', 'scratch', job);
   fs.mkdirSync(scratch, { recursive: true });
   seed((l) => {

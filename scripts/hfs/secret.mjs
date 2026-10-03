@@ -1,14 +1,14 @@
-// secret.mjs - `hfs secret list|show|set|gen`: the canon command over the sealed secrets of an app, `.starcistacks/<env>/secrets/<slug>.enc`
+// secret.mjs - `starci app secret list|show|set|gen`: the canon command over an app's sealed secrets.
 // (R06: a secret exists only as a sops envelope there). It is the one way an operator or an agent reads or writes one; a plain
 // `sops` command in a KEYS.md or a runbook is retired. Every sops use goes through scripts/api/sops (decrypt.mjs, seal.mjs):
-//   hfs secret list [--env <name>]                       every secret of the env and the keys it holds (names only, nothing decrypted)
-//   hfs secret show <slug> [--key <NAME>] [--env <name>] decrypt one value to stdout
-//   hfs secret set <slug> [--key <NAME>] [--age <recipient>]... [--env <name>]
+//   starci app secret list [--env <name>]                       every secret of the env and the keys it holds (names only, nothing decrypted)
+//   starci app secret show <slug> [--key <NAME>] [--env <name>] decrypt one value to stdout
+//   starci app secret set <slug> [--key <NAME>] [--age <recipient>]... [--env <name>]
 //                                                        the value is read from stdin (never from an argument); a new secret takes its
 //                                                        recipients from --age, else from the repository's .sops.yaml
-//   hfs secret gen <slug> [--key <NAME>] [--bytes <n>] [--age <recipient>]... [--env <name>]
+//   starci app secret gen <slug> [--key <NAME>] [--bytes <n>] [--age <recipient>]... [--env <name>]
 //                                                        a random value (base64url of n bytes, default 32) sealed without being printed
-// A single-value secret holds its value under the key `data`. Every verb runs at the app root (the folder of hfs.json), or at --repo.
+// A single-value secret holds its value under the key `data`. Every verb runs at the app root (the folder of hfs.json), or at --cwd.
 // Exit 0 done, 2 a refusal or bad usage (a secret value is never part of a message).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,7 +57,7 @@ export function plaintextOf(format, map) {
 /** The directory of the sealed secrets of the app at `repoRoot` for `env`; the one env that has secrets when none is named. */
 function secretsDirectory(repoRoot, env) {
   const stacks = path.join(repoRoot, '.starcistacks');
-  if (!fs.existsSync(stacks)) throw new SecretError('this app has no .starcistacks; run hfs secret at the app root, or pass --repo');
+  if (!fs.existsSync(stacks)) throw new SecretError('this app has no .starcistacks; run starci app secret at the app root, or pass --cwd');
   if (env) {
     if (!/^[a-z0-9][a-z0-9-]*$/u.test(env)) throw new SecretError(`--env ${env} is not an environment name`);
     return path.join(stacks, env, 'secrets');
@@ -96,7 +96,7 @@ function parse(argv) {
   const opts = { positional: [], age: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (['--repo', '--env', '--key', '--bytes', '--age'].includes(arg)) {
+    if (['--cwd', '--env', '--key', '--bytes', '--age'].includes(arg)) {
       if (argv[i + 1] === undefined) throw new SecretError(`${arg} needs a value`);
       if (arg === '--age') opts.age.push(argv[i + 1]); else opts[arg.slice(2)] = argv[i + 1];
       i += 1;
@@ -127,23 +127,23 @@ function writeSecret({ file, key, value, age, sops }) {
   fs.writeFileSync(file, sealed);
 }
 
-/** `hfs secret <verb> ...`; `stdin` returns the value `set` seals, `sops` and `random` are the test seams. */
-export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), stdin = readStdin, sops = null, random = randomBytes, env = process.env } = {}) {
+/** `starci app secret <verb> ...`; `stdin` returns the value `set` seals, `sops` and `random` are test seams. */
+export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), stdin = readStdin, sops = null, random = randomBytes, env = process.env, cwd = process.cwd() } = {}) {
   const [verb, ...rest] = argv;
   try {
-    if (!VERBS.has(verb)) throw new SecretError('usage: hfs secret list | show <slug> | set <slug> | gen <slug>  [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--repo DIR]');
+    if (!VERBS.has(verb)) throw new SecretError('usage: starci app secret list | show <slug> | set <slug> | gen <slug> [--key NAME] [--env NAME] [--age RECIPIENT] [--bytes N] [--cwd DIR]');
     const opts = parse(rest);
-    const repoRoot = path.resolve(opts.repo ?? process.cwd());
+    const repoRoot = path.resolve(cwd, opts.cwd ?? '.');
     const directory = secretsDirectory(repoRoot, opts.env);
     const key = opts.key ?? DEFAULT_KEY;
     if (verb === 'list') {
-      if (opts.positional.length) throw new SecretError('hfs secret list takes no name');
+      if (opts.positional.length) throw new SecretError('starci app secret list takes no name');
       const files = fs.existsSync(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.enc')).sort() : [];
       for (const name of files) stdout(`${name.slice(0, -'.enc'.length)}  ${envelopeOf(fs.readFileSync(path.join(directory, name), 'utf8')).keys.join(', ')}\n`);
       stdout(`${files.length} secret${files.length === 1 ? '' : 's'} in ${path.relative(repoRoot, directory).split(path.sep).join('/')}\n`);
       return 0;
     }
-    if (opts.positional.length !== 1) throw new SecretError(`hfs secret ${verb} takes one secret name`);
+    if (opts.positional.length !== 1) throw new SecretError(`starci app secret ${verb} takes one secret name`);
     const file = fileOf(directory, opts.positional[0]);
     const seam = sops ?? defaultSops(env);
     if (verb === 'show') {
@@ -166,10 +166,10 @@ export function secretMain(argv, { stdout = (s) => process.stdout.write(s), stde
     const bytes = opts.bytes === undefined ? 32 : Number(opts.bytes);
     if (!Number.isInteger(bytes) || bytes < 16 || bytes > 1024) throw new SecretError('--bytes is a whole number from 16 to 1024');
     writeSecret({ file, key, value: random(bytes).toString('base64url'), age: opts.age, sops: seam });
-    stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with hfs secret show\n`);
+    stdout(`generated and sealed ${opts.positional[0]} (${key}, ${bytes} bytes); read it with starci app secret show\n`);
     return 0;
   } catch (error) {
-    if (error instanceof SecretError || error instanceof SyntaxError) { stderr(`hfs secret: ${error.message}\n`); return 2; }
+    if (error instanceof SecretError || error instanceof SyntaxError) { stderr(`starci app secret: ${error.message}\n`); return 2; }
     throw error;
   }
 }

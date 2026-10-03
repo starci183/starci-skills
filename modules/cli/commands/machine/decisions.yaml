@@ -1,0 +1,30 @@
+group: machine
+verb: decisions
+owner: runtime
+summary: inspect and act on runtime and Supervisor decision items
+impl: {script: scripts/machine/decisions.mjs}
+positional:
+  - {name: action, enum: [ring, escalate-due, supervisor], required: true, variadic: false}
+flags:
+  - {name: repo, type: string, summary: repository whose workflow doorbell rings (ring needs it)}
+  - {name: workflow, type: string, summary: workflow id to ring (ring needs it)}
+  - {name: apply, type: boolean, summary: carry out the due escalations instead of only planning them}
+  - {name: list, type: boolean, summary: list Supervisor decisions (the supervisor default)}
+  - {name: all, type: boolean, summary: include settled Supervisor decisions in the list}
+  - {name: ring, type: boolean, summary: ring the Supervisor doorbell instead of listing}
+  - {name: claim, type: string, summary: Supervisor decision id to claim}
+  - {name: resolve, type: string, summary: Supervisor decision id to resolve}
+  - {name: by, type: string, summary: who claims or resolves (default supervisor)}
+  - {name: verb, type: string, summary: starci verb recorded as the resolution}
+  - {name: decision, type: string, summary: decision id recorded with the resolution}
+  - {name: note, type: string, summary: free-text note recorded with the resolution}
+exit: {"0": action completed, "1": action failed, "2": bad usage}
+json: flag
+examples:
+  - starci machine decisions supervisor --list
+  - starci machine decisions ring --repo <path> --workflow <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/machine/decisions.mjs
+  - node .claude/scripts/machine/decisions.mjs

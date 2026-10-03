@@ -1,4 +1,4 @@
-// seal.mjs - one `sops encrypt` of a plaintext document held in memory: the canon command `hfs secret set` and `hfs secret gen`
+// seal.mjs - one `sops encrypt` of a plaintext document held in memory: the canon command `starci app secret set` and `starci app secret gen`
 // (scripts/hfs/secret.mjs). The plaintext travels on the child's stdin and never on its argument list, so it is not visible in a
 // process listing; the ciphertext comes back on stdout.
 import { spawnSync } from 'node:child_process';

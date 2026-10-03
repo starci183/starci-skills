@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP R1: the rebind-once guard stays, because a repeated run-use fences live consumers.
 // run-use.mjs — the calls.yaml `run-use` call as a callable function.
-//   node scripts/api/orca/run-use.mjs --id <run_id> --from <coordinator terminal>
+// Internal entry: spawned by scripts/kernel/orca-runs.mjs; not invoked directly.
+// Args: --id <run_id> --from <coordinator terminal>
 // Binds the Run to --from as its coordinator. Returns {ok, run, errorCode, error, request, hostUnavailable}.
 // calls.yaml declares run-use replay: request (a repeated run-use fences live Dispatches): its ledger identity is the
 // pair it binds, {run, from}, so a lost receipt replays the recorded rebind instead of issuing a second one.

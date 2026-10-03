@@ -2,13 +2,13 @@
 //
 // Owner request 2026-09-27: kernels, workflows and op workers need easy-to-understand names.
 // The ids stay the keys everywhere (workflow_id, op_id, job_id); these are labels only:
-//   workflow  workflows.display_name (api rename; derived at define-goal), else the goal slug in
+//   workflow  workflows.display_name (starci kernel rename; derived at define-goal), else the goal slug in
 //             workflows.title, else the workflow id. Vietnamese, `<Product> · <what it does>`.
 //   operation modules/ops/_labels.yaml (vi/en), else the op id.
 //   op job    `<op label> · <what> · <workflow name>`: `what` is the job's target — an explicit
 //             enqueue --what, the work-graph node it covers, the Work record it owns, the slice
 //             its title names, its feature path, its cut — at most JOB_WHAT_MAX characters.
-// Every human-facing surface reads these helpers: the [Kernel]/[Op] Orca titles, api status,
+// Every human-facing surface reads these helpers: the [Kernel]/[Op] Orca titles, starci kernel status,
 // the supervisor digest and progress report, Telegram notices and the harness UI.
 import fs from 'node:fs';
 import path from 'node:path';

@@ -2,8 +2,9 @@
 // blob-gc.mjs — mark-and-sweep of the content-addressed blob store (ARCHITECTURE-DB §4.2, GC controller trigger
 // `blob-sweep`), with the retention policy Q4-Q6 and archive-before-delete.
 //
-//   node scripts/housekeeping/blob-gc.mjs [--json]            dry run (default): marks, candidates, bytes; writes nothing
-//   node scripts/housekeeping/blob-gc.mjs --apply [--json]    archive, verify, mark archived, then remove the files
+// Internal entry: spawned by scripts/housekeeping/hk-ledger.mjs; not invoked directly.
+// Args: [--json]            dry run (default): marks, candidates, bytes; writes nothing
+//       --apply [--json]    archive, verify, mark archived, then remove the files
 //
 // Mark: for EACH ledger machine.ledgers enrols (state <> 'retired'), opened read-only one at a time (no ATTACH),
 // every column its blob_ref_columns table names contributes the sha256 values it holds; then the same for

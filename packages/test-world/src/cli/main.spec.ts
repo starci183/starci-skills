@@ -77,15 +77,15 @@ const run = async (argv: ReadonlyArray<string>, status: StackStatus, cwd?: strin
 
 describe("parseArguments", () => {
     test("parses options and defaults", () => {
-        assert.deepEqual(parseArguments(["up"]), { command: "up", stack: ".starcistacks/dev", services: undefined, k3d: false, force: false, json: false, root: undefined })
-        assert.deepEqual(parseArguments(["up", "--stack", "s/x", "--services", "redis,postgresql", "--k3d", "--root=/r"]), {
+        assert.deepEqual(parseArguments(["up"]), { command: "up", stack: ".starcistacks/dev", services: undefined, k3d: false, force: false, json: false, cwd: undefined })
+        assert.deepEqual(parseArguments(["up", "--stack", "s/x", "--services", "redis,postgresql", "--k3d", "--cwd=/r"]), {
             command: "up",
             stack: "s/x",
             services: ["redis", "postgresql"],
             k3d: true,
             force: false,
             json: false,
-            root: "/r",
+            cwd: "/r",
         })
         assert.equal(parseArguments(["status", "-h"]), "help")
     })
@@ -100,14 +100,14 @@ describe("main", () => {
     test("help prints usage on stdout with exit 0", async () => {
         const result = await run(["--help"], RUNNING)
         assert.equal(result.code, 0)
-        assert.match(result.out, /Usage: starci-test-stack/)
+        assert.match(result.out, /Usage: starci app stack/)
     })
 
-    test("unknown command or flag prints usage on stderr with exit 64", async () => {
+    test("unknown command or flag prints usage on stderr with exit 2", async () => {
         for (const argv of [["restart"], ["up", "--nope"], []]) {
             const result = await run(argv, RUNNING)
-            assert.equal(result.code, 64)
-            assert.match(result.err, /Usage: starci-test-stack/)
+            assert.equal(result.code, 2)
+            assert.match(result.err, /Usage: starci app stack/)
             assert.equal(result.out, "")
         }
     })
@@ -127,9 +127,9 @@ describe("main", () => {
         assert.equal(lines[2], "leases: 0")
     })
 
-    test("up honours --services, --stack, --root and --k3d", async () => {
+    test("up honours --services, --stack, --cwd and --k3d", async () => {
         const root = fixture({ "other/infra/compose/c.yaml": "services:\n  redis:\n    image: redis:6\n" })
-        const result = await run(["up", "--stack", "other", "--services", "redis", "--k3d", "--root", root], RUNNING)
+        const result = await run(["up", "--stack", "other", "--services", "redis", "--k3d", "--cwd", root], RUNNING)
         assert.equal(result.code, 0)
         assert.deepEqual(result.calls.up[0]?.services, [{ service: "redis", image: "redis:6" }])
         assert.deepEqual(result.calls.up[0]?.k3d, { images: [], root })

@@ -1,0 +1,15 @@
+group: work
+verb: example-verify
+owner: runtime
+summary: replay and verify evidence for one example Work record
+impl: {script: scripts/example/example-verify.mjs}
+flags:
+  - {name: work, type: string, required: true, summary: the .starciwork tree that holds the record}
+  - {name: record, type: string, required: true, summary: record id whose evidence is replayed}
+  - {name: cwd, type: string, required: true, summary: directory the recorded commands are replayed in}
+exit: {"0": every assertion replays as recorded, "1": "a replay differs, is stale, or the arguments were refused", "2": bad usage}
+json: none
+examples: ['starci work example-verify --work .starciwork --record <id> --cwd <repo>']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/example/example-verify.mjs']

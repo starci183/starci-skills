@@ -5,7 +5,7 @@
 //   <repo>/.starciwork/worktrees/<name>    one runtime scratch tree
 // The directory is git-excluded (.git/info/exclude), so `git status`,
 // `git ls-files --others --exclude-standard` and sonar never see it; every scanner that walks the filesystem
-// (canon-scan's eslint, hfs lint, the architecture walkers, input digests, proof-integrity, Work readers)
+// (canon-scan's eslint, starci app lint, the architecture walkers, input digests, proof-integrity, Work readers)
 // skips it with isWorktreesPath / WORKTREES_IGNORE_GLOBS, or it would lint and hash every sibling worktree.
 import path from 'node:path';
 import { posixPath } from './path-key.mjs';

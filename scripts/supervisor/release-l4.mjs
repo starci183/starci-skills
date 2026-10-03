@@ -1,6 +1,6 @@
 // release-l4.mjs - the L4 row of the test ladder (docs/source-process.md), what the release cut runs exactly once before the tag:
 //   specs   ALL: the runtime suite, and per example app its unit, contract, integration and e2e runs
-//   lint    the whole repository and stylelint (the example apps' `lint` is the one eslint + stylelint + hfs lint)
+//   lint    the whole repository and stylelint (the example apps' `lint` is the one eslint + stylelint + starci app lint)
 //   checks  the full runtime check, the app format check, and the Sonar and coverage proof of every example (a proof seam)
 //   tsc     every project: each example's typecheck and test typecheck, and the builds
 //   images  every image of every example builds (`docker:build`)

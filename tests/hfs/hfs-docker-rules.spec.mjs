@@ -67,7 +67,7 @@ test('the managed .dockerignore and images workflow are required at the app root
 });
 
 const EDITED = ['# the app edited this file', 'FROM scratch', ''].join('\n');
-test('hfs new image writes the Dockerfile of every declared app that has none and never overwrites one', () => {
+test('starci app new image writes the Dockerfile of every declared app that has none and never overwrites one', () => {
   const dir = repoOf(MIXED, (root) => { fs.rmSync(at(root, 'be/apps/jobs/Dockerfile')); fs.rmSync(at(root, 'fe/apps/app/Dockerfile')); put(root, 'be/apps/cli/Dockerfile', EDITED); });
   assert.deepEqual(newImages({ repoRoot: dir }).sort(), ['be/apps/jobs/Dockerfile', 'fe/apps/app/Dockerfile']);
   assert.equal(fs.readFileSync(at(dir, 'be/apps/cli/Dockerfile'), 'utf8'), EDITED);

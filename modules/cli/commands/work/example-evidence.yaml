@@ -1,0 +1,16 @@
+group: work
+verb: example-evidence
+owner: runtime
+summary: collect evidence for one example Work record
+impl: {script: scripts/example/example-evidence.mjs}
+flags:
+  - {name: work, type: string, required: true, summary: the .starciwork tree that holds the record}
+  - {name: record, type: string, required: true, summary: record id to collect evidence for}
+  - {name: cwd, type: string, required: true, summary: directory the assertion commands run in}
+  - {name: assert, type: list, required: true, summary: "<ac-id>=<command> assertion to run; repeatable"}
+exit: {"0": every assertion passed, "1": an assertion failed or the arguments were refused, "2": bad usage}
+json: none
+examples: ['starci work example-evidence --work .starciwork --record <id> --cwd <repo> --assert AC-1="npm test"']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/example/example-evidence.mjs']

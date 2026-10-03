@@ -81,7 +81,7 @@ AGENT_ORCA_WORKTREE:
   causes_vi:
     - "Op workspace.manage hoặc runtime.operate tự gọi lệnh xoá worktree của Orca để dọn một worktree"
     - "Agent tự tạo worktree Orca để làm việc riêng"
-  nextStep_vi: "Lệnh không được chạy; xem worktree bằng node scripts/machine/worktrees.mjs counts, việc tạo và xoá đi qua API worktree của runtime; nhu cầu không tự đáp được thì báo blocked environment."
+  nextStep_vi: "Lệnh không được chạy; xem worktree bằng starci machine worktrees counts, việc tạo và xoá đi qua API worktree của runtime; nhu cầu không tự đáp được thì báo blocked environment."
   owner: op-retry
   kind: verb-refusal
 
@@ -215,7 +215,7 @@ ARCH_KNOWLEDGE_UNAVAILABLE:
   meaning_vi: "Bộ kiểm kiến trúc cần một tệp tri thức đi kèm (danh sách tệp gốc do framework ghim) nhưng không đọc được hoặc sai khuôn, nên không phán xét bằng hợp đồng khác."
   causes_vi:
     - "Bản đóng gói của `hfs` thiếu hoặc hỏng tệp tri thức, hoặc tệp tri thức trong runtime bị sửa sai khuôn."
-  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node scripts/hfs/sync-runtime.mjs`."
+  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `starci release sync-runtime`."
   owner: runtime-core
   kind: check-finding
 
@@ -316,7 +316,7 @@ ARCH_TYPESCRIPT_INVALID:
   meaning_vi: "Gói `typescript` trong kho được kiểm không cung cấp API trình biên dịch mà bộ kiểm kiến trúc cần."
   causes_vi:
     - "Gói `typescript` bị cài hỏng hoặc bị thay bằng gói khác cùng tên."
-  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `hfs check`."
+  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `starci app check`."
   owner: op-retry
   kind: check-finding
 
@@ -325,8 +325,8 @@ ARCH_TYPESCRIPT_MISSING:
   title_vi: "Kho được kiểm chưa cài TypeScript"
   meaning_vi: "Bộ kiểm kiến trúc chỉ dùng TypeScript cài trong chính kho được kiểm, không thay bằng bộ phân tích khác, nên không kiểm được."
   causes_vi:
-    - "Kho thiếu `package.json` hoặc chưa chạy `npm ci` nên `node_modules/typescript` không có."
-  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `hfs check`."
+    - "Kho thiếu `package.json` hoặc chưa chạy `starci npm ci` nên `node_modules/typescript` không có."
+  nextStep_vi: "Chạy `starci npm ci` trong kho rồi chạy lại `starci app check`."
   owner: op-retry
   kind: check-finding
 
@@ -1969,7 +1969,7 @@ EFFECT_UNKNOWN_STUCK:
   causes_vi:
     - "Tiến trình chết đúng lúc đang ghi hoặc đẩy thay đổi"
     - "Hệ thống bên ngoài không phản hồi nên chưa xác nhận được"
-  nextStep_vi: "Runtime tự chạy đối soát (api reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
+  nextStep_vi: "Runtime tự chạy đối soát (starci kernel reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
 
@@ -2671,7 +2671,7 @@ HFS_README_DESCRIPTION_INVALID:
 HFS_README_DEVELOPMENT_INCOMPLETE:
   title: "README Development section incomplete"
   title_vi: "Mục Development trong README chưa đủ lệnh"
-  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint, build và test (các script do hfs sync quản lý; test chạy bằng npm test)."
+  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint, build và test (các script do starci app sync quản lý; test chạy bằng npm test)."
   causes_vi:
     - "Quên một hoặc vài lệnh"
     - "Viết bằng lệnh của trình quản lý khác"
@@ -2857,63 +2857,64 @@ HFS_STACKS_IN_SIDE:
 
 HFS_SYNC_DRIFT:
   title: "Generated file drifted from its template"
-  title_vi: "Tệp do hfs sync sinh đã lệch khỏi mẫu"
-  meaning_vi: "Một tệp mà hfs sync sinh (mọi tệp thuộc slot có managedBy trong slots.yaml, khối .gitignore, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
+  title_vi: "Tệp do starci app sync sinh đã lệch khỏi mẫu"
+  meaning_vi: "Một tệp mà starci app sync sinh (mọi tệp thuộc slot có managedBy trong slots.yaml, khối .gitignore, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
   causes_vi:
     - "Tệp được sửa tay thay vì sửa mẫu"
-    - "hfs.json đổi (sides, apps) mà chưa chạy hfs sync --write"
+    - "hfs.json đổi (sides, apps) mà chưa chạy starci app sync --write"
     - "Preset jest đổi danh sách loại trừ độ phủ"
-  nextStep_vi: "Chạy npx hfs sync --write để sinh lại tệp; nếu cần khác mẫu thì đổi mẫu trong .claude, không sửa tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  nextStep_vi: "Chạy npx starci app sync --write để sinh lại tệp; nếu cần khác mẫu thì đổi mẫu trong .claude, không sửa tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
 HFS_SYNC_HFS_INVALID:
   title: "hfs.json unreadable for sync"
-  title_vi: "hfs.json không đọc được cho hfs sync"
-  meaning_vi: "hfs sync cần hfs.json hợp lệ ở gốc app (hfs bằng major của slots.yaml, kind app, project kebab-case, sides.be và sides.fe mỗi bên ít nhất một app có kind) nhưng tệp thiếu hoặc sai."
+  title_vi: "hfs.json không đọc được cho starci app sync"
+  meaning_vi: "starci app sync cần hfs.json hợp lệ ở gốc app (hfs bằng major của slots.yaml, kind app, project kebab-case, sides.be và sides.fe mỗi bên ít nhất một app có kind) nhưng tệp thiếu hoặc sai."
   causes_vi:
     - "Thiếu hfs.json ở gốc app"
     - "kind không phải app, hoặc thiếu sides.be / sides.fe"
     - "Danh sách apps của một bên rỗng hoặc trùng tên giữa hai bên"
-  nextStep_vi: "Sửa hfs.json cho đúng khuôn rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  nextStep_vi: "Sửa hfs.json cho đúng khuôn rồi chạy lại starci app sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
 HFS_SYNC_PRESET_MISSING:
   title: "Coverage preset not installed"
   title_vi: "Chưa cài preset độ phủ"
-  meaning_vi: "hfs sync lấy danh sách loại trừ độ phủ từ @starci/jest-preset của back end (front end không có test nên không có preset) nhưng repository chưa cài preset đó."
+  meaning_vi: "starci app sync lấy danh sách loại trừ độ phủ từ @starci/jest-preset của back end (front end không có test nên không có preset) nhưng repository chưa cài preset đó."
   causes_vi:
     - "Chưa khai báo preset độ phủ của back end trong package.json"
     - "node_modules chưa được cài sau khi khai báo"
-  nextStep_vi: "Đặt @starci/jest-preset về đúng phiên bản chính xác trong knowledge/hfs/canon-pins.yaml, cài lại rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  nextStep_vi: "Đặt @starci/jest-preset về đúng phiên bản chính xác trong knowledge/hfs/canon-pins.yaml, cài lại rồi chạy lại starci app sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
+
 
 HFS_SYNC_SONAR_KEY:
   title: "Ambiguous Sonar project key"
   title_vi: "Khóa dự án Sonar không rõ ràng"
-  meaning_vi: "Khai báo stack của repository (services.sonar.projects) liệt kê nhiều hơn một khóa Sonar cho cùng một repository, nên hfs sync không biết dùng khóa nào."
+  meaning_vi: "Khai báo stack của repository (services.sonar.projects) liệt kê nhiều hơn một khóa Sonar cho cùng một repository, nên starci app sync không biết dùng khóa nào."
   causes_vi:
     - "application-stacks.yaml khai hai project Sonar cho cùng repository"
-  nextStep_vi: "Op quản lý workspace sửa khối services.sonar để mỗi repository chỉ có một khóa, rồi chạy lại hfs sync."
+  nextStep_vi: "Op quản lý workspace sửa khối services.sonar để mỗi repository chỉ có một khóa, rồi chạy lại starci app sync."
   owner: other-op:workspace.manage
   kind: check-finding
 
 HFS_SYNC_TEMPLATE_VARIABLE:
   title: "Template names an unknown variable"
-  title_vi: "Mẫu dùng biến hfs sync không cung cấp"
-  meaning_vi: "Một mẫu trong templates của hfs sync nhắc tới biến mà hfs sync không sinh ra, nên không thể hiển thị tệp."
+  title_vi: "Mẫu dùng biến starci app sync không cung cấp"
+  meaning_vi: "Một mẫu trong templates của starci app sync nhắc tới biến mà starci app sync không sinh ra, nên không thể hiển thị tệp."
   causes_vi:
     - "Mẫu được sửa và gõ sai tên biến"
-  nextStep_vi: "Người bảo trì runtime sửa mẫu hoặc thêm biến vào hfs sync; sự cố runtime, không phải lỗi của repository sản phẩm."
+  nextStep_vi: "Người bảo trì runtime sửa mẫu hoặc thêm biến vào starci app sync; sự cố runtime, không phải lỗi của repository sản phẩm."
   owner: runtime-core
   kind: check-finding
 
 HFS_SYNC_TEMPLATE_MISSING:
   title: "Managed slot file has no template"
   title_vi: "Tệp của slot managedBy chưa có mẫu"
-  meaning_vi: "Một slot trong slots.yaml khai managedBy và liệt kê một tệp, nhưng templates/<profile hoặc common>/<managedBy> của hfs sync không có mẫu cho tệp đó."
+  meaning_vi: "Một slot trong slots.yaml khai managedBy và liệt kê một tệp, nhưng templates/<profile hoặc common>/<managedBy> của starci app sync không có mẫu cho tệp đó."
   causes_vi:
     - "Thêm tệp vào slot managedBy mà quên thêm mẫu"
     - "Gõ sai tên thư mục managedBy"
@@ -2924,7 +2925,7 @@ HFS_SYNC_TEMPLATE_MISSING:
 HFS_SYNC_MANIFEST_MANAGED:
   title: "Managed slot path is not a list of literal files"
   title_vi: "Đường dẫn slot managedBy không phải danh sách tệp cụ thể"
-  meaning_vi: "Một slot trong slots.yaml khai managedBy nhưng path của nó có ký tự đại diện hoặc là thư mục, nên hfs sync không biết cần sinh những tệp nào."
+  meaning_vi: "Một slot trong slots.yaml khai managedBy nhưng path của nó có ký tự đại diện hoặc là thư mục, nên starci app sync không biết cần sinh những tệp nào."
   causes_vi:
     - "Đặt managedBy cho slot có path dạng glob hoặc thư mục"
   nextStep_vi: "Người bảo trì runtime liệt kê từng tệp trong path của slot hoặc bỏ managedBy; sự cố runtime, không phải lỗi của repository sản phẩm."
@@ -3113,7 +3114,7 @@ KERNEL_ORCA_CHECK:
   meaning_vi: "Lệnh orca orchestration check từ cửa sổ Kernel bị chặn: cờ --ack sẽ xác nhận và tiêu thụ tin nhắn trước khi sổ ghi kịp lưu lại, nên tin nhắn có thể mất."
   causes_vi:
     - "Kernel làm theo thông báo của Orca bảo chạy orca orchestration check"
-  nextStep_vi: "Lệnh không được chạy; Kernel đọc tin nhắn bằng api messages và câu hỏi bằng api questions, runtime tự xử lý hộp thư."
+  nextStep_vi: "Lệnh không được chạy; Kernel đọc tin nhắn bằng starci kernel messages và câu hỏi bằng starci kernel questions, runtime tự xử lý hộp thư."
   owner: op-retry
   kind: verb-refusal
 
@@ -3278,7 +3279,7 @@ LEASE_STUCK:
   causes_vi:
     - "Worker chưa khởi động được"
     - "Tiến trình nhận việc bị chết sau khi nhận"
-  nextStep_vi: "Bộ điều phối tự chạy api reconcile để dọn công việc kẹt và đưa nó về hàng chờ."
+  nextStep_vi: "Bộ điều phối tự chạy starci kernel reconcile để dọn công việc kẹt và đưa nó về hàng chờ."
   owner: runtime-core
   kind: runtime-fault
 
@@ -3300,7 +3301,7 @@ LEDGER_LEGACY_WORK_SQLITE:
   causes_vi:
     - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
     - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
-  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (node scripts/housekeeping/ledger-hygiene.mjs, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (starci runtime ledger-hygiene, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
   owner: owner
   kind: check-finding
 
@@ -3311,7 +3312,7 @@ LEDGER_ORPHAN_STATE_ROOT:
   causes_vi:
     - "Một probe hoặc script debug tạo repo dùng một lần dưới thư mục tạm mà không đặt STARCI_LOCAL_ROOT trước khi đăng ký sổ ledger"
     - "Repo nguồn của sổ ledger đã bị xóa hoặc di chuyển mà không retire sổ ledger tương ứng"
-  nextStep_vi: "node scripts/housekeeping/ledger-hygiene.mjs --apply (hoặc node scripts/housekeeping/housekeeping.mjs --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
+  nextStep_vi: "starci runtime ledger-hygiene --apply (hoặc starci runtime housekeeping --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
   owner: owner
   kind: check-finding
 
@@ -3642,7 +3643,7 @@ PACKAGE_INSTALL_RED:
   causes_vi:
     - "package.json và package-lock.json của gói lệch nhau, npm ci từ chối"
     - "Một phụ thuộc khai báo không tồn tại hoặc không phân giải được trên npm registry"
-  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại node scripts/gates/package-clean-test.mjs."
+  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại starci release clean-test."
   owner: runtime-core
   kind: check-finding
 
@@ -3665,7 +3666,7 @@ PACKAGE_PROOF_UNRUN:
     - "Không gọi được npm, hoặc mạng không tới được npm registry"
     - "Thư mục tạm nằm dưới một thư mục có node_modules, nên bản cài không còn sạch"
     - "Hết thời gian cài hoặc chạy bài kiểm tra"
-  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại node scripts/gates/package-clean-test.mjs."
+  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại starci release clean-test."
   owner: runtime-core
   kind: check-finding
 
@@ -6217,6 +6218,17 @@ SUBSCRIPTION_UNDECLARED:
   owner: op-retry
   kind: check-finding
 
+SUPABASE_PORT_POLICY:
+  title: "Supabase port policy refused"
+  title_vi: "Chính sách cổng Supabase từ chối"
+  meaning_vi: "Lệnh Supabase bị từ chối vì dự án, khối cổng hoặc tiến trình đang giữ cổng không thuộc ngăn xếp cục bộ riêng của ứng dụng."
+  causes_vi:
+    - "Cổng nằm ngoài 41000-44999, trùng nhau hoặc thuộc dải dành riêng không phải của ứng dụng"
+    - "project_id bị thiếu, chứa nivo-lite hoặc một tiến trình khác đang lắng nghe trên cổng đã khai báo"
+  nextStep_vi: "Sửa supabase/config.toml để dùng project_id và khối cổng riêng, hoặc dừng tiến trình đang giữ cổng, rồi chạy lại lệnh."
+  owner: op-retry
+  kind: verb-refusal
+
 SUPERVISOR_GATE_OVERDUE:
   title: "Supervisor gate open too long"
   title_vi: "Cổng chờ Supervisor mở quá lâu"
@@ -6656,7 +6668,7 @@ WORKER_START_STUCK:
   causes_vi:
     - "Terminal hoặc agent không mở được"
     - "Máy quá tải nên khởi động chậm"
-  nextStep_vi: "Bộ điều phối coi worker đã chết và chạy api reconcile --dead-worker để bỏ lượt khởi chạy rồi dựng lại."
+  nextStep_vi: "Bộ điều phối coi worker đã chết và chạy starci kernel reconcile --dead-worker để bỏ lượt khởi chạy rồi dựng lại."
   owner: runtime-core
   kind: runtime-fault
 
@@ -6768,7 +6780,7 @@ agent-exited:
   causes_vi:
     - "Agent bị lỗi hoặc bị đóng"
     - "Agent tự thoát sau khi hết lượt"
-  nextStep_vi: "Không gõ gì vào terminal; trạng thái báo worker chết và api reconcile --dead-worker sẽ khôi phục việc."
+  nextStep_vi: "Không gõ gì vào terminal; trạng thái báo worker chết và starci kernel reconcile --dead-worker sẽ khôi phục việc."
   owner: runtime-core
   kind: verb-refusal
 agent-unknown:
@@ -6965,7 +6977,7 @@ autopilot-provision-deferred:
   meaning_vi: "Chế độ tự lái không mở câu hỏi cấp phát giữa chừng nên việc này bị hoãn tới lúc bàn giao."
   causes_vi:
     - "Op cần thông tin hoặc khóa từ chủ sở hữu ngay giữa quy trình"
-  nextStep_vi: "Enqueue bị từ chối; tiếp tục bằng đường sandbox hoặc stub và ghi nhu cầu bằng api autopilot --defer-to-handover."
+  nextStep_vi: "Enqueue bị từ chối; tiếp tục bằng đường sandbox hoặc stub và ghi nhu cầu bằng starci kernel autopilot --defer-to-handover."
   owner: op-retry
   kind: dispatch-refusal
 bad-attempt:
@@ -7024,7 +7036,7 @@ budget-exhausted:
   causes_vi:
     - "Đã dùng hết số lượt, token hoặc thời gian được cấp"
     - "Nhiều việc cùng giữ chỗ ngân sách"
-  nextStep_vi: "Việc mới không được giữ chỗ; Supervisor hoặc chủ sở hữu quyết định nới ngân sách (api autopilot --extend-budget)."
+  nextStep_vi: "Việc mới không được giữ chỗ; Supervisor hoặc chủ sở hữu quyết định nới ngân sách (starci kernel autopilot --extend-budget)."
   owner: supervisor
   kind: blocker
 budget-invalid:
@@ -7070,7 +7082,7 @@ canon-slice-no-fix-target:
   meaning_vi: "Các thay đổi của lát cắt canon này đang được giữ ở nơi khác nên không có chỗ để sửa."
   causes_vi:
     - "Kế hoạch canon đã đổi sau khi cắt"
-  nextStep_vi: "Enqueue bị từ chối; cắt lại lát cắt bằng api graph-edit --edit scan rồi cắt lại."
+  nextStep_vi: "Enqueue bị từ chối; cắt lại lát cắt bằng starci kernel graph-edit --edit scan rồi cắt lại."
   owner: supervisor
   kind: dispatch-refusal
 canon-slice-unknown:
@@ -7181,7 +7193,7 @@ check-run-missing:
   title_vi: "Check đã khai chưa có lần chạy được lưu"
   meaning_vi: "Số check worker khai không khớp với số lần chạy check đã được lưu."
   causes_vi:
-    - "Chưa gọi api check cho đủ các check"
+    - "Chưa gọi starci kernel record-checks cho đủ các check"
     - "Có check bị bỏ sót"
   nextStep_vi: "Bộ chốt không chốt được; ghi đủ check còn thiếu rồi chốt lại."
   owner: op-retry
@@ -7249,7 +7261,7 @@ checks-needed:
   meaning_vi: "Việc đã có báo cáo nhưng chưa có kết quả kiểm tra hợp lệ nên chưa thể chốt."
   causes_vi:
     - "Worker nộp báo cáo mà chưa chạy hoặc chưa ghi check"
-  nextStep_vi: "Bộ điều phối mở mục quyết định; ghi check cho việc (api check) rồi chốt lại."
+  nextStep_vi: "Bộ điều phối mở mục quyết định; ghi check cho việc (starci kernel record-checks) rồi chốt lại."
   owner: supervisor
   kind: blocker
 checks-not-green:
@@ -8407,7 +8419,7 @@ job-not-dispatched:
   meaning_vi: "Việc chưa từng chạy nên không có lượt làm nào để chốt."
   causes_vi:
     - "cố chốt một việc còn đang xếp hàng"
-  nextStep_vi: "Lệnh settle bị từ chối; nếu không cần việc này thì bỏ nó bằng api reconcile --drop."
+  nextStep_vi: "Lệnh settle bị từ chối; nếu không cần việc này thì bỏ nó bằng starci kernel reconcile --drop."
   owner: supervisor
   kind: verb-refusal
 job-not-editable:
@@ -8686,7 +8698,7 @@ link-stuck:
   causes_vi:
     - "Một tiến trình còn giữ thư mục liên kết"
     - "Quyền truy cập trên Windows chặn việc gỡ"
-  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
+  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy starci machine worktrees gc."
   owner: runtime-core
   kind: runtime-fault
 live-not-on-main:
@@ -8815,7 +8827,7 @@ main-checkout-damaged:
   causes_vi:
     - "Một liên kết trong worktree trỏ vào checkout chính và bị đi xuyên qua"
     - "Có người sửa checkout chính đúng lúc GC chạy"
-  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy node scripts/machine/worktrees.mjs resume."
+  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy starci machine worktrees resume."
   owner: supervisor
   kind: runtime-fault
 main-moving:
@@ -8911,11 +8923,11 @@ no-hooks-path:
 no-dispatch:
   title: "The observed op holds no Orca Dispatch, so its output cannot be read"
   title_vi: "Việc được quan sát không giữ Dispatch Orca nào nên không đọc được đầu ra"
-  meaning_vi: "api observe đọc đầu ra của thợ theo Dispatch (worker-read); việc này chỉ có cửa sổ mà không có Dispatch nên phần output để trống, trạng thái lượt vẫn được báo."
+  meaning_vi: "starci kernel observe đọc đầu ra của thợ theo Dispatch (worker-read); việc này chỉ có cửa sổ mà không có Dispatch nên phần output để trống, trạng thái lượt vẫn được báo."
   causes_vi:
     - "việc được khởi chạy trước khi có Dispatch Orca"
     - "payload của việc mất định danh Dispatch"
-  nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng api status hoặc đợi báo cáo của việc."
+  nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng starci kernel status hoặc đợi báo cáo của việc."
   owner: supervisor
   kind: runtime-fault
 no-job:
@@ -9002,7 +9014,7 @@ orca-worktree-rm-failed:
   causes_vi:
     - "Orca chưa chạy hoặc đang khởi động lại"
     - "Một tiến trình còn giữ thư mục của cây"
-  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/machine/worktrees.mjs gc."
+  nextStep_vi: "Không có gì bị xoá. GC thử lại ở lượt sau; nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy starci machine worktrees gc."
   owner: runtime-core
   kind: runtime-fault
 no-typescript:
@@ -9094,7 +9106,7 @@ orchestration-check-failed:
   causes_vi:
     - "Orca đang khởi động lại hoặc đang tự cập nhật (runtime_unavailable)"
     - "Lệnh xác nhận (--ack) sau khi ghi sổ không tới được Orca"
-  nextStep_vi: "Không cần làm gì: lần api status, api questions hoặc api messages kế tiếp đọc lại lô đó và không ghi trùng. Nếu lỗi kéo dài, kiểm tra Orca có đang chạy không."
+  nextStep_vi: "Không cần làm gì: lần starci kernel status, starci kernel questions hoặc starci kernel messages kế tiếp đọc lại lô đó và không ghi trùng. Nếu lỗi kéo dài, kiểm tra Orca có đang chạy không."
   owner: runtime-core
   kind: runtime-fault
 orchestration-consumer-fenced:
@@ -9104,7 +9116,7 @@ orchestration-consumer-fenced:
   causes_vi:
     - "Kernel đã được thay bằng terminal mới và việc gắn lại Run bị từ chối"
     - "Một Run cũ của workflow nay thuộc về coordinator khác"
-  nextStep_vi: "Xem api status: nếu Kernel vừa được thay, lần đọc sau sẽ gắn lại Run của nó; nếu đó là Run cũ, tin trên Run đó cần người có quyền coordinator đọc."
+  nextStep_vi: "Xem starci kernel status: nếu Kernel vừa được thay, lần đọc sau sẽ gắn lại Run của nó; nếu đó là Run cũ, tin trên Run đó cần người có quyền coordinator đọc."
   owner: runtime-core
   kind: runtime-fault
 orchestration-no-kernel-terminal:
@@ -9418,7 +9430,7 @@ path-held-by-other-workflow:
   meaning_vi: "Đường dẫn muốn thêm đang thuộc phạm vi của một luồng công việc khác nên bị từ chối."
   causes_vi:
     - "Hai luồng cùng nhắm vào một file"
-  nextStep_vi: "Không thêm đường dẫn. Nhắn luồng kia (api notify) hoặc chờ nó xong, không được lấy đường dẫn của nó."
+  nextStep_vi: "Không thêm đường dẫn. Nhắn luồng kia (starci kernel notify) hoặc chờ nó xong, không được lấy đường dẫn của nó."
   owner: supervisor
   kind: verb-refusal
 grant-parent-missing:
@@ -9542,7 +9554,7 @@ peer-message-unknown:
   causes_vi:
     - "Sai mã tin nhắn"
     - "Tin thuộc luồng khác"
-  nextStep_vi: "Không có gì thay đổi. Kiểm tra lại mã tin trong hộp thư (api inbox) rồi thử lại."
+  nextStep_vi: "Không có gì thay đổi. Kiểm tra lại mã tin trong hộp thư (starci kernel inbox) rồi thử lại."
   owner: supervisor
   kind: verb-refusal
 peer-not-running:
@@ -9688,9 +9700,9 @@ progress-unreadable:
   title_vi: "Không đọc được khối tiến độ"
   meaning_vi: "Lệnh giao việc hàng loạt không lấy được số liệu tiến độ nên không biết còn chỗ giao bao nhiêu job."
   causes_vi:
-    - "api status không trả về khối progress"
+    - "starci kernel status không trả về khối progress"
     - "Lỗi hoặc quá thời gian khi gọi status"
-  nextStep_vi: "Lệnh bị từ chối, không giao gì. Thử lại sau; nếu lặp lại thì cần xem lại api status."
+  nextStep_vi: "Lệnh bị từ chối, không giao gì. Thử lại sau; nếu lặp lại thì cần xem lại starci kernel status."
   owner: runtime-core
   kind: runtime-fault
 prompt-stuck:
@@ -10268,7 +10280,7 @@ scan-not-canon:
   meaning_vi: "Lệnh cắt lại theo bản quét chỉ dùng cho lát canon, nhưng lát này không có canonFamilies."
   causes_vi:
     - "Nhầm sang lát của loại việc khác"
-  nextStep_vi: "Lệnh bị từ chối; cắt lại phải đi qua op work.author bằng api redesign."
+  nextStep_vi: "Lệnh bị từ chối; cắt lại phải đi qua op work.author bằng starci kernel redesign."
   owner: other-op:work.author
   kind: verb-refusal
 scan-root-unknown:
@@ -10387,7 +10399,7 @@ settle-backlog:
   causes_vi:
     - "Kernel bỏ qua các job đã báo cáo"
     - "Job chờ quá lâu chưa ai quyết"
-  nextStep_vi: "Kernel phải chốt các job đó trước (api settle hoặc chạy lại kiểm tra) rồi mới làm tiếp."
+  nextStep_vi: "Kernel phải chốt các job đó trước (starci kernel settle hoặc chạy lại kiểm tra) rồi mới làm tiếp."
   owner: op-retry
   kind: verb-refusal
 settle-nongreen:
@@ -10543,7 +10555,7 @@ tests-deferred:
   meaning_vi: "Job kiểm thử bị huỷ vì chủ dự án đã tắt loại kiểm thử này trong cấu hình."
   causes_vi:
     - "config.yaml đặt specs unit hoặc e2e là false"
-  nextStep_vi: "Job được ghi là hoãn, các bước sau vẫn chạy; sau này api run-deferred-tests xếp lại."
+  nextStep_vi: "Job được ghi là hoãn, các bước sau vẫn chạy; sau này starci kernel run-deferred-tests xếp lại."
   owner: owner
   kind: settle-reason
 tick-items:
@@ -10562,7 +10574,7 @@ tool-unavailable:
   causes_vi:
     - "Chọn tay model thiếu công cụ"
     - "Tuyến chọn cũ"
-  nextStep_vi: "Lệnh giao bị từ chối, job vẫn chờ; chạy api route lại để chọn agent có công cụ rồi giao lại."
+  nextStep_vi: "Lệnh giao bị từ chối, job vẫn chờ; chạy starci kernel route lại để chọn agent có công cụ rồi giao lại."
   owner: op-retry
   kind: dispatch-refusal
 tree-update-failed:
@@ -10629,7 +10641,7 @@ unit-in-flight:
   causes_vi:
     - "Lần thử trước còn đang chạy hoặc chờ"
     - "Lệnh chạy lại được gọi quá sớm"
-  nextStep_vi: "Lệnh bị từ chối; sửa lần thử đang mở (api graph-edit) hoặc đợi nó kết thúc rồi chạy lại."
+  nextStep_vi: "Lệnh bị từ chối; sửa lần thử đang mở (starci kernel graph-edit) hoặc đợi nó kết thúc rồi chạy lại."
   owner: supervisor
   kind: verb-refusal
 unit-not-admitted:
@@ -10647,7 +10659,7 @@ unit-overlaps-failed-unit:
   meaning_vi: "Việc mới trùng phạm vi với đơn vị đã thất bại nên sẽ làm ngân sách thử bị làm mới."
   causes_vi:
     - "Tạo job mới thay vì thử lại đơn vị cũ"
-  nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua api graph-edit."
+  nextStep_vi: "Lệnh bị từ chối; dùng --retry-of với job cũ hoặc thay đổi hình dạng qua starci kernel graph-edit."
   owner: op-retry
   kind: verb-refusal
 unit-try-budget-exhausted:
@@ -10657,7 +10669,7 @@ unit-try-budget-exhausted:
   causes_vi:
     - "Đơn vị thất bại nhiều lần liên tiếp"
     - "Ngân sách thử đặt quá thấp"
-  nextStep_vi: "Lệnh bị từ chối; chủ dự án hoặc Supervisor quyết định nâng ngân sách (api unit --raise-budget), không tự thử thêm."
+  nextStep_vi: "Lệnh bị từ chối; chủ dự án hoặc Supervisor quyết định nâng ngân sách (starci kernel unit --raise-budget), không tự thử thêm."
   owner: supervisor
   kind: verb-refusal
 unit-unknown:
@@ -10901,7 +10913,7 @@ managed-unproven:
   causes_vi:
     - "worker-release bị Orca từ chối hoặc không trả lời lần đầu và lần lặp lại"
     - "Dispatch vẫn do Orca giữ (retained)"
-  nextStep_vi: "Job giữ nguyên trạng thái settled; api reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
+  nextStep_vi: "Job giữ nguyên trạng thái settled; starci kernel reconcile --job <id> --release-worker giải phóng lại, hoặc lượt dọn của supervisor xử lý."
   owner: runtime-core
   kind: settle-reason
 worker-process-survived:
@@ -10955,8 +10967,8 @@ worker-question:
   owner: op-retry
   kind: blocker
 worker-done-unsent:
-  title: "api report could not send the op's worker_done"
-  title_vi: "api report không gửi được worker_done của op"
+  title: "starci kernel report could not send the op's worker_done"
+  title_vi: "starci kernel report không gửi được worker_done của op"
   meaning_vi: "Báo cáo của op đã được ghi vào ledger, nhưng lệnh Orca gửi worker_done từ terminal của op bị từ chối hoặc không có kết quả, nên Orca chưa đóng Task và Dispatch của op."
   causes_vi:
     - "Orca không phản hồi hoặc từ chối người gửi không phải terminal được giao Dispatch"
@@ -11053,7 +11065,7 @@ workflow-checkpoint-failed:
 workflow-finish-dirty:
   title: "The workflow worktree has work no checkpoint carries"
   title_vi: "Worktree còn phần việc chưa có checkpoint"
-  meaning_vi: "api finish không đưa workflow vào main khi worktree còn tệp chưa nằm trong checkpoint nào."
+  meaning_vi: "starci kernel finish không đưa workflow vào main khi worktree còn tệp chưa nằm trong checkpoint nào."
   causes_vi:
     - "Một op chưa chốt"
     - "Có tệp được sửa tay trong worktree"
@@ -11075,7 +11087,7 @@ workflow-finish-gate-unavailable:
   title_vi: "Cổng toàn nhánh không chạy được một công cụ"
   meaning_vi: "gate.mjs không chạy được một công cụ nên không có kết quả; không bao giờ đưa vào main khi cổng không chạy."
   causes_vi:
-    - "hfs lint, tsc hoặc jest không chạy được"
+    - "starci app lint, tsc hoặc jest không chạy được"
     - "Thiếu node_modules sau npm ci"
   nextStep_vi: "Sửa môi trường công cụ rồi finish lại; main giữ nguyên."
   owner: runtime-core
@@ -11317,7 +11329,7 @@ workflow-work-record-not-owner:
   meaning_vi: "Settle từ chối vì op đã sửa một hồ sơ .starciwork mà một workflow khác đang sống sở hữu; chỉ workflow chủ được commit hồ sơ (trên nhánh workflow của nó), các workflow khác thấy hồ sơ khi chủ đưa vào main."
   causes_vi:
     - "Op viết vào hồ sơ dùng chung của một foundation, scope hoặc cut thuộc workflow khác"
-  nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng api notify --kind request."
+  nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng starci kernel notify --kind request."
   owner: op-retry
   kind: settle-reason
 workflow-worktree-missing:
@@ -11862,7 +11874,7 @@ HFS_GHOST_TREE:
 HFS_GITIGNORE_BLOCK_DRIFT:
   title: "The managed `.gitignore` block equals its render"
   title_vi: "Khối .gitignore lệch bản render"
-  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `hfs sync`."
+  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `starci app sync`."
   causes_vi:
     - "Vi phạm luật R04: Khối `.gitignore` do `.claude` quản lý phải trùng bản render (never-tracked list, deny `.env*`, cache)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -11872,7 +11884,7 @@ HFS_GITIGNORE_BLOCK_DRIFT:
 HFS_MANAGED_FILE_DRIFT:
   title: "A managed file equals its template render"
   title_vi: "Tệp do .claude quản lý bị lệch"
-  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
+  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `starci app sync --write`, không sửa tay."
   causes_vi:
     - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -11934,18 +11946,19 @@ HFS_SONAR_CONFIG:
   title_vi: "Cấu hình Sonar lệch"
   meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra và nhập báo cáo độ phủ lcov của be, chỉ tính phần logic của be/src/modules (phạm vi suy ra từ slot manifest)."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không bị đo (SonarQube không có coverage inclusions; hfs sync sinh phần bù từ trường coverage của slot và ruleParams.be.logicRoles qua scripts/hfs/coverage-scope.mjs, gồm cả fe/**; lệch dòng này là HFS_COVERAGE_SCOPE_DRIFT) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không phải service (SonarQube không có coverage inclusions; starci app sync sinh phần bù từ COVERAGE_SOURCES và bộ hậu tố của slot manifest, gồm cả fe/**) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không bị đo (SonarQube không có coverage inclusions; starci app sync sinh phần bù từ trường coverage của slot và ruleParams.be.logicRoles qua scripts/hfs/coverage-scope.mjs, gồm cả fe/**; lệch dòng này là HFS_COVERAGE_SCOPE_DRIFT) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
 HFS_CI_MISSING_CANON:
-  title: "CI runs the pinned `hfs lint`; pre-push runs typecheck and lint"
+  title: "CI runs the pinned `starci app lint`; pre-push runs typecheck and lint"
   title_vi: "CI thiếu bước canon"
   meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
   causes_vi:
-    - "Vi phạm luật R13: CI phải chạy `hfs lint` (`npm run lint` hoặc `npx @starci/hfs lint`, bản pin); pre-push phải có `typecheck` + `lint`."
+    - "Vi phạm luật R13: CI phải chạy `starci app lint`; pre-push phải có `typecheck` + `lint`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -11963,7 +11976,7 @@ HFS_DEP_VERSION_SKEW:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged` hoặc khóa Jest), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
     - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -11973,7 +11986,7 @@ HFS_TOOL_CONFIG_LOCAL:
 HFS_RULE_OFF_WITHOUT_REPLACEMENT:
   title: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository"
   title_vi: "Cấu hình ESLint hoặc stylelint lệch bản render"
-  meaning_vi: "`eslint.config.mjs` (hoặc `stylelint.config.mjs` của front end) khác bản render (một dòng gọi `starciBeConfig`, `starciFeConfig` hoặc `starciStylelintConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
+  meaning_vi: "`eslint.config.mjs` (hoặc `stylelint.config.mjs` của front end) khác bản render (một dòng gọi `starciBeConfig`, `starciFeConfig` hoặc `starciStylelintConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `starci app sync --write`, không sửa tay."
   causes_vi:
     - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -12006,9 +12019,9 @@ HFS_RULE_UNTESTED:
 HFS_RULE_CODE_UNOWNED:
   title: "Emitted finding code that no rule owns"
   title_vi: "Mã lỗi mà máy có thể báo nhưng không luật nào sở hữu"
-  meaning_vi: "Máy kiến trúc hoặc hfs check có thể phát ra một mã lỗi mà không luật nào của knowledge/hfs/rules.yaml liệt kê trong failureCodes. Mã không thuộc luật nào thì không có số R, không có cổng chạy và không có bằng chứng test. Chỉ các mã từ chối vì không phán xét được (hạ tầng hỏng, cấu hình không đọc được) được miễn, và chủ của chúng xuất khẩu chúng thành một danh sách riêng."
+  meaning_vi: "Máy kiến trúc hoặc starci app check có thể phát ra một mã lỗi mà không luật nào của knowledge/hfs/rules.yaml liệt kê trong failureCodes. Mã không thuộc luật nào thì không có số R, không có cổng chạy và không có bằng chứng test. Chỉ các mã từ chối vì không phán xét được (hạ tầng hỏng, cấu hình không đọc được) được miễn, và chủ của chúng xuất khẩu chúng thành một danh sách riêng."
   causes_vi:
-    - "Thêm một mã mới vào máy kiến trúc hoặc hfs check nhưng chưa xếp nó dưới luật nào"
+    - "Thêm một mã mới vào máy kiến trúc hoặc starci app check nhưng chưa xếp nó dưới luật nào"
     - "Hai mã cùng nói một nghĩa vụ nên phải giữ một và xoá một"
     - "Mã chỉ là lỗi hạ tầng nhưng chưa vào danh sách từ chối của chủ nó"
   nextStep_vi: "Người giám sát xếp mã vào failureCodes của đúng một luật mà nó phục vụ (mở rộng luật gần nhất nếu chưa ai nêu nghĩa vụ đó), xoá mã trùng hoặc lỗi thời cùng mọi tham chiếu, qua một lane đã land."
@@ -12018,7 +12031,7 @@ HFS_RULE_CODE_UNOWNED:
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
-  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
+  meaning_vi: "`<file>` chưa được format. Chạy `starci app lint --fix`."
   causes_vi:
     - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -12030,9 +12043,9 @@ HFS_FORMAT_TOOL_MISSING:
   title_vi: "Kho chưa cài prettier của chính nó"
   meaning_vi: "Kiểm tra định dạng (R19) chạy prettier của chính kho. Kho chưa cài prettier nên không thể xác nhận định dạng, và trạng thái đó không bao giờ được tính là đạt."
   causes_vi:
-    - "Chưa chạy `npm ci` trong kho"
+    - "Chưa chạy `starci npm ci` trong kho"
     - "prettier không nằm trong devDependencies của kho"
-  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `hfs check`."
+  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml bằng `starci npm ci` rồi chạy lại `starci app check`."
   owner: op-retry
   kind: input-invalid
 
@@ -12072,9 +12085,9 @@ HFS_TS_STRICT:
 HFS_CONTRACT_SNAPSHOT_DRIFT:
   title: "The be side commits its contract snapshot and it equals the emit"
   title_vi: "Bản hợp đồng lệch bản thật"
-  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` ở gốc app rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
+  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `starci app emit` ở gốc app rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
-    - "Vi phạm luật R23: phía be: `be/contracts/<app>/schema.graphql` và `be/contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. Phía fe đọc thẳng `be/contracts/` (đường đọc chéo duy nhất khai trong hfs.json `sides.fe.reads`), không giữ bản sao."
+    - "Vi phạm luật R23: phía be: `be/contracts/<app>/schema.graphql` và `be/contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `starci app emit` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. Phía fe đọc thẳng `be/contracts/` (đường đọc chéo duy nhất khai trong hfs.json `sides.fe.reads`), không giữ bản sao."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12240,7 +12253,7 @@ BE_TEST_TOPOLOGY:
   title_vi: "Cấu hình test lệch chuẩn"
   meaning_vi: "Cấu hình test lệch chuẩn: `<detail>`."
   causes_vi:
-    - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` = `typecheck:tests && jest --selectProjects <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
+    - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` chạy qua `starci gate run --root <app> --tests <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
     - "Vi phạm luật R47 về stack thật: mọi dịch vụ khai trong `.starcistacks/<env>` (Postgres, Redis, Keycloak, mail host, k3s...) chạy THẬT trong world qua toxiproxy, world đọc dịch vụ và phiên bản image từ stack lúc chạy; `fakes/<provider>/` chỉ giả SaaS bên ngoài mà đội không vận hành. Ngoại lệ duy nhất: dịch vụ stateless cần phần cứng đặc biệt hoặc model bên ngoài (GPU inference, embedding tự host) được giả khi mục `stacks` của dịch vụ đó trong `test-world.config.ts` khai `{ fakedBy, reason }` với `reason` không rỗng; dịch vụ có trạng thái (database, cache, identity, storage, mail, queue, search hoặc có volume bền) không bao giờ được giả, và mục `fakedBy` trỏ tới dịch vụ hoặc fake (mục `fakes` hay thư mục `fakes/`) không tồn tại bị coi là cũ. `test-world.config.ts` khai world theo đúng một dạng export có tên `export const { useTestWorld, useSandbox } = defineTestWorld({...})` (`stack`, `stacks` theo từng dịch vụ, `fakes`); export default không được đọc và bị báo lỗi."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
@@ -12292,7 +12305,7 @@ FE_WIRE_GENERATED:
   title_vi: "Kiểu wire gõ tay"
   meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi, hoặc kiểu sinh ra cũ hơn ảnh chụp hợp đồng. Dùng kiểu sinh từ `be/contracts/`."
   causes_vi:
-    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `npm run codegen` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `starci gate run --root <app>` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -12463,7 +12476,7 @@ HFS_HOOKS_PATH_REDIRECTED:
   meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua. Chỉ xét khi thư mục được kiểm tra chính là gốc work tree Git của nó; một thư mục nằm trong clone khác (một ví dụ trong clone runtime) không có hook riêng nên không bị xét."
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
-  nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
+  nextStep_vi: "Yêu cầu owner gỡ cấu hình local `core.hooksPath`, rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -12854,7 +12867,7 @@ sonar-proof-missing:
   causes_vi:
     - "Op chưa chạy sonar-local scan"
     - "Quét không dùng --wait nên chỉ mới gửi đi"
-    - "Tệp sonar.json không được đính kèm vào api report"
+    - "Tệp sonar.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy sonar-local scan --wait trên phần code đã sửa và đính kèm sonar.json khi nộp report."
   owner: op-retry
   kind: settle-reason
@@ -12865,15 +12878,15 @@ op-gate-proof-missing:
   meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/gates/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
   causes_vi:
     - "Op chưa chạy gate.mjs sau khi viết code"
-    - "Tệp gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
+    - "Tệp gate.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
   owner: op-retry
   kind: settle-reason
 
 op-gate-tool-failed:
   title: "A gate tool could not run"
   title_vi: "Một công cụ của cổng kiểm tra không chạy được"
-  meaning_vi: "gate.json báo exit 2: hfs lint, codegen, build gói, tsc hoặc jest không chạy được, nên phần code chưa được chấm. Công cụ không chạy được không bao giờ là đạt."
+  meaning_vi: "gate.json báo exit 2: starci app lint, codegen, build gói, tsc hoặc jest không chạy được, nên phần code chưa được chấm. Công cụ không chạy được không bao giờ là đạt."
   causes_vi:
     - "Thiếu gói trong node_modules của app (eslint, typescript, prettier, jest)"
     - "Script codegen hoặc build của gói fe bị lỗi"
@@ -12900,7 +12913,7 @@ op-read-digest-missing:
   meaning_vi: "Report không đính kèm bản tóm tắt ĐỌC (read-digest.json, schema starci/read-digest@1): không có bằng chứng op đã đọc tệp pattern, ví dụ và bản đồ slot trước khi viết code."
   causes_vi:
     - "Op viết code ngay mà không chạy scripts/gates/read-digest.mjs"
-    - "Tệp read-digest.json không được đính kèm vào api report"
+    - "Tệp read-digest.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op chạy read-digest.mjs --touch <tệp> --out read-digest.json, đọc đúng các tệp nó liệt kê, kiểm lại code theo đó rồi nộp lại kèm read-digest.json."
   owner: op-retry
   kind: settle-reason
@@ -12908,7 +12921,7 @@ op-read-digest-missing:
 op-read-digest-no-pattern:
   title: "The READ digest names no pattern for a touched file kind"
   title_vi: "Bản tóm tắt ĐỌC thiếu tệp pattern cho loại tệp đã sửa"
-  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà hfs explain trả về)."
+  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà starci app explain trả về)."
   causes_vi:
     - "Op sửa thêm tệp ngoài danh sách --touch lúc đọc"
     - "Bản tóm tắt được tạo cho slice khác"
@@ -12933,8 +12946,8 @@ op-doc-gate-missing:
   meaning_vi: "Op viết tài liệu, knowledge hoặc bản ghi Work nhưng report không đính kèm gate.json hồ sơ docs (gate.mjs --profile docs), nên runtime không chấm được tài liệu."
   causes_vi:
     - "Op chưa chạy gate.mjs --profile docs sau khi viết"
-    - "Tệp doc-gate.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/gate.mjs --profile docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
+    - "Tệp doc-gate.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate run --scope docs [--tree <app>/.starciwork] --out doc-gate.json và đính kèm khi nộp report."
   owner: op-retry
   kind: settle-reason
 
@@ -12966,8 +12979,8 @@ op-test-world-proof-missing:
   meaning_vi: "Op e2e hoặc integration không đính kèm test-world-run.json (schema starci/test-world-run@1), nên runtime không biết bộ test đã chạy trên test world thật hay chưa."
   causes_vi:
     - "Op chạy jest trực tiếp mà không qua scripts/gates/test-world-run.mjs"
-    - "Tệp test-world-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/test-world-run.mjs --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
+    - "Tệp test-world-run.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate test-world --root <app> --project e2e|integration --out test-world-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -12999,8 +13012,8 @@ op-unit-proof-missing:
   meaning_vi: "unit.verify không đính kèm unit-run.json (schema starci/unit-run@1), nên runtime không chấm được độ phủ từng service và cách dựng spec."
   causes_vi:
     - "Op chạy npm test trực tiếp mà không qua scripts/gates/unit-run.mjs"
-    - "Tệp unit-run.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/unit-run.mjs --root <app> --out unit-run.json và đính kèm khi nộp."
+    - "Tệp unit-run.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci gate unit --root <app> --out unit-run.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -13038,30 +13051,30 @@ op-unit-kit-violation:
   kind: settle-reason
 
 op-lint-proof-missing:
-  title: "No hfs lint report is attached"
-  title_vi: "Chưa đính kèm báo cáo hfs lint"
-  meaning_vi: "Op bảo mật hoặc giao diện không đính kèm lint.json (schema starci/lint@1) do hfs lint --format json in ra, nên runtime không chấm được các luật canon."
+  title: "No starci app lint report is attached"
+  title_vi: "Chưa đính kèm báo cáo starci app lint"
+  meaning_vi: "Op bảo mật hoặc giao diện không đính kèm lint.json (schema starci/lint@1) do starci app lint --format json in ra, nên runtime không chấm được các luật canon."
   causes_vi:
-    - "Op chưa chạy hfs lint ở gốc app"
-    - "Tệp lint.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy hfs lint --format json ở gốc app, lưu lint.json và đính kèm khi nộp."
+    - "Op chưa chạy starci app lint ở gốc app"
+    - "Tệp lint.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci app lint --format json ở gốc app, lưu lint.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
 op-lint-tool-failed:
-  title: "hfs lint could not run"
-  title_vi: "hfs lint không chạy được"
+  title: "starci app lint could not run"
+  title_vi: "starci app lint không chạy được"
   meaning_vi: "Báo cáo lint có errors: ESLint, stylelint hoặc kiểm tra app không chạy được, nên mã chưa được chấm. Không chạy được không bao giờ là đạt."
   causes_vi:
     - "Thiếu canon hoặc gói lint trong node_modules của app"
     - "hfs.json của app không đọc được"
-  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân môi trường rồi chạy lại hfs lint, hoặc chốt blocked với lỗi đó."
+  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân môi trường rồi chạy lại starci app lint, hoặc chốt blocked với lỗi đó."
   owner: op-retry
   kind: settle-reason
 
 op-lint-findings:
-  title: "hfs lint reports findings under an interface verdict"
-  title_vi: "hfs lint báo lỗi mà op giao diện vẫn chốt done"
+  title: "starci app lint reports findings under an interface verdict"
+  title_vi: "starci app lint báo lỗi mà op giao diện vẫn chốt done"
   meaning_vi: "Báo cáo lint của interface.audit còn lỗi dưới fe/, hoặc báo cáo lint của interface.draw hay interface.asset còn lỗi trên các tệp op đã tạo (canon FE, stylelint, ngữ pháp thương hiệu, kiểm tra app); op không thể chốt done khi các lỗi đó còn."
   causes_vi:
     - "Mã giao diện vi phạm canon FE hoặc stylelint"
@@ -13076,7 +13089,7 @@ op-security-findings-missing:
   meaning_vi: "security.verify đính kèm lint.json nhưng không đính kèm security-findings.json (schema starci/security-findings@1) liệt kê từng lỗi theo luật; danh sách rỗng khi không có lỗi."
   causes_vi:
     - "Op chỉ viết kết luận dạng văn bản"
-    - "Tệp security-findings.json không được đính kèm vào api report"
+    - "Tệp security-findings.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op ghi security-findings.json với từng lỗi (rule, code, path, line, severity, reachability) rồi nộp lại."
   owner: op-retry
   kind: settle-reason
@@ -13084,7 +13097,7 @@ op-security-findings-missing:
 op-security-finding-unreported:
   title: "The security verdict drops a canon finding"
   title_vi: "Kết luận bảo mật bỏ sót lỗi do canon báo"
-  meaning_vi: "hfs lint báo lỗi thuộc luật bảo mật (R41, R42, R44, R49, R71, R90, R107) mà security-findings.json không mang theo đúng đường dẫn và luật; kết luận có thể kèm lỗi nhưng không được bỏ sót."
+  meaning_vi: "starci app lint báo lỗi thuộc luật bảo mật (R41, R42, R44, R49, R71, R90, R107) mà security-findings.json không mang theo đúng đường dẫn và luật; kết luận có thể kèm lỗi nhưng không được bỏ sót."
   causes_vi:
     - "Op lọc bớt lỗi canon khi viết kết luận"
     - "Op chạy lint trên phạm vi khác với phạm vi báo cáo"
@@ -13098,7 +13111,7 @@ op-review-defects-missing:
   meaning_vi: "review.verify không đính kèm review-defects.json (schema starci/review-defects@1) liệt kê mọi lỗi tìm thấy kèm loại business hay non-business; danh sách rỗng khi không có lỗi."
   causes_vi:
     - "Op chỉ viết kết luận dạng văn bản"
-    - "Tệp review-defects.json không được đính kèm vào api report"
+    - "Tệp review-defects.json không được đính kèm vào starci kernel report"
   nextStep_vi: "Việc chốt bị từ chối; op ghi review-defects.json với từng lỗi, loại và check đã bắt được (hoặc missingCheck) rồi nộp lại."
   owner: op-retry
   kind: settle-reason
@@ -13130,8 +13143,8 @@ op-release-proof-missing:
   meaning_vi: "release.deliver publish hoặc deploy không đính kèm release-proof.json (schema starci/release-proof@1) do scripts/gates/release-proof.mjs in ra."
   causes_vi:
     - "Op phát hành mà không chạy release-proof.mjs"
-    - "Tệp release-proof.json không được đính kèm vào api report"
-  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/gates/release-proof.mjs --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
+    - "Tệp release-proof.json không được đính kèm vào starci kernel report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy starci release proof --repo <repo> --base <đầu dải phát hành>^ --out release-proof.json và đính kèm khi nộp."
   owner: op-retry
   kind: settle-reason
 
@@ -13193,9 +13206,9 @@ GATE_MERGE_UNREADABLE:
 GATE_TOOL_FAILED:
   title: "The lint gate could not run a tool"
   title_vi: "Cổng lint không chạy được một công cụ"
-  meaning_vi: "Phần lint của gate.mjs (hfs lint --changed so với commit gốc) mà canon parity chạy cho một slice báo exit 2: một công cụ không chạy được, nên không đo được slice. Đây là lỗi công cụ, không phải lỗi đỏ của slice."
+  meaning_vi: "Phần lint của gate.mjs (starci app lint --changed so với commit gốc) mà canon parity chạy cho một slice báo exit 2: một công cụ không chạy được, nên không đo được slice. Đây là lỗi công cụ, không phải lỗi đỏ của slice."
   causes_vi:
-    - "hfs lint không in ra báo cáo starci/lint@1"
+    - "starci app lint không in ra báo cáo starci/lint@1"
     - "Không đo được lint ở commit gốc"
   nextStep_vi: "Settler chuyển slice cho Kernel dưới dạng checker không dùng được; sửa môi trường công cụ rồi đo lại."
   owner: runtime-core
@@ -13625,12 +13638,12 @@ BE_FEATURE_THIN:
 HFS_COVERAGE_SCOPE_DRIFT:
   title: "A file states a coverage scope the slot manifest does not derive"
   title_vi: "Tệp nêu phạm vi độ phủ khác với phạm vi suy ra từ slot manifest"
-  meaning_vi: "Phạm vi độ phủ (những tệp nào bị đo 100% từng tệp) chỉ có một nguồn: trường `coverage: required|none` của từng slot be trong knowledge/hfs/slots.yaml cùng ruleParams.be.logicRoles, qua scripts/hfs/coverage-scope.mjs. Ba nơi dùng phạm vi đó đều do hfs sync sinh: be/jest.config.js (ngưỡng từng tệp), dòng sonar.coverage.exclusions của sonar-project.properties và codecov.yml (đường dẫn cùng các component theo từng service app và platform). `<detail>` nêu tệp đã lệch khỏi bản sinh; không ai được sửa tay phạm vi này."
+  meaning_vi: "Phạm vi độ phủ (những tệp nào bị đo 100% từng tệp) chỉ có một nguồn: trường `coverage: required|none` của từng slot be trong knowledge/hfs/slots.yaml cùng ruleParams.be.logicRoles, qua scripts/hfs/coverage-scope.mjs. Ba nơi dùng phạm vi đó đều do starci app sync sinh: be/jest.config.js (ngưỡng từng tệp), dòng sonar.coverage.exclusions của sonar-project.properties và codecov.yml (đường dẫn cùng các component theo từng service app và platform). `<detail>` nêu tệp đã lệch khỏi bản sinh; không ai được sửa tay phạm vi này."
   causes_vi:
     - "Sửa tay be/jest.config.js, codecov.yml hoặc dòng sonar.coverage.exclusions để đo ít tệp hơn hoặc thêm ngoại lệ"
-    - "Đổi trường coverage của slot hoặc ruleParams.be.logicRoles nhưng chưa chạy lại hfs sync"
+    - "Đổi trường coverage của slot hoặc ruleParams.be.logicRoles nhưng chưa chạy lại starci app sync"
     - "Thêm service app hoặc capability mới nên các component của codecov.yml đã cũ"
-  nextStep_vi: "Chạy `npx hfs sync --write` để sinh lại ba tệp từ slot manifest; muốn đổi phạm vi thì đổi trường `coverage` của slot (và ruleParams.be.logicRoles) trong .claude runtime, không sửa tệp sinh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  nextStep_vi: "Chạy `npx starci app sync --write` để sinh lại ba tệp từ slot manifest; muốn đổi phạm vi thì đổi trường `coverage` của slot (và ruleParams.be.logicRoles) trong .claude runtime, không sửa tệp sinh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -13678,7 +13691,7 @@ BE_OPERATION_CONTRACT:
     - "Đầu vào hoặc kết quả của thao tác khai báo là `unknown` nên client phải tự gõ kiểu tay"
     - "Mã từ chối khai báo là `string` thay vì hợp các literal như `\"DENIED\" | \"INVALID\"`"
     - "Route nhận `@Body() body: unknown` hoặc chỉ dùng một nửa `OperationRequest` / `OperationReply`"
-  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `npm run contract:emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
+  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `starci app emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 
@@ -13690,7 +13703,7 @@ FE_NO_TESTS:
     - "Viết spec hoặc e2e cho component, hook hay trang"
     - "Thêm vitest, Playwright, jest, testing-library hoặc axe vào package.json"
     - "Thêm script test hoặc cấu hình test vào repository front end"
-  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và hfs check."
+  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và starci app check."
   owner: op-retry
   kind: check-finding
 BE_SPEC_PLACEMENT:
@@ -13708,7 +13721,7 @@ HFS_REPO_LOCAL_CHECK:
   title_vi: "Kho tự giữ bộ kiểm tra riêng"
   meaning_vi: "Kho có nguồn kiểm tra hoặc luật lint cục bộ ở `<f>`: tệp `check-*` trong `scripts/` hay `tools/`, tệp `eslint-local-rules*`, plugin eslint cục bộ, hoặc script npm chạy một tệp `check-*`."
   causes_vi:
-    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
+    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (starci app check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp và script trỏ tới nó; nếu luật còn cần thì đề xuất vào canon trong runtime `.claude`, không giữ bản sao trong kho."
   owner: op-retry
   kind: check-finding
@@ -13749,7 +13762,7 @@ FE_GRAPHQL_CONTRACT:
   meaning_vi: "Một thao tác trong tệp `.graphql` dưới `fe/` không khớp ảnh chụp hợp đồng `be/contracts/<service>/schema.graphql` của dịch vụ phục vụ trường gốc đầu tiên của nó: trường, đối số hoặc trường input không được khai báo, thiếu đối số bắt buộc, biến khác kiểu, chọn trường trên giá trị lá hoặc thiếu lựa chọn trên đối tượng, biến khai báo mà không dùng, hoặc không hợp đồng nào phục vụ trường gốc đó."
   causes_vi:
     - "Vi phạm luật R113: front end gửi một tài liệu viết theo hợp đồng cũ (ví dụ `(request: ...)` trong khi back end nhận `input`), nên lời gọi hỏng khi chạy mà type-check của front end không thấy."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa tài liệu `.graphql` cho khớp hợp đồng (hoặc chạy `npm run contract:emit` nếu ảnh chụp đã cũ); không thêm ngoại lệ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa tài liệu `.graphql` cho khớp hợp đồng (hoặc chạy `starci app emit` nếu ảnh chụp đã cũ); không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -13790,8 +13803,8 @@ HFS_EVENT_CONTRACT:
   meaning_vi: "Ảnh chụp `be/contracts/<service>/events.json` thiếu, cũ so với bảng `apps/<service>/src/events.ts` của bên phát, một mục trong `apps/<app>/src/consumes.ts` của bên nhận trỏ tới sự kiện không có trong ảnh chụp hoặc có phiên bản khác, hoặc một hàng đợi consumer định nghĩa bằng `defineQueue` không được liệt kê trong bảng `consumes.ts` nào."
   causes_vi:
     - "Vi phạm luật R166: hợp đồng giữa các dịch vụ được vendor dưới `be/contracts/<service>/` và bên nhận chỉ đọc đúng sự kiện và phiên bản mà ảnh chụp khai báo."
-    - "Bên phát đổi sự kiện nhưng chưa chạy `npm run contract:emit`, hoặc bên nhận khai báo phiên bản cũ."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `npm run contract:emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
+    - "Bên phát đổi sự kiện nhưng chưa chạy `starci app emit`, hoặc bên nhận khai báo phiên bản cũ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chạy `starci app emit` rồi cập nhật `consumes.ts` và cách xử lý của bên nhận cho khớp; không sửa tay ảnh chụp."
   owner: op-retry
   kind: check-finding
 
@@ -13831,7 +13844,7 @@ BE_SAGA_EVENT_CONTRACT:
   meaning_vi: "Một bước hoặc bù trừ không khai `readonly event = \"<tên>\"`, sự kiện đó không có trong `be/contracts/<service>/events.json`, hoặc hợp đồng của sự kiện bù trừ không khai `compensates` đúng sự kiện của bước cùng tên."
   causes_vi:
     - "Vi phạm luật R171: mọi sự kiện của saga nằm trong hợp đồng đã vendor, và sự kiện thất bại của một bù trừ nói rõ nó hoàn tác sự kiện của bước nào."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `npm run contract:emit`, và ghi tên sự kiện vào bước/bù trừ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: khai sự kiện trong `events.ts` của bên phát (có `compensates`), chạy `starci app emit`, và ghi tên sự kiện vào bước/bù trừ."
   owner: op-retry
   kind: check-finding
 
@@ -13961,7 +13974,7 @@ EXAMPLES_CI_WORKFLOW_MISSING:
   meaning_vi: "Không có `.github/workflows/examples.yml`: GitHub chỉ chạy workflow ở gốc repository, nên không ứng dụng ví dụ nào được kiểm tra trong CI."
   causes_vi:
     - "Workflow gốc bị xoá hoặc đổi tên"
-  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `node scripts/checks/check-examples-ci.mjs --matrix`."
+  nextStep_vi: "Khôi phục `.github/workflows/examples.yml` với job `apps` in ma trận bằng `starci runtime check --only examples-ci -- --matrix`."
   owner: runtime-core
   kind: check-finding
 
@@ -13971,7 +13984,7 @@ EXAMPLES_CI_WORKFLOW_INVALID:
   meaning_vi: "Không đọc được `.github/workflows/examples.yml`: `<detail>`."
   causes_vi:
     - "Lỗi cú pháp YAML trong workflow"
-  nextStep_vi: "Sửa cú pháp YAML của `.github/workflows/examples.yml` rồi chạy lại `npm run check`."
+  nextStep_vi: "Sửa cú pháp YAML của `.github/workflows/examples.yml` rồi chạy lại `starci check run --level L2`."
   owner: runtime-core
   kind: check-finding
 
@@ -14033,7 +14046,7 @@ EXAMPLES_CI_CODECOV_MISSING:
   meaning_vi: "Codecov chỉ đọc một cấu hình gốc; không có `codecov.yml` thì không cờ nào của ứng dụng ví dụ được giữ ở mức 100."
   causes_vi:
     - "Tệp `codecov.yml` gốc bị xoá"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` để sinh lại tệp."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` để sinh lại tệp."
   owner: runtime-core
   kind: check-finding
 
@@ -14044,24 +14057,24 @@ EXAMPLES_CI_CODECOV_DRIFT:
   causes_vi:
     - "Thêm một ứng dụng ví dụ mà chưa sinh lại tệp"
     - "Sửa tay tệp sinh ra"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit tệp."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` và commit tệp."
   owner: runtime-core
   kind: check-finding
 
 HFS_MONO_WORKSPACES:
   title: "The app root is not the monorepo root"
   title_vi: "Gốc app không phải gốc monorepo"
-  meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do hfs sync sinh ra."
+  meaning_vi: "`package.json` ở gốc app phải khai báo `workspaces` đúng `[\"fe/apps/*\", \"fe/packages/*\"]`, `packageManager` là `npm@<phiên bản cụ thể>` và `turbo` trong devDependencies; gốc app giữ `turbo.json` do starci app sync sinh ra."
   causes_vi:
     - "Vi phạm luật R143: mọi sản phẩm luôn là monorepo, kể cả khi chỉ có một service, nên hình dạng hfs đồng nhất; thiếu workspaces hoặc turbo thì các app fe không được build qua turbo."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx hfs sync --write` để sinh `turbo.json`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt `workspaces`, `packageManager` và devDependency `turbo` (đúng bản ghim) trong `package.json` ở gốc, rồi chạy `npx starci app sync --write` để sinh `turbo.json`."
   owner: op-retry
   kind: check-finding
 
 HFS_MONO_FE_WORKSPACE:
   title: "An fe workspace manifest breaks the workspace shape"
   title_vi: "Manifest của một workspace fe sai hình dạng"
-  meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`hfs lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
+  meaning_vi: "Mỗi app fe `fe/apps/<app>` là workspace `@<project>/<app>`, private, có đúng các script build, dev, lint (`starci app lint --workspace .`), start và typecheck; mỗi gói `fe/packages/<pkg>` là private và có build, typecheck cùng script lint của workspace."
   causes_vi:
     - "Vi phạm luật R144: turbo chạy các task theo script của từng workspace; tên, script hoặc cờ private sai khiến build, lint hoặc typecheck của app bị bỏ qua hoặc chạy khác chuẩn."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt tên `@<project>/<app>`, `\"private\": true` và đúng bộ script trong `package.json` của workspace đó."
@@ -14083,7 +14096,7 @@ HFS_MONO_WORKSPACE_DEP:
   title_vi: "Một workspace fe import gói mà nó không khai báo"
   meaning_vi: "Mọi gói mà các tệp của một workspace fe import phải được khai báo trong `package.json` của chính workspace đó (gói workspace anh em ghi `\"*\"`); `package.json` ở gốc không bao giờ khai báo một gói workspace."
   causes_vi:
-    - "Vi phạm luật R146: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng (`npm run build -w`) hoặc khi turbo không biết thứ tự phụ thuộc."
+    - "Vi phạm luật R146: một app chỉ chạy được nhờ gói được hoist từ gốc sẽ hỏng khi build riêng bằng `starci docker build <app>` hoặc khi turbo không biết thứ tự phụ thuộc."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm gói vào dependencies của workspace đó (cùng một phiên bản trong cả workspace), hoặc bỏ gói workspace khỏi `package.json` ở gốc."
   owner: op-retry
   kind: check-finding
@@ -14134,8 +14147,8 @@ BE_EVENT_CLASS_CONTRACT:
   meaning_vi: "Một lớp sự kiện dưới `be/src/modules/events/<service>/` không khai báo đúng một lớp với `eventName` và `version` là literal, không đặt tên tệp theo sự kiện của nó, không có mục tương ứng (cùng tên và phiên bản) trong `be/contracts/<service>/events.json`, hoặc một mục của hợp đồng không có lớp."
   causes_vi:
     - "Vi phạm luật R151: sự kiện là hợp đồng giữa các context và dịch vụ; lớp có kiểu và tệp hợp đồng phải là cùng một sự thật, nếu không bên nhận đọc một sự kiện mà bên phát không còn phát (hoặc ngược lại)."
-    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `hfs emit-contracts`, hoặc thêm mục hợp đồng bằng tay."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `npm run contract:emit` để hợp đồng khớp; không sửa tay `events.json`."
+    - "Bên phát đổi tên hoặc phiên bản của lớp nhưng chưa chạy `starci app emit`, hoặc thêm mục hợp đồng bằng tay."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: sửa lớp (một lớp, eventName và version là literal, tên tệp theo sự kiện) rồi chạy `starci app emit` để hợp đồng khớp; không sửa tay `events.json`."
   owner: op-retry
   kind: check-finding
 
@@ -14264,8 +14277,8 @@ BE_KIND_DECLARATION:
   meaning_vi: "`sides.be.kinds` của hfs.json không khớp với các loại feature đang có: thiếu một loại đang dùng, khai báo một loại không có feature nào, thiếu pattern mà loại đó cần, hoặc thiếu platform capability của pattern đó."
   causes_vi:
     - "Vi phạm luật R179: mỗi loại chỉ được sinh ra khi dùng đến (không có boilerplate rỗng), và loại nào đang dùng thì hạ tầng platform của nó phải có (jobs cần platform/jobs và platform/queue, reactors cần platform/event-bus)."
-    - "Feature được tạo tay thay vì bằng `hfs add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `hfs add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
+    - "Feature được tạo tay thay vì bằng `starci app add`, hoặc loại cuối cùng đã bị xoá mà khai báo vẫn còn."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dùng `starci app add <loại> <tên>` để tạo thành viên đầu tiên cùng platform capability và khai báo, hoặc xoá khai báo của loại không còn dùng khỏi `sides.be.kinds`."
   owner: op-retry
   kind: check-finding
 
@@ -14274,9 +14287,9 @@ BE_KIND_EMPTY:
   title_vi: "Thư mục loại feature rỗng hoặc thành viên không có mã"
   meaning_vi: "Một tệp nằm trực tiếp trong `be/src/features/<loại>/` (ví dụ `.gitkeep` hay một feature trùng tên loại), hoặc một thư mục thành viên `<loại>/<tên>/` không có tệp TypeScript nào."
   causes_vi:
-    - "Vi phạm luật R180: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `hfs add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
+    - "Vi phạm luật R180: loại feature chỉ tồn tại khi có thành viên; thư mục loại rỗng là boilerplate mà `starci app add` không bao giờ sinh ra, và tên loại là tên dành riêng nên không dùng cho feature api."
     - "Tạo sẵn thư mục cho loại chưa dùng hoặc đổi tên feature api thành tên một loại."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `hfs add`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xoá thư mục rỗng, đổi tên feature trùng tên loại, hoặc tạo thành viên bằng `starci app add`."
   owner: op-retry
   kind: check-finding
 
@@ -14294,20 +14307,20 @@ BE_SQL_RETURNING_SHAPE:
 HFS_DOCKER_BUILD_CONTEXT:
   title: "The Dockerfile does not build from the app root"
   title_vi: "Dockerfile không build từ gốc app"
-  meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `docker build -f <be|fe>/apps/<app>/Dockerfile -t <image> .` đúng đường dẫn của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
+  meaning_vi: "Dockerfile của app phải ghi trong comment đầu tệp lệnh `starci docker build <app>` đúng app của chính nó (context là gốc app, nơi có `package.json` và lockfile duy nhất), và mọi nguồn của COPY/ADD nằm trong context (không có `..`, không có đường dẫn tuyệt đối)."
   causes_vi:
     - "Vi phạm luật R187: context build là gốc app; lệnh build sai hoặc nguồn COPY vượt ra ngoài context khiến image build được trên máy này nhưng hỏng trên CI hoặc trộn lẫn dữ liệu của app khác."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `docker build -f <đường dẫn Dockerfile> -t <image> .` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đặt lệnh `starci docker build <app>` vào comment đầu Dockerfile và sửa các nguồn COPY/ADD về đường dẫn tương đối trong gốc app."
   owner: op-retry
   kind: check-finding
 
 HFS_DOCKER_STAGES:
   title: "The Dockerfile stages, user or install break the canon"
   title_vi: "Các stage, user hoặc lệnh cài của Dockerfile sai chuẩn"
-  meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài là `npm ci` (không `npm install`); runtime của be chạy `npm ci --omit=dev --ignore-scripts`, runtime của fe không cài gì."
+  meaning_vi: "Dockerfile phải nhiều stage: một stage tên `build` (cài và build) và stage cuối tên `runtime` (thứ được chạy); runtime kết thúc bằng `USER node` và không chạy build; mọi lệnh cài đi qua `starci npm ci` (không dùng `starci npm install`); runtime của be chỉ cài dependency production và bỏ lifecycle scripts, runtime của fe không cài gì."
   causes_vi:
     - "Vi phạm luật R188: image chạy bằng root, mang theo công cụ build hoặc cài không theo lockfile thì vừa lớn vừa kém an toàn, và không tái lập được."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `npm install` thành `npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tách Dockerfile thành stage `build` và stage cuối `runtime`, thêm `USER node`, đổi `starci npm install` thành `starci npm ci`, và chuyển mọi lệnh build ra khỏi runtime."
   owner: op-retry
   kind: check-finding
 
@@ -14341,6 +14354,68 @@ HFS_DOCKER_SECRETS:
   owner: op-retry
   kind: check-finding
 
+RT_RETIRED_CLI_CALL:
+  title: "A removed CLI command is still invoked"
+  title_vi: "Một lệnh CLI đã bị gỡ vẫn được gọi"
+  meaning_vi: "Một file được theo dõi gọi lệnh đã bị CLI thống nhất gỡ (các cách gọi kernel, hfs, test-stack và các động từ runtime cấp cao nhất cũ, liệt kê trong trường removed của catalog và bảng của dispatcher); chỉ được gọi starci <group> <verb> mới."
+  causes_vi:
+    - "Vi phạm luật R197: tài liệu, prompt hoặc code còn chép cách gọi cũ."
+  nextStep_vi: "Đổi lời gọi sang lệnh thay thế mà bộ kiểm tra in ra (dòng use starci <group> <verb>) rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+CLI_ONLY_ENTRY:
+  title: "A tracked file runs a runtime script directly"
+  title_vi: "Một file được theo dõi chạy trực tiếp script của runtime"
+  meaning_vi: "Một prompt, tài liệu, skill, file knowledge, cấu hình, CI, hook hoặc đăng ký tác vụ chạy node scripts/..., chạy trực tiếp ui/harness-verbs.mjs hoặc npm run bọc script runtime thay vì starci <group> <verb>."
+  causes_vi:
+    - "Vi phạm luật R201: mọi hành động phải đi qua starci <group> <verb>."
+  nextStep_vi: "Đổi lời gọi thành lệnh starci mà bộ kiểm tra gợi ý; nếu script chưa có verb thì thêm file catalog hoặc khai báo nội bộ trong modules/cli/commands/_internal.yaml."
+  owner: op-retry
+  kind: check-finding
+
+RT_CLI_CATALOG_DRIFT:
+  title: "Generated CLI catalog outputs drifted"
+  title_vi: "Các đầu ra catalog CLI sinh tự động bị lệch"
+  meaning_vi: "Một đầu ra sinh từ catalog của modules/cli/commands (packages/cli/src/catalog.generated.mjs, docs/cli.md, packages/cli/completions/*) khác với nội dung mà scripts/cli/gen-catalog.mjs sinh ra: thiếu, cũ, hoặc đã sửa tay."
+  causes_vi:
+    - "Sửa một file catalog trong modules/cli/commands mà quên chạy gen-catalog --write"
+    - "Sửa tay một đầu ra sinh tự động thay vì sửa catalog nguồn"
+  nextStep_vi: "Người giám sát chạy starci runtime gen-catalog --write rồi commit cả catalog lẫn các đầu ra; không sửa tay tệp đã sinh."
+  owner: supervisor
+  kind: check-finding
+
+RT_CLI_VERB_PARITY:
+  title: "CLI catalog and implementation disagree"
+  title_vi: "Catalog CLI và cài đặt không khớp nhau"
+  meaning_vi: "Catalog của modules/cli/commands và code lệch nhau: một verb của catalog không có handler (impl.script thiếu, không có verbs/<verb>.mjs, không có case trong cli.mjs) hoặc không có tài liệu; một verb module của kernel hoặc một case của cli.mjs không có file catalog; một --flag trong usage:/required của module verb hay trong api-boolean-flags.txt không nằm trong flags của catalog."
+  causes_vi:
+    - "Thêm một verb module trong scripts/kernel/verbs mà quên file modules/cli/commands/kernel/<verb>.yaml"
+    - "Đổi usage hoặc required của một verb mà không cập nhật flags của catalog"
+  nextStep_vi: "Người giám sát đồng bộ hai phía: thêm file catalog cho verb mới, sửa flags của catalog theo usage/required, hoặc xóa verb khỏi catalog khi handler đã bị xóa."
+  owner: supervisor
+  kind: check-finding
+
+RT_CLI_APP_ONLY_TEMPLATES:
+  title: "Managed app template invokes the wrong CLI"
+  title_vi: "Template ứng dụng gọi sai bề mặt CLI"
+  meaning_vi: "Template do StarCi quản lý hoặc bản sao runtime đã sinh gọi lệnh hfs cũ, test-stack cũ, hoặc một nhóm starci không phải app; repository sản phẩm chỉ được gọi starci app <verb>."
+  causes_vi:
+    - "Vi phạm luật R200: mọi hành động sản phẩm trong template phải đi qua CLI thống nhất starci app."
+  nextStep_vi: "Đổi lời gọi thành starci app <verb>, sinh lại các bản sao runtime và chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+catalog-invalid:
+  title: "CLI catalog file is invalid"
+  title_vi: "File catalog CLI không hợp lệ"
+  meaning_vi: "scripts/cli/catalog.mjs từ chối một file trong modules/cli/commands: thiếu khóa bắt buộc, khóa không rõ, verb trùng, group rỗng, flag tên profile, hoặc --edition khác [full]."
+  causes_vi:
+    - "Sửa một file catalog sai schema (thiếu group/verb/impl/flags/exit/json/examples/editions/since/removed)"
+    - "Đặt trùng tên verb trong hai file, hoặc khai báo flag cấm"
+  nextStep_vi: "Người giám sát đọc danh sách lỗi của loadCatalog và sửa từng file catalog theo schema; chạy lại starci runtime check --only cli-parity."
+  owner: supervisor
+  kind: check-finding
 RT_FACT_FALSE:
   title: "A machine-evaluated fact is false, or prose contradicts it"
   title_vi: "Một sự thật máy kiểm được là sai, hoặc văn bản mâu thuẫn với nó"
@@ -14392,7 +14467,7 @@ RT_GENERATED_BLOCK_STALE:
   causes_vi:
     - "Sửa slots.yaml hoặc rules.yaml mà không chạy lại readme-blocks.mjs --write"
     - "Sửa tay nội dung bên trong một khối sinh tự động"
-  nextStep_vi: "Người giám sát chạy node scripts/hfs/readme-blocks.mjs --write hoặc node scripts/hfs/derived-fields.mjs --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
+  nextStep_vi: "Người giám sát chạy starci runtime readme-blocks --write hoặc starci runtime derived-fields --write rồi commit, qua một lane đã land; không sửa tay bên trong khối."
   owner: supervisor
   kind: check-finding
 
@@ -14492,7 +14567,7 @@ CI_UPLOAD_NOT_SILENT:
   causes_vi:
     - "Dùng token trong repository secret và đặt điều kiện if theo secret đó"
     - "Để continue-on-error hoặc quên fail_ci_if_error cho bước tải"
-  nextStep_vi: "Người giám sát đặt use_oidc: true và fail_ci_if_error: true cho bước, cấp permissions id-token: write cho job, bỏ continue-on-error và điều kiện theo secret, rồi render lại workflow bằng hfs sync --write."
+  nextStep_vi: "Người giám sát đặt use_oidc: true và fail_ci_if_error: true cho bước, cấp permissions id-token: write cho job, bỏ continue-on-error và điều kiện theo secret, rồi render lại workflow bằng starci app sync --write."
   owner: supervisor
   kind: check-finding
 
@@ -14503,7 +14578,7 @@ CI_TRIGGERS_RELEASE_ONLY:
   causes_vi:
     - "Giữ trigger push hoặc pull_request của mô hình CI cũ"
     - "Thêm bộ lọc branches hoặc paths vào push của tag"
-  nextStep_vi: "Người giám sát đặt on thành push với tags: ['v*'] và workflow_dispatch, sửa template trong packages/hfs/templates/app/ci-workflows rồi render lại ví dụ bằng hfs sync --write; không thêm trigger khác (docs/git-governance.md)."
+  nextStep_vi: "Người giám sát đặt on thành push với tags: ['v*'] và workflow_dispatch, sửa template trong packages/hfs/templates/app/ci-workflows rồi render lại ví dụ bằng starci app sync --write; không thêm trigger khác (docs/git-governance.md)."
   owner: supervisor
   kind: check-finding
 
@@ -14521,7 +14596,7 @@ RELEASE_NOTES:
 EXAMPLES_CI_IMAGES_NOT_DERIVED:
   title: "The examples workflow does not build every image from a derived matrix"
   title_vi: "Workflow ví dụ không build mọi image từ ma trận được suy ra"
-  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `node scripts/checks/check-examples-ci.mjs --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
+  meaning_vi: "Workflow gốc phải có job `images` build image của mọi ứng dụng trong từng ví dụ, ma trận lấy từ đầu ra của `starci runtime check --only examples-ci -- --images` (một mục cho mỗi app be và fe trong hfs.json), và không bao giờ đẩy image lên registry."
   causes_vi:
     - "Danh sách image viết tay trong workflow, hoặc thiếu job images"
     - "Một bước build có push: true hoặc docker push"
@@ -14536,7 +14611,7 @@ EXAMPLES_CI_APP_QUALITY_DRIFT:
   causes_vi:
     - "Preset nguồn đổi mà các tệp chưa được sinh lại"
     - "Sửa tay tệp sinh ra"
-  nextStep_vi: "Chạy `node scripts/checks/check-examples-ci.mjs --write` và commit các tệp sinh ra."
+  nextStep_vi: "Chạy `starci runtime check --only examples-ci -- --write` và commit các tệp sinh ra."
   owner: runtime-core
   kind: check-finding
 
@@ -14594,3 +14669,12 @@ RT_SYNTAX_INVALID:
   nextStep_vi: "Người giám sát sửa cú pháp tại dòng được báo và chạy lại cổng runtime; không bỏ qua tệp hoặc thêm ngoại lệ."
   owner: supervisor
   kind: check-finding
+DOCKER_PORT_POLICY:
+  title: "Docker ownership or published-port policy was refused"
+  title_vi: "Chính sách sở hữu Docker hoặc cổng công bố đã từ chối thao tác"
+  meaning_vi: "Lệnh Docker đã nhắm tới container nivo-lite thuộc hệ thống khác, dùng tên dự án không hợp lệ, công bố cổng được bảo vệ, hoặc công bố cổng ngoài dải 41000-44999 dành cho dự án."
+  causes_vi:
+    - "Compose đặt container_name chứa nivo-lite hoặc công bố cổng 3000, 3100, 54320-54329, 55321-55327 hay một cổng ngoài dải dự án."
+  nextStep_vi: "Đổi tên container sang tên thuộc dự án, lấy cổng trong dải 41000-44999 của dự án, rồi chạy lại lệnh starci docker; không sửa hay dừng container nivo-lite."
+  owner: runtime-core
+  kind: verb-refusal

@@ -74,14 +74,21 @@ pins:
     install: registry
     side: be
     source: packages/test-world/package.json
-    why: '1.2.0: Kafka as real own infra (the one digest-pinned apache/kafka KRaft image, a broker listener and proxy per slot, slot-prefixed topics, consumer groups and client ids) and schema-per-context Postgres (a schema and a login role per context in a shared database). 1.1.0: per-worker data slots: a run provisions min(jest workers, workers cap, default 2) slots, each its own namespace (<ns>_w<k>) with its own databases, Keycloak realm, leased Redis DB, bucket/collection/topic prefixes, fakes host, toxiproxy proxies and outage lock, so world files run in parallel; state file protocol 2, paired exactly with @starci/jest-preset 2.2.4 (TEST_WORLD_PAIR_MISMATCH otherwise). 1.0.6: republished after the move (no library change). 1.0.5: a modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, and w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client. 1.0.4: world.resolve and scope.resolve take any Nest token (class, string or symbol). 1.0.3: the globalSetup registers the path aliases as TypeScript resolves them (the extends chain, paths from the config that declares them, the effective baseUrl), so a tests tsconfig that only extends the side config loads the declaration. 1.0.2: every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json), where .starcistacks lives, never from the be side. The shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs, the outage lock and the starci-test-stack bin behind the managed test:stack script; a devDependency of every back end. 1.0.1: world.keycloak.events/sessions (the user events of the realm and live sessions through the admin API) and world.infra.postgresql.connection(name) (the database of one connection down while the others serve, under the outage lock).'
+    why: '1.2.0: Kafka as real own infra (the one digest-pinned apache/kafka KRaft image, a broker listener and proxy per slot, slot-prefixed topics, consumer groups and client ids) and schema-per-context Postgres (a schema and a login role per context in a shared database); its CLI main is exported at ./cli for starci app stack, and the former starci app stack bin is removed. 1.1.0: per-worker data slots: a run provisions min(jest workers, workers cap, default 2) slots, each its own namespace (<ns>_w<k>) with its own databases, Keycloak realm, leased Redis DB, bucket/collection/topic prefixes, fakes host, toxiproxy proxies and outage lock, so world files run in parallel; state file protocol 2, paired exactly with @starci/jest-preset 2.2.4 (TEST_WORLD_PAIR_MISMATCH otherwise). 1.0.6: republished after the move (no library change). 1.0.5: a modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, and w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client. 1.0.4: world.resolve and scope.resolve take any Nest token (class, string or symbol). 1.0.3: the globalSetup registers the path aliases as TypeScript resolves them (the extends chain, paths from the config that declares them, the effective baseUrl), so a tests tsconfig that only extends the side config loads the declaration. 1.0.2: every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json), where .starcistacks lives, never from the be side. The shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs and the outage lock; a devDependency of every back end. 1.0.1: world.keycloak.events/sessions (the user events of the realm and live sessions through the admin API) and world.infra.postgresql.connection(name) (the database of one connection down while the others serve, under the outage lock).'
+  '@starci/cli':
+    version: 1.0.0
+    group: starci
+    install: registry
+    side: both
+    source: packages/cli/package.json
+    why: '1.0.0: the only StarCi command package; product repositories install it for starci app, while @starci/hfs remains its pinned transitive implementation.'
   '@starci/hfs':
     version: 4.0.9
     group: starci
     install: registry
     side: both
     source: packages/hfs/package.json
-    why: '4.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2, eslint-canon-be 3.0.3 and eslint-canon-fe 8.0.3 (what `hfs scaffold app` writes); the package gains its own clean-install test. 4.0.2: .starcistacks and .sops.yaml live at the app root (slots app.starcistacks, app.sops; a side holding either is refused, HFS_STACKS_IN_SIDE), the managed .gitignore block carries the custody rules, the scaffold writes them at the root. 4.0.1: `hfs scaffold app` resolves the real lockfile with npm (`npm install --package-lock-only`) instead of writing a root-only stub that `npm ci` refuses. 4.0.0: the app monorepo standard: one app repository with the root package.json, lockfile and hfs.json of kind app, and the be/ and fe/ sides; `hfs scaffold app <name>` makes it, `hfs lint` at the root lints be/** with the BE canon and fe/** with the FE canon; the standalone be/fe repository kinds and `hfs init` are deleted.'
+    why: '4.0.9: the transitive app implementation used by @starci/cli; it carries the generated runtime slice read by starci app commands.'
   # --- tooling
   typescript:
     version: 5.9.3
@@ -210,7 +217,7 @@ pins:
     version: 11.1.1
     group: framework
     side: be
-    why: readiness probes with dependency indicators use Terminus (the liveness route of the hfs sync --init skeleton does not, being a thin door over the liveness service); every measured product back end resolves 11.1.1.
+    why: readiness probes with dependency indicators use Terminus (the liveness route of the scaffolded skeleton does not, being a thin door over the liveness service); every measured product back end resolves 11.1.1.
   '@nestjs/cqrs':
     version: 11.0.3
     group: framework
@@ -255,7 +262,7 @@ pins:
     version: 4.13.6
     group: framework
     side: fe
-    why: every HFS front end uses next-intl with the [locale] segment (hfs sync --init writes it); the measured front end resolves 4.13.6.
+    why: every HFS front end uses next-intl with the [locale] segment (starci app scaffold writes it); the measured front end resolves 4.13.6.
   graphql:
     version: 16.14.2
     group: framework

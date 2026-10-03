@@ -1,5 +1,5 @@
 // exec-as-spawn-sync.mjs — run one recorded spawnSync call ({command, argv, options}) asynchronously and answer it the way
-// spawnSync would ({pid, output, stdout, stderr, status, signal}): the Kernel's `api status` prefetches its Orca reads in
+// spawnSync would ({pid, output, stdout, stderr, status, signal}): the Kernel's `starci kernel status` prefetches its Orca reads in
 // parallel this way (scripts/kernel/cli.mjs prefetchStatusOrcaReads). Never rejects.
 import { execFile } from 'node:child_process';
 

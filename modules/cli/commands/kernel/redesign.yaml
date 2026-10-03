@@ -1,0 +1,57 @@
+# The contract of `starci kernel redesign` (scripts/kernel/verbs/redesign.mjs): the heavy path.
+group: kernel
+verb: redesign
+owner: runtime
+summary: dispatch the owning op with the RCA as its brief (strong reasoning pool)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - redesign
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow whose cut, scope or leg plan is redesigned
+  - name: op
+    type: string
+    required: true
+    summary: owning op to dispatch (work.author, scope.define or goal.revise by default)
+  - name: paths
+    type: string
+    required: true
+    summary: comma-separated paths the redesign op owns
+  - name: decision
+    type: string
+    required: true
+    summary: owner decision id that authorises the redesign
+  - name: brief
+    type: string
+    summary: replacement for the default ask sent to the op beside the RCA
+exit:
+  "0": enqueued
+  "1": refused
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel redesign --repo <path> --workflow <workflow> --op <op> --paths <paths> --decision <decision>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api redesign
+  - node scripts/kernel/cli.mjs redesign
+purpose: "When the RCA says the cut, the scope or the leg plan is wrong, dispatch the op that owns
+  it - work.author (re-cut), scope.define (re-scope), goal.revise (leg plan) - with the RCA
+  (progress, clusters, examples) as its brief in packet context.kernel_override.redesign.
+  runtimes.yaml allocation.redesign routes it as routeAs (implementation.plan: Opus, then Sol) at >=
+  minDifficulty whatever its usual order."
+writes:
+  - through starci kernel enqueue
+  - jobs payload.redesign/difficulty/kernelOverride of the new job
+  - events kernel-redesign
+refusals:
+  redesign-op-refused: only the ops of allocation.redesign.ops
+kernelOnly: true

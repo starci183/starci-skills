@@ -1,0 +1,23 @@
+group: supervisor
+verb: ram-cap
+owner: runtime
+summary: inspect or override RAM-aware workflow dispatch priorities
+impl:
+  script: scripts/supervisor/ram-cap.mjs
+positional:
+  - {name: action, enum: [status, prioritize, unprioritize], required: false, variadic: false}
+flags:
+  - {name: op, type: string, summary: operation kind to evaluate for admission}
+  - {name: workflow, type: string, summary: workflow id to inspect or prioritize}
+  - {name: weight, type: number, summary: positive workflow priority weight}
+  - {name: reserve, type: number, summary: dispatch slots reserved for the workflow}
+exit: {"0": status read or priority updated, "1": priority update failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor ram-cap status
+  - starci supervisor ram-cap prioritize --workflow <id> --weight 2 --reserve 1
+  - starci supervisor ram-cap unprioritize --workflow <id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/ram-cap.mjs

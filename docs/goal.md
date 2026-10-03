@@ -16,14 +16,14 @@ clone it, run it, understand it and trust it.
 
 | Dimension | Done means |
 |---|---|
-| **Architecture** | The runtime follows its own standard layout (`knowledge/hfs/runtime-slots.yaml`): every tracked path matches exactly one slot, imports obey the tier matrix, and an external system (git, orca, npm, docker, sonar, telegram, http) is called only from `scripts/api/<system>`. `modules/` holds contracts, `engine/` the shared mechanisms and databases, `scripts/reconciler/` the idempotent controllers, `scripts/kernel/` the Kernel verbs, `scripts/checks/` the gates. `bin/starci.mjs` is the one entry. State never lives in the source tree. |
+| **Architecture** | The runtime follows its own standard layout (`knowledge/hfs/runtime-slots.yaml`): every tracked path matches exactly one slot, imports obey the tier matrix, and an external system (git, orca, npm, docker, sonar, telegram, http) is called only from `scripts/api/<system>`. `modules/` holds contracts, `engine/` the shared mechanisms and databases, `scripts/reconciler/` the idempotent controllers, `scripts/kernel/` the Kernel verbs, `scripts/checks/` the gates. `packages/cli/bin/starci.mjs` is the one CLI entry. State never lives in the source tree. |
 | **Operating model** | Chat, goal, one Kernel agent per workflow, one ephemeral Op agent per job, spine settle, re-plan. Orca is the only place the runtime launches agents (`orca orchestration worker-start`), the Kernel nests its Ops, and every worktree is created by the runtime, one per op, removed at settle and capped. Works on any project, not just this repo. |
 | **Durability** | The ledger (`runtime.sqlite` per project, `machine.sqlite` per host) is the single truth. State survives worktree deletion, reboots and agent churn. Zero input loss, zero lease drift. |
 | **Correctness** | Work-correction policy enforced: a wrong business flow re-runs from the affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |
 | **Test quality** | End-to-end tests fake every third party at the network edge and keep the project's own infrastructure real; unit tests cover pure logic with few mocks. Sonar and Codecov are wired and green through the shared `starci-quality` gate. |
 | **Product quality** | Output projects meet `docs/quality-bar.md`: designed renders, complete UX states, code that follows the design and the grammar, evidence for every claim. |
 | **Determinism** | Model and op routing is declarative and reproducible: same inputs, same selection, with cited reasons. Spine code, not agent prose, settles truth. |
-| **Release** | `npm run check` (one `starci check` entry that reports every step) and the land gate are green before anything lands; a release is gated by one release check and publishing stays an explicit human step. |
+| **Release** | `starci check run --level L2` and the land gate are green before anything lands; a release is gated by one release check and publishing stays an explicit human step. |
 | **Docs** | `CONTEXT.md` load order is accurate; a new agent cold-starts correctly from it alone. Architecture docs match what the code does, and docs are English only. |
 | **Demonstrability** | The whole loop is showable: prompt, plan, dispatched ops, evidence, settled verdict. This is the content story. |
 

@@ -1,0 +1,23 @@
+group: supervisor
+verb: gate-stability
+owner: runtime
+summary: compare frozen gate behavior against accepted work in live workflows
+impl:
+  script: scripts/supervisor/gate-stability.mjs
+flags:
+  - {name: family, type: string, required: true, summary: frozen operation family to inspect}
+  - {name: tree, type: string, summary: tree whose gates should run for one side}
+  - {name: base, type: string, summary: baseline tree for a two-sided comparison}
+  - {name: head, type: string, summary: candidate tree for a two-sided comparison}
+  - {name: ledger, type: list, summary: runtime ledger file to include}
+  - {name: gate, type: list, summary: gate module and export as module#name}
+exit: {"0": stability report completed, "2": bad usage or report execution failed}
+json: flag
+examples:
+  - starci supervisor gate-stability --family <op> --tree <dir>
+  - starci supervisor gate-stability --family <op> --base <dir> --head <dir> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/gate-stability.mjs
+  - node .claude/scripts/supervisor/gate-stability.mjs

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// ram-cap.mjs — the Supervisor's handle on the RAM-aware dispatch cap (scripts/machine/ram-throttle.mjs).
+// starci supervisor ram-cap — the Supervisor's handle on the RAM-aware dispatch cap (scripts/machine/ram-throttle.mjs).
 //
-//   node scripts/supervisor/ram-cap.mjs status [--op <kind>] [--workflow <id>] [--json]
+//   starci supervisor ram-cap status [--op <kind>] [--workflow <id>] [--json]
 //        the effective cap on this host now and why: mode, free RAM, CPU, running ops across every ledger, the
 //        per-op RAM estimates (table or footprint history), the priorities, and - with --op - how one op would be
 //        admitted
-//   node scripts/supervisor/ram-cap.mjs prioritize --workflow <id> --weight <n> [--reserve <slots>] [--json]
+//   starci supervisor ram-cap prioritize --workflow <id> --weight <n> [--reserve <slots>] [--json]
 //        this host's priority override for one workflow (weight 1 is everyone's default; a higher weight is
 //        admitted first and keeps `reserve` slots and the RAM its queued ops need from lower workflows)
-//   node scripts/supervisor/ram-cap.mjs unprioritize --workflow <id> [--json]
+//   starci supervisor ram-cap unprioritize --workflow <id> [--json]
 //        drop the host override; runtimes.yaml allocation.resources.ramThrottle.priorities applies again
 //
 // The override lives in machine.sqlite throttle_state.priorities_json, read by every dispatch of every workflow on
@@ -46,7 +46,7 @@ function main(argv) {
     ].join('\n'));
     return 0;
   }
-  console.error('use: ram-cap.mjs status [--op <kind>] [--workflow <id>] | prioritize --workflow <id> --weight <n> [--reserve <slots>] | unprioritize --workflow <id>  [--json]');
+  console.error('use: starci supervisor ram-cap status [--op <kind>] [--workflow <id>] | prioritize --workflow <id> --weight <n> [--reserve <slots>] | unprioritize --workflow <id> [--json]');
   return 2;
 }
 

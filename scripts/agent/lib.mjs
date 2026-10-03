@@ -32,7 +32,7 @@ import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
 import { recordLaunchedTerminal } from './launched-terminals.mjs';
-import { loadModelRegistry } from './models.mjs';
+import { loadModelRegistry } from './models.mjs'; import { addStarciShimToPath } from './starci-shim.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -154,7 +154,7 @@ function answerGate(handle, rule, screen) {
 }
 
 /**
- * Answer an allowlisted gate that appears MID-RUN (the Kernel's `api nudge` on an op worker): the card's
+ * Answer an allowlisted gate that appears MID-RUN (the Kernel's `starci kernel nudge` on an op worker): the card's
  * gateAutoAnswer rule for `gate`, the same walk-and-Enter answerGate does at readiness, then up to settleMs
  * for the gate to leave the screen. A loop-detection dialog can halt a worker turn this way.
  * Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the
@@ -381,6 +381,7 @@ function sendPrompt(handle, text, adapter, io) {
 // proves nothing: the launch goes on and Orca stays the authority. The receipt carries the attested `depth`.
 export function spawnAgent({ provider, model = null, effort = null, worktree, repo = null, baseBranch = null, name = null, setup = null, title, spec, taskTitle = null,
   run, from = null, request, onCreated = null, parentDispatch = null, maxDepth = null, preflight = null, io = null } = {}) {
+  addStarciShimToPath();
   const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow,
     rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? closeWorker,
     trust: io?.trust ?? ensureLaunchTrust };
@@ -392,8 +393,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   if (refusal) return { ...refusal, provider, taskId: null, runId: run ?? null };
   const takesModel = card?.start?.modelArgument !== false;
   // A card's `start.defaultModel: pool` names the provider pool's registry.yaml defaultModel; a concrete id pins itself.
-  if (takesModel && !model)
-    model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
+  if (takesModel && !model) model = card?.start?.defaultModel === 'pool' ? Object.values(loadModelRegistry()?.pools ?? {}).find((p) => p?.provider === provider)?.defaultModel ?? null : card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
   // A card that takes no model flag (Devin) has no per-worker model: Orca refuses a launch-time model for it and Devin ignores a project config pin (live E7).

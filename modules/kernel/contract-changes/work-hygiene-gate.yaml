@@ -27,7 +27,7 @@ paths:
   - scripts/guards/install.mjs
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/settle.mjs
-  - modules/kernel/api-commands/settle.yaml
+  - modules/cli/commands/kernel/settle.yaml
   - modules/kernel/failure-codes.yaml
   - modules/kernel/contract-changes/work-hygiene-gate.yaml
   - tests/work-hygiene.spec.mjs

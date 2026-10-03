@@ -1,0 +1,67 @@
+# The contract of `starci kernel logs` (scripts/kernel/verbs/logs.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.logs (lane slim-04).
+group: kernel
+verb: logs
+owner: runtime
+summary: "list the workflow's typed log rows, oldest first"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - logs
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: job
+    type: string
+    summary: only this job
+  - name: after
+    type: number
+    summary: only rows after this seq
+  - name: kinds
+    type: string
+    summary: comma list of log kinds to keep
+  - name: limit
+    type: number
+    summary: at most this many rows (default 500)
+exit:
+  "0": rows listed
+  "1": refused or failed (unknown kind)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel logs --repo <path> --workflow <workflow>
+  - starci kernel logs --repo <path> --workflow <workflow> --kinds cmd.run,error --after 100 --limit 50
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api logs
+  - node scripts/kernel/cli.mjs logs
+purpose: The workflow's typed log rows, oldest first; the ledger's events are synced first.
+reads: "the ledger's logs table, after syncing it: the ledger events past the logs' cursor are
+  derived into typed rows (op-dispatched -> dispatch, report-filed -> report, checks-recorded -> one
+  check.result per recorded check plus one cmd.run per recorded check command, op-settled -> settle
+  and, when it landed, land, incident-* -> incident, worker-failed-no-report and dispatch-rejected
+  -> error, job-dropped -> job.drop, artifacts-indexed -> one file.edit per changed file of the
+  job's patch (from <patch>.json, diffRef <patch>.json#<path>) and one render / video / trace per
+  indexed image / video / Playwright trace with its subkind). An op job that settles without its own
+  step.start, step.end and a cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING
+  (WARN, never a refusal; starci kernel status logTypedMissing)"
+writes: the logs and log_cursors tables only (the derived and ingested rows, idempotent by src),
+  through the buffered log writer; no other ledger table
+returns:
+  rows: "[{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}] oldest first;
+    without --after the newest --limit (default 500)"
+  cursor: "the last seq returned: pass it as --after to follow"
+  more: true when more rows follow the cursor
+  synced: "{derived}: rows the sync added"
+refusals:
+  workflow-unknown: no workflows row for --workflow
+  log-kind-unknown: --kinds names a kind that is not a log kind
+usedBy: the Kernel reading what its ops did; ui/server.mjs /api/logs and /api/logs/stream read the
+  same file

@@ -1,0 +1,39 @@
+group: kernel
+verb: consume-report
+owner: runtime
+summary: "integrate the report a job filed; the Kernel must consume it before settle"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - consume-report
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: job
+    type: string
+    required: true
+    summary: job whose filed report is consumed
+exit:
+  "0": report consumed
+  "1": refused or failed (no report, unknown job)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel consume-report --repo <path> --job <job>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api consume-report
+  - node scripts/kernel/cli.mjs consume-report
+reads: the reports row for the job's dispatch_id
+writes: reports.consumed_at = now — the kernel has read and integrated the report into its view of
+  the frontier. The kernel consumes BEFORE it re-runs checks and settles; `starci kernel settle` enforces
+  consumption at the latest by marking the row itself — a report that never gets consumed is a
+  dispatch that never settled.
+returns: "{ok:true, jobId, workflowId, dispatchId, consumed} — consumed:false when no unconsumed
+  reports row exists; an unfiled report is a fact, not a refusal"
+refuses:
+  - job-unknown
+usedBy: drive.settle — the kernel reads the filed report, integrates it, consumes it, THEN re-runs checks

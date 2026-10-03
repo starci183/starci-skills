@@ -1,4 +1,4 @@
-// usage — the `api status` token summary of the workflow: total, by op, by model, the Kernel's own and how many attempts are
+// usage — the `starci kernel status` token summary of the workflow: total, by op, by model, the Kernel's own and how many attempts are
 // measured (scripts/kernel/usage-report.mjs). Null (no field) until any llm_usage row exists for the workflow.
 import { tokenLine, usageOfWorkflow } from '../usage-report.mjs';
 

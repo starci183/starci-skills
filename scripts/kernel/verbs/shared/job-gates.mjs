@@ -1,4 +1,4 @@
-// job-gates.mjs — the admission gates `api route` and `api dispatch` hold a queued job to before a route decision
+// job-gates.mjs — the admission gates `starci kernel route` and `starci kernel dispatch` hold a queued job to before a route decision
 // or a launch is spent: the settle-first / live-worker / op-identity prelude (queuedJobOp), then the owner-gate and
 // peer-wait incident refusals and the workflow's op-slot ceiling (refuseOwnerGate, refusePeerWait, opSlotsOrRefuse).
 // The cli.mjs internals they need (observeOperationWorker, ownerGateOf, openOwnerGates, opSlotAdmission) arrive

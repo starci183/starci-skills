@@ -29,8 +29,8 @@
 //                    inside a product repository; the owner removes it once the ledger is confirmed to live only
 //                    in %LOCALAPPDATA%/StarCi (owner ruling: no legacy).
 //
-//   node scripts/housekeeping/housekeeping.mjs --only orphanledgers [--apply] --json
-//   node scripts/housekeeping/ledger-hygiene.mjs [--apply] [--json]                  the standalone report (both findings)
+//   starci runtime housekeeping --only orphanledgers [--apply] --json
+//   starci runtime ledger-hygiene [--apply] [--json]                  the standalone report (both findings)
 import fs from 'node:fs';
 import path from 'node:path';
 import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';

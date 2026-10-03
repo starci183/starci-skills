@@ -1,0 +1,64 @@
+group: kernel
+verb: run-deferred-tests
+owner: runtime
+summary: re-queue the test legs the owner's specs switch deferred (see status testsDeferred)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - run-deferred-tests
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+  - name: kind
+    type: enum
+    enum:
+      - unit
+      - e2e
+      - integration
+    summary: limit to one test class; every deferred class when omitted
+  - name: by
+    type: string
+    summary: who re-queues the legs, recorded on the event (owner when omitted)
+  - name: dry-run
+    type: boolean
+    summary: list the deferred legs that would be re-queued without re-queuing them
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel run-deferred-tests --repo <path> --workflow <workflow>
+  - starci kernel run-deferred-tests --repo <path> --workflow <workflow> --kind unit --dry-run --json
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api run-deferred-tests
+  - node scripts/kernel/cli.mjs run-deferred-tests
+reads: the workflow's jobs whose result verdict is deferred (starci kernel status testsDeferred); the owner
+  config.yaml specs switches
+writes: "The owner's \"test later\" (owner 2026-09-28 \"speed up development; test later when
+  asked\"). The owner config.yaml root `specs: {unit?, e2e?}` switches product testing off per
+  class; an op whose brief policy.specsToggle.<class> is defer-leg (test.author, e2e.verify) is then
+  never dispatched: starci kernel enqueue, starci kernel route and starci kernel dispatch settle its queued job status succeeded
+  with result {verdict: deferred, deferred: {kind, reason: specs.<class>=false, at, via}} and one
+  tests-deferred event - no lease, no dispatch, no attempt spent - and the legs behind it proceed.
+  This command re-queues every such job of the workflow (only --kind's class when given) in one
+  transaction: status queued on its same attempt, result cleared, payload.specsForced {at, by, kind}
+  (so it dispatches even while its class is still off, with its whole brief - packet
+  context.specs_forced), and one tests-requeued event each. The Kernel then routes and dispatches
+  them as usual. --dry-run lists what it would re-queue and writes nothing"
+returns: "{ok:true, workflowId, kind, dryRun, deferred:[{jobId, op, attempt, kind, reason, at,
+  via}], requeued:[...same], specs:{harness, unit, e2e}}"
+refuses:
+  - workflow-unknown
+  - "deferred-tests-bad-kind: --kind is none of unit, e2e, integration"
+  - "workflow-finished: a finished or archived workflow takes no new work"
+  - "op-context-refused: an op terminal never re-queues legs"
+usedBy: the owner or supervisor running the tests the specs switches deferred (after flipping a
+  switch back, or when asked)

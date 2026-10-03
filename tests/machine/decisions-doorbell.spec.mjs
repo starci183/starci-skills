@@ -44,7 +44,7 @@ test('an idle seat gets exactly one ring with the fixed line; the rate limit hol
   const idle = seat('turn-idle');
   const first = ringDoorbellWith({ ledger, workflowId: WF, wake: idle.wake, now: 10_000 });
   assert.equal(first.action, 'rung');
-  assert.deepEqual(idle.calls, [`[decide] 1 waiting: api decisions --workflow ${WF}`]);
+  assert.deepEqual(idle.calls, [`[decide] 1 waiting: starci kernel decisions --workflow ${WF}`]);
   const soon = ringDoorbellWith({ ledger, workflowId: WF, wake: idle.wake, now: 10_000 + RING_MIN_GAP_MS - 1 });
   assert.equal(soon.action, 'rate-limited');
   assert.equal(idle.calls.length, 1, 'no second ring inside the gap');

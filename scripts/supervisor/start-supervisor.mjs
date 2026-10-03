@@ -11,12 +11,12 @@
 // (action 'chat-mode'); --stop and --status still work. The seat's liveness is the reconciler Host controller's
 // (concern host.supervisor-seat: scripts/supervisor/supervisor-watchdog.mjs --once).
 //
-//   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--reason <text>]
+//   starci supervisor start [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
-//   node scripts/supervisor/start-supervisor.mjs --replace [--json]      (the watchdog's call; never enables)
-//   node scripts/supervisor/start-supervisor.mjs --status [--json]
-//   node scripts/supervisor/start-supervisor.mjs --stop [--json]         disable, worker-stop + worker-release
-//   node scripts/supervisor/start-supervisor.mjs --restart [--json]      stop + start (a contract reload)
+//   starci supervisor start --replace [--json]      (the watchdog's call; never enables)
+//   starci supervisor status [--json]
+//   starci supervisor stop [--json]         disable, worker-stop + worker-release
+//   starci supervisor start --restart [--json]      stop + start (a contract reload)
 //
 // Singleton, three fences:
 //   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;

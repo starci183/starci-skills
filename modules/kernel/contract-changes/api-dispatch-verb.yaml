@@ -5,4 +5,4 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/dispatch.mjs
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/dispatch.yaml
+  - modules/cli/commands/kernel/dispatch.yaml

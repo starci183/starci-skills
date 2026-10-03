@@ -24,9 +24,9 @@
 //            whose job is not live. The reconciler GC controller runs it ACTIVE (controllers/gc.mjs key gc:worktrees).
 //   counts   worktreeCounts: each repo's live count against its cap and its orphans (start.mjs --check).
 //
-//   node scripts/machine/worktrees.mjs counts [--json]          each repo's live count, cap and orphans
-//   node scripts/machine/worktrees.mjs gc [--plan] [--json]     one GC pass now (--plan: what it would remove)
-//   node scripts/machine/worktrees.mjs resume                   clear the stop a main-checkout violation set (after inspecting it)
+//   starci machine worktrees counts [--json]          each repo's live count, cap and orphans
+//   starci machine worktrees gc [--plan] [--json]     one GC pass now (--plan: what it would remove)
+//   starci machine worktrees resume                   clear the stop a main-checkout violation set (after inspecting it)
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -135,7 +135,7 @@ export function gcWorktrees({ env = process.env, now = Date.now(), apply = true,
   // A removal that ever changed a main checkout stops the worktree GC until an operator clears it (worktrees.mjs resume).
   let stopped = null;
   try { stopped = withRegistry((m) => m.worktreeGcStop(), env); } catch { stopped = null; }
-  if (stopped) return [{ action: 'stopped', ok: false, reason: 'main-checkout-damaged', error: `stopped since ${new Date(stopped.at).toISOString()}: ${(stopped.damage ?? []).join('; ').slice(0, 200)}; inspect ${stopped.path}, then node scripts/machine/worktrees.mjs resume` }];
+  if (stopped) return [{ action: 'stopped', ok: false, reason: 'main-checkout-damaged', error: `stopped since ${new Date(stopped.at).toISOString()}: ${(stopped.damage ?? []).join('; ').slice(0, 200)}; inspect ${stopped.path}, then starci machine worktrees resume` }];
   // A bounded pass: removals stop once the time budget is spent (the rest waits for the next pass), and a removal that
   // touched the main checkout stops the GC at once.
   const halt = () => {
@@ -351,7 +351,7 @@ function main(argv) {
     console.log(cleared ? 'worktree GC resumed' : 'the worktree GC was not stopped');
     return 0;
   }
-  console.error('use: worktrees.mjs counts [--json] | gc [--plan] [--json] | resume');
+  console.error('use: starci machine worktrees counts [--json] | gc [--plan] [--json] | resume');
   return 2;
 }
 if (isMain(import.meta.url)) process.exitCode = main(process.argv.slice(2));

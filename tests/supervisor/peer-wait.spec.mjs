@@ -15,7 +15,7 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 // A workflow sat at orphaned-frontier / actionable:true with zero open
 // operations: its next approved op (brand.decide) cannot pass preflight until a PEER workflow
 // installs @starci/grammar 0.5.0. The projection woke the Kernel for nothing and hid the
-// cause. `api incident --kind peer-wait --peer <workflowId>` records the wait: the frontier reads peer-wait,
+// cause. `starci kernel incident --kind peer-wait --peer <workflowId>` records the wait: the frontier reads peer-wait,
 // not actionable; the held jobs read queuedBecause peer-wait; a message from that peer wakes the Kernel
 // (and resolves an --until-message wait); the supervisor judges the wait instead of alerting STALLED.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -75,14 +75,14 @@ test('no open operation and an open peer-wait: the frontier reads peer-wait, not
   const fx=fixture(t);
   const before=fx.frontier(WORK);
   assert.deepEqual([before.state,before.actionable],['orphaned-frontier',true],'the defect: an orphaned frontier re-wakes the Kernel');
-  assert.match(before.reason,/api incident --kind peer-wait --peer <workflowId>/);
+  assert.match(before.reason,/starci kernel incident --kind peer-wait --peer <workflowId>/);
   const {incidentId}=fx.wait();
   const after=fx.frontier(WORK);
   assert.deepEqual([after.state,after.actionable],['peer-wait',false]);
   assert.deepEqual(after.peerWaits.map(w=>[w.incidentId,w.peer,w.peerPhase,w.holds,w.untilMessage]),[[incidentId,BASE,'running',['brand.decide'],false]]);
   assert.deepEqual(after.peerWaitsDead,[]);
   assert.match(after.reason,new RegExp(`peer-wait ${incidentId} waits on ${BASE} \\(holds brand.decide\\)`));
-  assert.match(after.reason,/resolve the wait \(api incident --resolve\) once its proof holds/);
+  assert.match(after.reason,/resolve the wait \(starci kernel incident --resolve\) once its proof holds/);
 
   // Resolving it (the proof held) makes the next step the Kernel's again.
   fx.ok(['incident','--workflow',WORK,'--resolve',incidentId,'--detail','peer proof checked']);
@@ -271,7 +271,7 @@ test('stall: a peer whose ledger is quiet but whose worker or Kernel is mid-turn
   const [line]=byType(found,'PEER-WAIT');
   assert.match(line.line,new RegExp(`justified: peer ${BASE} is running and working \\(worker op-backend\\.implement-82b3110067 mid-turn; its ledger quiet 90m\\)`));
   assert.deepEqual([byType(found,'STALLED')[0].alert,byType(found,'STALLED')[0].justifiedPeerWait],[false,true],'so the parked workflow is not a stall either');
-  assert.ok(asked.includes(BASE),'the peer\'s own api status is read');
+  assert.ok(asked.includes(BASE),'the peer\'s own starci kernel status is read');
 
   // Its Kernel mid-turn counts the same; a Kernel at its prompt does not.
   const kernelBusy=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked,kernelTurnOf:(db,wf)=>(wf===BASE?'active':'turn-idle')});
@@ -340,7 +340,7 @@ test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD
   const [unreadLine]=found.filter(f=>f.type==='UNREAD-PEER');
   assert.equal(unreadLine.alert,false);
   assert.ok(unreadLine.line.startsWith(`UNREAD-PEER ${WORK} pm-proof00000001 from ${BASE} [reply] installed 0.5.0: pending since `),unreadLine.line);
-  assert.match(unreadLine.line,/inc-0aebf976e625 may concern it and still holds; tell its Kernel to read api inbox/);
+  assert.match(unreadLine.line,/inc-0aebf976e625 may concern it and still holds; tell its Kernel to read starci kernel inbox/);
   ledger.db.prepare("UPDATE inbox SET status='applied' WHERE key='pm-proof00000001'").run();
   const acked=judgePeerWait({db:ledger.db,workflowId:WORK,wait,dbOf,now:NOW});
   assert.deepEqual([acked.stale,acked.unread],[false,[]],'the Kernel read it and kept the wait: its call');

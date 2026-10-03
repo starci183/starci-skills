@@ -17,7 +17,7 @@ paths:
   - scripts/kernel/cli.mjs
   - scripts/kernel/verbs/settle.mjs
   - scripts/kernel/settle/job-settle.mjs
-  - modules/kernel/api-commands/reconcile.yaml
+  - modules/cli/commands/kernel/reconcile.yaml
   - modules/kernel/failure-codes.yaml
   - scripts/machine/close-verify.mjs
   - scripts/supervisor/gc.mjs

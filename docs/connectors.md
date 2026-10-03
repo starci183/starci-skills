@@ -13,7 +13,7 @@ talks to a supervisor chat and it answers. They are configured by `config.yaml`
 are all off by default.
 
 ```
-kernel: api serve-ask -> serve-ask.mjs parkAsk -> telegram.mjs notifyAsk -> Telegram: question + [Generate URL]
+kernel: starci kernel serve-ask -> serve-ask.mjs parkAsk -> telegram.mjs notifyAsk -> Telegram: question + [Generate URL]
                                                    (ledger: ask-notified; no form, no link)
 owner presses [Generate URL] -> telegram-bridge.mjs (getUpdates callback_query ask:<key>)
      -> spawns serve-ask.mjs --on-demand telegram (ledger: ask-serving onDemand) -> waits for the bind
@@ -30,8 +30,8 @@ Cloudflare edge -> cloudflared (tunnel.mjs) -> 127.0.0.1:<gateway.port> ask-gate
 | --- | --- | --- |
 | Gateway | `scripts/connectors/ask-gateway.mjs` | One fixed local port. Proxies `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST, redirects rewritten to paths) to the loopback form whose latest open `ask-serving` event carries that nonce and whose serve-ask process is alive, in the configured repos' ledgers plus every repo a Telegram notice named. Everything else is 404 and never forwarded (so the public host serves question forms and nothing else, and only while one is served); dot segments are refused; a non-loopback form URL is never a target. Adds `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Robots-Tag: noindex`. |
 | Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (`%LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml`), so `~/.cloudflared/config.yml` is never read. Records the public base URL in its `tunnel` connectors row. `status` carries `health` (below). |
-| Notifier | `scripts/connectors/telegram.mjs` | Called by the kernel's `api serve-ask` (`serve-ask.mjs parkAsk`): one message with the workflow, the question and its numbered options, in config `language`, and one inline button **Generate URL** (the Vietnamese label for "Generate reply link" when `language` is vi; `callback_data` `ask:<16 hex>`), with NO link. Deduped per ask while its notice is in the chat. `markAskClosed` deletes every message of an ask once it is answered, auto-accepted, retired or superseded (edited to "answered" only where Telegram refuses a delete, e.g. older than 48 h); `sweepAskMessages` is the bridge's reconciler. A missing token or chat id is a no-op with one stderr line; it never throws into its caller. Also `sweep`, `discover-chat` and `test`. |
-| Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `api settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its output goes to `machine_logs`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (PASS / FAIL, in Vietnamese) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
+| Notifier | `scripts/connectors/telegram.mjs` | Called by the kernel's `starci kernel serve-ask` (`serve-ask.mjs parkAsk`): one message with the workflow, the question and its numbered options, in config `language`, and one inline button **Generate URL** (the Vietnamese label for "Generate reply link" when `language` is vi; `callback_data` `ask:<16 hex>`), with NO link. Deduped per ask while its notice is in the chat. `markAskClosed` deletes every message of an ask once it is answered, auto-accepted, retired or superseded (edited to "answered" only where Telegram refuses a delete, e.g. older than 48 h); `sweepAskMessages` is the bridge's reconciler. A missing token or chat id is a no-op with one stderr line; it never throws into its caller. Also `sweep`, `discover-chat` and `test`. |
+| Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `starci kernel settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its output goes to `machine_logs`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (PASS / FAIL, in Vietnamese) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
 
 Repositories read: `connectors.repos`, or by default the source root plus every
 `.workspaces/projects/*/work.json` Work owner registered in `machine.ledgers`. The connectors open
@@ -73,15 +73,15 @@ Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
   uat.verify, uat.assisted.*), never the main line: never pushed, listed by `/creds` in one message, and
   counted in one line of the `/status` report and the owner digest.
 
-1. **Park.** The kernel's `api serve-ask --workflow <id> --dispatch <id>` runs `parkAsk`: earlier asks
+1. **Park.** The kernel's `starci kernel serve-ask --workflow <id> --dispatch <id>` runs `parkAsk`: earlier asks
    it replaces are superseded and their messages deleted. An approval ask is then sent to the owner
    with the **Generate URL** button; a credential ask is only listed. The ledger gets `ask-notified
    {dispatchId, onDemand:true, via:telegram|creds, askClass, messageId, key, fresh, fields}`. No form
-   runs. `api status` reads such an ask as `awaiting-owner` (`frontier.askOnDemandDispatches`), not
+   runs. `starci kernel status` reads such an ask as `awaiting-owner` (`frontier.askOnDemandDispatches`), not
    `ask-reserve`; credential asks (`frontier.credentialAskDispatches`) park the frontier only when every
    approved leg still owed is a live proof, else it reads `next-ready` (a plan is recorded and
    `nextActions` names the next leg) and the Kernel enqueues that leg with placeholders. The supervisor digest tags an on-demand ask `on-demand`.
-   With Telegram off (or a failed send, `ask-notify-failed`) `api serve-ask` serves the form at once,
+   With Telegram off (or a failed send, `ask-notify-failed`) `starci kernel serve-ask` serves the form at once,
    as before; `--now` does that on purpose while still sending the notice.
 2. **Generate URL.** The bridge answers the callback, launches `serve-ask.mjs --repo <r> --workflow <w>
    --dispatch <d> --on-demand telegram` detached (it hides its children's windows) unless the ask's form
@@ -96,7 +96,7 @@ Two kinds of ask, never mixed in one list or one message (owner, 2026-09-25;
    open credential ask of the same repos in ONE message, one button each (`cred:<key>`); a press opens
    that ask in a new message (the list stays) and serves its form as above.
 4. **Answer.** serve-ask records `ask-answered`, deletes the ask's messages (`ask-message-closed`) and
-   exits, so the gateway stops routing the nonce. `api retire-ask`, auto-accept and a superseding ask
+   exits, so the gateway stops routing the nonce. `starci kernel retire-ask`, auto-accept and a superseding ask
    delete them the same way. Every poll round (at most once a minute) the bridge sweeps the store: the
    messages of an ask that closed by any path (including forms started before this runtime) are
    deleted, and a message still linking to a form that ended goes back to the button notice.
@@ -107,7 +107,7 @@ are answered.
 
 ## Health and restart
 
-`node scripts/connectors/tunnel.mjs status` prints `health`: `manager {pid, alive, lockPid}`,
+`starci connect tunnel status` prints `health`: `manager {pid, alive, lockPid}`,
 `cloudflared {pid, alive, connected, restarts, lastExit}`, `gateway {pid, alive, port, reachable,
 status}` (a GET of `/` on the gateway port; nothing answering there is why the public host returns 502),
 `managers` (every `tunnel.mjs run` process on the host; `--fast` skips the process listing),
@@ -118,15 +118,15 @@ again.
 ## Commands
 
 ```
-node scripts/connectors/ask-gateway.mjs start        # detached; status | stop | run (foreground)
-node scripts/connectors/tunnel.mjs dry-run           # print the cloudflared argv + generated config
-node scripts/connectors/tunnel.mjs start             # detached manager; status | stop | run
-node scripts/connectors/telegram.mjs discover-chat   # after sending the bot /start: chat ids
-node scripts/connectors/telegram.mjs test            # one test message to connectors.telegram.chatId
-node scripts/connectors/telegram.mjs notify --ledger %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
+starci connect ask-gateway start        # detached; status | stop | run (foreground)
+starci connect tunnel dry-run           # print the cloudflared argv + generated config
+starci connect tunnel start             # detached manager; status | stop | run
+starci connect telegram discover-chat   # after sending the bot /start: chat ids
+starci connect telegram test            # one test message to connectors.telegram.chatId
+starci connect telegram notify --ledger %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite --workflow <id> --dispatch <id> [--repo <repo>]
                                                      # (re-)send one open ask's notice (deduped while it is in the chat)
-node scripts/connectors/telegram.mjs sweep           # delete the messages of closed asks, drop dead links
-node scripts/connectors/telegram-media.mjs settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict <v> [--dispatch <id>]
+starci connect telegram sweep           # delete the messages of closed asks, drop dead links
+starci connect telegram-media settle --ledger <file> --repo <repo> --workflow <id> --job <id> --attempt <n> --op <op> --verdict <v> [--dispatch <id>]
                                                      # send one settled op's media (deduped; what settle launches)
 ```
 
@@ -183,12 +183,12 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   `modules/reconciler/workers.yaml` and `scripts/reconciler/notifier.mjs`.
 
 ```
-node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]
-node scripts/supervisor/channel.mjs heartbeat --id <id>
-node scripts/supervisor/channel.mjs inbox --id <id> [--json] [--peek]     # unread; marks read unless --peek
-node scripts/supervisor/channel.mjs reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
-node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]     # "TELEGRAM <inboxId>: <text>", exit 0; 124 on timeout
-node scripts/supervisor/telegram-bridge.mjs start | run | status | stop
+starci supervisor channel register --id <id> --label <text> [--repos <csv>]
+starci supervisor channel heartbeat --id <id>
+starci supervisor channel inbox --id <id> [--json] [--peek]     # unread; marks read unless --peek
+starci supervisor channel reply --id <id> (--text <t> | --text-file <f>) [--to <inboxMessageId>]
+starci supervisor channel wait --id <id> [--timeout-ms <n>]     # "TELEGRAM <inboxId>: <text>", exit 0; 124 on timeout
+starci supervisor telegram-bridge start | run | status | stop
 ```
 
 What a supervisor may do on a chat message is `modules/supervisor/supervise.yaml` `channel`: the

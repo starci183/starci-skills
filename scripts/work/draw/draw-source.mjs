@@ -36,7 +36,7 @@
 // grammar component (data-component, a data-grammar-* hook or a starci-core-* class nearer than any drawn layout
 // element) - reported as DRAW_OFF_GRAMMAR_COMPONENT against the rendered DOM.
 //
-//   node scripts/work/draw/draw-source.mjs <X.draw.tsx> [--fixture <json>]... [--product <app dir>]
+//   starci work draw-source <X.draw.tsx> [--fixture <json>]... [--product <app dir>]
 //        [--grammar auto|product|claude-dist] [--grammar-dist <package root>] [--rationale <file>] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -349,7 +349,7 @@ async function main(argv) {
   const json = argv.includes('--json');
   const file = argv.find((a, i) => !a.startsWith('--') && !VALUE_FLAGS.includes(argv[i - 1]));
   const vals = (k) => argv.flatMap((a, i) => (argv[i - 1] === k ? [a] : []));
-  if (!file) { process.stderr.write('use: node scripts/work/draw/draw-source.mjs <X.draw.tsx> [--fixture <json>]... [--product <app dir>] [--grammar auto|product|claude-dist] [--grammar-dist <package root>] [--rationale <file>] [--json]\n'); return 2; }
+  if (!file) { process.stderr.write('use: starci work draw-source <X.draw.tsx> [--fixture <json>]... [--product <app dir>] [--grammar auto|product|claude-dist] [--grammar-dist <package root>] [--rationale <file>] [--json]\n'); return 2; }
   const productDir = path.resolve(vals('--product')[0] ?? path.dirname(file));
   const r = await checkDrawSource({ file: path.resolve(file), fixtures: vals('--fixture').map((f) => path.resolve(f)), productDir, prefer: vals('--grammar')[0] ?? 'auto',
     grammarDist: vals('--grammar-dist')[0] ?? null, rationaleFile: vals('--rationale')[0] ? path.resolve(vals('--rationale')[0]) : undefined });

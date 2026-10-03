@@ -1,4 +1,4 @@
-// The microservice policy of `hfs check` (scripts/hfs/rules/services.mjs): R163 HFS_SERVICE_PLACEMENT, R164 HFS_IMAGE_UNPINNED,
+// The microservice policy of `starci app check` (scripts/hfs/rules/services.mjs): R163 HFS_SERVICE_PLACEMENT, R164 HFS_IMAGE_UNPINNED,
 // R165 HFS_SERVICE_STACK_DECLARATION, R166 HFS_EVENT_CONTRACT (event classes -> events.json), R167 BE_ASYNC_SPEC_MISSING, plus the event contract emit
 // (packages/hfs/emit). Each rule has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the base.
 import test from 'node:test';
@@ -104,7 +104,7 @@ ${compensates === undefined ? '' : `  static readonly compensates = "${compensat
 const PLACED = eventClass({ className: 'OrderPlacedEvent', name: 'order.placed' });
 const REJECTED = eventClass({ className: 'InvoiceRejectedEvent', name: 'billing.invoice-rejected', compensates: 'order.placed', fields: 'readonly orderId: string; readonly reason: string' });
 
-/** What `hfs emit-contracts` writes for the event classes of `service`, in a scratch app that holds only those files. */
+/** What `starci app emit` writes for the event classes of `service`, in a scratch app that holds only those files. */
 const emitted = (service, classes) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-events-'));
   made.push(temp);
@@ -176,7 +176,7 @@ test('HFS_EVENT_CONTRACT: a committed snapshot of a service with no event class 
   assert.deepEqual(findings.map((f) => [f.path, f.drift]), [['be/contracts/shipping/events.json', 'left-behind']]);
 });
 
-test('hfs emit-contracts writes events.json for a service that declares event classes, sorted and with a final newline', () => {
+test('starci app emit writes events.json for a service that declares event classes, sorted and with a final newline', () => {
   const text = emitted('billing', { [REJECTED_PATH]: REJECTED });
   assert.equal(text, `${JSON.stringify({ events: { 'billing.invoice-rejected': { compensates: 'order.placed', payload: { orderId: 'string', reason: 'string' }, version: 1 } }, schema: 'starci/event-contract@1', service: 'billing' }, null, 2)}\n`);
 });

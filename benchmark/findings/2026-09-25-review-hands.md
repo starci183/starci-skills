@@ -94,7 +94,7 @@ work.author là rủi ro lớn nhất: Claude đạt 73% trên 37 job, trong khi
 Sau khoảng 48h kể từ khi land, chạy từ thư mục runtime live:
 
 ```sh
-node scripts/agent/benchmark-snapshot.mjs --since-hours 48
+starci runtime benchmark-snapshot --since-hours 48
 ```
 
 Sau đó viết findings mới, dẫn chiếu file này. Nếu H1 hoặc H2 sai, đặc biệt ở work.author và interface.audit, đề

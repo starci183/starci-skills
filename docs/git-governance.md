@@ -2,7 +2,7 @@ Task: move work to the remote once per release, with its annotated tag and finis
 
 # Git governance
 
-How work reaches the remote, for this runtime repository and for every app that `hfs scaffold` creates. The rules are enforced by checks, not by this page
+How work reaches the remote, for this runtime repository and for every app that `starci app scaffold` creates. The rules are enforced by checks, not by this page
 alone: the rule ids below are the contract, and knowledge and docs cite them instead of restating them. Every git action goes through the CLI (`starci git ...`, over the
 runtime's one git layer, and `starci release cut`); this page shows no raw git command. Who may do what, and which tests run when, is [source process](source-process.md).
 

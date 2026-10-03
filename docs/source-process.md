@@ -2,7 +2,7 @@ Task: choose the test scope, the change path and the rights of each role for a c
 
 # Source management process
 
-Who may do what, and which test scope runs when, for `.claude` upgrades and for product coding (apps scaffolded by `hfs scaffold` / `starci app scaffold`, worked by
+Who may do what, and which test scope runs when, for `.claude` upgrades and for product coding (apps scaffolded by `starci app scaffold` / `starci app scaffold`, worked by
 workflows and ops). The git model (local lands, one push per release, CI triggers, tags, release notes) is [git governance](git-governance.md) and is not restated here.
 
 ## The test ladder
@@ -27,10 +27,10 @@ the cause. There are no skip lists, no allowlists and no weakened specs.
 | Level | Specs | Lint | Checks | tsc |
 |---|---|---|---|---|
 | L0 commit | none | the staged files and format | work hygiene | none |
-| L1 working (op gate, worker) | the specs of the change and their importers | the changed files | `hfs lint --changed` (apps), the self-checks touching the change (`.claude`) | the project(s) holding the changed files |
-| L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`npm run check` / `starci runtime check`): fast and structural | every affected project |
+| L1 working (op gate, worker) | the specs of the change and their importers | the changed files | `starci app lint --changed` (apps), the self-checks touching the change (`.claude`) | the project(s) holding the changed files |
+| L2 land (local main) | the dependent specs (imports and data paths) | the changed files | the FULL check set (`starci check run --level L2`): fast and structural | every affected project |
 | L3 land touching IO | L2 plus the affected integration, contract and e2e specs | as L2 | as L2 | as L2 |
-| L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `hfs check` of every example, Sonar at zero and the coverage per component (the existing local gate scans each example and reads its dashboard; the local SonarQube stack is started for it when stopped and put back as found) | every project; first a real `npm ci` in every example, and last the Linux-parity step: the CI-equivalent light jobs derived from `.github/workflows` (installs, the full check set, package clean installs, per example codegen, typecheck, hfs lint and the builds; never a spec suite) in a Linux container on this host |
+| L4 release cut (once, before the tag) | ALL: the runtime, the packages, and each example's unit, integration, e2e and contract runs | the whole repository and stylelint | the full check, `starci app check` of every example, Sonar at zero and the coverage per component (the existing local gate scans each example and reads its dashboard; the local SonarQube stack is started for it when stopped and put back as found) | every project; first a real `npm ci` in every example, and last the Linux-parity step: the CI-equivalent light jobs derived from `.github/workflows` (installs, the full check set, package clean installs, per example codegen, typecheck, starci app lint and the builds; never a spec suite) in a Linux container on this host |
 | L5 tag CI (Linux, once) | as L4 | as L4 | as L4 | as L4 |
 
 Checks run in full from L2 because they are fast and catch structure errors early; the specs are the expensive part, so only L4 runs all of them. L4 is exactly the row above, each

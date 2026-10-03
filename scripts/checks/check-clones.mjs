@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-clones.mjs - one block of code, one place (smell S4; part of `npm run check`).
-//   node scripts/checks/check-clones.mjs [--json]
+//   starci runtime check --only clones [--json]
 //
 // RT_DUPLICATE_CODE: a token-normalised block of at least CLONE_LINES source lines and CLONE_TOKENS tokens that appears twice in
 // the runtime's production source (two files, or twice in one file) is code copied instead of shared. The threshold is the

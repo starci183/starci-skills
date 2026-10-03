@@ -1,0 +1,58 @@
+# The contract of `starci kernel usage` (scripts/kernel/verbs/usage.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs).
+group: kernel
+verb: usage
+owner: runtime
+summary: measured tokens by op, model and Kernel of one workflow, or per workflow
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - usage
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    summary: one workflow; every live workflow of the ledger when omitted
+  - name: legs
+    type: boolean
+    summary: with --workflow, list every attempt
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel usage --repo <path>
+  - starci kernel usage --repo <path> --workflow <workflow> --legs --json
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api usage
+  - node scripts/kernel/cli.mjs usage
+reads: "llm_usage rows (subject attempt and kernel-turn) joined to op_attempts, and each attempt's
+  settle state: written by scripts/kernel/usage-record.mjs from the agent CLI's own session file
+  (Claude Code JSONL message.usage, Codex rollout token_count events; devin and any other agent have
+  no adapter). Tokens are recorded facts; cost_usd is recorded only when modules/models/registry.yaml
+  models.<id>.price declares every rate the model used"
+writes: nothing - pure projection
+returns: "with --workflow: {ok, workflowId, total, byOp[{opId, attempts, ...counts, models[]}],
+  byModel[{model, ...counts}], kernel{...counts, sessions, models[]}, coverage{attempts, measured,
+  open, pending, unavailable, unavailableAttempts[{attemptId, opId, agent, reason}]},
+  legs?[{attemptId, jobId, opId, unitId, tryNo, agent, model, state:
+  measured|unavailable|pending|open, usageSource, usageReason?, ...counts}]}; without it: {ok,
+  total, attempts, kernel, byModel[], workflows[{workflowId, phase, total, kernel, coverage}]}.
+  Counts are {inputTokens (fresh), outputTokens (reasoning included), cacheReadTokens,
+  cacheWriteTokens, reasoningTokens, tokens (all four), turns, toolCalls, toolErrors, costUsd (null
+  when any contributing row is unpriced)}"
+refuses:
+  - workflow-unknown: --workflow names no workflow of this ledger
+unavailable: "an attempt whose usage cannot be measured is stored with op_attempts.usage_source
+  'unavailable' and usage_reason: at once when its agent has no adapter, else once it has been over
+  30 minutes with no session file found live or in the session archive. It is never given a number.
+  coverage.pending counts settled attempts not yet decided (their session may still be archived);
+  the sweep looks again until it measures or marks them"
+usedBy: the Kernel and the Supervisor reading what a workflow spent; `starci kernel status` carries the same
+  summary as its `usage` field

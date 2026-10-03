@@ -1,4 +1,4 @@
-// The repository-hygiene tree checks of `hfs check` (scripts/hfs/rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
+// The repository-hygiene tree checks of `starci app check` (scripts/hfs/rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
 // R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, R111 HFS_PEER_INTEGRATION_MISSING, and the slot app.scripts that holds the app root `scripts/` folder.
 // Each has a violating and a passing tree; the clean app of tests/helpers/hfs-cli-fixture.mjs is the passing base, checked at its root.
 import test from 'node:test';
@@ -102,7 +102,7 @@ test('HFS_LINT_SUPPRESSION_FILE: a suppressions file, the lint:suppressions scri
 
 test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(APP, (dir) => {
-    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:fix': 'hfs lint --fix' } }));
+    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:fix': 'starci app lint --fix' } }));
   }) });
   assert.deepEqual(only(result, 'HFS_LINT_SUPPRESSION_FILE'), []);
 });
@@ -128,7 +128,7 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a command whose files exist, flags, globs,
     put(dir, 'be/src/tests/e2e/login/gate.e2e-spec.ts');
     put(dir, '.starciwork/features/login/impl/demo/gate/index.yaml', RECORD({
       e2e: 'npm run test:e2e -- be/src/tests/e2e/login/gate.e2e-spec.ts',
-      implementation: 'node ../other/.claude/bin/starci.mjs validate ../demo/.starciwork/features/login --strict --json',
+      implementation: 'node ../other/.claude/packages/cli/bin/starci.mjs runtime validate ../demo/.starciwork/features/login --strict --json',
       requirements: 'docker compose -f ../infra/compose.yaml build && node be/dist/apps/core/main.js --config "src/**/*.json" --port=3000',
     }));
   }) });

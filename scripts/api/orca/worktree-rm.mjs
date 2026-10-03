@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP WT1, WT6: links are removed as links before the rm, and the git branch -d fallback stays (Orca deletes a branch only when it proves the merge).
 // worktree-rm.mjs — the calls.yaml `worktree-rm` call as a callable function.
-//   node scripts/api/orca/worktree-rm.mjs --worktree <sel> [--force]
+// Internal entry: spawned by scripts/machine/worktree-orca.mjs; not invoked directly.
+// Args: --worktree <sel> [--force]
 // Removes the worktree from Orca and git. Called only by scripts/machine/worktree-orca.mjs removeOrcaWorktree, after every link
 // in the tree was removed as a link. Returns {ok, removed, error}.
 import { orcaCall } from './lib.mjs';

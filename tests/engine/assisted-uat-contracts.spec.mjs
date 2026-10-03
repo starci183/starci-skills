@@ -113,6 +113,6 @@ test('assisted UAT doctrine fixes runner invocation, receipt lifecycle and canon
   assert.match(doc,/remains `state: todo`/);
   assert.match(doc,/only final[\s\S]*reconciliation may bind current SRS, SDS, implementation, test\/E2E and UAT evidence/);
   assert.match(doc,/starci\/op-report@1/);
-  assert.match(doc,/scripts\/kernel\/cli\.mjs report --repo <bound-repo> --job <current-job>/);
+  assert.match(doc,/starci kernel report --repo <bound-repo> --job <current-job> --report <op-report\.json>/);
   assert.match(doc,/No separate assisted-UAT ingestion[\s\S]*verb or direct SQL path exists/);
 });

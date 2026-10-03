@@ -2,7 +2,7 @@
 // host BEFORE the push, so the first GitHub run of the release tag is not the first Linux run of these gates. It is NOT a second full suite: the spec suites
 // (the root `npm test`, an example's unit, integration and e2e runs) already ran on the host in the same L4 row and are left out.
 // What runs is DERIVED from .github/workflows/*.yml, never listed by hand: every `run` step of every job (installs, the grammar build, the full check set, the clean
-// install of every published package, the scaffold against registry installs, the example records, and per example app codegen, typecheck, hfs lint and the be and fe
+// install of every published package, the scaffold against registry installs, the example records, and per example app codegen, typecheck, starci app lint and the be and fe
 // builds), in workflow order with the working directory and job env the workflow gives it. Left out, each with its reason in the record: spec suites, steps gated on
 // workflow_dispatch or on the tag-only uploads, docker builds, browser runs and installs, and workflow plumbing (`echo ... >> $GITHUB_OUTPUT`).
 // The container is the node image of the workflows' node-version; HEAD is handed to it as a tar of the tracked files (git archive: exactly what GitHub would check
@@ -84,7 +84,7 @@ export function parityPlan({ workflows, apps }) {
           const run = expand(step.run, { ...ctx, env: { ...ctx.env, ...jobEnv } });
           const reason = leaveOut({ step: { ...step, run }, dir, matrixJob: app !== null });
           if (reason) { skipped.push({ name, reason }); continue; }
-          // Identical means the same directory, command and the env values the command reads (`hfs lint "$APP_DIR"` differs per app).
+          // Identical means the same directory, command and the env values the command reads (`starci app lint "$APP_DIR"` differs per app).
           const read = Object.keys(jobEnv).filter((k) => run.includes(`$${k}`) || run.includes(`\${${k}}`)).map((k) => `${k}=${jobEnv[k]}`);
           const key = [dir, run.trim(), ...read].join('\u0000');
           if (seen.has(key)) continue;

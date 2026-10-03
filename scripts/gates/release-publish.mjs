@@ -3,14 +3,14 @@
 // packages that bundle the runtime's canon-pins copy last, each after its clean proof, each confirmed on the registry with a
 // matching shasum, then the canon binding must be green. The ONE publishing path of the runtime, and a human step.
 //
-//   node scripts/gates/release-publish.mjs                              the plan only (default): registry state, blockers, steps
-//   node scripts/gates/release-publish.mjs --publish --npm-user <name>  runs the plan; <name> must be the logged-in npm account
+//   starci release publish                              the plan only (default): registry state, blockers, steps
+//   starci release publish --publish --npm-user <name>  runs the plan; <name> must be the logged-in npm account
 //       [--poll-minutes <n>]     registry confirmation deadline per package (default 15)
 //       [--pre-land-ref <sha>]   publish a checkout whose HEAD is exactly that commit (the one a land is about to merge)
 //
 // Without --publish nothing is installed, proved or published. With it, a blocker, a dirty tracked tree under packages/,
 // knowledge/hfs or modules/models, a checkout off main (unless --pre-land-ref names HEAD) or a wrong npm account refuses the
-// run before anything is published. `npm run release:check` (release-check.mjs) is the read that must be GREEN afterwards.
+// run before anything is published. `starci release check` is the read that must be GREEN afterwards.
 // Exit: 0 done (or a plan without blockers), 1 a step failed, 2 bad usage or environment, 3 published but the canon binding
 // is not green (rebind modules/models/code-patterns.yaml), 4 a plan with blockers.
 import path from 'node:path';
@@ -25,7 +25,7 @@ import { buildPlan } from './release-plan.mjs';
 import { npmRegistry } from './release-registry.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const USAGE = 'usage: release-publish.mjs [--publish --npm-user <name> [--poll-minutes <n>] [--pre-land-ref <sha>]]';
+const USAGE = 'usage: starci release publish [--publish --npm-user <name> [--poll-minutes <n>] [--pre-land-ref <sha>]]';
 export const EXIT = Object.freeze({ done: 0, failed: 1, usage: 2, unbound: 3, blocked: 4 });
 const POLL_STEP_MS = 20_000;
 
@@ -90,7 +90,7 @@ export function releasePublish({ root = runtimeRoot, publish = false, npmUser = 
   }
   const bound = node([path.join(root, 'scripts', 'checks', 'check-canon-pins.mjs')], { cwd: root });
   if (bound.status !== 0) {
-    out(`release-publish: published ${plan.toPublish.length} package(s) but the canon binding is NOT green: rebind modules/models/code-patterns.yaml (canon.version and contentDigest), land it, then run npm run release:check`);
+    out(`release-publish: published ${plan.toPublish.length} package(s) but the canon binding is NOT green: rebind modules/models/code-patterns.yaml (canon.version and contentDigest), land it, then run starci release check`);
     return EXIT.unbound;
   }
   out(`release-publish: done; ${plan.toPublish.length} package(s) published and confirmed; canon binding green`);

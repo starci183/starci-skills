@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// poll.mjs — chat-facing supervisor: one ledger digest per interval, forever.
+// starci supervisor poll — chat-facing supervisor: one ledger digest per interval, forever.
 // Designed to run FOREGROUND inside a monitoring chat — the chat agent reads
 // this process's stdout between cycles and relays what changed. It is a pure
 // observer: reads the durable ledger + Orca terminal liveness, never writes,
 // never dispatches, never repairs (that is watchdog.mjs's lane).
 //
-//   node scripts/supervisor/poll.mjs --repo <ledger-owner>
+//   starci supervisor poll --repo <ledger-owner>
 //       [--workflow <id>]...   default: every non-finished workflow
 //       [--interval-ms <ms>] [--stall-minutes <n>] [--once] [--json]
 //
@@ -204,7 +204,7 @@ const LAUNCH_WINDOW_MS = 3600000;
 /**
  * Kernel jobs still dispatchable whose workflow is finished or archived: a seat nothing releases
  * (a ledger kept kernel-wf-<product>-ang-stales-refactor-mu9nfaxf 'running' days after its finish).
- * `api reconcile --orphan-kernel-jobs` settles them; the host controller boot phase (scripts/reconciler/boot.mjs --restart) runs it.
+ * `starci kernel reconcile --orphan-kernel-jobs` settles them; the host controller boot phase (scripts/reconciler/boot.mjs --restart) runs it.
  */
 export const orphanKernelJobs = (db) => db.prepare(`SELECT j.job_id, j.workflow_id, j.status, j.worker_id, w.phase, w.archived_at
     FROM jobs j JOIN workflows w ON w.workflow_id=j.workflow_id
@@ -241,7 +241,7 @@ export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = P
   }
   const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
   for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${named(names, i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);
-  for (const o of orphanKernelJobs(db)) lines.push(`  ORPHAN-KERNEL-JOB ${o.job_id} (${o.status}; workflow ${o.phase}${o.archived_at ? ', archived' : ''}): run node scripts/kernel/cli.mjs reconcile --orphan-kernel-jobs --repo ${repo}`);
+  for (const o of orphanKernelJobs(db)) lines.push(`  ORPHAN-KERNEL-JOB ${o.job_id} (${o.status}; workflow ${o.phase}${o.archived_at ? ', archived' : ''}): run starci kernel reconcile --orphan-kernel-jobs --repo ${repo}`);
   for (const l of launchStreaks(db, wanted)) lines.push(`  LAUNCH-FAIL ${l.provider}: ${l.count} refused launches in the last hour (last ${l.lastStep}: ${l.lastError})`);
   // Progress, not liveness (scripts/supervisor/stall.mjs): a live kernel and a
   // live watchdog idle-waiting on a gate whose reason is gone read healthy above.

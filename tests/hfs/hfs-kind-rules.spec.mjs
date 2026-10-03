@@ -36,7 +36,7 @@ test('BE_KIND_DECLARATION: a declared kind needs its patterns and its platform c
   const noPlatform = run([...API, ...JOB, ...PLATFORM('queue')], { kinds: ['api', 'jobs'], patterns: ['fenced-job', 'queue'] });
   assert.equal(noPlatform.length, 1);
   assert.equal(noPlatform[0].capability, 'jobs');
-  assert.match(noPlatform[0].message, /hfs add/);
+  assert.match(noPlatform[0].message, /starci app add/);
   const reactor = ['be/src/features/reactors/stock/index.ts', 'be/src/features/reactors/stock/stock.module.ts'];
   assert.deepEqual(run([...API, ...reactor, ...PLATFORM('event-bus')], { kinds: ['api', 'reactors'], patterns: ['event-bus'] }), []);
   assert.equal(run([...API, ...reactor], { kinds: ['api', 'reactors'], patterns: [] }).length, 2, 'the pattern and its platform capability');

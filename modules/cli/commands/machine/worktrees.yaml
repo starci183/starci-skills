@@ -1,0 +1,19 @@
+group: machine
+verb: worktrees
+owner: runtime
+summary: inspect, collect or resume runtime worktrees
+impl: {script: scripts/machine/worktrees.mjs}
+positional:
+  - {name: action, enum: [counts, gc, resume], required: true, variadic: false}
+flags:
+  - {name: plan, type: boolean, summary: gc only; report what would be removed without removing it}
+exit: {"0": action completed, "1": counts found an over-cap repo or orphan or gc failed to remove one, "2": bad usage}
+json: flag
+examples:
+  - starci machine worktrees counts --json
+  - starci machine worktrees gc --plan
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/machine/worktrees.mjs
+  - node .claude/scripts/machine/worktrees.mjs

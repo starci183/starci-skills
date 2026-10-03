@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// check-hfs-sync.mjs - the generated files of a product repository are the ones `hfs sync` renders, and its tracked
+// check-hfs-sync.mjs - the generated files of a product repository are the ones `starci app sync` renders, and its tracked
 // .starciwork / .starcistacks trees hold no agent output or plaintext secret. The op and land gates run it so a
 // hand-edited managed file (husky hook, workflow, sonar-project.properties, tsconfig*.json, jest.config.js,
 // .prettierrc, .prettierignore, the package.json scripts, the eslint one-liner) is a finding, not a silent divergence
-// (HFS decision 10). The managed-file findings are the ones `hfs check` reports (packages/hfs/sync/managed.mjs).
+// (HFS decision 10). The managed-file findings are the ones `starci app check` reports (packages/hfs/sync/managed.mjs).
 //
-//   node scripts/gates/hfs-sync.mjs --repo <product repo> [--json]
+//   starci gate hfs-sync --repo <product repo> [--json]
 //
 // Findings (all catalogued in modules/kernel/failure-codes.yaml):
 //   HFS_MANAGED_FILE_DRIFT, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT
-//                               the managed-file findings of `hfs check`, one source (packages/hfs/sync/managed.mjs)
-//   HFS_SYNC_DRIFT              printed by `hfs sync --check`, the hash view of the same drift (listed so the catalog knows its emitter)
+//                               the managed-file findings of `starci app check`, one source (packages/hfs/sync/managed.mjs)
+//   HFS_SYNC_DRIFT              printed by `starci app sync --check`, the hash view of the same drift (listed so the catalog knows its emitter)
 //   HFS_SYNC_HFS_INVALID        hfs.json is missing or invalid
 //   HFS_SYNC_PRESET_MISSING     the jest preset the back end's Sonar exclusions come from is not installed
 //   HFS_SYNC_SONAR_KEY          the stack declaration names two Sonar keys for the repository
@@ -55,7 +55,7 @@ export async function checkHfsSync(root, { presets } = {}) {
 async function main(argv) {
   const at = argv.indexOf('--repo');
   if (at < 0 || !argv[at + 1]) {
-    process.stdout.write('usage: node scripts/gates/hfs-sync.mjs --repo <product repo> [--json]\n');
+    process.stdout.write('usage: starci gate hfs-sync --repo <product repo> [--json]\n');
     return 2;
   }
   const result = await checkHfsSync(path.resolve(argv[at + 1]));

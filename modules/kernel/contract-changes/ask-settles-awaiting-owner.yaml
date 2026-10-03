@@ -11,6 +11,6 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/verdict-contract.yaml
-  - modules/kernel/api-commands/settle.yaml
-  - modules/kernel/api-commands/status.yaml
+  - modules/cli/commands/kernel/settle.yaml
+  - modules/cli/commands/kernel/status.yaml
   - modules/kernel/contract-changes/ask-settles-awaiting-owner.yaml

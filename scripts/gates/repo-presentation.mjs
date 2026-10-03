@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Repository presentation gate. Product repositories also receive the full HFS tree check.
+//   starci gate repo-presentation --root <repo> [--runtime] [--json]
 import path from 'node:path';
 import { checkHfsWithoutConfig, checkRepoPresentation } from '../hfs/architecture/hfs.mjs';
 
@@ -9,7 +10,7 @@ for (let index = 0; index < args.length; index += 1) {
   if (args[index] === '--root') root = args[++index];
   else if (args[index] === '--runtime') runtime = true;
   else if (args[index] === '--json') json = true;
-  else { process.stderr.write('usage: repo-presentation.mjs --root <repo> [--runtime] [--json]\n'); process.exit(2); }
+  else { process.stderr.write('usage: starci gate repo-presentation --root <repo> [--runtime] [--json]\n'); process.exit(2); }
 }
 if (!root) { process.stderr.write('--root needs a directory\n'); process.exit(2); }
 root = path.resolve(root);

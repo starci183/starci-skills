@@ -87,7 +87,7 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - An `incident` is the kernel's escalation record (plan divergence, retry budget exhausted, an op
   death it cannot reconcile): relay its kind and detail, never adjudicate it yourself.
 - `effect_unknown` is an open, fenced job and must remain visible in survey.
-  The Kernel owns `api reconcile --job <id>`; the monitor reports its result.
+  The Kernel owns `starci kernel reconcile --job <id>`; the monitor reports its result.
   Only exact no-effect host proof can return the same attempt to queued.
 
 ## 4. Owner answers go into the kernel terminal
@@ -108,9 +108,9 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 - Connected+writable is only terminal availability. A provider input prompt
   with no current Working/Thinking marker is `turn-idle`; phase=running means
   the same Kernel must be woken. The long-lived identity spans model turns.
-- `[Op] <op>` terminals belong to `api dispatch` alone: it spawns one ephemeral agent per job and
-  `api settle` records the verdict and closes the worker. Never read, send to, spawn or close an op
-  terminal from the chat — the kernel's own read-only window is `api observe --job <id>`, and it is
+- `[Op] <op>` terminals belong to `starci kernel dispatch` alone: it spawns one ephemeral agent per job and
+  `starci kernel settle` records the verdict and closes the worker. Never read, send to, spawn or close an op
+  terminal from the chat — the kernel's own read-only window is `starci kernel observe --job <id>`, and it is
   the kernel's surface, not yours.
 - When the owner says stop, send that to the kernel terminal — every api write is a single
   transaction, so a kernel that stands down (or whose terminal is closed) leaves no half-write; the

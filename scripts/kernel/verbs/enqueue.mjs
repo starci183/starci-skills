@@ -1,4 +1,4 @@
-// api enqueue: validate one planned operation and write its queued try of a work unit.
+// starci kernel enqueue: validate one planned operation and write its queued try of a work unit.
 import fs from 'node:fs';
 import path from 'node:path';
 import { newToken } from '../../../engine/db/ledger.mjs';
@@ -58,11 +58,11 @@ export default {
   const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
   // Autopilot (owner ruling 2026-09-28 "limit provision asks"): no provision.ask leg opens mid-flow - the code
   // proceeds on sandbox/stub/mocks and every credential or approval need is recorded deferred-to-handover
-  // (api autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
+  // (starci kernel autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.
   if (args.op === 'provision.ask' && args['retry-of'] == null && provisionAskMidFlow(db, workflowId, { params: { ...(legSplit.owner ?? {}), ...(kernelFlag ?? {}) } })) {
     const out = { ok: false, workflowId, op: args.op, reason: 'autopilot-provision-deferred',
-      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with api autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
+      detail: `autopilot (${AUTOPILOT_RULING}) opens no provision.ask mid-flow: build on the sandbox/stub path, record the need with starci kernel autopilot --workflow ${workflowId} --defer-to-handover --op <asking op> --class credential|real-money|shared-system|owner-decision --detail "<what is owed>" [--fields <FILE_OR_VAR,...>], and the end-of-flow checklist (--params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}') collects it once` };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
     process.exit(1);
   }
@@ -163,7 +163,7 @@ export default {
     const name = normalizeFoundationName(args.foundation);
     const foundation = readFoundation(db, name);
     if (foundation?.owner?.workflowId !== workflowId) {
-      throw Object.assign(new Error(`--foundation ${name}: ${foundation?.owner ? `owned by ${foundation.owner.workflowId}` : 'not claimed'}; a foundation leg builds a foundation this workflow claimed (api foundation --claim ${name})`), { code: 'foundation-not-owned' });
+      throw Object.assign(new Error(`--foundation ${name}: ${foundation?.owner ? `owned by ${foundation.owner.workflowId}` : 'not claimed'}; a foundation leg builds a foundation this workflow claimed (starci kernel foundation --claim ${name})`), { code: 'foundation-not-owned' });
     }
     foundationLeg = name;
   } else {
@@ -176,7 +176,7 @@ export default {
     if (duty.advised) foundationAdvisory = duty.detail;
   }
   // --contract-change <id> --follow-up-of <job>: the follow-up leg a `reach: follow-up` contract change
-  // owes an older leg (api status contractFollowUps); the older leg is never held for it.
+  // owes an older leg (starci kernel status contractFollowUps); the older leg is never held for it.
   let contractChange = null;
   if (args['contract-change'] != null || args['follow-up-of'] != null) {
     const change = changeById(registry, String(args['contract-change'] ?? '').trim());
@@ -231,7 +231,7 @@ export default {
     job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
     unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
-    // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; api run-deferred-tests runs it later).
+    // spent, and the legs behind it proceed (scripts/route/spec-deferral.mjs; starci kernel run-deferred-tests runs it later).
     // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
     const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
     if (deferral) {
@@ -247,7 +247,7 @@ export default {
     peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
     ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(contractChange ? { contractChange } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; starci kernel run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
 
   },
 };

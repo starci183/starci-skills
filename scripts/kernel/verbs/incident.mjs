@@ -1,4 +1,4 @@
-// api incident: durable waits, resolution and shared-blocker routing.
+// starci kernel incident: durable waits, resolution and shared-blocker routing.
 import path from 'node:path';
 import { newToken, openIncident, resolveIncident } from '../../../engine/db/ledger.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -90,14 +90,14 @@ export default {
         peer = landedCond.workflowId;
       }
       // --until-foundation <name>: a typed wait released when that shared foundation lands (a
-      // gate-conditions.mjs condition; api foundation --land resolves it and wakes this Kernel). Its
+      // gate-conditions.mjs condition; starci kernel foundation --land resolves it and wakes this Kernel). Its
       // peer is the foundation's owner.
       if (foundationCond) {
         const name = foundationCond.name;
         const foundation = readFoundation(db, name);
-        if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (api foundation --claim ${name}) or you declare the need (api foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
+        if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (starci kernel foundation --claim ${name}) or you declare the need (starci kernel foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
         if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
-        if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (api notify) and have it claimed first`), { code: 'foundation-unowned' });
+        if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (starci kernel notify) and have it claimed first`), { code: 'foundation-unowned' });
         if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
         peer = foundation.owner.workflowId;
         foundationWait = { name, foundation };
@@ -115,7 +115,7 @@ export default {
     const incidentId = `inc-${newToken().slice(0, 12)}`;
     // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): nothing waits on the owner mid-flow - an owner gate
     // the Kernel raises is a runtime/process wait and is recorded as the Supervisor's (supervisor-gate). An owner-only
-    // need is an ask the runtime defers to handover (api autopilot --defer-to-handover), never a gate.
+    // need is an ask the runtime defers to handover (starci kernel autopilot --defer-to-handover), never a gate.
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
     ledger.transaction(() => {
@@ -181,7 +181,7 @@ function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
   try {
     wake = wakeKernelForTransition(ledger, { workflowId: found.workflowId, transition: 'follow-up-received', lines: [
       `${workflowId} routed follow-up ${sent.key} (incident ${incidentId}) to you.`,
-      'Re-read canonical api status and api inbox now; act on the follow-up in your scope, then ack it.',
+      'Re-read canonical starci kernel status and starci kernel inbox now; act on the follow-up in your scope, then ack it.',
     ] });
   } catch { wake = null; }
   return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(typed ? { until: typed } : {}), ...(wake ? { wake } : {}) };

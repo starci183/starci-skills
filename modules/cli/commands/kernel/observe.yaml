@@ -1,0 +1,54 @@
+group: kernel
+verb: observe
+owner: runtime
+summary: read the exact op terminal screen of a job (reasoning context, never evidence)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - observe
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: job
+    type: string
+    required: true
+  - name: lines
+    type: number
+    summary: how many trailing screen lines to read (positive integer)
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel observe --repo <path> --job <job>
+  - starci kernel observe --repo <path> --job <job> --lines 60
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api observe
+  - node scripts/kernel/cli.mjs observe
+reads: the job row; the exact operation terminal handle resolved from the dispatch binding
+  (payload.managed/orca agentTerminalHandle, hierarchy runtime handle, or worker_id — the same
+  source nudge/status use); Orca terminal-show for liveness plus a bounded terminal-read screen tail
+  through scripts/api/orca wrappers — the kernel still never calls orca itself
+writes: "one events row kind 'op-observed' {opId, attempt, terminal, turnState, screenBytes} — a
+  compact receipt only; the screen bytes never enter the ledger. No
+  jobs/contracts/reports/checks/leases row is touched: observation is READ-ONLY reasoning context,
+  never evidence — an op's screen is never proof; only `starci kernel report` plus kernel-run `starci kernel record-checks` rows
+  settle a verdict"
+returns: "{ok:true, job, jobId, opId, attempt, ledgerStatus,
+  terminal:{handle,connected,writable,status,idleMs,screenState?}, screen:<tail of last --lines
+  lines, default 80, null when unreadable>,
+  turnState:active|staged-input|turn-idle|disconnected|unreadable|unknown, observedAt} —
+  staged-input is an unsubmitted paste (status workers.liveness); starci kernel nudge submits it"
+refuses:
+  - job-not-found: no jobs row for --job
+  - job-not-operation: only an operation job has an observable worker terminal
+  - no-live-worker: the job binds no live worker terminal (never dispatched, or no handle recorded) —
+      typed, not a crash
+usedBy: drive.wait — the modules/models/runtimes.yaml allocation.observeCadenceMs observation
+  cadence on a running op keeps reasoning context alive before nudge/settle-fail decisions;
+  observation never substitutes for report/checks

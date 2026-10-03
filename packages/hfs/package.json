@@ -1,19 +1,17 @@
 {
   "name": "@starci/hfs",
   "version": "4.0.9",
-  "description": "The HFS command line of a StarCi app (one repository: the root, be/ and fe/): hfs lint, check, scaffold app, explain, sync and work-hygiene. Self-contained: it carries the runtime files it reads.",
+  "description": "The StarCi app command implementation for scaffolding, linting, checking and synchronizing one product repository.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
-  "bin": {
-    "hfs": "./bin/hfs.mjs"
-  },
   "exports": {
+    ".": "./src/main.mjs",
     "./package.json": "./package.json",
     "./runtime/*": "./runtime/*"
   },
   "files": [
-    "bin/hfs.mjs",
+    "src/main.mjs",
     "emit/**",
     "lint/**",
     "scaffold/**",
@@ -35,6 +33,6 @@
     "sync:check": "node ../../scripts/hfs/sync-runtime.mjs --check",
     "prepack": "node prep-runtime.mjs",
     "pretest": "node prep-runtime.mjs",
-    "test": "node --test \"bin/*.spec.mjs\""
+    "test": "node --test \"src/*.spec.mjs\""
   }
 }

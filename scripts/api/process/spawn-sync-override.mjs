@@ -1,5 +1,5 @@
 // spawn-sync-override.mjs — run a function with node:child_process spawnSync replaced process-wide, then restore it: the
-// Kernel's `api status` answers prefetched Orca reads and memoises read-only git reads this way (scripts/kernel/cli.mjs
+// Kernel's `starci kernel status` answers prefetched Orca reads and memoises read-only git reads this way (scripts/kernel/cli.mjs
 // withStatusSpawnMemo), and records the spawns a read would make instead of running them (recordSpawns). Every api
 // system's spawnSync - a named import included (syncBuiltinESMExports) - sees the replacement while `fn` runs.
 import cp from 'node:child_process';

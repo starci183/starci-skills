@@ -173,7 +173,7 @@ $defs:
                   items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
               addKinds:
                 type: object
-                description: 'hfs add <noun> <name>. Noun -> the pattern topic whose files tree is generated, its instance variable, the patterns and trigger kind it registers, the options it needs and the defaults of the other variables.'
+                description: 'starci app add <noun> <name>. Noun -> the pattern topic whose files tree is generated, its instance variable, the patterns and trigger kind it registers, the options it needs and the defaults of the other variables.'
                 additionalProperties:
                   type: object
                   required: [topic, variable, patterns]
@@ -325,7 +325,7 @@ $defs:
               selfChecks:
                 type: array
                 minItems: 1
-                description: The retained runtime self-checks `starci check` runs after the runtime check, in order.
+                description: The retained runtime self-checks `starci runtime check` runs after the runtime check, in order.
                 items:
                   type: object
                   additionalProperties: false

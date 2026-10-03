@@ -1,0 +1,27 @@
+group: supervisor
+verb: actions
+owner: runtime
+summary: list, record, or preview the Supervisor's owed-action audit trail
+impl:
+  script: scripts/supervisor/actions.mjs
+positional:
+  - {name: action, enum: [list, record, digest], required: true, variadic: false}
+flags:
+  - {name: open, type: boolean, summary: list only unacted or breached items}
+  - {name: item, type: string, summary: owed-action key to record}
+  - {name: action, type: string, summary: action performed on the item}
+  - {name: reason, type: string, summary: reason for the recorded action}
+  - {name: workflow, type: string, summary: related workflow id}
+  - {name: refs, type: string, summary: comma-separated evidence references}
+  - {name: until, type: string, summary: ISO time until which the ruling holds}
+  - {name: hold-ms, type: number, summary: milliseconds for which the ruling holds}
+exit: {"0": action completed, "1": runtime read or write failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor actions list --open
+  - starci supervisor actions record --item <key> --action <verb> --reason <text>
+  - starci supervisor actions digest --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/actions.mjs

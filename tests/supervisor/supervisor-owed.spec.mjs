@@ -138,7 +138,7 @@ test('fixed-by: a later commit citing the incident, or an incident it escalates;
   assert.equal(i['inc-666666666666'].fixedBy,null);
   assert.match(i['inc-111111111111'].line,/^OWED wf-nivo-app-auth-mudqjob3 inc-111111111111 \[source-runtime-defect\] age=120m fixed-by aaaaaaaaa\?: terminal liveness/);
   assert.match(i['inc-666666666666'].line,/^OWED wf-nivo-app-auth-mudqjob3 inc-666666666666 \[weird-new-kind\] age=45m open: something nobody/);
-  assert.match(i['inc-111111111111'].action,/verify aaaaaaaaa fixed it, then tell wf-nivo-app-auth-mudqjob3's Kernel: api incident --workflow wf-nivo-app-auth-mudqjob3 --resolve inc-111111111111/);
+  assert.match(i['inc-111111111111'].action,/verify aaaaaaaaa fixed it, then tell wf-nivo-app-auth-mudqjob3's Kernel: starci kernel incident --workflow wf-nivo-app-auth-mudqjob3 --resolve inc-111111111111/);
   assert.match(i['inc-777777777777'].action,/decide it under the owner's delegated authority/);
   assert.doesNotMatch(owed.map(o=>o.action).join('\n'),/ask the owner/i,'an OWED item is the supervisor\'s to fix, never an owner question');
   // index.yaml appears in five commits: generic, never evidence.
