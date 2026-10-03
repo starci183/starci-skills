@@ -38,13 +38,13 @@ import crypto from 'node:crypto';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/db/ledger.mjs';
-import { openMachineReader } from '../../engine/db/machine.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadAdapter } from '../agent/lib.mjs';
 import { launchKernelGroup } from './launch-kernel-group.mjs';
+import { expiredKernelStartupHealth } from './kernel-startup-capacity.mjs';
 import { ownerReserveGrant, planAgentAdmission } from '../agent/admission.mjs';
 import { prepareProviderBudget } from '../agent/provider-budget.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
@@ -388,19 +388,7 @@ async function signalHealth(signal) {
   if (value.state === 'starting' && signal.expires_at > Date.now()) {
     return { live: true, reason: 'startup reservation active', terminal: null, value };
   }
-  if (value.state === 'starting') {
-    let machine=null;
-    try {
-      machine=openMachineReader();
-      const scopePrefix=`${ledger.ledgerId ?? ledger.path}:${signal.key}:kernel-attempt:`;
-      const held=machine?.providerReservations({activeOnly:true}).find(row=>row.role==='kernel'
-        && row.scope?.scopeId?.startsWith(scopePrefix) && ['launching','live','unknown'].includes(row.state));
-      if (held) return {live:false,unverified:true,reason:'startup reservation expired with an unsettled launch receipt',
-        terminal:held.handle ?? null,value};
-    } catch (error) { return {live:false,unverified:true,reason:`startup capacity could not be verified: ${error.message}`,terminal:null,value}; }
-    finally { machine?.close(); }
-    return {live:false,reason:'startup reservation expired before any launch effect',terminal:null,value};
-  }
+  if (value.state === 'starting') return expiredKernelStartupHealth({ ledgerId: ledger.ledgerId ?? ledger.path, workflowId: signal.key, value });
   if (value.dispatch) {
     const shown = workerShow({ dispatch: value.dispatch });
     // An Orca that does not answer proves nothing about the worker: host-unavailable, never a dead seat.

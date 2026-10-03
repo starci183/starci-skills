@@ -16,19 +16,23 @@ paths:
   - scripts/lib/agent-admission.mjs
   - scripts/lib/quota-evidence.mjs
   - scripts/lib/orca-request-id.mjs
+  - scripts/api/orca/lib.mjs
   - scripts/api/orca/request-show.mjs
   - scripts/agent/admission.mjs
-  - scripts/agent/launch.mjs
+  - scripts/agent/admission-launch.mjs
   - scripts/agent/pool-admission.mjs
   - scripts/agent/provider-budget.mjs
   - scripts/agent/quota/snapshot.mjs
   - scripts/agent/model-registry.mjs
   - scripts/kernel/launch-kernel-group.mjs
   - scripts/kernel/start-workflow.mjs
+  - scripts/kernel/kernel-startup-capacity.mjs
   - scripts/kernel/verbs/route.mjs
   - scripts/kernel/verbs/shared/dispatch-agent.mjs
   - scripts/route/admitted-model-set.mjs
   - scripts/supervisor/worker-state.mjs
+  - scripts/machine/provider-budget-release.mjs
+  - scripts/machine/worker-close.mjs
   - engine/db/machine.mjs
   - engine/db/machine-schema.mjs
   - engine/db/provider-reservations.mjs

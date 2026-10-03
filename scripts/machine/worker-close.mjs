@@ -32,7 +32,7 @@ import { readEnv } from '../lib/env.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { closeAndVerify } from './close-verify.mjs';
 import { supLog } from './sup-log.mjs';
-import { releaseProviderBudgetByHandle } from '../agent/provider-budget.mjs';
+import { releaseProviderBudgetByHandle } from './provider-budget-release.mjs';
 
 const HANDLE_ENV = 'ORCA_TERMINAL_HANDLE';
 

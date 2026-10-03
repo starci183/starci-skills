@@ -4,12 +4,12 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { withMachine, readMachine } from '../../engine/db/machine.mjs';
 import { normalizeQuotaSnapshot } from './quota/snapshot.mjs';
 import { inspectQuotaEvidence } from '../lib/quota-evidence.mjs';
+import { providerBudgetClock as clockOf, providerBudgetOptions as optionsOf } from '../machine/provider-budget-release.mjs';
+export { releaseProviderBudgetByHandle } from '../machine/provider-budget-release.mjs';
 
 const scopeOf = (input) => ({ scopeId: input.scopeId ?? input.scope?.scopeId ?? null,
   runId: input.scope?.runId ?? input.runId ?? null, jobId: input.scope?.jobId ?? input.jobId ?? null,
   seat: input.scope?.seat ?? input.seat ?? null });
-const clockOf = (options) => typeof options.now === 'function' ? options.now : () => options.now ?? Date.now();
-const optionsOf = (options) => ({ env: options.env ?? process.env, ...(options.file ? { file: options.file } : {}), now: clockOf(options) });
 const policyOf = (options) => options.policy ?? allocationSettings()?.admission;
 const exactOverride = (override, input, scope) => override?.authorized === true && typeof override.reason === 'string' && override.reason.trim()
   && override.scopeId === scope?.scopeId && scope?.scopeId != null && override.role === input.role
@@ -75,14 +75,4 @@ export function reconcileProviderBudget(observations = [], options = {}) {
 export function providerBudgetUsage(provider, account = 'default', options = {}) {
   return readMachine((m) => m.providerReservationUsage({ provider, account }),
   { running: null, reservations: [], observed: false }, optionsOf(options));
-}
-/** The centralized closure owner supplies verified terminal AND process-tree exit evidence. */
-export function releaseProviderBudgetByHandle(handle, proof, options = {}) {
-  if (!handle || proof?.kind !== 'closed' || proof.confirmed !== true || proof.handle !== handle)
-    return { ok: false, reason: 'exit-unproven', released: 0 };
-  return withMachine((m) => {
-    const rows = m.providerReservations({ activeOnly: true }).filter((row) => row.handle === handle);
-    const results = rows.map((row) => m.releaseProviderReservation({ ...row, proof }));
-    return { ok: results.every((result) => result.ok), released: results.filter((result) => result.ok && !result.reused).length, results };
-  }, optionsOf(options));
 }
