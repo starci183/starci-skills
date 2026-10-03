@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parityOutcome, parityPlan, parityScript, readWorkflows, runParity } from '../../scripts/supervisor/release-linux-parity.mjs';
 import { sonarSupplier } from '../../scripts/supervisor/release-l4-sonar.mjs';
 import { sonarUp } from '../../scripts/gates/sonar-status.mjs';
-import { exampleApps, planL4, runL4, scriptsOf, specEnv } from '../../scripts/supervisor/release-l4.mjs';
+import { exampleApps, passesOf, planL4, runL4, scriptsOf, sectionOf, skipReport, specEnv, specFilesFor } from '../../scripts/supervisor/release-l4.mjs';
 import { cutRelease } from '../../scripts/supervisor/release-cut.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -294,6 +294,82 @@ test('L4: a lite app is planned without the test scripts it cannot have, a full 
   assert.deepEqual(rows('big').filter(([, absent]) => absent), [['test:e2e', true]], 'a full app that lacks a script is absent, never skipped by silence');
   assert.equal(rows('big').length, 11);
   assert.deepEqual(scriptsOf({ edition: 'full' }).length, 11);
+});
+
+test('evidence rule: the log readers know the passed tests of both reporters and the part of the container log one step printed', () => {
+  const spec = '✔ bash completion has valid syntax (43ms)\n﹣ zsh completion has valid syntax (0.1ms) # zsh binary is unavailable\n  ✔ nested pass (1.5ms)\n✖ red one (2ms)\n';
+  assert.deepEqual(passesOf(spec), ['bash completion has valid syntax', 'nested pass']);
+  assert.deepEqual(passesOf('ok 1 - fine\nok 2 - skipped one # SKIP no shell\nnot ok 3 - broken\nok 4 - later # TODO later\n    ok 5 - nested fine\n'), ['fine', 'nested fine']);
+  const log = '##STEP linux-parity: install\nnpm ok\n##STEP linux-specs: 2 spec file(s) the host run skipped tests of\n✔ zsh completion has valid syntax (3ms)\n﹣ x (1ms) # no powershell\n##STEP later\nafter\n##DONE\n';
+  assert.equal(sectionOf(log, 'linux-specs'), '✔ zsh completion has valid syntax (3ms)\n﹣ x (1ms) # no powershell');
+  assert.equal(sectionOf(log, 'absent'), '');
+  assert.equal(sectionOf('##STEP linux-specs: last\nlast line\n##DONE', 'linux-specs'), 'last line');
+});
+
+test('evidence rule: a skip that passed in another leg is covered and listed with where; a declared skip stays declared; a skip no leg ran, or one that only passed in its own step, fails', () => {
+  const steps = [
+    { name: 'npm test', ok: true, skips: [{ name: 'zsh completion has valid syntax', reason: 'zsh binary is unavailable' }, { name: 'symlinked log', reason: 'EPERM' }, { name: 'draw-layer paints', reason: 'no browser' }, { name: 'only here', reason: 'no docker' }, { name: 'same name', reason: 'x' }], passes: ['bash ok', 'same name', 'PowerShell parse'] },
+    { name: 'linux-parity', ok: true, skips: [{ name: 'PowerShell parse', reason: 'powershell.exe is unavailable' }], passes: ['zsh completion has valid syntax', 'symlinked log'] },
+  ];
+  const report = skipReport(steps);
+  assert.deepEqual(report.covered, [
+    { name: 'zsh completion has valid syntax', skippedIn: 'npm test', passedIn: 'linux-parity' },
+    { name: 'symlinked log', skippedIn: 'npm test', passedIn: 'linux-parity' },
+    { name: 'PowerShell parse', skippedIn: 'linux-parity', passedIn: 'npm test' },
+  ], 'each leg covers the other');
+  assert.deepEqual(report.declared, ['draw-layer paints']);
+  assert.deepEqual(report.failures.map((k) => [k.name, k.class]), [['only here', 'infrastructure'], ['same name', 'undeclared']], 'a pass in the skipping step itself is no second leg');
+});
+
+test('the parity script runs the host-skipped spec files after the planned steps with the shells installed inside the container only; no spec step without files', () => {
+  const plan = { image: 'node:22', steps: [{ name: 'ci: Install', dir: '.', run: 'npm ci', env: {} }], skipped: [] };
+  const without = parityScript(plan);
+  assert.ok(!without.includes('apt-get') && !without.includes('linux-specs'));
+  const script = parityScript({ ...plan, specs: ['tests/cli/completions.spec.mjs', "tests/it's/odd.spec.mjs"] });
+  assert.ok(script.indexOf('run_step \'ci: Install\'') < script.indexOf('linux-specs: 2 spec file(s)'), 'after the planned steps');
+  assert.ok(script.indexOf('linux-specs') < script.indexOf('echo "##DONE"'), 'before the done marker');
+  assert.match(script, /apt-get install -y -qq zsh fish/);
+  assert.match(script, /node --import \.\/tests\/setup\/low-priority\.mjs --import \.\/tests\/setup\/isolated-temp\.mjs --import \.\/tests\/setup\/isolated-registry\.mjs --import \.\/tests\/setup\/runtime-copies\.mjs --test --test-reporter=spec 'tests\/cli\/completions\.spec\.mjs' 'tests\/it'\\''s\/odd\.spec\.mjs'/);
+});
+
+test('specFilesFor finds the spec files that hold a test title as literal text and names the titles it cannot find', (t) => {
+  const base = tmp(t, 'files');
+  const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(base, file)), { recursive: true }); fs.writeFileSync(path.join(base, file), text); };
+  put('tests/cli/completions.spec.mjs', "test('zsh completion has valid syntax', () => {});\ntest('fish completion has valid syntax', () => {});\n");
+  put('tests/housekeeping/hk-logs.spec.mjs', "test('a symlinked log file is skipped, never deleted through', () => {});\ntest('it\\'s quoted', () => {});\n");
+  put('tests/node_modules/x/ignored.spec.mjs', "test('zsh completion has valid syntax', () => {});\n");
+  put('tests/helpers/not-a-spec.mjs', "zsh completion has valid syntax\n");
+  const found = specFilesFor(base, ['zsh completion has valid syntax', 'a symlinked log file is skipped, never deleted through', "it's quoted", 'the packed ${name} loads']);
+  assert.deepEqual(found.files, ['tests/cli/completions.spec.mjs', 'tests/housekeeping/hk-logs.spec.mjs']);
+  assert.deepEqual(found.unmatched, ['the packed ${name} loads']);
+  assert.deepEqual(specFilesFor(path.join(base, 'absent'), ['x']), { files: [], unmatched: ['x'] });
+});
+
+test('L4 evidence: the Linux leg is handed the spec files of the host run\'s skipped tests, its log is read back, and a test that ran in neither leg fails the row', async (t) => {
+  const base = tmp(t, 'evidence');
+  fs.writeFileSync(path.join(base, 'package.json'), JSON.stringify({ name: 'rt', scripts: { test: 'x', check: 'x' } }));
+  fs.mkdirSync(path.join(base, 'tests', 'cli'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'tests', 'cli', 'completions.spec.mjs'), "test('zsh completion has valid syntax', () => {});\ntest('a title only the host skipped', () => {});\n");
+  const plan = planL4(base, { runtimeRoot: base });
+  const hostLog = '✔ bash completion has valid syntax (3ms)\n﹣ zsh completion has valid syntax (0.1ms) # zsh binary is unavailable\n﹣ a title only the host skipped (0.1ms) # no shell\n﹣ a template title 1 (0.1ms) # no shell\n';
+  const seen = {};
+  const leg = (passes) => (repo, deps) => {
+    seen.specs = deps.specs;
+    const log = path.join(base, 'parity.log');
+    fs.writeFileSync(log, `##STEP linux-parity: install\nok\n##STEP linux-specs: ${deps.specs.length} spec file(s)\n${passes}\n##DONE\n`);
+    return { name: 'linux-parity', ok: true, log, ms: 1, skips: [] };
+  };
+  const run = (parity) => runL4(base, { plan, supplier: { proofs: {}, close: () => {} }, unlink: () => true, parity, step: (s) => ({ ok: true, log: 'x', ms: 1, text: s.name === 'npm test' ? hostLog : '' }) });
+  const out = await run(leg('✔ zsh completion has valid syntax (30ms)\n﹣ PowerShell parse (0.1ms) # powershell.exe is unavailable'));
+  assert.deepEqual(seen.specs, ['tests/cli/completions.spec.mjs'], 'the files that hold the skipped titles, once');
+  const linux = out.at(-1);
+  assert.deepEqual([linux.passes, linux.skips.map((k) => k.name), linux.unmatched.sort()], [['zsh completion has valid syntax'], ['PowerShell parse'], ['a template title 1']]);
+  const report = skipReport(out);
+  assert.deepEqual(report.covered.map((c) => c.name), ['zsh completion has valid syntax']);
+  assert.deepEqual(report.failures.map((k) => k.name).sort(), ['PowerShell parse', 'a template title 1', 'a title only the host skipped'], 'executed in no leg: the title the Linux run did not pass, the one nothing found, and the Linux-only skip no host pass covers');
+  const quiet = await runL4(base, { plan, supplier: { proofs: {}, close: () => {} }, unlink: () => true, parity: () => ({ name: 'linux-parity', ok: true, log: null, ms: 1, skips: [] }), step: () => ({ ok: true, log: 'x', ms: 1, text: '✔ all fine (1ms)\n' }) });
+  assert.deepEqual(quiet.at(-1).specs, [], 'no host skip, no spec step');
+  assert.deepEqual(skipReport(quiet).failures, []);
 });
 
 test('the cut runs the default L4 row with its wiring: a red Linux step is a red suite and blocks the cut; the heavy part runs inside the host lock', async (t) => {

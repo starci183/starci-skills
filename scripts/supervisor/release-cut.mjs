@@ -108,11 +108,14 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const red = steps.filter((s) => !s.ok);
   if (red.length) return refuse('suite-red', `${red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ')} red: fix, land, and cut again (logs: ${red.map((s) => s.log).filter(Boolean).join(', ')})`);
   if (!steps.length) return refuse('suite-red', 'the full suite did not run');
-  // L4 reports every skipped test with its reason: a skip caused by missing infrastructure, or any skip but the declared browser-conditional ones, fails it.
+  // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
+  // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.
   const skips = skipReport(steps);
   out.skips = skips.skips;
   out.declaredSkips = skips.declared;
-  if (skips.failures.length) return refuse('suite-skips', `${skips.failures.length} skipped test(s) fail L4: ${skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ')}`);
+  out.coveredSkips = skips.covered;
+  const unmatched = steps.flatMap((s) => s.unmatched ?? []);
+  if (skips.failures.length) return refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ')}${unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : ''}`);
 
   if (run(['rev-parse', 'HEAD'], { cwd }).stdout !== head || run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout) return refuse('main-moved', 'the checkout changed while the suite ran: start over');
   const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });
