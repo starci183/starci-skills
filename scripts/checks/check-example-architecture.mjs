@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `starci app lint` (the published CLI over its
-// runtime copy, THE lint of an app: ESLint over be/ and fe/ with the two canons, which judge the architecture machine's source
-// findings, stylelint over fe/ and `starci app check`) on every examples/<name> app that has an hfs.json, prints per example the
+// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `starci app lint --format json` at the root of
+// every examples/<name> app that has an hfs.json, through the `starci` bin the example installs (its @starci/cli), else this runtime's
+// packages/cli/bin/starci.mjs (scripts/lib/package-at.mjs starciBin) - THE lint of an app: ESLint over be/ and fe/ with the two canons,
+// which judge the architecture machine's source findings, stylelint over fe/ and `starci app check`. It prints per example the
 // findings by code (the catalog code a finding carries, else its rule) and fails when any example has a finding or a tool that
 // could not run. `starci app check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
 // ...) sit on the lint surface (scripts/hfs/architecture/surface.mjs) and reach an app only through `starci app lint`.
@@ -16,9 +17,9 @@ import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from '../lib/is-main.mjs';
+import { starciBin } from '../lib/package-at.mjs';
 
-const HFS_BIN = path.join(skillRoot, 'packages', 'hfs', 'bin', 'hfs.mjs');
-const USAGE = 'usage: check-example-architecture.mjs [--examples <dir>] [--only <name>]';
+const USAGE = 'usage: starci runtime check --only example-architecture -- [--examples <dir>] [--only <name>]';
 
 /** The example directories under `examplesDir` that declare an hfs.json, by name. */
 export function exampleDirs(examplesDir, only) {
@@ -31,8 +32,9 @@ export function exampleDirs(examplesDir, only) {
  * {name, status, errors, byCode} of one example: status is `clean`, `findings` or `unrunnable` (the CLI refused, printed no
  * report, or a tool of the lint could not run - a lint that did not run is never clean).
  */
-function checkExample(examplesDir, name, { bin = HFS_BIN } = {}) {
-  const run = runNode([bin, 'lint', '--repo', path.join(examplesDir, name), '--format', 'json'], { maxBuffer: 256 * 1024 * 1024 });
+function checkExample(examplesDir, name, { bin } = {}) {
+  const root = path.join(examplesDir, name);
+  const run = runNode([bin ?? starciBin(root), 'app', 'lint', '--format', 'json'], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(run.stdout); } catch { report = null; }
   if (!report?.counts || !Array.isArray(report.findings)) return { name, status: 'unrunnable', errors: 1, byCode: {}, detail: (run.stderr || run.stdout || `exit ${run.status}`).trim().split('\n')[0] };
@@ -60,8 +62,8 @@ export function formatResults(results) {
   return `${lines.join('\n')}\n`;
 }
 
-/** The CLI: `bin` is the hfs CLI the examples are linted with (the runtime's own by default; a spec passes a stub). */
-export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), bin = HFS_BIN } = {}) {
+/** The check: `bin` is the starci CLI the examples are linted with (by default each example's own, else the runtime's). */
+export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), bin } = {}) {
   let examplesDir = path.join(skillRoot, 'examples');
   let only;
   for (let i = 0; i < argv.length; i += 1) {

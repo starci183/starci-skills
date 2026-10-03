@@ -39,13 +39,14 @@ export function workspaceOf(workspace) {
   return rel;
 }
 
-/** The flags of `starci app lint`; `--changed` takes every argument up to the next flag. */
+/** The flags of `starci app lint`; `--changed` takes every argument up to the next flag, and a repeated `--changed` adds to the list (the
+ *  catalog's list flag, `--changed a --changed b`, as the CLI dispatcher passes it through). */
 export function parseLintArgs(argv) {
   const opts = { changed: null, fix: false, format: 'text', sonar: undefined, workspace: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
-      opts.changed = [];
+      opts.changed ??= [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(posix(argv[++i]));
     } else if (arg === '--fix') opts.fix = true;
     else if (arg === '--json') opts.format = 'json';

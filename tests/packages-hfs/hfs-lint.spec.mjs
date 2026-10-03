@@ -100,6 +100,8 @@ test('parseLintArgs takes every argument after --changed up to the next flag, an
   assert.equal(opts.format, 'json');
   assert.equal(parseLintArgs(['--fix']).fix, true);
   assert.equal(parseLintArgs([]).changed, null);
+  // The catalog's list flag reaches @starci/hfs as `--changed a --changed b` (packages/cli/src/validate-args.mjs): every one counts.
+  assert.deepEqual(parseLintArgs(['--changed', 'a.ts', '--changed', 'b.ts', 'c.ts', '--format', 'json']).changed, ['a.ts', 'b.ts', 'c.ts']);
   assert.throws(() => parseLintArgs(['--format', 'xml']), /text or json/);
   assert.throws(() => parseLintArgs(['--nope']), /unknown argument/);
   assert.throws(() => parseLintArgs(['--sonar']), /needs a value/);
