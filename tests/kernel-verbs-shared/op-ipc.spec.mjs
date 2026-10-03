@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {startOpIpcCli} from '../helpers/kernel-verbs-shared-op-ipc-fixture.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 
@@ -56,6 +57,7 @@ const fixture=(t,{mode='healthy'}={})=>{
   for(const file of [CLI.machineFile,`${CLI.machineFile}-shm`,`${CLI.machineFile}-wal`])fs.rmSync(file,{force:true});
   const repo=path.join(CLI.workspaceRoot,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ['docs','src'])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const env={...process.env,
+    ...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:CLI.orcaArgs,
     STARCI_FAKE_ORCA_MODE:mode,
@@ -75,6 +77,8 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_FAKE_ORCA_LOG:env.STARCI_FAKE_ORCA_LOG,
     STARCI_FAKE_ORCA_STATE:env.STARCI_FAKE_ORCA_STATE,
     LOCALAPPDATA:env.LOCALAPPDATA,
+    APPDATA:env.APPDATA,
+    STARCI_DEVIN_SEAT_ENDPOINT:env.STARCI_DEVIN_SEAT_ENDPOINT,
     STARCI_PROJECTS_ROOT:env.STARCI_PROJECTS_ROOT,
     STARCI_TEST_MACHINE_FILE:env.STARCI_TEST_MACHINE_FILE,
     STARCI_AUTOPILOT:env.STARCI_AUTOPILOT,

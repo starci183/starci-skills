@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {bindWorkflowRun} from '../../scripts/kernel/orca-runs.mjs';
@@ -30,7 +31,8 @@ const fixture=(t,runs)=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,runs}));
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
+    STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
     // op_attempts.dispatch_id is unique per workflow: two jobs cannot share one terminal handle.
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',

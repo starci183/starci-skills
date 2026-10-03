@@ -11,6 +11,7 @@ import {findHostBoundaryViolations} from '../../scripts/checks/check-host-bounda
 import {spawnAgent,startAgent} from '../../scripts/agent/lib.mjs';
 import {pathToFileURL} from 'node:url';
 import {fakeAdmission} from '../helpers/fake-admission.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import { DatabaseSync } from 'node:sqlite';
 
 // Every agent launch goes through orchestration worker-start (modules/kernel/contract-changes/
@@ -222,7 +223,7 @@ const fixture=t=>{
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
     .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
-  const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:ownerRoot,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),USERPROFILE:path.join(root,'home'),HOME:path.join(root,'home'),

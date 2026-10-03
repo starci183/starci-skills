@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {jobResultSql} from '../../scripts/machine/job-row.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -33,7 +34,7 @@ const fixture=t=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handshake-'));dirs.push(root);
     const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
     const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-    const env={...process.env,
+    const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
       STARCI_ORCA_COMMAND:process.execPath,          // the stub runs as `node fake-orca.mjs ...`
       STARCI_ORCA_ARGS:JSON.stringify([stub]),
       STARCI_FAKE_ORCA_MODE:mode,

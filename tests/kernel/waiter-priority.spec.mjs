@@ -7,6 +7,8 @@ import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhas
 import {BLOCKING_HEADS_UP_MS,blockingJobs,blockingLines,orderQueuedByBlocking} from '../../scripts/kernel/waiter-priority.mjs';
 import {workflowProgress,workflowSection} from '../../scripts/supervisor/progress-report.mjs';
 import {runKernelCli} from '../helpers/kernel-waiter-priority-fixture.mjs';
+import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot-run.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -26,7 +28,10 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-waiter-prio-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["src"])fs.mkdirSync(path.join(repo,d),{recursive:true});
-  const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
+  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
+    STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
+    STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
   const api=args=>runKernelCli({args,repo,env,cwd:ROOT});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});

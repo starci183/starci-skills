@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {inspectLedger,ledgerFileFor,reserveTwoPhase} from '../../engine/db/ledger.mjs';
 import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseRequests,ownedPathsIntersect,ownedPathspec} from '../../engine/admission.mjs';
 import {ownedPathEffects} from '../../scripts/kernel/owned-path-effects.mjs';
@@ -165,7 +166,7 @@ const apiFixture=t=>withLedger(t,({root,repoRoot:repo,ledger,ledgerFile})=>{
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   routeCheckout(repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const env={...process.env,
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',

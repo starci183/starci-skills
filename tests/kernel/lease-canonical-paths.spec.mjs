@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {findOwnedPathLeaseConflicts,leaseCompareForm} from '../../engine/admission.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {leaseCanonicalizer} from '../../scripts/kernel/lease-canon.mjs';
@@ -116,7 +117,7 @@ test('lease paths compare case-insensitively on Windows only',()=>{
 test('api: dispatch takes the app-relative lease, a parent of the same catalog waits on it, the backend side path does not',t=>{
   const {dir,be,source}=fixture(t);
   const stub=path.join(dir,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const env={...process.env,STARCI_SOURCE_ROOT:source,
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(dir,'appdata')),STARCI_SOURCE_ROOT:source,
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
     LOCALAPPDATA:path.join(dir,'localappdata')};

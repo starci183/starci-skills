@@ -8,6 +8,7 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
@@ -42,7 +43,7 @@ const fixture=(t,{bound=true}={})=>{
     sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'},
   }));
   const stub=path.join(dir,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const env={...process.env,STARCI_SOURCE_ROOT:source,
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(dir,'appdata')),STARCI_SOURCE_ROOT:source,
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),

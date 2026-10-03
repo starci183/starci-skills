@@ -19,6 +19,7 @@ import { credentialFingerprintOf, fingerprintOf } from '../../scripts/agent/cred
 import { writeProviderCircuit } from '../../scripts/machine/provider-circuit.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { fakeDevinQuotaEnv } from '../helpers/fake-devin-quota.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
@@ -78,7 +79,7 @@ const fakeOrcaEnv = (t) => {
   const dir = tmp(t, 'starci-fake-orca-');
   const stub = path.join(dir, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   fs.writeFileSync(path.join(dir, 'state.json'), '{}');
-  return { STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
+  return { ...fakeDevinQuotaEnv(t, path.join(dir, 'appdata')), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json'),
     LOCALAPPDATA: path.join(dir, 'localappdata') };
 };

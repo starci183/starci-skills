@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
@@ -71,7 +72,7 @@ const fixture=(t,{registry=null}={})=>{
   fs.copyFileSync(path.join(ROOT,'knowledge','op-gate.yaml'),path.join(skill,'knowledge','op-gate.yaml')); // the op loop a code-writing settle reads
   fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const env={...process.env,
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
+import {fakeDevinQuotaEnv} from '../helpers/fake-devin-quota.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {withMachine} from '../../engine/db/machine.mjs';
 import {publishThrottle} from '../../scripts/machine/ram-throttle.mjs';
@@ -51,7 +52,7 @@ const fixture=t=>{
   const c=spawnSync('git',['-C',repo,'commit','--quiet','-m','seed'],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:past,GIT_COMMITTER_DATE:past}});
   assert.equal(c.status,0,c.stderr);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const env={...process.env,
+  const env={...process.env,...fakeDevinQuotaEnv(t,path.join(root,'appdata')),
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',
