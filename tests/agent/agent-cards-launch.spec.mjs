@@ -42,8 +42,8 @@ test('a launch that names no model starts the card\'s model, so a dead default i
   const r = spawnAgent({ provider: 'codex', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 1 }, io });
   assert.equal(r.ok, true, r.error);
   assert.equal(calls[0].model, 'gpt-6-luna');
-  const named = spawnAgent({ provider: 'codex', model: 'gpt-6-sol', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 2 }, io: { ...io, show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6-sol' } }) } });
-  assert.equal(calls.at(-1).model, 'gpt-6-sol', 'a named model is kept');
+  const named = spawnAgent({ provider: 'codex', model: 'gpt-6.1-sol', worktree: 'x', title: 't', spec: 's', task: 't1', run: 'run_1', request: { a: 2 }, io: { ...io, show: () => ({ ok: true, state: 'ready', dispatch: { depth: 1 }, effective: { agent: 'codex', model: 'gpt-6.1-sol' } }) } });
+  assert.equal(calls.at(-1).model, 'gpt-6.1-sol', 'a named model is kept');
   assert.equal(named.ok, true, named.error);
 });
 

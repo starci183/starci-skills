@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {hostToolsRequired,kindRoute,raiseToFloor,selectPool,loadRuntimes} from '../../scripts/agent/models.mjs';
+import {loadPrices,priceOf,costOfRow} from '../../scripts/lib/llm-usage.mjs';
 
 // runtimes.yaml roleOfKind is the allocator's reading of every kind: role, think/hands-on work and the
 // least difficulty it routes at. These specs hold the owner's rules on that table: canonical-record and
@@ -14,6 +15,17 @@ const runtimes=loadRuntimes(path.join(ROOT,'modules','models'));
 const kinds=read('modules/models/kinds.yaml');
 const DIFFICULTY=['easy','medium','hard','insane'];
 const rank=d=>DIFFICULTY.indexOf(d);
+
+test('the active Sol catalog and token meter use GPT-6.1 Sol and its dated official cached-input rate',()=>{
+  const registry=read('modules/models/registry.yaml');
+  const prices=loadPrices(path.join(ROOT,'modules/models/registry.yaml'));
+  assert.equal(registry.targets['gpt-6.1-sol'].defaultModel,'gpt-6.1-sol');
+  assert.equal(registry.models['gpt-6.1-sol'].provider,'codex');
+  assert.equal(prices.asOf,'2026-10-03');
+  assert.match(prices.source,/https:\/\/developers\.openai\.com\/api\/docs\/models\/gpt-6\.1-sol/);
+  assert.equal(priceOf('gpt-6.1-sol',prices).cacheRead,0.1);
+  assert.equal(costOfRow({model:'gpt-6.1-sol',inputTokens:1_000_000,outputTokens:1_000_000,cacheReadTokens:1_000_000},prices),12.1);
+});
 
 test('every op manifest and every kinds.yaml kind carries a complete roleOfKind entry that agrees on role',()=>{
   const ops=fs.readdirSync(path.join(ROOT,'modules','ops','ops')).filter(f=>f.endsWith('.yaml')).map(f=>f.slice(0,-5));
@@ -56,14 +68,14 @@ test('a floor raises a measured difficulty and never lowers it',()=>{
   assert.equal(kindRoute('legacy.kind',{roleOfKind:{'legacy.kind':'implement'}}).role,'implement','a bare role string still resolves');
 });
 
-// Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6 Sol when Claude is unavailable, at every
+// Owner rule: thinking work goes to Claude Opus 5.5, or GPT-6.1 Sol when Claude is unavailable, at every
 // difficulty the work may be measured at — never to Luna or Devin.
 // Owner decision 2026-09-25 review-hands: Opus and Sol keep strategy only; the think verdicts (review, handover,
 // goal audit) and work.author walk the review order - Devin, Opus and Sol as overflow - which
 // tests/agent/allocation-balance.spec.mjs holds. Owner routing 2026-09-26: the kernel's own model calls walk sol-think
 // (Sol first, Opus overflow); interface.audit, security.verify and uat.assisted.verify walk ui (Sol first);
 // the mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair walk implement.
-const FRONTIER=new Set(['claude-opus-5-5','gpt-6-sol']);
+const FRONTIER=new Set(['claude-opus-5-5','gpt-6.1-sol']);
 const thinkKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.work==='think'&&!e.order).map(([kind])=>kind);
 const kernelKinds=Object.entries(runtimes.roleOfKind).filter(([,e])=>e.order==='sol-think').map(([kind])=>kind);
 const claudeDown={'claude-agent':{auth:'dead'}};
@@ -77,7 +89,7 @@ test('strategy think kinds resolve to a frontier model at every difficulty, Clau
     const needsTool=hostToolsRequired(kind).length>0;
     assert.equal(up.target,needsTool?'codex-agent':'claude-agent',`${kind}@${difficulty} leads with Claude unless a host tool forbids it`);
     const down=selectPool({kind,difficulty,runtimes,capacity:claudeDown});
-    assert.deepEqual([down.target,down.modelId],['codex-agent','gpt-6-sol'],`${kind}@${difficulty} with Claude down`);
+    assert.deepEqual([down.target,down.modelId],['codex-agent','gpt-6.1-sol'],`${kind}@${difficulty} with Claude down`);
     const both=selectPool({kind,difficulty,runtimes,capacity:{...claudeDown,'codex-agent':{auth:'dead'}}});
     assert.ok(both.error&&!both.target,`${kind}@${difficulty} with Opus and Sol down refuses - never Devin`);
   }
@@ -87,7 +99,7 @@ test('the kernel model calls walk sol-think: Sol first at every difficulty, Opus
   assert.ok(kernelKinds.length>=7,'the sol-think order carries the kernel model functions and judge');
   for(const kind of kernelKinds)for(const difficulty of DIFFICULTY){
     const up=selectPool({kind,difficulty,runtimes});
-    assert.deepEqual([up.order,up.target,up.modelId],['sol-think','codex-agent','gpt-6-sol'],`${kind}@${difficulty} leads with Sol`);
+    assert.deepEqual([up.order,up.target,up.modelId],['sol-think','codex-agent','gpt-6.1-sol'],`${kind}@${difficulty} leads with Sol`);
     const down=selectPool({kind,difficulty,runtimes,capacity:codexDown});
     assert.deepEqual([down.target,down.modelId],['claude-agent','claude-opus-5-5'],`${kind}@${difficulty} with Sol down`);
     const both=selectPool({kind,difficulty,runtimes,capacity:{...claudeDown,...codexDown}});
@@ -103,7 +115,7 @@ test('a think role with no kind never lands on Luna or Devin below the hard tier
   }
   for(const role of ['decide','plan']){
     const hard=selectPool({kind:'direct.call',role,difficulty:'hard',runtimes,capacity:claudeDown});
-    assert.deepEqual([hard.target,hard.modelId],['codex-agent','gpt-6-sol']);
+    assert.deepEqual([hard.target,hard.modelId],['codex-agent','gpt-6.1-sol']);
   }
 });
 

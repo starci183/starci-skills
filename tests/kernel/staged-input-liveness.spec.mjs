@@ -47,7 +47,7 @@ test('an inline paste of the sent text is staged-input, never active',()=>{
   const tail=['Devin',...PREAMBLE.split('\n').slice(1).map(l=>`  ${l}`)].join('\n');
   assert.equal(classifyAgentScreen(tail,{sentText:PREAMBLE}).state,'staged-input');
   // The "[Pasted Content]" marker needs no sent text.
-  assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6-sol\n\n› [Pasted Content 5012 chars]\n  gpt-6-sol high · repo').state,'staged-input');
+  assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6.1-sol\n\n› [Pasted Content 5012 chars]\n  gpt-6.1-sol high · repo').state,'staged-input');
 });
 
 test('a submitted prompt, a live turn above a queued paste and an idle prompt keep their states',()=>{
@@ -61,7 +61,7 @@ test('a submitted prompt, a live turn above a queued paste and an idle prompt ke
   // A finished answer after an old spinner, then a staged paste: the paste is what waits.
   const finished=['• Working (12m 03s • esc to interrupt)','• All checks passed; report filed.','  done 11:27 PM','› [Pasted Content 900 chars]'].join('\n');
   assert.equal(classifyAgentScreen(finished).state,'staged-input');
-  assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6-sol\n› Ask Codex to do anything',{sentText:PREAMBLE}).state,'turn-idle');
+  assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6.1-sol\n› Ask Codex to do anything',{sentText:PREAMBLE}).state,'turn-idle');
 });
 
 

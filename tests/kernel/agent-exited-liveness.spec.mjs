@@ -41,7 +41,7 @@ const LIVE_DEVIN=[`  ✓ Shell cd /d ${BE} && npm test -- --runInBand src/module
 // A Claude Kernel at rest, plus a Bash tool row that printed a prompt.
 const IDLE_CLAUDE=['● Bash(pwsh -c "Get-Location")',`  ⎿  PS ${BE}>`,
   '✻ Saut\u00e9ed for 19s · done 3:12 AM','─'.repeat(40),'❯','─'.repeat(40),'  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
-const IDLE_CODEX=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
+const IDLE_CODEX=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6.1-sol high · 70% left · ~\\x'].join('\n');
 
 /* ------------------------------------------------------------------ units */
 
@@ -175,7 +175,7 @@ const APP_AFTER=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`),'At line:1
 const APP_EXITED_BARE=[...APP_TRANSCRIPT,APP_PS].join('\n');
 const APP_EXITED_RESIDUE=[...APP_TRANSCRIPT,`${APP_PS} % left · ~\\shop-be`].join('\n');
 // A frozen Codex still drawing its footer: nothing on screen says the process is gone.
-const APP_FROZEN=[...APP_TRANSCRIPT,'  gpt-6-sol high · 58% left · ~\\shop-be'].join('\n');
+const APP_FROZEN=[...APP_TRANSCRIPT,'  gpt-6.1-sol high · 58% left · ~\\shop-be'].join('\n');
 // The shell mid-echo: the wake typed after the prompt, not yet run.
 const APP_TYPING=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`)].join('\n');
 
@@ -186,7 +186,7 @@ test('a Codex frame frozen at Working with a shell prompt under its input row is
   assert.equal(exitedAgentPromptRow(APP_TYPING),null,'mid-echo the last row is the wrapped wake, not a prompt');
   assert.equal(exitedAgentPromptRow(APP_FROZEN),null,'a frozen frame that still draws its footer proves nothing');
   // A launch typed under an old agent frame is not an exit, and a live agent never ends in a prompt row.
-  assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} codex --model gpt-6-sol -c model_reasoning_effort=high`].join('\n')),null);
+  assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} codex --model gpt-6.1-sol -c model_reasoning_effort=high`].join('\n')),null);
   // So is one whose line sets the launch env first (agents/claude.yaml launchEnv).
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; & claude --model 'claude-opus-5-5' --dangerously-skip-permissions`].join('\n')),null);
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`].join('\n')),`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`,'an env statement alone is no launch');

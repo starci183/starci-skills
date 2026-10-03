@@ -32,7 +32,7 @@ const DEVIN_DONE=[' The dispatch is settled; returning to idle.','────�
   'SWE-2 Max                             Context: 35k / 262k tokens (13%)','4 shells · ↓ select'].join('\n');
 const CLAUDE_CHROME=['──────────────────────────────────────────────────────────────────────','❯ ',
   '──────────────────────────────────────────────────────────────────────','  ⏵⏵ bypass permissions on (shift+tab to cycle)'];
-const CODEX_DONE=['  Nothing further to do — the dispatch is closed: report filed (done) and the single worker_done already sent.','','› ','  gpt-6-sol high · 62% left'].join('\n');
+const CODEX_DONE=['  Nothing further to do — the dispatch is closed: report filed (done) and the single worker_done already sent.','','› ','  gpt-6.1-sol high · 62% left'].join('\n');
 const SONAR=[' ● Read shell 65471a',' │ Timeout: 4m40s',' └ No output yet (still running)',
   '⠋ Running tools · 45m 3s (esc twice to interrupt)',...DEVIN_FOOT].join('\n');
 

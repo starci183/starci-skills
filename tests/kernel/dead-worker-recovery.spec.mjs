@@ -187,7 +187,7 @@ const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
   `PS ${DRIVE}Repositories\\shop-be>`].join('\n');
-const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6-sol',screen:DEAD_CODEX};
+const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6.1-sol',screen:DEAD_CODEX};
 test('closeExitedTerminal closes only on proof: a bare shell or a disconnected terminal, never an agent screen or an outage',async()=>{
   const {closeExitedTerminal}=await import('../../scripts/kernel/close-op-terminal.mjs');
   const closes=[];const close=h=>{closes.push(h);return {ok:true};};
@@ -199,7 +199,7 @@ test('closeExitedTerminal closes only on proof: a bare shell or a disconnected t
   assert.deepEqual([r.closed,r.proof],[true,'disconnected']);
   assert.equal(closes.length,2);
   closes.length=0;
-  const live=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
+  const live=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6.1-sol high · 70% left · ~\\x'].join('\n');
   r=probe(up,live);assert.deepEqual([r.closed,r.proof,r.reason],[false,null,'agent-screen']);
   r=probe(up,null);assert.deepEqual([r.closed,r.reason],[false,'unreadable']);
   r=probe({ok:false,hostUnavailable:true,errorCode:'runtime_unavailable',error:'Start the Orca app first.'});

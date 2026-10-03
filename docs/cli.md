@@ -5383,7 +5383,7 @@ json: starci/worker-start@1
 
 ```sh
 starci worker start --agent devin --worktree <path> --spec @brief.md --task-title "CLI worker verbs"
-starci worker start --agent codex --model gpt-6-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
+starci worker start --agent codex --model gpt-6.1-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
 ```
 
 ### starci worker stop

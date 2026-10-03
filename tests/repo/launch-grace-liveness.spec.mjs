@@ -21,7 +21,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const WF='wf-launch-grace',JOB='job-launch-grace',OP='decide',DISPATCH='dispatch-fake-1',HANDLE='term-launch-grace';
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const HOUR=3600*1000,MIN=60*1000,SEC=1000;
-const IDLE=['Codex','model: gpt-6-sol','','› Ask Codex to do anything'].join('\n');
+const IDLE=['Codex','model: gpt-6.1-sol','','› Ask Codex to do anything'].join('\n');
 // The first sentence of the wake cmdNudge builds for this exact job and attempt.
 const WAKE=`Operation liveness wake for durable job ${JOB} (${OP}) attempt 1.`;
 

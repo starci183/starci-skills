@@ -78,14 +78,16 @@ Optional keys:
 ## Kernel group
 
 The kernel is a model group, not a single model. The shipped default is
-`kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6-sol}], effort: high}`:
+`kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}`:
 `scripts/kernel/start-workflow.mjs` tries the members in order, skips one whose provider quota probe reads
-`dead` or whose ledger provider-health circuit is open, puts a `limited` one last, and — when a member's
+`dead` or whose machine provider-health circuit is open, puts a `limited` one last, and — when a member's
 launch is refused before the model took any input (an interactive gate such as the Claude first-run screen,
 an auth screen, a readiness or model-attestation failure) — closes that terminal and boots the next member in
 the same start (the rule and its step list are `modules/kernel/start-workflow.yaml` `spawn.fallThrough`).
-`engine/config.mjs` refuses an empty group, an agent named twice, an unknown agent, a model no runtime of
-that agent declares, and a group mixed with `agent`/`model` keys. A single pin `{agent, model, effort}` keeps
+`engine/config.mjs` refuses an empty group, an agent named twice, an unknown agent, a model not declared
+for that agent by the model catalog or its pool, and a group mixed with `agent`/`model` keys. A concrete
+catalog model such as `claude-sonnet-5-5` can be a Kernel group member without changing the Claude
+operation pool's Opus pins. A single pin `{agent, model, effort}` keeps
 its meaning: it is authoritative and fails closed rather than substituting. With no `kernel` key the unpinned
 route is the `sol-think` order - Sol first, Opus as overflow - resolved by `scripts/route/route-model.mjs`
 (`modules/models/selection.yaml` `decisionFlow` `kernel-function` and `kernel-availability`).
@@ -132,12 +134,12 @@ required role. The kernel's own model call kinds are
 
 ## Model routing
 
-Model routing holds the owner's rules as data. The `[Kernel]` seat is the Claude Opus 5.5 then GPT-6 Sol
+Model routing holds the owner's rules as data. The `[Kernel]` seat is the Claude Opus 5.5 then GPT-6.1 Sol
 group ([Kernel group](#kernel-group)). Every kind has one
 entry in `modules/models/runtimes.yaml` `roleOfKind` — its role, whether its work is `think` or `hands-on`,
 and the difficulty `floor` read from what its op does. Think work is any op whose output is a canonical
 record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a verdict about quality; it
-runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
+runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6.1 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
 order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception:
 the verify kinds still declared on it and `work.author` walk the `review` order - Devin,
@@ -174,7 +176,7 @@ identity.
 | `host` | Workflow execution environment | `orca` |
 | `agent` | Executable/Orca adapter | `codex` |
 | `provider` | Credential, billing and quota family used by allocation | `codex` |
-| `model` | Concrete model identifier | `gpt-6-sol` |
+| `model` | Concrete model identifier | `gpt-6.1-sol` |
 | `profile` | StarCi capability/routing profile | `codex-agent` |
 | `runtimePool` | Capacity pool selected by the allocator | `codex-agent` |
 

@@ -16,7 +16,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
-const GROUP='kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6-sol}], effort: high}';
+const GROUP='kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}';
 
 const fixture=(t,kernelLine)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kernel-group-'));
@@ -38,20 +38,37 @@ const fixture=(t,kernelLine)=>{
   return {root,repo,state,workflowId,run,plan,machineFile:env.STARCI_TEST_MACHINE_FILE};
 };
 
-test('the group form plans Claude Opus 5.5 first with GPT-6 Sol behind it',t=>{
+test('the group form plans Claude Opus 5.5 first with GPT-6.1 Sol behind it',t=>{
   const {r,body}=fixture(t,GROUP).plan();
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.deepEqual([body.agent,body.model,body.effort,body.routedBy],['claude','claude-opus-5-5','high','config']);
-  assert.deepEqual(body.group.map(m=>[m.agent,m.model,m.effort]),[['claude','claude-opus-5-5','high'],['codex','gpt-6-sol','high']]);
+  assert.deepEqual(body.group.map(m=>[m.agent,m.model,m.effort]),[['claude','claude-opus-5-5','high'],['codex','gpt-6.1-sol','high']]);
   assert.equal(body.fallThrough,true);
   assert.equal(body.launch,'worker','every Kernel starts through orchestration worker-start');
+});
+
+test('the owner Sonnet group is valid and prefers GPT-6.1 Sol when Claude weekly usage is 96 percent',t=>{
+  const kernelLine='kernel: {group: [{agent: claude, model: claude-sonnet-5-5}, {agent: codex, model: gpt-6.1-sol}], effort: high}';
+  const f=fixture(t,kernelLine);
+  // Exercise the complete owner configuration validator as well as the launch plan, rather than the
+  // fixture's permissive minimal configuration path. Sonnet is a declared model, not an Opus pool pin.
+  const config=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8').replace(/^kernel:.*$/m,kernelLine);
+  fs.writeFileSync(path.join(f.root,'owner','config.yaml'),config);
+  const normal=f.plan();
+  assert.equal(normal.r.status,0,normal.r.stderr||normal.r.stdout);
+  assert.deepEqual(normal.body.group.map(m=>[m.agent,m.model]),[['claude','claude-sonnet-5-5'],['codex','gpt-6.1-sol']]);
+  const limited=f.plan({STARCI_FAKE_ORCA_LIMITED:'claude'});
+  assert.equal(limited.r.status,0,limited.r.stderr||limited.r.stdout);
+  assert.deepEqual([limited.body.agent,limited.body.model],['codex','gpt-6.1-sol']);
+  assert.deepEqual(limited.body.group.map(m=>[m.agent,m.model,m.availability]),
+    [['codex','gpt-6.1-sol','available'],['claude','claude-sonnet-5-5','limited']]);
 });
 
 test('the group skips a dead or circuit-open Claude and orders a limited one last',t=>{
   const f=fixture(t,GROUP);
   const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'claude'});
   assert.equal(dead.r.status,0,dead.r.stderr);
-  assert.deepEqual([dead.body.agent,dead.body.model],['codex','gpt-6-sol']);
+  assert.deepEqual([dead.body.agent,dead.body.model],['codex','gpt-6.1-sol']);
   assert.deepEqual(dead.body.group.map(m=>m.agent),['codex']);
   assert.match(dead.body.warnings.join('\n'),/claude\/claude-opus-5-5 skipped — quota probe dead/);
   const limited=f.plan({STARCI_FAKE_ORCA_LIMITED:'claude'});
@@ -70,7 +87,7 @@ test('the group skips a dead or circuit-open Claude and orders a limited one las
   const both=f.plan({STARCI_FAKE_ORCA_DEAD:'claude,codex'});
   assert.equal(both.r.status,1);
   assert.equal(both.body.step,'kernel-group-unavailable');
-  assert.match(both.body.routeError,/claude\/claude-opus-5-5 skipped.*codex\/gpt-6-sol skipped/s);
+  assert.match(both.body.routeError,/claude\/claude-opus-5-5 skipped.*codex\/gpt-6\.1-sol skipped/s);
 });
 
 test('a single pin keeps its meaning: authoritative, one member, no fall-through, fails closed',t=>{
@@ -94,23 +111,23 @@ const kernelEvents=(repo,workflowId)=>{
 const readState=f=>json(fs.readFileSync(f.state,'utf8'));
 const boot=(f,extra={})=>{const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],extra);return {r,body:json(r.stdout)};};
 
-test('a Claude worker that never reaches readiness falls through to GPT-6 Sol in the same boot',t=>{
+test('a Claude worker that never reaches readiness falls through to GPT-6.1 Sol in the same boot',t=>{
   // worker-start refused before a Dispatch existed: no effect, so the group hands the boot to the next member.
   const f=fixture(t,GROUP);
   const {r,body}=boot(f,{STARCI_FAKE_ORCA_START_REFUSE:'claude'});
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.agent,body.model,body.routedBy,body.launch],['codex','gpt-6-sol','config','worker']);
+  assert.deepEqual([body.agent,body.model,body.routedBy,body.launch],['codex','gpt-6.1-sol','config','worker']);
   assert.deepEqual(body.fellThrough.map(x=>[x.agent,x.model,x.step]),[['claude','claude-opus-5-5','worker-start']]);
   const events=kernelEvents(f.repo,f.workflowId);
   assert.deepEqual(events.map(e=>e.kind),['kernel-start-failed','kernel-booted']);
   const [failed,booted]=events;
   assert.deepEqual([failed.payload.step,failed.payload.effectState],['worker-start','none']);
-  assert.deepEqual(failed.payload.fellThroughTo,{agent:'codex',model:'gpt-6-sol'});
-  assert.deepEqual([booted.payload.agent,booted.payload.model,booted.payload.launch],['codex','gpt-6-sol','worker']);
+  assert.deepEqual(failed.payload.fellThroughTo,{agent:'codex',model:'gpt-6.1-sol'});
+  assert.deepEqual([booted.payload.agent,booted.payload.model,booted.payload.launch],['codex','gpt-6.1-sol','worker']);
   assert.equal(booted.payload.fellThrough.length,1);
   const state=readState(f);
   assert.deepEqual(state.refusedStarts,['claude']);
-  assert.deepEqual(state.workerStarts.map(w=>[w.agent,w.model]),[['codex','gpt-6-sol']],'one live Kernel worker, the booted one');
+  assert.deepEqual(state.workerStarts.map(w=>[w.agent,w.model]),[['codex','gpt-6.1-sol']],'one live Kernel worker, the booted one');
   assert.equal(body.terminal,state.workerStarts[0].handle);
 });
 
@@ -149,8 +166,8 @@ test('with no kernel key the unpinned route is the sol-think group',t=>{
   const f=fixture(t,null);
   const {r,body}=f.plan();
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6-sol','route-model']);
-  assert.deepEqual(body.group.map(m=>[m.agent,m.model]),[['codex','gpt-6-sol'],['claude','claude-opus-5-5']]);
+  assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6.1-sol','route-model']);
+  assert.deepEqual(body.group.map(m=>[m.agent,m.model]),[['codex','gpt-6.1-sol'],['claude','claude-opus-5-5']]);
   const dead=f.plan({STARCI_FAKE_ORCA_DEAD:'codex'});
   assert.equal(dead.r.status,0,dead.r.stderr);
   assert.deepEqual([dead.body.agent,dead.body.model],['claude','claude-opus-5-5']);

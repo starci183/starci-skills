@@ -30,7 +30,7 @@ export function runtimeProfile(){
   if(runtimeProfileCache?.version!==version){
     const doc=parseYaml(fs.readFileSync(source,'utf8'));
     const registry=parseYaml(fs.readFileSync(registryFile,'utf8'));
-    runtimeProfileCache={version,profile:{...(doc??{}),runtimes:registry?.pools??{}}};
+    runtimeProfileCache={version,profile:{...(doc??{}),runtimes:registry?.pools??{},models:registry?.models??{}}};
   }
   return structuredClone(runtimeProfileCache.profile);
 }
@@ -317,7 +317,7 @@ export function validateConfig(config){
     if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error('Invalid config.yaml: kernel.group names each agent once — availability is per provider.');
     for(const {agent,model} of group){
       if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: kernel.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
-      if(typeof model==='string'&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
+      if(typeof model==='string'&&profile.models?.[model]?.provider!==agent&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
         throw Error(`Invalid config.yaml: kernel.group model ${model} is not declared by a ${agent} runtime.`);
     }
     if(kernel.effort!==undefined&&kernel.effort!==null&&!EFFORT_LEVELS.includes(kernel.effort))

@@ -28,11 +28,13 @@ glossary:
 pricing:
   currency: USD
   unit: per-million-tokens
-  asOf: '2026-09-29'
+  asOf: '2026-10-03'
   source: >-
     Official list prices read 2026-09-29 (WebFetch): claude-* from https://claude.com/pricing (5-minute cache write TTL);
-    gpt-6-* from https://developers.openai.com/api/docs/pricing, Standard processing tier, short context (long context is
-    double, batch/flex half, fast mode double: not applied - the CLI reports no tier). swe-2-max (Devin) has
+    gpt-6-luna from https://developers.openai.com/api/docs/pricing. GPT-6.1 Sol list prices read 2026-10-03 from
+    https://developers.openai.com/api/docs/models/gpt-6.1-sol: Standard processing tier, contexts at or below 272K
+    tokens (input 2, output 10, cached input 0.10 per 1M tokens). Larger-context and other processing-tier multipliers
+    are not applied because the CLI reports no billing tier. swe-2-max (Devin) has
     no official per-token price page read, so its rates stay null and cost_usd stays NULL for it. A subscription seat
     (Claude Max, Codex Pro, Devin plan) bills a flat fee, so cost_usd is the API-equivalent list price.
   matching: >-
@@ -48,7 +50,7 @@ pricing:
 models:
   claude-opus-5-5:   {provider: claude, tier: frontier, price: {input: 4,   output: 20,  cacheRead: 0.2,  cacheWrite: 5,     source: official}}
   claude-sonnet-5-5: {provider: claude, tier: standard, price: {input: 2,   output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}}
-  gpt-6-sol:         {provider: codex,  tier: frontier, price: {input: 2,   output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}}
+  gpt-6.1-sol:       {provider: codex,  tier: frontier, price: {input: 2,   output: 10,  cacheRead: 0.1,  cacheWrite: 2.5,   source: official}}
   gpt-6-luna:        {provider: codex,  tier: economy,  price: {input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, source: official}}
   swe-2-max:         {provider: devin,  tier: frontier, price: {input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}}
 
@@ -70,8 +72,8 @@ pools:
     models:
       easy: gpt-6-luna
       medium: gpt-6-luna
-      hard: gpt-6-sol
-      insane: gpt-6-sol
+      hard: gpt-6.1-sol
+      insane: gpt-6.1-sol
     effort:
       easy: low
       medium: medium
@@ -154,17 +156,17 @@ targets:
     runtime: codex
     profiles:
       working: gpt-6-luna
-      reasoning: gpt-6-sol
+      reasoning: gpt-6.1-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
-  # Launch-only targets: an explicit `--model gpt-6-sol` or `--model gpt-6-luna` request reaches that one model
+  # Launch-only targets: an explicit `--model gpt-6.1-sol` or `--model gpt-6-luna` request reaches that one model
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
   # `defaultModel` is the launch model resolveWorkerLaunchModel returns for them (they hold no pools entry).
-  gpt-6-sol:
+  gpt-6.1-sol:
     runtime: codex
-    defaultModel: gpt-6-sol
+    defaultModel: gpt-6.1-sol
     profiles:
-      working: gpt-6-sol
-      reasoning: gpt-6-sol
+      working: gpt-6.1-sol
+      reasoning: gpt-6.1-sol
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   gpt-6-luna:
     runtime: codex
@@ -173,7 +175,7 @@ targets:
       working: gpt-6-luna
       reasoning: gpt-6-luna
     orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
-  # Cursor: Orca agent id `cursor` (binary cursor-agent). A launch-only target like gpt-6-sol: off every automatic chain,
+  # Cursor: Orca agent id `cursor` (binary cursor-agent). A launch-only target like gpt-6.1-sol: off every automatic chain,
   # reached by an explicit `--model auto` (the CLI's default) or any id of the account's `cursor-agent --list-models`.
   # Live proof 2026-10-02: worker-start --agent cursor --model auto reached worker_done and released cleanly. No Cursor
   # quota probe exists, so no automatic chain routes to it. `defaultModel: auto` is the CLI's selector keyword —
@@ -199,12 +201,12 @@ targets:
       reasoning: devin-reviewer
     orcaLaunch: {agent: devin}   # orca orchestration worker-start --agent devin
 targetAliases:
-  codex-gpt-6-sol: codex-agent
+  codex-gpt-6.1-sol: codex-agent
   codex-gpt-6-luna: codex-agent
   devin-devin-worker: devin-agent
   devin-devin-reviewer: devin-agent
   # Bare model ids that are not targets resolve to the provider-window pool that carries them, so workflow
-  # quota entries land on the right window. gpt-6-sol and gpt-6-luna are targets; their `runtime: codex`
+  # quota entries land on the right window. gpt-6.1-sol and gpt-6-luna are targets; their `runtime: codex`
   # names the window.
   claude-opus: claude-agent
   claude-opus-5-5: claude-agent
@@ -528,7 +530,7 @@ selection: |-
   (worker-show). Devin takes no model flag (Orca: --model is for Claude, Codex and Cursor) and starts on its CLI default.
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and
-  gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role,
+  gpt-6.1-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role,
   and Devin opens through the owner's default grant (config.yaml allocation.grants). modules/models/runtimes.yaml
   roleOfKind splits the kinds: strategy (decide, plan and every other think kind that is not a verdict, a
   kernel call or a mechanical op) runs the Claude pool, then the Codex pool on Sol; the kernel's own model
@@ -570,8 +572,8 @@ assetFallback: When image generation is unavailable, reuse verified assets first
 examples:
   codexFrontend:
     runtime: codex
-    profile: gpt-6-sol
-    model: gpt-6-sol
+    profile: gpt-6.1-sol
+    model: gpt-6.1-sol
     imageGenerationAvailable: true
   claudeFrontend:
     runtime: claude

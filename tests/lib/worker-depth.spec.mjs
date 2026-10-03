@@ -182,7 +182,7 @@ test('starci kernel dispatch refuses an op whose Kernel already sits at orca.max
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   const ownerRoot = path.join(root, 'owner');
   fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   const log = path.join(root, 'calls.jsonl');
@@ -251,7 +251,7 @@ test('start-workflow from a worker terminal at the depth limit refuses the Kerne
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   const ownerRoot = path.join(root, 'owner');
   fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   const log = path.join(root, 'calls.jsonl');

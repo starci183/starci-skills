@@ -10,11 +10,11 @@ const registry = () => ({
   runtimes: ['codex', 'claude', 'devin', 'cursor'],
   models: {
     'gpt-6-luna': { provider: 'codex' },
-    'gpt-6-sol': { provider: 'codex' },
+    'gpt-6.1-sol': { provider: 'codex' },
     'claude-opus-5-5': { provider: 'claude' },
   },
   pools: {
-    'codex-agent': { provider: 'codex', maxParallel: 2, defaultModel: 'gpt-6-luna', models: { hard: 'gpt-6-sol' } },
+    'codex-agent': { provider: 'codex', maxParallel: 2, defaultModel: 'gpt-6-luna', models: { hard: 'gpt-6.1-sol' } },
     'claude-agent': { provider: 'claude', maxParallel: 1, defaultModel: 'claude-opus-5-5' },
     'devin-agent': { provider: 'devin', maxParallel: 2, defaultModel: 'swe-2-max' },
   },

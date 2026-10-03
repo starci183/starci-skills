@@ -128,14 +128,14 @@ test('starci kernel dispatch --model inside the order launches that pool at the 
   const fx=fixture(t);
   // An unrouted think job measured medium: codex launches Sol, the hard-floor pin, never Luna.
   fx.seed({jobId:'job-decide-codex',payload:{difficulty:'medium'}});
-  for(const target of ['codex-agent','gpt-6-sol']){
+  for(const target of ['codex-agent','gpt-6.1-sol']){
     const r=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-codex','--model',target,'--json');
     assert.equal(r.status,0,`${target}: ${r.stderr||r.stdout}`);
-    assert.equal(json(r.stdout)?.launch?.model,'gpt-6-sol',target);
+    assert.equal(json(r.stdout)?.launch?.model,'gpt-6.1-sol',target);
   }
   // A job routed to codex-agent and dispatched with --model claude-agent launches Claude's own pin,
   // never the routed Codex model id.
-  fx.seed({jobId:'job-decide-claude',payload:{model:'codex-agent',modelId:'gpt-6-sol',effort:'high',difficulty:'hard'}});
+  fx.seed({jobId:'job-decide-claude',payload:{model:'codex-agent',modelId:'gpt-6.1-sol',effort:'high',difficulty:'hard'}});
   const r=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-claude','--model','claude-agent','--spawn','--json');
   assert.equal(r.status,0,r.stderr||r.stdout);
   const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');

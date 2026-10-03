@@ -60,7 +60,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   // callers may rewrite the pin line.
   const example=fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8');
   const writeConfig=(kernelLine)=>{
-    const canonical=kernelLine??'kernel: {agent: codex, model: gpt-6-sol, effort: high}';
+    const canonical=kernelLine??'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}';
     const body=example.replace(/^kernel:.*$/m,canonical);
     assert.match(body,/^kernel:/m,'fixture config keeps the kernel: line');
     fs.writeFileSync(path.join(ownerRoot,'config.yaml'),body);
@@ -120,7 +120,7 @@ const reportFile=(fx,jobId)=>{
 describe('managed dispatch CLI scenarios',{concurrency:3},()=>{
 
 test('kernel pin precedence: config selects the agent/model the Kernel worker starts with',async t=>{
-  // The fixture pins kernel {agent: codex, model: gpt-6-sol, effort: high}.
+  // The fixture pins kernel {agent: codex, model: gpt-6.1-sol, effort: high}.
   // A plan must resolve routedBy 'config' without ever asking
   // route-model. Ingress may be any human chat surface; Orca still owns a
   // dedicated Kernel terminal.
@@ -133,7 +133,7 @@ test('kernel pin precedence: config selects the agent/model the Kernel worker st
   assert.equal(plan.routedBy,'config');
   assert.equal(plan.executionHost,'orca');
   assert.equal(plan.launch,'worker','every Kernel starts through orchestration worker-start');
-  assert.equal(plan.model,'gpt-6-sol');
+  assert.equal(plan.model,'gpt-6.1-sol');
   assert.equal(plan.effort,'high');
   assert.equal(plan.route,undefined,'route-model must not be consulted when the pin decides');
   assert.equal(plan.config?.agent,'codex');
@@ -173,7 +173,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const ledger=openLedger({file:fx.ledgerFile});
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-managed',workflowId:'wf-managed',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-managed'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
@@ -316,7 +316,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   const ledger=openLedger({file:fx.ledgerFile});
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-release',workflowId:'wf-release',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-release',parentNodeId:'workflow:wf-release',role:'kernel'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-release',parentNodeId:'workflow:wf-release',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-release'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
@@ -390,7 +390,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const ledger=openLedger({file:fx.ledgerFile});
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-claude-auth',workflowId:'wf-claude-auth',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-claude-auth'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
@@ -630,20 +630,20 @@ test('reconcile converts a fenced effect_unknown prompt stall into the same queu
 /* -------------------------------------------- the Kernel is a worker-start worker */
 
 test('kernel launch: Codex boots as a worker of its own entry Run through worker-start, never a terminal create',async t=>{
-  const fx=fixture(t);fx.writeConfig(); // shipped pin: codex / gpt-6-sol / high
+  const fx=fixture(t);fx.writeConfig(); // shipped pin: codex / gpt-6.1-sol / high
   const workflowId=await defineGoal(fx);
   const r=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
   assert.equal(r.status,0,`Kernel launch failed: ${r.stderr||r.stdout}`);
   const out=json(r.stdout);
   assert.deepEqual([out?.agent,out?.routedBy,out?.executionHost,out?.launch],['codex','config','orca','worker']);
-  assert.deepEqual([out?.terminal,out?.dispatch,out?.runId,out?.model,out?.modelAttested],['fake-terminal-1','dispatch-fake-1','run-fake-1','gpt-6-sol',true]);
+  assert.deepEqual([out?.terminal,out?.dispatch,out?.runId,out?.model,out?.modelAttested],['fake-terminal-1','dispatch-fake-1','run-fake-1','gpt-6.1-sol',true]);
   const job=jobRow(fx,`kernel-${workflowId}`);
   assert.equal(job?.status,'running');
   assert.equal(job?.worker_id,'fake-terminal-1','the Kernel job persists its worker terminal handle');
   assert.equal(json(job?.payload_json)?.managed?.dispatchId,'dispatch-fake-1');
   assert.deepEqual(kernelSignal(fx,workflowId),{
     terminal:'fake-terminal-1',dispatch:'dispatch-fake-1',runId:'run-fake-1',host:'orca',agent:'codex',routedBy:'config',
-    model:'gpt-6-sol',effort:'high',launch:'worker',modelAttested:true,
+    model:'gpt-6.1-sol',effort:'high',launch:'worker',modelAttested:true,
   });
   const seen=fx.calls();
   for(const step of ['orchestration run-create','orchestration worker-start','terminal rename','orchestration worker-show'])
@@ -652,7 +652,7 @@ test('kernel launch: Codex boots as a worker of its own entry Run through worker
     assert.equal(seen.includes(gone),false,`worker-start --spec files the Task and names the terminal: no ${gone}`);
   assert.equal(seen.includes('terminal create'),false,'the Kernel is never launched with terminal create');
   const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
-  assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6-sol','high']);
+  assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6.1-sol','high']);
 
   // A second start must not double the seat: the live Dispatch is the Kernel identity.
   const again=await fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
@@ -680,8 +680,8 @@ test('kernel launch fails closed when the worker does not attest the requested m
   assert.notEqual(r.status,0,'a worker running another model must reject the Kernel boot');
   const failure=json(r.stderr)||json(r.stdout);
   assert.equal(failure?.step,'attestation');
-  assert.equal(failure?.requestedModel,'gpt-6-sol');
-  assert.match(failure?.error??'',/expected agent=codex model=gpt-6-sol, got agent=codex model=gpt-6-luna/);
+  assert.equal(failure?.requestedModel,'gpt-6.1-sol');
+  assert.match(failure?.error??'',/expected agent=codex model=gpt-6\.1-sol, got agent=codex model=gpt-6-luna/);
   assert.ok(fx.calls().includes('orchestration worker-release'),'the mis-attested worker is released');
   const job=jobRow(fx,`kernel-${workflowId}`);
   assert.notEqual(job?.status,'running','an unattested Kernel must never be recorded running');
@@ -900,7 +900,7 @@ test('a dead managed worker settles with custody released from its disconnected 
   const ledger=openLedger({file:fx.ledgerFile});
   try{
     enqueueFixtureJob(ledger,{jobId:'kernel-wf-custody',workflowId:'wf-custody',kind:'kernel',role:'kernel',
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-custody',parentNodeId:'workflow:wf-custody',role:'kernel'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-custody',parentNodeId:'workflow:wf-custody',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-custody'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}

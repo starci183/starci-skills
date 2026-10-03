@@ -632,8 +632,8 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     ledger.write.bindKernelJob({workflowId:wf,workerId:'term-kernel',payload:{
-        route:{host:'orca',agent:'codex',model:'gpt-6-sol',runtimePool:'codex-agent'},
-        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-kernel'}},
+        route:{host:'orca',agent:'codex',model:'gpt-6.1-sol',runtimePool:'codex-agent'},
+        hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6.1-sol',terminalHandle:'term-kernel'}},
       }});
   });
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
@@ -648,7 +648,7 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
   assert.equal(kernel?.nodeId,`agent:kernel:${wf}`);
   assert.equal(kernel?.parentNodeId,`workflow:${wf}`);
   assert.equal(kernel?.runtime?.agent,'codex');
-  assert.equal(kernel?.runtime?.model,'gpt-6-sol');
+  assert.equal(kernel?.runtime?.model,'gpt-6.1-sol');
   assert.equal(op?.parentNodeId,kernel?.nodeId);
   assert.equal(op?.opId,'docs.author');
   assert.ok(body?.edges?.some(e=>e.parentNodeId===kernel.nodeId&&e.childNodeId===op.nodeId));
@@ -899,7 +899,7 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
     setPhase(ledger,wf,'running');
     ledger.write.bindKernelJob({workflowId:wf,workerId:'term-k7-kernel',payload:{
       hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,
-        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-k7-kernel'}},
+        role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6.1-sol',terminalHandle:'term-k7-kernel'}},
     }});
     ledger.write.setSignal({scope:'kernel',key:wf,workflowId:wf,token:'token-k7',value:{terminal:'term-k7-kernel',modelAttested:true}});
     // Finish needs the owner's handover approval (tests/kernel/handover.spec.mjs owns that gate).

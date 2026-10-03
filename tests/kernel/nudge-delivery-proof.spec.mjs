@@ -195,7 +195,7 @@ test('nudge: agent_prompt_blocked followed by a confirmed Enter-only send is del
 // every watchdog wake since 19:59 was lost. The same text with enter:false staged in the input row and an
 // Enter-only send submitted it. A frame that stays idle with no trace of the wake is now retried once that
 // way (scripts/kernel/wake-delivery.mjs splitRetry).
-const CODEX_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6-sol high · 62% context left'].join('\n');
+const CODEX_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6.1-sol high · 62% context left'].join('\n');
 const CODEX_STAGED=[CODEX_IDLE,...wrap(WAKE).map((r,i)=>(i?'  ':'› ')+r)].join('\n');
 const CODEX_RUNNING=[CODEX_IDLE,...wrap(WAKE).map((r,i)=>(i?'  ':'› ')+r),'• Working (2s • esc to interrupt)','› Ask Codex to do anything'].join('\n');
 const sendsOf=s=>s.calls.map(c=>[c.text===WAKE?'wake':c.text,c.enter]);

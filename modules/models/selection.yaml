@@ -217,7 +217,7 @@ decisionFlow:
       The kernel's own model calls (the [Kernel] seat, its decisions and validations) are the
       runtime's control plane, not operation work: they carry no operation effects for a
       qualification record to scope, and they run only on the owner-declared sol-think order
-      (GPT-6 Sol first, Claude Opus 5.5 as overflow — owner routing 2026-09-26). The qualification
+      (GPT-6.1 Sol first, Claude Opus 5.5 as overflow — owner routing 2026-09-26). The qualification
       store ships empty, so without this step
       an elevated kernel route (model.manageWorkflow --risk high) refuses on every fresh install and
       a single-model config pin becomes the only way to boot a kernel. Qualified and probation

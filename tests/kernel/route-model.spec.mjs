@@ -68,17 +68,17 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','claude-agent']);
 });
 
-// The kernel route is the sol-think order: GPT-6 Sol first, Claude Opus 5.5 as overflow (owner routing
+// The kernel route is the sol-think order: GPT-6.1 Sol first, Claude Opus 5.5 as overflow (owner routing
 // 2026-09-26). selection.yaml decisionFlow kernel-function admits it with an empty qualification store.
 const kernelRoute=(t,env={},extra=[])=>{
   const r=run(['--kind','model.manageWorkflow','--risk','high',...extra,'--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir(),...env});
   return {r,body:out(r)};
 };
 
-test('the unpinned --risk high kernel route resolves through the sol-think order to GPT-6 Sol',t=>{
+test('the unpinned --risk high kernel route resolves through the sol-think order to GPT-6.1 Sol',t=>{
   const {r,body}=kernelRoute(t);
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['codex-agent','gpt-6-sol','kernel-function']);
+  assert.deepEqual([body.pick.target,body.pick.model,body.pick.mode],['codex-agent','gpt-6.1-sol','kernel-function']);
   assert.match(body.rule,/decisionFlow\.kernel-function/);
   assert.deepEqual(body.fallbackChain.map(f=>[f.target,f.model]),[['claude-agent','claude-opus-5-5']]);
   assert.equal(body.availability['codex-agent'].state,'available');
@@ -165,7 +165,7 @@ test('--help prints the CLI usage and exits 0',()=>{
   assert.match(r.stdout,/--kind <kind>/);
 });
 
-// The model catalog is GPT-6 Sol/Luna on the codex-agent window and Claude Opus 5.5 on
+// The model catalog is GPT-6.1 Sol/Luna on the codex-agent window and Claude Opus 5.5 on
 // claude-agent (modules/models/registry.yaml pools). The launch model is the pool's difficulty pin.
 const planModels=(t,kind,difficulty)=>{
   const r=run(['--kind',kind,'--difficulty',difficulty,'--plan','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
@@ -175,12 +175,12 @@ const planModels=(t,kind,difficulty)=>{
   return {body,model:target=>body.candidates.find(c=>c.target===target)?.model};
 };
 
-test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
+test('codex-agent launches gpt-6.1-sol on the hard tier and gpt-6-luna on the easy tier',t=>{
   const hard=planModels(t,'architecture.decide','hard');
   assert.deepEqual(hard.body.tier?.chain,['claude-agent','codex-agent'],'think work is Opus then Sol only');
   assert.equal(hard.body.pick?.primary?.target,'claude-agent');
-  assert.equal(hard.model('codex-agent'),'gpt-6-sol');
-  assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6-sol');
+  assert.equal(hard.model('codex-agent'),'gpt-6.1-sol');
+  assert.equal(planModels(t,'architecture.decide','insane').model('codex-agent'),'gpt-6.1-sol');
   assert.equal(planModels(t,'code.refactor','easy').model('codex-agent'),'gpt-6-luna');
   assert.equal(planModels(t,'code.refactor','medium').model('codex-agent'),'gpt-6-luna');
 });
@@ -202,7 +202,7 @@ test('an explicit --model naming a removed catalog id fails closed as unknown',(
     assert.equal(r.status,1,`--model ${removed} must refuse, got ${r.status}: ${r.stdout}`);
     assert.match(r.stderr,new RegExp(`no model target '${removed.replaceAll('.','\\.')}' in modules/models/registry\\.yaml`));
   }
-  for(const current of ['gpt-6-sol','gpt-6-luna']){
+  for(const current of ['gpt-6.1-sol','gpt-6-luna']){
     const r=dispatch(current);
     assert.equal(r.status,0,r.stderr);
     assert.equal(out(r)?.constraints?.model??out(r)?.packet?.constraints?.model,current);
@@ -228,9 +228,9 @@ test('a decide op measured medium routes to Claude Opus 5.5; --prefer/--avoid ar
   }
 });
 
-test('the unpinned kernel route resolves to GPT-6 Sol',t=>{
+test('the unpinned kernel route resolves to GPT-6.1 Sol',t=>{
   const body=pick(t,['--kind','model.manageWorkflow']);
-  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6-sol']);
+  assert.deepEqual([body.pick.target,body.pick.model],['codex-agent','gpt-6.1-sol']);
   assert.equal(body.workload.work,'think');
 });
 

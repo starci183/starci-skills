@@ -174,7 +174,7 @@ export default {
   const model = resolveModel(args.model ?? payload.model ?? defaultOperationTarget());
   if (model.error) throw Object.assign(new Error(model.error), { code: 'model-unknown' });
   // Dispatch launches only inside the kind's order at its tier, so strategy kinds run on Claude or Codex alone.
-  // A named profile target (gpt-6-sol) counts as its provider's pool.
+  // A named profile target (gpt-6.1-sol) counts as its provider's pool.
   const launchOrder = kindOrder({ kind: op, difficulty: payload.difficulty ?? 'medium', fanOut: isFanOutSlice(payload) });
   const allowed = launchOrder.chain ?? [];
   const outsideOrder = allowed.some((p) => p === model.target || launchOrder.rt?.runtimes?.[p]?.provider === model.provider) ? null

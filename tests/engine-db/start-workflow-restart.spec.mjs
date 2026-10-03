@@ -25,7 +25,7 @@ const fixture=t=>{
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   // Real Orca mints a distinct Dispatch id per worker-start; the canned 'dispatch-fake-1' would collide on
   // op_attempts.UNIQUE(workflow_id,dispatch_id) when a workflow's second managed op dispatches.
@@ -77,7 +77,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   const firstOut=json(first.stdout);assert.equal(firstOut?.replaced,false);assert.equal(firstOut?.attempt,1);
   assert.equal(firstOut?.generation,0);assert.equal(firstOut?.promptSubmitted,true);
   let state=json(fs.readFileSync(f.state,'utf8'));
-  assert.deepEqual([state.workerStarts[0].agent,state.workerStarts[0].model,state.workerStarts[0].effort],['codex','gpt-6-sol','high'],
+  assert.deepEqual([state.workerStarts[0].agent,state.workerStarts[0].model,state.workerStarts[0].effort],['codex','gpt-6.1-sol','high'],
     'the Kernel starts through worker-start with the pinned agent, model and effort');
   assert.equal(firstOut?.launch,'worker');
   assert.match(state.terminals[firstOut.terminal].prompt,new RegExp(ROOT.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));

@@ -153,7 +153,7 @@ test('ensureLaunchTrust asserts the launch env for a Claude launch only',t=>{
 
 const TOML_FIXTURE=[
   '# owner config — keep me',
-  'model = "gpt-6-sol"',
+  'model = "gpt-6.1-sol"',
   'approval_policy = "never"',
   'sandbox_mode = "danger-full-access"',
   '',
@@ -458,11 +458,11 @@ test('a Claude kernel boot pre-trusts the repository and asserts the bypass cons
 test('the Codex update check is pinned off at top level, before any table, and is idempotent',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-update-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const file=path.join(dir,'config.toml');
-  fs.writeFileSync(file,`model = "gpt-6-sol"\n\n[projects."${F(UP,'x')}"]\ntrust_level = "trusted"\n`);
+  fs.writeFileSync(file,`model = "gpt-6.1-sol"\n\n[projects."${F(UP,'x')}"]\ntrust_level = "trusted"\n`);
   assert.equal(writeCodexNoUpdateCheck({file}).ok,true);
   assert.equal(writeCodexNoUpdateCheck({file}).written,false,'the second call writes nothing');
   const text=fs.readFileSync(file,'utf8');
-  assert.ok(text.startsWith('model = "gpt-6-sol"'),'the owner leading keys stay first');
+  assert.ok(text.startsWith('model = "gpt-6.1-sol"'),'the owner leading keys stay first');
   assert.ok(text.indexOf('check_for_update_on_startup = false')<text.indexOf('[projects'),'a top-level key must precede every table');
   fs.writeFileSync(file,`check_for_update_on_startup = true\n[projects."${F(UP,'x')}"]\n`);
   writeCodexNoUpdateCheck({file});

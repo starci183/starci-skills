@@ -26,7 +26,7 @@ test('interface.draw walks the draw order: Devin first, Codex the fallback', () 
     const r = selectPool({ kind: 'interface.draw', difficulty: d, runtimes });
     assert.deepEqual([r.target, r.modelId, r.chain, r.order], ['devin-agent', 'swe-2-max', ['devin-agent', 'codex-agent'], 'draw'], d);
     const down = selectPool({ kind: 'interface.draw', difficulty: d, runtimes, capacity: { 'devin-agent': { auth: 'dead' } } });
-    assert.deepEqual([down.target, down.modelId], ['codex-agent', 'gpt-6-sol'], `${d}: Codex Sol when Devin cannot`);
+    assert.deepEqual([down.target, down.modelId], ['codex-agent', 'gpt-6.1-sol'], `${d}: Codex Sol when Devin cannot`);
   }
   // Devin runs Playwright in product checkouts: the manifest's browser-dom host tool is on its card.
   assert.deepEqual(hostToolsRequired('interface.draw'), ['browser-dom']);
@@ -52,7 +52,7 @@ test('the dry route prints the same picks (route-model.mjs)', () => {
   const draw = route('interface.draw');
   assert.equal(draw.status, 0, draw.stderr);
   assert.match(draw.stdout, /PICK devin-agent\s+model=swe-2-max/);
-  assert.match(draw.stdout, /-> codex-agent \(gpt-6-sol\)/);
+  assert.match(draw.stdout, /-> codex-agent \(gpt-6\.1-sol\)/);
   assert.match(route('brand.decide').stdout, /PICK claude-agent\s+model=claude-opus-5-5[\s\S]*-> codex-agent/);
 });
 

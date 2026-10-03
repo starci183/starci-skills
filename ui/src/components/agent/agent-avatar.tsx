@@ -9,7 +9,7 @@ const PROVIDER_FAMILY: Record<string, AgentFamily> = { claude: 'claude', anthrop
 
 /** Maps agent/provider/pool/model fields to an agent family. The declared `provider` (the registry.yaml
  * provider family the attempt row carries) wins; the agent/pool/model strings are the fallback
- * (pool `devin-agent`, model `swe-2-max`, `gpt-6-sol`, `claude-opus-5-5`…). */
+ * (pool `devin-agent`, model `swe-2-max`, `gpt-6.1-sol`, `claude-opus-5-5`…). */
 export function agentOf(input: { agent?: string | null; provider?: string | null; pool?: string | null; model?: string | null }): AgentRef {
   const family: AgentFamily = PROVIDER_FAMILY[(input.provider ?? '').toLowerCase()]
     ?? PROVIDER_FAMILY[(input.agent ?? '').toLowerCase()]

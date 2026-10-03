@@ -25,7 +25,7 @@ const FINISHED_AFTER_SPINNER=[
   '  it remains fenced under incident inc-000000000001. The workflow awaits the runtime repair.',
   '  done 11:27 PM',
   '› Ask Codex to do anything',
-  `  gpt-6-sol high · ${DRIVE}Repositories\\ecommerce-app · Orchestrate ecommerce-app workflow`,
+  `  gpt-6.1-sol high · ${DRIVE}Repositories\\ecommerce-app · Orchestrate ecommerce-app workflow`,
 ].join('\n');
 // A live Codex turn: the spinner sits directly above the input row.
 const SPINNER_LAST=[
@@ -34,7 +34,7 @@ const SPINNER_LAST=[
   '  └ {"ok": true}',
   '• Working (3m 44s • esc to interrupt) · 1 background terminal running · /ps to view',
   '› Ask Codex to do anything',
-  `  gpt-6-sol high · ${DRIVE}Repositories\\ecommerce-app · Prepare ecommerce-app base repos`,
+  `  gpt-6.1-sol high · ${DRIVE}Repositories\\ecommerce-app · Prepare ecommerce-app base repos`,
 ].join('\n');
 
 test('a finished answer and prompt after the last spinner row is turn-idle; the last rows decide',()=>{

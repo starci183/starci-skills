@@ -229,7 +229,7 @@ const uniqueTerminals = process.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS === '1';
 // Handles that terminal close refuses ('*' refuses every close).
 const closeFails = new Set((process.env.STARCI_FAKE_ORCA_CLOSE_FAILS || '').split(',').map(s => s.trim()).filter(Boolean));
 const record = handle => (state.terminals || {})[handle] || null;
-const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-6-sol';
+const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-6.1-sol';
 const isDevin = handle => /(?:^|\s)devin(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
 const PROMPT = h => (isDevin(h) ? 'Devin\nmodel: ' + renderedModel(h) + '\nAsk Devin to build features...\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
 const DEAD = h => (isDevin(h) ? 'Devin\nmodel: ' + renderedModel(h) + '\nAsk Devin to build features...' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
@@ -248,7 +248,7 @@ const BOOT_EXIT = h => ['PS ' + FAKE_REPO + '> ' + String(record(h)?.command ?? 
 const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
 const INLINE_STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n' + String(record(h)?.prompt ?? '').split(/\r?\n/).filter(Boolean).slice(-8)
   .map((line, i) => (i === 0 ? '› ' : '  ') + line).join('\n') + '\n';
-const STAGED = h => stuckPaste.startsWith('inline') ? INLINE_STAGED(h) : 'Codex\nmodel: ' + renderedModel(h) + '\n\n› [Pasted Content ' + String(record(h)?.prompt ?? '').length + ' chars]\n  gpt-6-sol high · repo\n';
+const STAGED = h => stuckPaste.startsWith('inline') ? INLINE_STAGED(h) : 'Codex\nmodel: ' + renderedModel(h) + '\n\n› [Pasted Content ' + String(record(h)?.prompt ?? '').length + ' chars]\n  gpt-6.1-sol high · repo\n';
 // STARCI_FAKE_ORCA_SEND_STALLED 'queued' | 'landed' | 'lost': a non-empty send
 // with --enter answers agent_prompt_stalled. 'queued': a Claude frame holds the
 // text behind a running hook spinner with "Press up to edit queued messages";
@@ -643,7 +643,7 @@ else if (verb === 'orchestration worker-show') {
       // workerStates[dispatch]: what worker-stop / worker-release left (a seeded Dispatch reads ready).
       worker: { state: state.workerStates?.[arg('dispatch')] ?? 'ready', agent_terminal_handle: 'fake-terminal-1',
         // STARCI_FAKE_ORCA_EFFECTIVE_MODEL: the model the worker really runs, when it is not the requested one.
-        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || (state.model ?? 'gpt-6-sol') } } } },
+        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || (state.model ?? 'gpt-6.1-sol') } } } },
       observation: { exactWorker: true } } });
 }
 else if (verb === 'orchestration worker-stop') {

@@ -106,7 +106,7 @@ test('a refusal, an ended worker, a missing verdict and a failed launch are type
   assert.deepEqual([refused.critique.outcome, refused.critique.verdict], ['launch-failed', null]);
   assert.match(refused.critique.error, /agent_unavailable/);
   assert.equal(refused.orca.names().includes('worker-release'), false, 'a start refused before any effect leaves nothing to release');
-  const none = await runCritic({ ...round(t), rubric: DEFAULT_RUBRIC, critic: { provider: 'codex', model: 'gpt-6-sol' }, orca: fakeCriticOrca() });
+  const none = await runCritic({ ...round(t), rubric: DEFAULT_RUBRIC, critic: { provider: 'codex', model: 'gpt-6.1-sol' }, orca: fakeCriticOrca() });
   assert.equal(none.outcome, 'not-configured', 'a critic without a timeout is not configured');
 });
 

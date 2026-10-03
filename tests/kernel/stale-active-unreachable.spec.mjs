@@ -31,7 +31,7 @@ const FROZEN_CODEX=[
   '    454:       invite: {','    455:         title: t("invite.title"),',
   '• Working (5m 30s • esc to interrupt)',
   '› Ask Codex to do anything',
-  `  gpt-6-sol high · ${path.join(os.tmpdir(), 'shop-be')} · Report task outcome`,
+  `  gpt-6.1-sol high · ${path.join(os.tmpdir(), 'shop-be')} · Report task outcome`,
 ].join('\n');
 
 let sharedFixture;

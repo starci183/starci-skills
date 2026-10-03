@@ -967,7 +967,7 @@ moduleLocalDocumentKinds:
       - modules/models/profiles/codex-agent.yaml
       - modules/models/profiles/devin-agent.yaml
       - modules/models/profiles/gpt-6-luna.yaml
-      - modules/models/profiles/gpt-6-sol.yaml
+      - modules/models/profiles/gpt-6.1-sol.yaml
       - modules/models/profiles/cursor-agent.yaml
   - id: starci/agent-card@1
     governs: "One agent's spawn contract. Enforced by scripts/checks/check-providers.mjs (schema id, agent == file stem) and tests/repo/provider-orca.spec.mjs."

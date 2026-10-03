@@ -174,13 +174,13 @@ test('sendEnterWithProof trusts the draft, not the receipt: an Enter that left t
 
 test('quit-agent empties a draft before its quit command, and types nothing over a draft it cannot clear',t=>{
   const w=orcaWorld(t);
-  w.seed('term-q',{command:'codex --model gpt-6-sol',draft:'half a contract'});
+  w.seed('term-q',{command:'codex --model gpt-6.1-sol',draft:'half a contract'});
   const r=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-q',agent:'codex',waitMs:0,intervalMs:0});
   assert.equal(r.sent,true);
   assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);
   assert.equal(w.term('term-q').submitted,undefined,'the draft was never submitted with /quit as its tail');
   assert.equal(w.term('term-q').quit,'/quit');
-  w.seed('term-s',{command:'codex --model gpt-6-sol',draft:'half a contract\nsecond row',draftKeep:1});
+  w.seed('term-s',{command:'codex --model gpt-6.1-sol',draft:'half a contract\nsecond row',draftKeep:1});
   const s=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-s',agent:'codex',waitMs:0,intervalMs:0});
   assert.deepEqual([s.sent,s.exited,s.reason,s.draft],[false,false,'draft-stuck','half a contract']);
   assert.ok(w.term('term-s').keys.every(k=>k.text==='\u0015'));
@@ -291,7 +291,7 @@ test('deliveryFieldsOf carries the draft-stale note into receipts and events',as
 
 test('quit-agent types its quit command over a stale draft and notes it',t=>{
   const w=orcaWorld(t);
-  w.seed('term-q',{command:'codex --model gpt-6-sol',draft:'check status',draftStale:true});
+  w.seed('term-q',{command:'codex --model gpt-6.1-sol',draft:'check status',draftStale:true});
   const r=w.call('scripts/kernel/quit-agent.mjs','quitAgent',{handle:'term-q',agent:'codex',waitMs:0,intervalMs:0});
   assert.deepEqual([r.sent,r.draftNote,r.staleDraft],[true,'draft-stale','check status']);
   assert.deepEqual(w.term('term-q').keys.map(k=>[k.text==='\u0015'?'^U':k.text,k.enter]),[['^U',false],['/quit',true]]);

@@ -218,7 +218,7 @@ const fixture=t=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),fs.readFileSync(path.join(ROOT,'config.example.yaml'),'utf8')
-    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6-sol, effort: high}'));
+    .replace(/^kernel:.*$/m,'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:ownerRoot,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),
@@ -237,7 +237,7 @@ const seedOp=(fx,{jobId,model})=>{
   try{
     ledger.ensureWorkflow({workflowId:'wf-launch'});
     ledger.write.enqueueJob({jobId:'kernel-wf-launch',workflowId:'wf-launch',kind:'kernel',role:'kernel',status:'running',unitId:null,
-      payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-launch',parentNodeId:'workflow:wf-launch',role:'kernel'}}});
+      payload:{route:{host:'orca',agent:'codex',model:'gpt-6.1-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-launch',parentNodeId:'workflow:wf-launch',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-launch'").run();
     ledger.write.createUnit({workflowId:'wf-launch',unitId:jobId,opId:'code.refactor',subjectKey:jobId,goalRevision:1});
     ledger.write.enqueueJob({jobId,workflowId:'wf-launch',opId:'code.refactor',kind:'op',status:'queued',unitId:jobId,
@@ -298,7 +298,7 @@ test('the Kernel boots as a worker of its own entry Run through worker-start, ne
   assert.deepEqual(seen.filter(c=>order.includes(c)),order,'entry Run -> worker-start --spec (the Kernel Task) -> attestation');
   assert.equal(seen.includes('orchestration task-create')||seen.includes('orchestration dispatch-show'),false);
   const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
-  assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6-sol','high']);
+  assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6.1-sol','high']);
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
   try{
     const seat=json(ledger.db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId).value_json);

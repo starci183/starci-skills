@@ -117,7 +117,7 @@ test('start-workflow binds the Kernel guard to the terminal worker-start names a
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   const ownerRoot = path.join(root, 'owner');
   fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), 'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   const fake = path.join(root, 'fake-orca.mjs');
   const state = path.join(root, 'orca-state.json');
   fs.writeFileSync(state, JSON.stringify({ sends: 0, counter: 0, terminals: {}, commands: [] }));

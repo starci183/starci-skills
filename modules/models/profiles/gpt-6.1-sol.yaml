@@ -1,12 +1,12 @@
-# Profile: gpt-6-sol — a named Codex operation target (not a pool).
-# Business frame: GPT-6 Sol is the Codex window's hard and insane model and its
+# Profile: gpt-6.1-sol — a named Codex operation target (not a pool).
+# Business frame: GPT-6.1 Sol is the Codex window's hard and insane model and its
 # reasoning model. The codex-agent pool launches it for every hard or insane
 # operation; this target is the explicit route an owner names with
-# `--model gpt-6-sol` to reach Sol at any difficulty.
+# `--model gpt-6.1-sol` to reach Sol at any difficulty.
 # Registry facts (provider, runtime, launch agent, the launch model itself) live
-# in modules/models/registry.yaml — targets.gpt-6-sol.defaultModel.
+# in modules/models/registry.yaml — targets.gpt-6.1-sol.defaultModel.
 
-target: gpt-6-sol             # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
+target: gpt-6.1-sol             # registry.yaml targets — a TARGET, distinct from the codex-agent pool entry
 schema: starci/module-model-profile@1
 
 identity:
@@ -20,7 +20,7 @@ business:
   whenNeeded:
     - Hard and insane operations routed to codex-agent — registry.yaml pins Sol there.
     - Think work when claude-agent is unavailable — think kinds route at a hard floor, so codex-agent launches Sol.
-    - "The [Kernel] seat when the owner pins `kernel: {agent: codex, model: gpt-6-sol}` (config.example.yaml)."
+    - "The [Kernel] seat when the owner pins `kernel: {agent: codex, model: gpt-6.1-sol}` (config.example.yaml)."
     - An owner-named explicit route to Sol for an easy or medium operation.
   whenNot:
     - Easy/medium bulk work on the pool — the pool pins Luna there.
