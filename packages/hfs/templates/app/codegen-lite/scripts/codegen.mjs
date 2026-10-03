@@ -2,4 +2,8 @@
 // Database types hook: contract:emit owns the emitter; this is its single managed call site in codegen.
 import { execFileSync } from "node:child_process"
 
-execFileSync("npm", ["run", "db:types", "--silent"], { stdio: "inherit" })
+// npm is npm.cmd on Windows, which a bare spawn without a shell cannot find: run npm's own cli script with this node instead.
+const npmCli = process.env.npm_execpath
+if (npmCli === undefined) throw new Error("codegen runs through npm (npm_execpath is unset): use `npm run codegen`")
+
+execFileSync(process.execPath, [npmCli, "run", "db:types", "--silent"], { stdio: "inherit" })

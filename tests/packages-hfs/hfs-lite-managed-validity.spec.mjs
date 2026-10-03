@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { runNpm } from '../../scripts/api/npm/run-npm.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadSlotManifest } from '../../scripts/hfs/slots.mjs';
 import { renderTargets } from '../../packages/hfs/sync/index.mjs';
@@ -121,6 +125,28 @@ test('lite package scripts exclude tests and use only the approved database comm
   }
   assert.equal(databaseScripts['db:types'], 'npm run contract:emit');
   assert.equal(databaseScripts['db:lint'], 'starci app check --fast');
+});
+
+test('the generated codegen never spawns a bare npm or npx and runs green through npm on this host', () => {
+  const codegen = targets['scripts/codegen.mjs'].content;
+  assert.doesNotMatch(codegen, /(?:execFileSync|execSync|spawnSync|spawn|execFile)\s*\(\s*["'`](?:npm|npx)(?:\.cmd)?["'`]/, 'a bare npm or npx spawn fails on Windows, where the bin is npm.cmd');
+  assert.match(codegen, /process\.env\.npm_execpath/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-lite-codegen-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'scripts'));
+    fs.writeFileSync(path.join(dir, 'scripts', 'codegen.mjs'), codegen);
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'codegen-probe', private: true, scripts: { codegen: 'node scripts/codegen.mjs', 'db:types': 'node -e "require(\'fs\').writeFileSync(\'ran.txt\', \'db:types\')"' } }));
+    const run = runNpm(['run', 'codegen', '--silent'], { cwd: dir, timeout: 120_000 });
+    assert.equal(run.status, 0, `${run.stdout ?? ''}${run.stderr ?? ''}${run.error?.message ?? ''}`);
+    assert.equal(fs.readFileSync(path.join(dir, 'ran.txt'), 'utf8'), 'db:types', 'codegen ran the db:types script through npm');
+    const env = { ...process.env };
+    delete env.npm_execpath;
+    const direct = spawnSync(process.execPath, [path.join(dir, 'scripts', 'codegen.mjs')], { cwd: dir, encoding: 'utf8', env, windowsHide: true });
+    assert.notEqual(direct.status, 0, 'run outside npm, codegen refuses');
+    assert.match(direct.stderr, /npm_execpath is unset\): use `npm run codegen`/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('lite codegen is JavaScript with exactly one database-types hook call site', () => {

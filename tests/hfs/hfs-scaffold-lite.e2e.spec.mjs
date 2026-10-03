@@ -155,6 +155,8 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
   }
 
   step('npm run contract:emit', ['run', 'contract:emit'], { timeout: 300_000 });
+  // The managed codegen hook (the land gate and the editors run it): it must spawn npm on every OS, so it runs here too.
+  step('npm run codegen', ['run', 'codegen', '--silent'], { timeout: 300_000 });
   const typesDiff = spawnSync('git', ['diff', '--exit-code', '--', 'supabase/types'], {
     cwd: app, encoding: 'utf8', windowsHide: true, timeout: 60_000,
   });
