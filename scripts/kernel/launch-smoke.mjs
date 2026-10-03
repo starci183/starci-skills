@@ -391,7 +391,7 @@ async function driveWorkflow({ wf, state, orca, seen, entry, root, script }) {
     const file = ownedFileOf('opFail', spec.workflowId, spec.feApp);
     const head = orca.git(['rev-parse', 'HEAD'], wf.path);
     const status = orca.git(['status', '--porcelain', '--untracked-files=all'], wf.path);
-    const kept = r?.preservedRef ? orca.git(['show', `${r.preservedRef}:${file}`], wf.path) : { ok: false };
+    const kept = r?.preservedRef ? orca.git(['show', `${r.preservedRef}:${file}`, '--'], wf.path) : { ok: false };
     wf.reset = { preservedRef: r?.preservedRef ?? null, resetTo: r?.resetTo ?? null, lastCheckpoint, head: head.ok ? head.stdout.trim() : null,
       clean: status.ok && status.stdout.trim() === '', fileGone: !fs.existsSync(path.join(wf.path, file)),
       preservedHasFile: kept.ok && kept.stdout === ownedTextOf('opFail', spec.workflowId), ...(r?.ok === false ? { error: r.error ?? r.refusal ?? null } : {}) };
@@ -584,7 +584,7 @@ export async function runSmoke({ entry = readEnv('ORCA_TERMINAL_HANDLE') || null
         wf.main = { before: before.head, after: after.head, ancestor: ancestor.ok, ...diff,
           // The committed blob, not the checkout's bytes: a core.autocrlf checkout rewrites line ends on disk.
           addedBytesOk: ['op', 'opFe'].every((role) => after.files[ownedFileOf(role, workflowId, feApp)] != null
-            && orca.git(['show', `${after.head}:${ownedFileOf(role, workflowId, feApp)}`], appRepo).stdout === ownedTextOf(role, workflowId)) };
+            && orca.git(['show', `${after.head}:${ownedFileOf(role, workflowId, feApp)}`, '--'], appRepo).stdout === ownedTextOf(role, workflowId)) };
       } else wf.problems.push(`main manifest after: ${after.error ?? before.error}`);
     }
   } catch (error) {

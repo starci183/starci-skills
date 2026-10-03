@@ -54,7 +54,7 @@ function scratchApp(tmp) {
 }
 
 /** The parts A and B stubs (the contract's interfaces), over the scratch app. */
-function fakeWorkflowRuntime(tmp, { sameSideConcurrent = false, finishTouchesMain = false, finishRefuses = null, unlisted = false } = {}) {
+function fakeWorkflowRuntime(tmp, { sameSideConcurrent = false, finishTouchesMain = false, finishRefuses = null, unlisted = false, workflowPathLength = 0 } = {}) {
   const rows = new Map();
   const listed = new Map();
   const calls = [];
@@ -71,7 +71,8 @@ function fakeWorkflowRuntime(tmp, { sameSideConcurrent = false, finishTouchesMai
     // `orca worktree list` (unless the case says Orca never lists it), then the registry row.
     ensure: rec('ensureWorkflowWorktree', (ctx, { workflowId, appRepo }) => {
       const name = `wf-${workflowId}`;
-      const p = path.join(tmp, 'orca-worktrees', name);
+      const base = path.join(tmp, 'orca-worktrees', name), padding = Math.max(0, workflowPathLength - base.length - 1);
+      const p = padding ? path.join(tmp, 'x'.repeat(padding), 'orca-worktrees', name) : base;
       fs.mkdirSync(path.dirname(p), { recursive: true });
       git(tmp, 'clone', '-q', appRepo, p);
       git(p, 'checkout', '-q', '-b', name);
@@ -341,6 +342,19 @@ test('each green op is a checkpoint gated against the previous one; the failing 
   assert.equal(r.agents.opFail.status, 'failed', 'the failing op reported failed');
   const order = fake.wfr.calls.map((c) => c[0]);
   assert.ok(order.indexOf('preserveAndReset') < order.indexOf('finishWorkflow'), 'the reset happens before the finish');
+});
+
+test('a long workflow path observes the exact preserved blob and completes the workflow after reset', async (t) => {
+  const fake = fakeOrca(t, { runtime: { workflowPathLength: 175 } });
+  const r = await smoke(fake), wf = r.workflow;
+  assert.equal(r.ok, true, JSON.stringify(r, null, 2));
+  assert.ok(wf.path.length >= 175);
+  assert.ok(wf.path.length + 1 + wf.reset.preservedRef.length + 1 + ownedFileOf('opFail', 'smoke-t', 'web').length > 260,
+    'Git must treat ref:file as a revision, rather than stat it as an ambiguous Windows path');
+  assert.deepEqual([wf.reset.preservedHasFile, wf.reset.clean, wf.reset.fileGone, wf.reset.head], [true, true, true, wf.checkpoints.opFe]);
+  assert.equal(wf.main.addedBytesOk, true, 'the final committed blobs also retain the exact authored bytes');
+  assert.equal(wf.finish.ok, true);
+  assert.equal(wf.removed.pathExists, false);
 });
 
 test('the finish merges to main and leaves the worktree release-pending; the controller removes it; main is byte-identical but for the two green files', async (t) => {
