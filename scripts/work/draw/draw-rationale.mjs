@@ -28,7 +28,7 @@
 //   - an empty `because`, or one that cites no FR, content or user job;
 //   - a part with no measured render (re-render it with draw-render) or no redline render beside it.
 //
-//   node scripts/work/draw/draw-rationale.mjs <render.html> [--rationale <file>] [--ui <ui-record-dir>]
+//   starci work draw-rationale <render.html> [--rationale <file>] [--ui <ui-record-dir>]
 //        [--records <draw-render.json>[,<...>]] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -389,7 +389,7 @@ export function rationaleFindings({ html, entries = [], errors = [], measures = 
 
   // 5. What the render measured, at every viewport.
   if (!measures.length || measures.some((m) => m?.schema !== MEASURE_SCHEMA)) {
-    add('render not measured', `${label} has no measured render (draw-render records carry rationale measures): re-render it with scripts/work/draw-render.mjs`);
+    add('render not measured', `${label} has no measured render (draw-render records carry rationale measures): re-render it with starci work draw-render`);
   }
   const need = { spacing: new Map(), radius: new Map(), fontSize: new Map(), fontWeight: new Map(), lineHeight: new Map() };
   for (const m of measures.filter((x) => x?.schema === MEASURE_SCHEMA)) {
@@ -662,7 +662,7 @@ export function drawRedlines(arg) {
 async function main(argv) {
   const file = argv.find((a) => !a.startsWith('--') && /\.html?$/i.test(a));
   const at = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
-  if (!file) { process.stderr.write('use: node scripts/work/draw/draw-rationale.mjs <render.html> [--rationale <file>] [--ui <ui-record-dir>] [--records <draw-render.json>[,...]] [--json]\n'); return 2; }
+  if (!file) { process.stderr.write('use: starci work draw-rationale <render.html> [--rationale <file>] [--ui <ui-record-dir>] [--records <draw-render.json>[,...]] [--json]\n'); return 2; }
   const html = path.resolve(file);
   const rationale = at('--rationale') ? path.resolve(at('--rationale')) : rationaleFileOf(html);
   const { entries, errors } = loadRationale(rationale);

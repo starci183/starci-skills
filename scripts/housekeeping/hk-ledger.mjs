@@ -1,6 +1,6 @@
 // hk-ledger.mjs — row retention of the project ledgers (ARCHITECTURE-DB §7 Q5 and Q6, alpha.3 schema).
 //
-// Two places call it: `api finish` / `api archive` (retainLedgerDb on the ending workflow's ledger) and the
+// Two places call it: `starci kernel finish` / `starci kernel archive` (retainLedgerDb on the ending workflow's ledger) and the
 // housekeeping sweep (sweepLedgers over every ledger machine.ledgers enrols).
 //
 // What retention does — never erase history a live workflow can still need:
@@ -10,7 +10,7 @@
 //      deleting -> purged; engine/db/ledger.mjs deleteWorkflowRows cascades the rows). The approval is the owner's Q6
 //      decision (alpha.3 COMMON.md adopts §7 as recommended). A workflow is kept, and reported, while any job of it is
 //      live or while a Work record cites one of its artifacts (work_citations pins its evidence; a purge would orphan it).
-//      Only the sweep purges, and only with --apply; `api finish` never purges (the workflow just ended).
+//      Only the sweep purges, and only with --apply; `starci kernel finish` never purges (the workflow just ended).
 //   3. PRAGMA incremental_vacuum hands freelist pages back. No WAL checkpoint here: the reconciler engine's connection
 //      is the ONE that checkpoints (RESEARCH-STORAGE §3).
 // Blobs are not touched: the blob GC (scripts/housekeeping/blob-gc.mjs) owns their lifetime.
@@ -46,7 +46,7 @@ function pruneDebugLogs(db, { now }) {
 const reclaimSpace = (db) => { try { db.exec('PRAGMA incremental_vacuum'); return true; } catch { return false; } };
 
 /**
- * The retention an ending workflow runs on its own ledger (api finish / api archive): Q5 debug logs and the
+ * The retention an ending workflow runs on its own ledger (starci kernel finish / starci kernel archive): Q5 debug logs and the
  * freelist. Call outside every transaction. Returns {retained, debugLogsDeleted, vacuumed}.
  */
 export function retainLedgerDb(db, { now = Date.now() } = {}) {

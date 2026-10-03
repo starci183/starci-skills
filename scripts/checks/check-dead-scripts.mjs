@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // check-dead-scripts.mjs - no runtime script lives without a reader (redundancy RED18; part of `npm run check`).
-//   node scripts/checks/check-dead-scripts.mjs [--json]
+//   starci runtime check --only dead-scripts -- [--json]
 //
 // A tracked `.mjs` under scripts/, engine/, modules/, bin/ or ext/ is alive only when something EXECUTABLE names it:
 //   - code: an import or dynamic import (by relative specifier), a spawn argument or a path literal in another code file
-//     (comment lines do not count), a package.json script, a hook of .claude/settings.json;
+//     (comment lines do not count), a package.json script, a hook or .claude/settings.json;
 //   - an agent command: a `node <script>` line of a skill (skills/**/SKILL.md) or of a YAML contract, or a YAML key that is
 //     an executable position (run, check, script, executable, entry, command, exec, cmd, handler) holding the script path;
+//     `starci runtime check --only <name>` names scripts/checks/check-<name>.mjs through the runtime check dispatcher;
 //   - a directory the runtime loads by listing it (DYNAMIC_ROOTS: verbs, status views, reconciler controllers);
 //   - an entry of the dead-script-entries section of modules/kernel/allowlist.yaml: a CLI nothing imports (owner or agent
 //     tool), declared once with the reason it has no code reader.
@@ -37,20 +38,26 @@ export const DYNAMIC_ROOTS = Object.freeze({
   'scripts/reconciler/controllers/': 'scripts/reconciler/engine.mjs loads each controller of modules/reconciler/reconciler.yaml by name',
 });
 const CODE = /\.(mjs|cjs|js|ts|tsx|ps1|sh|cmd)$/;
+const HOOK = /(^|\/)(?:\.husky|hooks\/husky)\/[^/]+$/;
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
 const HISTORY = /^modules\/kernel\/(contract-changes\/|retired-paths\.yaml|owner-rulings\.yaml)/;
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*|#)/;
+const EXEC_POSITION = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:/;
 const EXEC_KEY = /\b(run|check|script|executable|entry|command|exec|cmd|handler)\s*:\s*['"]?(node\s+|npm run\s+)?[\w./-]+\.mjs/;
 const NODE_COMMAND = /(^|[\s`'"(])node\s+[\w./-]+\.mjs/;
+const runtimeCheckNames = (text) => new Set([...String(text).matchAll(/\b(?:(?:npx\s+)?starci\s+runtime\s+check|npm\s+run(?:\s+--silent)?\s+starci(?:\s+--silent)?\s+--\s+runtime\s+check)\s+--only(?:=|\s+)([a-z0-9-]+)/gi)].map((match) => match[1]));
 
 /** The part of a reader's text that counts: code without comment lines; YAML and skills only where executable. */
 function executableText(rel, text) {
-  if (CODE.test(rel) || path.posix.basename(rel) === 'package.json' || rel === '.claude/settings.json') {
-    return CODE.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
+  if (CODE.test(rel) || HOOK.test(rel) || path.posix.basename(rel) === 'package.json' || rel === '.claude/settings.json') {
+    return CODE.test(rel) || HOOK.test(rel) ? text.split('\n').filter((line) => !COMMENT_LINE.test(line)).join('\n') : text;
   }
-  if (/\.ya?ml$/.test(rel) || /^skills\/.*SKILL\.md$/.test(rel)) {
-    return text.split('\n').filter((line) => (EXEC_KEY.test(line) && !/^\s*#/.test(line)) || NODE_COMMAND.test(line)).join('\n');
+  const skill = /^skills\/.*SKILL\.md$/.test(rel);
+  if (/\.ya?ml$/.test(rel) || skill) {
+    return text.split('\n').filter((line) => !/^\s*#/.test(line) && (
+      EXEC_KEY.test(line) || NODE_COMMAND.test(line) || (runtimeCheckNames(line).size && (skill || EXEC_POSITION.test(line)))
+    )).join('\n');
   }
   return '';
 }
@@ -74,12 +81,16 @@ export function deadScriptFindings({ tracked, read }) {
   const entries = parseEntries(tracked.includes(ALLOWLIST_FILE) ? read(ALLOWLIST_FILE) : '');
   const readers = tracked.filter((rel) => !isTest(rel) && !GENERATED.test(rel) && !HISTORY.test(rel));
   const texts = new Map();
-  for (const rel of readers) { const text = executableText(rel, read(rel)); if (text) texts.set(rel, text); }
+  for (const rel of readers) {
+    const text = executableText(rel, read(rel));
+    if (text) texts.set(rel, { text, checks: runtimeCheckNames(text) });
+  }
   const readBy = (rel) => {
     const base = path.posix.basename(rel);
     const stem = rel.replace(/\.mjs$/, '');
-    for (const [reader, text] of texts) {
-      if (reader !== rel && (text.includes(base) || text.includes(stem))) return reader;
+    const check = /^scripts\/checks\/check-([a-z0-9-]+)\.mjs$/.exec(rel)?.[1];
+    for (const [reader, executable] of texts) {
+      if (reader !== rel && (executable.text.includes(base) || executable.text.includes(stem) || (check && executable.checks.has(check)))) return reader;
     }
     return null;
   };

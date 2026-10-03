@@ -1,4 +1,4 @@
-// workflow-settle.mjs - what api settle does in a workflow worktree (WFWT2), on top of the checkpoint primitives of
+// workflow-settle.mjs - what starci kernel settle does in a workflow worktree (WFWT2), on top of the checkpoint primitives of
 // scripts/kernel/workflow-checkpoint.mjs:
 //   settleCheckpoint  a green op: the Work-record owner rule, then its checkpoint, then the milestone rebase; a failed or
 //                     blocked op: preserved and reset.
@@ -93,11 +93,11 @@ export function requireWorkOwner(ctx, { workflowId, opId }) {
   if (!records.length) return;
   const ownerOf = ctx?.ownerOf ?? createOwnership(ctx.db, { repo: ctx.repo });
   const foreign = records.map((file) => ({ file, ...ownerOf(file) })).filter((o) => o.workflowId && o.workflowId !== workflowId && o.by !== 'repo-owner');
-  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ')}): only the owner's workflow commits a record - ask it (api notify --kind request)`), { files: foreign.slice(0, 40) });
+  if (foreign.length) throw Object.assign(fail({ code: 'workflow-work-record-not-owner' }, `${opId} changed ${foreign.length} Work record file(s) another workflow owns (${foreign.slice(0, 3).map((o) => `${o.file}: ${o.workflowId} by ${o.by}`).join('; ')}): only the owner's workflow commits a record - ask it (starci kernel notify --kind request)`), { files: foreign.slice(0, 40) });
 }
 
 /**
- * What api settle does in a workflow worktree, as the ledger event it records: a green op is a checkpoint followed by the
+ * What starci kernel settle does in a workflow worktree, as the ledger event it records: a green op is a checkpoint followed by the
  * milestone rebase; a failed or blocked op is preserved and reset. Throws the typed refusal of checkpointOp/preserveAndReset.
  */
 export function settleCheckpoint(ctx, { workflowId, opId, pass }) {

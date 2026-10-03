@@ -1,0 +1,27 @@
+group: typecheck
+verb: run
+owner: runtime
+summary: check changed runtime modules or affected TypeScript projects
+impl: {module: scripts/machine/ladder-typecheck.mjs, export: typecheckRun}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - Use L1 while working, L2 before asking for a land, and L3 when an IO slot changed.
+  - L1 checks projects holding changed files, L2 and L3 check affected projects, and L4 checks every project.
+  - Runtime JavaScript uses node --check; product TypeScript always uses tsc --noEmit through the Node API owner.
+flags:
+  - {name: level, type: enum, enum: [L0, L1, L2, L3, L4], default: L1, summary: typecheck ladder level}
+  - {name: changed, type: list, summary: changed repository paths}
+  - {name: project, type: list, summary: explicit tsconfig project paths}
+positional: []
+exit:
+  "0": "every selected program was clean"
+  "1": "syntax or type findings"
+  "2": "usage or ladder policy refusal"
+json: starci/typecheck-run@1
+examples:
+  - starci typecheck run --level L1 --changed packages/hfs/src/main.mjs
+  - starci typecheck run --level L2 --project ui/tsconfig.json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

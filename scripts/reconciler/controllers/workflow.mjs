@@ -3,23 +3,23 @@
 // modules/reconciler/workflow.yaml. Engine contract: LANES.md "Shared contract" (lane rc-engine discovers this file).
 //
 // One key per running workflow, `workflow:<ledgerId>:<workflowId>`. Each pass reads ONE projection - the cached
-// `api status --json` (ctx.status: progress, rca, frontier, stuck[], kernelRev) and scripts/supervisor/stall.mjs
+// `starci kernel status --json` (ctx.status: progress, rca, frontier, stuck[], kernelRev) and scripts/supervisor/stall.mjs
 // stallFindings over a read-only handle, its frontierOf answered from that same cached status - and from it:
 //   - keeps the SLA clocks of the workflow (stalled, orphaned, rev-ack, goal text, one per stuck[] wait);
 //   - opens one Decision Item per finding for the Kernel (progress-stall, stale-gate, stale-wait, stale-peer-wait,
 //     unread-peer, orphaned-frontier, rev-ack), escalates a stall past progress.supervisorGraceMs to the Supervisor,
 //     then rings the Kernel seat's doorbell (lane rc-decisions; a would-row until it lands and in shadow);
-//   - re-parks an owner ask whose poll digest tag is dead, stale or unserved (api serve-ask);
-//   - finishes a finish-ready workflow (api finish).
+//   - re-parks an owner ask whose poll digest tag is dead, stale or unserved (starci kernel serve-ask);
+//   - finishes a finish-ready workflow (starci kernel finish).
 // Everything that acts goes through ctx (ctx.api / ctx.openDecision carry the shadow gate). The pure planner,
 // planWorkflow, holds every decision so specs read it without a ledger.
 //
-// It wraps, never re-implements: progress + rca come from api status (scripts/kernel/progress-rca.mjs), the stall
+// It wraps, never re-implements: progress + rca come from starci kernel status (scripts/kernel/progress-rca.mjs), the stall
 // notice from scripts/kernel/progress-rca.mjs stallNotice, the waits and their SLA from
 // scripts/machine/op-metrics.mjs (stuck[], opTelemetry.stuckSla), the findings from stall.mjs, the ask tags from
 // scripts/supervisor/poll.mjs openAsks.
 //
-//   node scripts/reconciler/controllers/workflow.mjs --dry [--repo <path>]... [--workflow <id>] [--json]
+// Internal args (spawned by the reconciler engine): --dry [--repo <path>]... [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints the plan (clocks, would-DIs, re-parks, finish); writes nothing.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,7 +45,7 @@ const WORKFLOW_FILE = path.join(skillRoot, 'modules', 'reconciler', 'workflow.ya
 export const DI_SCHEMA = 'starci/decision-item@1';
 export const OPENED_BY = 'workflow-controller';
 export const SUPERVISOR_LEDGER = 'supervisor';
-/** api status stuck[] kind -> violation code (DESIGN Appendix A; a supervisor-gate is SUPERVISOR_GATE_OVERDUE). */
+/** starci kernel status stuck[] kind -> violation code (DESIGN Appendix A; a supervisor-gate is SUPERVISOR_GATE_OVERDUE). */
 const STUCK_CODES = Object.freeze({
   'owner-gate': 'WAIT_OVERDUE', 'peer-wait': 'PEER_WAIT_OVERDUE', dependency: 'WAIT_OVERDUE', 'retry-cap': 'WAIT_OVERDUE',
   'deferred-settle': 'WAIT_OVERDUE', 'queued-ready': 'READY_UNDISPATCHED', throttled: 'WAIT_OVERDUE',
@@ -118,12 +118,12 @@ export function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workfl
 
 /**
  * Everything one pass decides for one running workflow. Pure: no ledger, no clock, no spawn.
- *   status    the cached api status value (null when unreadable)
+ *   status    the cached starci kernel status value (null when unreadable)
  *   findings  stallFindings of this workflow
  *   goal      {missing: bool, why}
  *   asks      [{dispatchId, liveness, lastServedAt}] (poll.mjs openAsks)
  *   clocks    the workflow's open clocks [{entity, state, enteredAt}] (to read an episode's age)
- *   unreadable  {misses, since, error, heldAt} when this pass could not read api status (holdStatus), else null
+ *   unreadable  {misses, since, error, heldAt} when this pass could not read starci kernel status (holdStatus), else null
  * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
  */
 export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], unreadable = null, now, settings }) {
@@ -145,7 +145,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
     out.lines.push(`GOAL_TEXT_MISSING ${workflowId}: ${goal.why}`);
   }
 
-  // ---- stall: api status progress.stall and the STALLED finding are one episode
+  // ---- stall: starci kernel status progress.stall and the STALLED finding are one episode
   const stalledFinding = findings.find((f) => f.type === 'STALLED' && f.alert) ?? null;
   const orphaned = frontier?.state === 'orphaned-frontier';
   const progressStalled = progress?.stall?.stalled === true;
@@ -197,11 +197,11 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
     if (now - since < s.revAckMs) {
       out.rewake = cur;
       out.lines.push(`rev-ack pending ${workflowId}: rev ${cur} rides the Kernel's next wake; a decision only after ${Math.round(s.revAckMs / 60_000)}m`);
-    } else di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then api kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
+    } else di({ kind: 'rev-ack', subject: 'runtime-rev', summary: `runtime rev ${cur} not acked (acked ${shortRev(rev.acked) ?? 'none'}); re-read ${rev.full ? 'kernel-prompt.md and driver-loop.yaml in full' : (rev.files ?? []).slice(0, 6).join(', ')} then starci kernel kernel-ack-rev --workflow ${workflowId} --rev ${cur}`,
       evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
   }
 
-  // ---- api status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
+  // ---- starci kernel status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
   // statusUnreadablePasses consecutive misses are a runtime defect of the read itself, the Supervisor's, naming the error.
   // It lands in the SUPERVISOR ledger (like cap-starved / service-quarantined): a product-ledger DI with decider supervisor
   // never reaches `decisions.mjs supervisor --list`. productLedger/workflowId keep the refs.
@@ -211,7 +211,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
     if (unreadable.misses >= (s.statusUnreadablePasses ?? 3)) {
       const f = unreadable.failure ?? null;
       di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', ledger: SUPERVISOR_LEDGER, entity: { type: 'workflow', id: workflowId },
-        summary: `status-unreadable: api status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
+        summary: `status-unreadable: starci kernel status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
         evidence: [`last error: ${unreadable.error}`, f ? `cause ${f.cause ?? '?'}; exit ${f.code ?? '-'}; timedOut ${Boolean(f.timedOut)}${f.refusal ? `; refusal ${f.refusal}` : ''}` : null,
           f?.stderrHead ? `stderr: ${f.stderrHead}` : null, `ledger ${ledgerId} workflow ${workflowId}`, findings.find((x) => x.type === 'STATUS-UNREADABLE')?.line] });
     }
@@ -227,7 +227,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
       entity: f.jobId ? { type: 'job', id: f.jobId } : f.incidentId ? { type: 'incident', id: f.incidentId } : { type: 'workflow', id: workflowId }, top });
   }
 
-  // ---- one clock per api status stuck[] wait (opTelemetry.stuckSla)
+  // ---- one clock per starci kernel status stuck[] wait (opTelemetry.stuckSla)
   for (const item of status?.stuck ?? []) {
     const id = String(item.key ?? '').split(':').slice(3).join(':') || item.incidentId || item.jobId;
     if (!id || !item.kind) continue;
@@ -249,7 +249,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
     out.lines.push(`ASK-REPARK ${workflowId} ${a.dispatchId} (${a.liveness})`);
   }
 
-  // ---- finish: every job settled and the handover approved (api status frontier finish-ready)
+  // ---- finish: every job settled and the handover approved (starci kernel status frontier finish-ready)
   if ((status?.phase ?? 'running') === 'running' && frontier?.state === 'finish-ready' && !(Number(frontier.openOperations) > 0)) out.finish = true;
 
   for (const d of out.decisions) out.lines.push(`DI ${d.decider} ${d.idempotencyKey}: ${clipLine(d.summary, 160)}`);
@@ -282,10 +282,10 @@ function goalOf(db, workflowId) {
 const lastServedAt = (db, workflowId, dispatchId) => Number(db.prepare(
   "SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND kind IN ('ask-serving','ask-notified') AND json_extract(payload_json,'$.dispatchId')=?").get(workflowId, dispatchId)?.at) || null;
 
-/** Whether an api status value carries a frontier to judge (apiFrontier's ok shape). */
+/** Whether an starci kernel status value carries a frontier to judge (apiFrontier's ok shape). */
 const readable = (v) => Boolean(v && typeof v === 'object' && v.ok !== false && v.frontier);
 /**
- * One api status read: {value, error, failure}; error names why it is unreadable (a throw, {ok:false,error}, no value).
+ * One starci kernel status read: {value, error, failure}; error names why it is unreadable (a throw, {ok:false,error}, no value).
  * Through ctx.statusRead when the ctx has it: failure = the spawn's cause (timeout | spawn | refused | exit | no-json),
  * exit code and stderr head, so a refusal cli.mjs printed on stderr (plan-edges-missing) is named, not 'no value'.
  */
@@ -294,7 +294,7 @@ async function readStatus(ctx, ledgerId, workflowId) {
     const { value: v, failure = null } = typeof ctx.statusRead === 'function' ? await ctx.statusRead(ledgerId, workflowId) : { value: await ctx.status(ledgerId, workflowId) };
     if (readable(v)) return { value: v, error: null, failure: null };
     const error = v && typeof v === 'object' ? (v.error ?? (v.ok === false ? 'ok:false with no error' : 'no frontier in the value'))
-      : failure?.error ?? 'no value (api status timed out, exited non-zero or printed no JSON)';
+      : failure?.error ?? 'no value (starci kernel status timed out, exited non-zero or printed no JSON)';
     return { value: null, error: clipLine(error, 300), failure };
   } catch (error) { return { value: null, error: clipLine(`threw: ${error?.message ?? error}`, 200), failure: { cause: 'threw' } }; }
 }
@@ -318,7 +318,7 @@ function holdStatus(ctx, key, read, now, passes) {
   const hold = next.last && next.misses < passes;
   return { status: hold ? next.last : null, unreadable: { misses: next.misses, since: next.since, error: read.error, failure: read.failure ?? null, heldAt: hold ? next.lastAt : null } };
 }
-/** An api status value in the shape stall.mjs frontierOf answers (apiFrontier). */
+/** An starci kernel status value in the shape stall.mjs frontierOf answers (apiFrontier). */
 const asFrontier = (v) => (v && v.ok !== false && v.frontier ? { ...v, ok: true, frontier: v.frontier ?? {}, workers: v.workers ?? [] } : { ok: false, error: v?.error ?? 'status unreadable' });
 
 /* ------------------------------------------------------------------------------------------------ apply */
@@ -362,7 +362,7 @@ async function clearWorkflowClocks(ctx, ledgerId, workflowId) {
 /* ------------------------------------------------------------------------------------------------ the controller */
 
 const settingsNow = () => workflowSettings();
-/** The stall-episode clocks an unjudged pass (api status unreadable, none held) keeps open. */
+/** The stall-episode clocks an unjudged pass (starci kernel status unreadable, none held) keeps open. */
 const UNJUDGED_KEEP = new Set(['STALL_UNOWNED', 'STALL_ESCALATED', 'ORPHANED_FRONTIER']);
 const defaults = settingsNow();
 
@@ -466,7 +466,7 @@ export default {
 
 /* ------------------------------------------------------------------------------------------------ --dry */
 
-/** A ctx that writes nothing: statuses through api status (read-only), every action recorded. */
+/** A ctx that writes nothing: statuses through starci kernel status (read-only), every action recorded. */
 function dryCtx({ repos = productRepos(), now = Date.now() } = {}) {
   const would = [];
   const cache = new Map();
@@ -495,7 +495,7 @@ if (isMain(import.meta.url)) {
   const repos = argv.flatMap((a, i) => (a === '--repo' && argv[i + 1] ? [path.resolve(argv[i + 1])] : []));
   const only = argv.flatMap((a, i) => (a === '--workflow' && argv[i + 1] ? [argv[i + 1]] : []));
   if (!argv.includes('--dry')) {
-    console.log('usage: node scripts/reconciler/controllers/workflow.mjs --dry [--repo <path>]... [--workflow <id>] [--json]\n(the engine runs this controller: node scripts/reconciler/engine.mjs --once --controller workflow)');
+    console.log('args: --dry [--repo <path>]... [--workflow <id>] [--json]\n(the reconciler engine runs this controller)');
   } else {
     const ctx = dryCtx(repos.length ? { repos } : {});
     const keys = (await listWorkflows(ctx)).filter((k) => !only.length || only.includes(parseKey(k)?.workflowId));

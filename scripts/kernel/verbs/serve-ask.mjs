@@ -1,4 +1,4 @@
-// api serve-ask — park an owner ask. A StarCi Next Kernel held an ask-reserve for an hour
+// starci kernel serve-ask — park an owner ask. A StarCi Next Kernel held an ask-reserve for an hour
 // (inc-2558dd227dfd) because it could mutate only through cli.mjs, so this verb is the Kernel's
 // one way to put a question in front of the owner. Owner, 2026-09-24: a form URL is served only
 // when the owner asks for it. So with Telegram ready this verb serves NOTHING: parkAsk
@@ -59,7 +59,7 @@ export default {
     if (report && !answered) {
       const pilot = autopilotAnswerAsk({ ledger, repo, workflowId, report,
         wake: (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-          `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] }) });
+          `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read starci kernel status and run nextActions.'] }) });
       if (pilot.handled) {
         const out = { ok: true, workflowId, dispatchId: report.dispatch_id, autopilot: true, action: pilot.action, class: pilot.class, ...(pilot.receiptPath ? { receiptPath: pilot.receiptPath } : {}),
           ...(pilot.stubPath ? { stubPath: pilot.stubPath, owed: pilot.owed } : {}), ...(pilot.findings ? { findings: pilot.findings.slice(0, 20) } : {}) };

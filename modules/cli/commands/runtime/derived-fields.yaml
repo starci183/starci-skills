@@ -1,0 +1,18 @@
+group: runtime
+verb: derived-fields
+owner: runtime
+summary: regenerate or check the derived fields of the knowledge pattern files
+impl: {script: scripts/hfs/derived-fields.mjs}
+flags:
+  - {name: write, type: boolean, summary: rewrite the stale output in place}
+  - {name: check, type: boolean, summary: list the stale output (the default)}
+exit: {"0": current or rewritten by --write, "1": stale output listed, "2": bad usage}
+json: none
+examples:
+  - starci runtime derived-fields --check
+  - starci runtime derived-fields --write
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/hfs/derived-fields.mjs
+  - node .claude/scripts/hfs/derived-fields.mjs

@@ -15,7 +15,7 @@ import tsParser from "@typescript-eslint/parser"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { at, FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
 import { appDeclaration } from "../be/fixtures/app.mjs"
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { noArbitraryValue, noFractionalStep, noHandRolledHeading, noUnresolvedTokenClass, rules } from "./tokens.mjs"
@@ -118,6 +118,7 @@ const themedRoot = () => {
 }
 
 const THEMED = themedRoot()
+test.after(() => rmSync(THEMED, { recursive: true, force: true }))
 
 /** The typed-fixture declaration rooted at the themed repository, so its files classify by slot there. */
 const themedTester = new RuleTester({

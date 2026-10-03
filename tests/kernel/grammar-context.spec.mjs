@@ -104,7 +104,7 @@ test('buildOpPrompt renders packet context.grammar and nothing when the packet h
   assert.match(prompt,new RegExp(`records: \\.starciwork\\/shell\\ngrammar_context \\(family nivo\\)[^\\n]*\\n  family-css: ${esc(cssPath)}\\n`));
 });
 
-test('api dispatch attaches context.grammar and refuses grammar-context-missing before any Orca call',t=>{
+test('starci kernel dispatch attaches context.grammar and refuses grammar-context-missing before any Orca call',t=>{
   const root=tmp(t);
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);

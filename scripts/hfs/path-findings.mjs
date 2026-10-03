@@ -1,4 +1,4 @@
-// hfs-path-findings.mjs - the per-path judgements of the slot manifest: what a tracked path is. One function, two surfaces: `hfs check`
+// hfs-path-findings.mjs - the per-path judgements of the slot manifest: what a tracked path is. One function, two surfaces: `starci app check`
 // (checkRepo) runs it over the tracked tree and keeps the findings that have no TypeScript file to sit on; the lint canon's project graph
 // (scripts/hfs/project-graph.mjs) runs it over the same tree and serves the findings on a TypeScript file as ESLint reports.
 //   HFS_SLOT_UNDECLARED / HFS_SLOT_AMBIGUOUS / HFS_SLOT_NOT_ENABLED / HFS_FORBIDDEN_PRESENT / HFS_TOOL_CONFIG_LOCAL / HFS_TRACKED_MUST_BE_IGNORED (R01, R16)

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // task-list.mjs — the calls.yaml `task-list` call as a callable function.
-//   node scripts/api/orca/task-list.mjs --run <run_id>
+// Internal entry: spawned by scripts/kernel/cli.mjs; not invoked directly.
+// Args: --run <run_id>
 // Returns {ok, tasks, errorCode, error, hostUnavailable}: `tasks` is result.tasks (Orca's own Task status).
 import { orcaCall } from './lib.mjs';
 import { arg } from '../../lib/cli-arg.mjs';

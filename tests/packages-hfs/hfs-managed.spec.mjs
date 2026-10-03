@@ -10,7 +10,7 @@ import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
 import { tsStrictFindings } from '../../packages/hfs/sync/ts-strict.mjs';
 import { APP, PRESETS } from '../helpers/hfs-cli-fixture.mjs';
 
-// The managed-file findings of `hfs check` (R05 HFS_MANAGED_FILE_DRIFT, R16 HFS_TOOL_CONFIG_LOCAL, R17
+// The managed-file findings of `starci app check` (R05 HFS_MANAGED_FILE_DRIFT, R16 HFS_TOOL_CONFIG_LOCAL, R17
 // HFS_RULE_OFF_WITHOUT_REPLACEMENT, R22 HFS_TS_STRICT): every code has a violating tree and a clean one. The app is synced and judged
 // at its root: the root's managed files (package.json scripts, hooks, workflows, prettier) and each side's (be/, fe/).
 const made = [];
@@ -76,7 +76,7 @@ test('HFS_MANAGED_FILE_DRIFT: key order in package.json scripts and lines outsid
 test('HFS_MANAGED_FILE_DRIFT: the root package.json owns the scripts of both sides (test:stack included); an app devDependency such as ajv is not drift, a changed test:stack is', async () => {
   const dir = await synced();
   const pkg = JSON.parse(read(dir, 'package.json'));
-  assert.equal(pkg.scripts['test:stack'], 'cd be && starci-test-stack');
+  assert.equal(pkg.scripts['test:stack'], 'starci app stack');
   put(dir, 'package.json', JSON.stringify({ ...pkg, devDependencies: { ajv: '^8.17.1' } }));
   assert.deepEqual(await findings(dir), []);
   put(dir, 'package.json', JSON.stringify({ ...pkg, devDependencies: { ajv: '^8.17.1' }, scripts: { ...pkg.scripts, 'test:stack': 'echo no' } }));

@@ -2,7 +2,8 @@
 // Deep map WRAP RR5, RR6: Orca's archive is unredacted and on Orca's retention, so the blob store plus redact.mjs stay the sink.
 // worker-read.mjs — the calls.yaml `worker-read` call as a callable function: Orca's bounded output of one
 // supervised worker, read by its Dispatch (deep map T1, REPLACE: the one read of a worker's output).
-//   node scripts/api/orca/worker-read.mjs --dispatch <dispatch_id> [--source <auto|transcript|terminal>] [--cursor <c>] [--limit <n>]
+// Internal entry: spawned by scripts/kernel/verbs/observe.mjs; not invoked directly.
+// Args: --dispatch <dispatch_id> [--source <auto|transcript|terminal>] [--cursor <c>] [--limit <n>]
 //
 // Every worker is read by Dispatch, never by terminal handle: Orca 1.4.209 states that not every worker has a
 // terminal and that `orca terminal` verbs do not accept every worker handle, while `worker-read --source auto`

@@ -6,7 +6,7 @@ paths:
   - scripts/kernel/api.mjs
   - scripts/kernel/api-verbs/dispatch.mjs
   - scripts/kernel/repair-rejected-attempts.mjs
-  - modules/kernel/api-commands/dispatch.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
   - ui/api/pipeline.mjs
   - tests/rejected-attempt-repair.spec.mjs
   - tests/terminal-create-recovery.spec.mjs

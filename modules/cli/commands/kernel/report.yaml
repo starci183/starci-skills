@@ -1,0 +1,157 @@
+group: kernel
+verb: report
+owner: runtime
+summary: a worker files its job report (the durable op to kernel IPC)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - report
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: job
+    type: string
+    required: true
+    summary: job the worker is reporting for
+  - name: report
+    type: string
+    required: true
+    summary: report JSON file inside the attempt's scratch (starci/op-report@1)
+  - name: attach
+    type: list
+    summary: attachment file inside the scratch; repeat the flag for each file
+  - name: outcome
+    type: enum
+    enum:
+      - done
+      - partial
+      - failed
+      - ask
+      - blocked
+    summary: the outcome the report must carry; refused when the envelope says otherwise
+  - name: dispatch-capability
+    type: string
+    summary: the dispatch capability from the Orca preamble, authenticating the worker_done message
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel report --repo <path> --job <job> --report <report>
+  - starci kernel report --repo <path> --job <job> --report <report> --attach <file> --outcome done --dispatch-capability <capability> --json
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api report
+  - node scripts/kernel/cli.mjs report
+reads: "the job row and its OPEN attempt (op_attempts: latest dispatch, no end_state, not settled)
+  with its contracts row; the report file under the attempt's STARCI_JOB_SCRATCH
+  (op_attempts.scratch_dir) - a starci/op-report@1 JSON envelope {outcome, summary, files[],
+  checks[{name, command, exitCode, phase?, cwd?, unavailable?, stdoutPath?, stderrPath?,
+  outputPath?}], open|question|blocker per outcome}; each --attach file, also under the scratch"
+writes: "One transaction under api_requests idempotency (request id = sha(verb, dispatch, job +
+  report digest + attachment shas)): reports row (engine/db/ledger.mjs fileReport, UNIQUE
+  attempt_id, immutable - H10) holding the ONLY copy of the normalized report_json, check file paths
+  replaced by artifact names; op_attempts.reported_at/report_outcome; one job_artifacts row per
+  --attach file (a directory attaches every file under it, named attachments/<path in the scratch>:
+  runs/<runId>/** is role uat-run with run_id, captures/** capture | dom, round-<n>/ sets round; an
+  attached interface-audit.json becomes the audit's interface_audits row) and per check
+  stdout/stderr/output (role report-attachment | screenshot | video | trace | dom | patch | diff |
+  log | check-stdout | check-stderr | check-output, origin op, keyed (attempt_id, name) -
+  attachments/<file>, checks/<i>-<check>/<stream><ext>) over blobs put BEFORE the transaction (text
+  redacted by scripts/lib/redact.mjs, blobs.redaction v1; media binary) and report_attachments; one
+  check_runs row per declared check (runner op, authority declared: the op's exitCode is
+  declared_exit_code, exit_code stays NULL; unavailable:true is status unavailable, never red - H7);
+  jobs.status running|answering|effect_unknown -> reported and the unit running -> reported; event
+  report-filed {dispatchId, attemptId, reportId, artifacts[{id, name, sha256}], checks}. After the
+  commit the scratch directory is deleted, the attempt's terminal scrollback is stored as
+  op_attempts.transcript_sha (scripts/kernel/transcripts.mjs), the Kernel is woken
+  (scripts/kernel/wake-delivery.mjs, delivery proven from the screen; the watchdog
+  allocation.watchdogCadenceMs is only the fallback) and the runtime settler starts. No report is
+  ever read back from a file: the reports row is the record, and `starci kernel status` projects it. A row
+  filed with outcome 'ask' then follows askLifecycle below until it is answered or superseded."
+returns: "{ok:true, jobId, workflowId, dispatchId, attemptId, outcome, reportId, attachments,
+  artifacts:[{id, name, sha256}], audit?:{auditId, verdict}, kernelWake:{action,terminal,...},
+  reask?:{dispatchId, reason}} | {ok:true, replayed:true, jobId, workflowId, dispatchId, outcome,
+  reportId} when the same report was already filed"
+answeredAsks: "an `ask` report is checked against the answered asks of the job's retry lineage
+  (dispatch ownerAnswers, scripts/machine/owner-answers.mjs repeatedAnswerOf): a question with the
+  same text (case, spacing and trailing punctuation aside) or the same two or more option labels
+  repeats that ask and is refused ask-already-answered. handover.review is exempt: every round asks
+  approval of a new package with the same three options, so its earlier answers ride in the packet
+  only. The one way past is a declared re-ask: question.reasks {dispatchId: <the answered ask>,
+  reason} for an answer that provably could not take effect; it is filed with a WARNING on stderr,
+  `reask` in the result and on the 'report-filed' event, so the Kernel sees it before it serves the
+  ask"
+binding: "The job's open attempt is the binding: its dispatch_id is the identity the envelope must
+  match (run/task/dispatch/from are stamped from op_attempts, the worker never claims them) and it
+  must carry the contracts row `starci kernel dispatch` wrote (keyed attempt_id). A redispatch is a new
+  attempt with its own contract, so an old dispatch never files into it."
+refuses:
+  - report-job-not-active: the job is not running, answering, effect_unknown or reported - a queued or
+      settled job has no worker to file for it
+  - report-dispatch-unbound: the job has no open dispatched attempt
+  - report-contract-unbound: the open attempt has no contracts row
+  - report-scratch-unbound / report-scratch-invalid / report-scratch-missing: the attempt has no scratch
+      directory, it is not under the OS temp directory, or it is gone (a filed attempt answers
+      replayed instead)
+  - report-missing: report file missing or unreadable
+  - report-outside-scratch: the report file is not under the attempt's STARCI_JOB_SCRATCH (a Work path is never a report)
+  - "report-attachment-missing / report-attachment-outside-scratch / report-attachment-invalid: an
+    --attach file or a check stdoutPath/stderrPath/outputPath that is missing, outside the scratch,
+    or an --attach without a path"
+  - "STARCI_REPORT_ALREADY_FILED: the attempt already filed a different report (reports are
+    immutable; the same report again returns replayed)"
+  - "artifact-immutable: an artifact name of this attempt already holds other bytes"
+  - report-invalid: fails starci/op-report@1 — bad outcome, missing summary, files outside owned_paths,
+      missing open/question/blocker for its outcome, identity mismatch (a report claiming a dispatch
+      the job does not bind is refused here), prose that lost its non-ASCII letters to a legacy code
+      page (a question mark inside words, U+FFFD) — the file must be written as UTF-8
+      (scripts/kernel/report-envelope.mjs lossyTextFields)
+  - outcome-mismatch: --outcome flag contradicts the envelope outcome
+  - "ask-already-answered: an ask whose question repeats an ask the job's retry lineage already had
+    answered (answeredAsks above). The error names the answered ask, who answered it with which
+    option and the receipt; nothing is filed. Apply the answer (packet context.owner_answers), or
+    declare a re-ask with question.reasks"
+  - "ask-declared-in-stack: an ask that requests what the repository's stack declaration says the
+    runtime already holds - a service in its services block (or the source host's entry listing this
+    repository) declared ownerAction none with its custody present, named by one of its credential
+    or CI secret/variable names, or by the service next to a credential word (a Sonar token or host,
+    a GitHub CI setting). scripts/gates/starcistacks.mjs ownerAskConflict; nothing is filed; the
+    error names the declaration and the custody to use. The guard fails open when a declaration
+    cannot be read"
+  - "draw-review-owed: a done interface.draw report whose files hold a ui record another leg waits
+    on (the surface-layout design record of a planned layout, a record another record dependsOn) -
+    or, for a leg admitted after contract change draw-content-owner-gate, ANY drawn ui record
+    (draw-review.mjs EVERY_DRAW_GATE: every drawing is the owner's to accept, an automatic accept is
+    not the owner's) - whose drawn parts the owner has not accepted (scripts/work/draw-review.mjs
+    drawReviewsOwed; mia inc-a4b5b1abdd90). The attempt files outcome ask with the question
+    `draw-review.mjs question --ui <dir> --job <id>` prints (one ask, even with candidatesPerScreen
+    1): shapes only, one per XBase#state of ui.shapes, never a retired data-status image,
+    owner-requested when drawOwnerRulingOf reads the owner's request from the ledger lineage; the
+    attempt re-enqueued with the answer applies it (draw-review.mjs apply). A leg admitted before
+    contract change interface-draw-owner-review reports as it was admitted"
+  - "draw-feedback-unaddressed: an interface.draw ask or done report (a leg admitted after contract
+    change owner-draw-feedback-golden) whose ui record - the ask's question.review record, or a
+    record under report.files - carries an owner redraw answer the ledger holds (draw-redraw-owed)
+    that draw-review.mjs apply has not written into ui.review.feedback, or an open owner note the
+    current drawing does not address: a part still the bytes the owner rejected, a brief
+    (generation.promptPath) without the note id, or a draw-loop critique whose best round does not
+    pass the note's gate check (DRAW_FEEDBACK_UNADDRESSED; scripts/work/draw-feedback.mjs
+    reportFeedbackFindings). The findings (first 50) ride on the error; redraw through draw-loop.mjs
+    with the brief carrying draw-feedback.mjs brief, check with draw-feedback.mjs check, then
+    report"
+  - "draw-review-unjudged: the draw-review-owed guard could not judge a ui record the report reaches
+    - its index.yaml, the layout tree or a record under features/ does not parse, or the guard
+    crashed. The error names each file; nothing is filed until the record is repaired. A leg
+    admitted before contract change draw-review-gate-fails-closed gets a stderr warning instead"
+  - report-invalid (handover ask):a handover.review ask whose question.options are not exactly three
+    distinct non-empty labels in the order approve, feedback, question, or that declares picks
+    (scripts/kernel/handover.mjs handoverAskProblem)
+  - report-identity-mismatch: the caller is an op (conventions.callerBoundary) and --job is not its own job
+  - job-unknown / job-settled
+usedBy: the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a
+  terminal

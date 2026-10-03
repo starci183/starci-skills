@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-env.mjs - every environment variable the runtime reads is catalogued, and read in one place (smell S8-01, S8-02 and
 // S11-04; part of `npm run check`).
-//   node scripts/checks/check-env.mjs [--json]
+//   starci runtime check --only env [--json]
 //
 // The catalog is modules/schemas/env.yaml (`variables:` keyed by name: purpose, kind). Its `reader` field names the one
 // module that reads `process.env` by name (scripts/lib/env.mjs: readEnv, isSpecRun, ...). The check parses every runtime

@@ -15,7 +15,7 @@ summary: >-
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/rc-gc-resource-pool-backoff.yaml
-  - modules/kernel/api-commands/provider-backoff.yaml
+  - modules/cli/commands/kernel/provider-backoff.yaml
   - modules/reconciler/resource.yaml
   - scripts/agent/models.mjs
   - scripts/kernel/api-verbs/provider-backoff.mjs

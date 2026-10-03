@@ -1,0 +1,22 @@
+group: release
+verb: proof
+owner: runtime
+summary: build the release proof attached before publish or deploy effects
+impl: {script: scripts/gates/release-proof.mjs}
+flags:
+  - {name: repo, type: string, required: true, summary: released repository}
+  - {name: base, type: string, required: true, summary: first commit of the release range}
+  - {name: main, type: string, summary: main reference used by the merge guard}
+  - {name: out, type: string, summary: write the proof to this file}
+exit:
+  "0": every release step passed
+  "1": a release step is red or skipped
+  "2": proof could not be built or usage was invalid
+json: always
+examples:
+  - starci release proof --repo <repo> --base <range-start>^ --out release-proof.json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/release-proof.mjs
+  - node .claude/scripts/gates/release-proof.mjs

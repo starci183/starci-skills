@@ -1,0 +1,135 @@
+# The contract of `starci kernel log` (scripts/kernel/verbs/log.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.log (lane slim-api).
+group: kernel
+verb: log
+owner: runtime
+summary: "append one typed log row to the ledger's logs table"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - log
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: job
+    type: string
+    summary: job the row belongs to (an op may log only its own)
+  - name: kind
+    type: enum
+    required: true
+    summary: "typed row kind; --data must carry its required fields"
+    enum:
+      - step.start
+      - step.end
+      - cmd.run
+      - file.edit
+      - check.result
+      - test.result
+      - render
+      - video
+      - trace
+      - warning
+      - decision
+      - narration
+      - ask
+      - error
+      - dispatch
+      - report
+      - settle
+      - land
+      - incident
+      - job.drop
+      - supervisor.action
+      - gc.collect
+      - gc.summary
+      - reconciler.would
+      - reconciler.act
+      - reconciler.error
+      - reconciler.event
+      - invariant.violated
+      - invariant.cleared
+      - log.truncated
+  - name: msg
+    type: string
+    required: true
+    summary: short message
+  - name: data
+    type: string
+    summary: kind-specific data as a JSON object
+  - name: refs
+    type: string
+    summary: comma list of refs
+  - name: level
+    type: enum
+    summary: row level (default by kind)
+    enum:
+      - info
+      - warn
+      - error
+  - name: node
+    type: string
+    summary: work-graph node the row is about
+  - name: actor
+    type: enum
+    summary: actor the row speaks for (an op always logs as op)
+    enum:
+      - kernel
+      - runtime
+      - check
+      - land
+exit:
+  "0": row appended (or dropped at the job cap)
+  "1": refused or failed (unknown job or kind, bad data JSON, actor not allowed)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel log --repo <path> --workflow <workflow> --kind narration --msg <message>
+  - starci kernel log --repo <path> --workflow <workflow> --job <job> --kind cmd.run --msg <message> --data <json>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api log
+  - node scripts/kernel/cli.mjs log
+reads: the workflow and job rows (identity only), the caller (an op terminal is bound to its job)
+writes: "one row into the ledger's logs table (<repo>/.starciwork/runtime.sqlite since 2026-09-27;
+  scripts/kernel/ typed-logs.mjs) through the process's buffered log writer
+  (scripts/machine/log-writer.mjs: its own connection, one short transaction, committed before the
+  verb returns; no events row, never inside a ledger transaction). The row is validated per kind,
+  redacted (the push secret-scan patterns of scripts/lib/secret-patterns.mjs plus OTPs, bearer
+  tokens and secret-named keys: the value is blanked, the key kept) and capped per job
+  (runtimes.yaml allocation.logs.perJobCap, default 2000; the first row past it writes one
+  log.truncated row, later ones are dropped)"
+kinds: "step.start {name} | step.end {name, durationMs?, ok?} | cmd.run {cmd, exit, durationMs?,
+  stdoutRef?, stderrRef?, output?, checkName?, evidenceRef?} | file.edit {path, added?, removed?,
+  diffRef?, status?, oldPath?} | check.result {name, pass, evidenceRef?} | test.result {suite,
+  passed, failed, skipped?, failures?[{name, message?, file?}]} | render {artifactRef, label?,
+  subkind?} | video {artifactRef, label?, subkind?} | trace {artifactRef, subkind?} | decision
+  {markdown} | narration {markdown} | ask {question, options?} | error {code, message, hint?} |
+  warning {code, message, missing?}; derived from ledger events (a Kernel may write them): dispatch,
+  report, settle, land, incident, job.drop, log.truncated"
+sidecar: "none in any repository (alpha.3): the retired
+  .starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl file is gone. An op logs through this
+  verb; lines it kept in <STARCI_JOB_SCRATCH>/log.jsonl instead (one JSON object per line, {kind,
+  msg, data?, refs?, at?, level?, node?}) are ingested by starci kernel report into the ledger's logs table
+  before the scratch is deleted (typed-logs.mjs ingestScratchLog), keyed by line so nothing is
+  stored twice"
+returns:
+  seq: the stored row's sequence (null when dropped)
+  kind: the kind
+  level: the level (defaulted from the kind and data when --level is absent)
+  actor: op for an op caller, else --actor (default kernel)
+  dropped: true when the job already reached its cap
+refuses:
+  - "workflow-unknown / job-unknown: the workflow, or the job in that workflow, does not exist"
+  - "log-identity-mismatch: an op caller logging for another job or for the workflow"
+  - log-kind-unknown, log-data-invalid, log-level-unknown, log-actor-unknown, log-msg-missing
+  - "log-data-too-large: --data over allocation.logs.dataMaxBytes (4096) after redaction; put the
+    bulk in a file and name it in --refs"
+usedBy: the Kernel (driver-loop.yaml boundary.typedLogs) and every op worker (op prompt `logging:`);
+  ui/server.mjs /api/logs renders the rows

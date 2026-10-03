@@ -2,6 +2,7 @@
 
 ## 1.2.0 - 2026-10-02
 
+- Breaking: remove the `starci-test-stack` bin; the stack CLI is exported at `@starci/test-world/cli` for `starci app stack`.
 - Added: Kafka as real own infrastructure, Apache Kafka in KRaft mode only. The stack definition must name exactly
   `apache/kafka:4.2.2@sha256:1213eb3943d551e5ed1fca7a4e109001cee35770b66a02a0c37a8964efe09b69` (`KAFKA_IMAGE`, the one pin
   shared with the dev stacks); Redpanda, cp-kafka and an undigested tag fail with `TEST_WORLD_STACK_DEFINITION`, and

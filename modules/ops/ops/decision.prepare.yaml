@@ -37,7 +37,7 @@ reads:
     path: shared
     purpose:
       en: shared
-      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: decision
     path: .starciwork/features/<feature>/decision/<slug>/index.yaml
@@ -74,8 +74,8 @@ steps:
   - reads: [standard, question]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/design-patterns.yaml knowledge/architecture-rules.yaml knowledge/hfs/rules.yaml <and the knowledge/patterns files of the kinds the question concerns> --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). A question the standard already answers is answered from it (cite the rule or pattern id) like one the records decided; each option analysed names the rules it keeps or breaks, and the recommendation never breaks a canon rule silently. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/design-patterns.yaml knowledge/architecture-rules.yaml knowledge/hfs/rules.yaml <và các tệp knowledge/patterns của loại mà câu hỏi liên quan> --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Câu hỏi mà chuẩn đã trả lời thì trả lời từ chuẩn (dẫn mã luật hoặc pattern) như câu hỏi bản ghi đã quyết; mỗi phương án phân tích nêu các luật nó giữ hoặc phá, và khuyến nghị không bao giờ ngầm phá một luật canon. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/design-patterns.yaml knowledge/architecture-rules.yaml knowledge/hfs/rules.yaml <and the knowledge/patterns files of the kinds the question concerns> --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). A question the standard already answers is answered from it (cite the rule or pattern id) like one the records decided; each option analysed names the rules it keeps or breaks, and the recommendation never breaks a canon rule silently. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/design-patterns.yaml knowledge/architecture-rules.yaml knowledge/hfs/rules.yaml <và các tệp knowledge/patterns của loại mà câu hỏi liên quan> --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Câu hỏi mà chuẩn đã trả lời thì trả lời từ chuẩn (dẫn mã luật hoặc pattern) như câu hỏi bản ghi đã quyết; mỗi phương án phân tích nêu các luật nó giữ hoặc phá, và khuyến nghị không bao giờ ngầm phá một luật canon. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - question
       - decided
@@ -106,7 +106,7 @@ steps:
       - question
     writes: []
     action:
-      en: 'Run `starci validate` and report done exactly once: first line "decision: <record id>", then
+      en: 'Run `starci runtime validate` and report done exactly once: first line "decision: <record id>", then
         "recommended: <n>", then the options numbered as the owner will answer them. If the owner
         happened to answer here already, the first line is "answered-by-owner: <n>" instead.'
 proofs:
@@ -137,8 +137,8 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
-      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
-      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: QUESTION_UNCLEAR

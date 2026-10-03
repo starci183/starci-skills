@@ -1,0 +1,22 @@
+group: release
+verb: clean-test
+owner: runtime
+summary: test published packages from fresh isolated installs
+impl: {script: scripts/gates/package-clean-test.mjs}
+flags:
+  - {name: changed, type: list, summary: changed paths selecting affected packages (space-separated or repeated; no comma lists)}
+  - {name: base, type: string, summary: revision whose changes select affected packages}
+exit:
+  "0": every selected package is green
+  "1": a selected package is red
+  "2": a package proof could not run or usage was invalid
+json: none
+examples:
+  - starci release clean-test
+  - starci release clean-test --changed packages/cli/package.json
+  - starci release clean-test --base origin/main
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/package-clean-test.mjs
+  - node .claude/scripts/gates/package-clean-test.mjs

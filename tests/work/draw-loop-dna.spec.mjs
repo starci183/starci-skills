@@ -356,7 +356,7 @@ test('ui.archetype: explicit wins, else derived; the direction prerequisite read
   assert.deepEqual(pre.unmet.map((u) => [u.kind, u.record, u.archetype]), [['direction-unaccepted', list, 'list']]);
 });
 
-test('api settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
+test('starci kernel settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
   const { spawnSync } = await import('node:child_process');
   const { openLedger, ledgerFileFor, fileReport, recordCheckRun, writeContract } = await import('../../engine/db/ledger.mjs');
   const p = product(t);

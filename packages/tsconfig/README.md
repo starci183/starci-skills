@@ -14,7 +14,7 @@ None of them sets `outDir`, `rootDir`, `baseUrl`, `paths`, `include` or `exclude
 that declares them, so a shared file would point inside `node_modules`. The repository owns them, and for a back end the
 repository owns exactly one of them, `paths`.
 
-A back-end `tsconfig.json` is a managed file (`hfs sync` renders it, `hfs check` compares it, HFS_TS_STRICT names any flag it
+A back-end `tsconfig.json` is a managed file (`starci app sync` renders it, `starci app check` compares it, HFS_TS_STRICT names any flag it
 lowers): the preset and the three aliases, nothing else.
 
 ```jsonc

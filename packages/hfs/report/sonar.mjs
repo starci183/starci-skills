@@ -1,10 +1,10 @@
-// Sonar documents of the ONE lint entry `hfs lint` (contract changes hfs-sonar-import, hfs-lint-entry): the building blocks that turn the
+// Sonar documents of the ONE lint entry `starci app lint`: the building blocks that turn the
 // findings of the StarCi canon into a Sonar Generic Issue Import document (SonarQube 10.3+ format: `{ rules, issues }`).
-//   sonarReport(findings)        the repository findings of `hfs check`, engineId `starci-hfs`, rule id = the finding code
+//   sonarReport(findings)        the repository findings of `starci app check`, engineId `starci-hfs`, rule id = the finding code
 //   linterReport(kind, results)  a linter's own json output (`eslint -f json`, `stylelint --formatter json`), engineId `eslint` / `stylelint`,
 //                                rule id = the linter's rule. Sonar's own ESLint import (sonar.eslint.reportPaths) is not used: it drops an
 //                                issue on a file outside sonar.sources, and a stylelint result has no native import at all.
-//   mergeReports(reports)        the documents of one `hfs lint` run as ONE file (reports/lint.sonar.json, sonar.externalIssuesReportPaths)
+//   mergeReports(reports)        the documents of one `starci app lint` run as ONE file
 // One placement rule for every engine: Sonar imports an issue only on a file it indexes (a tracked source or stylesheet under
 // sonar.sources). A finding on any other path (hfs.json, a workflow, a package under an unindexed root, e2e/, a directory) is filed
 // on the first source file of sonar.sources and its message names the real path, so no finding is dropped.
@@ -39,7 +39,7 @@ function document(rules, issues) {
   return { rules: [...rules.values()].filter((rule) => used.has(rule.id)).sort((a, b) => cmp(a.id, b.id)), issues: sorted };
 }
 
-/** One document of several (the starci-hfs, eslint and stylelint documents of one `hfs lint` run): rules by id, issues in the one sort order. */
+/** One document of several (the starci-hfs, eslint and stylelint documents of one app lint): rules by id, issues in the one sort order. */
 export function mergeReports(reports) {
   const rules = new Map(reports.flatMap((report) => report.rules).map((rule) => [rule.id, rule]));
   return document(rules, reports.flatMap((report) => report.issues));

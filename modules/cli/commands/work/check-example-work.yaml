@@ -1,0 +1,14 @@
+group: work
+verb: check-example-work
+owner: runtime
+summary: check the layout, ids, refs and evidence of every example Work tree
+impl: {script: scripts/work/validate/check-example-work.mjs}
+flags: []
+exit: {"0": clean or warnings only, "1": refused records, "2": bad usage}
+json: none
+examples:
+  - starci work check-example-work
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/work/validate/check-example-work.mjs

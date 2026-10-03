@@ -1,0 +1,49 @@
+# The contract of `starci kernel kernel-ack-rev` (scripts/kernel/verbs/kernel-ack-rev.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.kernel-ack-rev (lane slim-api).
+group: kernel
+verb: kernel-ack-rev
+owner: runtime
+summary: record the runtime rev whose kernel files this Kernel has read
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - kernel-ack-rev
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: rev
+    type: string
+    required: true
+    summary: runtime commit (sha or ref) that was read
+  - name: files
+    type: string
+    summary: comma list of the kernel files read at that rev
+exit:
+  "0": acked
+  "1": refused or failed (rev is no commit of the runtime)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel kernel-ack-rev --repo <path> --workflow <workflow> --rev <rev>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api kernel-ack-rev
+  - node scripts/kernel/cli.mjs kernel-ack-rev
+reads: the workflows row; the runtime root's git (rev-parse, diff) (scripts/kernel/runtime-rev.mjs)
+writes: "one runtime-rev-acked event {rev (full sha), files, source: ack, attempt}. start-workflow
+  records the boot rev the same way (source boot, files kernel-prompt.md + driver-loop.yaml). The
+  newest one is the Kernel's acked rev: status kernelRev, the wake text and the kernel-rev-stale
+  gate of enqueue/dispatch read it"
+returns: "{ok:true, workflowId, rev, files, attempt, kernelRev}"
+refuses:
+  - workflow-unknown
+  - "kernel-rev-unknown: --rev is not a commit of the runtime root"
+usedBy: the Kernel, after re-reading what a wake naming a newer runtime rev listed (driver-loop.yaml
+  survey.runtimeRev)

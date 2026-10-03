@@ -12,7 +12,7 @@ import {writeGreenProofs} from '../helpers/sonar-scan.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../../scripts/kernel/input-digests.mjs';
 
-// Stale input: `api dispatch` records the digests of the inputs an op reads
+// Stale input: `starci kernel dispatch` records the digests of the inputs an op reads
 // (contracts.context_json.inputs) by kind. A Source-law input (knowledge/**,
 // modules/schemas/**) edited after admission is advisory `sourceDrift`, never
 // stale; a product Work record the job read (payload.records under .starciwork),
@@ -37,7 +37,7 @@ const fixture=(t,{registry=null}={})=>{
     t.after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   }
   const skill=path.join(root,'skill'),repo=path.join(root,'repo');
-  for(const dir of ['scripts','engine','modules','bin'])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
+  for(const dir of ['scripts','engine','modules',path.join('packages','cli')])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
   for(const file of ['CONTEXT.md','package.json'])fs.copyFileSync(path.join(ROOT,file),path.join(skill,file));
   fs.mkdirSync(path.join(skill,'knowledge'),{recursive:true});
@@ -148,7 +148,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',...(writeGreenProofs(path.join(fx.repo,'src','refactor')),['src/refactor/sonar.json','src/refactor/gate.json','src/refactor/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
   const reported=fx.run('report','--job','job-refactor','--report',report);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
-  const checked=fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
+  const checked=fx.run('record-checks','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   withLedger(fx,ledger=>{
     const attempt=ledger.db.prepare('SELECT attempt_id,span_id FROM op_attempts WHERE job_id=?').get('job-refactor');
@@ -259,7 +259,7 @@ test('a finished workflow reports no stale input',t=>{
 
 // knowledge/application-stacks.yaml
 // and the repository baseline record (BASELINE, a fixture path) were edited under dozens of
-// settled legs of four workflows; `api status` listed every one in staleInput, the Kernels redid the
+// settled legs of four workflows; `starci kernel status` listed every one in staleInput, the Kernels redid the
 // seams, and each further edit re-staled the redo. The same happened through a cut set
 // (8 slices, seam first). The fix: Source edits are judged against admission.
 const STACKS='knowledge/application-stacks.yaml',BASELINE='knowledge/churn-baseline.yaml';

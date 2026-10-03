@@ -2,7 +2,7 @@ Owner: knowledge/hfs/rules.yaml
 # Services of one product
 
 A product that runs more than one back-end service stays one repository, one `package.json` and one lockfile. This page is the
-policy the `hfs check` rules R163 to R168 enforce and the way the reference example, `examples/ecommerce-app`, follows it.
+policy the `starci app check` rules R163 to R168 enforce and the way the reference example, `examples/ecommerce-app`, follows it.
 
 ## One place for a service
 
@@ -39,7 +39,7 @@ export const EVENTS = {
 } as const
 ```
 
-`hfs emit-contracts` writes `be/contracts/order/events.json` (`starci/event-contract@1`) from it. A consumer states what it reads
+`starci app emit` writes `be/contracts/order/events.json` (`starci/event-contract@1`) from it. A consumer states what it reads
 in `be/apps/<app>/src/consumes.ts`:
 
 ```ts

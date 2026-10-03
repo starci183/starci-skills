@@ -1,0 +1,20 @@
+group: connect
+verb: tunnel
+owner: runtime
+summary: operate the Cloudflare owner-ask tunnel
+impl: {script: scripts/connectors/tunnel.mjs}
+positional:
+  - {name: action, enum: [start, run, status, stop, dry-run], required: false, variadic: false}
+flags:
+  - {name: port, type: number, summary: "gateway port the tunnel forwards to (default: connectors.gateway.port)"}
+  - {name: fast, type: boolean, summary: status only - skip the process-table scan for extra tunnel managers}
+exit: {"0": action completed, "1": another tunnel manager owns the tunnel state, "2": bad usage or configuration}
+json: always
+examples:
+  - starci connect tunnel status
+  - starci connect tunnel dry-run
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/connectors/tunnel.mjs
+  - node .claude/scripts/connectors/tunnel.mjs

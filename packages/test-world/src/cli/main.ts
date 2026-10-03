@@ -1,4 +1,4 @@
-/** The `starci-test-stack` command: `up`, `down` and `status` of the shared warm stack. */
+/** The implementation of `starci app stack`: `up`, `down` and `status` of the shared warm stack. */
 import { TestWorldErrorCode, worldError } from "../errors"
 import { matchesKind, readStackDefinition } from "../config/stack-file"
 import { INFRA_SERVICES, type InfraName } from "../config/types"
@@ -12,7 +12,7 @@ export interface CliDependencies {
     readonly out?: (text: string) => void
     /** Standard error (default: `process.stderr`). */
     readonly err?: (text: string) => void
-    /** The working directory, the default `--root` (default: `process.cwd()`). */
+    /** The working directory, the default `--cwd` (default: `process.cwd()`). */
     readonly cwd?: string
 }
 
@@ -24,21 +24,21 @@ export interface CliOptions {
     readonly k3d: boolean
     readonly force: boolean
     readonly json: boolean
-    readonly root: string | undefined
+    readonly cwd: string | undefined
 }
 
-/** A command line that cannot be parsed; the CLI answers it with the usage and exit code 64. */
+/** A command line that cannot be parsed; the CLI answers it with the shared bad-usage exit code. */
 export interface CliUsageError {
     readonly usageError: string
 }
 
-/** The exit code of a bad command line (`EX_USAGE`). */
-export const EXIT_USAGE = 64
+/** The exit code of a bad command line. */
+export const EXIT_USAGE = 2
 /** The exit code of `down` refused because of live leases. */
 export const EXIT_LEASED = 2
 
 /** The usage text. */
-export const USAGE = `Usage: starci-test-stack <up|down|status> [options]
+export const USAGE = `Usage: starci app stack <up|down|status> [options]
 
 Commands:
   up        start (or find) the shared warm containers of the stack definition
@@ -51,7 +51,7 @@ Options:
   --k3d                    up: also warm the k3d cluster and registry
   --force                  down: stop everything even while leases exist
   --json                   status: print JSON
-  --root <dir>             repository root (default: the current directory)
+  --cwd <dir>              app root (default: the current directory)
   -h, --help               this text
 `
 
@@ -63,7 +63,7 @@ export const parseArguments = (argv: ReadonlyArray<string>): CliOptions | CliUsa
     let k3d = false
     let force = false
     let json = false
-    let root: string | undefined
+    let cwd: string | undefined
     const args = [...argv]
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index] ?? ""
@@ -80,11 +80,11 @@ export const parseArguments = (argv: ReadonlyArray<string>): CliOptions | CliUsa
         if (flag === "--k3d") k3d = true
         else if (flag === "--force") force = true
         else if (flag === "--json") json = true
-        else if (flag === "--stack" || flag === "--root" || flag === "--services") {
+        else if (flag === "--stack" || flag === "--cwd" || flag === "--services") {
             const got = value()
             if (typeof got !== "string") return got
             if (flag === "--stack") stack = got
-            else if (flag === "--root") root = got
+            else if (flag === "--cwd") cwd = got
             else {
                 const names = got.split(",").map((name) => name.trim()).filter((name) => name !== "")
                 const unknown = names.filter((name) => !(INFRA_SERVICES as ReadonlyArray<string>).includes(name))
@@ -98,7 +98,7 @@ export const parseArguments = (argv: ReadonlyArray<string>): CliOptions | CliUsa
         else return { usageError: command === undefined ? `unknown command ${arg}` : `unexpected argument ${arg}` }
     }
     if (command === undefined) return { usageError: "a command is required" }
-    return { command, stack, services, k3d, force, json, root }
+    return { command, stack, services, k3d, force, json, cwd }
 }
 
 const pad = (cells: ReadonlyArray<string>, widths: ReadonlyArray<number>): string =>
@@ -150,7 +150,7 @@ export const main = async (argv: ReadonlyArray<string>, dependencies: CliDepende
         return 0
     }
     if ("usageError" in parsed) {
-        err(`starci-test-stack: ${parsed.usageError}\n\n${USAGE}`)
+        err(`starci app stack: ${parsed.usageError}\n\n${USAGE}`)
         return EXIT_USAGE
     }
     const line = (text: string): void => out(`${text}\n`)
@@ -171,7 +171,7 @@ export const main = async (argv: ReadonlyArray<string>, dependencies: CliDepende
                 const status = await stack.status()
                 if (status.leases.length > 0) {
                     err(
-                        `starci-test-stack: refusing to stop the stack, ${status.leases.length} live lease(s) hold it: ${status.leases.map((lease) => `${lease.namespace} (run ${lease.runId}, pid ${lease.pid})`).join(", ")}. Use --force to stop it anyway.\n`,
+                        `starci app stack: refusing to stop the stack, ${status.leases.length} live lease(s) hold it: ${status.leases.map((lease) => `${lease.namespace} (run ${lease.runId}, pid ${lease.pid})`).join(", ")}. Use --force to stop it anyway.\n`,
                     )
                     return EXIT_LEASED
                 }
@@ -182,10 +182,10 @@ export const main = async (argv: ReadonlyArray<string>, dependencies: CliDepende
             line(formatLeases(status)[0] ?? "")
             return 0
         }
-        const root = parsed.root ?? dependencies.cwd ?? process.cwd()
+        const root = parsed.cwd ?? dependencies.cwd ?? process.cwd()
         const images = imagesFromDefinition(root, parsed.stack, parsed.services)
         if (images.length === 0) {
-            err(`starci-test-stack: the stack definition ${parsed.stack} under ${root} has no service this library supports (${INFRA_SERVICES.join(", ")})\n`)
+            err(`starci app stack: the stack definition ${parsed.stack} under ${root} has no service this library supports (${INFRA_SERVICES.join(", ")})\n`)
             return 1
         }
         const status = await stack.up(images, parsed.k3d ? { images: [], root } : undefined)
@@ -193,7 +193,7 @@ export const main = async (argv: ReadonlyArray<string>, dependencies: CliDepende
         for (const row of formatLeases(status)) line(row)
         return 0
     } catch (error) {
-        err(`starci-test-stack: ${error instanceof Error ? error.message : String(error)}\n`)
+        err(`starci app stack: ${error instanceof Error ? error.message : String(error)}\n`)
         return 1
     }
 }

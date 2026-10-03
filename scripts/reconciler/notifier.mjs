@@ -12,9 +12,10 @@
 // Each send is one machine.sqlite sup_events row (notifier-digest-sent | notifier-urgent-sent), which is also the
 // dedupe state; the AUTO lands are the land_runs rows. Language: config.yaml language.
 //
-//   node scripts/reconciler/notifier.mjs judge --text "<one line>" [--json]
-//   node scripts/reconciler/notifier.mjs digest [--send] [--force] [--json]
-//   node scripts/reconciler/notifier.mjs urgent --class <class> --key <key> --text "<text>" [--send] [--json]
+// Internal entry: spawned by scripts/reconciler/controllers/workers.mjs; not invoked directly.
+// Args: judge --text "<one line>" [--json]
+//       digest [--send] [--force] [--json]
+//       urgent --class <class> --key <key> --text "<text>" [--send] [--json].
 //
 // The Workers controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
 import fs from 'node:fs';

@@ -1,0 +1,20 @@
+group: release
+verb: sync-runtime
+owner: runtime
+summary: refresh or check the runtime copies bundled in published packages
+impl: {script: scripts/hfs/sync-runtime.mjs}
+flags:
+  - {name: check, type: boolean, summary: report drift without writing copies}
+exit:
+  "0": copies were refreshed or already agree
+  "1": bundled copies drift in check mode
+  "2": bad usage
+json: none
+examples:
+  - starci release sync-runtime
+  - starci release sync-runtime --check
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/hfs/sync-runtime.mjs
+  - node .claude/scripts/hfs/sync-runtime.mjs

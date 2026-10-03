@@ -42,7 +42,7 @@ export const closeOperationTerminal = (handle, { tabOnly = false, list = termina
 // host shell). Anything else - an agent screen, an unreadable frame, an Orca
 // that does not answer - is left open and says why. A handle a running Orca
 // no longer knows is gone: nothing to close. Used for a dead worker's shell
-// (api reconcile --dead-worker) and an exited kernel's shell (start-workflow).
+// (starci kernel reconcile --dead-worker) and an exited kernel's shell (start-workflow).
 // Returns {handle, closed, proof: disconnected|shell-prompt|gone|null, shellPrompt?, tab?, reason?, error?}.
 export const closeExitedTerminal = (handle, { show = terminalShow, read = terminalRead, close = closeOperationTerminal } = {}) => {
   if (!handle) return null;

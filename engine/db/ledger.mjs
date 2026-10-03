@@ -67,7 +67,7 @@ const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
  * The runtime tree is never a Work root of its own: a project's Work root is its backend, reached through
  * `.workspaces`. A ledger for a root inside the runtime checkout is refused by name.
  */
-const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
+const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'packages','cli','bin','starci.mjs'))
   &&fs.existsSync(path.join(root,'engine','db','ledger.mjs'));
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
 /** True when `root` is a repository with a ledger on this host (the runtime checkout itself never is one). */
@@ -451,7 +451,7 @@ export function insertGoal(db,{workflowId,revision,goalIdentity,markdown,goal,am
   appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,kind:'goal-revision',payload:{revision,goalIdentity},createdAt});
   return Number(lastInsertRowid);
 }
-/** Rewrite a goal revision's derived json (api plan: the derived plan); markdown and approval never change. */
+/** Rewrite a goal revision's derived json (starci kernel plan: the derived plan); markdown and approval never change. */
 export function updateGoalJson(db,{goalSeq,goal,at=nowMs()}){
   const row=db.prepare('SELECT workflow_id,revision FROM goals WHERE goal_seq=?').get(goalSeq);
   need(row,`goal ${goalSeq} not found`);
@@ -865,7 +865,7 @@ export function setCondition(db,{workflowId,entityType,entityId,type,status,reas
 }
 const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask','credential-missing','safety-block','runtime-defect','evidence-missing','scope-change','partial-effect','other']);
 /**
- * The runtime's free incident kinds (api incident --kind, the '[kind] detail' prefix of last_progress) mapped onto the
+ * The runtime's free incident kinds (starci kernel incident --kind, the '[kind] detail' prefix of last_progress) mapped onto the
  * incidents.kind enum and the owner who must clear it. An enum value maps to itself.
  */
 function incidentClassOf(freeKind){

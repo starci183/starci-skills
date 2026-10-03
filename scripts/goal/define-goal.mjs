@@ -4,14 +4,14 @@
 // derived op chain) + one pending inbox row in <repo>/.starciwork/runtime.sqlite.
 // The queue is the contract: kernels claim from inbox, never from chat.
 //
-//   node scripts/goal/define-goal.mjs --repo <path> --text "<owner prompt>" [--title <t>] [--json] [--plan]
-//   node scripts/goal/define-goal.mjs --project <name> --text "<owner prompt>" [--title <t>] [--json] [--plan]
+//   starci workflow define --repo <path> --text "<owner prompt>" [--title <t>] [--json] [--plan]
+//   starci workflow define --project <name> --text "<owner prompt>" [--title <t>] [--json] [--plan]
 //
 // --params '{"<op>": {"<name>": <value>}}' attaches the owner's tunables to the
 // matching legs of the derived chain, so a choice like "three candidates per
 // screen" is a value on the leg rather than a sentence the op has to read out of
 // the goal prose. Each name must be one the op brief declares with setBy owner
-// (modules/schemas/op.schema.yaml); `api enqueue` validates the value and
+// (modules/schemas/op.schema.yaml); `starci kernel enqueue` validates the value and
 // refuses params-invalid. A leg the chain does not hold is an error here.
 //
 // --project resolves <source>/.workspaces/projects/<name>/work.json
@@ -50,7 +50,7 @@ const revisionReason = argvValue(process.argv, 'reason', 'owner-approved plan-di
 const approveRevision = argvValue(process.argv, 'approve-revision');
 const routingBias = parseJson(argvValue(process.argv, 'routing-bias', 'null'));
 // Owner tunables per leg: {"<op>": {"<name>": <value>}}. Legality is the op
-// brief's business (api enqueue validates it); here the only rules are that the
+// brief's business (starci kernel enqueue validates it); here the only rules are that the
 // flag parses as a map of maps and that every named op is in the derived chain.
 const legParams = (() => {
   const raw = argvValue(process.argv, 'params');
@@ -232,7 +232,7 @@ if (legParams) {
 const now = Date.now();
 const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
 // The approved leg graph: route-plan's legs and their dependency edges
-// (scripts/route/plan-edges.mjs reads it; api plan replaces it).
+// (scripts/route/plan-edges.mjs reads it; starci kernel plan replaces it).
 const derivedPlanOf = c => c ? {
   legs: c.legs.map(l => ({ op: l.op, ...(l.instance ? { instance: l.instance } : {}), ...(l.params ? { params: l.params } : {}), ...(l.kernelParams ? { kernelParams: l.kernelParams } : {}) })),
   edges: Array.isArray(c.edges) ? c.edges : (() => { throw Object.assign(new Error('plan-edges-missing: route-plan returned legs without edges'), { code: 'plan-edges-missing' }); })(),

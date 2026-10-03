@@ -24,8 +24,8 @@ const fixture=t=>{
 };
 
 /** One workflow + one dispatched op job (running + a contract-bound open attempt,
- * the state `api report`/`settle` require), seeded through the ledger then closed.
- * The attempt's STARCI_JOB_SCRATCH is returned: api report reads the report file
+ * the state `starci kernel report`/`settle` require), seeded through the ledger then closed.
+ * The attempt's STARCI_JOB_SCRATCH is returned: starci kernel report reads the report file
  * out of it and nowhere else (H10). */
 const seedJob=(repo,jobId)=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
@@ -68,14 +68,14 @@ test('settle accepts the contract verdicts pass|fail|blocked',async t=>{
     await t.test(`--verdict ${verdict} settles the job as ${expected}`,t=>{
       const repo=fixture(t).repo(),jobId=`job-${verdict}`;
       const scratch=seedJob(repo,jobId);
-      // The report is filed row-first via `api report` out of the attempt's scratch;
+      // The report is filed row-first via `starci kernel report` out of the attempt's scratch;
       // pass additionally needs the kernel's independently recorded green checks
       // (verdict-contract.yaml) — recorded the way the settler records them, with
       // runtime authority (a caller-declared green never counts, H8).
       const filed=runApi(['report','--repo',repo,'--job',jobId,'--report',reportFile(scratch,outcome),'--json']);
       assert.equal(filed.status,0,filed.stderr||filed.error?.message);
       if(verdict==='pass'){
-        const checked=runApi(['check','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json'],{env:{STARCI_CALLER:'runtime-settler'}});
+        const checked=runApi(['record-checks','--repo',repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'self-check',command:'true',exitCode:0}]}),'--json'],{env:{STARCI_CALLER:'runtime-settler'}});
         assert.equal(checked.status,0,checked.stderr||checked.error?.message);
       }
       const r=runApi(['settle','--repo',repo,'--job',jobId,'--verdict',verdict,'--json']);

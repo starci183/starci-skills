@@ -9,7 +9,7 @@ import { createGraphReader } from '../../packages/hfs/emit/static-graph.mjs';
 import { openApiText, readOperations } from '../../packages/hfs/emit/operations.mjs';
 import { contractEmitFindings, CONTRACT_SNAPSHOT_DRIFT } from '../../scripts/hfs/rules/contract.mjs';
 
-// `hfs emit-contracts`: the pure parts (packages/hfs/emit/contracts.mjs), the static module-graph reader that decides what an app
+// `starci app emit`: the pure parts (packages/hfs/emit/contracts.mjs), the static module-graph reader that decides what an app
 // serves (static-graph.mjs, run here over virtual files) and the full-pass check that the committed snapshots are current
 // (contractEmitFindings). The schema itself is built by Nest in a child process of the repository under emission and is proved
 // by the committed snapshots of the examples and of the product repositories.
@@ -336,7 +336,7 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT: openapi.json is judged like the schema: fresh
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: an emit that cannot run is a finding with its error, never a silent skip', () => {
   withRepo(GQL_OLD, (dir) => {
-    const emit = () => { throw new Error('hfs emit-contracts: core failed (exit 1): operation sales.policy@1: input: unknown'); };
+    const emit = () => { throw new Error('starci app emit: core failed (exit 1): operation sales.policy@1: input: unknown'); };
     const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit });
     assert.equal(result.findings.length, 1);
     assert.equal(result.findings[0].code, CONTRACT_SNAPSHOT_DRIFT);

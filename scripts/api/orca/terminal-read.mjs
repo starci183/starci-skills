@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Deep map WRAP T2, T6: the rendered frame (--screen) and its draft; only the frame shows turn-idle, a staged draft and rate-limit text, and proves a wake began a turn (worker output is read with worker-read).
 // terminal-read.mjs — the calls.yaml `terminal-read` call as a callable function.
-//   node scripts/api/orca/terminal-read.mjs --terminal <handle> [--screen] [--limit <n>]
+//   starci orca terminal-read --terminal <handle> [--tail] [--limit <n>]
 // Returns {ok, screen, draft} — screen is the extracted frame text, ready to pattern-test; draft is
 // the text sitting unsubmitted in the agent's input box (Orca's `draft`, which the frame leaves
 // out), or null. A reader that ignores draft cannot see a send whose Enter never landed.

@@ -1,0 +1,13 @@
+group: work
+verb: grammar-knowledge
+owner: runtime
+summary: compare or refresh measured grammar knowledge
+impl: {script: scripts/work/ui/grammar-knowledge.mjs}
+flags:
+  - {name: write, type: boolean, summary: "rewrite the grammar DNA from the package; without it only compares"}
+exit: {"0": "knowledge matches the package, or was rewritten", "1": knowledge drifted from the package, "2": bad usage}
+json: flag
+examples: ['starci work grammar-knowledge --write']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/ui/grammar-knowledge.mjs']

@@ -6,5 +6,5 @@ summary: >-
   op took its contract returns the same job to ready and spends no try (H13); dispatch launches queued or ready jobs.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/dispatch.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
   - modules/kernel/contract-changes/a3-dispatch-attempts.yaml

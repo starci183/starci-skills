@@ -1,5 +1,5 @@
 // run-script.mjs — `node <script> [args]`: one runtime script as a child process with the parent's terminal (stdio
-// inherited), the way `starci check` runs each retained self-check. Returns its exit status (1 when it could not start).
+// inherited), the way `starci runtime check` runs each retained self-check. Returns its exit status (1 when it could not start).
 import { nodeSpawn } from './lib.mjs';
 
 /** Runs `script` with `args` in `cwd`, output going to this process's terminal; the exit status, 1 when it did not start. */

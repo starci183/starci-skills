@@ -2,7 +2,7 @@
 // unit-run.mjs - the unit run summary (schema starci/unit-run@1) unit.verify attaches (knowledge/op-gate.yaml proofs.unit-kit,
 // contract change op-mechanism-proofs).
 //
-//   node scripts/gates/unit-run.mjs --root <app> [--out <file>]
+//   starci gate unit --root <app> [--out <file>]
 //
 // The unit standard (packages/jest-preset README, knowledge/patterns/be/test.yaml): the unit-tested roles of the slot manifest
 // (ruleParams.be.unitRoles: every be/src/**/*.service.ts, every cli command of be.cli) own one <name>.<role>.spec.ts beside each, the subject built by
@@ -16,7 +16,7 @@
 //             spec beside it (owed when `specRequired`), and the kit judgment of that spec of a spec-required subject
 //             (op-gate.yaml unitKit: Test.createTestingModule required; jest.mock, overrideProvider, Date.now(), process.env and a
 //             `new <Service>(` of the subject forbidden).
-// `api settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
+// `starci kernel settle` re-reads it (scripts/kernel/gate-settle.mjs). Exit 0 green, 1 a finding or a red run, 2 it could not be built.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,7 +36,7 @@ export const UNIT_RUN_SCHEMA = 'starci/unit-run@1';
 const COVERAGE_METRICS = Object.freeze(['lines', 'branches', 'functions', 'statements']);
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SERVICE_ROOT = 'be/src';
-const USAGE = 'usage: unit-run.mjs --root <app> [--out <file>]';
+const USAGE = 'usage: starci gate unit --root <app> [--out <file>]';
 
 /** op-gate.yaml unitKit: {required[], forbidden[]}. */
 export function unitKitRules(runtime = runtimeRoot) {

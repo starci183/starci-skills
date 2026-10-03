@@ -40,13 +40,13 @@ paths:
   - modules/host/orca/index.yaml
   - modules/host/orca/recipes.yaml
   - modules/host/orca/validation.yaml
-  - modules/kernel/api-commands/dispatch.yaml
-  - modules/kernel/api-commands/incident.yaml
-  - modules/kernel/api-commands/nudge.yaml
-  - modules/kernel/api-commands/provider-health.yaml
-  - modules/kernel/api-commands/route.yaml
-  - modules/kernel/api-commands/status.yaml
-  - modules/kernel/api-commands/usage.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/incident.yaml
+  - modules/cli/commands/kernel/nudge.yaml
+  - modules/cli/commands/kernel/provider-health.yaml
+  - modules/cli/commands/kernel/route.yaml
+  - modules/cli/commands/kernel/status.yaml
+  - modules/cli/commands/kernel/usage.yaml
   - modules/kernel/dispatch.yaml
   - modules/kernel/driver-loop.yaml
   - modules/kernel/owner-rulings.yaml

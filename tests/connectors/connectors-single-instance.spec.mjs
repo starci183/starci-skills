@@ -12,7 +12,7 @@ import {createGateway} from '../../scripts/connectors/ask-gateway.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {mkdtemp} from '../helpers/tmpdir.mjs';
 
-// `api serve-ask` runs `tunnel.mjs start` for every ask, and concurrent starts each launched a manager
+// `starci kernel serve-ask` runs `tunnel.mjs start` for every ask, and concurrent starts each launched a manager
 // before the first wrote tunnel.json: nine managers, nine cloudflared. A manager (tunnel `run`,
 // ask-gateway `run`) now claims the host lock <name> (machine.sqlite host_locks) and refuses while another live
 // manager holds it or owns the connectors row. These specs start managers concurrently and get exactly one. Every

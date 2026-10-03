@@ -5,5 +5,5 @@ summary: >-
   stopped -> queued, owner only). A paused or stopped workflow takes and launches no new job.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/lifecycle.yaml
+  - modules/cli/commands/kernel/lifecycle.yaml
   - modules/kernel/contract-changes/a3-lifecycle-verb.yaml

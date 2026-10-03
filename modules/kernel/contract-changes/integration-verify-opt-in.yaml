@@ -18,7 +18,7 @@ paths:
   - modules/kernel/contract-changes/integration-verify-opt-in.yaml
   - modules/goal/archetypes.yaml
   - modules/ops/ops/integration.verify.yaml
-  - modules/kernel/api-commands/run-deferred-tests.yaml
+  - modules/cli/commands/kernel/run-deferred-tests.yaml
   - modules/ops/_common.yaml
   - docs/verify-proof.md
   - CONTEXT.md

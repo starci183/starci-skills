@@ -77,7 +77,7 @@ function plannedTree(implState) {
   return { repo, work };
 }
 
-test('starci validate warns, never refuses, a todo planned record whose owner path, test path and sealed identity do not exist yet', (t) => {
+test('starci runtime validate warns, never refuses, a todo planned record whose owner path, test path and sealed identity do not exist yet', (t) => {
   const { repo, work } = plannedTree('todo');
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   const report = validateWork(work);

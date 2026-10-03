@@ -481,7 +481,7 @@ function goldenPromotionOf({ drawing, record, receipt, receiptAbs, review, write
 }
 
 export function drawReviewMain(argv = []) {
-  const usage = 'Usage: node scripts/work/draw-review.mjs <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
+  const usage = 'Usage: starci work draw-review <status|question|apply> --ui <ui-record-dir> [--lang en|vi] [--owner-requested] [--job <op-job-id>] [--receipt <answer.json> --write] [--json]\n';
   return reviewMain(argv, {
     targetFlag: '--ui', usage, tag: 'draw-review',
     status: (ui) => {

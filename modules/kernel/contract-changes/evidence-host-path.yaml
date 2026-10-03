@@ -9,7 +9,7 @@ reach: new-legs
 adds:
   codes: [EVIDENCE_HOST_PATH]
 paths:
-  - modules/kernel/api-commands/settle.yaml
+  - modules/cli/commands/kernel/settle.yaml
   - modules/kernel/failure-codes.yaml
   - scripts/example/example-evidence.mjs
   - scripts/kernel/cli.mjs

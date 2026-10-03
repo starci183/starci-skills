@@ -9,13 +9,13 @@
 //   staleness  the same row keeps the code sha the proof was made at and the digest of every path it depends on
 //              (the job's owned code paths and read records, the work-graph nodes of what it claims, the specs it
 //              ran), digested with scripts/kernel/input-digests.mjs. A dependency whose digest moved makes the
-//              proof `stale`; api status names the owning check op as an impact-check.
+//              proof `stale`; starci kernel status names the owning check op as an impact-check.
 //   coverage   every FR, shape and applicable proof case of the workflow's scope with its evidence and status
-//              proven | stale | missing (api coverage); an FR whose requiresProof has a required kind is a
-//              must-have, and handover.review may not ask the owner while one is missing or stale (api report).
+//              proven | stale | missing (starci kernel coverage); an FR whose requiresProof has a required kind is a
+//              must-have, and handover.review may not ask the owner while one is missing or stale (starci kernel report).
 //   tamper     the report-filed and artifacts-indexed events carry every artifact {id, name, sha256}, so the events
 //              digest chain covers them; verifyProofs re-reads each blob (the store re-hashes it) and walks the chain
-//              (api verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
+//              (starci kernel verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
 import fs from 'node:fs';
 import path from 'node:path';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
@@ -243,7 +243,7 @@ const evidenceIndex = (artifacts) => {
 const statusOf = (evidence) => (!evidence.length ? 'missing' : evidence.some((e) => e.state !== 'stale') ? 'proven' : 'stale');
 
 /**
- * The stale proofs api status acts on: claimed items whose every piece of evidence is stale, grouped by the newest
+ * The stale proofs starci kernel status acts on: claimed items whose every piece of evidence is stale, grouped by the newest
  * stale job that made one - [{jobId, op, attempt, items[], changed[]}]. `open` ops (a job still running or queued)
  * are left out: that job re-proves or changes them.
  */
@@ -279,7 +279,7 @@ function scopeOf(db, workflowId) {
 }
 
 /**
- * api coverage: every FR, shape and applicable proof case of the workflow's scope with its evidence and status.
+ * starci kernel coverage: every FR, shape and applicable proof case of the workflow's scope with its evidence and status.
  * `briefCases(record)` returns the applicable "RULE-N case-N" ids of one ui record (scripts/work/ui/ui-proof-brief.mjs
  * buildBrief); it is injected so a caller that cannot load the knowledge still reports FRs and shapes.
  */
@@ -315,14 +315,14 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
   return { schema: PROOF_COVERAGE_SCHEMA, workflowId, graphVersion: scope.graphVersion, summary: { ...summary, total: items.length, mustOwed: owed.length }, mustOwed: owed, items, ...(errors.length ? { errors } : {}) };
 }
 
-/** One text line per coverage item, for the human form of api coverage. */
+/** One text line per coverage item, for the human form of starci kernel coverage. */
 export const coverageLines = (cov) => [
   `coverage ${cov.workflowId}: ${cov.summary.proven} proven, ${cov.summary.stale} stale, ${cov.summary.missing} missing of ${cov.summary.total}${cov.summary.mustOwed ? `; ${cov.summary.mustOwed} must-have owed` : ''}`,
   ...cov.items.map((i) => `  ${i.status.padEnd(7)} ${i.kind.padEnd(5)} ${i.id}${i.must ? ' (must)' : ''}${i.evidence.length ? ` — ${i.evidence.map((e) => `${e.jobId}:${e.name}${e.state === 'stale' ? ` [stale: ${list(e.changed).slice(0, 3).join(', ')}]` : ''}`).slice(0, 3).join('; ')}${i.evidence.length > 3 ? ` (+${i.evidence.length - 3})` : ''}` : ''}`),
 ];
 
 /**
- * api verify-proofs: re-read every artifact's blob (the store re-hashes it), compare its sha with the {id, sha256} the
+ * starci kernel verify-proofs: re-read every artifact's blob (the store re-hashes it), compare its sha with the {id, sha256} the
  * chained report-filed / artifacts-indexed events recorded, and walk the workflow's events digest chain (engine/db/ledger.mjs
  * verifyEventChain). Returns {ok, files{checked, intact, tampered[{artifactId, jobId, name, reason, expected, actual?}],
  * unchained}, chain{events, ok, brokenAt, broken[{seq, kind, reason}]}}.

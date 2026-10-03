@@ -1,4 +1,4 @@
-// api contract-release: split from cli.mjs.
+// starci kernel contract-release: split from cli.mjs.
 import { JOB_ROW } from '../../machine/job-row.mjs';
 import { getWorkflow, jobPayloadOf } from './shared/rows.mjs';
 import { recordJobResult, setJobStatus, updateJob } from '../../../engine/db/ledger.mjs';

@@ -1,4 +1,4 @@
-// api reply: split from cli.mjs.
+// starci kernel reply: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { setInboxStatusByKey } from '../../../engine/db/ledger.mjs';
 import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from './shared/worker-messages.mjs';
@@ -16,7 +16,7 @@ export default {
     if (!toOwner && !(typeof args.body === 'string' && args.body.trim())) {
       throw Object.assign(new Error('reply needs --body <answer> or --to-owner'), { code: 'reply-body-missing' });
     }
-    // A question Orca delivered since the last drain is bridged first: the ledger row is what api reply answers.
+    // A question Orca delivered since the last drain is bridged first: the ledger row is what starci kernel reply answers.
     drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: `reply:${messageId}` }) });
     const item = workerQuestionsOf(db, workflowId).questions.find((q) => q.messageId === messageId);
     if (!item) throw Object.assign(new Error(`no worker question or escalation ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });

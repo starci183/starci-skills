@@ -36,7 +36,7 @@ rules:
     cases:
       - id: case-1
         when: A tsconfig
-        write: 'be/tsconfig.json is the render of hfs sync: { "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": { "@features/*": ["./src/features/*"], "@modules/*": ["./src/modules/*"], "@tests/*": ["./src/tests/*"] } }, "exclude": [the template list] } and nothing else.'
+        write: 'be/tsconfig.json is the render of starci app sync: { "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": { "@features/*": ["./src/features/*"], "@modules/*": ["./src/modules/*"], "@tests/*": ["./src/tests/*"] } }, "exclude": [the template list] } and nothing else.'
     verification:
       automated:
         - HFS_TS_STRICT

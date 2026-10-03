@@ -10,7 +10,7 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhas
 import {wakeDeliveryOf} from '../../scripts/lib/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../../scripts/kernel/wake-delivery.mjs';
 
-// inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f (part 2): `api nudge` returned ok:false
+// inc-b87a42ec8690, inc-e4f69f9ef061, inc-13ab4be5059f (part 2): `starci kernel nudge` returned ok:false
 // terminal-send-failed and wrote no op-worker-nudged event whenever Orca answered agent_prompt_stalled,
 // although the wake sat on the worker's screen (landed, or queued behind its running turn). Nudge now reads
 // the frame before and after the send and reports delivered / queued / failed from the screen.

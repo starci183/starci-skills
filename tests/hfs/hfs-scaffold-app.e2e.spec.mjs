@@ -1,11 +1,11 @@
-// hfs-scaffold-app.e2e.spec.mjs - the single-service case end to end. `hfs scaffold app demo` writes the monorepo into a
+// hfs-scaffold-app.e2e.spec.mjs - the single-service case end to end. `starci app scaffold demo` writes the monorepo into a
 // temp dir (fs.mkdtempSync under os.tmpdir(), removed with fs.rmSync in after), then the app REALLY installs: `npm ci` on
 // its own lockfile, the @starci scope resolved from this checkout's packed packages through the source-canon registry
 // (tests/helpers/source-canon-registry.mjs, the same registry the scaffold's lock step wrote the lockfile against; every
 // other package comes from the public registry). Then the app's own commands, run for real through npm:
 //   npm run typecheck   codegen, the be tsc and the turbo `typecheck` task of every fe workspace (turbo builds the fe
 //                       packages first: ^build) - every import of the skeleton resolves
-//   npm run lint        `hfs lint` of the installed @starci/hfs: both side canons, the app check and stylelint - 0 findings
+//   npm run lint        `starci app lint` of the installed @starci/hfs: both side canons, the app check and stylelint - 0 findings
 //   npm run test        the be unit run (`cd be && jest --selectProjects unit --coverage`)
 //   npm run build:be    the be build (tsc, tsc-alias) that be/dist/apps/cli/src/main.js comes from
 //   npm run migrate     `cli migrate run` against a REAL Postgres: @starci/test-world's stack.attach (the world/attach API
@@ -53,7 +53,7 @@ const dockerProbe = spawnSync('docker', ['info'], { encoding: 'utf8', windowsHid
 const skipReason = dockerProbe.status === 0 ? false
   : `docker is unavailable: ${dockerProbe.error?.message ?? `${dockerProbe.stderr ?? dockerProbe.stdout ?? ''}`.trim().split(/\r?\n/)[0] ?? 'docker info failed'}`;
 
-test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, the be unit run and cli migrate run over a real Postgres', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+test('starci app scaffold end to end: npm ci, codegen + typecheck, starci app lint clean, the be unit run and cli migrate run over a real Postgres', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
   const into = mkdtemp(t, 'hfs-scaffold-e2e-');
   const app = path.join(into, 'demo');
   const registry = await startSourceCanonRegistry();
@@ -72,9 +72,10 @@ test('hfs scaffold app end to end: npm ci, codegen + typecheck, hfs lint clean, 
   }
   assert.equal(ci.status, 0, `npm ci failed (${ci.status ?? ci.error?.message}): ${tail(ci)}`);
   assert.ok(fs.existsSync(path.join(app, 'node_modules', '.bin', 'turbo')), 'the install linked the workspace tools');
-  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'hfs', 'bin', 'hfs.mjs')), 'the install holds @starci/hfs from the canon registry');
+  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'cli', 'bin', 'starci.mjs')), 'the install holds @starci/cli from the canon registry');
+  assert.ok(fs.existsSync(path.join(app, 'node_modules', '@starci', 'hfs', 'src', 'main.mjs')), 'the install holds @starci/hfs, the transitive implementation @starci/cli runs');
 
-  // hfs lint (and the hfs check it carries) read the app's tracked files: git ls-files of the index.
+  // starci app lint (and the starci app check it carries) read the app's tracked files: git ls-files of the index.
   execFileSync('git', ['init', '-q'], { cwd: app });
   execFileSync('git', ['-c', 'core.autocrlf=false', 'add', '-A'], { cwd: app });
 

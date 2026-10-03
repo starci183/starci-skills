@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // grammar-registry-pin.mjs — a product manifest names @starci/grammar by a
 // registry spec, never a local path. This check does not validate semver syntax.
-//   node scripts/work/ui/grammar-registry-pin.mjs --repo <frontend repo> [--json]
+//   starci work grammar-registry-pin --repo <frontend repo> [--json]
 // The owner ruled on 2026-09-23 that consumers take the grammar from npm: a
 // `file:` link left one consumer on a hand-built dist, while others
 // pinned 0.4.x from the registry and never saw 0.5.0. Every
@@ -35,7 +35,7 @@ export function grammarPinsIn(repo) {
   return out;
 }
 
-const USAGE = 'use: grammar-registry-pin.mjs --repo <path> [--json]';
+const USAGE = 'use: starci work grammar-registry-pin --repo <path> [--json]';
 
 function parseArgs(argv) {
   let repo, json = false;

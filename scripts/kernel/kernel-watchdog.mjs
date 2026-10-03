@@ -5,7 +5,7 @@
 // finishes a workflow: settles and worker recovery are the Job controller's, quota probes the Resource controller's,
 // housekeeping the GC controller's, the footprint scan the Host controller's own step.
 //
-//   node scripts/kernel/kernel-watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
+//   starci machine kernel-watchdog --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
 //
 // --once without --repair is the read-only probe: it reports restart-needed / wake-needed and acts on nothing.
 // --repair continues an approved workflow; it never creates one or widens its authority. It reads canonical
@@ -82,12 +82,12 @@ const classifyKernelScreen = classifyAgentScreen;
 
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
-  'Re-read canonical api status and survey. The runtime settles green reports itself; decide every needs-kernel-decision item first (api status settleDecisions: settle it fail/blocked, route its retry or incident, or check+settle what the settler could not verify), then work the ranked actions and the frontier until nothing is immediately executable.',
+  'Re-read canonical starci kernel status and survey. The runtime settles green reports itself; decide every needs-kernel-decision item first (starci kernel status settleDecisions: settle it fail/blocked, route its retry or incident, or check+settle what the settler could not verify), then work the ranked actions and the frontier until nothing is immediately executable.',
   `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the runtime (the reconciler Host controller) owns the ~${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
   'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
   WAKE_BOUNDS,
 ].join(' '), workflow, attempt, revLine);
-/** The liveness wake this tick would type, from one api status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
+/** The liveness wake this tick would type, from one starci kernel status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
 export const wakePromptOf = (workflow, statusValue) =>
   buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
 
@@ -260,7 +260,7 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
   try {
     decision = withKernelLedger((ledger) => openDecisionRow(ledger, { kind: 'progress-stall', decider: 'owner', workflowId, entity: { type: 'workflow', id: workflowId },
       idempotencyKey: `kernel-idle-after-replace:${workflowId}:${idle.replaced}`, by: 'kernel-watchdog',
-      summary: `the Kernel of ${workflowId} was replaced after ${WAKE_IDLE_REPLACE} delivered wakes with no move and its replacement is idle again: the frontier needs the owner (read api status, then decide or api lifecycle --pause)` })?.di ?? null);
+      summary: `the Kernel of ${workflowId} was replaced after ${WAKE_IDLE_REPLACE} delivered wakes with no move and its replacement is idle again: the frontier needs the owner (read starci kernel status, then decide or starci kernel lifecycle --pause)` })?.di ?? null);
   } catch (error) { decision = { error: String(error?.message ?? error).slice(0, 200) }; }
   return { ok: true, workflowId, phase, terminal, action: 'stall-escalated', idle, outputAgeMs, decision: decision?.id ?? decision };
 };
@@ -306,7 +306,7 @@ async function statusTick() {
   // An archived workflow is stopped for good: its Kernel is never replaced.
   if (status.value.archivedAt != null || phase === 'archived') return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt ?? null };
   // Q14 / MB-08: only a running workflow's Kernel is repaired, woken or relaunched. A paused, stopped (or not yet
-  // started) workflow is left alone - nothing but the owner's api lifecycle --resume brings it back.
+  // started) workflow is left alone - nothing but the owner's starci kernel lifecycle --resume brings it back.
   if (phase !== 'running') return { ok: true, workflowId, phase, action: 'not-running' };
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
@@ -473,7 +473,7 @@ const print = result => {
 
 if (isMain(import.meta.url)) {
   if (!repo || !workflowId || !once) {
-    console.error('use: kernel-watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
+    console.error('use: starci machine kernel-watchdog --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
   const result = await watchdogTick();

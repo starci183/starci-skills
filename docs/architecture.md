@@ -18,7 +18,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
                    ▼
    runtime.sqlite (one per project)  ◄── engine/db/ledger.mjs (the only writer)
                    ▲                                   │
-   op agents ──────┘ api report / log / op-contract    │ blobs put first, then the row
+   op agents ──────┘ starci kernel report / log / op-contract    │ blobs put first, then the row
                                                        ▼
                                   ~/.starci/artifacts/<sha[0:2]>/<sha256>
                                                        ▲
@@ -61,7 +61,7 @@ The schema itself is data: `engine/db/migrations/runtime/0001-init.sql` and
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/cli.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
-| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
+| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its workflow's worktree (one per Kernel workflow, shared by its ops: serial per side, parallel across sides). Reads its contract (`starci kernel op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `starci kernel log`, files one `starci kernel report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and owner digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
 | Harness UI | One process | Serves the read-only views of both databases and `GET /api/blob/<sha>`. | Never writes, never calls an API verb, never talks to Orca for a closed terminal. |
@@ -89,7 +89,7 @@ awaiting-approval ──► queued ──► running ──► finished ──�
         ▼               ▼          │
       stopped ◄─────────┴──────────┘ (from queued, running or paused)
         │
-        ├──► queued      (owner only: api lifecycle --resume)
+        ├──► queued      (owner only: starci kernel lifecycle --resume)
         └──► archived
 ```
 
@@ -104,11 +104,11 @@ awaiting-approval ──► queued ──► running ──► finished ──�
 ## The Kernel API: `scripts/kernel/cli.mjs`
 
 ```text
-node scripts/kernel/cli.mjs <verb> --repo <path> [...]
+starci kernel <verb> --repo <path> [...]
 ```
 
-`modules/kernel/api.yaml` and `modules/kernel/api-commands/<verb>.yaml` name every verb with its
-arguments, reads, writes and refusals; `scripts/checks/check-api-surface.mjs` keeps them in step with
+`modules/kernel/api.yaml` and `modules/cli/commands/kernel/<verb>.yaml` name every verb with its
+arguments, reads, writes and refusals; `scripts/checks/check-cli-parity.mjs` keeps them in step with
 the code. A write verb records its request in `api_requests` (idempotency), runs one transaction and
 appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed fact, never a crash.
 `dispatch --spawn` is the only place an op agent is started: `scripts/agent/lib.mjs` runs one
@@ -116,7 +116,7 @@ appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed 
 `modules/models/agents/<agent>.yaml`; every other agent (Kernel, Supervisor, workers) starts through
 `worker-start` too, and no runtime code creates a terminal for an agent ([host contract](host-contract.md)).
 
-The op lifecycle is `enqueue → route → dispatch → api report → api check → api settle`, and every
+The op lifecycle is `enqueue → route → dispatch → starci kernel report → starci kernel record-checks → starci kernel settle`, and every
 step is a column of the attempt row (`routed_at`, `dispatched_at`, `reported_at`, `checked_at`,
 `settled_at`, `released_at`). The op's own claim (`report_outcome`) and the runtime's verdict
 (`verdict`) are separate columns; a check's raw exit code (`exit_code`) is separate from the one the
@@ -125,8 +125,8 @@ op declared (`declared_exit_code`), and only the raw one decides a verdict.
 ## The reconciler
 
 `scripts/reconciler/engine.mjs` is the one host runtime loop. The scheduled task
-`StarCi-Reconciler` runs `scripts/reconciler/boot.mjs ensure` at logon and periodically;
-`boot.mjs --restart` is the engine-only restart entry; `scripts/reconciler/start.mjs` (the `start` skill) brings the
+`StarCi-Reconciler` runs `starci reconciler start` at logon and periodically;
+`starci reconciler restart` is the restart entry; the `start` skill brings the
 whole host up and prints one green/red checklist (see "Start"). Every engine start, exit and cause is a
 `process_runs` row; every leadership epoch is a `leader_history` row. Each controller runs
 `off`, `shadow` or `active` (`controller_modes`, with every change recorded in `mode_changes`
@@ -157,14 +157,14 @@ truncated. SLA breaches are `sla_episodes` (append-only); invariant breaches are
 
 **Decision Items** are the durable messages between controllers and deciders
 (`decision_items` in a ledger, `sup_decision_items` in machine). Only
-`scripts/machine/decisions.mjs` writes them, through `api decisions`. A Kernel item overdue twice
+`scripts/machine/decisions.mjs` writes them, through `starci kernel decisions`. A Kernel item overdue twice
 escalates to the Supervisor. The doorbell (`[decide] N items waiting …` typed into an idle seat) is
 only a reminder; every delivery attempt is a `deliveries` row, and a seat that refuses input
 repeatedly is replaced.
 
 ### Start
 
-`node scripts/reconciler/start.mjs` (skill `start`, the one start skill; `boot.mjs --restart` is the engine-only lever) runs, in order: preflight (Node bundles
+`starci reconciler up` (skill `start`, the one start skill; `starci reconciler restart` is the restart lever) runs, in order: preflight (Node bundles
 SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
 reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
@@ -314,14 +314,14 @@ records it refs, its allowed `dependsOn`, and an optional `stateMachine`/`sequen
 observable outcomes. Records carry `state`/`activity` (`todo`, `activity: investigating |
 implementing | verifying`, `blockers[]`) rather than a second lifecycle; an implementation op
 reports an `sds-gap` blocker only on concrete proof of a bounded contradiction, and the kernel
-routes it to `architecture.revise`. `bin/starci.mjs validate` proves structure and traceability —
+routes it to `architecture.revise`. `starci runtime validate` proves structure and traceability —
 not code conformance.
 
 ## The layout tree
 
 A product's UI wraps a screen through the Next.js App Router layout chain. The Work tree records
 it once at `.starciwork/shell/index.yaml` (schema `work/layout-tree@1`, generated by
-`scripts/work/layout-tree.mjs scan`): one tree per declared front-end app, one node per `app/`
+`starci work layout-tree scan`): one tree per declared front-end app, one node per `app/`
 segment, and per layout its chrome, navigation, used i18n keys and per-breakpoint captures. A
 re-scan keeps owner decisions, bumps a changed layout's `rev` and returns it to `todo`.
 
@@ -329,15 +329,15 @@ re-scan keeps owner decisions, bumps a changed layout's `rev` and returns it to 
 workers never invent chrome. Every `ui` record binds to the tree by `app`, `route` and
 `surface` (`layout`, `page`, `modal`, `drawer`, `loading`, `error`, `not-found`), and a draw works
 from the unsettled shell first: a missing ancestor layout is drawn and settled before the screens
-on top. `compose-direction.mjs` composites a drawn state onto the real layout captures;
-`scripts/work/ui/shell-conformance.mjs` judges the tree, the ui bindings and the implementation
+on top. `starci work compose-direction` composites a drawn state onto the real layout captures;
+`starci work shell-conformance` judges the tree, the ui bindings and the implementation
 routes, and [interface audit](interface-audit.md) applies the same check as its layout lens.
 
 ## The architecture machine
 
-`scripts/hfs/architecture.mjs` (`checkArchitecture`) is the read-only tree, dependency and
-source-shape check of one side of an app, run per side (`hfs check`, or directly with
-`node scripts/hfs/architecture.mjs <app>/be [--base <commit>]`) and through the op gate. It
+`starci runtime architecture` (`checkArchitecture`) is the read-only tree, dependency and
+source-shape check of one side of an app, run per side (`starci app check`, or directly with
+`starci runtime architecture <app>/be [--base <commit>]`) and through the op gate. It
 resolves the side's manifests, tsconfig aliases, relative paths, package exports, re-export
 barrels and literal dynamic imports, then emits one `starci/architecture-check@1` record whose
 `coverage` states what actually ran — an unavailable parser, an unresolvable target or a missing
@@ -369,7 +369,7 @@ only in its own system's folder). A path the target tree moves is a forbidden sl
 names its successor; files move with the move codemod, which appends the `moved[]` entries of
 `modules/kernel/retired-paths.yaml`.
 
-`npm run check` is `node bin/starci.mjs check` → `scripts/checks/check-runtime.mjs`: `node --check`
+`starci runtime check` dispatches to `scripts/checks/check-runtime.mjs`: `node --check`
 over every `.mjs` of `engine/`, `scripts/`, `modules/` and `bin/`; the runtime HFS check
 (`scripts/hfs/runtime-check.mjs`) with the runtime-rule modules of `scripts/hfs/runtime-rules/` and
 the cited-path scan over live prose; then every retained self-check of

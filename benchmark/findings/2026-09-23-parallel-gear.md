@@ -7,9 +7,9 @@ those become 5 and 10 (`fable.md` "parallel-gear", 2026-09-23). Everything else 
 how many slots, what a slice is — stays where it already lives. Three holes had to close for
 that knob to mean anything:
 
-1. `api estimate` sized a cut from a 15–30 minute window and knew nothing about a size class.
+1. `starci kernel estimate` sized a cut from a 15–30 minute window and knew nothing about a size class.
 2. `budgets.maxOps` was validated by `engine/config.mjs` and enforced by nobody.
-3. `api status` reported a queued job's existence but never why it was still queued.
+3. `starci kernel status` reported a queued job's existence but never why it was still queued.
 
 ## Observed
 
@@ -156,7 +156,7 @@ always one agent.
   `allocation.slicing.weights` and count toward `minutes` (so they can push a closure from `s` to
   `m`) but neither has a `from` bound, so a record-heavy or component-heavy closure with few files
   never classifies `l`. Adding one is a line of yaml; the ledger holds nothing to set it from.
-- **The thresholds need a real closure measure.** They will stay guesses until `api estimate`'s
+- **The thresholds need a real closure measure.** They will stay guesses until `starci kernel estimate`'s
   own inputs are recorded. The cheapest fix: have the kernel pass the measured counts on
   `enqueue` so `job-enqueued` carries `{files, assertions, components}`, then re-derive this
   table against wall-clock in one workflow's time. Until then `l.from.files: 12` rests on 15

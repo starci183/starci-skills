@@ -5,7 +5,7 @@
 // planner (scripts/kernel/seam-policy.mjs canonCutPlanOf) grants each slice the relocation destinations its findings need
 // and gives contested destinations to the wave's wire leg. This module is the gate over that plan: the first try of a
 // canon slice is admitted only with the canon-scan record it was cut from (--canon-scan), and only when its owned paths
-// cover the plan's `owned` for its ordinal; api graph-edit recut enqueues through the plan and refuses a slice whose
+// cover the plan's `owned` for its ordinal; starci kernel graph-edit recut enqueues through the plan and refuses a slice whose
 // moves all landed on another slice (no fix target: it is cut again, never enqueued to block).
 import fs from 'node:fs';
 import { canonCutPlanOf } from './seam-policy.mjs';
@@ -49,13 +49,13 @@ export function unfixableSlicesOf(plan) {
  */
 export function requirePlannedCanonSlice({ cut, ownedPaths, scanFile }) {
   if (!scanFile) {
-    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (node scripts/kernel/seam-policy.mjs canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
+    throw Object.assign(new Error(`a canon slice (params.canonFamilies, cut ${cut.id}#${cut.ordinal}) is enqueued from the canon plan: pass --canon-scan <the canon-scan --json record it was cut from> (starci machine seam-policy canon-plan --scan <file> --cut-id ${cut.id} prints the commands)`), { code: 'canon-slice-unplanned' });
   }
   const plan = canonCutPlanOf(readCanonScan(scanFile), { cutId: cut.id });
   const slice = plan.slices.find((s) => Number(s.ordinal) === Number(cut.ordinal));
   if (!slice) throw Object.assign(new Error(`cut ordinal ${cut.ordinal} is not a slice of ${scanFile} (${plan.slices.length} slices)`), { code: 'canon-slice-unknown' });
   const unfixable = unfixableSlicesOf(plan).find((u) => Number(u.ordinal) === Number(cut.ordinal));
-  if (unfixable) throw Object.assign(new Error(`canon slice ${cut.ordinal} has no fix target: its moves are held elsewhere (${unfixable.moves.slice(0, 3).join('; ')}); cut it again (api graph-edit --edit scan, then recut)`), { code: 'canon-slice-no-fix-target' });
+  if (unfixable) throw Object.assign(new Error(`canon slice ${cut.ordinal} has no fix target: its moves are held elsewhere (${unfixable.moves.slice(0, 3).join('; ')}); cut it again (starci kernel graph-edit --edit scan, then recut)`), { code: 'canon-slice-no-fix-target' });
   const missing = slice.owned.filter((p) => !ownedPaths.some((q) => covers(q, p)));
   if (missing.length) {
     throw Object.assign(new Error(`canon slice ${cut.ordinal} must own the plan's relocation destinations too (paths + grants): missing ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? ` +${missing.length - 8}` : ''}`), { code: 'canon-slice-missing-grants', missing });

@@ -1,0 +1,16 @@
+group: work
+verb: draw-dna
+owner: runtime
+summary: compare a rendered drawing with grammar DNA
+impl: {script: scripts/work/draw/draw-dna.mjs}
+positional:
+  - {name: html, required: true, variadic: false}
+flags:
+  - {name: family, type: string, summary: grammar family to compare with, default: starci}
+  - {name: proposals, type: string, summary: grammar proposals file that licenses off-grammar parts}
+exit: {"0": the drawing matches the grammar DNA, "1": findings, "2": bad usage}
+json: flag
+examples: ['starci work draw-dna <render.html> --family starci --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw/draw-dna.mjs']

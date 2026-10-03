@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // gate.mjs - THE gate of a code-writing op and of the Kernel landing (schema starci/gate@1).
 //
-//   node scripts/gates/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
+//   starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
 //
 // An op forces it every round of its READ-CODE-CHECK-FIX-REPORT loop (knowledge/op-gate.yaml) and attaches the JSON it prints;
-// `api settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
+// `starci kernel settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
 // against its base, so a branch green in the op is green at landing. Over the changed files of the app at --root:
-//   1. `hfs lint --changed <files> --format json` at the app root (starci/lint@1: ESLint only on the changed files - the BE canon
+//   1. `starci app lint --changed <files> --format json` at the app root (starci/lint@1: ESLint only on the changed files - the BE canon
 //      under be/, the FE canon under fe/ - plus the repository checks on them);
 //   2. before any tsc: the root `codegen` script and the build of every workspace package that exposes a `dist` export
 //      (each skipped while its inputs are unchanged since its last run in this worktree);
@@ -33,13 +33,13 @@
 // 2026-09-30). A finding the base already has is counted as preexisting, never a finding of the op. Failing specs always block.
 // Exit 0 clean, 1 new findings, 2 a tool could not run (never a pass). stdout is the one JSON document.
 //
-//   node scripts/gates/gate.mjs --profile docs [--tree <app>/.starciwork] [--out <file>]
+//   starci gate run --scope docs [--tree <app>/.starciwork] [--out <file>]
 //
 // The DOCUMENT profile (knowledge/op-gate.yaml docChecks, owed by docs.author, knowledge.repair and work.author): every document
 // check runs from the runtime root - doc-language, check-work-surfaces, check-work-deep, check-example-work, check-contract-cites,
 // check-json-exceptions - the `tree` ones over the Work root --tree names (else the runtime's examples). A check that exits 1 is a
 // finding (engine doc, rule the check id, its refusal lines); any other exit is a tool that could not run. The report carries
-// `profile: docs`; `api settle` refuses a documenting op's done on a red or unrunnable document gate.
+// `profile: docs`; `starci kernel settle` refuses a documenting op's done on a red or unrunnable document gate.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -70,7 +70,7 @@ const TSC_BOUND = 'bounded-v1';
 /** A tsc project whose app root (or side) has no install, or no typescript inside it: never measured (exit 2). */
 const INSTALL_MISSING = 'GATE_INSTALL_MISSING';
 const LISTED_MAX = 500;
-const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | gate.mjs --profile docs [--tree <work root>] [--out <file>]';
+const USAGE = 'usage: starci gate run --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | starci gate run --scope docs [--tree <work root>] [--out <file>]';
 export const DOC_PROFILE = 'docs';
 const GATE_PROFILES = Object.freeze(['code', DOC_PROFILE]);
 
@@ -82,13 +82,13 @@ export function parseGateArgs(argv) {
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--main', '--tests', '--out', '--profile', '--tree'].includes(arg)) {
+    } else if (['--root', '--base', '--main', '--tests', '--out', '--tree', '--scope'].includes(arg)) {
       if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
-      opts[arg.slice(2)] = argv[++i];
+      opts[arg === '--scope' ? 'profile' : arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
   }
-  if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--profile must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
-  if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --profile ${DOC_PROFILE}; ${USAGE}`);
+  if (!GATE_PROFILES.includes(opts.profile)) throw new Error(`--scope must be one of ${GATE_PROFILES.join(', ')}; ${USAGE}`);
+  if (opts.tree && opts.profile !== DOC_PROFILE) throw new Error(`--tree belongs to --scope ${DOC_PROFILE}; ${USAGE}`);
   return opts;
 }
 
@@ -178,7 +178,7 @@ export function hfsEntry(root) {
   }
 }
 
-/** `hfs lint --changed` over the files, in chunks (the Windows command line); {findings, errors}. */
+/** `starci app lint --changed` over the files, in chunks (the Windows command line); {findings, errors}. */
 function runHfsLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
@@ -186,8 +186,8 @@ function runHfsLint(root, files, hfs) {
     const run = runNode([hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
-    if (report?.schema !== LINT_SCHEMA) { errors.push(`hfs lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
-    errors.push(...(report.errors ?? []).map((e) => `hfs lint: ${e}`));
+    if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
+    errors.push(...(report.errors ?? []).map((e) => `starci app lint: ${e}`));
     for (const finding of report.findings ?? []) {
       const id = JSON.stringify([finding.engine, finding.rule, finding.path, finding.line, finding.column, finding.message]);
       if (!seen.has(id)) { seen.add(id); findings.push(finding); }
@@ -515,7 +515,7 @@ function runTests(root, pattern, cache) {
   return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, total: result.numTotalTests ?? 0, failed: result.numFailedTests ?? 0, ms: Date.now() - started }, findings, error: null };
 }
 
-/** The lint half: `hfs lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
+/** The lint half: `starci app lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
 async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache }) {
   const lint = runHfsLint(root, files, hfs);
   const errors = [...lint.errors];

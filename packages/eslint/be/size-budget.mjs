@@ -9,7 +9,7 @@
  * baseline is git's.
  *
  * There is no soft-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing the
- * files over the soft budget (`fileLines.soft`) is a report item of the hfs check, never a block.
+ * files over the soft budget (`fileLines.soft`) is a report item of the starci app check, never a block.
  * There is no baseline file and no allowlist: the record is the repository's own history. A spec, a fixture and an e2e
  * file are source files like any other. A migration is exempt (a file of the `be.persistence` slot named
  * `<timestamp>-<name>.ts`: append-only, never edited), and so is a declaration file.

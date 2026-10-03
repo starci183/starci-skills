@@ -1,4 +1,4 @@
-// The router decides, the Kernel does not bias: api route refuses --prefer/--avoid, and a retry learns
+// The router decides, the Kernel does not bias: starci kernel route refuses --prefer/--avoid, and a retry learns
 // from its own lineage (scripts/kernel/lineage-route.mjs).
 //
 // Live defect (owner decision): the Kernel routed
@@ -103,7 +103,7 @@ const openCircuit = (repo, provider, failureKind = 'auth') => {
   finally{machine.close();}
 };
 
-test('a Kernel --avoid/--prefer is an unknown option on api route: refused, nothing routed', (t) => {
+test('a Kernel --avoid/--prefer is an unknown option on starci kernel route: refused, nothing routed', (t) => {
   const repo = tmp(t, 'starci-route-ignored-');
   seedWorkflow(repo);
   for (const args of [['--avoid', 'devin-agent'], ['--prefer', 'codex-agent']]) {
@@ -119,7 +119,7 @@ test('a Kernel --avoid/--prefer is an unknown option on api route: refused, noth
   assert.equal(routeDecided(repo).lineageAdjust, undefined, 'a first attempt has no lineage');
 });
 
-test('api dispatch refuses --prefer/--avoid as unknown options', (t) => {
+test('starci kernel dispatch refuses --prefer/--avoid as unknown options', (t) => {
   const repo = tmp(t, 'starci-dispatch-ignored-');
   seedWorkflow(repo);
   route(t, repo);

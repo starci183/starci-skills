@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // release-app-installs.mjs: the release verification of a scaffolded app against FRESH registry installs.
-// It runs the published `hfs scaffold app release-app` (npx, canon-pins versions) into a temp dir, installs that app from the npm registry (`npm ci` on the
+// It runs the published `starci app scaffold release-app` (npx, canon-pins versions) into a temp dir, installs that app from the npm registry (`npm ci` on the
 // scaffold's own lockfile, or `npm install` when it has none), and runs tests/packages-hfs/hfs-scaffold-app.spec.mjs with
 // STARCI_APP_INSTALLS = that install and STARCI_REQUIRE_APP_INSTALLS=1. A missing install then fails the spec
 // instead of skipping it, so the lint, typecheck and api boot proofs can never pass silently.
 //
-//   node scripts/gates/release-app-installs.mjs              scaffold, install, run the spec; exit = the spec's exit
-//   node scripts/gates/release-app-installs.mjs --keep       keep the temp app and print where it is
+//   starci release app-installs          scaffold, install, run the spec; exit = the spec's exit
+//   starci release app-installs --keep   keep the temp app and print where it is
 //
 // CI (.github/workflows/ci.yml) and the release checklist both run it. It needs the network and the published
 // @starci packages the scaffold pins.

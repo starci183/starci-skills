@@ -1,0 +1,61 @@
+# The contract of `starci kernel kernel-proposal` (scripts/kernel/verbs/kernel-proposal.mjs): tier 2.
+group: kernel
+verb: kernel-proposal
+owner: runtime
+summary: file a tier-2 shared runtime change proposal for the Supervisor, or list proposals
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - kernel-proposal
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: title
+    type: string
+    summary: one-line title of the proposal (required unless --list)
+  - name: evidence
+    type: string
+    summary: why the change is needed (required unless --list)
+  - name: patch
+    type: string
+    summary: path of a patch file for the change
+  - name: files
+    type: string
+    summary: comma list of the files the change touches
+  - name: decision
+    type: string
+    summary: Decision Item the proposal answers
+  - name: list
+    type: boolean
+    summary: list the proposals of the workflow
+exit:
+  "0": listed or filed
+  "1": refused (incomplete, duplicate within 6 hours, patch missing)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel kernel-proposal --repo <path> --workflow <workflow> --list
+  - starci kernel kernel-proposal --repo <path> --workflow <workflow> --title <title> --evidence <evidence>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api kernel-proposal
+  - node scripts/kernel/cli.mjs kernel-proposal
+purpose: A change the Kernel needs in shared .claude (op manifest, knowledge, grammar, gate, runtime
+  code) is filed as a proposal with evidence and an optional patch; the Supervisor lands AUTO-tier
+  ones through a lane and forwards IMPORTANT ones (lessons.mjs tierOf) to the owner. The Kernel
+  never edits .claude itself; a local override keeps the workflow moving meanwhile.
+writes:
+  - events kernel-proposal
+  - the patch as a kernel artifact proposals/<id>.diff (blob + job_artifacts
+  - origin kernel)
+  - the Supervisor inbox
+refusals:
+  proposal-duplicate: the same title was proposed in the last 6 h
+kernelOnly: true

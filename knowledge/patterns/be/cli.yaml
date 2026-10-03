@@ -160,8 +160,8 @@ rules:
     kind: mandatory
     hfsRules: [R34, R147]
     requirement: |-
-      Migrations run only through the cli migrate command (`cli migrate run`, the root script `npm run migrate`) and through
-      the test world over the same connection list (`cli.options.ts`). Seed data never sits in a
+      Migrations run only through the cli migrate command (`cli migrate run`) and through the test world over the same
+      connection list (`cli.options.ts`); `starci gate run --root <app>` verifies that path. Seed data never sits in a
       migration: it is a sub-command of the `seed` group. Api and worker apps neither migrate nor seed (persistence.yaml
       BE-PERSISTENCE-2).
     rationale: |-

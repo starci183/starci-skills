@@ -1,30 +1,23 @@
 #!/usr/bin/env node
-// job-settle.mjs — SETTLE as a deterministic runtime service (owner ruling settle-runtime-service, 2026-09-28): the
-// first controller of the reconciler architecture (one loop engine, idempotent controllers per concern, LLMs as
-// deciders only). The watchdog loop only CALLS it (scripts/kernel/kernel-watchdog.mjs), so it can move into the engine as is.
+// job-settle.mjs — SETTLE as a deterministic runtime service: the first reconciler controller (one loop engine,
+// idempotent controllers per concern, LLMs as deciders only), called by the watchdog and movable into the engine as is.
 //
-//   node scripts/kernel/settle/job-settle.mjs --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json]
-//   node scripts/kernel/settle/job-settle.mjs --all [--dry-run] [--json]          every config.yaml supervisor.repos ledger
-//   node scripts/kernel/settle/job-settle.mjs --invariant [--repo <r>] [--json]  read-only report of reported jobs past invariantMaxAgeMs
+// Internal args: --repo <ledger-owner> [--workflow <id>] [--job <id>] [--dry-run] [--json] | --all | --invariant.
 //
 // reconcileJobSettle({repo, workflowId?, jobId?}) drives each job whose worker filed a report through explicit states,
 // one typed ledger event per transition:
 //
 //   reported --(outcome done + declared checks re-verify green)--> settled   event job-settle-settled
-//   reported --(the report or a raw re-run decides it: failed|partial, blocked|ask, a red re-run)--> settled fail|blocked
-//                                                                          event job-settle-settled (H1: no Kernel needed)
-//   reported --(a checker that could not run)---------------------> stays reported, retried; after tail.maxAttempts
-//                                                                    one runtime-defect Decision Item (H7: never red)
+//   reported --(failed|partial, blocked|ask, or a red raw re-run)--> settled fail|blocked (H1: no Kernel needed)
+//   reported --(checker unavailable)--> stays reported; after tail.maxAttempts one runtime-defect DI (H7: never red)
 //   reported --(judgment: not re-verifiable, owner act, refusal)--> kernel    event job-settle-needs-kernel
 //   settled  --(managed worker release proven)--> released  event job-settle-released
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
-// path as the Kernel's: `api check --checks-file` (the re-run results) then `api settle --verdict pass`, so every
-// refusal of settle (landed proof, cut checks, draw acceptance, handover approval ...) still holds; a refusal hands the
+// path as `starci kernel record-checks` then `starci kernel settle`; every refusal still holds, and hands the
 // job to the Kernel with its code. The settler settles what the evidence decides without judgment (H1): a failed or
-// partial report fails, a blocked or ask report settles blocked, a done report whose RAW re-run is red fails (claim
-// overruled, the failure routes then run). It never passes on a worker-declared exit code (H8): every verdict is the
+// partial report fails, blocked/ask settles blocked, and a done report whose RAW re-run is red fails. It never passes on a worker-declared exit code (H8): every verdict is the
 // raw exit the runtime observed. It never settles an op whose pass is an owner act, nor a done report nothing re-verifies.
 //
 // Idempotent: a settled job is not due; a needs-kernel handover is recorded once per dispatch and reason; a release is
@@ -34,9 +27,9 @@
 //   - a checks row the Kernel already recorded for the attempt: green -> settle; red -> kernel;
 //   - else every check the report declares must claim exit 0 (a *-before/baseline measurement is evidence, not a
 //     verdict, and is skipped), and every one that is a check (not a git/read action)
-//     must be a runtime check the settler can re-run without a shell: node <runtime>/bin/starci.mjs validate ...,
-//     node <runtime>/scripts/checks/<x>.mjs ... (never --fix/--write/--apply), node <runtime>/scripts/work/work-graph.mjs
-//     validate|show|diff ...; each re-run (argv, no shell, cwd = the ledger repo) must exit 0;
+//     must be a runtime check the settler can re-run without a shell: starci runtime validate ..., the package CLI,
+//     scripts/checks/<x>.mjs (never --fix/--write/--apply), or starci work graph validate|show|diff; each re-run
+//     (argv, no shell, cwd = the ledger repo) must exit 0;
 //   - a cut slice (payload.cut) records the two cut checks settle demands: a canon slice (params.canonFamilies) re-runs
 //     canon-scan in-process over its owned paths (cut-slice-postcondition, paths never on a command line) and the
 //     declared re-runs are its cut-regression-inventory; any other cut, and the set-closing pass (full-regression-final),
@@ -189,13 +182,20 @@ export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
   if (!command || ACTION.test(command)) return { kind: 'action' };
   const argv = argvOf(command);
   if (!argv) return { kind: 'foreign', why: 'shell-or-placeholder' };
+  const cliRel = 'packages/cli/bin/starci.mjs';
+  if (/^starci(?:\.cmd|\.exe)?$/i.test(path.basename(argv[0]))) {
+    const rest = argv.slice(1);
+    if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
+    if (rest[0] !== 'runtime' || rest[1] !== 'validate') return { kind: 'foreign', why: 'not-a-runtime-check' };
+    return { kind: 'runtime', script: path.join(skillRoot, ...cliRel.split('/')), argv: rest, rel: cliRel };
+  }
   if (!/^node(?:\.exe)?$/i.test(path.basename(argv[0])) || !argv[1]) return { kind: 'foreign', why: 'not-a-runtime-check' };
-  const rel = /(?:^|\/)\.claude\/((?:bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
+  const rel = /(?:^|\/)\.claude\/((?:packages\/cli\/bin|scripts)\/.+\.mjs)$/i.exec(norm(argv[1]))?.[1]
     ?? (norm(path.resolve(argv[1])).toLowerCase().startsWith(`${norm(skillRoot).toLowerCase()}/`) ? norm(path.relative(skillRoot, path.resolve(argv[1]))) : null);
   if (!rel) return { kind: 'foreign', why: 'outside-runtime' };
   const rest = argv.slice(2);
   if (rest.some((a) => MUTATING_FLAG.test(a))) return { kind: 'foreign', why: 'mutating-flag' };
-  const ok = (rel === 'bin/starci.mjs' && rest[0] === 'validate')
+  const ok = (rel === cliRel && rest[0] === 'runtime' && rest[1] === 'validate')
     || (/^scripts\/checks\/[\w.-]+\.mjs$/.test(rel))
     || (rel === 'scripts/work/work-graph.mjs' && ['validate', 'show', 'diff'].includes(rest[0]));
   if (!ok) return { kind: 'foreign', why: `not-a-check-script:${rel}` };
@@ -260,7 +260,7 @@ export async function recordSettlerCheck(ledger, item, run, { now = Date.now } =
 }
 
 /**
- * Is this reported job green? {green, reason?, detail?, checks?: envelope for api check (null: already recorded), via}
+ * Is this reported job green? {green, reason?, detail?, checks?: envelope for starci kernel record-checks (null: already recorded), via}
  * Seams: rerun (rerunCheck), canon (canonSliceCheck).
  */
 export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env,
@@ -313,7 +313,7 @@ export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
  * - never the exit the worker declared, never a check the Kernel recorded by hand. A declared red that is not
  * re-verifiable is the worker's own admission (declared-check-red, still subject to canon parity). A checker that could
  * not run is unavailable (H7): {green:false, unavailable:true}, never red. A red re-run carries its raw checks
- * envelope, so the settler records it (api check) before it settles the claim overruled.
+ * envelope, so the settler records it (starci kernel record-checks) before it settles the claim overruled.
  */
 async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, record }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
@@ -376,7 +376,7 @@ const jsonOf = (text) => {
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   return a >= 0 && b > a ? parse(t.slice(a, b + 1)) : null;
 };
-/** `node scripts/kernel/cli.mjs <verb> ... --json` as the runtime: {ok, value, error, code} */
+/** `starci kernel <verb> ... --json` as the runtime: {ok, value, error, code} */
 export function runApi(args, { env = process.env, timeoutMs = 600_000 } = {}) {
   const r = runNode([API_FILE, ...args, '--json'], { cwd: SKILL_ROOT, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const value = jsonOf(r.stdout), err = jsonOf(r.stderr);
@@ -417,7 +417,7 @@ function mechanicalSettleOf(item, verdict) {
   if (['failed', 'partial'].includes(item.outcome)) return { verdict: 'fail' };
   if (['blocked', 'ask'].includes(item.outcome)) return { verdict: 'blocked' };
   if (item.outcome !== 'done' || !RED_REASONS.includes(verdict.reason)) return null;
-  // A parity measurement records its own check_runs; its red is recorded for api settle as one runtime check.
+  // A parity measurement records its own check_runs; its red is recorded for starci kernel settle as one runtime check.
   const checks = verdict.checks?.checks?.length ? verdict.checks
     : { checks: [{ name: verdict.reason, exitCode: 1, command: 'runtime settler (canon parity)', evidence: (verdict.detail ?? []).join('; ').slice(0, 1500) || verdict.reason }] };
   return { verdict: 'fail', checks };
@@ -528,7 +528,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         if (dryRun) { out.settled.push({ jobId: item.jobId, via: verdict.via, dryRun: true }); continue; }
         if (verdict.checks) {
           const file = checksFile(fresh, verdict.checks);
-          const checked = api(['check', '--repo', path.resolve(repo), '--job', fresh.jobId, '--checks-file', file], { env });
+          const checked = api(['record-checks', '--repo', path.resolve(repo), '--job', fresh.jobId, '--checks-file', file], { env });
           try { fs.rmSync(file, { force: true }); } catch { /* temp */ }
           if (!checked.ok) { out.kernel.push(handToKernel(ledger, fresh, { reason: 'check-refused', code: checked.code, detail: [checked.error] }, { now: now() })); continue; }
         }
@@ -551,7 +551,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
     }
     try { out.released = await releaseSettled(ledger, { workflowId, jobId, now: now(), settings, dryRun }); }
     catch (error) { out.ok = false; out.errors.push({ step: 'release', error: String(error?.message ?? error).slice(0, 300) }); }
-    // The async settle tail (api settle-tail): a failed or never-started tail run is retried here.
+    // The async settle tail (starci kernel settle-tail): a failed or never-started tail run is retried here.
     if (!dryRun) {
       try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
       // H12: leaked leases and overdue incidents are closed or escalated through their owner, every pass.
@@ -655,7 +655,7 @@ export const tailLockName = (repo, jobId) => `settle-tail-${repoKey(repo)}-${slu
 
 /* ------------------------------------------------------------ callers */
 
-/** The pass right after `api report` files: detached, never blocking the op's own terminal. */
+/** The pass right after `starci kernel report` files: detached, never blocking the op's own terminal. */
 export function startSettlerFor(repo, { workflowId = null, jobId = null, env = process.env } = {}) {
   try {
     const args = [selfFile, '--repo', path.resolve(repo), ...(workflowId ? ['--workflow', workflowId] : []), ...(jobId ? ['--job', jobId] : []), '--json'];

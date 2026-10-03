@@ -11,7 +11,7 @@
 //   PARAM_DEFAULT   a param carries both a default and `required: true`, or neither
 //   SCHEMA_INVALID  the manifest breaks modules/schemas/op.schema.yaml
 //
-//   node scripts/checks/check-op-manifest.mjs [--opsDir <dir>] [--json]
+//   starci runtime check --only op-manifest -- [--opsDir <dir>] [--json]
 //
 // Exit 0 is clean; any finding exits 1.
 import fs from 'node:fs';
@@ -170,7 +170,7 @@ export function checkOpManifest({ root = skillRoot, opsDir } = {}) {
 
 export function opManifestMain(argv = []) {
   if (argv.includes('--help') || argv.includes('-h')) {
-    return { exitCode: 0, text: 'Usage: node scripts/checks/check-op-manifest.mjs [--opsDir <dir>] [--json]\n\nEvery modules/ops/ops/<id>.yaml holds the modules/schemas/op.schema.yaml shape, gives each param a default or required: true, keeps each rule in one step, cites params instead of restating numbers, keeps rules out of reads[].purpose, writes one path per entry and cites only checks that exist. Exit 0 is clean.\n' };
+    return { exitCode: 0, text: 'Usage: starci runtime check --only op-manifest -- [--opsDir <dir>] [--json]\n\nEvery modules/ops/ops/<id>.yaml holds the modules/schemas/op.schema.yaml shape, gives each param a default or required: true, keeps each rule in one step, cites params instead of restating numbers, keeps rules out of reads[].purpose, writes one path per entry and cites only checks that exist. Exit 0 is clean.\n' };
   }
   const i = argv.indexOf('--opsDir');
   const result = checkOpManifest(i >= 0 ? { opsDir: argv[i + 1] } : {});

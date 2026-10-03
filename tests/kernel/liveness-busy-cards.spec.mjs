@@ -158,7 +158,7 @@ test('D: a done worker held by a peer-wait is released - terminal closed, lease 
   assert.deepEqual(status(run).frontier.settleReadyJobs,[JOB]);
   assert.equal(out(run('reconcile','--job',JOB,'--release-worker')).alreadyReleased,true,'still released once the wait resolved');
   const releasesBefore=releases();
-  assert.equal(run('check','--job',JOB,'--checks',JSON.stringify({checks:[{name:'regression',command:'npm test',exitCode:1,evidence:'red'}]})).status,0);
+  assert.equal(run('record-checks','--job',JOB,'--checks',JSON.stringify({checks:[{name:'regression',command:'npm test',exitCode:1,evidence:'red'}]})).status,0);
   const settled=run('settle','--job',JOB,'--verdict','fail');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   const receipt=out(settled);

@@ -8,8 +8,6 @@ import { readEnv } from '../scripts/lib/env.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, 'dist');
-const port = Number(readEnv('STARCI_STATUS_PORT') || appPort);
-const api = createApiHandler();
 const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.svg':'image/svg+xml', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.ico':'image/x-icon', '.woff2':'font/woff2' };
 
 function serveStatic(request,response,url) {
@@ -31,17 +29,29 @@ function serveStatic(request,response,url) {
   createReadStream(target).on('error',()=>response.destroy()).pipe(response);
 }
 
-const server = serve(async (request,response) => {
-  try {
-    const url = new URL(request.url || '/', 'http://localhost');
-    response.setHeader('X-Content-Type-Options','nosniff');
-    response.setHeader('Referrer-Policy','no-referrer');
-    if (await api.handle(request,response,url)) return;
-    serveStatic(request,response,url);
-  } catch {
-    if (!response.headersSent) response.writeHead(500,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
-    response.end(request.method === 'HEAD' ? undefined : '{"error":{"code":"INTERNAL","message":"Request failed"}}');
-  }
-});
-server.listen(port,'127.0.0.1',()=>console.log(`StarCi harness: http://127.0.0.1:${port}`));
-process.on('SIGTERM',()=>{ api.close(); server.close(); });
+/** Start the built harness UI and API in the caller's process; the caller owns signals and logging. */
+export function startHarnessServer({ port = null, env = process.env } = {}) {
+  const selectedPort = Number(port ?? (readEnv('STARCI_STATUS_PORT', env) || appPort));
+  const api = createApiHandler({ env });
+  const server = serve(async (request,response) => {
+    try {
+      const url = new URL(request.url || '/', 'http://localhost');
+      response.setHeader('X-Content-Type-Options','nosniff');
+      response.setHeader('Referrer-Policy','no-referrer');
+      if (await api.handle(request,response,url)) return;
+      serveStatic(request,response,url);
+    } catch {
+      if (!response.headersSent) response.writeHead(500,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
+      response.end(request.method === 'HEAD' ? undefined : '{"error":{"code":"INTERNAL","message":"Request failed"}}');
+    }
+  });
+  server.listen(selectedPort,'127.0.0.1');
+  let closed = false;
+  const close = () => new Promise((resolve) => {
+    if (closed) { resolve(); return; }
+    closed = true;
+    try { api.close(); } catch { /* best-effort teardown continues with the listener */ }
+    try { server.close(() => resolve()); } catch { resolve(); }
+  });
+  return { server, close };
+}

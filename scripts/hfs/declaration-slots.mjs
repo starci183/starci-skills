@@ -36,7 +36,7 @@ export function kindShapeProblems(s, at, namePattern) {
   return Array.isArray(list) && list.every((value) => namePattern.test(String(value))) && new Set(list).size === list.length ? [] : [`${at}.kinds must be a unique list of trigger kind names`];
 }
 
-/** The problems of `ruleParams.be.kindPatterns` (trigger kind -> patterns) and `ruleParams.be.addKinds` (hfs add noun -> {topic, variable, patterns, trigger?, needs?, also?, defaults?, wire?}). */
+/** The problems of `ruleParams.be.kindPatterns` (trigger kind -> patterns) and `ruleParams.be.addKinds` (starci app add noun -> {topic, variable, patterns, trigger?, needs?, also?, defaults?, wire?}). */
 export function kindParamProblems(be, triggerKinds) {
   const kebab = /^[a-z][a-z0-9-]*$/;
   const names = (list) => Array.isArray(list) && list.every((value) => kebab.test(String(value))) && new Set(list).size === list.length;

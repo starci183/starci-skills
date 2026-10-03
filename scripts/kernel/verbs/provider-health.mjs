@@ -1,4 +1,4 @@
-// api provider-health: inspect and recover provider circuits, including quota probes.
+// starci kernel provider-health: inspect and recover provider circuits, including quota probes.
 import { parseJson } from '../../lib/json.mjs';
 import { readProviderCircuit, writeProviderCircuit } from '../../machine/provider-circuit.mjs';
 import { QUOTA_FAILURE_KIND, quotaSpecOf, quotaProbeProviders } from '../../agent/provider-outage.mjs';

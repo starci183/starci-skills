@@ -27,7 +27,7 @@ profiles: [runtime]
 tiers:
   runtime:
     entry:      {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
-    checks:     {mayImport: [reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package]}
+    checks:     {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package]}
     reconciler: {mayImport: [supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
     supervisor: {mayImport: [kernel, domain, gates, machine, hfs, api, db, base]}
     kernel:     {mayImport: [domain, gates, machine, hfs, api, db, base]}
@@ -47,7 +47,7 @@ ruleParams:
     # HFS_SIZE_GROWTH: a runtime source file above soft may not grow against the base revision; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
     # The runtime's production source: what the external-owner, tier, base-purity and source-name rules read.
-    sourceRoots: [bin, engine, scripts, ui/api, ui/server.mjs, ui/start.mjs]
+    sourceRoots: [bin, engine, scripts, ui/api, ui/server.mjs, ui/harness-process.mjs, ui/harness-verbs.mjs]
     # RT_EXTERNAL_OWNER: a module specifier, a global or a spawned program word -> the owners allowed to use it ([] means
     # nowhere in runtime production code). An owner is api/<system> (the folder scripts/api/<system>/), api/* (any api
     # system) or engine/db (the DB tier). A program word is read from the spawn's command with the TypeScript AST
@@ -115,19 +115,19 @@ ruleParams:
       - {root: ui/src/i18n/generated, generatedBy: scripts/hfs/sync-runtime.mjs}
     # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
     pinned:
-      - {path: bin/starci.mjs, why: the npm bin}
+      - {path: packages/cli/bin/starci.mjs, why: the @starci/cli npm bin}
       - {path: scripts/kernel/cli.mjs, why: every Kernel and op prompt runs it}
       - {path: scripts/kernel/start-workflow.mjs, why: the start-kernel skill and the bin}
       - {path: scripts/supervisor/start-supervisor.mjs, why: the supervisor seat launch}
-      - {path: scripts/reconciler/boot.mjs, why: the StarCi-Reconciler scheduled task}
-      - {path: scripts/guards/command-guard.mjs, why: the PreToolUse hook written into every lane worktree by scripts/agent/trust.mjs}
-      - {path: scripts/guards/seat-tools.mjs, why: the .claude/settings.json hook}
       - {path: "scripts/api/orca/<call>.mjs", why: the only Orca form agent prose may cite (scripts/checks/check-host-boundary.mjs)}
-    # The retained runtime self-checks `starci check` (bin/starci.mjs) runs after the runtime check, in this order.
+    # The retained runtime self-checks `starci runtime check` runs after the runtime check, in this order.
     selfChecks:
       - {id: ops-registry, run: scripts/route/build-ops-registry.mjs, args: [--check]}
       - {id: providers, run: scripts/checks/check-providers.mjs}
-      - {id: api-surface, run: scripts/checks/check-api-surface.mjs}
+      - {id: cli-catalog-drift, run: scripts/cli/gen-catalog.mjs, args: [--check]}
+      - {id: cli-parity, run: scripts/checks/check-cli-parity.mjs}
+      - {id: retired-cli, run: scripts/checks/check-retired-cli.mjs}
+      - {id: cli-only-entry, run: scripts/checks/check-cli-only-entry.mjs}
       - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
       - {id: schema-shared, run: scripts/checks/check-schema-shared.mjs}
       - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
@@ -258,7 +258,7 @@ slots:
   # ----- entry ----------------------------------------------------------------------------------------------
   - id: runtime.cli
     profiles: [runtime]
-    path: bin/starci.mjs
+    path: packages/cli/bin/starci.mjs
     presence: required
     tracked: tracked
     tier: entry
@@ -266,14 +266,14 @@ slots:
     rules: [RT_PINNED_PATH_MOVED, RT_TIER_DIRECTION]
   - id: runtime.ui
     profiles: [runtime]
-    # The harness UI app: a node API server (server.mjs, start.mjs, api/**) and a Vite client (src/**), with its own package.json.
+    # The harness UI app: a node API server (server.mjs, harness-*.mjs, api/**) and a Vite client (src/**), with its own package.json.
     path: "ui/"
     presence: required
     tracked: tracked
     tier: entry
     owner: true
     requires: [package.json, server.mjs, README.md, CONTRACT.md]
-    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
+    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, harness-process.mjs, harness-verbs.mjs, start.cmd, ports.mjs, ports.d.mts, "api/**", "src/**", "public/**", "fixtures/**"]
     forbids: [run-cloudflared.ps1]
     tests: none
     rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
@@ -401,13 +401,13 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
   - id: runtime.kernel-verbs
     profiles: [runtime]
-    # One file per modules/kernel/api-commands/<verb>.yaml (check-api-surface).
+    # One file per modules/cli/commands/kernel/<verb>.yaml (check-cli-parity).
     path: "scripts/kernel/verbs/<verb>.mjs"
     presence: required
     tracked: tracked
     tier: inherit
     tests: none
-    requires: ["/modules/kernel/api-commands/<verb>.yaml"]
+    requires: ["/modules/cli/commands/kernel/<verb>.yaml"]
     rules: [RT_TIER_DIRECTION]
   - id: runtime.supervisor
     profiles: [runtime]
@@ -441,7 +441,7 @@ slots:
   - id: runtime.domain
     profiles: [runtime]
     # One capability per folder; owners import each other without cycles.
-    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work}/"
+    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work,cli}/"
     presence: required
     tracked: tracked
     tier: domain
@@ -470,8 +470,17 @@ slots:
     rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
   - id: runtime.checks
     profiles: [runtime]
-    # Runtime self-checks only: each judges the runtime tree with catalogued codes; run by `starci check`.
+    # Runtime self-checks only: each judges the runtime tree with catalogued codes; run by `starci runtime check`.
     path: "scripts/checks/check-<topic>.mjs"
+    presence: required
+    tracked: tracked
+    tier: checks
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
+  - id: runtime.checks-lib
+    profiles: [runtime]
+    # Shared implementation helpers used only by runtime self-checks.
+    path: "scripts/checks/lib/<name>.mjs"
     presence: required
     tracked: tracked
     tier: checks
@@ -489,7 +498,16 @@ slots:
   # ----- contracts, knowledge, docs, skills ---------------------------------------------------------------------
   - id: runtime.contracts
     profiles: [runtime]
-    path: "modules/{kernel,goal,ops,host,models,reconciler,schemas,supervisor}/"
+    path: "modules/{cli,kernel,goal,ops,host,models,reconciler,schemas,supervisor}/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [RT_CITED_PATH_MISSING]
+  - id: runtime.cli-catalog
+    profiles: [runtime]
+    # The unified starci CLI catalog (scripts/cli/catalog.mjs validates; gen-catalog.mjs generates packages/cli + docs/cli.md from it).
+    path: "modules/cli/commands/{_global.yaml,<group>/_group.yaml,<group>/<verb>.yaml}"
     presence: required
     tracked: tracked
     tier: none
@@ -584,7 +602,7 @@ slots:
   - id: runtime.package
     profiles: [runtime]
     # A published @starci package: its own layout under its own package.json; specs beside the source as <name>.spec.*.
-    path: "packages/{fe-kit,grammar,heroicons,hfs,jest-preset,prettier-config,stylelint,test-world,tsconfig,eslint/be,eslint/fe}/"
+    path: "packages/{cli,fe-kit,grammar,heroicons,hfs,jest-preset,prettier-config,stylelint,test-world,tsconfig,eslint/be,eslint/fe}/"
     presence: required
     tracked: tracked
     tier: package
@@ -645,4 +663,4 @@ consumers:
   - scripts/hfs/runtime-check.mjs
   - scripts/checks/check-host-boundary.mjs
   - scripts/checks/check-contract-cites.mjs
-  - bin/starci.mjs
+  - packages/cli/bin/starci.mjs

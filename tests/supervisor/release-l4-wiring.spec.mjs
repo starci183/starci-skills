@@ -35,7 +35,7 @@ const WORKFLOWS = [
       { name: 'Install root', 'working-directory': '.', run: 'npm ci' },
       { name: 'Install app', run: 'npm ci' },
       { name: 'Typecheck', run: 'npm run typecheck' },
-      { name: 'hfs lint', 'working-directory': '.', run: 'node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR"' },
+      { name: 'starci app lint', 'working-directory': '.', run: 'npm run starci --silent -- app lint --cwd "$APP_DIR"' },
       { name: 'Unit', run: 'npm test -- --ci' },
       { name: 'Integration', if: "${{ github.event_name == 'workflow_dispatch' }}", run: 'npm run test:integration -- --ci' },
       { name: 'Build', run: 'npm run build:be' },
@@ -50,10 +50,10 @@ test('the parity plan is derived from the workflows: one run per example app, th
   assert.equal(plan.image, 'node:22');
   assert.deepEqual(plan.steps.map((s) => [s.dir, s.run]), [
     ['.', 'npm ci'], ['packages/grammar', 'npm ci\nnpm run build'], ['.', 'npm run check'],
-    ['examples/shop', 'npm ci'], ['examples/shop', 'npm run typecheck'], ['.', 'node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR"'], ['examples/shop', 'npm run build:be'],
-    ['examples/blog', 'npm ci'], ['examples/blog', 'npm run typecheck'], ['.', 'node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR"'], ['examples/blog', 'npm run build:be'],
+    ['examples/shop', 'npm ci'], ['examples/shop', 'npm run typecheck'], ['.', 'npm run starci --silent -- app lint --cwd "$APP_DIR"'], ['examples/shop', 'npm run build:be'],
+    ['examples/blog', 'npm ci'], ['examples/blog', 'npm run typecheck'], ['.', 'npm run starci --silent -- app lint --cwd "$APP_DIR"'], ['examples/blog', 'npm run build:be'],
   ]);
-  const lint = plan.steps.filter((s) => s.name.includes('hfs lint'));
+  const lint = plan.steps.filter((s) => s.name.includes('starci app lint'));
   assert.deepEqual(lint.map((s) => s.env.APP_DIR), ['examples/shop', 'examples/blog'], 'the job env reaches the step, per app');
   assert.ok(plan.steps.every((s) => !('SONAR_TOKEN' in s.env)), 'a secret never reaches the container');
   const reasons = Object.fromEntries(plan.skipped.map((s) => [s.name.replace(/^.*?: /, ''), s.reason]));
@@ -66,14 +66,14 @@ test('the parity plan is derived from the workflows: one run per example app, th
   assert.match(plan.skipped.find((s) => s.name.includes('GITHUB_OUTPUT') || s.name.includes('apps=')).reason, /plumbing/);
 });
 
-test('the repository\'s own workflows give a plan that holds the full check set, the per-app typecheck, hfs lint and builds, and no spec suite', () => {
+test('the repository\'s own workflows give a plan that holds the full check set, the per-app typecheck, starci app lint and builds, and no spec suite', () => {
   const plan = parityPlan({ workflows: readWorkflows(ROOT), apps: exampleApps(ROOT).map((a) => a.name) });
   const runs = plan.steps.map((s) => `${s.dir}: ${s.run.split('\n').join(' && ')}`);
-  for (const expected of ['.: npm run check', '.: node scripts/gates/package-clean-test.mjs']) assert.ok(runs.includes(expected), expected);
+  for (const expected of ['.: npm run check', '.: npm run starci --silent -- release clean-test']) assert.ok(runs.includes(expected), expected);
   for (const app of exampleApps(ROOT).map((a) => a.name)) {
     for (const cmd of ['npm ci', 'npm run typecheck', 'npm run build:be', 'npm run build:fe']) assert.ok(runs.includes(`examples/${app}: ${cmd}`), `${app}: ${cmd}`);
   }
-  assert.ok(runs.some((r) => r.startsWith('.: node packages/hfs/bin/hfs.mjs lint')), 'hfs lint');
+  assert.ok(runs.some((r) => r.startsWith('.: npm run starci --silent -- app lint')), 'starci app lint');
   assert.ok(!runs.some((r) => /: npm (?:run )?test(?::\w+)?(?: -- .*)?$/.test(r) && !r.startsWith('packages/grammar')), 'no spec suite');
   assert.ok(!runs.some((r) => /docker|playwright/.test(r)), 'no docker or browser step');
 });
@@ -82,7 +82,7 @@ test('the parity script extracts HEAD from the read-only tar, snapshots it as a 
   const script = parityScript(parityPlan({ workflows: WORKFLOWS, apps: ['shop'] }));
   assert.match(script, /tar -xf \/in\/src\.tar -C \/work/);
   assert.match(script, /git init -q && git add -A && git -c user\.name=starci/);
-  assert.match(script, /run_step 'examples\.yml:app\[shop\]: hfs lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnode packages/);
+  assert.match(script, /run_step 'examples\.yml:app\[shop\]: starci app lint' '\.' <<'__STEP_\d+__'\nexport NODE_VERSION='22'\nexport APP_DIR='examples\/shop'\nnpm run starci/);
   assert.match(script, /##DONE"\n$/);
   const log = '##STEP a\nok\n##STEP b\nboom\n##FAILED b\n';
   assert.deepEqual(parityOutcome(log), { done: false, failed: 'b', steps: ['a', 'b'] });

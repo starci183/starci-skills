@@ -9,8 +9,8 @@
 //     sonar.coverage.exclusions;
 //   - Codecov: `codecovPaths` are the measured roots, and `coverageComponents` one component per service app plus platform,
 //     each 100% and red below it, rendered into codecov.yml.
-// hfs sync renders the three for an app, scripts/checks/check-examples-ci.mjs for the example apps of the runtime repository,
-// and `hfs check` compares the files with this derivation. Nothing here lists a path of a product: it all comes from slots.yaml.
+// starci app sync renders the three for an app, scripts/checks/check-examples-ci.mjs for the example apps of the runtime repository,
+// and `starci app check` compares the files with this derivation. Nothing here lists a path of a product: it all comes from slots.yaml.
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { logicRolesOf } from './manifest-shape.mjs';
 

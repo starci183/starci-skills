@@ -1,0 +1,19 @@
+group: runtime
+verb: architecture
+owner: runtime
+summary: check one repository against the runtime architecture rules
+impl: {script: scripts/hfs/architecture.mjs}
+positional:
+  - {name: repo-root, required: true, variadic: false}
+flags:
+  - {name: base, type: string, summary: first commit of the range to judge (default the whole tree)}
+exit: {"0": architecture clean, "1": violations or execution errors, "2": bad usage}
+json: always
+examples:
+  - starci runtime architecture <repo-root>
+  - starci runtime architecture <repo-root> --base <commit>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/hfs/architecture.mjs
+  - node .claude/scripts/hfs/architecture.mjs

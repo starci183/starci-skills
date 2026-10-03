@@ -1479,7 +1479,7 @@ export function machineLog(row, { env = process.env } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// CLI: node engine/db/machine.mjs <init|status|ledgers|register|resolve> [--file <machine.sqlite>] [--json]
+// CLI: starci runtime machine-db <init|status|ledgers|register|resolve> [--file <machine.sqlite>] [--json]
 // ---------------------------------------------------------------------------------------------------------------------
 if (isMain(import.meta.url)) {
   const args = process.argv.slice(2);

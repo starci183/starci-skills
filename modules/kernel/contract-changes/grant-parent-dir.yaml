@@ -7,6 +7,6 @@ summary: >-
   now gets the refusal and fixes the path or declares the new module.
 reach: new-legs
 paths:
-  - modules/kernel/api-commands/enqueue.yaml
+  - modules/cli/commands/kernel/enqueue.yaml
   - modules/kernel/failure-codes.yaml
   - modules/kernel/contract-changes/grant-parent-dir.yaml

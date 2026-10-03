@@ -2,7 +2,7 @@
 // ledger (owner ruling 2026-09-29 draw-from-todo: "interface.draw must start from todo; if the parent is not drawn,
 // draw the parent, or tell the supervisor"; the shell/layout ancestors are shared by the five workflows of one product).
 //
-// interface.draw never refuses because a layout above its record is todo or unsettled. `api dispatch` decides who
+// interface.draw never refuses because a layout above its record is todo or unsettled. `starci kernel dispatch` decides who
 // draws the parents (scripts/kernel/verbs/dispatch.mjs):
 //   - the chain is settled                        -> nothing to do, the draw only draws its screens;
 //   - nobody owns foundation `shell` (or its owner stopped running, or it landed and the tree went unsettled again)
@@ -45,7 +45,7 @@ function layoutChainVerdicts(repo, bindings) {
       if (typeof ui?.route !== 'string') { verdicts.push({ record, unknown: 'the ui record declares no route' }); continue; }
       const shell = readShellRecord(workRoot);
       if (!shell || shell.error) { verdicts.push({ record, unknown: 'no readable shell record' }); continue; }
-      if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - node scripts/work/layout-tree.mjs convert --work <.starciwork> --write`] }] }); continue; }
+      if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - starci work layout-tree scan --work <.starciwork> --write`] }] }); continue; }
       const resolved = appOfUi(shell.record, ui);
       if (resolved.error) { verdicts.push({ record, unknown: `${resolved.error.code}: ${resolved.error.message}` }); continue; }
       const tree = resolved.tree;
@@ -132,7 +132,7 @@ export function gateShellFoundation(ledger, { job, need, now = Date.now(), setti
     const claimedAt = existing.owner?.claimedAt ?? now;
     let decision = null;
     if (now - claimedAt > stallMsOf(settings)) {
-      const summary = `Foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) has been claimed by ${ownerId} for ${Math.round((now - claimedAt) / 60000)} min and is still not landed; interface.draw ${job.job_id} of ${workflowId} waits on it. Re-dispatch a parent draw (interface.draw of the surface-layout record) or hand the foundation to a live workflow (api foundation --claim ${SHELL_FOUNDATION}).`;
+      const summary = `Foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) has been claimed by ${ownerId} for ${Math.round((now - claimedAt) / 60000)} min and is still not landed; interface.draw ${job.job_id} of ${workflowId} waits on it. Re-dispatch a parent draw (interface.draw of the surface-layout record) or hand the foundation to a live workflow (starci kernel foundation --claim ${SHELL_FOUNDATION}).`;
       try {
         decision = openDecisionRow(ledger, { workflowId, kind: 'cross-workflow', decider: 'supervisor', summary,
           entity: { type: 'workflow', id: ownerId }, idempotencyKey: `shell-foundation-stalled:${ownerId}:${claimedAt}`,
@@ -179,5 +179,5 @@ export function shellFoundationWaitOf(db, workflowId) {
   if (!foundation || foundation.state !== 'claimed' || !ownerId || ownerId === workflowId) return null;
   if (!(foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) return null;
   if (!workflowRunning(getWorkflow(db, ownerId))) return null;
-  return { owner: ownerId, detail: `foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) is drawn by ${ownerId}; the draw dispatches once it lands (api foundation --land) - never a second shell draft` };
+  return { owner: ownerId, detail: `foundation ${SHELL_FOUNDATION} (shell + ancestor layouts) is drawn by ${ownerId}; the draw dispatches once it lands (starci kernel foundation --land) - never a second shell draft` };
 }

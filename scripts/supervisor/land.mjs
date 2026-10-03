@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// land.mjs — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
+// starci supervisor land — the ONE land gate of the live runtime (modules/supervisor/supervise.yaml landGate, docs/supervisor.md).
 // Serialized by a host lock; a change reaches live main only through all of it, or not at all.
 //
-//   node scripts/supervisor/land.mjs --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --status [--json]
+//   starci supervisor land --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
+//   starci supervisor land --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
+//   starci supervisor land --status [--json]
 //
 // 1. The land queue in machine.sqlite (engine/db/machine.mjs land_queue): each waiter files a ticket and only the
 //    oldest live ticket enters the gate; a ticket whose process died is cancelled (waits up to --wait-ms, default
@@ -20,11 +20,11 @@
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
 //      sync-runtime regenerates the git-ignored runtime copies a scratch worktree lacks, then check-module-yaml,
-//        check-contract-cites, check-api-surface, check-worktree-add (red only when red on the
+//        check-contract-cites, check-cli-parity, check-db-openers, check-worktree-add (red only when red on the
 //        candidate and not the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the clean-install proof of every published package the change touches (packageProofCheck: package-clean-test.mjs --base <base>; red or not run refuses, no baseline);
-//      the FULL `starci check` of the candidate (land-full-check.mjs: npm run check, not only the gate), a step of its own; red refuses, no baseline;
+//      the FULL `starci runtime check` of the candidate (land-full-check.mjs: packages/cli/bin/starci.mjs runtime check, not only the gate), a step of its own; red refuses, no baseline;
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -40,7 +40,7 @@
 //        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
 //        gates as main and as the candidate have them over the latest accepted leg of every live workflow
 //        (scripts/supervisor/gate-stability.mjs, read-only) and reports how many would flip - so the Supervisor
-//        decides when to api contract-release it.
+//        decides when to starci kernel contract-release it.
 // 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
 //    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
 //    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
@@ -51,7 +51,7 @@
 // 5. Push main (secret scan of origin/main..main first, hooks on) unless --no-push or config
 //    supervisor.landGate.push is false. A push the remote refuses leaves the land in place and is reported.
 // A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
-// (workers.mjs stage --self) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
+// (`starci supervisor workers stage --self`) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
@@ -88,7 +88,7 @@ import { fastForwardLive } from '../machine/live-fast-forward.mjs';
 import { withoutGitLocalEnv } from '../lib/git.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { tailLines } from '../lib/clip.mjs'; import { landUnderHostLock } from './land-lock.mjs'; import { selfUpgradeBranchContaining, selfUpgradeIdOf, selfUpgradeNote, withSelfUpgradeRef, writeSelfUpgradeRef } from './self-upgrade-ref.mjs';
 const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
-export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-worktree-add.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-worktree-add.mjs']);
 const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
@@ -424,7 +424,7 @@ export function specBaselineVerdict({ candidate, base, changed = [] }) {
 
 /** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
 export const MIRROR_CHECK = 'scripts/hfs/sync-runtime.mjs';
-export const MIRROR_FIX = 'the runtime copies are generated and git-ignored: fix what sync-runtime.mjs mirrors until its run is clean';
+export const MIRROR_FIX = 'the runtime copies are generated and git-ignored: fix what sync-runtime.mjs mirrors (starci release sync-runtime regenerates them) until its run is clean';
 
 /** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
 export function mirrorRun(dir) {
@@ -543,7 +543,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
       if (!baseTree || baseHead !== base || !fs.existsSync(runner)) { checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, skipped: !baseTree ? 'no base tree' : baseHead !== base ? `base tree is at ${baseHead}, not ${base}` : 'no gate-stability.mjs in the candidate' }); continue; }
       const report = (gateStability ?? ((opts) => spawnGateStability(opts)))({ runner, base: baseTree, head: dir, family });
       checks.push({ name: `gate-stability ${family}`, ok: true, advisory: true, why, ...(report.error ? { error: report.error } : { legs: report.legs, flips: report.flips, newlyFailing: report.newlyFailing,
-        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (api contract-release --family ${family})`,
+        output: `${report.flips} of ${report.legs} accepted ${family} leg(s) of live workflows would newly fail; ${report.newlyFailing} get new findings - the Supervisor decides the release (starci kernel contract-release --family ${family})`,
         perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
     }
   } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }
@@ -819,7 +819,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
     try {
       m.openSupDecision({ keyParts: { kind: 'push-owed', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', head: String(result.landed).slice(0, 12) }, kind: 'push-refused',
         summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate', dueAt: Date.now() + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
-        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'node scripts/supervisor/push-mains.mjs --repo <runtime root> --json', recommended: true }] });
+        evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'starci supervisor push-mains --repo <runtime root> --json', recommended: true }] });
     } catch { /* the land_runs row and its push row are the record */ }
   }
   return runId;
@@ -940,7 +940,7 @@ if (isMain(import.meta.url)) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: starci supervisor land --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });

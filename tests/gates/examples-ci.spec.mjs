@@ -123,7 +123,7 @@ test('integration and e2e run on workflow_dispatch only; the automatic steps hol
 /** The hfs.json of a fixture example: one api app and one Next app. */
 const declarationOf = (app) => JSON.stringify({ hfs: 2, kind: 'app', project: app, sides: { be: { apps: [{ name: 'core', kind: 'api' }, { name: 'cli', kind: 'cli' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } } });
 
-/** A fixture runtime: the jest preset, the hfs sync it renders through, and examples/ with the given apps. */
+/** A fixture runtime: the jest preset, the starci app sync it renders through, and examples/ with the given apps. */
 function fixture(t, apps) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-examples-ci-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

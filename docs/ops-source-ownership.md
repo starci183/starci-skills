@@ -16,7 +16,7 @@ per file and no derived view to keep in step by hand.
 
 | Path | Role | Regenerate with |
 | --- | --- | --- |
-| `modules/ops/registry.yaml` | The op index routing reads: id list, kinds and route keys projected from the manifests | `node scripts/route/build-ops-registry.mjs` (`--check` to verify it is current) |
+| `modules/ops/registry.yaml` | The op index routing reads: id list, kinds and route keys projected from the manifests | `starci runtime gen-ops` (`--check` to verify it is current) |
 
 `npm run check` runs that `--check`, so a manifest edit that is not reflected in
 the registry is a red check, not a silent drift. See [writing an op

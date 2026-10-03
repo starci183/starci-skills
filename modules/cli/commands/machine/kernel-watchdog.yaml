@@ -1,0 +1,22 @@
+group: machine
+verb: kernel-watchdog
+owner: runtime
+summary: inspect or repair one running workflow Kernel seat
+impl: {script: scripts/kernel/kernel-watchdog.mjs}
+flags:
+  - {name: repo, type: string, required: true, summary: repository holding the workflow ledger}
+  - {name: workflow, type: string, summary: workflow id whose Kernel seat to check (or --goal)}
+  - {name: goal, type: string, summary: goal id used to find the workflow when --workflow is absent}
+  - {name: once, type: boolean, required: true, summary: run a single check pass (the only supported mode)}
+  - {name: repair, type: boolean, summary: restart the Kernel seat when the check finds it dead}
+  - {name: interval-ms, type: number, summary: accepted but unused since a single pass never loops}
+exit: {"0": seat healthy or repaired, "1": seat check failed, "2": bad usage}
+json: flag
+examples:
+  - starci machine kernel-watchdog --repo <path> --workflow <id> --once
+  - starci machine kernel-watchdog --repo <path> --workflow <id> --once --repair
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/kernel/kernel-watchdog.mjs
+  - node .claude/scripts/kernel/kernel-watchdog.mjs

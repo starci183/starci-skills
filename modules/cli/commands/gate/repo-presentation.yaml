@@ -1,0 +1,21 @@
+group: gate
+verb: repo-presentation
+owner: runtime
+summary: check repository presentation rules for a product or runtime tree
+impl: {script: scripts/gates/repo-presentation.mjs}
+flags:
+  - {name: root, type: string, summary: repository to check}
+  - {name: runtime, type: boolean, summary: apply the runtime presentation profile}
+exit:
+  "0": presentation is clean
+  "1": presentation findings remain
+  "2": bad usage
+json: flag
+examples:
+  - starci gate repo-presentation --root <repo>
+  - starci gate repo-presentation --root <repo> --runtime --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/repo-presentation.mjs
+  - node .claude/scripts/gates/repo-presentation.mjs

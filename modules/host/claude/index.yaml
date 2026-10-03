@@ -9,7 +9,7 @@ agentCard: ../../models/agents/claude.yaml
 executionHost: false
 executionAuthority: >-
   Operation and kernel agents are Orca-hosted. The host contract is modules/host/orca/, the spawn
-  facts are modules/models/agents/claude.yaml, and `node scripts/kernel/cli.mjs dispatch --spawn` is
+  facts are modules/models/agents/claude.yaml, and `starci kernel dispatch --spawn` is
   the only path that creates one.
 concurrency: modules/models/runtimes.yaml runtimes.claude-agent.maxParallel
 validatedBy: scripts/checks/check-providers.mjs

@@ -1,0 +1,21 @@
+group: supervisor
+verb: poll
+owner: runtime
+summary: stream or print a read-only Supervisor digest of workflow progress and blockers
+impl:
+  script: scripts/supervisor/poll.mjs
+flags:
+  - {name: repo, type: string, summary: product ledger owner path}
+  - {name: workflow, type: list, summary: workflow id to include}
+  - {name: interval-ms, type: number, summary: milliseconds between digest cycles}
+  - {name: stall-minutes, type: number, summary: age threshold for stalled work}
+  - {name: once, type: boolean, summary: print one digest and exit}
+exit: {"0": polling ended cleanly, "1": ledger or host inspection failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor poll --repo <path> --once
+  - starci supervisor poll --repo <path> --workflow <id> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/poll.mjs

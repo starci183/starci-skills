@@ -1,0 +1,4 @@
+group: test
+summary: run the bounded L1-L4 test ladder without accidental whole-suite work
+owner: runtime
+since: 1.0.0-alpha.4

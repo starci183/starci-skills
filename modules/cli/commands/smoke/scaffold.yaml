@@ -1,0 +1,27 @@
+group: smoke
+verb: scaffold
+owner: runtime
+summary: scaffold and prove one full or lite app in an isolated scratch directory
+impl: {module: scripts/machine/smoke-scaffold.mjs, export: smokeScaffold}
+effect: host
+roles: [lead, coordinator, release, owner]
+conventions:
+  - the scratch root is a starci-smoke-* directory under the OS temp directory or --into
+  - scaffold, install, lint, typecheck, build and app check run sequentially under the host lock
+  - scratch output is link-safely removed unless --keep is given
+  - the smoke never starts Docker or Supabase and never opens port 3100
+flags:
+  - {name: into, type: string, summary: parent directory for the isolated starci-smoke-* scratch root}
+  - {name: keep, type: boolean, summary: retain the scratch root after the proof}
+positional: []
+exit:
+  "0": every scaffold proof step passed
+  "1": a proof, host lock or cleanup step failed
+  "2": edition or usage was refused
+json: starci/smoke-scaffold@1
+examples:
+  - starci smoke scaffold --edition full
+  - starci smoke scaffold --edition lite --into <dir> --keep --json
+editions: [full, lite]
+since: 1.0.0-alpha.4
+removed: [bash smoke-scaffold.sh]

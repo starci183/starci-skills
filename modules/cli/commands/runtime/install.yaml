@@ -1,0 +1,32 @@
+group: runtime
+verb: install
+owner: runtime
+summary: install the StarCi runtime — fetch the pinned package, then init or update <cwd>/.claude
+impl:
+  script: scripts/install/install.mjs
+  args:
+    - init
+flags:
+  - name: force
+    type: boolean
+    summary: replace a .claude the installer did not write / take package versions over local edits
+  - name: hosts
+    type: string
+    summary: comma list of extra bootstrap files — claude,devin or all (AGENTS.md is always written)
+  - name: no-bootstrap
+    type: boolean
+    summary: leave the host AGENTS.md/.gitignore untouched
+exit:
+  "0": installed or updated
+  "1": refusal or error
+  "2": bad usage
+json: none
+examples:
+  - starci runtime install
+  - starci runtime install --cwd <repo> --hosts claude,devin
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci init
+  - npx starci init

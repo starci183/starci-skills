@@ -125,7 +125,7 @@ writes:
     artifacts: [manifest.yaml, result.md, screens/**/*.png, videos/**]
     content:
       en: "The run is agent data (ARCHITECTURE-DB §5.1): write it under STARCI_JOB_SCRATCH, never under .starciwork,
-        and file it with `api report --attach <scratch>/runs/<runId>` - every file becomes an artifact of this attempt
+        and file it with `starci kernel report --job <job> --report <report.json> --attach <scratch>/runs/<runId>` - every file becomes an artifact of this attempt
         (role uat-run, run_id <runId>). The flow's sibling evidence.yaml cites the run it settled on as
         run {id: <runId>, result: {artifact?, sha256}, screens: [{artifact?, sha256, label}], videos: [{artifact?, sha256}]}.
         Keep request flow order, original assertion IDs, actual locators/actions and business results,
@@ -146,12 +146,12 @@ steps:
       - environment
     writes: [evidence]
     action:
-      en: "Environment pre-step, before any setup or walk. api dispatch already ran node
+      en: "Environment pre-step, before any setup or walk. starci kernel dispatch already ran node
         scripts/uat/env-health.mjs check --restart on the environments this flow's records reference and
         put the result in the packet (context.environment). Re-run it yourself - node
         scripts/uat/env-health.mjs check --repo <ledger repo> --paths <owned paths as JSON> --json - and
         record it in report.checks as name env-health with its exit code (0 ready, 3 not ready). A service
-        that is down is started ONLY through node scripts/uat/env-health.mjs serve --repo <ledger repo>
+        that is down is started ONLY through starci gate env-health serve --repo <ledger repo>
         --env <id> --service <name> --cwd <checkout> --url <probe> -- <start command>, which registers it so
         the next pre-step restarts it itself; never kill a process env-health reports as port-conflict. A
         probe-drift row means the declared probe path is stale while the service is up: walk, and name the
@@ -307,7 +307,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: sequence

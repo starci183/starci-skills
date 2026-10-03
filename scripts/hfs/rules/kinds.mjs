@@ -51,7 +51,7 @@ export function kindFindings({ files, repo }) {
     if (!kindFolders.has(first)) continue;
     if (first === CLI) { roots.add(CLI); continue; }
     if (rest.length === 2) {
-      findings.push(found(KIND_EMPTY, file, `${file} sits directly in the kind folder ${FEATURES}${first}/, which holds only instance folders (${first}/<name>/); an empty kind folder is never kept: run \`hfs add\` to create the first member.`, { kind: first }));
+      findings.push(found(KIND_EMPTY, file, `${file} sits directly in the kind folder ${FEATURES}${first}/, which holds only instance folders (${first}/<name>/); an empty kind folder is never kept: run \`starci app add\` to create the first member.`, { kind: first }));
       continue;
     }
     if (!instances.has(first)) instances.set(first, new Set());
@@ -60,26 +60,25 @@ export function kindFindings({ files, repo }) {
     sources.set(key, (sources.get(key) ?? 0) + (/\.[cm]?tsx?$/.test(file) ? 1 : 0));
   }
   for (const [key, count] of sources) {
-    if (count === 0) findings.push(found(KIND_EMPTY, `${FEATURES}${key}/`, `${FEATURES}${key}/ holds no TypeScript source: a kind member without code is an empty folder; add its files with \`hfs add\` or remove the folder.`, { kind: key.split('/')[0] }));
+    if (count === 0) findings.push(found(KIND_EMPTY, `${FEATURES}${key}/`, `${FEATURES}${key}/ holds no TypeScript source: a kind member without code is an empty folder; add its files with \`starci app add\` or remove the folder.`, { kind: key.split('/')[0] }));
   }
   const present = new Set([...instances.keys(), ...roots]);
   const declared = new Set(be.kinds ?? []);
   const patterns = new Set(be.patterns ?? []);
   for (const kind of [...present].sort()) {
-    if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${FEATURES}${kind}/ uses; declare every kind in use (\`hfs add\` registers it).`, { kind }));
+    if (!declared.has(kind)) findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds does not declare the kind \`${kind}\`, which ${FEATURES}${kind}/ uses; declare every kind in use (\`starci app add\` registers it).`, { kind }));
   }
   for (const kind of [...declared].sort()) {
     if (!present.has(kind)) {
-      findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds declares \`${kind}\` but no feature of that kind exists; a kind is declared only when it is used, so remove it or add its first member with \`hfs add\`.`, { kind }));
+      findings.push(found(KIND_DECLARATION, 'hfs.json', `hfs.json sides.be.kinds declares \`${kind}\` but no feature of that kind exists; a kind is declared only when it is used, so remove it or add its first member with \`starci app add\`.`, { kind }));
       continue;
     }
     for (const pattern of kindPatterns[kind] ?? []) {
       if (!patterns.has(pattern)) findings.push(found(KIND_DECLARATION, 'hfs.json', `the kind \`${kind}\` needs the pattern \`${pattern}\`, which hfs.json sides.be.patterns does not declare.`, { kind, pattern }));
       for (const capability of platform.get(pattern) ?? []) {
-        if (!tracked.has(`be/src/modules/platform/${capability}/index.ts`)) findings.push(found(KIND_DECLARATION, `be/src/modules/platform/${capability}/`, `the kind \`${kind}\` needs the platform capability \`${capability}\` (pattern ${pattern}), which is not tracked at be/src/modules/platform/${capability}/; \`hfs add\` generates it with the first member of the kind.`, { kind, pattern, capability }));
+        if (!tracked.has(`be/src/modules/platform/${capability}/index.ts`)) findings.push(found(KIND_DECLARATION, `be/src/modules/platform/${capability}/`, `the kind \`${kind}\` needs the platform capability \`${capability}\` (pattern ${pattern}), which is not tracked at be/src/modules/platform/${capability}/; \`starci app add\` generates it with the first member of the kind.`, { kind, pattern, capability }));
       }
     }
   }
   return findings;
 }
-

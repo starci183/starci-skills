@@ -52,7 +52,7 @@ test('taskSpecOf: a packet over the argv budget is written verbatim to the job d
   assert.equal(taskSpecOf({prompt:big,file:null,op:'x',jobId:'j'}).tooLong,true,'no file to write keeps the prompt inline');
 });
 
-// The live shape, through api status: a business.decide whose deferred settle waits until-job on the
+// The live shape, through starci kernel status: a business.decide whose deferred settle waits until-job on the
 // draw retry, and the draw retry enqueued --after the
 // failed attempt it retries.
 test('status: the draw a deferred settle waits on reads ready, not dependency on its own waiter',t=>{

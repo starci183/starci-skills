@@ -1,0 +1,50 @@
+group: kernel
+verb: inbox
+owner: runtime
+summary: "list the workflow's pending inbox items, or acknowledge one with a disposition"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - inbox
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: ack
+    type: string
+    summary: key of the inbox item to acknowledge
+  - name: disposition
+    type: string
+    summary: "what was done about it; required with --ack"
+exit:
+  "0": listed or acknowledged
+  "1": refused or failed (unknown key)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel inbox --repo <path> --workflow <workflow>
+  - starci kernel inbox --repo <path> --workflow <workflow> --ack <key> --disposition <text>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api inbox
+  - node scripts/kernel/cli.mjs inbox
+reads: peer-message inbox rows addressed to --workflow, and the latest 20 it sent
+writes: without --ack nothing. --ack sets that pending row status applied, disposition_json
+  {disposition, by, at} and applied_at, and appends 'peer-message-acked' {key, from, kind,
+  disposition} on --workflow; the sender reads the disposition back in its own `starci kernel inbox` sent list
+returns: "{ok:true, workflowId, pending:[{key, from, fromTitle, kind, subject, body, replyTo,
+  refs[], at}], sent:[{key, to, kind, subject, replyTo, at, status, disposition, appliedAt}] newest
+  first}  | --ack: {ok:true, workflowId, acked:{key, from, kind, subject, disposition}, pending:<n
+  left>}"
+refuses:
+  - workflow-unknown
+  - peer-message-unknown: --ack names no peer message in this workflow's inbox
+  - peer-message-not-pending: already acked (the existing disposition is quoted) or closed by finish
+  - disposition-missing: --disposition is blank (absent is a usage error, exit 2)
+usedBy: drive — every wake reads it before planning; each message is acted on and acked with what was done

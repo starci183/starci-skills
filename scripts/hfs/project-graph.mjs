@@ -4,7 +4,7 @@
 // Both @starci/eslint-canon-be and @starci/eslint-canon-fe ship a byte copy of this file (and of the machine it imports) in their
 // runtime/ bundle (scripts/hfs/sync-runtime.mjs). There is no second graph: `projectGraph` runs `checkArchitecture`
 // (scripts/hfs/architecture/index.mjs) with `surface: 'lint'`, which judges exactly the checks whose findings attach to a
-// TypeScript file, and indexes the findings by repository-relative path. `hfs check` runs the other surface ('check') and never
+// TypeScript file, and indexes the findings by repository-relative path. `starci app check` runs the other surface ('check') and never
 // the lint one, so no rule has two enforcers.
 //
 // The per-path judgements of the slot manifest (hfs-path-findings.mjs: slot ownership, source file name, spec placement) over the

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// debug-pass.mjs — the state behind `/claude-debug` (skills/claude-debug): one loop per host, one pass per tick, one lane per alert.
+// starci debug pass — debug-loop state: one loop per host, one pass per tick, one lane per alert.
 //
-//   node scripts/reconciler/debug-pass.mjs setup                     record the chat's /loop unless a live one exists
-//   node scripts/reconciler/debug-pass.mjs pass [--snapshot <file>]  one pass: core-watch snapshot -> alerts to dispatch
+//   starci debug pass setup                     record the chat's /loop unless a live one exists
+//   starci debug pass pass [--snapshot <file>]  one pass: core-watch snapshot -> alerts to dispatch
 //     [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]   passed to the core-watch snapshot
-//   node scripts/reconciler/debug-pass.mjs claim --key <alert> --lane <lane>     a lane now fixes that alert
-//   node scripts/reconciler/debug-pass.mjs note --key <alert> --reason <text>    diagnosed, no core fix owed while it lasts
-//   node scripts/reconciler/debug-pass.mjs release --key <alert>                 forget a fix (lane died, fix did not help)
-//   node scripts/reconciler/debug-pass.mjs stop                                  forget the loop (after the chat ends its /loop)
-//   node scripts/reconciler/debug-pass.mjs status
+//   starci debug pass claim --key <alert> --lane <lane>     a lane now fixes that alert
+//   starci debug pass note --key <alert> --reason <text>    diagnosed, no core fix owed while it lasts
+//   starci debug pass release --key <alert>                 forget a fix (lane died, fix did not help)
+//   starci debug pass stop                                  forget the loop (after the chat ends its /loop)
+//   starci debug pass status
 // Every verb prints one JSON object. The loop interval is config.yaml claudeDebug.interval (engine/config.mjs
 // claudeDebugSettings); code carries no default.
 //
@@ -139,7 +139,7 @@ async function main(argv = process.argv.slice(2)) {
     out = settleFix(state, key, { now, lane, reason: flag(argv, '--reason') ?? 'no core fix owed', release: verb === 'release' });
   } else if (verb === 'stop') { out = { stopped: state.loop?.id ?? null }; state.loop = null; }
   else if (verb === 'status') out = { loop: state.loop, live: loopLive(state.loop, now), fixes: state.fixes };
-  else { console.log('usage: debug-pass.mjs setup | pass [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop | status'); process.exitCode = verb ? 2 : 0; return; }
+  else { console.log('usage: starci debug pass setup | pass [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop | status'); process.exitCode = verb ? 2 : 0; return; }
   if (verb !== 'status') saveState(file, state);
   console.log(JSON.stringify(out));
 }

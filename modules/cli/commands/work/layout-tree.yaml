@@ -1,0 +1,36 @@
+group: work
+verb: layout-tree
+owner: runtime
+summary: scan, capture, plan, lock, or inspect a product layout tree
+impl: {script: scripts/work/layout-tree.mjs}
+positional:
+  - {name: command, enum: [scan, capture, plan, destinations, lockup, slot], required: true, variadic: false}
+  - {name: image, required: false, variadic: false}
+flags:
+  - {name: work, type: string, summary: the .starciwork root that holds the shell record}
+  - {name: app-dir, type: list, summary: "frontend app directory to scan; repeatable"}
+  - {name: write, type: boolean, summary: "write the record; without it the command only reports"}
+  - {name: app, type: string, summary: app name when the shell has several apps}
+  - {name: repo-root, type: string, summary: repository root the app directories resolve in}
+  - {name: node, type: list, summary: "layout node id to capture or plan; repeatable for plan"}
+  - {name: breakpoint, type: string, summary: breakpoint of the capture}
+  - {name: theme, type: string, summary: theme of the capture}
+  - {name: file, type: string, summary: capture image file}
+  - {name: url, type: string, summary: URL the capture was taken from}
+  - {name: provenance, type: string, summary: how the capture was made}
+  - {name: destination, type: string, summary: destination key the capture shows}
+  - {name: route, type: list, summary: "route to resolve the shell captures for; repeatable"}
+  - {name: locale, type: string, summary: locale of the capture}
+  - {name: from, type: string, summary: capture or layout composite to crop the lockup from}
+  - {name: rect, type: string, summary: "crop rectangle as x,y,w,h"}
+  - {name: active-nav, type: string, summary: active navigation item for a route lookup}
+  - {name: design, type: string, summary: design record the planned node follows}
+  - {name: files, type: string, summary: comma list of files a planned node owns}
+  - {name: key, type: string, summary: slot key colour as hex, default: ff00ff}
+  - {name: tolerance, type: number, summary: colour tolerance when finding the slot, default: 8}
+exit: {"0": success, "1": "a refused record, missing layout tree, or slot not found", "2": bad usage}
+json: flag
+examples: ['starci work layout-tree scan --work .starciwork --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/layout-tree.mjs']

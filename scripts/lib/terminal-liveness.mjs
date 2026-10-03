@@ -129,7 +129,7 @@ export function echoesSentText(row, sentText) {
  *  - with no later glyph row, the frame tail is two or more rows of `sentText` (a TUI that shows the paste
  *    itself in its input box, glyph row empty or scrolled away).
  * A Devin command-terminal worker sat 13 minutes with its whole inline contract in the input box; the
- * contract text says "Running", "Working", "esc to interrupt", so the frame read `active` and `api nudge`
+ * contract text says "Running", "Working", "esc to interrupt", so the frame read `active` and `starci kernel nudge`
  * skipped it as worker-active (inc-06aeecf432f1). Knowing the sent text is what tells a paste from a turn.
  */
 export function stagedInputRegion(screen, { stagedPattern = DEFAULT_STAGED_PATTERN, sentText = null } = {}) {

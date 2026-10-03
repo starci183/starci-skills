@@ -4,7 +4,7 @@
 //   - every file declares the schema, an area named by its file, a `runtime` or `ui` scope, and a non-empty messages list;
 //   - `en` is an English string (no Vietnamese letter), `vi` a non-empty string, both carrying exactly the same `{placeholder}`s;
 //   - an English source appears once within a scope (RT_I18N_DUPLICATE); the runtime and UI may intentionally word it differently.
-//   node scripts/checks/check-i18n-catalog.mjs [--json]
+//   starci runtime check --only i18n-catalog -- [--json]
 // Exit 0 clean, 1 findings.
 import fs from 'node:fs';
 import path from 'node:path';

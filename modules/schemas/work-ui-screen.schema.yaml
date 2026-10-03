@@ -105,7 +105,7 @@ properties:
       `{ref: shell, rev, layouts}` naming the layout tree (work/layout-tree@1), or `{chromeless: true, because}` for a
       route the product draws without its persistent chrome. `ui.shell` below is the direction's prose about
       that chrome; this is the edge. It is optional on the schema so ui records drawn before the shell
-      record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
+      record existed stay valid - `starci runtime validate` lists each of them as SHELL_BINDING_MISSING for a
       redraw - and interface.draw's shell-conformance proof is what requires it on every record the op
       writes from now on (scripts/work/ui/shell-conformance.mjs)."
   app:
@@ -121,7 +121,7 @@ properties:
       dynamic segments kept: /[locale]/(console)/agentos/[id]/accounting. It places the screen under its
       layouts (drawn inside their real captures) and is where interface.implement creates its files. Optional on
       the schema so records drawn before the layout tree stay valid; interface.draw's shell-conformance proof
-      requires it, and `starci validate` lists a record without it as UI_ROUTE_MISSING."
+      requires it, and `starci runtime validate` lists a record without it as UI_ROUTE_MISSING."
   routeParent:
     $ref: "#/$defs/layoutNodeId"
     description: For a route the layout tree does not hold yet (a page, layout or intercept this feature adds),
@@ -1042,7 +1042,7 @@ $defs:
         artifact:
           type: integer
           minimum: 1
-          description: The job_artifacts id api report returned for the blob (optional; the sha256 is the citation).
+          description: The job_artifacts id starci kernel report returned for the blob (optional; the sha256 is the citation).
         name:
           $ref: "urn:work:common:1#/$defs/prose"
           description: The artifact name of a blob citation - agent output (a draw round, a capture, a lockup) lives in

@@ -1,0 +1,17 @@
+group: work
+verb: draw-gates
+owner: runtime
+summary: run machine and owner gates for a drawn UI record
+impl: {script: scripts/work/draw-gates.mjs}
+flags:
+  - {name: ui, type: string, required: true, summary: ui record directory of the drawing}
+  - {name: repo, type: string, required: true, summary: product repository root}
+  - {name: files, type: string, summary: comma list of bound files to judge}
+  - {name: no-remeasure, type: boolean, summary: trust the stored measurements instead of rendering again}
+  - {name: checks-out, type: string, summary: file to write the gate checks to as JSON}
+exit: {"0": every gate green, "1": a gate is red, "2": bad usage}
+json: flag
+examples: ['starci work draw-gates --ui <record> --repo <repo> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/draw-gates.mjs']

@@ -17,7 +17,7 @@ import { parseExampleArgs } from '../lib/cli-arg.mjs';
  * evidence.yaml stays exactly as it was, whether the replay matches or not.
  *
  * Usage:
- *   node scripts/example/example-verify.mjs --work <path-to-.starciwork> --record <record-id> --cwd <repo-dir>
+ *   starci work example-verify --work <path-to-.starciwork> --record <record-id> --cwd <repo-dir>
  *
  * Exit 0 when every assertion's replayed outcome matches the outcome the evidence already claims. Exit 1
  * (PROOF_STALE) the moment any assertion's replayed outcome differs, or lacks a `command` to replay at all

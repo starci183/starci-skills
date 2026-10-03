@@ -1,15 +1,15 @@
 // report-salvage.mjs — a dead worker's report that was written but never filed is filed on its behalf.
 //
-// A worker's last two steps are "write report.json" and "api report --report <it>". A worker that dies
+// A worker's last two steps are "write report.json" and "starci kernel report --report <it>". A worker that dies
 // between them (a host terminal disconnect, a context limit, a killed agent) leaves a complete verdict
-// on disk while api reconcile --dead-worker sees no reports row, settles the attempt failed-no-report,
+// on disk while starci kernel reconcile --dead-worker sees no reports row, settles the attempt failed-no-report,
 // spends a business attempt and re-runs the whole op (once, 5 such deaths across two product
 // ledgers in one 10-minute host disconnect). Before a dead worker is fenced or settled failed,
 // unfiledReportCandidates lists the op-report@1 files in its STARCI_JOB_SCRATCH (alpha.3: a report is written
 // only there - op_attempts.scratch_dir, else op-prompt.mjs jobScratchDirOf) written since its dispatch (newest
-// first, stamped for this job or not stamped at all), and the caller files the first one that api report accepts -
-// through `api report` itself, so every report guard (the scratch boundary, validation, draw review, ask guards)
-// still applies. Nothing is salvaged that api report would refuse; a report file anywhere else never is.
+// first, stamped for this job or not stamped at all), and the caller files the first one that starci kernel report accepts -
+// through `starci kernel report` itself, so every report guard (the scratch boundary, validation, draw review, ask guards)
+// still applies. Nothing is salvaged that starci kernel report would refuse; a report file anywhere else never is.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
@@ -63,7 +63,7 @@ export function unfiledReportCandidates({ scratch = null, sinceMs = 0, jobId = n
 
 /**
  * salvageUnfiledReport({candidates, fileReport}) -> {salvaged:{file, outcome}, tried[]} | {salvaged:null, tried[]}
- * `fileReport(file)` runs api report for the job and returns {ok, error?}; the first accepted candidate wins.
+ * `fileReport(file)` runs starci kernel report for the job and returns {ok, error?}; the first accepted candidate wins.
  */
 export function salvageUnfiledReport({ candidates = [], fileReport }) {
   const tried = [];

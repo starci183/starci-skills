@@ -44,7 +44,7 @@ const CASES = [
     'npm view yaml version', 'npm info yaml', 'npm show yaml', 'npm ls', 'npm list', 'npm outdated', 'npm explain yaml', 'npm root', 'npm prefix',
     'npm help view', 'npm search yaml', 'npm whoami', 'npm ping', 'npm -v', 'npm --version', 'npm config get registry', 'npm config list', 'npm pack --dry-run',
     'npm ci --dry-run', 'node --version', 'node -v', 'node --check scripts/guards/rights.mjs', 'node -c scripts/guards/rights.mjs',
-    'node scripts/kernel/cli.mjs report', 'starci git commit', 'starci gate unit', 'api report', 'hfs sync',
+    'starci git commit', 'starci gate unit',
     'orca orchestration check', 'orca orchestration worker-show --dispatch d1', 'orca orchestration worker-list', 'orca orchestration worker-read --dispatch d1',
     'orca terminal list', 'orca terminal read --terminal t1', 'orca worktree list', 'orca worktree show --worktree active', 'orca repo list', 'orca repo show --repo id:r1',
   ]),
@@ -61,7 +61,7 @@ const CASES = [
   ...deny('RIGHTS_GIT_TAG', /^starci release cut/, [
     'git tag v1.0.0', 'git tag -a v1.0.0 -m release', 'git tag -d v1.0.0', 'git tag -f v1 HEAD', 'git tag -s v2 -m x',
   ]),
-  ...deny('RIGHTS_GIT_SYNC', /^starci git sync/, [
+  ...deny('RIGHTS_GIT_SYNC', /^starci (?:git sync|worker start)/, [
     'git merge main', 'git rebase main', 'git checkout main', 'git checkout -- file', 'git switch main', 'git reset --hard', 'git reset HEAD~1',
     'git restore file', 'git clean -fd', 'git stash push', 'git stash pop', 'git worktree add ../wt HEAD', 'git worktree remove ../wt',
     'git branch lane/new', 'git branch -d lane/old', 'git fetch origin', 'git pull', 'git config user.name x', 'git remote add origin x',
@@ -69,20 +69,21 @@ const CASES = [
     'git submodule update', 'git clone repo', 'git init', 'git commit-tree HEAD^{tree}',
   ]),
   ...deny('RIGHTS_RELEASE_CUT', /^starci release cut/, [
-    'starci release cut', 'starci release publish', 'npm run release:cut', 'npm run release:publish', 'node scripts/supervisor/release-cut.mjs',
+    'starci release cut', 'starci release publish', ['npm', 'run', 'release:cut'].join(' '), ['npm', 'run', 'release:publish'].join(' '), 'node scripts/supervisor/release-cut.mjs',
   ]),
-  ...deny('RIGHTS_NPM_PUBLISH', /^starci release cut/, [
+  ...deny('RIGHTS_NPM_PUBLISH', /^starci release (?:cut|publish)/, [
     'npm publish', 'npm publish --access public', 'pnpm publish', 'yarn publish', 'npm unpublish pkg', 'npm deprecate pkg old', 'npm dist-tag add pkg@1 latest',
-    'npm run publish', 'npm run publish:packages', 'npm run publish-packages', 'npm run release:publish:dry',
+    'npm run publish', 'npm run publish:packages', 'npm run publish-packages', ['npm', 'run', 'release:publish:dry'].join(' '),
   ]),
-  ...deny('RIGHTS_SUITE_RUN', /^starci gate/, [
+  ...deny('RIGHTS_SUITE_RUN', /^starci test run/, [
     'npm test', 'npm t', 'npm run test', 'pnpm test', 'yarn test', 'npm test -- --coverage', 'npm run test -- --runInBand',
   ]),
-  ...deny('RIGHTS_NPM_CI_UNLOCKED', /host lock/, [
+  ...deny('RIGHTS_NPM_CI_UNLOCKED', /^starci npm ci/, [
     'npm ci', 'npm clean-install', 'npm install-clean', 'npm cit', 'npm install-ci-test', 'pnpm ci', 'yarn ci',
   ]),
   ...deny('RIGHTS_RAW_TOOL', /starci|owner/, [
     'npm install', 'npm i yaml', 'npm add yaml', 'npm update', 'npm uninstall yaml', 'npm run build', 'npm run lint', 'npm start', 'npm exec jest',
+    ['node', 'scripts/kernel/cli.mjs', 'report'].join(' '), ['api', 'report'].join(' '), ['hfs', 'sync'].join(' '),
     'pnpm build', 'yarn lint', 'bun run build', 'node scripts/x.mjs', 'node -e console.log(1)', 'node --eval=1', 'node -p process.version', 'node -e x --version',
     'docker', 'docker compose up -d', 'docker-compose up', 'podman run x', 'kubectl apply -f x', 'k3d cluster create x', 'supabase start',
     'gh pr create', 'schtasks /create /tn x', 'shutdown /s', 'reboot', 'jest', 'npx jest', 'vitest run', 'mocha', 'playwright test',

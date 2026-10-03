@@ -50,8 +50,8 @@ paths:
   - modules/host/orca/index.yaml
   - modules/host/orca/calls.yaml
   - modules/kernel/dispatch.yaml
-  - modules/kernel/api-commands/dispatch.yaml
-  - modules/kernel/api-commands/incident.yaml
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/incident.yaml
   - modules/models/registry.yaml
   - modules/schemas/work-layout.yaml
   - modules/ops/_common.yaml

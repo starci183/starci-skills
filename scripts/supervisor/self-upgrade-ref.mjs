@@ -47,7 +47,7 @@ export function writeSelfUpgradeRef({ root = SKILL_ROOT, id, head, exists = null
     const ref = `${SELF_UPGRADE_PREFIX}${safeId}${serial === 1 ? '' : `-${serial}`}`;
     try { if (has(ref)) continue; } catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
     let written;
-    try { written = update(root, ref, head, { old: zeroOid, message: `starci self-upgrade ${safeId}` }); }
+    try { written = update(root, ref, head, { old: zeroOid, message: `self-upgrade ${safeId}` }); }
     catch (error) { return { ok: false, ref, error: String(error?.message ?? error) }; }
     if (written?.status === 0 || written?.ok === true) return { ok: true, ref };
     try { if (has(ref)) continue; } catch { /* report the update failure below */ }

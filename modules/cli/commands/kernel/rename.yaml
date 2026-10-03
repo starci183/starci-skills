@@ -1,0 +1,73 @@
+# The contract of `starci kernel rename` (scripts/kernel/verbs/rename.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.rename (lane slim-api).
+group: kernel
+verb: rename
+owner: runtime
+summary: set a workflow's display name and rename its live [Kernel] and [Op] terminal tabs
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - rename
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+  - name: title
+    type: string
+    required: true
+    summary: the new display name (workflow_id is unchanged)
+  - name: by
+    type: enum
+    enum:
+      - owner
+      - supervisor
+    default: owner
+    summary: who renames the workflow, recorded on the event
+  - name: no-terminals
+    type: boolean
+    summary: leave the live terminal tabs to the next boot or dispatch
+  - name: dry-run
+    type: boolean
+    summary: show the rename and the tab it would touch without writing
+exit:
+  "0": success
+  "1": refusal or error
+  "2": bad usage
+json: flag
+examples:
+  - starci kernel rename --repo <path> --workflow <workflow> --title <title>
+  - starci kernel rename --repo <path> --workflow <workflow> --title <title> --by supervisor --no-terminals --json
+  - starci kernel rename --repo <path> --workflow <workflow> --title <title> --dry-run
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api rename
+  - node scripts/kernel/cli.mjs rename
+reads: the workflows row; the Kernel signal and job (its terminal); the workflow's running/answering
+  operation jobs and their terminals
+writes: "The human name of a workflow (owner request 2026-09-27); the owner or the supervisor runs
+  it, never a Kernel and never an op. One transaction sets workflows.display_name (one line, 1..80
+  characters) and appends one workflow-renamed event {from, to, slug, by, at}; workflow_id and the
+  goal slug in workflows.title never change, so every key, job id, peer message and ledger reader is
+  unaffected. The name reads everywhere a person sees the workflow (scripts/lib/display-names.mjs):
+  the [Kernel] tab title, the [Op] worker titles `<op label> · <what> · <name>`, starci kernel status title,
+  the supervisor digest and progress report, Telegram notices and the harness UI. After the write,
+  unless --no-terminals or the workflow is finished or archived, the live tabs are renamed best
+  effort through the host terminal-rename call: the Kernel terminal to `[Kernel] <name>` and each
+  running/answering op worker to its `[Op]` name; a tab that cannot be renamed takes the name at its
+  next boot or dispatch. Renaming to the current name writes nothing and still re-applies the tab
+  titles. define-goal sets the first name (--display-name, else derived from the goal text and the
+  product, at most 48 characters, else the slug). --dry-run writes nothing and renames no tab: it
+  prints {dryRun:true, title, from, changed, kernelTerminal}"
+returns: "{ok:true, workflowId, title, from, slug, by, changed, terminals:[{terminal, title, ok,
+  role: kernel|op, jobId?, error?}]}"
+refuses:
+  - workflow-unknown
+  - "rename-bad-title: --title is empty, spans lines only, or is longer than 80 characters"
+  - "rename-bad-by: --by is neither owner nor supervisor"
+  - "op-context-refused: an op terminal never renames a workflow"
+usedBy: the owner or supervisor giving a workflow an easy-to-understand name

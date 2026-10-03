@@ -65,7 +65,7 @@ TARGET_MISSING:
   kind: input-invalid   # check-finding | settle-reason | dispatch-refusal | blocker | check-status | verb-refusal | runtime-fault | input-invalid
 ```
 
-`npm run check` runs `scripts/checks/check-failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
+`starci runtime check` runs `scripts/checks/check-failure-codes.mjs`: it scans `scripts/ engine/ modules/` for emitted codes (a quoted
 UPPER_SNAKE literal, a `[CODE]` token in a message, a kebab literal in a `code:` / `reason:` / `rejected:` / `failureKind:` /
 `signal:` position, the last argument of `refuse(...)`, `hand('...')`, constant `*_REASONS|CODES|KINDS|CLASSES` lists) and
 refuses an emitted code with no entry, an entry no code emits, a malformed entry, an owner outside the set, an
@@ -99,7 +99,7 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
    metric, command, baseline}`), `kernel-decision-result` (same entity_id, payload `{result: keep|revert, observed}`) and
    `kernel-proposal` (entity_type `kernel-proposal`, payload `{id, title, evidence, files, tier, status}`). Reader:
    `kernelNotesOf(ledgerDbOrHandle, workflowId, {limit})` returns `[{kind:'decision'|'proposal', id, at, status, headline, ...}]`,
-   oldest first (decision status `open|kept|reverted`). `api status` returns it as `kernelNotes[]`.
+   oldest first (decision status `open|kept|reverted`). `starci kernel status` returns it as `kernelNotes[]`.
 5. **Does `dispatch-rejected` count against `work_units.tries` (the Vietnamese "attempt n/5" display)? No.** `work_units.tries` counts JOBS of the
    unit (`jobs.try_no`), never attempts; a refused launch keeps its job (it goes back to `ready`) and opens no new job, so
    `tries` does not move. The `dispatches` counter is given back by lane/orphan-attempt's `endRejectedAttempt`. `why.next`
@@ -107,13 +107,13 @@ goes to the `not-codes` section of `modules/kernel/allowlist.yaml` with the reas
 
 ## Read surface
 
-- `api status`: `legs[].why` (latest attempt of each non-green leg), `legs[].attempts[]` (each with its `why`),
+- `starci kernel status`: `legs[].why` (latest attempt of each non-green leg), `legs[].attempts[]` (each with its `why`),
   `frontier.why`, `kernelNotes[]`; the text form prints `why:` lines.
 - `scripts/reconciler/core-watch.mjs`: a bad leg's alert text is `<op> <state> - <why.headline>`.
 
 ## Where the why is written
 
 `recordWhy(db, attemptId)` runs inside the ending transaction, after the attempt's end columns and settle result:
-`api settle` (fail / blocked / ask), the refused launch (`rejectDispatch`), the dead-worker settle and the reconcile
-requeue (`api reconcile`), and the archive / abandoned-dispatch cancel. A failure to explain never blocks the settle: it is
+`starci kernel settle` (fail / blocked / ask), the refused launch (`rejectDispatch`), the dead-worker settle and the reconcile
+requeue (`starci kernel reconcile`), and the archive / abandoned-dispatch cancel. A failure to explain never blocks the settle: it is
 recorded as a `why-failed` event.

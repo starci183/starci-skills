@@ -1,9 +1,9 @@
 // sonar-settle.mjs - the settle-time Sonar gate of the code-writing ops (knowledge/sonar-gate.yaml enforcedOps).
 //
 // backend.implement, interface.implement and code.refactor run scripts/gates/sonar-local.mjs on their own change and attach
-// its sonar.json. At `api settle` the runtime reads that summary itself (judgeSummary): it never takes the op's word. The
+// its sonar.json. At `starci kernel settle` the runtime reads that summary itself (judgeSummary): it never takes the op's word. The
 // judgment is recorded as the runtime check `sonar-gate` (runner settler, authority runtime) on the attempt, so:
-//   - a pass with a red judgment is refused (api settle prints the why code), and the check keeps the attempt from ever
+//   - a pass with a red judgment is refused (starci kernel settle prints the why code), and the check keeps the attempt from ever
 //     counting as green: summarizeCheckEvidence counts it failed;
 //   - the settled attempt's why (scripts/kernel/why.mjs) carries the Vietnamese text of the code
 //     (modules/kernel/failure-codes.yaml sonar-gate-red | sonar-unavailable | sonar-scan-refused | sonar-proof-missing);
@@ -90,7 +90,7 @@ export function recordSonarJudgment(ledger, { workflowId, jobId, opId = null, at
   return { checkName: SONAR_CHECK, green, status: judged.status, code: judged.code, evidence, ...(incidentId ? { incidentId } : {}) };
 }
 
-/** What `api settle` prints when it refuses a pass the Sonar gate does not allow. */
+/** What `starci kernel settle` prints when it refuses a pass the Sonar gate does not allow. */
 export function refusalText(op, judged, jobId) {
   const next = judged.status === 'unavailable'
     ? 'Sonar is unavailable: the Supervisor has been told (a runtime incident). Settle blocked or fail; never pass without the gate.'

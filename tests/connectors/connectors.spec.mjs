@@ -337,7 +337,7 @@ test('parkAsk records ask-notified with the ask fields when the owner is told, a
     assert.deepEqual(events[2][1].deleted,[old.telegram.messageId],'the superseded ask left the chat');
     assert.ok(bot.calls.some(c=>c.method==='deleteMessage'&&c.body.message_id===old.telegram.messageId));
     assert.equal(bot.calls.filter(c=>c.method==='sendMessage').length,2,'parkAsk never serves, it only tells');
-    // Telegram off: nothing is recorded, and the caller (api serve-ask) serves the form itself.
+    // Telegram off: nothing is recorded, and the caller (starci kernel serve-ask) serves the form itself.
     seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_off',question:{text:'q',options:[],refs:['decision.off']}});
     const off=await parkAsk({ledger,ledgerFile,repo:repoRoot,workflowId:'wf-park',report:report('ctx_off'),close,
       notify:a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl,config:withConnectors({secretsFile:null}),env:{LOCALAPPDATA:machineHome}}))});

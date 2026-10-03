@@ -1,0 +1,32 @@
+group: git
+verb: commit
+owner: runtime
+summary: commit staged work with the message convention and trailers
+impl: {module: scripts/machine/git-commit.mjs, export: gitCommit}
+effect: local-write
+roles: [lead, coordinator, release, owner]
+conventions:
+  - "subjects use `type(scope): summary`; types are feat, fix, refactor, test, docs, chore, land and release"
+  - keep one logical change in each commit and pass explicit paths instead of staging unrelated work
+  - hooks run the L0 checks; never bypass them and never amend a pushed or landed commit
+flags:
+  - {name: type, type: enum, enum: [feat, fix, refactor, test, docs, chore, land, release], required: true, summary: the conventional commit type}
+  - {name: scope, type: string, summary: the optional subject scope}
+  - {name: summary, type: string, required: true, summary: the lowercase subject summary without a trailing period}
+  - {name: body, type: string, summary: the optional commit body}
+  - {name: paths, type: list, summary: existing repository paths to stage before committing}
+  - {name: lane, type: string, summary: the lane or workflow id for the Lane trailer}
+  - {name: co-author, type: string, summary: the identity for the Co-Authored-By trailer}
+  - {name: dry-run, type: boolean, summary: print the message and staged files without changing the repository}
+positional: []
+exit:
+  "0": "committed or the dry run is valid"
+  "1": "nothing to commit or Git failed"
+  "2": "invalid message, path or branch policy"
+json: starci/git-commit@1
+examples:
+  - starci git commit --type fix --scope cli --summary "handle an empty index"
+  - starci git commit --type docs --summary "explain backup refs" --paths docs/git-governance.md --dry-run
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

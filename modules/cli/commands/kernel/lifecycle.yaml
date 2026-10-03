@@ -1,0 +1,74 @@
+# The contract of `starci kernel lifecycle` (scripts/kernel/verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
+group: kernel
+verb: lifecycle
+owner: runtime
+summary: "pause, stop or resume a workflow; only the owner or supervisor resumes or stops"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - lifecycle
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: pause
+    type: boolean
+    summary: pause a running workflow (owner, supervisor or kernel)
+  - name: stop
+    type: boolean
+    summary: stop the workflow (owner or supervisor)
+  - name: resume
+    type: boolean
+    summary: resume a paused or stopped workflow (owner or supervisor)
+  - name: by
+    type: enum
+    required: true
+    summary: who makes the move
+    enum:
+      - owner
+      - supervisor
+      - kernel
+  - name: reason
+    type: string
+    required: true
+    summary: why the move is made
+exit:
+  "0": moved
+  "1": refused or failed (not exactly one move, wrong phase, actor may not make it)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel lifecycle --repo <path> --workflow <workflow> --pause --by owner --reason <reason>
+  - starci kernel lifecycle --repo <path> --workflow <workflow> --resume --by owner --reason <reason>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api lifecycle
+  - node scripts/kernel/cli.mjs lifecycle
+purpose: The one verb that pauses, stops and resumes a workflow (DBTREE workflow_transitions +
+  lifecycle_changes). A paused or stopped workflow takes no new job (starci kernel enqueue refuses
+  workflow-not-accepting-work) and launches none (starci kernel dispatch refuses); an op already running
+  finishes and settles. Paused is a hold the owner, the Supervisor or the Kernel may set and the
+  owner or the Supervisor lifts; stopped is the owner's (or the Supervisor's) stop and only the
+  OWNER resumes it (stopped -> queued, then the Kernel seat starts again). No controller ever moves
+  a phase (MB-08).
+moves:
+  pause: running -> paused; by owner, supervisor or kernel
+  stop: awaiting-approval | queued | running | paused -> stopped; by owner or supervisor
+  resume: paused -> running (owner or supervisor); stopped -> queued (owner only)
+writes: one lifecycle_changes row {from_phase, to_phase, by, reason} and
+  workflows.phase/phase_reason in one transaction, plus one phase-transition event
+  (engine/db/ledger.mjs changeWorkflowPhase)
+returns: "{ok, workflowId, move, from, to, by, reason}"
+refusals:
+  lifecycle-move: not exactly one of --pause, --stop, --resume
+  lifecycle-needs-reason: --reason is missing
+  workflow-unknown: the workflow is not in this ledger
+  lifecycle-by-refused: --by may not make this move
+  lifecycle-phase-refused: the workflow's phase is not one the move leaves from
+  lifecycle-owner-only: a stopped workflow is resumed by the owner only (Q14)

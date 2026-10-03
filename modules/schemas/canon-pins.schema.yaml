@@ -29,6 +29,7 @@ properties:
       - '@starci/tsconfig'
       - '@starci/prettier-config'
       - '@starci/jest-preset'
+      - '@starci/cli'
       - typescript
       - stylelint
       - prettier

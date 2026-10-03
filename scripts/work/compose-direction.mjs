@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // compose-direction.mjs — a direction is the generated slot content placed into the REAL layout chain.
 //
-//   node scripts/work/compose-direction.mjs --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <t>
+//   starci work compose-direction --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <t>
 //        [--state <flow-state>] [--presentation page|overlay] [--host-state <flow-state>] [--fit cover|stretch]
 //        [--scrim 0.5] [--tool draw-render] [--prompt <path>] [--out <png>] [--json]
 //
@@ -132,7 +132,7 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   const workRoot = workRootOf(uiAbs);
   if (!workRoot) return { ok: false, error: `${slash(uiAbs)} is not under a .starciwork Work root` };
   const shell = readShellRecord(workRoot);
-  if (!shell || shell.error || !isLayoutTree(shell.record)) return { ok: false, error: `${slash(workRoot)}/shell/index.yaml is not a work/layout-tree@1 record (run scripts/work/layout-tree.mjs scan or convert)` };
+  if (!shell || shell.error || !isLayoutTree(shell.record)) return { ok: false, error: `${slash(workRoot)}/shell/index.yaml is not a work/layout-tree@1 record (run starci work layout-tree scan)` };
   const resolved = appOfUi(shell.record, ui);
   if (resolved.error) return { ok: false, error: `${ui.id} ${resolved.error.message} (${resolved.error.code})` };
   const tree = resolved.tree;
@@ -248,7 +248,7 @@ export function recompose(workRoot, uiFile, composite, { uiRecords = null } = {}
 export function composeDirectionMain(argv = []) {
   const need = ['--ui', '--content', '--breakpoint', '--theme'];
   if (argv.includes('--help') || need.some((n) => !flag(argv, n))) {
-    return { exitCode: argv.includes('--help') ? 0 : 2, text: 'Usage: node scripts/work/compose-direction.mjs --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <light|dark> [--state <flow-state>] [--presentation page|overlay] [--host-state <s>] [--fit cover|stretch] [--scrim 0.5] [--tool <t>] [--prompt <path>] [--out <png>] [--json]\n' };
+    return { exitCode: argv.includes('--help') ? 0 : 2, text: 'Usage: starci work compose-direction --ui <ui-record-dir> --content <png> --breakpoint <bp> --theme <light|dark> [--state <flow-state>] [--presentation page|overlay] [--host-state <s>] [--fit cover|stretch] [--scrim 0.5] [--tool <t>] [--prompt <path>] [--out <png>] [--json]\n' };
   }
   const result = composeDirection({
     uiDir: flag(argv, '--ui'), content: flag(argv, '--content'), breakpoint: flag(argv, '--breakpoint'), theme: flag(argv, '--theme'),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// scripts/agent/benchmark-snapshot.mjs — record one append-only model-pool snapshot under benchmark/snapshots/.
+// starci runtime benchmark-snapshot — record one append-only model-pool snapshot under benchmark/snapshots/.
 //
-//   node scripts/agent/benchmark-snapshot.mjs --since-hours N [--repo <repoRoot> ...] [--date YYYY-MM-DD]
+//   starci runtime benchmark-snapshot --since-hours N [--repo <repoRoot> ...] [--date YYYY-MM-DD]
 //        [--dir <snapshotsDir>] [--json]
 //
 // Runs scripts/agent/model-scorecard.mjs (scorecardFor, read-only on every ledger) over the given --repo roots,
@@ -129,7 +129,7 @@ function main(argv = process.argv.slice(2)) {
     else if (argv[i] === '--dir') dir = path.resolve(argv[++i]);
   }
   if (sinceHours == null) {
-    console.error('usage: benchmark-snapshot.mjs --since-hours N [--repo <repoRoot> ...] [--date YYYY-MM-DD] [--dir <snapshotsDir>] [--json]');
+    console.error('usage: starci runtime benchmark-snapshot --since-hours N [--repo <repoRoot> ...] [--date YYYY-MM-DD] [--dir <snapshotsDir>] [--json]');
     process.exitCode = 2; return;
   }
   try {

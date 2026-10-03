@@ -1,4 +1,4 @@
-// api unit — the work units of a workflow and their try budgets (H3, Q13; DBTREE work_units.try_budget).
+// starci kernel unit — the work units of a workflow and their try budgets (H3, Q13; DBTREE work_units.try_budget).
 //
 //   unit --workflow <wf> [--unit <id>]                                                show units: state, tries, budget
 //   unit --workflow <wf> --unit <id> --raise-budget <n> --by owner|supervisor --ref <di|incident>

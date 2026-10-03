@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP WT1: the tree is Orca's; the per-repo cap, the ownership registry and the main-checkout assertion are the runtime's.
 // worktree-create.mjs — the calls.yaml `worktree-create` call as a callable function.
-//   node scripts/api/orca/worktree-create.mjs --repo <sel> --name <n> [--base-branch <ref>] [--setup run|skip|inherit] [--comment <t>]
+// Internal entry: spawned by scripts/machine/worktree-orca.mjs; not invoked directly.
+// Args: --repo <sel> --name <n> [--base-branch <ref>] [--setup run|skip|inherit] [--comment <t>]
 // Always a top-level row (--no-parent). Orca picks the path and the branch (its name with '/' turned into '-', a -2
 // suffix when taken); the receipt's worktree is what the caller records. Returns {ok, worktree: {id, path, branch, head}, error}.
 import { orcaCall } from './lib.mjs';

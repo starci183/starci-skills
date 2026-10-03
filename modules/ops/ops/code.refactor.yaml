@@ -164,7 +164,7 @@ writes:
     path: shared
     content:
       en: shared
-      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ hfs explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
+      vi: "Bản tóm tắt ĐỌC: các tệp sẽ sửa, bản đồ slot của chúng từ starci app explain, và mọi tệp pattern và ví dụ đã đọc kèm sha256."
   - id: gate-proof
     path: shared
     content:
@@ -174,8 +174,8 @@ steps:
   - reads: [op-loop]
     writes: [read-digest]
     action:
-      en: "READ before coding (op loop, knowledge/op-gate.yaml): run node scripts/gates/read-digest.mjs --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map hfs explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
-      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà hfs explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
+      en: "READ before coding (op loop, knowledge/op-gate.yaml): run starci gate read --root <app> --touch <every file the slice will create or change> --out $STARCI_JOB_SCRATCH/read-digest.json and read exactly what it lists, nothing wider - the knowledge/patterns/{be|fe}/*.yaml of each touched file kind, the matching example files of examples/<app>/{fe,be} and the slot map starci app explain prints per path (slot, tier, allowed imports, rules). Code only after this read; a file the slice comes to touch later is added with --touch and read the same way."
+      vi: "ĐỌC trước khi viết code (vòng lặp op, knowledge/op-gate.yaml): chạy starci gate read --root <app> --touch <mọi tệp slice sẽ tạo hoặc sửa> --out $STARCI_JOB_SCRATCH/read-digest.json và đọc đúng những gì nó liệt kê, không rộng hơn - các tệp knowledge/patterns/{be|fe}/*.yaml của từng loại tệp sẽ sửa, các tệp ví dụ cùng slot trong examples/<app>/{fe,be} và bản đồ slot mà starci app explain in cho từng đường dẫn (slot, tầng, import được phép, luật). Chỉ viết code sau bước đọc này; tệp phát sinh về sau được thêm bằng --touch và đọc theo cùng cách."
   - reads:
       - target
       - business
@@ -199,17 +199,17 @@ steps:
         record the slice's admission commit (git rev-parse HEAD) before editing (with
         params.resumeFrom set, first apply that preserved work to your owned paths - git diff
         <resumeFrom>^ <resumeFrom> -- <owned paths> | git apply - and continue from the findings it
-        left, never redoing it) and run node scripts/gates/gate.mjs
+        left, never redoing it) and run starci gate run
         --root ROOT --base <slice admission commit> --changed <owned paths>
         BEFORE the first edit. It gates only the slice's new findings. Without context.cut,
-        run the whole-repository hfs lint --format json at ROOT
+        run the whole-repository starci app lint --format json at ROOT
         BEFORE the first edit. Keep the machine report, exact command and exit code in either mode.
-        For a cut slice in a TypeScript repository, the gate's tsc step (node scripts/gates/gate.mjs
+        For a cut slice in a TypeScript repository, the gate's tsc step (starci gate run
         --root ROOT --base <slice admission commit> --changed <owned files>) is the typecheck: one program per
         tsconfig that owns a changed file, its base read from the admission commit's blobs, so other in-flight
         files are identical on both sides of the measurement. A repository-wide typecheck may be recorded as context, but
         its pre-existing errors outside the slice do not block this ordinal.
-        When params.canonFamilies is set, run node scripts/gates/canon-scan.mjs
+        When params.canonFamilies is set, run starci gate canon-scan
         --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
         edit as well: its findings are the slice's scope, the exact list this refactor removes. A green baseline is normally the invariant's left side. The sole
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
@@ -273,14 +273,14 @@ steps:
         beside the before run; where the machines ran before, run the SAME gate.mjs
         command AFTER the change with the same --base for context.cut, its --changed naming the owned
         paths as they are now (moved destinations and files created under owned directories included),
-        or the same whole-repository hfs lint for an uncut refactor. The gate measures a moved file
+        or the same whole-repository starci app lint for an uncut refactor. The gate measures a moved file
         against its old base path, so carried findings stay preexisting and only new findings gate;
         retain its report beside the before report.
         For a cut TypeScript slice, the gate.json's tsc findings are gating whether they appear in an owned
         file or an untouched importer; its preexisting count is advisory. A gate that could not run tsc
         (exit 2) is not a pass.
         The ordinal whose pass closes the cut set runs
-        the whole-repository hfs lint --format json at ROOT ONCE
+        the whole-repository starci app lint --format json at ROOT ONCE
         after its gate run and records the whole-repository report and exit code with
         `full-regression-final`; non-final ordinals do not run this repo-wide lint check. Where
         canon-scan ran before, run it again without --fix on the same paths and families; it must
@@ -310,7 +310,7 @@ steps:
         root> --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out
         <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` and attach both files
-        at api report. The verdict is the slice's own - outcome pass means no open blocker or critical issue and
+        at starci kernel report. The verdict is the slice's own - outcome pass means no open blocker or critical issue and
         no to-review security hotspot on a changed line, duplication within the
         numbers of knowledge/sonar-gate.yaml (a pure move or rename changes no line, so nothing new is
         held). The runtime re-reads that sonar.json at settle and refuses a done without outcome pass; a
@@ -320,12 +320,12 @@ steps:
   - reads: [op-loop]
     writes: [gate-proof]
     action:
-      en: "FORCE THE CHECKS after coding: run node scripts/gates/gate.mjs --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
-      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy node scripts/gates/gate.mjs --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
+      en: "FORCE THE CHECKS after coding: run starci gate run --root <app> --changed <the files the slice changed> [--tests <the slice spec pattern>] --out $STARCI_JOB_SCRATCH/gate.json. FIX what it reports and run it again, at most params.gateRounds rounds: exit 0 is green; exit 1 lists the new findings (lint per file and rule, tsc per message, failing specs - a finding the base already has never counts); exit 2 means a tool could not run and is never green. Still red after the last round: report blocked with the exact findings of that gate.json. Never report done while the gate is red or could not run. REPORT with gate.json and read-digest.json attached."
+      vi: "ÉP CHẠY KIỂM TRA sau khi viết code: chạy starci gate run --root <app> --changed <các tệp slice đã đổi> [--tests <mẫu spec của slice>] --out $STARCI_JOB_SCRATCH/gate.json. SỬA những gì nó báo rồi chạy lại, tối đa params.gateRounds vòng: exit 0 là xanh; exit 1 liệt kê lỗi mới (lint theo tệp và luật, tsc theo thông điệp, spec thất bại - lỗi đã có trên commit gốc không bao giờ bị tính); exit 2 là một công cụ không chạy được và không bao giờ là xanh. Hết vòng cuối mà vẫn đỏ: báo blocked kèm đúng các lỗi trong gate.json đó. Không bao giờ báo done khi cổng đỏ hoặc không chạy được. BÁO CÁO kèm gate.json và read-digest.json."
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: proposal-binding
@@ -352,7 +352,7 @@ proofs:
         A cut TypeScript slice's gate.json (same admission base, owned files) carries no new tsc finding
         anywhere in its checked projects; its preexisting count does not change this verdict, including
         when repository-wide typecheck is red on untouched debt.
-        The closing ordinal records one whole-repository hfs lint measurement with
+        The closing ordinal records one whole-repository starci app lint measurement with
         `full-regression-final`; an uncut refactor uses it on both sides. A new architecture or
         pattern violation after the change is a failure. A missing, different or narrowed check on
         either side is a failure, and no coverage at all is the `test-gap` blocker, never a silent pass."
@@ -378,8 +378,8 @@ proofs:
         settle as this op's checkpoint on wf-<workflowId>. Report no-change honestly.
   - id: op-gate
     requirement:
-      en: "api settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
-      vi: "api settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
+      en: "starci kernel settle re-reads the attached gate.json (exit 0 over the slice's changed files) and read-digest.json (a pattern file named for every touched file kind) and records the runtime check op-gate; a done without them, with a tool that could not run or with a new finding is refused, and the Kernel re-runs the same gate on the branch at landing."
+      vi: "starci kernel settle tự đọc lại gate.json đính kèm (exit 0 trên các tệp slice đã đổi) và read-digest.json (có tệp pattern cho mọi loại tệp đã sửa) rồi ghi check op-gate; done thiếu chúng, có công cụ không chạy được hoặc có lỗi mới đều bị từ chối, và Kernel chạy lại đúng cổng đó trên nhánh khi land."
 blockers:
   - code: TEST_COVERAGE_ABSENT
     condition:

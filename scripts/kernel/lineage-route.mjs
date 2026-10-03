@@ -1,9 +1,9 @@
 // lineage-route.mjs — retry-aware routing: a retry learns from its own lineage's failed attempts.
 //
 // Owner decision 2026-09-25: a Kernel routed
-// an interface.implement job with `api route --avoid devin-agent` and the job went to
+// an interface.implement job with `starci kernel route --avoid devin-agent` and the job went to
 // codex gpt-6-luna, defeating the evidence routing (implementation goes to Devin first). A Kernel no
-// longer biases a route (api route refuses --prefer/--avoid as unknown options); the ROUTER decides, from ledger facts:
+// longer biases a route (starci kernel route refuses --prefer/--avoid as unknown options); the ROUTER decides, from ledger facts:
 //   - a pool whose provider-health circuit is open is rejected by capacity (unchanged);
 //   - this module: when the job is a retry, each earlier attempt of its retry lineage
 //     (jobs.retry_of|resume_of; scripts/machine/owner-answers.mjs lineageJobsOf) that FAILED on
@@ -24,7 +24,7 @@
 // death in a host terminal wipe (result retryClass environment, cause host-terminal-wipe; or, read in
 // hindsight, a disconnected/stale worker whose settle a host event proven after it surrounds -
 // host-event.mjs hostEventAround, cause host-terminal-wipe-hindsight), a blocked or
-// awaiting-owner settle (a missing secret, an owner gate), a peer-blocked settle (api check attributed every
+// awaiting-owner settle (a missing secret, an owner gate), a peer-blocked settle (starci kernel record-checks attributed every
 // red check to a peer's change), a failed report or a first red check, a dispatch refused before any
 // provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
@@ -52,7 +52,7 @@ const redChecksOf = (db, row) => {
   if (!row) return [];
   // The kernel-recorded (independent) checks of the job's newest attempt (check_runs).
   const checks = independentChecksOf(db, { jobId: row.job_id })?.checks;
-  // A peer-blocked red check (api check) was never this attempt's failure.
+  // A peer-blocked red check (starci kernel record-checks) was never this attempt's failure.
   return Array.isArray(checks) ? checks.filter((c) => c && c.exitCode !== 0 && !c.peerBlocked).map((c) => c.name ?? 'unnamed-check') : [];
 };
 const reportOutcomeOf = (db, row) => parse(db.prepare(

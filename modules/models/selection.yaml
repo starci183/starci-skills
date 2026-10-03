@@ -253,7 +253,7 @@ reviewerPolicy:
     providerDifferent and modelDifferent are REPORTED, not required —
     capabilities.yaml: "differentProviderAloneIsInsufficient". runtimes.yaml adds
     verifyAvoidsImplementRuntime: true — the allocator keeps the verifier off the
-    runtime that implemented the slice (scripts/agent/models.mjs selectPool cross-family audit: api route
+    runtime that implemented the slice (scripts/agent/models.mjs selectPool cross-family audit: starci kernel route
     passes the implementer's pool as auditOf for every verify kind), but eligibility itself is the gates above.
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// watchdog.mjs — liveness and cadence of the ONE [Supervisor] kernel (modules/supervisor/supervise.yaml
+// starci supervisor watchdog — liveness and cadence of the ONE [Supervisor] kernel (modules/supervisor/supervise.yaml
 // kernelSeat, docs/supervisor.md). Like scripts/kernel/kernel-watchdog.mjs for a Kernel, it never decides anything:
 //   - replaces a Supervisor terminal a responding Orca proves dead (twice) or back at a bare shell prompt
 //     (scripts/supervisor/start-supervisor.mjs --replace, which re-proves it and dedupes);
@@ -14,7 +14,7 @@
 //   - heartbeats channel 'main' while the seat is proven live and registered from its own terminal;
 //   [Worker] terminals are the Job controller's (scripts/reconciler/controllers/job.mjs calls sweepWorkers below).
 //
-//   node scripts/supervisor/supervisor-watchdog.mjs --once [--json] one pass; the reconciler Host controller runs it
+//   starci supervisor watchdog --once [--json] one pass; the reconciler Host controller runs it
 //                                                        (concern host.supervisor-seat). There is no loop (owner ruling
 //                                                        2026-09-28 "on error just delete it": the reconciler is the only loop).
 //
@@ -148,11 +148,11 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
   if (workerDeaths.length) tags.push('worker');
   if (!registered) tags.push('register');
   const parts = [];
-  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: node scripts/supervisor/channel.mjs register --id ${SUPERVISOR_ID} --label "Supervisor".`);
-  if (tags.includes('inbox')) parts.push(`[inbox] ${unread.length} unread message(s)${fresh.length ? ` (new ${fresh.map(shortId).join(',')})` : ''}${remind.length ? ` (still unread ${remind.map(shortId).join(',')})` : ''}: node scripts/supervisor/channel.mjs inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
-  if (tags.includes('decide')) parts.push(`[decide] ${openDis.length} open Supervisor decision(s)${diFresh.length ? ` (new ${diFresh.join(',')})` : ''}${diRemind.length ? ` (still open ${diRemind.join(',')})` : ''}: node scripts/machine/decisions.mjs supervisor --list, then claim and resolve each.`);
-  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: node scripts/supervisor/workers.mjs list, then land (node scripts/supervisor/land.mjs --job <id>) or redirect.`);
-  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: node scripts/supervisor/workers.mjs show --job <id>, then decide.`);
+  if (tags.includes('register')) parts.push(`[register] channel '${SUPERVISOR_ID}' is not registered from this terminal: starci supervisor channel register --id ${SUPERVISOR_ID} --label "Supervisor".`);
+  if (tags.includes('inbox')) parts.push(`[inbox] ${unread.length} unread message(s)${fresh.length ? ` (new ${fresh.map(shortId).join(',')})` : ''}${remind.length ? ` (still unread ${remind.map(shortId).join(',')})` : ''}: starci supervisor channel inbox --id ${SUPERVISOR_ID}, then reply to each (--to <inboxId>).`);
+  if (tags.includes('decide')) parts.push(`[decide] ${openDis.length} open Supervisor decision(s)${diFresh.length ? ` (new ${diFresh.join(',')})` : ''}${diRemind.length ? ` (still open ${diRemind.join(',')})` : ''}: starci machine decisions supervisor --list, then claim and resolve each.`);
+  if (tags.includes('land')) parts.push(`[land] report(s) filed by ${land.join(', ')}: starci supervisor workers list, then land (starci supervisor land --job <id>) or redirect.`);
+  if (tags.includes('report')) parts.push(`[report] ${report.join(', ')} filed a diagnosis or a blocked/failed report: starci supervisor workers show --job <id>, then decide.`);
   if (tags.includes('worker')) parts.push(`[worker] ${workerDeaths.map((d) => `${d.jobId} (${d.reason})`).join(', ')}: respawn, reassign or take it yourself.`);
   const text = parts.length ? `${WAKE_TAG} ${parts.join(' ')} Act until nothing is executable, then yield; never sleep or poll in a turn.` : null;
   if (text && wakes.some((w) => w.payload.text === text)) return { tags: [], inbox: [], land: [], report: [], decisions: [], text: null, duplicate: true };
@@ -368,7 +368,7 @@ function noteInputOutcome(terminal, action, { env = process.env } = {}) {
 
 if (isMain(import.meta.url)) {
   if (!process.argv.includes('--once')) {
-    console.error('use: node scripts/supervisor/supervisor-watchdog.mjs --once [--json]  (the Host controller runs it; there is no loop)');
+    console.error('use: starci supervisor watchdog --once [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
   const r = await watchdogPass();

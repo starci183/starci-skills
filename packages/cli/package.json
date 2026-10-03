@@ -1,0 +1,30 @@
+{
+  "name": "@starci/cli",
+  "version": "1.0.0",
+  "description": "The single catalog-driven command line for StarCi apps and runtimes.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "starci": "./bin/starci.mjs"
+  },
+  "exports": {
+    ".": "./src/main.mjs",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@starci/hfs": "4.0.9"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "completions/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

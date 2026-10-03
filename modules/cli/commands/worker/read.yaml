@@ -1,0 +1,24 @@
+group: worker
+verb: read
+owner: runtime
+summary: read a bounded tail of one supervised worker's output
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerReadVerb}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - read by Dispatch id so Orca can use the exact transcript or its labelled terminal fallback
+flags:
+  - {name: dispatch, type: string, required: true, summary: authoritative Orca Dispatch id}
+  - {name: lines, type: number, default: 80, summary: maximum output rows to return}
+positional: []
+exit:
+  "0": "output read"
+  "1": "Orca could not read the worker"
+  "2": "bad usage"
+json: starci/worker-read@1
+examples:
+  - starci worker read --dispatch <dispatch-id>
+  - starci worker read --dispatch <dispatch-id> --lines 200
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

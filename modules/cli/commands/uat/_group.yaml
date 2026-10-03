@@ -1,0 +1,4 @@
+group: uat
+summary: run assisted and slot-controlled user acceptance tests
+owner: runtime
+since: 1.0.0-alpha.4

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP AC1, AC2: quota windows and the active account are Orca's; the quota circuit and credential fingerprint policy are the runtime's.
 // account-list.mjs — the calls.yaml `account-list` call as a callable function.
-//   node scripts/api/orca/account-list.mjs
+// Internal entry: spawned by scripts/agent/quota/orca-account.mjs; not invoked directly.
+// Args: none.
 // Returns {ok, accounts, rateLimits} — accounts is result minus rateLimits.
 import { orcaCall } from './lib.mjs';
 import { isMain } from '../../lib/is-main.mjs';

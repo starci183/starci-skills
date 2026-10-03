@@ -1,4 +1,4 @@
-// frontend.mjs - the front-end tree checks of hfs check. Per app of the fe side (`apps/<app>`, kind next, side-relative paths):
+// frontend.mjs - the front-end tree checks of starci app check. Per app of the fe side (`apps/<app>`, kind next, side-relative paths):
 //   FE_I18N_PLACEMENT (R59)     next-intl with the `[locale]` segment: every route file sits under `src/app/[locale]/` (the root
 //                               redirect page, global-error and health probes excepted), locale routing is `src/proxy.ts` and never
 //                               `middleware.ts`, and the default locale's catalog `vi.json` exists

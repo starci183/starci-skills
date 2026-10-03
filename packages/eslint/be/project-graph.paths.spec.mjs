@@ -2,7 +2,7 @@
  * RuleTester proofs of the three back-end project rules that serve the slot manifest's per-path judgement (scripts/hfs/path-findings.mjs,
  * origin "repo"): slot-undeclared, source-suffix and spec-placement. The project graph runs that judgement over `git ls-files` of the
  * fixture (the tester git-inits and adds every file) and each rule reports the findings of its codes on the TypeScript file ESLint visits.
- * A finding on a file that is not TypeScript stays in `hfs check` and is not on the lint surface (see the last test).
+ * A finding on a file that is not TypeScript stays in `starci app check` and is not on the lint surface (see the last test).
  *
  *   node --test project-graph.paths.spec.mjs
  */
@@ -141,7 +141,7 @@ test("a spec file lives in one of the four test layers and nowhere else", (t) =>
     })
 })
 
-test("a misplaced spec that is not TypeScript is not on the lint surface: it stays in hfs check", (t) => {
+test("a misplaced spec that is not TypeScript is not on the lint surface: it stays in starci app check", (t) => {
     const f = projectFixture({ files: { "tools/x.spec.mjs": "export {}\n", "scripts/probe.test.cjs": "module.exports = {}\n", "src/modules/domain/billing/invoice.service.ts": EXPORT, "src/features/api/orders/place-order.spec.ts": EXPORT } })
     t.after(f.cleanup)
     f.tester.run("spec-placement", rules["spec-placement"], {

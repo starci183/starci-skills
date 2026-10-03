@@ -148,7 +148,7 @@ test('the draw loop metric and draw-quality carry DRAW_RATIONALE_MISSING', async
   assert.match(missing.findings[0].detail, /no rationale\.json/);
   fs.writeFileSync(path.join(dir, 'screen.rationale.json'), JSON.stringify(GOOD_RATIONALE));
   assert.deepEqual((await run()).findings, []);
-  assert.ok(DRAW_QUALITY_CODES.includes(DRAW_RATIONALE_MISSING), 'draw-quality (so draw-acceptance at api settle) refuses it');
+  assert.ok(DRAW_QUALITY_CODES.includes(DRAW_RATIONALE_MISSING), 'draw-quality (so draw-acceptance at starci kernel settle) refuses it');
 });
 
 test('a real render: draw-render measures the values and captures the redline (skipped without Playwright)', async (t) => {

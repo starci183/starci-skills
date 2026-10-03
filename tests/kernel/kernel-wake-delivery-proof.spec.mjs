@@ -8,8 +8,8 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 
 // A terminal-send to a Claude Kernel answered agent_prompt_stalled while the wake text sat on its
-// screen. `api nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
-// the other Kernel wake paths - the durable transition wake after `api report`, the watchdog's
+// screen. `starci kernel nudge` already proves delivery from the screen (tests/kernel/nudge-delivery-proof.spec.mjs);
+// the other Kernel wake paths - the durable transition wake after `starci kernel report`, the watchdog's
 // liveness wake and the ask-answered wake - called the same send a failure. They now reuse
 // scripts/kernel/wake-delivery.mjs: a wake the screen shows landed or queued is delivered, only a
 // screen that shows none of it fails.
@@ -55,7 +55,7 @@ test('a long wake queued behind a Claude turn is queued, not staged, once the sp
   const {classifyAgentScreen,wakeDeliveryOf}=await import('../../scripts/lib/terminal-liveness.mjs');
   // The shape of buildWakePrompt (scripts/kernel/kernel-watchdog.mjs), ~850 chars.
   const wake=['Watchdog liveness wake for wf-long.','The approved workflow is still phase=running, but the prior model turn returned to the terminal input prompt.',
-    'Re-read canonical api status and survey now and continue the exact durable frontier.',
+    'Re-read canonical starci kernel status and survey now and continue the exact durable frontier.',
     'This wake grants no new approval, path, scope or operation decision: never duplicate an existing job or bypass an effect fence.',
     'Handle every filed Op outcome through consume-report/check/settle and the declared retry or incident path.',
     'Reason and act until the current durable state has no immediately executable transition.',
@@ -72,7 +72,7 @@ test('a long wake queued behind a Claude turn is queued, not staged, once the sp
   assert.equal(classifyAgentScreen(staged,{sentText:wake}).state,'staged-input');
 });
 
-/* ------------------------------------------------ transition wake (api report) */
+/* ------------------------------------------------ transition wake (starci kernel report) */
 
 const reportWorld=t=>{
   const w=world(t,'starci-transition-wake-');
@@ -91,7 +91,7 @@ const reportWorld=t=>{
   const d=run(['dispatch','--repo',w.repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
   w.seedKernelTerminal();
-  // api report reads the envelope only from the attempt's scratch (op_attempts.scratch_dir, H10).
+  // starci kernel report reads the envelope only from the attempt's scratch (op_attempts.scratch_dir, H10).
   const scratch=(()=>{const l=inspectLedger({file:w.ledgerFile()});
     try{return l.db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC').get(jobId)?.scratch_dir;}finally{l.close();}})();
   assert.ok(scratch,'the dispatch recorded the attempt scratch dir');

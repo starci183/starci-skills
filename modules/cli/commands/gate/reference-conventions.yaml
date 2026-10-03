@@ -1,0 +1,16 @@
+group: gate
+verb: reference-conventions
+owner: runtime
+summary: probe the installed backend reference rules of a reference root
+impl: {script: scripts/gates/probe-reference-conventions.mjs}
+positional:
+  - {name: reference-root, required: false, variadic: false}
+flags: []
+exit: {"0": probes passed, "1": a probe failed, "2": bad usage}
+json: none
+examples:
+  - starci gate reference-conventions <backend-reference-root>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/probe-reference-conventions.mjs

@@ -1,14 +1,11 @@
 {
   "name": "@starci/test-world",
   "version": "1.2.0",
-  "description": "The shared e2e library of every StarCi back end: one warm docker stack shared by all repos (postgres, redis, minio, qdrant, kafka, keycloak behind toxiproxy, k3d with a local registry), a framework for network-edge fakes (smtp, openai-compatible, vnpay, momo, payos, sepay), the Nest boot and the typed useTestWorld handle, and the starci-test-stack cli.",
+  "description": "The shared e2e library of every StarCi back end, including the implementation behind starci app stack.",
   "license": "UNLICENSED",
   "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "starci-test-stack": "bin/starci-test-stack.js"
-  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -26,13 +23,16 @@
       "types": "./dist/fakes/index.d.ts",
       "default": "./dist/fakes/index.js"
     },
+    "./cli": {
+      "types": "./dist/cli/main.d.ts",
+      "default": "./dist/cli/main.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "!dist/**/*.spec.*",
     "!dist/**/*.map",
-    "bin",
     "README.md",
     "CHANGELOG.md"
   ],

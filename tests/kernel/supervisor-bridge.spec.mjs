@@ -218,7 +218,7 @@ test('hub blocker: two workflows on one stuck job -> a bridging workflow owns it
     assert.equal(g.findings.filter((f) => f.kind === 'hub-blocker').length, 0, `nobody waits on the blocker any more: ${JSON.stringify(g.findings)} ${JSON.stringify(g.edges)}`);
     assert.deepEqual([...new Set(g.edges.filter((e) => e.strength === 'hard').map((e) => e.to))], [bridgeWf]);
   });
-  // api status / api peers show the graph and the bridge.
+  // starci kernel status / starci kernel peers show the graph and the bridge.
   const status = fx.ok(['status', '--workflow', STUDIO]);
   assert.deepEqual(status.dependencies.waitsOn, [bridgeWf]);
   assert.equal(status.dependencies.bridges[0].id, out.bridgeId);

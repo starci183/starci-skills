@@ -9,7 +9,7 @@ resyncMs: 30000
 concurrency: 2
 # One op-ram-footprint supervisor event per footprintEveryMs (the per-op RAM history ram-throttle.mjs reads).
 footprintEveryMs: 300000
-# resource:quota:<ledger>: api provider-health --quota-probe at most once per quotaProbeEveryMs while a quota circuit is open.
+# resource:quota:<ledger>: starci kernel provider-health --quota-probe at most once per quotaProbeEveryMs while a quota circuit is open.
 quotaProbeEveryMs: 300000
 quotaProbeTimeoutMs: 120000
 # cap-starved: the priority workflow held fewer than min(reserve, demand) slots for this long -> Decision Item to the Supervisor.

@@ -54,7 +54,7 @@ export const withLock = async <T>(dir: string, action: () => Promise<T>, options
                 continue
             }
             if (clock.now() >= deadline) {
-                throw worldError(TestWorldErrorCode.InfrastructureFailed, `timed out after ${timeoutMs} ms waiting for the lock ${dir}; remove it if no starci-test-stack process is running`)
+                throw worldError(TestWorldErrorCode.InfrastructureFailed, `timed out after ${timeoutMs} ms waiting for the lock ${dir}; remove it if no starci app stack process is running`)
             }
             await clock.pause(200)
         }

@@ -1,0 +1,20 @@
+group: runtime
+verb: benchmark-snapshot
+owner: runtime
+summary: append one model-pool snapshot file under benchmark/snapshots
+impl:
+  script: scripts/agent/benchmark-snapshot.mjs
+flags:
+  - {name: since-hours, type: number, required: true, summary: positive scorecard window in hours}
+  - {name: repo, type: list, summary: product ledger owner path}
+  - {name: date, type: string, summary: snapshot date as YYYY-MM-DD}
+  - {name: dir, type: string, summary: snapshot output directory}
+exit: {"0": snapshot appended, "1": output exists or snapshot failed, "2": bad usage}
+json: flag
+examples:
+  - starci runtime benchmark-snapshot --since-hours 24
+  - starci runtime benchmark-snapshot --since-hours 24 --repo <path> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/agent/benchmark-snapshot.mjs

@@ -12,7 +12,7 @@ npm i -D @starci/eslint-canon-be
 
 ## Use it
 
-`eslint.config.mjs` of a back end is a managed file (`hfs sync` renders it; `hfs check` refuses any other content):
+`eslint.config.mjs` of a back end is a managed file (`starci app sync` renders it; `starci app check` refuses any other content):
 
 ```js
 import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"

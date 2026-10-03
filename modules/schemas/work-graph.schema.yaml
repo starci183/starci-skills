@@ -64,7 +64,7 @@ $defs:
       size:
         type: object
         additionalProperties: false
-        description: The counts `api estimate` sizes (modules/models/runtimes.yaml allocation.slicing).
+        description: The counts `starci kernel estimate` sizes (modules/models/runtimes.yaml allocation.slicing).
         properties:
           files: {type: integer, minimum: 0}
           assertions: {type: integer, minimum: 0}

@@ -10,7 +10,7 @@
  *   - `cli-command-shape`: a nest-commander command class (`@Command` or `@SubCommand`, by the import that binds the decorator) is
  *     declared only in the cli feature root: a group `@Command` in `<group>/<group>.cli.ts`, a `@SubCommand` in
  *     `<group>/subs/<name>.cli.ts`, one class per file, and a sub-command extends `CommandRunner`. Its unit spec beside it
- *     (`<name>.cli.spec.ts`) is required by `hfs check` (scripts/hfs/rules/cli.mjs);
+ *     (`<name>.cli.spec.ts`) is required by `starci app check` (scripts/hfs/rules/cli.mjs);
  *   - `cli-owner`: `nest-commander` is imported only by the cli app and the cli feature root; no back-end source parses the process
  *     arguments itself (`process.argv`) or imports another argument parser (commander, yargs, minimist): an action door anywhere
  *     else is refused.

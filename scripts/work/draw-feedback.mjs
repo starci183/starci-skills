@@ -13,7 +13,7 @@
 //      independent critic's rubric as gate checks for that shape (draw-critic.mjs rubricFor). A redraw that does not
 //      address a note is DRAW_FEEDBACK_UNADDRESSED: its parts are the bytes the owner rejected, its brief does not carry
 //      the note, or its loop's critic did not pass the note's check. draw-review.mjs question refuses to ask again,
-//      api report refuses the ask/done report, api settle refuses the pass. The cycle repeats until the owner accepts.
+//      starci kernel report refuses the ask/done report, starci kernel settle refuses the pass. The cycle repeats until the owner accepts.
 //   3. Learning: each note is classified (by structure here; the Kernel or the critic may reclassify with `classify`,
 //      which structure confirms) as product-direction (appended to the product's brand.direction.learned, status
 //      proposed until the owner next accepts the direction; every later draw of the product reads it in the brief and
@@ -307,7 +307,7 @@ export function briefBlock(dir, { shape = null } = {}) {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// The ledger side (serve-ask, api status)
+// The ledger side (serve-ask, starci kernel status)
 // ---------------------------------------------------------------------------------------------------------
 
 const eventExists = (db, workflowId, kind, key, value) => Boolean(db.prepare(
@@ -387,7 +387,7 @@ export function openKnowledgeRequests(db, workflowId) {
 }
 
 /**
- * The owner's image review board of one workflow (api status drawReviews): one entry per ui record a draw-review
+ * The owner's image review board of one workflow (starci kernel status drawReviews): one entry per ui record a draw-review
  * ask of this workflow showed - {record, recordPath, awaitingOwner, rounds: [{round, dispatchId, jobId, askedAt,
  * state, decision, answeredBy, answeredAt, golden, parts, notes}], shapes: [{shape, round, parts, openNotes,
  * addressed, unaddressed, golden}], redrawOwed}. Read-only.
@@ -472,7 +472,7 @@ function uiRecordDirsOf(repo, files) {
 }
 
 /**
- * What an interface.draw report owes the owner's feedback (api report): {findings}. For every ui record the report
+ * What an interface.draw report owes the owner's feedback (starci kernel report): {findings}. For every ui record the report
  * reaches (an ask's question.review record, a done report's files): the newest owner redraw answer the ledger holds
  * for it (draw-redraw-owed, any workflow of this ledger) must be applied to the record (ui.review.feedback, by
  * draw-review.mjs apply), and every open note addressed (feedbackFindings). Read-only.
@@ -531,7 +531,7 @@ function drawFeedbackMain(argv = []) {
   const [command, ...args] = argv;
   const json = args.includes('--json');
   const ui = flag(args, '--ui');
-  const usage = 'Usage: node scripts/work/draw-feedback.mjs <brief|status|check|classify> --ui <ui-record-dir> [--shape <XBase#state>] [--note <id> --class <class> [--target <x>] [--as <kind>] [--by kernel|critic] --write] [--json]\n';
+  const usage = 'Usage: starci work draw-feedback <brief|status|check|classify> --ui <ui-record-dir> [--shape <XBase#state>] [--note <id> --class <class> [--target <x>] [--as <kind>] [--by kernel|critic] --write] [--json]\n';
   if (!['brief', 'status', 'check', 'classify'].includes(command) || !ui) return { exitCode: 2, text: usage };
   try {
     const dir = path.resolve(ui);

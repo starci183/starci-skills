@@ -257,7 +257,7 @@ test('serve-ask serves the form for a handover, a credential and an unrecommende
   });
 });
 
-test('api serve-ask launches the form for a handover ask even when it carries a recommendation',async t=>{
+test('starci kernel serve-ask launches the form for a handover ask even when it carries a recommendation',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     seedAsk(ledger,{dispatchId:'ctx_handover',opId:'handover.review',question:{text:'Duy\u1ec7t b\u00e0n giao?',options:['Duy\u1ec7t','G\u00f3p \u00fd','H\u1ecfi th\u00eam'],recommended:0,recommendedReason:'xanh'}});

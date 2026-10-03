@@ -26,7 +26,7 @@ const fakeGit = ({ branch = 'main', dirty = [], ahead = 2, heads = ['aaa111'] } 
 
 const greenStep = () => ({ ok: true, exit: 0, ms: 5, log: 'l.log', text: '' });
 
-// The managed scripts every app carries (hfs sync writes them from this template); {{appScripts}} is the per-app run lines.
+// The managed scripts every app carries (starci app sync writes them from this template); {{appScripts}} is the per-app run lines.
 // The template composes partials ({{> app/package-scripts/core.json}}): the sync renderer expands them, every other placeholder stays for the line below.
 const KEEP_PLACEHOLDERS = new Proxy(Object.create(null), {
   get: (_target, key) => `{{${String(key)}}}`,

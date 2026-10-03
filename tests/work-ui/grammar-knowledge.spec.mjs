@@ -26,7 +26,7 @@ const copyGrammarRoot=t=>{
 
 test('the grammar knowledge snapshots match the package source: no drift', async()=>{
   const result=await checkGrammarKnowledge({packageRoot,grammarRoot,census});
-  assert.deepEqual(result.findings,[],`drift - refresh with \`node scripts/work/ui/grammar-knowledge.mjs --write\`:\n${result.findings.map(f=>`${f.file} ${f.what}: ${f.detail}`).join('\n')}`);
+  assert.deepEqual(result.findings,[],`drift - refresh with \`starci work grammar-knowledge --write\`:\n${result.findings.map(f=>`${f.file} ${f.what}: ${f.detail}`).join('\n')}`);
   assert.equal(result.ok,true);
 });
 

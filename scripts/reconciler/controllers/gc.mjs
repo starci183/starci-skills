@@ -12,7 +12,7 @@
 //   2. key gc:sweep, every allocation.gc.sweepMs (30 min): runGc({apply: mode === 'active'}) under the host lock
 //      `gc` (runGc takes it on a live apply), so a hand-run gc.mjs never overlaps;
 //   3. key gc:housekeeping, every housekeepingEveryMs (24 h) and at once when host-resources reads lowDisk/lowRam
-//      (at most every lowResourceGapMs): `node scripts/housekeeping/housekeeping.mjs --apply` through ctx.run.
+//      (at most every lowResourceGapMs): `starci runtime housekeeping --apply` through ctx.run.
 //   4. key gc:blob-sweep, every blobSweepEveryMs (24 h): scripts/housekeeping/blob-gc.mjs (mark each ledger, then machine.sqlite;
 //      sweep what nothing marks) - shadow logs the read-only plan, active runs --apply as a child.
 //   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/machine/worktrees.mjs
@@ -387,7 +387,7 @@ export function createGcController(overrides = {}) {
       idempotencyKey: `gc-main-damaged:${String(stop.path ?? 'unknown').replace(/:/g, '_')}`, entity: { type: 'worktree', id: String(stop.path ?? 'unknown') },
       summary: `The GC stopped: removing ${stop.path ?? 'a worktree'} changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`,
       evidence: [{ ref: `worktree:${stop.path ?? ''}`, why: (stop.damage ?? []).join('; ').slice(0, 500) }],
-      options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then node scripts/machine/worktrees.mjs resume', recommended: true }],
+      options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then starci machine worktrees resume', recommended: true }],
       allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
     });
   }

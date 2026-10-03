@@ -1,6 +1,6 @@
 // install.mjs — puts the shared-checkout guard around an op or [Worker] agent.
 //
-// api dispatch (opGuardLaunch), the [Worker] launch (workers.mjs workerGuard) and the Kernel launch
+// starci kernel dispatch (opGuardLaunch), the [Worker] launch (workers.mjs workerGuard) and the Kernel launch
 // (scripts/kernel/start-workflow.mjs, role 'kernel') call guardLaunch() for every agent they start
 // (modules/kernel/api.yaml conventions.sharedCheckout). Each layer is idempotent and best effort - a
 // guard that cannot be installed is reported on the dispatch receipt, never a reason to refuse the launch:
@@ -113,7 +113,7 @@ export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..')
 /** One git call (a scripts/api/git call file) in the repository at `cwd`. */
 const git = (call, cwd, args) => call(args, { dir: cwd, timeout: 20_000 });
 
-export function historyHookBody({ branches = [], verify, nodePath = process.execPath, terminals = terminalsDir() }) {
+export function historyHookBody({ branches = [], root, nodePath = process.execPath, terminals = terminalsDir() }) {
   const protectedList = [...new Set(['main', 'master', ...branches.filter((b) => /^[A-Za-z0-9._/-]+$/.test(b))])].join(' ');
   const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
   return `#!/bin/sh
@@ -121,7 +121,7 @@ export function historyHookBody({ branches = [], verify, nodePath = process.exec
 # The shared branch is append-only (modules/ops/_common.yaml "Evidence, completion and commits"):
 # a protected branch only moves forward and is never deleted. An op - named by the Orca terminal it runs in
 # (<guards root>/terminals/<handle>.json) - never creates a worktree, and the commits it lands carry only its
-# owned paths (scripts/guards/verify-commit.mjs).
+# owned paths (starci guard verify-commit).
 if [ "$1" != "prepared" ]; then cat >/dev/null; exit 0; fi
 PROTECTED=" ${protectedList} "
 guard=""
@@ -160,7 +160,7 @@ while read -r old new ref; do
         status=1; continue
       fi
       if [ -n "$guard" ]; then
-        STARCI_GUARD_FILE="$guard" ${q(nodePath)} ${q(verify)} "$old" "$new" || status=1
+        STARCI_GUARD_FILE="$guard" STARCI_RUNTIME=${q(root)} ${q(nodePath)} ${q(path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'))} guard verify-commit "$old" "$new" || status=1
       fi ;;
   esac
 done
@@ -224,7 +224,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   const branches = [];
   const list = git(worktreeListQuery, root, ['--porcelain']);
   if (list.status === 0) for (const line of list.stdout.split(/\r?\n/)) if (line.startsWith('branch refs/heads/')) branches.push(line.slice('branch refs/heads/'.length));
-  const body = historyHookBody({ branches, verify: path.join(skillRoot, 'scripts', 'guards', 'verify-commit.mjs'), nodePath, terminals: terminalsDir(skillRoot) });
+  const body = historyHookBody({ branches, root: skillRoot, nodePath, terminals: terminalsDir(skillRoot) });
   if (fs.existsSync(file)) {
     const current = fs.readFileSync(file, 'utf8');
     if (!current.includes(HOOK_MARKER)) return { installed: false, reason: 'foreign-hook', path: file };
@@ -239,13 +239,13 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
 }
 
 /** The work-record check shared by the dispatch hook and the runtime's generated pre-commit hook. */
-export function workHookCheck({ check, nodePath = process.execPath }) {
+export function workHookCheck({ root, nodePath = process.execPath }) {
   const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
   return `# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/hook-install.mjs); rewritten on every op dispatch.
 # Staged Work and stack files are checked before the commit exists: YAML that parses, records that pass their scoped
-# strict validation, and no secret outside an .enc file (scripts/work/validate/work-hygiene.mjs). e2e never runs here.
+# strict validation, and no secret outside an .enc file (starci work hygiene). e2e never runs here.
 if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)\\.(starciwork|starcistacks)/'; then
-  ${q(nodePath)} ${q(check)} staged --repo "$(git rev-parse --show-toplevel)" || exit 1
+  STARCI_RUNTIME=${q(root)} ${q(nodePath)} ${q(path.join(root, 'packages', 'cli', 'bin', 'starci.mjs'))} work hygiene staged --repo "$(git rev-parse --show-toplevel)" || exit 1
 fi
 `;
 }
@@ -254,9 +254,9 @@ fi
  * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
  * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
  */
-function workHookBody({ check, nodePath = process.execPath }) {
+function workHookBody({ root, nodePath = process.execPath }) {
   return `#!/bin/sh
-${workHookCheck({ check, nodePath })}
+${workHookCheck({ root, nodePath })}
 # husky's generated dispatcher (.husky/_/h) keeps running the repository's own pre-commit
 if [ -f "$(dirname "$0")/h" ]; then . "$(dirname "$0")/h"; fi
 `;
@@ -273,7 +273,7 @@ export function ensureWorkHook(repoRoot, { skillRoot = path.resolve(here, '..', 
   const target = hookTarget(repoRoot, 'pre-commit');
   if (target.installed === false) return target;
   const { hooksDir, file } = target;
-  const body = workHookBody({ check: path.join(skillRoot, 'scripts', 'work', 'validate', 'work-hygiene.mjs'), nodePath });
+  const body = workHookBody({ root: skillRoot, nodePath });
   if (fs.existsSync(file)) {
     const current = fs.readFileSync(file, 'utf8');
     if (current.includes(RUNTIME_GIT_HOOKS_MARKER)) return { installed: true, path: file, changed: false };
@@ -320,7 +320,7 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
 }
 
 /**
- * The layers a dispatch receipt (guardLaunch's, as api dispatch records it on op-dispatched `guard`) says did not
+ * The layers a dispatch receipt (guardLaunch's, as starci kernel dispatch records it on op-dispatched `guard`) says did not
  * install: [] for a whole guard. A switched-off layer is not a failure.
  */
 export function guardReceiptErrors(receipt) {

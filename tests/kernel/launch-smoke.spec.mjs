@@ -17,7 +17,7 @@ import { buildAppFixture } from '../helpers/app-fixture.mjs';
 const gitResult = (args, options) => gitResultOf(runGit(args, options));
 
 // The pre-workflow launch smoke (scripts/kernel/launch-smoke.mjs, starci/launch-smoke@2) drives the runtime's own
-// launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
+// launchers - startAgent (Supervisor, Kernel, the starci kernel dispatch shape of an Op), agent/start-worker.mjs startWorkerAgent ([Worker])
 // and draw-critic.mjs launchCriticWorker (the critic on its criticWorkspace placement) - against a fake Orca at the
 // wrapper level: Runs, worker-start --spec (it files the Task), worker-show (depth and creator Dispatch, the way Orca
 // reports them), worker-read, worker-stop, worker-release, task-update, and worktree list. Each fake agent does
@@ -343,7 +343,7 @@ test('the finish merges to main and leaves the worktree release-pending; the con
 test("the smoke's no-op files sit in slots an app owns: the hfs repository check over the frozen fixture finds nothing new", (t) => {
   // The finish gate lints the whole branch; a file in an invented folder (HFS_SLOT_UNDECLARED) would refuse the finish and
   // hide a real finish failure. The frozen fixture has only the app-tree shape this assertion needs; the repository check
-  // hfs lint runs is the subject (the preset and formatter passes need an installed app and are not this question).
+  // starci app lint runs is the subject (the preset and formatter passes need an installed app and are not this question).
   const app = buildAppFixture(t);
   git(path.dirname(app), 'init', '-q', '-b', 'main', app);
   git(app, 'config', 'core.autocrlf', 'false');
@@ -474,7 +474,7 @@ test('the no-op agent is the cheapest priced model a registry.yaml pool pins, wi
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {
   const parent = noopSpec({ role: 'op', script: 'scripts/kernel/launch-smoke.mjs' });
-  assert.match(parent, /node "scripts\/kernel\/launch-smoke\.mjs" stage --as op$/m, 'the command names only the role: nothing random to mistype');
+  assert.match(parent, /starci release launch-smoke stage --as op$/m, 'the command names only the role: nothing random to mistype');
   assert.match(parent, /timeout of at least 300 seconds/);
   assert.deepEqual(CHILDREN, { supervisor: ['worker'], kernel: ['op', 'opFe'], op: ['critic'] }, 'the smoke itself starts opFail, never a stage');
   for (const role of ['critic', 'opFe', 'opFail']) {

@@ -11,9 +11,9 @@ paths:
   - modules/kernel/driver-loop.yaml
   - modules/kernel/verdict-contract.yaml
   - modules/kernel/retired-paths.yaml
-  - modules/kernel/api-commands/artifacts.yaml
-  - modules/kernel/api-commands/logs.yaml
-  - modules/kernel/api-commands/reconcile.yaml
-  - modules/kernel/api-commands/settle.yaml
-  - modules/kernel/api-commands/verify-proofs.yaml
+  - modules/cli/commands/kernel/artifacts.yaml
+  - modules/cli/commands/kernel/logs.yaml
+  - modules/cli/commands/kernel/reconcile.yaml
+  - modules/cli/commands/kernel/settle.yaml
+  - modules/cli/commands/kernel/verify-proofs.yaml
   - modules/schemas/index.yaml

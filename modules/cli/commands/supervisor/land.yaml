@@ -1,0 +1,27 @@
+group: supervisor
+verb: land
+owner: runtime
+summary: run the in-runtime land gate; external land-to-main.sh remains external
+impl:
+  script: scripts/supervisor/land.mjs
+flags:
+  - {name: job, type: string, summary: Supervisor worker job id to land}
+  - {name: commit, type: string, summary: comma-separated commit shas to land}
+  - {name: specs, type: string, summary: "spec files or touching, direct, all, or none"}
+  - {name: reason, type: string, summary: reason required when no spec applies}
+  - {name: full-by-push-git, type: boolean, summary: authorize the full suite from the push flow}
+  - {name: lane, type: string, summary: source lane name}
+  - {name: no-push, type: boolean, summary: leave landed main unpushed}
+  - {name: notify, type: boolean, summary: file the land outcome in the Supervisor inbox}
+  - {name: status, type: boolean, summary: inspect the land queue without landing}
+  - {name: wait-ms, type: number, summary: maximum land-queue wait in milliseconds}
+exit: {"0": land passed or status was read, "1": land refused or failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor land --status
+  - starci supervisor land --job <job-id>
+  - starci supervisor land --commit <sha> --specs touching --lane <name>
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/land.mjs

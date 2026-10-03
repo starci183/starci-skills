@@ -90,16 +90,16 @@ test('the contract version digests the brief, the shared documents and what the 
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-root-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const put=(rel,text)=>{fs.mkdirSync(path.dirname(path.join(root,rel)),{recursive:true});fs.writeFileSync(path.join(root,rel),text);};
-  put('modules/ops/ops/interface.draw.yaml','reads:\n  - path: modules/schemas/work-layout-tree.schema.yaml\ncheck: node scripts/work/ui/shell-conformance.mjs\n');
+  put('modules/ops/ops/interface.draw.yaml','reads:\n  - path: modules/schemas/work-layout-tree.schema.yaml\ncheck: starci work shell-conformance\n');
   put('modules/ops/_common.yaml','common\n');
   put('modules/schemas/work-layout-tree.schema.yaml','schema\n');
   const sha='0123456789abcdef0123456789abcdef01234567';
   put('.git/HEAD','ref: refs/heads/main\n');put('.git/packed-refs',`# pack-refs\n${sha} refs/heads/main\n`);
   assert.equal(runtimeShaOf(root),sha,'a packed ref resolves');
-  assert.deepEqual(contractFilesOf(root,'interface.draw'),['modules/ops/ops/interface.draw.yaml','modules/ops/_common.yaml','modules/kernel/verdict-contract.yaml','modules/schemas/work-layout-tree.schema.yaml','scripts/work/ui/shell-conformance.mjs']);
+  assert.deepEqual(contractFilesOf(root,'interface.draw'),['modules/ops/ops/interface.draw.yaml','modules/ops/_common.yaml','modules/kernel/verdict-contract.yaml','modules/schemas/work-layout-tree.schema.yaml']);
   const v1=contractVersionOf(root,'interface.draw',{now:5});
   assert.deepEqual([v1.schema,v1.runtimeSha,v1.admittedAt],[CONTRACT_VERSION_SCHEMA,sha,5]);
-  assert.equal(v1.files.find(f=>f.path==='scripts/work/ui/shell-conformance.mjs').digest,'absent');
+  assert.equal(v1.files.some(f=>f.path==='scripts/work/ui/shell-conformance.mjs'),false,'the catalog command does not expose its internal script path');
   put('modules/schemas/work-layout-tree.schema.yaml','schema v2\n');
   assert.notEqual(contractVersionOf(root,'interface.draw').digest,v1.digest,'a change to a cited schema is a new contract version');
   assert.equal(runtimeShaOf(ROOT)?.length,40,'the runtime root itself reads its HEAD');
@@ -163,17 +163,17 @@ const fixture=t=>{
   return {repo,wf,api,ok,seed,read,leg};
 };
 
-test('api check records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
+test('starci kernel record-checks records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
   const fx=fixture(t);
   fx.leg('job-old-draw','interface.draw',T_TREE+60_000);
   fx.leg('job-new-draw','interface.draw',Date.now());
   const checks=JSON.stringify({checks:[{name:'unit',exitCode:0},{name:'shell-conformance',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE'],evidence:'desktop only'}]});
-  const old=fx.ok(['check','--job','job-old-draw','--checks',checks]);
+  const old=fx.ok(['record-checks','--job','job-old-draw','--checks',checks]);
   assert.deepEqual(old.checkEvidence,{observed:2,passed:0,failed:0,green:false,declared:1,advisory:1});
   assert.deepEqual(old.advisory,[{name:'shell-conformance',changes:['part-review-matrix']}]);
   const stored=fx.read(db=>JSON.parse(db.prepare("SELECT summary_json FROM check_runs WHERE job_id=? AND name='shell-conformance' ORDER BY check_id DESC LIMIT 1").get('job-old-draw').summary_json).entry);
   assert.match(stored.advisory.reason,/added by part-review-matrix after this leg was admitted/);
-  const current=fx.ok(['check','--job','job-new-draw','--checks',checks]);
+  const current=fx.ok(['record-checks','--job','job-new-draw','--checks',checks]);
   assert.deepEqual(current.checkEvidence,{observed:2,passed:0,failed:1,green:false,declared:1},'a leg admitted after the change is held to it');
   assert.equal(current.advisory,undefined);
 

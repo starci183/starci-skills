@@ -1,0 +1,92 @@
+# The contract of `starci kernel artifacts` (scripts/kernel/verbs/artifacts.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.artifacts (lane slim-04).
+group: kernel
+verb: artifacts
+owner: runtime
+summary: "list the indexed proof files of the workflow's jobs, per job (read-only)"
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - artifacts
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: workflow
+    type: string
+    required: true
+    summary: workflow id
+  - name: job
+    type: string
+    summary: only this job
+  - name: kind
+    type: enum
+    summary: only this artifact kind
+    enum:
+      - diff
+      - patch
+      - image
+      - video
+      - report
+      - log
+      - trace
+      - file
+  - name: subkind
+    type: enum
+    summary: only this artifact subkind
+    enum:
+      - draw-render
+      - asset-gen
+      - app-capture
+      - e2e-capture
+      - uat-capture
+      - uat-video
+      - e2e-video
+      - playwright-trace
+      - patch
+      - patch-json
+      - diff
+      - report
+      - log
+      - critique
+      - metrics
+      - grammar-proposal
+      - asset-request
+      - terminal-transcript
+      - cli-transcript
+exit:
+  "0": success
+  "1": refused or failed (the JSON error names the reason)
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel artifacts --repo <path> --workflow <workflow>
+  - starci kernel artifacts --repo <path> --workflow <workflow> --job <job> --kind video
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api artifacts
+  - node scripts/kernel/cli.mjs artifacts
+purpose: Every indexed proof file of the workflow's jobs (job_artifacts), per job; a pure projection.
+reads: the job_artifacts rows of the workflow (engine/db/migrations/runtime/0001-init.sql), joined
+  to each job's status
+subkinds: "what produced the file (engine/db/ledger.mjs JOB_ARTIFACT_SUBKINDS,
+  scripts/kernel/artifact-subkind.mjs): draw-render | asset-gen | app-capture | e2e-capture |
+  uat-capture | uat-video | e2e-video | playwright-trace | patch | patch-json | diff | report | log
+  | critique | metrics | grammar-proposal | asset-request; null when no rule proves it (derived at
+  index time from the op id, the path conventions and the ui record manifests)"
+writes: nothing — pure projection
+returns:
+  workflowId: the workflow read
+  total: the number of artifacts
+  jobs: "[{jobId, opId, tryNo, cut, status, byKind, bySubkind, artifacts:[{artifactId, attemptId,
+    role, kind, subkind, name, sha256, bytes, mediaType, label, origin, httpPath
+    (/api/blob/<sha256>), round, runId, baseSha?, headSha?, integratedSha?, createdAt}]}] — a
+    patch/diff row carries its range; bySubkind counts a null subkind as unknown; a Work record
+    cites an artifact by artifactId + sha256"
+refusals:
+  artifact-kind-unknown: --kind is not a job_artifacts kind (engine/db/ledger.mjs JOB_ARTIFACT_KINDS)
+  artifact-subkind-unknown: --subkind is not a job_artifacts subkind (engine/db/ledger.mjs JOB_ARTIFACT_SUBKINDS)
+usedBy: ui/api/routes/attempt.mjs (read-only attempt artifacts and /api/media), and anyone auditing
+  what a job proved

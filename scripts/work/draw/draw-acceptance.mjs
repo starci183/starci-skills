@@ -24,7 +24,7 @@
 // judged by scripts/work/draw/draw-quality.mjs (SHAPE_DUPLICATE, DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING,
 // DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED; the DNA gate DRAW_OFF_GRAMMAR_COMPONENT,
 // DRAW_NOTICE_NOT_ALERT, DRAW_RATIO_NOT_METER; the taste metrics DRAW_ACCENT_BUDGET, DRAW_TOO_MANY_BANDS,
-// DRAW_TOO_MANY_BADGES; DRAW_LOOP_MISSING). api settle then re-renders and re-measures every live part itself
+// DRAW_TOO_MANY_BADGES; DRAW_LOOP_MISSING). starci kernel settle then re-renders and re-measures every live part itself
 // (scripts/work/draw-loop-settle.mjs, draw-metrics-failed).
 //
 // Scope (contract change draw-acceptance-scope-artwork-palette): a file belongs to the ui record whose directory is
@@ -34,7 +34,7 @@
 // is kept proof, never re-judged.
 // An entry marked retired, a retired asset and a rejected-* candidate are kept proof.
 //
-//   node scripts/work/draw/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
+//   starci work draw-acceptance --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]
 // --job reads the ledger read-only for the job's report files and owned paths. Exit 0 accepted, 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -308,7 +308,7 @@ async function main(argv) {
   const get = (name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
   const repo = get('--repo'), jobId = get('--job'), filesArg = get('--files'), json = argv.includes('--json');
   if (!repo || (!jobId && !filesArg)) {
-    process.stderr.write('use: node scripts/work/draw/draw-acceptance.mjs --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]\n');
+    process.stderr.write('use: starci work draw-acceptance --repo <repo> (--job <jobId> | --files <a,b,...>) [--json]\n');
     return 2;
   }
   let files = filesArg ? filesArg.split(',').map((s) => s.trim()).filter(Boolean) : [];

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// push-mains.mjs — the Supervisor pushes main of the runtime and of every product repository each tick
+// starci supervisor push-mains — the Supervisor pushes main of the runtime and of every product repository each tick
 // (modules/supervisor/supervise.yaml kernelSeat, owner 2026-09-24). Secret scan first, hooks on:
 // never --no-verify, never force, never a branch other than main, never a repository not listed.
 //
-//   node scripts/supervisor/push-mains.mjs [--repo <path>]... [--dry-run] [--hooks-only] [--json]
+//   starci supervisor push-mains [--repo <path>]... [--dry-run] [--hooks-only] [--json]
 //       default repositories: the runtime (.claude) plus one app checkout per
 //       configured project binding (.workspaces/projects/<p>/work.json —
 //       scripts/kernel/target-repo.mjs projectBinding)

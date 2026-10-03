@@ -1,4 +1,4 @@
-// The child process of `hfs emit-contracts` for the OPERATIONS of ONE app: `node operations-worker.mjs <repoRoot> <app>`.
+// The child process of `starci app emit` for the operations of one app.
 // Prints the OpenAPI 3.1 document of the app's typed operation table on stdout; exit 3 when the app has no `apps/<app>/src/operations.ts`.
 // Loads the repository's own typescript (resolved from the repository, never from hfs). Nothing of the repository is executed.
 import { createRequire } from 'node:module';

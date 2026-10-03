@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // brand-palette.mjs — a drawn part, a composite or a capture is painted in the brand's colours and no other hue.
 //
-//   node scripts/work/brand/brand-palette.mjs --prompt <work-root>            the colour block every draw prompt carries
-//   node scripts/work/brand/brand-palette.mjs --check <png> --brand <work-root> [--json]
-//   node scripts/work/brand/brand-palette.mjs --scan <work-root> [--json]     every part, composite and capture, read-only
+//   starci work brand-palette --prompt <work-root>            the colour block every draw prompt carries
+//   starci work brand-palette --check <png> --brand <work-root> [--json]
+//   starci work brand-palette --scan <work-root> [--json]     every part, composite and capture, read-only
 //
 // Owner, 2026-09-24 ("why is it red one time and green the next??"): one product drawing painted its primary button, links and selection in
 // the image model's default blue while the brand has ONE accent, Unicorn red. scripts/work/ui/render.mjs already read
@@ -466,7 +466,7 @@ async function main(argv) {
     const lines = bad.map((r) => `${r.record}  ${r.file}  [${r.kind}${r.declared ? '' : ', undeclared'}]\n    ${r.refused.map(describeOffender).join('\n    ')}${r.findings.some((f) => f.code === PALETTE_CODES.primaryAbsent) ? `\n    primary ${r.primary.token} ${r.primary.hex} absent` : ''}`);
     return { exitCode: 0, text: `${lines.join('\n')}${lines.length ? '\n' : ''}${bad.length} of ${result.results.length} images off-brand (brand ${result.brand.file} rev ${result.brand.rev}, primary ${result.brand.primary?.hex ?? 'none'})\n` };
   }
-  return { exitCode: 2, text: 'Usage: node scripts/work/brand/brand-palette.mjs --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
+  return { exitCode: 2, text: 'Usage: starci work brand-palette --prompt <work-root> | --check <png> --brand <work-root> [--json] | --scan <work-root> [--json]\n' };
 }
 
 if (isMain(import.meta.url)) {

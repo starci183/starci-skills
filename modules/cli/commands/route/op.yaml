@@ -1,0 +1,21 @@
+group: route
+verb: op
+owner: runtime
+summary: resolve the operation that serves a structured routing request
+impl: {script: scripts/route/route-op.mjs}
+flags:
+  - {name: kind, type: string, summary: operation id or family to route}
+  - {name: node-kind, type: string, summary: work node kind the operation serves}
+  - {name: phase, type: string, summary: workflow phase the operation runs in}
+  - {name: intent, type: list, summary: "intent term; comma list or repeatable"}
+  - {name: ops-dir, type: string, summary: "operation catalog directory (default is modules/ops)"}
+exit: {"0": operation resolved, "1": no operation matched or the catalog is missing, "2": bad usage or no routing key}
+json: flag
+examples:
+  - starci route op --kind backend.implement --json
+  - starci route op --node-kind ui --intent implement
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/route/route-op.mjs
+  - node .claude/scripts/route/route-op.mjs

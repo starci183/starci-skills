@@ -1,0 +1,22 @@
+group: reconciler
+verb: once
+owner: runtime
+summary: run one reconcile pass of the controllers in memory, shadow unless --apply
+impl:
+  script: scripts/reconciler/engine.mjs
+  args: [--once]
+flags:
+  - {name: controller, type: enum, enum: [job, host, gc, resource, workflow, workers, learning], summary: run only this controller}
+  - {name: key, type: string, summary: reconcile only this key}
+  - {name: apply, type: boolean, summary: "take the lead and apply the actions instead of planning them; refused while another leader is live"}
+exit:
+  "0": the pass finished
+  "1": the pass failed or the lead was refused
+  "2": bad usage
+json: flag
+examples:
+  - starci reconciler once --controller job --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/reconciler/engine.mjs --once

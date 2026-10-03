@@ -1,0 +1,29 @@
+group: gate
+verb: canon-scan
+owner: runtime
+summary: measure canon conformance debt and plan its disjoint slices
+impl: {script: scripts/gates/canon-scan.mjs}
+flags:
+  - {name: root, type: string, required: true, summary: repository to scan}
+  - {name: stack-kind, type: enum, enum: [next, nest], summary: repository framework kind}
+  - {name: families, type: list, summary: canon rule families to select}
+  - {name: paths, type: list, summary: repository paths in the slice}
+  - {name: exclude, type: list, summary: paths owned by another workflow}
+  - {name: machines, type: list, summary: eslint and architecture machines to run}
+  - {name: fix, type: boolean, summary: apply selected fixes inside the slice}
+  - {name: out, type: string, summary: write the scan output to this file}
+  - {name: blob, type: boolean, summary: store the scan output as a blob}
+exit:
+  "0": selected machines ran and no finding remains
+  "1": findings remain
+  "2": bad usage
+  "3": a selected machine could not run
+json: flag
+examples:
+  - starci gate canon-scan --root <repo> --stack-kind next --json
+  - starci gate canon-scan --root <repo> --paths apps/web/src --fix
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/canon-scan.mjs
+  - node .claude/scripts/gates/canon-scan.mjs

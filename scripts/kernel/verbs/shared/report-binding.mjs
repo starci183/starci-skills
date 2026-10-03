@@ -1,7 +1,7 @@
 // Durable worker report binding and identity for one dispatched job (alpha.3 runtime schema).
 //
 // The binding is the job's OPEN attempt: the op_attempts row of its latest dispatch that has no end state and is
-// not settled. Its dispatch_id is the report's identity, and it must carry a contracts row (api dispatch writes the
+// not settled. Its dispatch_id is the report's identity, and it must carry a contracts row (starci kernel dispatch writes the
 // contract, keyed by attempt_id, before the job goes running). A redispatch after a dead worker is a new attempt
 // (dispatch_seq + 1) with its own contract, so an old dispatch can never file into the new one.
 import { jobRowOf } from './rows.mjs';

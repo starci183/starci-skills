@@ -21,7 +21,7 @@ import { argThrow, needArgs, parseOpts, workRecordSpec } from '../lib/cli-arg.mj
  * provenance it did not earn (see the provenance note below).
  *
  * Usage:
- *   node scripts/example/example-evidence.mjs --work <path-to-.starciwork> --record <record-id> --cwd <repo-dir> \
+ *   starci work example-evidence --work <path-to-.starciwork> --record <record-id> --cwd <repo-dir> \
  *     --assert <ac-id>=<command> [--assert <ac-id>=<command> ...]
  *
  * Every `--assert` runs its command (via the system shell, resolved against --cwd) and is recorded with

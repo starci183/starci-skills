@@ -10,7 +10,7 @@
 // rollout-x.jsonl). It then deletes archive files older than
 // allocation.housekeeping.archiveMaxAgeMs (30 days).
 //
-// archiveSessionFiles is the per-op twin the settle lane calls when `api settle`
+// archiveSessionFiles is the per-op twin the settle lane calls when `starci kernel settle`
 // closes an op: the files it names go to <archiveRoot>/<agent>/<basename-ish> right
 // away, no age test — the caller already decided the session is over.
 //

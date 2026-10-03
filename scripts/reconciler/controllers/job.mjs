@@ -4,20 +4,20 @@
 //
 // Keys: `job:<ledgerId>:<jobId>` (one op job), `wf:<ledgerId>:<workflowId>` (the per-workflow dispatch pass) and
 // `workers:supervisor` (the Supervisor ledger's [Worker] jobs). Each job pass reads the job, its report, the settler's
-// events and the cached `api status` frontier, then does the FIRST due step (DESIGN §8.1 order):
+// events and the cached `starci kernel status` frontier, then does the FIRST due step (DESIGN §8.1 order):
 //
-//   dead worker (frontier.deadWorkerJobs)       -> api reconcile --job <id> --dead-worker --settle-failed   job.worker
-//   held worker (frontier.heldWorkerJobs)       -> api reconcile --job <id> --release-worker                job.worker
+//   dead worker (frontier.deadWorkerJobs)       -> starci kernel reconcile --job <id> --dead-worker --settle-failed   job.worker
+//   held worker (frontier.heldWorkerJobs)       -> starci kernel reconcile --job <id> --release-worker                job.worker
 //   reported, not yet settled or handed over    -> the runtime settler for this job                          job.settle
-//                                                  (node scripts/kernel/settle/job-settle.mjs --repo R --job J: reconcileJobSettle -
-//                                                  consume, re-verify or canon parity, api check + api settle; wrapped, never
+//                                                  (reconcileJobSettle({ repo: R, jobId: J }) -
+//                                                  consume, re-verify or canon parity, starci kernel record-checks + starci kernel settle; wrapped, never
 //                                                  re-implemented)
 //   reported, handed to the Kernel              -> Decision Item settle-nongreen (one per report)             job.consume-check
-//   answering                                   -> api questions --workflow (bridge) + DI worker-question    job.consume-check
-//   effect_unknown older than effectUnknownMs   -> api reconcile --job <id>                                  job.worker
+//   answering                                   -> starci kernel questions --workflow (bridge) + DI worker-question    job.consume-check
+//   effect_unknown older than effectUnknownMs   -> starci kernel reconcile --job <id>                                  job.worker
 //   settled, worker release unproven            -> the settler for this job (its releaseSettled closes and    job.close-verify
 //                                                  verifies the terminal), recordLeftover op-worker-after-settle
-//   wf: running < allowedParallel, queued-ready -> api dispatch-ready --workflow <wf> (at most once per       job.dispatch
+//   wf: running < allowedParallel, queued-ready -> starci kernel dispatch-ready --workflow <wf> (at most once per       job.dispatch
 //                                                  dispatchEveryMs per workflow)
 //   workers:supervisor                          -> scripts/supervisor/supervisor-watchdog.mjs sweepWorkers (called, not   job.close-verify
 //                                                  copied); in shadow over a dry ledger and dry host seams
@@ -27,7 +27,7 @@
 // Every act goes through ctx (ctx.api / ctx.run / ctx.openDecision carry the shadow gate). The pure planner planJob
 // holds every decision, so specs read it without a ledger.
 //
-//   node scripts/reconciler/controllers/job.mjs --dry [--repo <path>] [--workflow <id>] [--json]
+// Internal args (spawned by the reconciler engine): --dry [--repo <path>] [--workflow <id>] [--json].
 //     one read-only pass over the live ledgers: prints each job's plan (step + clocks); writes nothing.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,7 +81,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
       WORKER_RELEASE_LEAK: num(sla.WORKER_RELEASE_LEAK, 60_000),
     },
     health: Object.fromEntries(Object.entries(HEALTH_DEFAULTS).map(([k, v]) => [k, num(doc.health?.[k], v)])),
-    allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
+    allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'record-checks', 'reconcile', 'enqueue', 'incident'],
   };
 }
 const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
@@ -146,7 +146,7 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
 
 /**
  * The plan of one job: {step: {kind, concern, ...} | null, clocks: [{state, enteredAt, slaMs}]}. Pure.
- * `frontier` is api status frontier (deadWorkerJobs, heldWorkerJobs); `questions` the status workerQuestions of this job.
+ * `frontier` is starci kernel status frontier (deadWorkerJobs, heldWorkerJobs); `questions` the status workerQuestions of this job.
  */
 export function planJob(f, { frontier = {}, questions = [], settings = jobSettings() } = {}) {
   const S = settings.sla;
@@ -168,7 +168,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
       clock('DECISION_OVERDUE', f.handover.at);
       set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
     } else if (f.report.outcome !== 'done' || KERNEL_ONLY_OPS.includes(f.op)) {
-      // The settler never settles these; its handover is the Kernel's item (api status settleDecisions).
+      // The settler never settles these; its handover is the Kernel's item (starci kernel status settleDecisions).
       clock('DECISION_OVERDUE', f.report.filedAt);
       set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: KERNEL_ONLY_OPS.includes(f.op) ? 'owner-act' : `outcome-${f.report.outcome}` });
     } else {
@@ -194,7 +194,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   return { step, clocks };
 }
 
-/** The per-workflow dispatch plan from api status progress. Pure. */
+/** The per-workflow dispatch plan from starci kernel status progress. Pure. */
 export function planWorkflow(status, { lastDispatchAt = 0, now = Date.now(), settings = jobSettings() } = {}) {
   const p = status?.progress ?? {};
   const running = Number(p.running) || 0, allowed = Number(p.allowedParallel) || 0, ready = Number(p.queuedReady) || 0;
@@ -295,7 +295,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
       return { action: s.kind, ...(await ctx.api(ledgerId, s.verb, s.argv)) };
     case 'settle':
-      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api check + settle, release).
+      // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, starci kernel record-checks + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
@@ -433,7 +433,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
         out.sends += 1;
       } else if (a?.kind === 'dead-worker') {
         // H14: a gone/exited worker, or one whose lease the settler found expired (LeaseLive=False), is settled now.
-        ctx.log('reconciler.worker-health', `${j.job_id} dead (${a.why}): api reconcile --dead-worker --settle-failed`, { ...who, state: 'dead', why: a.why });
+        ctx.log('reconciler.worker-health', `${j.job_id} dead (${a.why}): starci kernel reconcile --dead-worker --settle-failed`, { ...who, state: 'dead', why: a.why });
         await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
       } else if (a?.kind === 'fail-no-report') {
         // done-without-report past doneFailAfterMs: the failed-no-report path (its salvage continues from the commits).

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// actions.mjs — the OWED ACTIONS list: every stuck item of every running workflow, classified, with the one action
+// starci supervisor actions — the OWED ACTIONS list: every stuck item of every running workflow, classified, with the one action
 // the [Supervisor] takes on it and an SLA clock (modules/supervisor/supervise.yaml mission; owner, 2026-09-28:
 // "the supervisor must watch, manage, send mail in, and adjust" - autopilot, the owner is asked only for the final
 // credentials step and the handover).
 //
 // It classifies nothing twice: OWED incidents and patterns come from owed.mjs through cluster.mjs, stalls/gates/waits
-// from stall.mjs (the poll digest), frontiers from `api status`, dead kernels and
+// from stall.mjs (the poll digest), frontiers from `starci kernel status`, dead kernels and
 // pushes from the tick. This file maps each to a class and a concrete action, and keeps the SLA:
 //   first seen   tick state owedSeen (the tick's state), a key a tick no longer sees starts over
 //   acted        a `supervisor-action` event naming the item (this CLI `record`, notify.mjs --item), or a
@@ -14,9 +14,9 @@
 // The tick records one `supervisor-owed-actions` event per run; `list` prints the newest. Every event here is a
 // machine.sqlite sup_events row (home.mjs supervisorEvent / newestEvent).
 //
-//   node scripts/supervisor/actions.mjs list [--json] [--open]
-//   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
-//   node scripts/supervisor/actions.mjs digest [--json]                       read-only preview of the owner digest
+//   starci supervisor actions list [--json] [--open]
+//   starci supervisor actions record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
+//   starci supervisor actions digest [--json]                       read-only preview of the owner digest
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
@@ -35,23 +35,23 @@ export const NOTICE_KIND = 'supervisor-notice';
 
 /** The classes, each with what the Supervisor does (supervise.yaml mission.classes). */
 export const CLASSES = Object.freeze({
-  'progress-stall': 'OUTCOME FIRST: the workflow does not progress past allocation.progress.supervisorGraceMs although its Kernel owns it. Read api status progress + rca, five-whys to the root cause, find the ONE systemic change that fixes the most (never re-dispatch the same failing shape): the Kernel lacks authority -> do it (lane) or rule it; a runtime cause -> runtime-defect; cross-workflow -> bridge/notify the peer; the Kernel ignores its rca.actions -> the tick already notified it, a second miss is a Kernel-loop defect (lane)',
-  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (api kernel-proposal): AUTO tier -> land it through a lane (lesson-actions.mjs land), IMPORTANT -> lesson-actions.mjs propose to the owner; record the result and close it in the product ledger',
-  'runtime-defect': 'fix it in an Opus lane or ONE [Worker] job per cluster, land it, then resolve each incident: api incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel',
-  'fixed-defect': 'verify the commit against the incident, then api incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel (or ack the pattern: owed.mjs ack)',
+  'progress-stall': 'OUTCOME FIRST: the workflow does not progress past allocation.progress.supervisorGraceMs although its Kernel owns it. Read starci kernel status progress + rca, five-whys to the root cause, find the ONE systemic change that fixes the most (never re-dispatch the same failing shape): the Kernel lacks authority -> do it (lane) or rule it; a runtime cause -> runtime-defect; cross-workflow -> bridge/notify the peer; the Kernel ignores its rca.actions -> the tick already notified it, a second miss is a Kernel-loop defect (lane)',
+  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (starci kernel kernel-proposal): AUTO tier -> land it through a lane (starci supervisor lesson-actions land), IMPORTANT -> starci supervisor lesson-actions propose to the owner; record the result and close it in the product ledger',
+  'runtime-defect': 'fix it in an Opus lane or ONE [Worker] job per cluster, land it, then resolve each incident: starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel',
+  'fixed-defect': 'verify the commit against the incident, then starci kernel incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel (or ack the pattern: owed.mjs ack)',
   'retry-cap': 'never a blind retry: diagnose the root cause (a [Worker] diagnose job), then notify the Kernel with the disposition - re-route to the root-cause op, re-cut the leg, or drop it',
-  'stale-gate': 'notify the owning Kernel with the evidence; still open past the SLA: resolve it yourself, api incident --resolve <inc> --by supervisor --detail "<evidence>"',
+  'stale-gate': 'notify the owning Kernel with the evidence; still open past the SLA: resolve it yourself, starci kernel incident --resolve <inc> --by supervisor --detail "<evidence>"',
   'owner-gate-no-ask': 'autopilot: not an owner step - take the ruling, record it, resolve --by supervisor (or type it: --attach <inc> --until-*); only credentials/handover stay the owner\'s',
   'peer-wait': 'notify the waiting Kernel and the PEER Kernel (the thing it owes is its next move); a peer that is itself stuck is escalated as its own item',
-  'owner-ask': 'autopilot (owner 2026-09-28): only credentials and the handover are the owner\'s. Never answer the ask: tell the Kernel to retire it (api retire-ask --dispatch <id> --reason ...) and take the decision itself or bring it to you as a delegated ruling you record; a credential/handover ask stays and is named in the owner digest',
-  'unread-peer': 'notify the Kernel to read api inbox and act on the message',
+  'owner-ask': 'autopilot (owner 2026-09-28): only credentials and the handover are the owner\'s. Never answer the ask: tell the Kernel to retire it (starci kernel retire-ask --dispatch <id> --reason ...) and take the decision itself or bring it to you as a delegated ruling you record; a credential/handover ask stays and is named in the owner digest',
+  'unread-peer': 'notify the Kernel to read starci kernel inbox and act on the message',
   undispatched: 'ready work is not dispatched: wake the Kernel (notify.mjs, [supervisor] dispatch <job>); a repeat is a wake defect - open a lane fix',
-  'dead-worker': 'notify the Kernel to reconcile (api reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead or gated: run that reconcile yourself',
-  'dead-kernel': 'the Host controller replaces a dead Kernel seat (watchdog.mjs --once --repair); if it is quarantined, node scripts/kernel/start-workflow.mjs --goal',
+  'dead-worker': 'notify the Kernel to reconcile (starci kernel reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead or gated: run that reconcile yourself',
+  'dead-kernel': 'the Host controller replaces a dead Kernel seat; if it is quarantined, starci workflow start --goal <id>',
   orphaned: 'wake the Kernel to name its next step; a plan that cannot continue: request a re-plan (define-goal --revise path) or archive --by supervisor',
-  stalled: 'read api status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
-  'contract-stale': 'notify the Kernel to re-read the changed runtime files and api kernel-ack-rev --rev <sha>',
-  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: node scripts/supervisor/lesson-actions.mjs revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
+  stalled: 'read starci kernel status; actionable -> wake the Kernel; held by a stale gate/wait -> that item; unexplained -> diagnose',
+  'contract-stale': 'notify the Kernel to re-read the changed runtime files and starci kernel kernel-ack-rev --rev <sha>',
+  'experiment-revert': 'a self-learning experiment measured no improvement or a regression: starci supervisor lesson-actions revert --experiment <id> --apply (a revert lane through the land gate), which records "did not work"',
   'push-refused': 'classify (secret / lint / test / hook) from the refusal and route the fix to a lane; a secret is removed from history in a lane, never pushed',
 });
 
@@ -108,7 +108,7 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
   for (const w of flows.workflows ?? []) {
     if (w.error) continue;
     for (const j of [...(w.deadWorkerJobs ?? []), ...(w.wedgedJobs ?? [])])
-      add({ key: key('worker', w.workflowId, j), class: 'dead-worker', workflowId: w.workflowId, repo: w.repo, subject: j, evidence: `api status lists ${j} dead or wedged` });
+      add({ key: key('worker', w.workflowId, j), class: 'dead-worker', workflowId: w.workflowId, repo: w.repo, subject: j, evidence: `starci kernel status lists ${j} dead or wedged` });
     if (w.ownerAsks?.length) add({ key: key('ask', w.workflowId), class: 'owner-ask', workflowId: w.workflowId, repo: w.repo, subject: w.ownerAsks.join(','),
       evidence: `${w.ownerAsks.length} pending non-credential owner ask(s): ${w.ownerAsks.slice(0, 4).join(', ')}` });
     if (w.kernelRevStale) add({ key: key('rev', w.workflowId), class: 'contract-stale', workflowId: w.workflowId, repo: w.repo, subject: w.kernelRevStale.current ?? null,
@@ -116,7 +116,7 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
   }
   for (const k of flows.deadKernels ?? []) add({ key: key('kernel', k.workflowId), class: 'dead-kernel', workflowId: k.workflowId, repo: k.repo, subject: k.workflowId, evidence: `watchdog read ${k.action} x${k.count}` });
   for (const o of flows.orphaned ?? []) add({ key: key('orphaned', o.workflowId), class: 'orphaned', workflowId: o.workflowId, repo: o.repo, subject: o.workflowId, evidence: one(o.reason) });
-  // op-metrics stuck waits past their SLA (api status stuck[], lane op-telemetry): only what no finding above names.
+  // op-metrics stuck waits past their SLA (starci kernel status stuck[], lane op-telemetry): only what no finding above names.
   const STUCK_CLASS = { 'owner-gate': 'owner-gate-no-ask', 'peer-wait': 'peer-wait', dependency: 'peer-wait', 'retry-cap': 'retry-cap', 'deferred-settle': 'stalled', 'queued-ready': 'undispatched', throttled: 'stalled' };
   for (const s of stuck) {
     const cls = STUCK_CLASS[s.kind];
@@ -282,7 +282,7 @@ if (isMain(import.meta.url)) {
       const r = await ownerDigest();
       console.log(asJson ? JSON.stringify(r) : `${r.text}\n-- preview only; the Owner Notifier sends the owner digest`);
     } else {
-      console.error('use: actions.mjs list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
+      console.error('use: starci supervisor actions list [--json] [--open] | record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>] | digest [--json]');
       process.exitCode = 2;
     }
   } catch (error) {

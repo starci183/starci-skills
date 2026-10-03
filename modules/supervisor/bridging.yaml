@@ -14,7 +14,7 @@ purpose: |
 
 detection:
   source: scripts/kernel/dependency-graph.mjs dependencyGraph (read-only; the whole ledger)
-  cli: node scripts/supervisor/bridge.mjs detect [--repo <ledger-owner>]... [--json]   default repos config.yaml supervisor.repos
+  cli: starci supervisor bridge detect [--repo <ledger-owner>]... [--json]   default repos config.yaml supervisor.repos
   nodes: every live workflow (phase running or queued, not archived)
   edges: |
     waiter -> blocker, one per piece of evidence, each hard (a real wait) or soft (a need, not a wait):
@@ -26,7 +26,7 @@ detection:
       foreign-file     an open [foreign-file-committed] incident names a file a peer owns           hard
       peer-request     a pending peer request names a peer's job or record                          soft
       foundation       a dependent of a foundation that has not landed                              soft
-      record-owner     api record-change was refused (record-change-refused event, 7 days)          soft
+      record-owner     starci kernel record-change was refused (record-change-refused event, 7 days)          soft
       work-graph-read  a work-graph node reads a path a peer's node owns                            soft
   findings: |
     circular-wait   a cycle over hard edges. Proposal designate: the lead is the workflow the most live
@@ -44,7 +44,7 @@ detection:
                     live owners claim one foundation under two names. Proposal revise (the younger
                     workflow parks or merges its duplicating legs); never clear-cut
   surfaces: |
-    api peers returns the whole graph as `dependencies` (edges, findings, bridges, self); api status carries
+    starci kernel peers returns the whole graph as `dependencies` (edges, findings, bridges, self); starci kernel status carries
     `dependencies` (the part touching the workflow) when it has any; the ui snapshot carries
     projects[].dependencies (hard edges, findings, bridges); bridge.mjs detect prints one line per hard wait and
     finding with the command the Supervisor would run for a clear-cut one.
@@ -72,7 +72,7 @@ actions:
     dependent's open wait on the blocker (or --waits) is re-typed: a new peer-wait --until-foundation <name>
     holding what the old one held, then the old one resolved --by supervisor naming the new. Not running yet:
     the record says rewire pending and `bridge.mjs rewire --bridge <id>` finishes it. The bridge Kernel lands
-    the foundation (api foundation --land) when the shared part is committed and verified, which releases every
+    the foundation (starci kernel foundation --land) when the shared part is committed and verified, which releases every
     dependent; the blocker is told its own job for it is redundant once it lands.
   transfer: |
     (b) bridge.mjs transfer --foundation <name> --to <wf> | --merge-into <foundation>, or --record <path> --to
@@ -80,7 +80,7 @@ actions:
     foundation spelled two ways into the other (its dependents become the other's, the record keeps mergedInto),
     and every open peer-wait typed on it is re-typed onto the new owner / merged foundation. A record transfer is
     a signals row scope 'ownership-transfer' (starci/ownership-transfer@1), rule 0 of
-    scripts/kernel/work-ownership.mjs ownerOf: the new owner declares its changes (api record-change).
+    scripts/kernel/work-ownership.mjs ownerOf: the new owner declares its changes (starci kernel record-change).
   revise: |
     (c) bridge.mjs revise --workflow <wf> --text <revised goal> --reason <text> [--request-only]: define-goal
     --revise --plan previews the leg change; under autopilot it is applied with --approve-revision <token>

@@ -18,8 +18,8 @@
 //   codex|codex-agent -> codex-agent   claude|claude-agent -> claude-agent
 //   devin|devin-agent -> devin-agent
 //
-// CLI: node scripts/agent/bias.mjs "<text>"            -> extracted JSON
-//      node scripts/agent/bias.mjs --normalize '<json>' -> normalized JSON
+// Internal entry: spawned by scripts/route/route-model.mjs; not invoked directly.
+// Args: "<text>" -> extracted JSON; --normalize '<json>' -> normalized JSON.
 import { isMain } from '../lib/is-main.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { altOf } from '../lib/source-phrases.mjs';

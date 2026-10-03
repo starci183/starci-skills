@@ -10,8 +10,8 @@
  * the path is exact, subdirectories stay in the inventory, and the directory must exist.
  *
  * Usage:
- *   node scripts/checks/check-json-exceptions.mjs
- *   node scripts/checks/check-json-exceptions.mjs --ignore-lockfiles
+ *   starci runtime check --only json-exceptions
+ *   starci runtime check --only json-exceptions -- --ignore-lockfiles
  */
 import fs from 'node:fs';
 import path from 'node:path';

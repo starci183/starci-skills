@@ -1,4 +1,4 @@
-// The child process of `hfs emit-contracts` for ONE app: `node schema-worker.mjs <repoRoot> <app>`.
+// The child process of `starci app emit` for one app.
 // Prints the schema the app serves on stdout; exit 3 when the app's module graph has no GraphQL server.
 // Loads the repository's own typescript, @nestjs/* and graphql (resolved from the repository, never from hfs).
 //

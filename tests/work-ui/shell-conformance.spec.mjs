@@ -194,7 +194,7 @@ test('the product-locale rule is kept: every content prompt states it', async (t
   assert.equal(productLocaleFor(null), null);
 });
 
-test('starci validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
+test('starci runtime validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
   const p = await settledProduct(t);
   const legacyUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
   fs.mkdirSync(legacyUi, { recursive: true });
@@ -227,13 +227,13 @@ test('the contracts wire the layout tree: owner op, draw, implement, audit, scaf
   for (const field of ['route', 'surface', 'direction', 'routed', 'host']) assert.ok(draw.writes.find((w) => w.id === 'node').fields.includes(field), `draw writes ${field}`);
   assert.ok(draw.blockers.some((b) => b.code === 'LAYOUT_ANCESTOR_UNSETTLED'));
   assert.match(draw.steps[1].action.en, /ImageGen never draws chrome/);
-  assert.match(draw.steps[1].action.en, /compose-direction\.mjs/);
+  assert.match(draw.steps[1].action.en, /starci work compose-direction/);
   assert.match(draw.steps[1].action.en, /both presentations/);
   assert.doesNotMatch(JSON.stringify(draw), /\bsheet\b(?! is| from)/, 'no sheet surface is offered');
   assert.equal(draw.proofs.find((p) => p.id === 'shell-conformance').check, 'scripts/work/ui/shell-conformance.mjs');
   const brand = readYaml('modules/ops/ops/brand.decide.yaml');
   assert.equal(brand.writes.find((w) => w.id === 'shellNode').schema, 'work/layout-tree@1');
-  assert.match(brand.steps.find((s) => s.writes.includes('shellNode')).action.en, /layout-tree\.mjs scan/);
+  assert.match(brand.steps.find((s) => s.writes.includes('shellNode')).action.en, /starci work layout-tree scan --work \.starciwork --write/);
   assert.equal(readYaml('modules/ops/ops/interface.scaffold.yaml').writes.find((w) => w.id === 'shellNode').schema, 'work/layout-tree@1');
   const implement = readYaml('modules/ops/ops/interface.implement.yaml');
   assert.match(JSON.stringify(implement.steps), /@modal\/\(\.\)<segment>\/page\.tsx/);

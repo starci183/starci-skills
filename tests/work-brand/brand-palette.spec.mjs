@@ -145,7 +145,7 @@ test('a tree without a brand record is told so, never refused', async (t) => {
 
 test('the contracts wire it: the draw prompt carries the brand colours and the gates name the codes', () => {
   const draw = fs.readFileSync(path.join(ROOT, 'modules/ops/ops/interface.draw.yaml'), 'utf8');
-  assert.match(draw, /brand-palette\.mjs --prompt/);
+  assert.match(draw, /starci work brand-palette --prompt/);
   assert.match(draw, /PALETTE_OFF_BRAND/);
   const drawOp = parseYaml(draw);
   assert.ok(drawOp.proofs.some((proof) => proof.id === 'brand-palette' && proof.check === 'scripts/work/ui/shell-conformance.mjs'));

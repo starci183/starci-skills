@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-helper-once.mjs - one home per shared helper (redundancy RED15 and RED17; part of `npm run check`).
-//   node scripts/checks/check-helper-once.mjs [--json]
+//   starci runtime check --only helper-once -- [--json]
 //
 // RT_HELPER_REDEFINED: every tracked `.mjs` under scripts/, engine/, modules/, bin/ and ext/ is parsed with acorn. The
 // helper table is DERIVED from the exports of the shared libs (scripts/lib/*.mjs, scripts/api/<system>/lib.mjs, engine/*.mjs and the check kit

@@ -1,8 +1,8 @@
 // decisions-archived-workflow.spec.mjs — archive/finish close a workflow's live Decision Items
 // (cluster decisions-archived-workflow). A live product repo had DIs open/claimed on workflows
-// archived by owner ruling; `api decisions --resolve` on them refuses 'workflow-archived: no further writes'
+// archived by owner ruling; `starci kernel decisions --resolve` on them refuses 'workflow-archived: no further writes'
 // (events_refuse_archived), so they could never close yet kept being counted, escalated and digested.
-//   1. api archive | api finish resolves every live DI (open|claimed|escalated) of the workflow inside its own
+//   1. starci kernel archive | starci kernel finish resolves every live DI (open|claimed|escalated) of the workflow inside its own
 //      transaction, BEFORE the phase flips: resolution by 'runtime', verb workflow-archived|workflow-finished,
 //      event decision-resolved auto:true.
 //   2. A leftover DI locked open on an already-archived workflow is never listed, blocking, escalated or rung.
@@ -44,7 +44,7 @@ const openDi = (ledger, workflowId, extra = {}) => openDecisionRow(ledger, {
   summary: 'no unit passed in 60 min', by: 'reconciler/workflow', ...extra,
 }, { now: 0 }).di;
 
-test('api archive resolves every live DI of the workflow (open|claimed|escalated) before the phase flips', (t) => {
+test('starci kernel archive resolves every live DI of the workflow (open|claimed|escalated) before the phase flips', (t) => {
   const { ledger, api, di } = repoWithLedger(t, [WF, OTHER]);
   const open = openDi(ledger, WF, { idempotencyKey: 'progress-stall:wf:a' });
   const claimed = openDi(ledger, WF, { kind: 'worker-question', idempotencyKey: 'worker-question:wf:b' });
@@ -93,10 +93,10 @@ test('a leftover DI locked open on an already-archived workflow is never listed,
   assert.equal(plan.actions.length, 0, 'never escalated');
   const listed = api('decisions', '--workflow', WF_ARCH);
   assert.equal(listed.status, 0, listed.stderr || listed.stdout);
-  assert.equal(JSON.parse(listed.stdout).decisions.length, 0, 'api decisions lists none');
+  assert.equal(JSON.parse(listed.stdout).decisions.length, 0, 'starci kernel decisions lists none');
 });
 
-test('api finish resolves the live DIs of a finished workflow (a re-finish repairs leftovers)', (t) => {
+test('starci kernel finish resolves the live DIs of a finished workflow (a re-finish repairs leftovers)', (t) => {
   const { ledger, api, di } = repoWithLedger(t, [WF_FIN]);
   const a = openDi(ledger, WF_FIN, { idempotencyKey: 'progress-stall:fin:a' });
   const b = openDi(ledger, WF_FIN, { kind: 'stale-wait', idempotencyKey: 'stale-wait:fin:b' });

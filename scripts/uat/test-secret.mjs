@@ -10,7 +10,8 @@
 // A credential that need not be stable across runs (a disposable account registered per run) is generated per run
 // and stored nowhere. A value is never logged.
 //
-//   node scripts/uat/test-secret.mjs get <name> --repo <path> [--stack dev] [--reveal]   prints nothing unless --reveal
+// Internal entry: spawned by scripts/supervisor/push-mains.mjs; not invoked directly.
+// Args: get <name> --repo <path> [--stack dev] [--reveal]   prints nothing unless --reveal
 //
 // In a script:  import { testSecret } from '<runtime>/scripts/uat/test-secret.mjs';
 //               const password = testSecret('login-capture-password', { repo });

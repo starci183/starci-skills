@@ -168,7 +168,7 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
     { pid: 102, created: old, cmd: `node ${DRIVE}Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo ${DRIVE}Repositories\\shop-be --workflow wf-shop-fe-canon --repair` },
     { pid: 103, created: old, cmd: `node ${D}Repositories/ecommerce-app/.claude/scripts/supervisor/supervisor-watchdog.mjs` },
     { pid: 104, created: T0 - 5 * 60_000, cmd: `node scripts/kernel/ask-server.mjs --repo ${D}Temp/starci-x/repo --workflow wf-y` },
-    { pid: 105, created: old, cmd: `node scripts/kernel/start-workflow.mjs --repo "${D}Temp/starci-host-outage-Zz/repo" --workflow wf-z` },
+    { pid: 105, created: old, cmd: `starci workflow start --repo "${D}Temp/starci-host-outage-Zz/repo" --workflow wf-z` },
     { pid: 106, created: old, cmd: `node ${D}tools/other-watchdog.mjs.bak --repo ${D}Temp/x` },
   ];
   const pure = findOrphans(procs, { knownRepos: [KNOWN], runningWorkflows: new Set(['wf-shop-fe-canon']), now: T0, minAgeMs: S.processes.orphanMinAgeMs });

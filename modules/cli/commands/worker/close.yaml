@@ -1,0 +1,27 @@
+group: worker
+verb: close
+owner: runtime
+summary: release a worker, close its terminal and prove its process tree is gone
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerCloseVerb}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - always finish a worker with starci worker close; release alone is not complete cleanup
+  - --stop-first requires positive caller knowledge that the Dispatch is still working
+  - success requires release, terminal-close and process-exit proof
+flags:
+  - {name: dispatch, type: string, required: true, summary: authoritative Orca Dispatch id}
+  - {name: stop-first, type: boolean, summary: stop a worker known to be working before release}
+  - {name: retry-release, type: boolean, summary: retry Orca's release once after an unconfirmed release}
+positional: []
+exit:
+  "0": "worker fully closed"
+  "1": "release, terminal-close or process-exit proof is missing"
+  "2": "bad usage"
+json: starci/worker-close@1
+examples:
+  - starci worker close --dispatch <dispatch-id>
+  - starci worker close --dispatch <dispatch-id> --stop-first --retry-release
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

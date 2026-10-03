@@ -57,7 +57,7 @@ export const sameDriveTmp=()=>path.join(path.parse(process.cwd()).root,'starci-t
 
 /**
  * Resolve once `pid` has exited (true) or `timeoutMs` passed (false). A detached child a spec launched
- * through `api serve-ask` holds the fixture's ledger open until it exits, and it writes its last event
+ * through `starci kernel serve-ask` holds the fixture's ledger open until it exits, and it writes its last event
  * (`ask-serving-expired`) *before* `process.exit`: a spec that stops at that event lets `t.after`'s
  * `rmSync` race the child's handle and EPERM on Windows under full-suite load. Await the pid, not the event.
  */

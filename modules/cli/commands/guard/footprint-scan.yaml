@@ -1,0 +1,26 @@
+group: guard
+verb: footprint-scan
+owner: runtime
+summary: scan for fresh cross-repository links and linked worktrees
+impl:
+  script: scripts/guards/footprint-scan.mjs
+flags:
+  - name: root
+    type: string
+    summary: repositories root to scan
+  - name: depth
+    type: number
+    summary: maximum directory depth to inspect
+exit:
+  "0": footprint scanned and recorded
+  "1": scan failed
+  "2": bad usage
+json: flag
+examples:
+  - starci guard footprint-scan --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/guards/footprint-scan.mjs
+internal: true
+why: the reconciler Host controller invokes this implementation as an owned internal child

@@ -71,7 +71,7 @@ reads:
     path: shared
     purpose:
       en: shared
-      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: .starciwork/features/<feature>/{sds/**/index.yaml,contract/**/index.yaml,integration/**/index.yaml}
@@ -97,7 +97,7 @@ writes:
         dependsOn, stateMachine, sequence, requiresProof) and leave owners absent - owners are
         module-root paths, which no design names before code exists; review.verify's final
         reconciliation writes them from the done implementation records that prove the component, and
-        starci validate lists a component without them as SDS_OWNERS_PENDING until then, synchronous surfaces between a
+        starci runtime validate lists a component without them as SDS_OWNERS_PENDING until then, synchronous surfaces between a
         provider feature and a consumer feature as work/contract@1 under contract/<name>/ (between,
         owner, surface, guarantees, consumerObligations), and each external system as
         work/integration@1 under integration/<name>/ (provider, boundary, endpoints, credential
@@ -134,8 +134,8 @@ steps:
   - reads: [standard, design-patterns, application-stacks]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/architecture-rules.yaml knowledge/design-patterns.yaml knowledge/application-stacks.yaml knowledge/hfs/slots.yaml knowledge/hfs/rules.yaml knowledge/patterns/{be,fe}/<the pattern of each layer the design places: architecture-check, cqrs, transport, api-auth, persistence, injection, error, background, idempotency, resilience, boundaries, multi-app>.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every standard-bound choice the record makes cites the rule id (knowledge/hfs/rules.yaml R<n>), pattern id or slot it rests on; a choice no read file supports is a reported gap or an owner question, never an invented standard. Each component the design places names the hfs slot it lands in (be.feature.application, be.integrations, fe.route, ...), so the build ops' READ digests resolve the same patterns. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/architecture-rules.yaml knowledge/design-patterns.yaml knowledge/application-stacks.yaml knowledge/hfs/slots.yaml knowledge/hfs/rules.yaml knowledge/patterns/{be,fe}/<pattern của từng tầng mà thiết kế đặt: architecture-check, cqrs, transport, api-auth, persistence, injection, error, background, idempotency, resilience, boundaries, multi-app>.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi lựa chọn bị chuẩn ràng buộc trong bản ghi đều dẫn mã luật (knowledge/hfs/rules.yaml R<n>), mã pattern hoặc slot mà nó dựa vào; lựa chọn không tệp nào đã đọc ủng hộ là một khoảng trống được báo hoặc câu hỏi cho chủ sở hữu, không bao giờ là chuẩn tự đặt. Mỗi thành phần thiết kế đặt ra nêu slot hfs nơi nó nằm (be.feature.application, be.integrations, fe.route, ...), để bản tóm tắt ĐỌC của các op build ra đúng các pattern đó. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/architecture-rules.yaml knowledge/design-patterns.yaml knowledge/application-stacks.yaml knowledge/hfs/slots.yaml knowledge/hfs/rules.yaml knowledge/patterns/{be,fe}/<the pattern of each layer the design places: architecture-check, cqrs, transport, api-auth, persistence, injection, error, background, idempotency, resilience, boundaries, multi-app>.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every standard-bound choice the record makes cites the rule id (knowledge/hfs/rules.yaml R<n>), pattern id or slot it rests on; a choice no read file supports is a reported gap or an owner question, never an invented standard. Each component the design places names the hfs slot it lands in (be.feature.application, be.integrations, fe.route, ...), so the build ops' READ digests resolve the same patterns. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/architecture-rules.yaml knowledge/design-patterns.yaml knowledge/application-stacks.yaml knowledge/hfs/slots.yaml knowledge/hfs/rules.yaml knowledge/patterns/{be,fe}/<pattern của từng tầng mà thiết kế đặt: architecture-check, cqrs, transport, api-auth, persistence, injection, error, background, idempotency, resilience, boundaries, multi-app>.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi lựa chọn bị chuẩn ràng buộc trong bản ghi đều dẫn mã luật (knowledge/hfs/rules.yaml R<n>), mã pattern hoặc slot mà nó dựa vào; lựa chọn không tệp nào đã đọc ủng hộ là một khoảng trống được báo hoặc câu hỏi cho chủ sở hữu, không bao giờ là chuẩn tự đặt. Mỗi thành phần thiết kế đặt ra nêu slot hfs nơi nó nằm (be.feature.application, be.integrations, fe.route, ...), để bản tóm tắt ĐỌC của các op build ra đúng các pattern đó. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - design-patterns
       - application-stacks
@@ -279,7 +279,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, declared proof demands are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: implementability
@@ -315,8 +315,8 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
-      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
-      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: OWNERSHIP_UNKNOWN

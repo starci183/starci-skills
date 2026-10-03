@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // worker-output.mjs — every page of one supervised worker's output, read by its Dispatch through Orca's
 // `worker-read --source auto` (scripts/api/orca/worker-read.mjs workerRead reads one page).
-//   node scripts/machine/worker-output.mjs --dispatch <dispatch_id> [--source <auto|transcript|terminal>] [--limit <n>]
+// Internal entry: spawned by scripts/kernel/transcripts.mjs; not invoked directly.
+// Args: --dispatch <dispatch_id> [--source <auto|transcript|terminal>] [--limit <n>].
 //
 // workerOutput follows the top-level cursor (pinned to its source) until a page returns no rows, the cursor stops
 // moving or MAX_PAGES; a `source_changed` answer restarts it once without the cursor. Its contentComplete is true

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // worker-close.mjs - the ONE way the runtime lets a finished (or failed, or stuck) managed worker go, so that nothing of it is left running.
 //
 // Why (owner rule, 2026-10-02 23:35: "a finished worker is closed COMPLETELY"): `worker-release` alone was believed to end the agent (live smoke E1 proved

@@ -1,4 +1,4 @@
-// api notify: split from cli.mjs; output and validation remain stable.
+// starci kernel notify: split from cli.mjs; output and validation remain stable.
 import path from 'node:path';
 import { getWorkflow, csvList } from './shared/rows.mjs';
 import { PEER_MESSAGE, peerMessageOf, peerRefusalOf, peerWaitMessageArrived, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './shared/peer-waits.mjs';

@@ -2,7 +2,7 @@
 // assess.mjs — bounded cold-scan state snapshot of target repos.
 // Feeds define-goal --plan: heuristics only, no test runs, finishes in seconds.
 //
-//   node scripts/goal/assess.mjs --repo <path> [--repo <path2>...] [--json]
+//   starci workflow assess --repo <path> [--repo <path2>...] [--json]
 //
 // Per-repo JSON:
 //   { repo, exists, size:{files,tsFiles,loc}, testInfra:{framework,specFiles,
@@ -204,7 +204,7 @@ for (let i = 0; i < args.length; i++) {
 }
 const asJson = args.includes('--json');
 if (args.includes('--help') || (!repos.length && !asJson)) {
-  console.log('usage: assess.mjs --repo <path> [--repo <path2>...] [--json]');
+  console.log('usage: starci workflow assess --repo <path> [--repo <path2>...] [--json]');
   process.exit(repos.length ? 0 : 2);
 }
 if (!repos.length) repos.push(process.cwd());

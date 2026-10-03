@@ -130,7 +130,7 @@ reads:
     path: shared
     purpose:
       en: shared
-      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (hfs explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
+      vi: "Chuẩn mà quyết định và bản ghi của op dẫn ra: knowledge/op-gate.yaml (proofs.read-knowledge), các tệp knowledge liệt kê ở bước ĐỌC và bản đồ slot hfs của mọi bản ghi op viết (starci app explain ở gốc app). Các tệp được đọc tại chỗ và ghi kèm sha256 vào bản tóm tắt ĐỌC; không chép lại vào bản ghi."
 writes:
   - id: node
     path: .starciwork/brand/index.yaml
@@ -213,7 +213,7 @@ writes:
         validate lists it as DESIGN_PLANNED, never refuses it, so it stays in layout.design and is never moved into blockers.
         A sibling evidence.yaml binds the scan and capture runs."
   - id: shellAssets
-    path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts, attached by api report) - never .starciwork/shell/assets
+    path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts, attached by starci kernel report) - never .starciwork/shell/assets
     fields: [capture bytes cited by name + sha256 in shell/index.yaml]
     content:
       en: "Agent data (ARCHITECTURE-DB §5.1): `layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and
@@ -245,8 +245,8 @@ steps:
   - reads: [standard, knowledge]
     writes: [read-digest]
     action:
-      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/gates/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
-      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy node scripts/gates/read-digest.mjs --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<họ của sản phẩm>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi token, cặp tông và luật tài sản mà bản ghi thương hiệu chốt đều dẫn mục grammar hoặc ui knowledge nó theo (cặp tông solid và soft của HeroUI, ngưỡng contrast-aa); giá trị mà grammar cấm là câu hỏi cho chủ sở hữu, không bao giờ ghi đè ngầm. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
+      en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run starci gate read --root <app> --touch <every record this op will write> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<the product family>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every token, tone pair and asset rule the brand record settles cites the grammar or ui knowledge entry it follows (the HeroUI solid and soft tone pairs, contrast-aa thresholds); a value the grammar forbids is an owner question, never a silent override. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."
+      vi: "ĐỌC chuẩn trước khi quyết định (knowledge/op-gate.yaml proofs.read-knowledge): chạy starci gate read --root <app> --touch <mọi bản ghi op sẽ viết> --knowledge knowledge/ui/index.yaml knowledge/grammars/index.yaml knowledge/grammars/<họ của sản phẩm>/* knowledge/patterns/fe/css.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, rồi đọc những gì nó ghi - các tệp knowledge tại chỗ và bản đồ slot hfs của từng bản ghi (slot, tầng, luật). Mọi token, cặp tông và luật tài sản mà bản ghi thương hiệu chốt đều dẫn mục grammar hoặc ui knowledge nó theo (cặp tông solid và soft của HeroUI, ngưỡng contrast-aa); giá trị mà grammar cấm là câu hỏi cho chủ sở hữu, không bao giờ ghi đè ngầm. Bản ghi phát sinh về sau được thêm bằng --touch và đọc theo cùng cách; BÁO CÁO kèm read-digest.json."
   - reads:
       - target
       - owner
@@ -384,7 +384,7 @@ steps:
     action:
       en: "Write the layout tree (not exclusively: interface.draw scans, draws or captures it itself when it starts from a
         todo shell, and only one workflow at a time draws the shared shell foundation - a tree another workflow's draw is
-        settling is left to it). When the frontend exists, run `node scripts/work/layout-tree.mjs scan --work
+        settling is left to it). When the frontend exists, run `starci work layout-tree scan --work
         .starciwork --write` and read what it
         reports: every node, every layout's component and chrome guess, and the navigation findings - a
         destination with no route, a route no page answers, a label a catalog lacks, a top-level route no
@@ -394,7 +394,7 @@ steps:
         providers or a guard. Serve the app locally and, for every visible layout at desktop and mobile in
         the light theme (dark only where the tree already carries it - never demanded), render a route directly under it in a real browser with the whole chain above,
         hide the slot's children and fill the slot element #FF00FF, capture the viewport, and record it
-        with `node scripts/work/layout-tree.mjs capture --work .starciwork --node <id> --breakpoint <bp>
+        with `starci work layout-tree capture --work .starciwork --node <id> --breakpoint <bp>
         --theme <theme> --file <png> --url <url> --provenance <how> --write`. A layout that marks where the
         user is (an active sidebar destination, an active tab) is also captured once per active state, with
         that state active, into layout.destinations: `layout-tree.mjs capture ... --destination <nav or tab
@@ -429,7 +429,7 @@ steps:
         otherwise, every declared mascot asset exists
         with its recorded hash, and the icon set is the only one named; run `node
         scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as
-        STARCI_JOB_SCRATCH/shell-conformance.txt, attached at api report. Bump `rev` and record what
+        STARCI_JOB_SCRATCH/shell-conformance.txt, attached at starci kernel report. Bump `rev` and record what
         changed. Report `done` exactly once with the new `rev`, the checks and the token-to-source
         trace; a failing check is `failed` with its output; a value that cannot be traced to a
         source is `ask` naming the token and the file; a source file the record needs and that does
@@ -452,7 +452,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+      en: Run the record-class validator `starci runtime validate` and, on every record directory it writes, `starci runtime validate --strict`; every cited ID/path exists or is explicitly
         proposed, required assertions are covered, input bindings are current, and an honest
         not-run/fail cannot earn done.
   - id: token-traceability
@@ -475,7 +475,7 @@ proofs:
         or accepted.
   - id: direction
     requirement:
-      en: "When the record carries `brand.direction`, `node scripts/work/brand/brand.mjs <work-root>` reports its
+      en: "When the record carries `brand.direction`, `starci work brand <work-root>` reports its
         `direction` check pass: every required archetype field present, every recipe mapped onto a DNA component
         (else a pending grammar proposal), unique rubric checks with cites, golden renders on disk with their
         sha256, and every `accepted` archetype - and an accepted direction - backed by the owner's own
@@ -484,7 +484,7 @@ proofs:
     check: scripts/work/brand/brand.mjs
   - id: shell-capture
     requirement:
-      en: "`node scripts/work/ui/shell-conformance.mjs .starciwork/shell/index.yaml` exits 0 on the written layout
+      en: "`starci work shell-conformance .starciwork/shell/index.yaml` exits 0 on the written layout
         tree: it is a work/layout-tree@1 record and done, a re-scan of app/ still matches its source digest,
         every visible layout has a slot-measured capture at desktop and mobile in the light theme (dark
         optional) on disk with its
@@ -492,7 +492,7 @@ proofs:
         productLocale default label and a route that lands on a page (a null route is a disabled
         destination), and every layout capture is painted in this record's colours (PALETTE_OFF_BRAND
         names a colour the brand does not declare, its area share and the nearest token;
-        scripts/work/brand/brand-palette.mjs). `starci validate --strict` compiles it against work/layout-tree@1."
+        scripts/work/brand/brand-palette.mjs). `starci runtime validate --strict` compiles it against work/layout-tree@1."
     check: scripts/work/ui/shell-conformance.mjs
   - id: checkpointed
     requirement:
@@ -502,8 +502,8 @@ proofs:
         refuses workflow-foreign-commit or workflow-foreign-change otherwise.
   - id: read-knowledge
     requirement:
-      en: "api settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
-      vi: "api settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
+      en: "starci kernel settle re-reads the attached read-digest.json (runtime check op-proof, proof read-knowledge): a done whose digest is missing (op-read-digest-missing), names no knowledge file or leaves a written record without its hfs slot (op-read-digest-no-knowledge) is refused."
+      vi: "starci kernel settle tự đọc lại read-digest.json đính kèm (check op-proof, proof read-knowledge): done thiếu bản tóm tắt (op-read-digest-missing), không nêu tệp knowledge nào hoặc có bản ghi đã viết thiếu slot hfs (op-read-digest-no-knowledge) đều bị từ chối."
     check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: SHELL_RENDER_UNAVAILABLE

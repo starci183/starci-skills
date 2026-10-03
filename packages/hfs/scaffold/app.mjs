@@ -1,4 +1,4 @@
-// hfs scaffold app <name> - the first tree of a new app, the one shape every StarCi product has:
+// starci app scaffold <name> - the first tree of a new app, the one shape every StarCi product has:
 //
 //   <name>/            hfs.json (kind app), package.json (the monorepo root: workspaces fe/apps/* and fe/packages/*, npm, turbo,
 //                      the back end's dependencies and every tool at its canon pin, the managed scripts), turbo.json,
@@ -19,7 +19,7 @@
 // variables: a `__app__` folder is written once per app of the side, named after it; an fe `apps/<name>/` folder is the skeleton of
 // the declared fe app <name> alone (landing and app differ); `__project__` in a path is the project name (packages/__project__-ui is
 // packages/<name>-ui). The workspace manifests and every tsconfig.json are written from code, never kept as template files (a
-// tsconfig.json under templates/ would be a TypeScript project of this repository); the managed files are the render of `hfs sync` (sync/index.mjs), so a fresh app
+// tsconfig.json under templates/ would be a TypeScript project of this repository); the managed files are the render of `starci app sync` (sync/index.mjs), so a fresh app
 // is in sync by construction. The lockfile is never written by hand: once the files are written, npm resolves the real one
 // (`npm install --package-lock-only`, no node_modules, no scripts), so `npm ci` installs the new app as it is. When npm cannot
 // resolve it the scaffold fails (HFS_SCAFFOLD_LOCK_FAILED), names the step and removes the app it began, so no app without a lock
@@ -110,7 +110,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
     'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
-    turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
+    turbo: null, '@nestjs/testing': null, '@starci/cli': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/jest-preset': null,
     '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/test-world': null, '@starci/tsconfig': null, '@tailwindcss/postcss': null, '@types/express': null,
     '@types/jest': null, '@types/node': null, '@types/react': null, '@types/react-dom': null, eslint: null, 'eslint-plugin-react-hooks': null,
     husky: null, jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: null, 'ts-jest': null,
@@ -351,14 +351,14 @@ export function npmLock(root) {
 }
 
 /**
- * `hfs scaffold app <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
+ * `starci app scaffold <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
  * exclusions); the CLI passes the one it resolves. A failed lock step removes the app and throws HFS_SCAFFOLD_LOCK_FAILED.
  */
 export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
   const root = path.join(into, name);
-  if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; hfs scaffold app never writes into an existing directory`);
+  if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; starci app scaffold never writes into an existing directory`);
   const declaration = starterDeclaration(name, manifest, edition);
   const app = resolveRepoDeclaration(manifest, declaration);
   const pkg = packageManifest(name, pins, app.edition);
@@ -399,7 +399,7 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
   const locked = lock(root);
   if (!locked.ok) {
     fs.rmSync(root, { recursive: true, force: true });
-    throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}); the app was removed. Check the network and the npm registry, then run hfs scaffold app ${name} again`);
+    throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}); the app was removed. Check the network and the npm registry, then run starci app scaffold ${name} again`);
   }
   return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort() };
 }

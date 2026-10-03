@@ -1,4 +1,4 @@
-// hfs new service | spec - the one way a `*.service.ts` and its unit spec come into being.
+// starci app new service | spec - the one way a `*.service.ts` and its unit spec come into being.
 //
 // Unit test standard (owner-locked): only `*.service.ts` files are unit-tested, each with exactly one colocated
 // `<name>.service.spec.ts`, built with `Test.createTestingModule({ providers }).compile()` and `moduleRef.get(Service)`,
@@ -163,7 +163,7 @@ function specSkeleton({ shape, serviceFile, manifest = loadSlotManifest() }) {
     }
     const entry = doubleOf(table, dependency.token);
     const emit = EMITTERS[entry.double];
-    if (!emit) throw new ScaffoldError('HFS_NEW_DOUBLE_UNKNOWN', `the slot manifest names the double ${entry.double} for ${dependency.token}, which hfs new cannot write yet`);
+    if (!emit) throw new ScaffoldError('HFS_NEW_DOUBLE_UNKNOWN', `the slot manifest names the double ${entry.double} for ${dependency.token}, which starci app new cannot write yet`);
     const made = emit(dependency);
     for (const name of made.uses ?? []) kit.add(name);
     if (made.clock) { needsClock = true; kit.add('FakeClock'); }
@@ -282,24 +282,24 @@ function serviceSource({ name, dependencies = [] }) {
 
 const loadTypeScript = repoRoot => {
   try { return createRequire(path.join(repoRoot, 'package.json'))('typescript'); } catch {
-    throw new ScaffoldError('HFS_NEW_TYPESCRIPT_MISSING', `typescript is not installed under ${repoRoot}; run npm ci first, hfs new reads the constructor with the repository's own TypeScript`);
+    throw new ScaffoldError('HFS_NEW_TYPESCRIPT_MISSING', `typescript is not installed under ${repoRoot}; run npm ci first, starci app new reads the constructor with the repository's own TypeScript`);
   }
 };
 
 const BE = 'be';
 
-/** The declaration of the app at `appRoot` and its be side folder: hfs new runs at the app root and writes into be/ only. */
+/** The declaration of the app at `appRoot` and its be side folder: starci app new runs at the app root and writes into be/ only. */
 const backEndOf = (appRoot, manifest = loadSlotManifest()) => {
   let repo;
   try { repo = readRepoDeclaration(manifest, appRoot); } catch (error) { throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} has no valid app hfs.json (${error.message})`); }
-  if (!repo.sides) throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} is not the app root; run hfs new at the folder of hfs.json`);
+  if (!repo.sides) throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} is not the app root; run starci app new at the folder of hfs.json`);
   return { repo, beRoot: path.join(appRoot, BE) };
 };
 
 /** An app-relative path below be/ as a be-relative one; a path of the root or of fe/ is refused. */
 const belowBackEnd = input => {
   const relative = input.split(path.sep).join('/').replace(/^\.\//, '').replace(/\/$/, '');
-  if (!relative.startsWith(`${BE}/`)) throw new ScaffoldError('HFS_NEW_BACKEND_ONLY', `hfs new service | spec writes back-end services under be/; ${relative} is not below be/`);
+  if (!relative.startsWith(`${BE}/`)) throw new ScaffoldError('HFS_NEW_BACKEND_ONLY', `starci app new service | spec writes back-end services under be/; ${relative} is not below be/`);
   return relative.slice(BE.length + 1);
 };
 
@@ -311,13 +311,13 @@ const requireSlot = (repoRoot, relative) => {
 
 const writeNew = (repoRoot, relative, text) => {
   const target = path.join(repoRoot, relative);
-  if (fs.existsSync(target)) throw new ScaffoldError('HFS_NEW_EXISTS', `${relative} already exists; hfs new never overwrites`);
+  if (fs.existsSync(target)) throw new ScaffoldError('HFS_NEW_EXISTS', `${relative} already exists; starci app new never overwrites`);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, text);
   return relative;
 };
 
-/** `hfs new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
+/** `starci app new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
 export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManifest() }) {
   const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
   // `new spec` writes a unit spec: the test world it belongs to (be.tests.*) is a full-edition capability.
@@ -332,7 +332,7 @@ export function newSpec({ repoRoot: appRoot, file, ts, manifest = loadSlotManife
   return [writeNew(repoRoot, specPath, specSkeleton({ shape, serviceFile: relative, manifest }))].map(created => `${BE}/${created}`);
 }
 
-/** `hfs new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
+/** `starci app new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
 export function newService({ repoRoot: appRoot, dir, name, inject = [], ts, manifest = loadSlotManifest() }) {
   const { repo, beRoot: repoRoot } = backEndOf(appRoot, manifest);
   // `new service` writes the service and its unit spec: the test world (be.tests.*) is a full-edition capability.
@@ -341,7 +341,7 @@ export function newService({ repoRoot: appRoot, dir, name, inject = [], ts, mani
   const relative = path.posix.join(belowBackEnd(dir), `${name}.service.ts`);
   requireSlot(repoRoot, relative);
   requireSlot(repoRoot, relative.replace(/\.ts$/, '.spec.ts'));
-  for (const target of [relative, relative.replace(/\.ts$/, '.spec.ts')]) if (fs.existsSync(path.join(repoRoot, target))) throw new ScaffoldError('HFS_NEW_EXISTS', `${target} already exists; hfs new never overwrites`);
+  for (const target of [relative, relative.replace(/\.ts$/, '.spec.ts')]) if (fs.existsSync(path.join(repoRoot, target))) throw new ScaffoldError('HFS_NEW_EXISTS', `${target} already exists; starci app new never overwrites`);
   const text = serviceSource({ name, dependencies: inject.map(parseInject) });
   const shape = readServiceShape({ ts: ts ?? loadTypeScript(appRoot), fileName: path.join(repoRoot, relative), text });
   const spec = specSkeleton({ shape, serviceFile: relative, manifest });

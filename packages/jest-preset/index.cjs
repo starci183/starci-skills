@@ -15,7 +15,7 @@ const { fakeIds, FakeIds } = require("./ids.cjs")
  * Coverage is measured where logic runs: every file `<name>.<role>.ts` of a LOGIC role (service, policy, projection, guard, mapper, client, ...)
  * inside the roots the slot manifest marks `coverage: required` (the modules of the back end: domain, integrations, platform, projections).
  * The features (handlers, resolvers, controllers, consumers, processors, steps, sagas, cli commands) are thin by rule (BE_FEATURE_THIN) and are
- * never measured. The scope is NOT written here: `hfs sync` renders it from the manifest (scripts/hfs/coverage-scope.mjs) into the repository's
+ * never measured. The scope is NOT written here: `starci app sync` renders it from the manifest (scripts/hfs/coverage-scope.mjs) into the repository's
  * jest.config.js as `starciJestConfig({ coverage: { roots, roles, excludes } })`, and the same derivation renders Sonar's
  * `sonar.coverage.exclusions` and the Codecov paths and components, so the three can never disagree. Every measured file must reach 100 on every metric.
  * The unit run also writes `coverage/lcov.info`: Sonar and Codecov import it.
@@ -91,7 +91,7 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * The whole jest config of a Nest repository: projects `unit` (colocated `<name>.spec.ts`), `integration`
  * (`src/tests/integration/<capability>/<name>.integration-spec.ts`), `e2e` (`src/tests/e2e/<area>/<name>.e2e-spec.ts`) and
  * `contract` (`src/tests/contract/<provider>/<name>.contract-spec.ts`). It takes ONE option, the coverage scope: the repository's `jest.config.js` is a managed file
- * (R05), rendered by `hfs sync` as `module.exports = require("@starci/jest-preset").starciJestConfig({ coverage: { roots, roles, excludes } })`, the scope derived from the slot manifest.
+ * (R05), rendered by `starci app sync` as `module.exports = require("@starci/jest-preset").starciJestConfig({ coverage: { roots, roles, excludes } })`, the scope derived from the slot manifest.
  *
  * The managed scripts select one project each (`test` = unit, `test:integration`, `test:e2e`, `test:contract`); the
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
@@ -161,12 +161,12 @@ function hasCoverageSubjects(root, glob) {
   return walk(base)
 }
 
-/** The scope `{ roots, roles, excludes }` of an options object, or a refusal: the scope is rendered by `hfs sync`, never defaulted. */
+/** The scope `{ roots, roles, excludes }` of an options object, or a refusal: the scope is rendered by `starci app sync`, never defaulted. */
 function coverageOf(options) {
   const coverage = options?.coverage
   const list = (value) => Array.isArray(value) && value.every((item) => typeof item === "string" && item.length > 0)
   if (!coverage || !list(coverage.roots) || !list(coverage.roles) || !coverage.roles.length || !list(coverage.excludes)) {
-    throw new Error("starciJestConfig({ coverage: { roots, roles, excludes } }) needs the coverage scope hfs sync renders from the slot manifest; run \"npx hfs sync --write\"")
+    throw new Error("starciJestConfig({ coverage: { roots, roles, excludes } }) needs the coverage scope starci app sync renders from the slot manifest; run \"npx starci app sync --write\"")
   }
   return coverage
 }

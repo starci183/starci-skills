@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP R1: one Run per workflow; the rebind-once guard stays, because a repeated run-use fences live consumers.
 // run-show.mjs — the calls.yaml `run-show` call as a callable function.
-//   node scripts/api/orca/run-show.mjs --id <run_id>
+// Internal entry: spawned by scripts/kernel/orca-runs.mjs; not invoked directly.
+// Args: --id <run_id>
 // Returns {ok, run, coordinator, missing, errorCode, error, hostUnavailable}:
 // `coordinator` is result.run.coordinator_handle, `missing` is Orca's typed
 // run_not_found (the Run is gone, not the host).

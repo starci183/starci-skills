@@ -1,4 +1,4 @@
-// api record-change: split from cli.mjs.
+// starci kernel record-change: split from cli.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { getWorkflow, workDirOf, workflowRunning } from './shared/rows.mjs';
@@ -36,7 +36,7 @@ export default {
       // The refusal is a cross-workflow dependency the Supervisor reads (dependency-graph.mjs record-owner edges).
       try { ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: RECORD_CHANGE_REFUSED,
         payload: { record, reach, owners: foreign.slice(0, 20).map((o) => ({ file: o.file, workflowId: o.workflowId ?? null, by: o.by })) } })); } catch { /* the refusal stands either way */ }
-      throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with api notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
+      throw Object.assign(new Error(`${workflowId} does not own ${foreign.length} record file(s) of ${record}: ${foreign.slice(0, 5).map((o) => `${o.file} is owned by ${o.workflowId ?? '-'} (${o.by}${o.detail ? `: ${o.detail}` : ''})`).join('; ')}; only a record's owner declares its change (tell the owner with starci kernel notify --kind request)`), { code: 'record-change-not-owner', owners: foreign });
     }
     const heads = committedReader(tree, { workDir })(keys);
     const inFlight = heads ? keys.filter((file) => !committedMatches(heads.get(file) ?? null, files[file].slice(0, 16))) : [];

@@ -1,6 +1,6 @@
 // The findings of the rules that compare a file with its render or run the repository's own tool: R04 the managed .gitignore block
 // (packages/hfs/sync/managed.mjs, next to the other managed files; R11 sonar-project.properties is proved in tests/gates/hfs-sync.spec.mjs)
-// and R19 prettier (packages/hfs/sync/format.mjs). Each has a violating and a passing repository and names its code; `hfs check`
+// and R19 prettier (packages/hfs/sync/format.mjs). Each has a violating and a passing repository and names its code; `starci app check`
 // reports them through the CLI with their Vietnamese why.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { trackedFiles } from '../../scripts/hfs/check.mjs';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { SyncError } from '../../packages/hfs/sync/index.mjs';
 import { formatFindings, loadPrettier } from '../../packages/hfs/sync/format.mjs';
 import { managedFindings } from '../../packages/hfs/sync/managed.mjs';
@@ -56,12 +56,12 @@ test('the CLI reports the block drift with its Vietnamese why, and an app with n
   let out = '';
   let err = '';
   const seams = { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: PRESETS, prettier: FORMATTED };
-  const code = await main(['check', '--repo', dir, '--json'], seams);
+  const code = await main(['check', '--cwd', dir, '--json'], seams);
   assert.equal(code, 1);
   const [finding] = JSON.parse(out).findings.filter((f) => f.code === 'HFS_GITIGNORE_BLOCK_DRIFT');
   assert.ok(finding);
   assert.match(finding.titleVi, /[\u00c0-\u1ef9]/);
-  const refused = await main(['check', '--repo', dir], { ...seams, presets: undefined, stdout: () => {} });
+  const refused = await main(['check', '--cwd', dir], { ...seams, presets: undefined, stdout: () => {} });
   assert.equal(refused, 2);
   assert.match(err, /HFS_SYNC_PRESET_MISSING/);
 });

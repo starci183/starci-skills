@@ -1,4 +1,4 @@
-// api artifacts — every indexed proof file of the workflow's jobs (job_artifacts), per job; read-only
+// starci kernel artifacts — every indexed proof file of the workflow's jobs (job_artifacts), per job; read-only
 // (scripts/kernel/job-artifacts.mjs listJobArtifacts). Split out of cli.mjs (lane slim-04); its help line
 // stays in cli.mjs usage() (usageInCore).
 //

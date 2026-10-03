@@ -85,7 +85,7 @@ rules:
     requirement: |-
       A synchronous API keeps its snapshot (`be/contracts/<service>/schema.graphql`, `openapi.json`; R23, R113). The async contract
       is the literal `EVENTS` table of the publisher's `apps/<service>/src/events.ts` (event name, version, payload fields, and `compensates` when the event announces the failure of the step another event started)
-      and its snapshot `be/contracts/<service>/events.json` (`starci/event-contract@1`), emitted by `npm run contract:emit`. A
+      and its snapshot `be/contracts/<service>/events.json` (`starci/event-contract@1`), emitted by `starci app emit`. A
       consumer states what it reads in the literal `CONSUMES` table of `apps/<app>/src/consumes.ts` (service, event, version); each
       entry must exist in the provider's snapshot at that version. A breaking change bumps the event version in the provider and
       fails every consumer that has not followed.

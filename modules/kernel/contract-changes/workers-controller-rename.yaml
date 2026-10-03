@@ -14,7 +14,7 @@ reach: new-legs
 paths:
   - modules/kernel/driver-loop.yaml
   - modules/kernel/dispatch.yaml
-  - modules/kernel/api-commands/
+  - modules/cli/commands/kernel/
   - modules/kernel/failure-codes.yaml
   - modules/kernel/owner-rulings.yaml
   - modules/reconciler/

@@ -5,7 +5,7 @@
 // restart}. probe() is read-only and async (a child process or an HTTP GET, never a blocking spawnSync inside the
 // engine). start() does NOT act: it returns the actuator command {cmd, args}, which the controller hands to
 // ctx.run, so shadow mode records it and only active mode runs it. Every actuator is this file's own CLI
-// (`node scripts/reconciler/services.mjs --start <name>`), so one place starts each service.
+// (the services actuator), so one place starts each service.
 //
 // Ports and URLs are read once, from one source each (servicePorts): the harness port from runtimes.yaml
 // allocation.supervisorTick.statusApp.port, the public harness hostname from ~/.cloudflared/harness.yml ingress
@@ -18,15 +18,14 @@
 // `restart` events: no restarts_json), every probe to `service_probes`. The same table also holds the Host
 // controller's seat rows (`seat:...`) and ledger rows (`ledger:<id>`), so `boot.mjs --status` shows everything the Host owns.
 //
-//   node scripts/reconciler/services.mjs --list [--json]            the rows of the services table
-//   node scripts/reconciler/services.mjs --probe <name> [--json]    one read-only probe
-//   node scripts/reconciler/services.mjs --start <name> [--json]    the actuator (run by ctx.run in active mode only)
-//   node scripts/reconciler/services.mjs --reopen <name> [--json]   a quarantined service/seat back to `declared`
-//   node scripts/reconciler/services.mjs --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
-//   node scripts/reconciler/services.mjs --processes                the process table (host-health listProcesses) as JSON
-//   node scripts/reconciler/services.mjs --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
-//   node scripts/reconciler/services.mjs --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
-//   node scripts/reconciler/services.mjs --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal
+// Internal args (spawned by the host controller): --list [--json] for the rows of the services table
+//       --probe|--start <name> [--json]    read-only probe or active-mode actuator
+//       --reopen <name> [--json]   a quarantined service/seat back to `declared`
+//       --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
+//       --processes                the process table (host-health listProcesses) as JSON
+//       --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
+//       --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
+//       --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -41,6 +40,7 @@ export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
 const HARNESS_TUNNEL_YML = path.join(os.homedir(), '.cloudflared', 'harness.yml');
 const RECONCILER_TASK = 'StarCi-Reconciler';
+const starciLauncher = () => path.join(os.homedir(), '.starci', 'bin', process.platform === 'win32' ? 'starci.cmd' : 'starci');
 
 /* ------------------------------------------------------------ settings */
 
@@ -174,7 +174,7 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
   return { ok: false, verdict: value?.hostUnavailable ? 'unavailable' : 'error', error: String(value?.error ?? r.stderr ?? '').slice(0, 200) };
 }
 
-/** `node scripts/connectors/<script> status` answers running (and, for the tunnel, no health problems). */
+/** A connector's internal status probe answers running (and, for the tunnel, no health problems). */
 async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
   const [cmd, args] = node(`scripts/connectors/${script}`, ['status', ...extraArgs]);
   let last = null;
@@ -242,7 +242,7 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
         const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run });
         return t.exists || settings.allowTaskRepair ? t : { ...t, unmanaged: true };
       },
-      start: () => ({ cmd: 'node', args: ['scripts/reconciler/boot.mjs', '--install-task', '--apply', '--json'] }) }),
+      start: () => ({ cmd: starciLauncher(), args: ['task', 'register', 'reconciler', '--apply', '--json'] }) }),
   ];
   for (const c of settings.checkers) {
     out.push({ name: `checker:${c.name}`, kind: 'checker', restart: false, ownerPath: false, ...c, start: () => null,
@@ -445,7 +445,7 @@ export async function startService(name, { settings = hostSettings(), ports = se
       return { ok: r.status === 0, app, ...(lastJson(r.stdout) ?? {}), ...(r.status ? { error: String(r.stderr ?? '').trim().slice(0, 300) } : {}) };
     }
     case 'harness-ui': case 'harness-tunnel': {
-      const task = s.task; // what harness-tunnel's task runs is registered by tunnel-task.mjs (node ui/start.mjs --tunnel)
+      const task = s.task; // tunnel-task.mjs registers `starci harness start --tunnel` as the harness-tunnel action
       tasks(['/End', '/TN', task]);
       if (name === 'harness-ui' && ports.harnessPort) {
         // A listener that holds the port but does not answer blocks the new server: stop it first.

@@ -1,5 +1,5 @@
 /**
- * `hfs emit-contracts`: writes `contracts/<service>/events.json` for every service that declares typed event classes under
+ * `starci app emit`: writes `contracts/<service>/events.json` for every service that declares typed event classes under
  * `src/modules/events/<service>/` (events.mjs: the async contract, R166), `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
  * `contracts/<app>/openapi.json` for every api app whose `apps/<app>/src/operations.ts` exports the typed operation table
  * `OPERATIONS` (operations.mjs: OpenAPI 3.1 read from the TypeScript checker; nothing is executed).
@@ -67,7 +67,7 @@ function runWorker(worker, repoRoot, app) {
   const result = spawnSync(process.execPath, [worker, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: readEnv('PATH') ?? '' }, maxBuffer: 256 * 1024 * 1024 });
   if (result.status === 3) return { text: null, lines: [] };
   const lines = (result.stderr ?? '').split(/\r?\n/).filter(Boolean);
-  if (result.status !== 0) throw new Error(`hfs emit-contracts: ${app} failed (exit ${result.status}): ${(lines.join('\n') || result.stdout).trim()}`);
+  if (result.status !== 0) throw new Error(`starci app emit: ${app} failed (exit ${result.status}): ${(lines.join('\n') || result.stdout).trim()}`);
   return { text: result.stdout, lines: lines.filter((line) => line.startsWith(STAND_IN)) };
 }
 

@@ -7,7 +7,7 @@
 // the slice itself, over its OWNED paths, against its admission base, and settles it only when ALL hold:
 //
 //   (a) canon-scan over the owned paths returns 0 findings              - the slice's own goal is met;
-//   (b) the gate's lint half (scripts/gates/gate.mjs: hfs lint --changed over the owned files, per (file, rule) against the
+//   (b) the gate's lint half (scripts/gates/gate.mjs: starci app lint --changed over the owned files, per (file, rule) against the
 //       admission base, read-only) reports no new finding and every tool ran  - nothing new, nothing unproven;
 //   (c) every declared red / unavailable check is superseded by one of these owned-scope measurements (canon, lint,
 //       typecheck, git diff --check) or re-runs exit 0 as a runtime check - so what stays red is FOREIGN residue,
@@ -67,8 +67,8 @@ export const withoutNodePath = (command) => String(command ?? '')
 
 export function checkFamilyOf(check) {
   const name = String(check?.name ?? ''), command = String(check?.command ?? '');
-  if (/canon-scan\.mjs/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
-  if (/gate\.mjs|\bhfs\s+lint\b|\beslint\b/.test(command) || /code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
+  if (/canon-scan\.mjs|\bstarci\s+gate\s+canon-scan\b/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
+  if (/gate\.mjs|\bstarci\s+gate\s+run\b|\bstarci\s+app\s+lint\b|\bhfs\s+lint\b|\beslint\b/.test(command) || /code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
   if (/(?:^|[\s/\\])tsc(?:\.cmd)?(?:\s|$)/.test(command) || /(?:^|[-_.])tsc(?:$|[-_.])|type-?check/i.test(name)) return 'tsc';
   if (/^git\s+diff\b[^&|;]*--check\b/.test(command.trim())) return 'diff';
   // Exactly one file operand, never a flag (a preload flag would run code).
@@ -244,7 +244,7 @@ export function tscParity({ root, ownedRels, baseBlobs, extraProjects = [], ts: 
 /* ------------------------------------------------------------ (b) lint parity through the gate */
 
 /**
- * (b)+(c) for lint: the gate's lint half (scripts/gates/gate.mjs runLintGate: `hfs lint --changed` over the owned files,
+ * (b)+(c) for lint: the gate's lint half (scripts/gates/gate.mjs runLintGate: `starci app lint --changed` over the owned files,
  * judged per (file, rule) against the admission base read-only from git objects) in a child process. {ok, status, counts,
  * gating: [...], baseline}. status clean | findings | unavailable (a tool could not run: never green).
  */

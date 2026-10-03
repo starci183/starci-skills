@@ -4,7 +4,7 @@ summary: "Bootstrap of land-conflict-free-registries (its own file modules/kerne
 reach: new-legs
 paths:
   - modules/kernel/api.yaml
-  - modules/kernel/api-commands/extensions.yaml
+  - modules/cli/commands/kernel/extensions.yaml
   - modules/kernel/contract-changes/land-conflict-free-registries.yaml
   - modules/supervisor/supervise.yaml
   - modules/supervisor/worker-prompt.md

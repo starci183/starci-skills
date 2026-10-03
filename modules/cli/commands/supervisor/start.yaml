@@ -1,0 +1,26 @@
+group: supervisor
+verb: start
+owner: runtime
+summary: enable and start the one long-lived Supervisor seat
+impl:
+  script: scripts/supervisor/start-supervisor.mjs
+flags:
+  - name: plan
+    type: boolean
+    summary: prove the launch plan without starting the seat
+  - name: reason
+    type: string
+    summary: owner reason recorded with the launch
+exit:
+  "0": supervisor started or already healthy
+  "1": launch refused or failed
+  "75": Orca is not answering (host unavailable)
+  "2": bad usage
+json: flag
+examples:
+  - starci supervisor start
+  - starci supervisor start --plan
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/start-supervisor.mjs

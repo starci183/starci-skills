@@ -1,0 +1,65 @@
+group: workflow
+verb: define
+owner: runtime
+summary: define a goal — assess the prompt, plan the op chain, queue it in the ledger inbox
+impl:
+  script: scripts/goal/define-goal.mjs
+flags:
+  - name: repo
+    type: string
+    summary: "repository whose .starciwork ledger owns the goal (default: the working directory)"
+  - name: project
+    type: string
+    summary: registered project name; resolves the work.json binding (mutually exclusive with --repo)
+  - name: text
+    type: string
+    required: true
+    summary: the owner prompt the goal is defined from
+  - name: title
+    type: string
+    summary: short title; defaults to the first 80 chars of --text
+  - name: display-name
+    type: string
+    summary: human name approved with the plan; one is derived when absent
+  - name: params
+    type: string
+    summary: "JSON owner tunables bound to the derived operation legs"
+  - name: plan
+    type: boolean
+    summary: print the derived plan without persisting anything
+  - name: revise
+    type: string
+    summary: existing workflow_id to revise instead of defining a new workflow
+  - name: reason
+    type: string
+    summary: why the goal or revision is defined
+  - name: approve-revision
+    type: string
+    summary: approval token from a --plan preview of the same revision
+  - name: defined-by
+    type: enum
+    enum: [supervisor]
+    summary: supervisor provenance on a new definition (bridge)
+  - name: approved-by
+    type: enum
+    enum: [supervisor]
+    summary: supervisor provenance on a revision (bridge)
+  - name: bridge-id
+    type: string
+    summary: supervisor bridge key the provenance is bound to
+  - name: routing-bias
+    type: string
+    summary: JSON routing bias attached to the workflow payload
+exit:
+  "0": goal queued or revision recorded
+  "2": refusal or bad usage
+json: flag
+examples:
+  - starci workflow define --text "Add password reset"
+  - starci workflow define --plan --text "Add password reset"
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci goal
+  - node scripts/goal/define-goal.mjs

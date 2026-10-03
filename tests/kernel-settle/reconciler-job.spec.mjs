@@ -93,7 +93,7 @@ test('a red report handed to the Kernel -> one settle-nongreen DI, the same key 
   } finally { fx.close(); }
 });
 
-test('a dead worker -> api reconcile --dead-worker --settle-failed; a held one -> --release-worker', async () => {
+test('a dead worker -> starci kernel reconcile --dead-worker --settle-failed; a held one -> --release-worker', async () => {
   const fx = fixture({ report: null });
   try {
     const dead = ctxFor(fx, { status: () => ({ frontier: { deadWorkerJobs: ['op-a'] } }) });

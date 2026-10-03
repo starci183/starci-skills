@@ -7,7 +7,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, CHECK_CODES, checkRepo, checkRepository, explainPath, readWhy } from '../../scripts/hfs/check.mjs';
 import { ARCHITECTURE_RULE_IDS } from '../../scripts/hfs/architecture/index.mjs';
 import { HfsSlotsError } from '../../scripts/hfs/slots.mjs';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../../scripts/hfs/sync-runtime.mjs';
 import { APP, TWO_FE_APPS, FORMATTED, PRESETS, appOf, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
@@ -31,7 +31,7 @@ const drop = (dir, relative) => fs.rmSync(path.join(dir, ...relative.split('/'))
 const codesOf = (result) => result.findings.map((f) => f.code);
 const only = (result, code) => result.findings.filter((f) => f.code === code);
 const presetsOf = (argv) => {
-  const at = argv.indexOf('--repo');
+  const at = argv.indexOf('--cwd');
   return at >= 0 && fs.existsSync(path.join(argv[at + 1], 'hfs.json')) ? PRESETS : undefined;
 };
 const cli = async (argv, seams = {}) => {
@@ -248,7 +248,7 @@ test('every code the check can emit has a Vietnamese catalog entry, and the pack
     assert.match(why[code].titleVi, HAS_VIETNAMESE, code);
     assert.ok(why[code].whyVi.length > 20 && why[code].nextStepVi.length > 20, code);
   }
-  assert.deepEqual(driftOfRuntime(), [], 'run `node scripts/hfs/sync-runtime.mjs` after changing a copied runtime file');
+  assert.deepEqual(driftOfRuntime(), [], 'run `starci release sync-runtime` after changing a copied runtime file');
 });
 
 test('explain names the slot, tier, allowed imports and required tests of a path', () => {
@@ -275,25 +275,25 @@ test('explain names the slot, tier, allowed imports and required tests of a path
 });
 
 test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json is machine readable', async () => {
-  const clean = await cli(['check', '--repo', repoOf(APP)]);
+  const clean = await cli(['check', '--cwd', repoOf(APP)]);
   assert.equal(clean.code, 0);
   assert.match(clean.out, /0 error findings/);
 
-  // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `hfs check` judges the paths no editor shows
+  // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `starci app check` judges paths no editor shows
   const stray = repoOf(APP, (dir) => put(dir, 'be/src/stray/thing.json'));
-  const bad = await cli(['check', '--repo', stray, '--json']);
+  const bad = await cli(['check', '--cwd', stray, '--json']);
   assert.equal(bad.code, 1);
   const parsed = JSON.parse(bad.out);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.findings[0].code, 'HFS_SLOT_UNDECLARED');
 
-  const text = await cli(['check', '--repo', stray]);
+  const text = await cli(['check', '--cwd', stray]);
   assert.match(text.out, /HFS_SLOT_UNDECLARED x1/);
   assert.match(text.out, HAS_VIETNAMESE);
 
   const notGit = writeCleanRepo(APP);
   made.push(notGit);
-  const refused = await cli(['check', '--repo', notGit]);
+  const refused = await cli(['check', '--cwd', notGit]);
   assert.equal(refused.code, 2);
   assert.match(refused.err, /HFS_REPO_UNREADABLE/);
   assert.equal((await cli(['check', '--nope'])).code, 2);
@@ -302,21 +302,21 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
 
 test('the CLI: report-only backlog leaves the exit code 0; explain prints what it found', async () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/features/api/orders/application/place-order.handler.ts', 'export {};\n'.repeat(600)));
-  assert.equal((await cli(['check', '--repo', dir])).code, 0);
+  assert.equal((await cli(['check', '--cwd', dir])).code, 0);
 
-  const explained = await cli(['explain', 'be/src/features/api/orders/index.ts', '--repo', dir]);
+  const explained = await cli(['explain', 'be/src/features/api/orders/index.ts', '--cwd', dir]);
   assert.equal(explained.code, 0);
   assert.match(explained.out, /be\.feature/);
   assert.match(explained.out, /may import domain, events, queues, projections, platform, integrations, package/);
-  assert.equal((await cli(['explain', 'be/src/stray/x.ts', '--repo', dir])).code, 1);
-  assert.equal((await cli(['explain', '--repo', dir])).code, 2);
+  assert.equal((await cli(['explain', 'be/src/stray/x.ts', '--cwd', dir])).code, 1);
+  assert.equal((await cli(['explain', '--cwd', dir])).code, 2);
 
-  assert.equal((await cli(['init', '--repo', dir])).code, 2, 'hfs init is gone: hfs scaffold app makes a new app');
+  assert.equal((await cli(['init', '--cwd', dir])).code, 2, 'init is not an app verb: starci app scaffold makes a new app');
 });
 
 test('sync is delegated to the packaged sync command: an app without the generated files fails its --check', async () => {
   const dir = repoOf(APP);
-  assert.notEqual((await cli(['sync', '--check', '--root', dir])).code, 0);
+  assert.notEqual((await cli(['sync', '--check', '--cwd', dir])).code, 0);
   assert.equal((await cli(['sync'])).code === 0, false);
 });
 
@@ -332,7 +332,7 @@ test('the packaged entry point runs from a fresh process with no runtime checkou
   const dir = installPresets(installTypeScript(repoOf(APP)));
   // A fresh process has no seams: the coverage exclusions come from the installed preset and the format check from the repository's own prettier.
   install(dir, 'prettier', 'module.exports = { getFileInfo: async () => ({ ignored: true }), resolveConfig: async () => null, check: async () => true };');
-  const run = spawnSync(process.execPath, [path.join(root, 'packages/hfs/bin/hfs.mjs'), 'check', '--repo', dir, '--json'], { encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [path.join(root, 'packages/hfs/src/main.mjs'), 'check', '--cwd', dir, '--json'], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(JSON.parse(run.stdout).ok, true);
 });
@@ -402,9 +402,9 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
   assert.deepEqual(only(result, 'HFS_EMPTY_DIR'), []);
 });
 
-// ------------------------------------------------------------------------------------- the machine inside hfs check
+// ------------------------------------------------------------------------------------- the machine inside starci app check
 
-test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
+test('starci app check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
   const [finding] = only(result, 'HFS_REQUIRED_FILE_MISSING');
@@ -416,7 +416,7 @@ test('hfs check runs the architecture machine: its violation is a finding under 
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
   assert.equal(result.counts.byCode.HFS_REQUIRED_FILE_MISSING.count, 1);
-  assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a hfs check finding');
+  assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a starci app check finding');
 });
 
 test('a clean back end and a clean front end are clean to the machine too', () => {
@@ -466,12 +466,12 @@ test('an app without TypeScript installed fails the check with ARCH_TYPESCRIPT_M
 
 test('--fast without a merge-base is a refusal that names the fix, never a silent full pass', async () => {
   const dir = repoOf(APP);
-  const refused = await cli(['check', '--repo', dir, '--fast']);
+  const refused = await cli(['check', '--cwd', dir, '--fast']);
   assert.equal(refused.code, 2);
   assert.match(refused.err, /merge-base/);
   assert.match(refused.err, /git fetch origin main|--base/);
   assert.equal(refused.out, '');
-  const unknownBase = await cli(['check', '--repo', branched(), '--fast', '--base', 'no-such-ref']);
+  const unknownBase = await cli(['check', '--cwd', branched(), '--fast', '--base', 'no-such-ref']);
   assert.equal(unknownBase.code, 2);
   assert.match(unknownBase.err, /--base no-such-ref/);
 });
@@ -508,7 +508,7 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
   assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(), ['be/src/stray/new.json', 'be/src/stray/old.json']);
   assert.deepEqual(only(full, 'HFS_EMPTY_DIR').map((f) => f.path), ['be/src/modules/business']);
 
-  const cliFast = await cli(['check', '--repo', dir, '--fast', '--json']);
+  const cliFast = await cli(['check', '--cwd', dir, '--fast', '--json']);
   assert.equal(cliFast.code, 1);
   assert.equal(JSON.parse(cliFast.out).fast.changed, 1);
 });
@@ -517,25 +517,25 @@ test('--fast with the real machine: a Vietnamese document already on main is not
   const dir = branched((d) => { put(d, 'be/docs/adr/0001-old.md', '\u0110\u00e2y l\u00e0 m\u1ed9t t\u00e0i li\u1ec7u vi\u1ebft b\u1eb1ng ti\u1ebfng Vi\u1ec7t, kh\u00f4ng ph\u1ea3i ti\u1ebfng Anh.\n'); });
   put(dir, 'be/src/features/api/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
-  const fast = await cli(['check', '--repo', dir, '--fast']);
+  const fast = await cli(['check', '--cwd', dir, '--fast']);
   assert.equal(fast.code, 0, fast.out);
   assert.match(fast.out, /--fast/);
   assert.match(fast.out, /owners be\/src\/features\/api\/orders/);
-  const full = await cli(['check', '--repo', dir]);
+  const full = await cli(['check', '--cwd', dir]);
   assert.equal(full.code, 1);
   assert.match(full.out, /HFS_DOC_NOT_ENGLISH x1/);
 });
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every api app and says so, --fast skips it and says so, an emit that cannot run is a finding', async () => {
   const dir = branched();
-  const full = await cli(['check', '--repo', dir, '--json']);
+  const full = await cli(['check', '--cwd', dir, '--json']);
   assert.deepEqual(JSON.parse(full.out).contracts, { status: 'checked', apps: [{ app: 'core', artifact: 'schema.graphql', status: 'none' }] });
   assert.deepEqual(only(JSON.parse(full.out), 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
-  assert.match((await cli(['check', '--repo', dir])).out, /contract snapshots: emitted and compared, core\/schema\.graphql none/);
-  assert.match((await cli(['check', '--repo', dir, '--fast'])).out, /contract snapshots: skipped, --fast does not emit the apps/);
-  assert.equal(JSON.parse((await cli(['check', '--repo', dir, '--fast', '--json'])).out).contracts.status, 'skipped');
+  assert.match((await cli(['check', '--cwd', dir])).out, /contract snapshots: emitted and compared, core\/schema\.graphql none/);
+  assert.match((await cli(['check', '--cwd', dir, '--fast'])).out, /contract snapshots: skipped, --fast does not emit the apps/);
+  assert.equal(JSON.parse((await cli(['check', '--cwd', dir, '--fast', '--json'])).out).contracts.status, 'skipped');
   put(dir, 'be/apps/core/src/app.module.ts', "import { Missing } from './missing';\nexport class AppModule {\n  static register() {\n    return { module: AppModule, imports: [Missing] };\n  }\n}\n");
-  const broken = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  const broken = JSON.parse((await cli(['check', '--cwd', dir, '--json'])).out);
   const [finding] = only(broken, 'HFS_CONTRACT_SNAPSHOT_DRIFT');
   assert.match(finding.message, /cannot be verified.*cannot resolve \.\/missing/);
   assert.match(finding.whyVi, HAS_VIETNAMESE);
@@ -551,16 +551,16 @@ export interface Ask { readonly id: string }
 export interface Answer { readonly total: number }
 export const OPERATIONS = defineOperations({ 'shop.total@1': query<Ask, Answer, 'DENIED'>() });
 `);
-  const emitted = await cli(['emit-contracts', '--repo', dir]);
+  const emitted = await cli(['emit', '--cwd', dir]);
   assert.equal(emitted.code, 0, emitted.err + emitted.out);
   assert.match(emitted.out, /wrote be\/contracts\/core\/openapi\.json/);
   const document = JSON.parse(fs.readFileSync(path.join(dir, 'be', 'contracts', 'core', 'openapi.json'), 'utf8'));
   assert.deepEqual(document['x-operations'], [{ id: 'shop.total@1', kind: 'query' }]);
   git(dir, 'add', '-A', '--', '.', ':!node_modules');
-  const fresh = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  const fresh = JSON.parse((await cli(['check', '--cwd', dir, '--json'])).out);
   assert.deepEqual(fresh.contracts.apps.filter((a) => a.artifact === 'openapi.json'), [{ app: 'core', artifact: 'openapi.json', status: 'fresh' }]);
   put(dir, 'be/apps/core/src/operations.ts', fs.readFileSync(path.join(dir, 'be/apps/core/src/operations.ts'), 'utf8').replace("'DENIED'", "'DENIED' | 'GONE'"));
-  const stale = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  const stale = JSON.parse((await cli(['check', '--cwd', dir, '--json'])).out);
   assert.match(only(stale, 'HFS_CONTRACT_SNAPSHOT_DRIFT')[0].message, /contracts\/core\/openapi\.json \([0-9a-f]{12}\) differs from what core emits now/);
 });
 
@@ -570,23 +570,23 @@ test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   let calls = 0;
   const counting = { ...FORMATTED, check: async () => { calls += 1; return true; } };
-  await cli(['check', '--repo', dir, '--fast'], { prettier: counting });
+  await cli(['check', '--cwd', dir, '--fast'], { prettier: counting });
   assert.equal(calls, 0);
-  await cli(['check', '--repo', dir, '--json'], { prettier: counting });
+  await cli(['check', '--cwd', dir, '--json'], { prettier: counting });
   assert.ok(calls > 0);
-  const refused = await cli(['check', '--repo', dir], { prettier: undefined });
+  const refused = await cli(['check', '--cwd', dir], { prettier: undefined });
   assert.equal(refused.code, 2);
   assert.match(refused.err, /HFS_FORMAT_TOOL_MISSING/);
 });
 
 test('the CLI: machine findings fail the exit code and print with their Vietnamese why', async () => {
   const dir = repoOf(APP, (d) => put(d, 'be/src/modules/domain/order/a.ts'));
-  const text = await cli(['check', '--repo', dir]);
+  const text = await cli(['check', '--cwd', dir]);
   assert.equal(text.code, 1);
   assert.match(text.out, /architecture machine: ran over \d+ source files/);
   assert.match(text.out, /HFS_REQUIRED_FILE_MISSING x1/);
   assert.match(text.out, HAS_VIETNAMESE);
-  const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  const json = JSON.parse((await cli(['check', '--cwd', dir, '--json'])).out);
   assert.equal(json.machine.status, 'ran');
 });
 

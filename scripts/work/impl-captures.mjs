@@ -1,5 +1,5 @@
 // impl-captures.mjs — the running-page captures a work/implementation@1 record cites (alpha.3, ARCHITECTURE-DB §5.1).
-// A capture is agent output: interface.implement files it from STARCI_JOB_SCRATCH/captures with api report, and the
+// A capture is agent output: interface.implement files it from STARCI_JOB_SCRATCH/captures with starci kernel report, and the
 // record's assets[] cites each file {artifact?, name, role, sha256} - never a file under the record's assets/.
 // capturesOf pairs every cited PNG with the markup cited under the same stem (<stem>.html), resolved through the blob
 // store (engine/db/blob.mjs assetFileOf).

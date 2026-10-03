@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Deep map WRAP R1, R2: Run creation is Orca's; which Run a workflow or seat reuses is the runtime's record.
 // run-create.mjs — the calls.yaml `run-create` call as a callable function.
-//   node scripts/api/orca/run-create.mjs --objective <text> --request <identity json> [--from <handle>]
+// Internal entry: spawned by scripts/agent/lib.mjs; not invoked directly.
+// Args: --objective <text> --request <identity json> [--from <handle>]
 // Returns {ok, runId, result, request} — runId is result.run.id. `request` is the caller's ledger identity: calls.yaml
 // declares run-create replay: request, so the first issue carries the --retry-request id derived from it.
 import { orcaCall } from './lib.mjs';

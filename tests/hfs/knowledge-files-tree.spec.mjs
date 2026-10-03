@@ -1,5 +1,5 @@
 // The `files:` tree of a back-end pattern topic (knowledge/patterns/be/*.yaml) is the single source of what the pattern places and
-// of the rules that judge it (and of the files `hfs add` generates). The slot of each entry is derived from its path
+// of the rules that judge it (and of the files `starci app add` generates). The slot of each entry is derived from its path
 // (scripts/hfs/derived-fields.mjs, RT_GENERATED_BLOCK_STALE). This spec holds each tree to the manifests: every rule code is in the catalog, every scenario a tree names is in ruleParams.be.patternScenarios, and every
 // path variable is a plain `<name>` placeholder.
 import test from 'node:test';

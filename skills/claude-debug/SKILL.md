@@ -24,7 +24,7 @@ user-invocable: true
    Monitor stream instead.
 
 `/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
-`node scripts/reconciler/debug-pass.mjs stop`.
+`starci debug pass stop`.
 
 Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
@@ -49,8 +49,8 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
    `dispatched` again, so a pass is idempotent.
 2. Diagnose each `dispatched` core alert read-only with section 3 until you can name its cause.
 3. A core defect: dispatch one lane (section 4), then
-   `node scripts/reconciler/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
-   workflow waiting normally): `node scripts/reconciler/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
+   `starci debug pass claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
+   workflow waiting normally): `starci debug pass note --key <alert key> --reason "<why>"`. A lane that
    died or landed without clearing its alert: `release --key <alert key>` so the next pass dispatches it again. A
    reservation nobody claims or notes within 30 minutes is dispatched again.
 4. Print a short diagnosis table in Vietnamese from `rows`, one row per alert: symptom (the alert text), cause (your
@@ -66,16 +66,16 @@ Commands run from the runtime root (`.claude`). One pass, then stop:
   every seat not live.
 - `wf:<ledger>:<workflow>:*` for every non-finished workflow of every registered active ledger (no hard-coded ids):
   `leg:<op>:<job>` turning failed/blocked/cancelled, `wedged`, `dead`, `stale`, `stuck`, `held`, `owner` (open owner
-  asks), `status` (api status failed twice in a row within the snapshot).
+  asks), `status` (starci kernel status failed twice in a row within the snapshot).
 - `tokens`: input+output tokens in the window above the spike limit, from `machine.sqlite` `llm_usage` (there is no
-  `api usage` verb).
+  `starci kernel usage` verb).
 - `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
 - `worktrees:<repo>`: for the runtime and every active ledger's repo, read from Orca's `worktree ps`: more worktrees than
   `claudeDebug.worktreeLimit`, a tree whose directory is gone, or a tree carrying the runtime's ownership stamp
   (`starci:<kind>:<slot>`) with no registry row, which the worktree GC adopts or removes. `worktrees:orca`: the ps read
   itself failed. A product repository's
   registered worktrees are workflow worktrees (kind `workflow`, one per Kernel workflow, keyed by Orca's worktree id,
-  created by Orca with a real `npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
+  created by Orca with a real `starci npm ci` and no junctions); there is no per-op worktree. Read only; never prune from the
   pass.
 - `integrity:tracked-deleted`, `integrity:node_modules`, `integrity:packages/node_modules`: the runtime's main checkout
   (first `git worktree list` entry) lost tracked files, or a node_modules directory is missing or empty (the signature of
@@ -117,24 +117,24 @@ Which controller blocks the engine thread: time each one alone (`--once` keeps i
 engine's keys):
 
 ```
-node scripts/reconciler/engine.mjs --once --controller job --json     # then host, workflow, resource, gc, workers, learning
+starci reconciler once --controller job --json     # then host, workflow, resource, gc, workers, learning
 ```
 
 Compare wall time per controller; a controller that takes minutes on the engine thread starves the heartbeat. Do not
 pass `--apply`.
 
-Kernel screen (read only): `node scripts/api/orca/terminal-read.mjs --terminal <handle> --screen` (handle from
+Kernel screen (read only): `starci orca terminal-read --terminal <handle>` (the rendered frame; `--tail` reads raw output; handle from
 `op_attempts.terminal_handle`, `seats`, `terminals`). Never `terminal-send`.
 
-Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/start.mjs --check`,
-`node scripts/supervisor/poll.mjs --once --repo <repo>`.
+Also: `starci reconciler status`, `starci reconciler up --check`,
+`starci supervisor poll --once --repo <repo>`.
 
 ## 4. Fix loop
 
 1. Reproduce from evidence (section 3) and name the root cause; contain with the smallest lever (a controller `off` in
    `config.yaml`) only when the engine is being harmed, and record it.
 2. One lane per disjoint file set, each a staged checkout made by the runtime worktree API: from the live `.claude`,
-   `node scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
+   `starci supervisor workers stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
    `sup/<job>` under `<lanesRoot>/staging` (default `<lanes root>/staging`) with its `node_modules` link and
    `config.yaml` already in place, and prints its path; copy `packages/grammar/dist` from the live checkout. A lane never
    makes its own worktree or link and never deletes a tree recursively; a missing `packages/node_modules` is reported as
@@ -143,12 +143,12 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
    `orca orchestration worker-start --agent claude --model <Sonnet model id> --worktree path:<staged path> --spec "<brief>" --task-title "sonnet · .claude · <lane>"`,
    supervised with worker-show / worker-read / worker-stop / worker-release. The brief is self-contained: the evidence,
    the scope (files it may touch), the hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec
-   counts, `npm run check` exit 0, a report). Lanes never edit the same file.
+   counts, `starci check run --level L1 --changed <files>` exit 0, a report). Lanes never edit the same file.
 4. Land as soon as a lane's touching specs are green; never hold a ready lane waiting for others (owner 2026-09-29:
    held lanes keep the kernels on the broken core and collide with each other). Commits that are ready at the same
    moment go in one land (each land re-execs the engine); a busy gate is the only reason to wait, and the land runs
    again the moment it is free:
-   `node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
+   `starci supervisor land --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
    Anything under `modules/`, `knowledge/` or a schema needs a `modules/kernel/contract-changes/<id>.yaml`.
 5. Never push. Pushing is `/push-git`'s job (once it exists; reference it by name, never run `push-mains.mjs`).
 6. After the land, the next passes (section 2) show the alert `resolved` once it clears; then report to the owner in
@@ -176,7 +176,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   A probe that only needs the machine registry (not a project ledger too) may instead set the narrower
   `STARCI_TEST_MACHINE_FILE`; a probe that needs a specific ledger location without moving the whole state root may
   instead set `STARCI_PROJECTS_ROOT`. Verify before finishing: the probe's ledger id must not appear in
-  `node engine/db/machine.mjs ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
+  `starci runtime machine-db ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
 - A standard, schema or rule set that has not been released is unversioned or version 1 in the runtime; never label runtime
   content as a second version before a first one has shipped (owner ruling 2026-09-29).
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.
@@ -192,7 +192,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 | Supervisor seat `selector_not_found` | The nested `.claude` repo is not an Orca worktree; the seat and worker launch must fall back to the registered host repo. |
 | `LEDGER_CORRUPT` on a legacy store | Usually a false alarm for a legacy in-repo store; verify with `PRAGMA quick_check` on the registered file before acting; `start.mjs --retire-stale-ledgers` for temp/test paths. |
 | `integrity:*`: tracked files deleted and `packages/node_modules` empty in the main checkout (2026-10-01: 490 files, nothing caught it) | A `git worktree remove` ran through a node_modules junction. Fix the remover in a lane (rmdir junctions first); restoring the checkout is the owner's call. |
-| A workflow worktree left after its workflow finished, or a failed op's changes gone | The finish fast-forwards and pushes main, then marks the worktree `release-pending`; the host-side controller removes it once its terminals are released (link check, Orca's worktree removal, then `git branch -d`), so a `release-pending` row with a live terminal is expected and one without is a controller defect. A failed or blocked op's work is the ref `preserved/<workflowId>/<op>` and the tree was reset to the last checkpoint on `wf-<workflowId>`. Read the registry row (`machine.sqlite` `worktrees`, kind `workflow`) and the ref before acting; fix the runtime in a lane, never remove the tree by hand. |
+| A workflow worktree left after its workflow finished, or a failed op's changes gone | The finish fast-forwards and pushes main, then marks the worktree `release-pending`; the host-side controller removes it once its terminals are released (link check, Orca's worktree removal, then the runtime's verified branch cleanup), so a `release-pending` row with a live terminal is expected and one without is a controller defect. A failed or blocked op's work is the ref `preserved/<workflowId>/<op>` and the tree was reset to the last checkpoint on `wf-<workflowId>`. Read the registry row (`machine.sqlite` `worktrees`, kind `workflow`) and the ref before acting; fix the runtime in a lane, never remove the tree by hand. |
 | `push-mains.mjs` has no `--help` | Running it pushes. Never run it to see usage; read its source. |
 
 Add a row here when a new signature is understood, with the evidence query that found it.

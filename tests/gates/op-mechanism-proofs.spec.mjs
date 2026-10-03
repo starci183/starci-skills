@@ -1,8 +1,8 @@
 // The mechanism proofs (knowledge/op-gate.yaml proofs/opProofs, contract change op-mechanism-proofs): every op whose job touches a
-// runtime mechanism attaches the document that mechanism prints, and `api settle` re-reads it (scripts/kernel/gate-settle.mjs
+// runtime mechanism attaches the document that mechanism prints, and `starci kernel settle` re-reads it (scripts/kernel/gate-settle.mjs
 // judgeJobProofs, runtime check op-proof) and refuses a done that lacks it, is red or could not run. One spec per refusal code,
-// the producers' own judgments (test-world-run.mjs, unit-run.mjs, release-proof.mjs, gate.mjs --profile docs, read-digest.mjs
-// --knowledge), and api settle end to end for a documenting, a test-world and a reviewing op.
+// the producers' own judgments (test-world-run.mjs, unit-run.mjs, release-proof.mjs, starci gate run --scope docs, read-digest.mjs
+// --knowledge), and starci kernel settle end to end for a documenting, a test-world and a reviewing op.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -93,10 +93,10 @@ test('doc-gate: missing (or a code gate) is op-doc-gate-missing, a check that ca
   assert.equal(judgeDocGate(greenDocGate()).status, 'pass');
 });
 
-test('gate.mjs --profile docs runs every docChecks script: exit 1 is a finding, a crash or another exit is a tool failure', () => {
-  assert.equal(parseGateArgs(['--profile', 'docs', '--tree', 'x']).profile, DOC_PROFILE);
-  assert.throws(() => parseGateArgs(['--profile', 'lint']), /--profile must be one of/);
-  assert.throws(() => parseGateArgs(['--tree', 'x']), /--tree belongs to --profile docs/);
+test('gate run --scope docs runs every docChecks script: exit 1 is a finding, a crash or another exit is a tool failure', () => {
+  assert.equal(parseGateArgs(['--scope', 'docs', '--tree', 'x']).profile, DOC_PROFILE);
+  assert.throws(() => parseGateArgs(['--scope', 'lint']), /--scope must be one of/);
+  assert.throws(() => parseGateArgs(['--tree', 'x']), /--tree belongs to --scope docs/);
   const checks = [{ id: 'a', script: 'a.mjs', tree: false }, { id: 'b', script: 'b.mjs', tree: true }];
   const seen = [];
   const answers = { 'a.mjs': { status: 0, stdout: 'ok' }, 'b.mjs': { status: 1, stdout: 'REFUSE docs/x.md:4 a refusal\n1 refused' } };
@@ -274,7 +274,7 @@ test('review-defects: missing, an unclassified defect and an uncaught non-busine
   assert.equal(codeOf(judgeReviewDefects(doc([{ id: 'd2', class: 'non-business', caughtBy: '', missingCheck: { check: ' ' } }]))), 'op-review-missing-check-unrecorded');
   assert.equal(judgeReviewDefects(doc([
     { id: 'd2', class: 'non-business', caughtBy: null, missingCheck: { check: 'eslint-be/no-floating-promise', rule: 'R60', detail: 'an unawaited publish' } },
-    { id: 'd3', class: 'non-business', caughtBy: 'hfs lint R42' },
+    { id: 'd3', class: 'non-business', caughtBy: 'starci app lint R42' },
     { id: 'd4', class: 'business', caughtBy: null },
   ])).status, 'pass');
   assert.equal(judgeReviewDefects(greenReviewDefects()).status, 'pass', 'a review that found nothing attaches an empty list');
@@ -327,7 +327,7 @@ test('judgeJobProofs reads each proof from the attached files by schema and stop
   assert.equal(judgeJobProofs({ op: 'goal.revise', files }), null, 'an op with no proof is not judged');
 });
 
-// ---- api settle end to end ----
+// ---- starci kernel settle end to end ----
 
 const effectiveOf = (id) => loadContractChanges(ROOT).changes.find((c) => c.id === id).effectiveAt;
 function seedOp(t, { label, op, docs, admittedAt = null }) {
@@ -363,7 +363,7 @@ const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo)
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const lastProofCheck = (repo) => read(repo, (db) => db.prepare("SELECT status FROM check_runs WHERE name='op-proof' ORDER BY check_id DESC").get()?.status ?? null);
 
-test('api settle refuses a documenting op without its document gate and a reviewing op with an unrecorded missing check; a leg admitted earlier settles on its old contract', (t) => {
+test('starci kernel settle refuses a documenting op without its document gate and a reviewing op with an unrecorded missing check; a leg admitted earlier settles on its old contract', (t) => {
   const cases = [
     ['docs-nogate', 'docs.author', { 'read-digest.json': greenReadDigest() }, 'op-doc-gate-missing'],
     ['docs-noread', 'docs.author', { 'doc-gate.json': greenDocGate() }, 'op-read-digest-missing'],
@@ -389,7 +389,7 @@ test('api settle refuses a documenting op without its document gate and a review
   assert.equal(lastProofCheck(old.repo), null);
 });
 
-test('api settle refuses an e2e.verify done whose test-world summary shows a hand-rolled world, after its code loop is green', (t) => {
+test('starci kernel settle refuses an e2e.verify done whose test-world summary shows a hand-rolled world, after its code loop is green', (t) => {
   const handRolled = { ...greenTestWorldRun(), specs: [{ path: 'be/src/tests/e2e/a.e2e-spec.ts', useTestWorld: true, modes: ['apps'], outage: 0, forbidden: ['testcontainers'] }] };
   const { repo, jobId } = seedOp(t, { label: 'e2e-rolled', op: 'e2e.verify', docs: { 'gate.json': { ...greenGate(), changed: [] }, 'read-digest.json': greenReadDigest(), 'test-world-run.json': handRolled, 'run.png': PNG } });
   const refused = settle(repo, jobId);

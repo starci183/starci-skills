@@ -8,7 +8,7 @@ and colocated class-name composition consistent without prescribing a custom ren
 npm i -D @starci/eslint-canon-fe eslint-plugin-react-hooks typescript
 ```
 
-A repository's `eslint.config.mjs` is the managed one-liner `hfs sync` renders (and `hfs check` compares, R05/R17):
+A repository's `eslint.config.mjs` is the managed one-liner `starci app sync` renders (and `starci app check` compares, R05/R17):
 
 ```js
 import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"

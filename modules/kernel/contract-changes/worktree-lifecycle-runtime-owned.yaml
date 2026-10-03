@@ -28,7 +28,7 @@ paths:
   - modules/kernel/contract-changes/worktree-lifecycle-runtime-owned.yaml
   - modules/kernel/product-land.yaml
   - modules/kernel/dispatch.yaml
-  - modules/kernel/api-commands/incident.yaml
+  - modules/cli/commands/kernel/incident.yaml
   - modules/kernel/failure-codes.yaml
   - modules/kernel/retired-paths.yaml
   - scripts/lib/worktrees.mjs

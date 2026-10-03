@@ -2,7 +2,7 @@
 // owner-claims-audit.mjs — list past incident resolutions that claim an owner decision no owner answer backs,
 // and open owner-gates whose own text says they are not owner work (scripts/machine/owner-claim.mjs).
 //
-//   node scripts/housekeeping/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]
+//   starci runtime owner-claims-audit --repo <repo>[,<repo>...] [--workflow <id>] [--json]
 //
 // Opens each repo's runtime.sqlite (engine/db/ledger.mjs ledgerFileFor) READ-ONLY and never writes: history is surfaced, never rewritten.
 // Exit 0 nothing found, 1 findings listed, 2 usage or an unreadable ledger.
@@ -27,7 +27,7 @@ async function main(argv) {
   const get = (name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
   const repos = String(get('--repo') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const workflowId = get('--workflow'), json = argv.includes('--json');
-  if (!repos.length) { process.stderr.write('use: node scripts/housekeeping/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]\n'); return 2; }
+  if (!repos.length) { process.stderr.write('use: starci runtime owner-claims-audit --repo <repo>[,<repo>...] [--workflow <id>] [--json]\n'); return 2; }
   const out = [];
   for (const repo of repos) {
     const file = ledgerFileFor(path.resolve(repo));

@@ -14,7 +14,7 @@ import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhas
 // a seam retry on a background ask while status said engaged. The bridge (map REPLACE #7): status, questions,
 // messages and reply drain the workflow's Runs through the consuming `orchestration check --run <run> --terminal
 // <kernel>` into the ledger inbox, ack each Delivery after the commit, and project the pending question as the
-// actionable frontier `worker-question`; `api reply` answers it (or routes it to the owner through outcome ask)
+// actionable frontier `worker-question`; `starci kernel reply` answers it (or routes it to the owner through outcome ask)
 // via the Orca reply wrapper.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
@@ -62,7 +62,7 @@ const question=(id,{run='run-fake-1',dispatch,text,options=[]})=>({id,run_id:run
   from_handle:`dispatch:${dispatch}`,to_handle:`run:${run}`,subject:'Question',body:text,type:'question',priority:'normal',
   thread_id:id,payload:JSON.stringify({taskId:'task-fake-1',dispatchId:dispatch,question:text,options}),read:0,created_at:new Date().toISOString()});
 
-test('a worker orchestration ask is surfaced, bridged into the ledger and answered through api reply',t=>{
+test('a worker orchestration ask is surfaced, bridged into the ledger and answered through starci kernel reply',t=>{
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -121,7 +121,7 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
   const routed=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_q2','--to-owner']);
   assert.equal(routed.status,0,routed.stderr);
   assert.equal(json(routed.stdout).toOwner,true);
-  assert.match(fx.orcaState().replies.at(-1).body,/outcome ask.*api report/);
+  assert.match(fx.orcaState().replies.at(-1).body,/outcome ask.*starci kernel report/);
 
   // A reply that does not land writes nothing; the question stays pending.
   fx.writeState(s=>{s.messages=[question('msg_q3',{dispatch:dispatchId,text:'May I add a devDependency?'}),...s.messages];});
@@ -147,7 +147,7 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
 });
 
 // Live defect: a monorepo run's inbox (thousands of worker heartbeats) passed spawnSync's 1 MB default and
-// every `api questions` failed with `spawnSync orca.exe ENOBUFS`, so Codex ops blocked in `orca orchestration
+// every `starci kernel questions` failed with `spawnSync orca.exe ENOBUFS`, so Codex ops blocked in `orca orchestration
 // ask` never reached the Kernel. A consuming check delivers 50 messages at a
 // time: the drain walks every Delivery, counts heartbeats on the Delivery event (Orca keeps lastHeartbeatAt) and
 // bridges the ask inside them.
@@ -183,9 +183,9 @@ test('a Run of 1600 heartbeats still bridges the Codex worker ask inside it, eve
 });
 
 // Live defect: a Codex op sent an escalation ("Blocked: frontend source boundary
-// and build lock") and waited for the Kernel's decision; api reply refused it question-unknown, so no verb
+// and build lock") and waited for the Kernel's decision; starci kernel reply refused it question-unknown, so no verb
 // could answer. An escalation is answered exactly like a question.
-test('a worker escalation is surfaced and answered through api reply',t=>{
+test('a worker escalation is surfaced and answered through starci kernel reply',t=>{
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
@@ -197,7 +197,7 @@ test('a worker escalation is surfaced and answered through api reply',t=>{
   assert.equal(status.frontier.state,'worker-question');
   assert.deepEqual(status.workerQuestions.map(q=>[q.messageId,q.type,q.jobId,q.question]),[['msg_esc1','escalation',fx.jobId,text]]);
   const messages=json(fx.api(['messages','--workflow',fx.workflowId]).stdout);
-  assert.match(messages.messages.find(m=>m.id==='msg_esc1').handle,/api reply/);
+  assert.match(messages.messages.find(m=>m.id==='msg_esc1').handle,/starci kernel reply --message <id>/);
   const answer='Do not stop it; build with a separate Next distDir or report partial with the EBUSY evidence.';
   const replied=fx.api(['reply','--workflow',fx.workflowId,'--message','msg_esc1','--body',answer]);
   assert.equal(replied.status,0,replied.stderr);
@@ -217,9 +217,9 @@ test('reply refuses an unknown question and a missing body before any host call'
 });
 
 // Live defect: the supervisor replaced the Collab Kernel (start-workflow, a new terminal); the Run
-// still named the old terminal, and api reply was refused consumer_fenced until some later dispatch rebound
+// still named the old terminal, and starci kernel reply was refused consumer_fenced until some later dispatch rebound
 // it. Every Run-scoped call binds the Run to the current Kernel terminal first.
-test('a replaced Kernel rebinds the Run before api reply answers',t=>{
+test('a replaced Kernel rebinds the Run before starci kernel reply answers',t=>{
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);

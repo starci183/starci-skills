@@ -165,7 +165,7 @@ export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
   return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort();
 })());
 
-/** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
+/** Every code the machine can emit, derived from the rule id lists of its checks (`starci app check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
   ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
@@ -266,7 +266,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   const asViolation = item => LINT_CODES.has(item.ruleId);
   const allErrors = context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item));
   const obligations = surface === 'all' ? violations : [...violations, ...context.errors.filter(asViolation).filter(inScope)];
-  // The lint surface is what an editor can show on a line of a TypeScript file; `hfs check` keeps every other finding of the machine.
+  // The lint surface is what an editor can show on a line of a TypeScript file; `starci app check` keeps every other finding of the machine.
   const onSurface = item => surface === 'all' || onLintSurface(config.root, item) === (surface === 'lint');
   const errors = stable(surface === 'all' ? allErrors : allErrors.filter(item => !asViolation(item)));
   const scopedViolations = stable(obligations.filter(inScope).filter(onSurface));

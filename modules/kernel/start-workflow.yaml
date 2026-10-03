@@ -33,8 +33,8 @@ watchdog:
     terminal. A turn-idle Kernel with an actionable frontier receives a
     continuation wake; exact death proof re-enters start-workflow for the same
     approved goal. Its only op transitions are the api's own recoveries: a dead
-    worker through `api reconcile --dead-worker --settle-failed` and a held
-    worker through `api reconcile --release-worker` - the Job controller's
+    worker through `starci kernel reconcile --dead-worker --settle-failed` and a held
+    worker through `starci kernel reconcile --release-worker` - the Job controller's
     reconciles while it is active (the watchdog's run yields, reconciler-owned).
     It also runs the ledger's quota-circuit probe and the host footprint scan
     (scripts/kernel/kernel-watchdog.mjs header; the footprint scan is the Host
@@ -59,7 +59,7 @@ usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [-
 launchAuthority: >-
   A replacement prompt opens with the rule (resume now as Kernel attempt N, ask no one to confirm), then
   the owner approval (goal revision and identity, first boot time), the launcher and the previous
-  attempt's terminal and death reason, and the proof: api status kernel.attempt, kernel.launchedBy and
+  attempt's terminal and death reason, and the proof: starci kernel status kernel.attempt, kernel.launchedBy and
   kernel.you (scripts/kernel/start-workflow.mjs launchAuthorityText). Every Kernel wake ends with the
   seat's attempt (scripts/kernel/wake-delivery.mjs wakeIdentity), checked the same way.
 
@@ -142,14 +142,14 @@ spawn:
     absolute API path + {workflow_id, goal_revision} + mandatory load order —
     Source CONTEXT.md → modules/kernel/{driver-loop,api,dispatch,verdict-contract}.yaml →
     read goal from .starciwork/runtime.sqlite → run the loop. Every state
-    mutation goes through node scripts/kernel/cli.mjs <cmd>
+    mutation goes through starci kernel <cmd>
     (the verb surface is modules/kernel/api.yaml `commands` — that file is the
     only list, and two of its verbs are worker-side op IPC) — never
     direct sqlite writes, never self-spawned op workers, never direct
     orca/git/agent-CLI calls (report/contract/check truth is the ledger
-    rows via the api verbs); `api route` persists the model decision before
-    every dispatch; dispatch goes through api dispatch; findings/plans
-    persist via api plan|incident before dispatch (driver-loop.yaml boundary).
+    rows via the api verbs); `starci kernel route` persists the model decision before
+    every dispatch; dispatch goes through starci kernel dispatch; findings/plans
+    persist via starci kernel plan|incident before dispatch (driver-loop.yaml boundary).
   attestation: >-
     worker-start --spec (ready; the agent terminal from its receipt, else worker-show) →
     terminal rename "[Kernel] <Workflow>" → worker-show: the worker's EFFECTIVE
@@ -175,7 +175,7 @@ orcaTree:
     recorded.
   enforcedBy:
     - scripts/kernel/start-workflow.mjs — the restart merges the new seat over the previous kernel payload, so orca.runId and hierarchy.runtime.runId survive, and terminal-closes the previous kernel terminal before the replacement is recorded; a refused close is a kernel-stale-terminal-unclosed event plus an open incident.
-    - scripts/kernel/cli.mjs — ensureWorkflowRun creates the Run once per workflow; api dispatch's worker-start --spec passes the current kernel terminal as `from`; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; an op settles its own Dispatch and Task with worker_done after api report, and settle only releases the worker (worker-stop first only for a Dispatch that did not settle itself); finish closes the kernel terminal.
+    - scripts/kernel/cli.mjs — ensureWorkflowRun creates the Run once per workflow; starci kernel dispatch's worker-start --spec passes the current kernel terminal as `from`; rejectDispatch closes the terminal or worker the refused attempt created and records terminalClosed; an op settles its own Dispatch and Task with worker_done after starci kernel report, and settle only releases the worker (worker-stop first only for a Dispatch that did not settle itself); finish closes the kernel terminal.
     - modules/host/orca/calls.yaml — the typed calls those steps issue (terminal-close, worker-start --spec --from, worker-show, worker-stop, worker-release).
   titles:
     kernelTerminal: '[Kernel] <workflow_id>'
@@ -197,7 +197,7 @@ orcaTree:
       Only StarCi's own terminals — a handle the ledger names, or a title the
       kernel wrote. An owner's own terminals are never findings.
     notInNpmCheck: >-
-      It reads a ledger, which `npm run check` does not have. It runs against a
+      It reads a ledger, which `starci runtime check` does not have. It runs against a
       project's .starciwork, and scripts/supervisor/poll.mjs prints the same
       findings every cycle.
 

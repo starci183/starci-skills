@@ -55,7 +55,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/contract-changes/draw-new-rule.yaml', "id: draw-new-rule\neffectiveAt: '2026-09-27T20:00:00+07:00'\nsummary: \"The draw brief gained a rule\"\nreach: new-legs\nops: [interface.draw]\n");
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
-  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/kernel/api-commands/k${i}.yaml`, `k: ${i}\n`);
+  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/cli/commands/kernel/k${i}.yaml`, `k: ${i}\n`);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
   const C = git(root, 'rev-parse', 'HEAD');
   return { root, A, B, C, checkout: (rev) => git(root, 'checkout', '-q', rev) };
@@ -82,7 +82,7 @@ test('an acked rev behind HEAD is stale: the wake names the rev, the changed ker
   const line = revWakeLine(state, wf);
   assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read modules/kernel/contract-changes/draw-new-rule.yaml, modules/kernel/driver-loop.yaml, modules/ops/ops/interface.draw.yaml`), line);
   assert.match(line, /new contract changes: draw-new-rule \(The draw brief gained a rule\)/);
-  assert.match(line, new RegExp(`api kernel-ack-rev --workflow ${wf} --rev ${shortRev(rt.B)}`));
+  assert.match(line, new RegExp(`starci kernel kernel-ack-rev --workflow ${wf} --rev ${shortRev(rt.B)}`));
   assert.doesNotMatch(line, /\n/, 'one line: a newline would submit half a wake');
 
   // The gate holds only the legs whose op contract moved.
@@ -102,13 +102,13 @@ test('past the file cap, or for a rev git no longer knows, the wake asks for the
   const { db, wf, ack } = ledgerFixture(t);
   const unacked = kernelRevState(db, wf, { root: rt.root });
   assert.deepEqual([unacked.unacked, unacked.stale], [true, false]);
-  assert.match(revWakeLine(unacked, wf), /^Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then api kernel-ack-rev/);
+  assert.match(revWakeLine(unacked, wf), /^Runtime rev [0-9a-f]{12}: no runtime rev acked yet - re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then starci kernel kernel-ack-rev/);
   assert.equal(opRevStale(unacked, 'interface.draw', { root: rt.root }), null);
 
   ack(rt.A);
   const full = kernelRevState(db, wf, { root: rt.root });
   assert.deepEqual([full.stale, full.full, full.files.length, full.fileCount], [true, true, REV_DIFF_MAX_FILES, REV_DIFF_MAX_FILES + 2]);
-  assert.match(revWakeLine(full, wf), /re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then api kernel-ack-rev/);
+  assert.match(revWakeLine(full, wf), /re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then starci kernel kernel-ack-rev/);
   assert.ok(opRevStale(full, 'interface.draw', { root: rt.root }), 'the gate reads every changed file, not the capped list');
   assert.equal(opRevStale(full, 'code.refactor', { root: rt.root }), null);
 
@@ -138,9 +138,9 @@ test('every Kernel wake carries the runtime rev before its seat identity: wakeKe
   assert.ok(sends.length >= 1 && sends[0].text, 'the wake was typed');
   const text = sends[0].text;
   assert.match(text, new RegExp(`^Durable transition wake for workflow wf-rev: report-filed\\. Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read `));
-  assert.match(text, /Runtime wake for Kernel attempt 2 of wf-rev: api status --workflow wf-rev shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/, 'the seat identity still ends the wake');
+  assert.match(text, /Runtime wake for Kernel attempt 2 of wf-rev: starci kernel status --workflow wf-rev shows kernel\.attempt 2 and kernel\.you true on your terminal\.$/, 'the seat identity still ends the wake');
 
-  // The watchdog builds its wake from one api status read.
+  // The watchdog builds its wake from one starci kernel status read.
   const state = kernelRevState(db, wf, { root: rt.root });
   const prompt = wakePromptOf(wf, { kernel: { attempt: 2 }, kernelRev: JSON.parse(JSON.stringify(state)) });
   assert.match(prompt, new RegExp(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev`));
@@ -201,7 +201,7 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   assert.deepEqual([status.kernelRev.acked, status.kernelRev.stale], [rt.A, true]);
   assert.deepEqual(status.kernelRev.files, ['modules/kernel/driver-loop.yaml'], 'no interface.draw leg yet: only the Kernel contract file asks for the re-read');
   assert.equal(status.nextActions[0].kind, 'reread');
-  assert.match(status.nextActions[0].reason, new RegExp(`api kernel-ack-rev --workflow ${fx.wf} --rev ${shortRev(rt.B)}`));
+  assert.match(status.nextActions[0].reason, new RegExp(`starci kernel kernel-ack-rev --workflow ${fx.wf} --rev ${shortRev(rt.B)}`));
   assert.equal(status.frontier.actionable, true, 'a stale Kernel has work: the re-read');
 
   const refused = fx.api(['enqueue', '--workflow', fx.wf, '--op', 'interface.draw', '--paths', 'docs/draw']);
@@ -229,7 +229,7 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   assert.deepEqual(fx.read((db) => db.prepare('SELECT json_extract(payload_json,\'$.source\') s FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(fx.wf, KERNEL_REV_ACKED_EVENT).map((r) => r.s)), ['ack', 'ack']);
 });
 
-test('api settle WARNs op-rev-drift when the op contract changed after dispatch; status lists it', (t) => {
+test('starci kernel settle WARNs op-rev-drift when the op contract changed after dispatch; status lists it', (t) => {
   const rt = runtime(t); rt.checkout(rt.B);
   const fx = apiFixture(t, rt);
   const now = Date.now();

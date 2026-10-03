@@ -1,14 +1,14 @@
-// api dispatch-ready — the parallelism push (owner 2026-09-28: the priority workflow ran 2 units with 21 queued-ready
-// and 60% free RAM). Routes and dispatches up to the allowed parallelism (api status progress.allowedParallel: the RAM
+// starci kernel dispatch-ready — the parallelism push (owner 2026-09-28: the priority workflow ran 2 units with 21 queued-ready
+// and 60% free RAM). Routes and dispatches up to the allowed parallelism (starci kernel status progress.allowedParallel: the RAM
 // cap, the pools, the workflow's priority reserve) in ONE call, so a Kernel on a modest model does not hand-dispatch
-// one job per turn. Each job goes through the ordinary `api route` + `api dispatch --spawn` (every admission refusal
+// one job per turn. Each job goes through the ordinary `starci kernel route` + `starci kernel dispatch --spawn` (every admission refusal
 // stands: leases, host resources, RAM throttle, seams, autopilot). A queued unit whose shape already failed for a
 // shape-related cause is skipped (never the same failing shape; change it with graph-edit first).
 //
 //   dispatch-ready --workflow <wf> [--max <n>] [--dry-run] [--foreground]
 //
 // Without --foreground the pushes run in a detached child (dispatches can outlast an agent's command window) and the
-// verb answers at once with the result file; the next `api status` shows the running count.
+// verb answers at once with the result file; the next `starci kernel status` shows the running count.
 import fs from 'node:fs';
 import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
@@ -21,7 +21,7 @@ export default {
   required: ['workflow'],
   kernelOnly: true,
   flags: ['foreground'],
-  usage: '  dispatch-ready --workflow <id> [--max <n>] [--dry-run] [--foreground]   route + dispatch queued-ready units up to api status progress.allowedParallel',
+  usage: '  dispatch-ready --workflow <id> [--max <n>] [--dry-run] [--foreground]   route + dispatch queued-ready units up to starci kernel status progress.allowedParallel',
   async run({ ledger, args, repo, emit }) {
     const db = ledger.db, wf = args.workflow, now = Date.now();
     // Decisions first: a push never runs past the Kernel's open Decision Items (its route/dispatch children are exempt).
@@ -35,12 +35,12 @@ export default {
       const log = fs.openSync(`${resultFile}.log`, 'a');
       const child = spawnNode(argv, { detached: true, stdio: ['ignore', log, log], env: process.env });
       child.unref();
-      emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next api status shows the running count`, args.json);
+      emit({ ok: true, workflowId: wf, pushId, detached: true, pid: child.pid, resultFile }, `dispatch-ready ${pushId} running in the background (pid ${child.pid}); result: ${resultFile}; the next starci kernel status shows the running count`, args.json);
       return;
     }
     const st = apiRun(['status', '--workflow', wf], { repo, timeoutMs: 300_000 });
     const p = st.json?.progress;
-    if (!p) throw refuse(`api status gave no progress block: ${st.json?.error ?? st.err ?? st.out}`.slice(0, 400), 'progress-unreadable');
+    if (!p) throw refuse(`starci kernel status gave no progress block: ${st.json?.error ?? st.err ?? st.out}`.slice(0, 400), 'progress-unreadable');
     const room = Math.max(0, p.allowedParallel - p.running);
     const k = Math.min(room, args.max != null ? Number(args.max) : room);
     const results = [];
@@ -50,7 +50,7 @@ export default {
       const job = jobRow(db, jobId);
       if (!job || job.status !== 'queued') { results.push({ jobId, skipped: `status ${job?.status ?? 'gone'}` }); continue; }
       const failed = failedShapesOf(db, wf, job).get(shapeOf(job.op_id, job.payload));
-      if (failed) { results.push({ jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with api graph-edit (widen/params/split) first` }); continue; }
+      if (failed) { results.push({ jobId, skipped: `same-failing-shape as ${failed.jobId} (${failed.causes.join(', ')}): change it with starci kernel graph-edit (widen/params/split) first` }); continue; }
       if (args['dry-run']) { results.push({ jobId, would: job.payload.kernelModel ? `dispatch --model ${job.payload.kernelModel}` : 'route + dispatch --spawn' }); launched += 1; continue; }
       let model = job.payload.kernelModel ?? null;
       if (!model) {

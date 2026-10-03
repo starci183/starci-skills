@@ -1,7 +1,7 @@
 // A routed-but-queued job holds its pool slot only while its latest route decision is younger than
-// runtimes.yaml allocation.routeHoldMs; running jobs always hold theirs; api route and api status count alike.
+// runtimes.yaml allocation.routeHoldMs; running jobs always hold theirs; starci kernel route and starci kernel status count alike.
 //
-// Live defect: api route and api status counted every
+// Live defect: starci kernel route and starci kernel status counted every
 // non-settled job with a payload.model toward its pool. Jobs routed and then parked for hours (owner gate,
 // Supervisor hold, peer-wait, dependency, readiness-timeout loop) kept their slot forever: devin-agent 10/10
 // with 5 running, codex-agent 10/10 with 3 running, claude-agent 6/6 with 0 running, so fe-canon's four ready
@@ -106,7 +106,7 @@ test(`queued jobs routed 1 min ago still fill ${POOL}; running jobs always do; r
   const status = await fx.status();
   assert.equal(status.poolLoad.running[POOL], MAX, 'fresh routes and running jobs hold; the stale and never-stamped queued ones do not');
   const route = await fx.route();
-  assert.equal(route.value?.poolLoad?.running?.[POOL], status.poolLoad.running[POOL], 'api route counts what api status counts');
+  assert.equal(route.value?.poolLoad?.running?.[POOL], status.poolLoad.running[POOL], 'starci kernel route counts what starci kernel status counts');
   assert.ok(fullOf(route), `${POOL} is full: ${route.stdout}`);
 });
 
@@ -116,7 +116,7 @@ test('routing stamps routedAt, so a re-routed queued job holds its slot again fr
   const first = await fx.route();
   assert.equal(first.status, 0, first.stderr || first.stdout);
   const payload = fx.db((d) => json(d.prepare("SELECT payload_json FROM jobs WHERE job_id='route-me'").get().payload_json));
-  assert.ok(payload.routedAt >= before && payload.routedAt <= Date.now(), 'api route stamps payload.routedAt');
+  assert.ok(payload.routedAt >= before && payload.routedAt <= Date.now(), 'starci kernel route stamps payload.routedAt');
   const pool = payload.model;
   assert.equal((await fx.status()).poolLoad.running[pool], 1, 'the freshly routed queued job holds its slot');
   // Age it past the hold: the slot frees; a re-route stamps it again (and does not count itself while routing).

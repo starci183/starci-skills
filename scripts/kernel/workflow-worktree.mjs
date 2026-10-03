@@ -15,7 +15,7 @@
 //   ops        every op of the workflow launches with `--worktree <the workflow worktree>` (opWorktreeArgs); no op gets a
 //              tree of its own. Ops on the same side (be/ or fe/, from their owned paths) run one at a time; ops on
 //              different sides may run together; an op touching both sides (or the app root) runs alone
-//              (canDispatchConcurrently, enforced by api dispatch as the typed wait workflow-side-busy).
+//              (canDispatchConcurrently, enforced by starci kernel dispatch as the typed wait workflow-side-busy).
 //   checkpoint part B commits each green op on the workflow branch and calls setCheckpoint; the registry row keeps the sha.
 //   release    never from inside the worktree (coordinator ruling): part B's finish marks the row release-pending
 //              (markReleasePending); the host-side GC (scripts/machine/worktrees.mjs gcWorktrees, the reconciler GC

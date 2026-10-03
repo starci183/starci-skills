@@ -9,7 +9,7 @@
     "test:integration": "npm run typecheck:tests && cd be && jest --selectProjects integration",
     "test:e2e": "npm run typecheck:tests && cd be && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && cd be && jest --selectProjects contract",
-    "test:stack": "cd be && starci-test-stack",
-    "contract:emit": "hfs emit-contracts"
+    "test:stack": "starci app stack",
+    "contract:emit": "starci app emit"
   }
 }

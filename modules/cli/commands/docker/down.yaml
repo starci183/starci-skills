@@ -1,0 +1,29 @@
+group: docker
+verb: down
+owner: runtime
+summary: remove only the labelled resources owned by one application stack
+impl: {module: scripts/machine/docker-stack.mjs, export: dockerDown}
+effect: host
+roles: [worker, lead, coordinator, owner]
+conventions:
+  - containers and networks are selected by starci.project and the exact Compose project label, never by a name pattern
+  - --volumes removes only volumes carrying both ownership labels and never runs docker system prune
+  - published ports come from the project's 41000-44999 block
+  - never touch containers of another project (the protected local installation) or ports 3000 and 3100
+  - clean up with `starci docker down`
+flags:
+  - {name: env, type: string, default: dev, summary: environment directory below .starcistacks}
+  - {name: volumes, type: boolean, summary: also remove volumes owned by this project and stack}
+positional:
+  - {name: stack, required: true, variadic: false}
+exit:
+  "0": "selected resources were removed"
+  "1": "Docker failed"
+  "2": "usage or Docker ownership policy was refused"
+json: starci/docker-down@1
+examples:
+  - starci docker down api
+  - starci docker down api --volumes --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

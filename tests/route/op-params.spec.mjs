@@ -12,7 +12,7 @@ import { resolveOpParams } from '../../scripts/kernel/dispatch-op.mjs';
 process.env.STARCI_AUTOPILOT ??= 'off';
 
 // The tunable's road: the brief declares it, the goal leg carries what the owner
-// chose, `api enqueue --params` carries what the kernel chose, and the dispatch
+// chose, `starci kernel enqueue --params` carries what the kernel chose, and the dispatch
 // packet delivers the merged values. No step of it reads a number out of prose.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');

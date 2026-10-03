@@ -2,8 +2,8 @@
 // grammar-geometry.mjs — the control geometry a product actually renders, read from its CSS, and the check
 // that a drawn render keeps it.
 //
-//   node scripts/work/ui/grammar-geometry.mjs --prompt --repo <product repo> [--family <name>] [--json]
-//   node scripts/work/ui/grammar-geometry.mjs --check <html file | capture dir> --repo <product repo>
+//   starci work grammar-geometry --prompt --repo <product repo> [--family <name>] [--json]
+//   starci work grammar-geometry --check <html file | capture dir> --repo <product repo>
 //        [--family <name>] [--viewport 390x844] [--json]
 //
 // Every value comes from the cascade of the product's installed CSS: HeroUI v3 (`@heroui/styles`
@@ -1124,8 +1124,8 @@ export async function checkGeometry(target, { repo, family = null, viewport = DE
 // ---------------------------------------------------------------------------------------------------------
 
 const USAGE = `Usage:
-  node scripts/work/ui/grammar-geometry.mjs --prompt --repo <product repo> [--family <name>] [--json]
-  node scripts/work/ui/grammar-geometry.mjs --check <html file | capture dir> --repo <product repo> [--family <name>] [--viewport 390x844] [--json]
+  starci work grammar-geometry --prompt --repo <product repo> [--family <name>] [--json]
+  starci work grammar-geometry --check <html file | capture dir> --repo <product repo> [--family <name>] [--viewport 390x844] [--json]
 `;
 
 export function parseViewport(text) {

@@ -4,7 +4,7 @@
 // or ask, and the workflow counts as done only when the reviewer approves.
 // handover.review is that op (modules/ops/ops/handover.review.yaml), the last
 // leg of every chain; scripts/kernel/handover.mjs reads the answer receipt back;
-// api settle records handover-approved only for the owner's approve, and api
+// starci kernel settle records handover-approved only for the owner's approve, and api
 // finish refuses handover-not-approved without it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,11 +50,11 @@ const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
 }));
 /**
  * One op job of the migrated schema: unit -> queued -> ready -> leased -> a contract-bound open
- * attempt -> running (the state api report / check / settle accept), or further to reported ->
+ * attempt -> running (the state starci kernel report / check / settle accept), or further to reported ->
  * succeeded with its result on the attempt when `status` says so. Jobs of one `unitKey` are the
  * tries of one unit: a retry chains retry_of to the failed previous try, a try after a passed one
- * goes through reopenUnit (H5) — the same lineage api enqueue writes.
- * Returns {scratch, attemptId}: the attempt's STARCI_JOB_SCRATCH dir (api report reads the report
+ * goes through reopenUnit (H5) — the same lineage starci kernel enqueue writes.
+ * Returns {scratch, attemptId}: the attempt's STARCI_JOB_SCRATCH dir (starci kernel report reads the report
  * file only from inside it) and the attempt row id.
  */
 function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=null,result=null}){
@@ -118,7 +118,7 @@ const settleApproval=(repo,wf,{attempt,dispatchId})=>{
   const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  const checked=runSettler('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
+  const checked=runSettler('record-checks','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'starci kernel status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   return run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','pass','--json');
 };
@@ -149,7 +149,7 @@ test('handover.review is a valid op manifest wired into the kind catalog, the ro
   assert.deepEqual(readYaml('modules/models/registry.yaml').operators[HANDOVER_OP].chain,['devin-agent','claude-agent','codex-agent']);
 });
 
-test('a handover ask carries exactly the three options approve, feedback, question; api report refuses any other shape',t=>{
+test('a handover ask carries exactly the three options approve, feedback, question; starci kernel report refuses any other shape',t=>{
   assert.equal(handoverAskProblem({text:'x',options:OPTIONS}),null);
   assert.match(handoverAskProblem({text:'x',options:OPTIONS.slice(0,2)}),/exactly 3 options/);
   assert.match(handoverAskProblem({text:'x',options:[...OPTIONS,'Kh\u00e1c']}),/exactly 3 options/);
@@ -306,7 +306,7 @@ test('the planner appends handover.review as the final leg of every chain',()=>{
   assert.ok(!ambiguous.legs.some(l=>l.op===HANDOVER_OP),'an intent question is no chain to hand over');
 });
 
-test('api plan does not count a trailing handover.review appended to an older chain as divergence',t=>{
+test('starci kernel plan does not count a trailing handover.review appended to an older chain as divergence',t=>{
   const repo=fixture(t),wf='wf-handover-plan';
   seedWorkflow(repo,wf);
   seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=?').run(JSON.stringify({opChain:{legs:[{op:'docs.author'},{op:'review.verify'}]},derivedPlan:{legs:[{op:'docs.author'},{op:'review.verify'}],edges:[['docs.author','review.verify']]}}),wf));

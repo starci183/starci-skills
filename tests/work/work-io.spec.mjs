@@ -60,7 +60,7 @@ test('layout-tree plan without --node prints its usage and writes nothing', (t) 
   const before = fs.readFileSync(file, 'utf8');
   const bare = layoutTreeMain(['plan', '--work', p.work, '--files', 'layout', '--write']);
   assert.equal(bare.exitCode, 2);
-  assert.match(bare.text, /^Usage: layout-tree\.mjs plan .*--node <id>/);
+  assert.match(bare.text, /^Usage: starci work layout-tree plan .*--node <id>/);
   assert.equal(fs.readFileSync(file, 'utf8'), before, 'no rev+1 with a "Planned ." change');
   assert.equal(parseYaml(before).rev, 1);
 });

@@ -1,0 +1,72 @@
+group: kernel
+verb: contract-release
+owner: runtime
+summary: release a frozen op family at the Supervisor release point (contract-freeze.yaml)
+impl:
+  script: scripts/kernel/cli.mjs
+  args:
+    - contract-release
+flags:
+  - name: repo
+    type: string
+    summary: managed repository whose .starciwork ledger the command uses
+  - name: family
+    type: string
+    required: true
+    summary: op family to release
+  - name: workflow
+    type: string
+    summary: workflow id
+  - name: batch
+    type: string
+    summary: name of the release batch
+  - name: reason
+    type: string
+    summary: why the family is released
+  - name: by
+    type: enum
+    summary: who releases it
+    enum:
+      - supervisor
+      - owner
+  - name: dry-run
+    type: boolean
+    summary: report what would be released without recording it
+exit:
+  "0": released, or the dry-run plan shown
+  "1": refused or failed
+  "2": "bad usage: a required flag is missing or a flag has no value"
+json: flag
+examples:
+  - starci kernel contract-release --repo <path> --family <family>
+  - starci kernel contract-release --repo <path> --family <family> --workflow <workflow> --batch <batch> --reason <reason> --dry-run
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci api contract-release
+  - node scripts/kernel/cli.mjs contract-release
+reads: modules/kernel/contract-changes/ and modules/kernel/contract-freeze.yaml
+  (scripts/machine/contract-version.mjs); every live workflows row (archived_at null, phase not
+  finished) or --workflow; their contract-release events, jobs and contracts rows
+writes: 'Owner ruling 2026-09-28 ("Freeze the drawing rules"): the release point of a frozen op
+  family. Per workflow whose family changes are still frozen (batched, landed after the workflow was
+  created, never released there): one contract-release event {family, batch, changes[], by, reason,
+  runtimeSha, owedBefore, owedAfter, restamped[], dropped[]} (entity contract/<family>). After it a
+  new leg carries the released changes (dispatch withholds only still-frozen ones:
+  contracts.context_json.contract.withheld) and a leg that does not carry them owes ONE follow-up
+  for the whole set (status contractFollowUps, alsoCovers). Every queued leg of the family op is
+  re-stamped payload.contractRelease {family, changes, at, event} - it is admitted under the
+  released set at dispatch, so it is the redo; an older never-dispatched duplicate of it (same cut
+  group and owned paths, no live job --after it) is cancelled {verdict: dropped, reason:
+  superseded-by-contract-release} with a job-dropped event. Running legs keep their admission
+  (status runningOpRevDrift; starci kernel nudge carries the notice). --dry-run writes nothing and reports the
+  same numbers'
+returns: "{ok:true, family, batch, dryRun, workflows:[{workflowId, changes[], alreadyReleased[],
+  owedBefore, owedAfter, owed[], restamped[], dropped[], running[], released}]}"
+refuses:
+  - "contract-family-unknown: no registered change or freeze names --family"
+  - workflow-unknown
+  - "op-context-refused: an operation terminal never releases contracts"
+usedBy: the Supervisor, when it decides a frozen family's batch is ready (after the land gate's
+  gate-stability report), never a Kernel or an op

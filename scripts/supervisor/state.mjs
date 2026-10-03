@@ -4,7 +4,7 @@
 //               supervisor-booted | supervisor-restarted | supervisor-adopted, config.yaml supervisor.mode
 //   tick        sup_events supervisor-tick (OWED counts) and supervisor-tick-duties (ok, alerts, errors)
 //   workflows   the newest supervisor-owed-actions event: per running workflow its frontier state, ready ops and holds
-//               (api status queuedCauses) - the sequence each workflow waits in
+//               (starci kernel status queuedCauses) - the sequence each workflow waits in
 //   owed        the same event's items: every stuck item with its class, action, age, SLA breach and matching lessons
 //   actions     sup_events supervisor-action (actions.mjs record) and supervisor-notice (notify.mjs)
 //   messages    sup_messages direction 'in' (inbox) and 'out' (outbox)

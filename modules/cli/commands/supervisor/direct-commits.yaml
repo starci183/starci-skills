@@ -1,0 +1,18 @@
+group: supervisor
+verb: direct-commits
+owner: runtime
+summary: find runtime main commits that bypassed the exclusive land gate
+impl:
+  script: scripts/supervisor/direct-commits.mjs
+flags:
+  - {name: repo, type: string, summary: runtime repository to inspect}
+exit: {"0": no direct commits found, "1": direct commits found, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor direct-commits
+  - starci supervisor direct-commits --repo <path> --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/direct-commits.mjs
+  - node .claude/scripts/supervisor/direct-commits.mjs

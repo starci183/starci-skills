@@ -18,7 +18,7 @@
 //                .ps1/.sh script, and a JS line that hands it to a shell (exec, execSync, spawn, spawnSync, shell:)
 // Comment lines (//, *, /*, #), prose and messages that merely name the command are not invocations.
 //
-//   node scripts/checks/check-worktree-add.mjs [--root <tree>] [--json]
+//   starci runtime check --only worktree-add -- [--root <tree>] [--json]
 // Exit 0 clean, 1 a stray `git worktree add`, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';

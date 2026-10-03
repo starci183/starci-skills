@@ -1,4 +1,4 @@
-// api archive: stop a workflow while preserving its history.
+// starci kernel archive: stop a workflow while preserving its history.
 import { changeWorkflowPhase, getUnit, recordJobResult, resolveIncident, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateIncident, updateJob } from '../../../engine/db/ledger.mjs';
 import { recordWhy } from '../why-record.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -37,10 +37,10 @@ export default {
     `workflow ${workflowId} was already archived at ${new Date(archivedAt).toISOString()}; nothing changed`, args.json);
   if (wf.phase === 'archived') return alreadyArchived(wf.archived_at);
   // H9: a job whose worker filed a report is settled, never dropped - its work would be thrown away unjudged
-  // (DBTREE job_transitions has no reported -> cancelled). The settler (or api settle) settles it first.
+  // (DBTREE job_transitions has no reported -> cancelled). The settler (or starci kernel settle) settles it first.
   const unsettled = reportedJobs(db, { workflowId });
   if (unsettled.length) {
-    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ')}); settle them first (node scripts/kernel/settle/job-settle.mjs --repo <repo> --workflow ${workflowId}, or api settle), then archive`),
+    throw Object.assign(new Error(`archive refused: ${unsettled.length} job(s) of ${workflowId} filed a report that is not settled yet (${unsettled.slice(0, 8).map((it) => `${it.jobId} ${it.outcome}`).join(', ')}); wait for the reconciler-managed settler or use starci kernel settle for each job, then archive`),
       { code: 'archive-unsettled-reports', jobs: unsettled.map((it) => ({ jobId: it.jobId, outcome: it.outcome, dispatchId: it.dispatchId })) });
   }
 

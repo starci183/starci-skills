@@ -11,7 +11,7 @@ import {placeOnRepo} from '../helpers/op-placement.mjs';
 // Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
 process.env.STARCI_SLEEP_SCALE??='0.02';
 
-// api dispatch resolves each owned path against its target side
+// starci kernel dispatch resolves each owned path against its target side
 // (scripts/kernel/target-repo.mjs) before the packet reaches the worker: a
 // path spelled with its side folder is relative to that folder — bare when it
 // is the worker's directory, rooted at the side folder otherwise — and the
@@ -71,7 +71,7 @@ const fixture=(t,{bound=true}={})=>{
       return {status:job.status,markdown:row.markdown,packet:JSON.parse(row.context_json).packet};
     }finally{l.close();}
   };
-  // api report reads the envelope only from the attempt's STARCI_JOB_SCRATCH (op_attempts.scratch_dir).
+  // starci kernel report reads the envelope only from the attempt's STARCI_JOB_SCRATCH (op_attempts.scratch_dir).
   const scratchOf=jobId=>{
     const l=inspectLedger({file:ledgerFileFor(be,{env})});
     try{return l.db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.scratch_dir;}

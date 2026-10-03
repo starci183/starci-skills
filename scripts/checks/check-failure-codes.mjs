@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // failure-codes.mjs — the emitted-code scanner and the catalog checker (part of `npm run check`).
-//   node scripts/checks/check-failure-codes.mjs [--json] [--list]
+//   starci runtime check --only failure-codes -- [--json] [--list]
 //
 // Every code the runtime can emit as a verdict reason, a check finding, a blocker kind, a dispatch refusal or a settle
 // reason is a string literal in scripts/ engine/ modules/. modules/kernel/failure-codes.yaml is the owner-facing catalog

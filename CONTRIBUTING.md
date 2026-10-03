@@ -8,8 +8,12 @@ change that contradicts them is a bug in the code.
 
 ```sh
 npm ci
+npm run check   # starci runtime check
 npm test        # node --test tests/*.spec.mjs
 ```
+
+`npm run check` is the repository wrapper for `starci runtime check`. During a focused
+change, run one check with `starci runtime check --only <name>`.
 
 Node.js 22.13+ is required (`node:sqlite` unflagged). Runtime code has zero npm dependencies —
 it runs on node builtins plus the vendored `engine/yaml.mjs` bundle. `devDependencies` exist only
@@ -29,7 +33,7 @@ for the test suite and tooling:
   the repo under test, never commit generated fixture output.
 - No real network. Provider CLIs (`orca`, `devin`, `claude`, `codex`) are stubbed or recorded; a
   spec that would spawn a real agent is wrong.
-- Specs may spawn `node scripts/...` under test with `spawnSync` — that is the sanctioned
+- Specs may spawn `starci <group> <verb>` under test with `spawnSync` — that is the sanctioned
   process boundary. Assert exit codes and ledger state, not stdout poetry.
 - Shared helpers live in `tests/helpers/`; the ledger fixture is `tests/helpers/ledger-fixture.mjs`.
 
@@ -49,6 +53,12 @@ record and is worse than a red check.
   `scripts/`. An import that resolves outside those three roots is the bug.
 - **YAML contracts are data.** `modules/**/*.yaml` files are read by agents and scripts alike;
   keep them declarative — no code, no comments restating the field name.
+- **The CLI catalog is authoritative.** `modules/cli/commands/` is the one source of the CLI
+  surface. Adding a verb means adding its YAML file. Run
+  `starci runtime check --only cli-catalog-drift`, regenerate stale outputs with
+  `starci runtime gen-catalog --write`, and use `starci runtime gen-catalog --check` to confirm
+  the generated catalog, reference, and completions agree. Keep the catalog parity and drift
+  checks green.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
   visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
   hashes bytes).
@@ -100,14 +110,14 @@ Kernels run `.claude` main live, so no one edits the main checkout in place. A l
 into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
 `<lanesRoot>/<lane>` (the lanes root is `STARCI_LANES_ROOT`, else the owner config `roots.lanes`,
 else `<starciLocalRoot>/lanes`; `lanesRoot()` in `scripts/machine/home.mjs`), never with junctions or symlinks. It lands one commit at a time with
-`node scripts/supervisor/land.mjs --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
+`starci supervisor land --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
 
 - `land.mjs` runs from the main checkout, never from the lane worktree.
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
   owning lane, not into a drive-by edit.
 - A lane that depends on another's surface starts after that one merges, and merges `main` before
   it reads anything.
-- A lane finishes by submitting its report through the kernel (`api report`) so the ledger records
+- A lane finishes by submitting its report through the kernel (`starci kernel report`) so the ledger records
   the outcome; no report, the lane is not done.
 - Deletions and import rewiring that cross allowlists are their own cut, merged between lanes.
 

@@ -16,7 +16,7 @@
 //   DRAW_TOO_MANY_BADGES an entity (a card, a static state row, a list/table row) carries more than
 //                        `badgesPerEntityMax` badges (Badge, StateMark, badge/chip/pill classes) of its own.
 //
-//   node scripts/work/draw/draw-taste.mjs --html <render.html> [--png <part.png>]... [--json]
+//   starci work draw-taste --html <render.html> [--png <part.png>]... [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import { isMain } from '../../lib/is-main.mjs';
@@ -212,7 +212,7 @@ export function accentBudgetOf(png, { html = null, accent = null, settings = dra
 async function main(argv) {
   const at = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
   const html = at('--html');
-  if (!html) { process.stderr.write('use: node scripts/work/draw/draw-taste.mjs --html <render.html> [--png <part.png>]... [--json]\n'); return 2; }
+  if (!html) { process.stderr.write('use: starci work draw-taste --html <render.html> [--png <part.png>]... [--json]\n'); return 2; }
   const text = fs.readFileSync(html, 'utf8');
   const findings = htmlTasteFindings(text, { label: path.basename(html) });
   const accents = [];

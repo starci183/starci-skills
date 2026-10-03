@@ -141,3 +141,18 @@ test('CLI: a clean tree exits 0, a dirty tree 1 with file:line, --json reports, 
     fs.rmSync(dirty, { recursive: true, force: true });
   }
 });
+
+test('a moved path that is the tail of its own destination is not a use of the old path', () => {
+  const registry = REGISTRY.replace('retiredNames:', '  - {from: bin/tool.mjs, to: packages/pkg/bin/tool.mjs, movedIn: x, quiesced: false}\nretiredNames:');
+  const root = fixtureTree({
+    'docs/live.md': 'Run packages/pkg/bin/tool.mjs for it.\n',
+    'packages/pkg/package.json': '{"bin":{"tool":"./bin/tool.mjs"}}\n',
+    'docs/stale.md': 'Run node bin/tool.mjs for it.\n',
+  }, registry);
+  try {
+    const dead = checkRetiredNames(root).dead.filter((d) => d.token === 'bin/tool.mjs');
+    assert.deepEqual(dead.map((d) => d.file), ['docs/stale.md']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

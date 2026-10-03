@@ -2,45 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { CATALOG } from '../../packages/cli/src/catalog.generated.mjs';
+import { checkCommand, docCommandFiles, extractCommands } from '../helpers/doc-commands.mjs';
 
-// Every `starci <verb>` an agent or owner is told to run is a route bin/starci.mjs serves: `starci help` prints
-// the served verb list, and an unknown verb is refused — the CLI's own output is the route authority.
+// Every `starci <group> <verb>` an agent or owner is told to run exists in the generated command catalog.
+// The extraction and the flag-level proof live in tests/helpers/doc-commands.mjs and tests/repo/doc-command-flags.spec.mjs.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const BIN = path.join(ROOT, 'bin', 'starci.mjs');
-const routes = () => {
-  const help = spawnSync(process.execPath, [BIN, 'help'], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
-  assert.equal(help.status, 0, help.stderr);
-  // A help line is `starci verb` or `starci verb|verb|verb` (several verbs of one usage).
-  const verbs = new Set([...help.stdout.matchAll(/^\s*starci ([a-z][a-z|-]*)/gm)].flatMap((m) => m[1].split('|')));
-  for (const v of ['init', 'update', 'doctor', 'version', 'api', 'start', 'goal', 'validate', 'check', 'help']) assert.ok(verbs.has(v), `starci help names ${v}`);
-  const bad = spawnSync(process.execPath, [BIN, 'definitely-not-a-verb'], { encoding: 'utf8', windowsHide: true, timeout: 30_000 });
-  assert.notEqual(bad.status, 0, 'an unknown verb is refused');
-  assert.match(`${bad.stdout}${bad.stderr}`, /unknown command/);
-  return verbs;
-};
-const walk = (dir, ext) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-  const p = path.join(dir, e.name);
-  return e.isDirectory() ? walk(p, ext) : ext.some((x) => e.name.endsWith(x)) ? [p] : [];
-});
-const PENDING = new Set();
 
-test('docs, skills and op contracts name only starci verbs bin/starci.mjs routes', () => {
-  const known = routes();
-  const files = [
-    ...walk(path.join(ROOT, 'docs'), ['.md']), ...walk(path.join(ROOT, 'skills'), ['.md']),
-    ...walk(path.join(ROOT, 'modules', 'ops'), ['.yaml']),
-    path.join(ROOT, 'README.md'), path.join(ROOT, 'CONTEXT.md'),
-  ];
+test('docs, skills, op contracts, knowledge and hint scripts name only generated starci groups and verbs', () => {
   const bad = [];
-  for (const file of files) {
-    const rel = path.relative(ROOT, file).split(path.sep).join('/');
-    if (PENDING.has(rel)) continue;
-    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      for (const m of line.matchAll(/(?:`|^\s*|\b(?:[Rr]un|[Ee]xecute)\s+)starci ([a-z][a-z-]*)\b/g)) {
-        if (!known.has(m[1])) bad.push(`${rel}:${i + 1} starci ${m[1]}`);
+  for (const file of docCommandFiles(ROOT)) {
+    const name = path.relative(ROOT, file).split(path.sep).join('/');
+    const text = fs.readFileSync(file, 'utf8');
+    if (!text.includes('starci')) continue;
+    for (const occurrence of extractCommands(text, { kind: file.endsWith('.mjs') ? 'script' : 'text' })) {
+      for (const reason of checkCommand(occurrence, CATALOG)) {
+        if (/^unknown (group|verb)/.test(reason)) bad.push(`${name}:${occurrence.line} ${reason}`);
       }
-    });
+    }
   }
   assert.deepEqual(bad, []);
 });

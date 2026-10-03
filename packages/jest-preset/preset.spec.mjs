@@ -14,7 +14,7 @@ const jestTypeRoot = () => path.dirname(path.dirname(require.resolve('@types/jes
 
 // The config is read from a repository root (jest runs there): the default one below has a test world, so all four
 // projects exist; `withoutWorld` is a repository whose world is not written yet.
-// The coverage scope the managed jest.config.js passes (hfs sync renders it from the slot manifest): roots, the logic roles measured in them, the none directories inside a root.
+// The coverage scope the managed jest.config.js passes (starci app sync renders it from the slot manifest): roots, the logic roles measured in them, the none directories inside a root.
 const SCOPE = { roots: ['src/modules/domain/*/', 'src/modules/platform/*/'], roles: ['service', 'guard'], excludes: ['src/modules/domain/*/persistence/**'] };
 const OPTIONS = { coverage: SCOPE };
 const withWorld = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-world-'));
@@ -111,9 +111,9 @@ test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnost
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.tsx'), false);
 });
 
-test('starciJestConfig takes ONE option, the coverage scope hfs sync renders: it refuses to run without it, and any other option changes nothing', () => {
+test('starciJestConfig takes ONE option, the coverage scope starci app sync renders: it refuses to run without it, and any other option changes nothing', () => {
   assert.equal(preset.starciJestConfig.length, 1);
-  assert.throws(() => preset.starciJestConfig(), /needs the coverage scope hfs sync renders/);
+  assert.throws(() => preset.starciJestConfig(), /needs the coverage scope starci app sync renders/);
   assert.throws(() => preset.starciJestConfig({ coverage: { roots: ['src/'], roles: [], excludes: [] } }), /needs the coverage scope/, 'a scope that measures no role is refused');
   assert.throws(() => preset.starciJestConfig({ coverage: { roots: 'src/', roles: ['service'], excludes: [] } }), /needs the coverage scope/);
   const tuned = preset.starciJestConfig({ coverage: SCOPE, moduleNameMapper: { '^@x/(.*)$': '<rootDir>/x/$1' }, e2e: { globalSetup: 'x' }, unit: { setupFiles: ['x'] } });
@@ -205,7 +205,7 @@ test('the unit run writes the lcov Sonar imports, keeps the text summary, and re
   assert.ok(config.coverageReporters.includes('lcov'), 'lcov is the report Sonar imports (sonar.javascript.lcov.reportPaths)');
   assert.ok(config.coverageReporters.includes('text-summary'));
   assert.equal(config.coverageDirectory, 'coverage');
-  // The scope is NOT a constant of the preset: hfs sync derives it from the slot manifest (scripts/hfs/coverage-scope.mjs) into the repository's jest.config.js.
+  // The scope is NOT a constant of the preset: starci app sync derives it from the slot manifest (scripts/hfs/coverage-scope.mjs) into the repository's jest.config.js.
   assert.equal(preset.COVERAGE_SOURCES, undefined);
 });
 
@@ -615,7 +615,7 @@ module.exports = config
 function spawnE2e(root, extra) {
   const jestPackage = require.resolve('jest/package.json');
   const jestBin = path.join(path.dirname(jestPackage), 'bin', 'jest.js');
-  const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), ...extra], {
+  const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), '--cacheDirectory', path.join(root, '.jest-cache'), ...extra], {
     cwd: root,
     encoding: 'utf8',
     // the fixture resolves jest (and the world runner its jest-runner) from the same installation as this spec

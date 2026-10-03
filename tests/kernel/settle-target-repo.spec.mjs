@@ -75,7 +75,7 @@ const project=t=>{
 
 // Every owned path of a bound app is app-relative (be/…, fe/…, .starciwork/…): it resolves in the app
 // checkout, under the same spelling gate.mjs and every finding use.
-test('api enqueue records the side the app-relative paths name; any other spelling is refused path-not-app-relative',t=>{
+test('starci kernel enqueue records the side the app-relative paths name; any other spelling is refused path-not-app-relative',t=>{
   const {be,api}=project(t);
   const ledger=openLedger({file:ledgerFileFor(be.repo)});
   try{ledger.transaction(db=>{

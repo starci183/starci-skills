@@ -65,7 +65,7 @@ test('a canon slice needing a relocation nobody else holds is planned as slice-w
   }
   assert.deepEqual(plan.wires, [], 'no shared registration and no contested destination: nothing for a wire leg to own');
   assert.ok(!plan.commands.some((command) => command.includes('"canonWire":true')));
-  assert.ok(plan.commands.some((command) => command.startsWith(`api enqueue --op code.refactor --paths ${slice.owned.join(',')} --cut-id fe-canon --cut-ordinal 2 --cut-total 3`)));
+  assert.ok(plan.commands.some((command) => command.startsWith(`starci kernel enqueue --op code.refactor --paths ${slice.owned.join(',')} --cut-id fe-canon --cut-ordinal 2 --cut-total 3`)));
 });
 
 test('a destination a sibling already owns is never granted: the move goes to the wave\'s wire leg', () => {
@@ -76,7 +76,7 @@ test('a destination a sibling already owns is never granted: the move goes to th
   assert.ok(wire.paths.includes(`${SRC}/features/layouts/Sidebar`) && wire.paths.includes(`${shells}/Sidebar`), 'the wire moves the contested owner once the slices land');
   assert.ok(!wire.paths.some((p) => p.endsWith('architecture.json')), 'the wire carries the contested move, no retired registration file');
   assert.deepEqual(wire.after, [2]);
-  assert.match(plan.commands.find((command) => command.includes('"canonWire":true')), /^api enqueue --op code\.refactor --paths .*--params '\{"canonWire":true\}' --after /);
+  assert.match(plan.commands.find((command) => command.includes('"canonWire":true')), /^starci kernel enqueue --op code\.refactor --paths .*--params '\{"canonWire":true\}' --after /);
 });
 
 test('a blocked slice routes config files to the wire and no registration file is assumed', () => {
@@ -122,7 +122,7 @@ test('a blocked slice is redone from its preserved work: --retry-of with its pre
     const redo = canonRedispatchOf(ledger.db, jobId, { extraPaths: [`${SRC}/features/layouts/Sidebar`] });
     assert.equal(redo.resumeFrom, `refs/heads/preserved/${workflowId}/${jobId}`);
     assert.equal('admissionBase' in redo, false);
-    assert.equal(redo.command, `api enqueue --workflow ${workflowId} --op code.refactor --paths ${[...owned, `${SRC}/features/layouts/Sidebar`].join(',')} --cut-id fe-canon --cut-ordinal 7 --cut-total 34 --retry-of ${jobId} --params '{"resumeFrom":"refs/heads/preserved/${workflowId}/${jobId}"}'`);
+    assert.equal(redo.command, `starci kernel enqueue --workflow ${workflowId} --op code.refactor --paths ${[...owned, `${SRC}/features/layouts/Sidebar`].join(',')} --cut-id fe-canon --cut-ordinal 7 --cut-total 34 --retry-of ${jobId} --params '{"resumeFrom":"refs/heads/preserved/${workflowId}/${jobId}"}'`);
   } finally { ledger.close(); }
   const cli = spawnSync(process.execPath, [SEAM_POLICY, 'canon-redispatch', '--repo', repo, '--job', jobId], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.equal(cli.status, 0, cli.stderr);

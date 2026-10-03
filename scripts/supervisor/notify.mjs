@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// notify.mjs — the [Supervisor]'s notice to one workflow's Kernel (a ruling, a "fixed by <sha>, resolve inc-...",
+// starci supervisor notify — the [Supervisor]'s notice to one workflow's Kernel (a ruling, a "fixed by <sha>, resolve inc-...",
 // a disposition). Since lane rc-decisions (reconciler DESIGN §10.2) the notice is a durable Decision Item, never text
-// typed into the Kernel terminal: it opens a `supervisor-ruling` DI in the product ledger through `api decisions --open
+// typed into the Kernel terminal: it opens a `supervisor-ruling` DI in the product ledger through `starci kernel decisions --open
 // --by supervisor` (text = the notice; it supersedes the Kernel's live DIs on the same entity) and rings the doorbell
 // (scripts/machine/decisions.mjs ringDoorbell: one fixed line, only when the seat reads turn-idle).
 //
-//   node scripts/supervisor/notify.mjs --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <owed-action key>]
+//   starci supervisor notify --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <owed-action key>]
 //        [--entity <type>:<id>] [--json]
 //
 // A busy Kernel is no longer a failure: the DI waits in the ledger and the answer is `queued` (delivered: true); the
@@ -76,7 +76,7 @@ if (isMain(import.meta.url)) {
   const entityArg = value('entity');
   const entity = entityArg && entityArg.includes(':') ? { type: entityArg.slice(0, entityArg.indexOf(':')), id: entityArg.slice(entityArg.indexOf(':') + 1) } : null;
   if (!value('repo') || !value('workflow') || !text?.trim()) {
-    console.error('use: notify.mjs --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <key>] [--entity <type>:<id>] [--json]');
+    console.error('use: starci supervisor notify --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <key>] [--entity <type>:<id>] [--json]');
     process.exitCode = 2;
   } else {
     const r = await notifyKernel({ repo: value('repo'), workflowId: value('workflow'), text, item: value('item'), entity });

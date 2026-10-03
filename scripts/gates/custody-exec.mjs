@@ -2,9 +2,9 @@
 // custody-exec.mjs - `sops exec-env` for a custody file named `<name>.<fmt>.enc` (the one runtime helper; product
 // repositories carry no copy).
 //
-//   node <runtime>/scripts/gates/custody-exec.mjs <file>.<yaml|json|env>.enc '<command>'   run <command> with the keys in its env
-//   node <runtime>/scripts/gates/custody-exec.mjs <file>.<fmt>.enc --get NAME               print one value (a pipe consumer)
-//   node <runtime>/scripts/gates/custody-exec.mjs <file>.<fmt>.enc --keys                   print the key NAMES only
+//   starci gate custody-exec <file>.<yaml|json|env>.enc '<command>'   run <command> with the keys in its env
+//   starci gate custody-exec <file>.<fmt>.enc --get NAME             print one value (a pipe consumer)
+//   starci gate custody-exec <file>.<fmt>.enc --keys                 print the key NAMES only
 //   add  --input-type yaml|json|dotenv  to state the format instead of taking it from the name
 //
 // WHY. Custody members are committed as `<name>.<fmt>.enc` (check-starcistacks refuses any other tracked member under
@@ -36,7 +36,7 @@ function main(argv) {
   const get = flag('--get');
   const keys = has('--keys');
   const [file, ...command] = argv;
-  if (!file) throw new Error("usage: custody-exec.mjs <file>.<fmt>.enc ('<command>' | --get NAME | --keys) [--input-type yaml|json|dotenv]");
+  if (!file) throw new Error("usage: starci gate custody-exec <file>.<fmt>.enc ('<command>' | --get NAME | --keys) [--input-type yaml|json|dotenv]");
   if (keys) { process.stdout.write(`${Object.keys(execEnv(file, { inputType })).join('\n')}\n`); return 0; }
   if (get !== undefined) {
     const values = execEnv(file, { inputType });

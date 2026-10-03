@@ -207,8 +207,8 @@ rules:
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_SIDE
       manual:
-        - node scripts/work/validate/work-validate.mjs <app>/.starciwork passes.
-        - node scripts/gates/starcistacks.mjs <app> exits 0.
+        - starci runtime validate <app>/.starciwork passes.
+        - starci gate starcistacks <app> exits 0.
     relatedExamples: []
   - id: REPO-FOLDER-5
     title: Storage states, ignored and external
@@ -266,7 +266,7 @@ rules:
     cases:
       - id: case-1
         when: A new app
-        write: Start from the README hfs scaffold app writes (packages/hfs/templates/app/skeleton/README.md).
+        write: Start from the README starci app scaffold writes (packages/hfs/templates/app/skeleton/README.md).
     verification:
       automated:
         - HFS_SLOT_REQUIRED_MISSING

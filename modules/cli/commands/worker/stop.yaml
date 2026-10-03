@@ -1,0 +1,22 @@
+group: worker
+verb: stop
+owner: runtime
+summary: stop a supervised worker that Orca still reports as working
+impl: {module: scripts/supervisor/worker-verbs.mjs, export: workerStopVerb}
+effect: host
+roles: [lead, coordinator, owner]
+conventions:
+  - stop only a working Dispatch; finish cleanup with starci worker close
+flags:
+  - {name: dispatch, type: string, required: true, summary: authoritative Orca Dispatch id}
+positional: []
+exit:
+  "0": "worker stopped"
+  "1": "Orca could not prove the stop"
+  "2": "bad usage or the worker is not working"
+json: starci/worker-stop@1
+examples:
+  - starci worker stop --dispatch <dispatch-id>
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

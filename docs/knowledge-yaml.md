@@ -32,7 +32,7 @@ Operator `supportingReferences` and `CONTEXT.md` name runtime paths such as `kno
 From this skill directory:
 
 ```sh
-npm test
+starci check run --level L2
 ```
 
 Authored knowledge is validated as YAML by the test suite and readers. Rejected: unsafe `..` paths, duplicate rule/example IDs, missing referenced example files, unsupported YAML tags/duplicate keys. Install/update copies the authored sources and records success after verification; see [releasing](releasing.md).

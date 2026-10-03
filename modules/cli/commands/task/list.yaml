@@ -1,0 +1,19 @@
+group: task
+verb: list
+owner: runtime
+summary: list state, runs, results and actions for registered runtime tasks
+impl: {module: scripts/machine/task-verbs.mjs, export: taskList}
+effect: read
+roles: [worker, lead, coordinator, release, owner]
+conventions:
+  - only the runtime-owned harness tunnel and reconciler tasks are listed
+flags: []
+positional: []
+exit: {"0": registered runtime tasks listed, "1": Task Scheduler could not be read, "2": bad usage}
+json: starci/task-list@1
+examples:
+  - starci task list
+  - starci task list --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

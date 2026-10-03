@@ -17,7 +17,7 @@ never proven by a dependency that may not be installed.
 ## Running it
 
 ```
-node scripts/work/brand/brand.mjs <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
+starci work brand <work-root> [--source <repository-root>] [--stage decide|verify] [--json]
 ```
 
 `<work-root>` is the Work tree that owns the brand record (`<tree>/brand/index.yaml`; a repository root works
@@ -201,8 +201,7 @@ markup it was rendered from, kept beside it as `<candidate>.html` — and answer
 while PNG assets without `generation` are implementation captures regardless of prose provenance. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide
 the implementation but cannot prove exact Grammar components, DOM/render anatomy or API behavior.
 
-The module is a library, not a verb — bin/starci.mjs routes no render command. The checks run through the
-composition it exports:
+The module is a library, not a CLI verb. The checks run through the composition it exports:
 
 ```
 runRenderChecks({uiDir, captureDir=null, brandTree, family=null, grammarRoot=<host>/knowledge/grammars})

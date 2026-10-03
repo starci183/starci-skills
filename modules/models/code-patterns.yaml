@@ -153,7 +153,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Confirm that a declared module owns a cohesive capability instead of hiding feature orchestration.
@@ -166,7 +166,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Inspect callbacks with neutral names for hidden product behavior.
@@ -179,7 +179,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Verify semantic validation and DTO/result projection at the actual transport boundary.
@@ -475,7 +475,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Confirm the exported surface is a stable capability API.
@@ -564,7 +564,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [BE_PUBLIC_CONTRACT_FORM, BE_READONLY_BOUNDARY, BE_SOURCE_FORM]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: knowledge/patterns/be/typing.yaml
           review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
@@ -606,11 +606,11 @@ profiles:
         status: implemented
       - id: NEST-SAGA-OBSERVATION
         sourceRuleIds: [BE-SAGA-1, BE-SAGA-2, BE-SAGA-3, BE-SAGA-4]
-        rationale: These are tree checks of `hfs check` (BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_CONSUMER_DEDUPE, BE_SAGA_E2E_MISSING) over a folder tree, event names and e2e spec files, not lint rules; whether a compensation really undoes its step, a step is idempotent and an injected fault is the right one is reviewed against the accepted design.
+        rationale: These are tree checks of `starci app check` (BE_SAGA_STEP_COMPENSATION, BE_SAGA_STATE_VERSIONED, BE_SAGA_EVENT_CONTRACT, BE_SAGA_CONSUMER_DEDUPE, BE_SAGA_E2E_MISSING) over a folder tree, event names and e2e spec files, not lint rules; whether a compensation really undoes its step, a step is idempotent and an injected fault is the right one is reviewed against the accepted design.
         guidance: knowledge/patterns/be/saga.yaml
       - id: NEST-SERVICE-STACK-AND-CONTRACT-OBSERVATION
         sourceRuleIds: [BE-SERVICES-2, BE-SERVICES-3, BE-SERVICES-4]
-        rationale: These are tree checks of `hfs check` (HFS_IMAGE_UNPINNED, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING), not lint rules; whether a spec asserts the right behaviour, whether a version bump is compatible and whether a saga compensates every failure is reviewed against the accepted design.
+        rationale: These are tree checks of `starci app check` (HFS_IMAGE_UNPINNED, HFS_EVENT_CONTRACT, BE_ASYNC_SPEC_MISSING), not lint rules; whether a spec asserts the right behaviour, whether a version bump is compatible and whether a saga compensates every failure is reviewed against the accepted design.
         guidance: knowledge/patterns/be/services.yaml
 
       - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
@@ -629,7 +629,7 @@ profiles:
         status: implemented
       - id: NEST-EVENT-BUS-OBSERVATION
         sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
-        rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
+        rationale: These are tree checks of starci app check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
         guidance: knowledge/patterns/be/event-bus.yaml
 
       - id: NEST-EVENT-BUS-OUTBOX-AND-CONSUMER
@@ -648,7 +648,7 @@ profiles:
         status: implemented
       - id: NEST-EVENT-BUS-OBSERVATION
         sourceRuleIds: [BE-EVENT-BUS-1, BE-EVENT-BUS-2, BE-EVENT-BUS-5, BE-QUEUES-2, BE-QUEUES-3, BE-QUEUES-4]
-        rationale: These are tree checks of hfs check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
+        rationale: These are tree checks of starci app check (BE_EVENT_CLASS_CONTRACT, BE_PATTERN_SPEC_MISSING) and the infra-owner table (kafkajs, bullmq, no cron); whether a fact really crosses a context, whether a payload change is additive and whether a scenario proves the right behaviour is reviewed against the accepted design and a real broker run.
         guidance: knowledge/patterns/be/event-bus.yaml
       - id: NEST-WEBHOOK-DOOR
         sourceRuleIds: [BE-WEBHOOK-2]
@@ -666,7 +666,7 @@ profiles:
         status: implemented
       - id: NEST-WEBHOOK-OBSERVATION
         sourceRuleIds: [BE-WEBHOOK-1, BE-WEBHOOK-3, BE-WEBHOOK-4]
-        rationale: These are tree checks of hfs check (the slot of the kind, the required files, BE_PATTERN_SPEC_MISSING) and the delivery rule of the inbox; whether each provider event maps to exactly one published event and whether a scenario proves the right behaviour is reviewed against the provider contract and a real run of the fake.
+        rationale: These are tree checks of starci app check (the slot of the kind, the required files, BE_PATTERN_SPEC_MISSING) and the delivery rule of the inbox; whether each provider event maps to exactly one published event and whether a scenario proves the right behaviour is reviewed against the provider contract and a real run of the fake.
         guidance: knowledge/patterns/be/webhooks.yaml
       - id: NEST-REALTIME-DOOR
         sourceRuleIds: [BE-REALTIME-1, BE-REALTIME-2, BE-REALTIME-3]
@@ -684,7 +684,7 @@ profiles:
         status: implemented
       - id: NEST-REALTIME-OBSERVATION
         sourceRuleIds: [BE-REALTIME-4]
-        rationale: The three realtime scenarios are a tree check of hfs check (BE_PATTERN_SPEC_MISSING); whether a real client proves delivery, isolation and cleanup is reviewed against a real run.
+        rationale: The three realtime scenarios are a tree check of starci app check (BE_PATTERN_SPEC_MISSING); whether a real client proves delivery, isolation and cleanup is reviewed against a real run.
         guidance: knowledge/patterns/be/realtime.yaml
 
       - id: NEST-FENCED-JOB-AND-PROJECTION
@@ -703,7 +703,7 @@ profiles:
         status: implemented
       - id: NEST-JOB-PROJECTION-REACTOR-OBSERVATION
         sourceRuleIds: [BE-JOBS-5, BE-PROJECTIONS-3, BE-PROJECTIONS-4, BE-REACTORS-1, BE-REACTORS-2, BE-REACTORS-3, BE-REACTORS-4]
-        rationale: The scenarios are checked by hfs check (BE_PATTERN_SPEC_MISSING) and the kind boundary by the architecture machine (BE_KIND_ISOLATION); whether a zombie is really refused, a replay rebuilds the same rows and a reactor copy is complete is reviewed against the test-world runs.
+        rationale: The scenarios are checked by starci app check (BE_PATTERN_SPEC_MISSING) and the kind boundary by the architecture machine (BE_KIND_ISOLATION); whether a zombie is really refused, a replay rebuilds the same rows and a reactor copy is complete is reviewed against the test-world runs.
         guidance: knowledge/patterns/be/jobs.yaml
 
   next:
@@ -795,7 +795,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_ROUTE_DEFAULT_EXPORT, FE_ROUTE_ONE_PAGE, FE_ROUTE_DRAWING_DECISION, FE_ROUTE_CLIENT_BOUNDARY, FE_ROUTE_CLIENT_HOOK]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Confirm a server loader adapts framework input rather than owning product orchestration.
@@ -808,7 +808,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_TIER_DIRECTION, FE_APP_ISOLATION, ARCH_OWNER_CYCLE, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_TRANSPORT_OWNER, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Classify scenario, reusable capability and intrinsic visual responsibilities before applying a directory edge.
@@ -821,7 +821,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_PURE_WORLD_HOOK, FE_PURE_WORLD_IMPORT, FE_PURE_REACHES_DATA]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Intrinsic focus, measurement, disclosure, drag and reduced-motion state remain valid visual ownership.
@@ -935,7 +935,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Confirm the public surface belongs to one cohesive feature/module/package owner.
@@ -948,7 +948,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [ARCH_GRAMMAR_EXPORT_BYPASS, ARCH_GRAMMAR_CONTRACT_INVALID]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Typecheck actual component props and render states; static package identity cannot prove behavior.
@@ -961,7 +961,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_WORLD_OWNER_RENDER_BOUNDARY]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: docs/architecture.md
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
@@ -1015,7 +1015,7 @@ profiles:
           check:
             kind: architecture
             ruleIds: [FE_SWR_KEY_IDENTITY, FE_SWR_MUTATION_RESOURCE_IDENTITY]
-            externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/hfs/architecture.mjs <repo-root>' }
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci runtime architecture <repo-root>' }
         semantic:
           guidance: knowledge/patterns/fe/function.yaml
           review: Exercise identity changes and stale-result boundaries; syntax cannot prove key completeness without domain meaning.

@@ -100,7 +100,7 @@ calls:
       Binds the Run to the --from terminal as its coordinator. Issued only when run-show proves the
       coordinator is not the workflow's current Kernel terminal (one re-bind per Kernel replacement:
       a repeated run-use invalidates live Dispatches, so it is replay: request with the identity {run, from}).
-      Caller: api dispatch (ensureWorkflowRun).
+      Caller: starci kernel dispatch (ensureWorkflowRun).
   run-list:
     command: orchestration run-list
     kind: read
@@ -123,7 +123,7 @@ calls:
       status: [pending, ready, dispatched, completed, failed, blocked]
     receipt: [result.task.id]
     note: >-
-      Never issued for an operation Task: the op's own worker_done (after api report) settles its Task and
+      Never issued for an operation Task: the op's own worker_done (after starci kernel report) settles its Task and
       Dispatch, and Orca refuses a task-update after that (orca-deep-map smoke E3). Issued only by
       scripts/kernel/launch-smoke.mjs for a smoke worker that never reported, and by the draw critic.
   worker-start:
@@ -142,7 +142,7 @@ calls:
       on: [windows, macos, linux]
     receipt: [result.dispatchId, result.taskId]
     creates: dispatch
-    note: "--from is resolved by Orca from the calling terminal when omitted; the runtime always passes the exact coordinator handle (the entry terminal for the Kernel, the Kernel terminal for an op). Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. The Task Orca created from --spec is result.taskId. The worker's terminal is result.worker.agentTerminalHandle, else the attestation worker-show's result.dispatch.assigneeHandle (there is no dispatch-show). For a fresh worker in an existing worktree, creation labels do not set the terminal title: terminal-rename applies the semantic [Op] title. Request identity: the job and its lease token (api dispatch), or the launch the caller names (startAgent)."
+    note: "--from is resolved by Orca from the calling terminal when omitted; the runtime always passes the exact coordinator handle (the entry terminal for the Kernel, the Kernel terminal for an op). Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. The Task Orca created from --spec is result.taskId. The worker's terminal is result.worker.agentTerminalHandle, else the attestation worker-show's result.dispatch.assigneeHandle (there is no dispatch-show). For a fresh worker in an existing worktree, creation labels do not set the terminal title: terminal-rename applies the semantic [Op] title. Request identity: the job and its lease token (starci kernel dispatch), or the launch the caller names (startAgent)."
     classify:
       - when: {exitCode: 0, path: result.state, in: [ready]}
         outcome: ok
@@ -292,7 +292,7 @@ calls:
     receipt: [result]
     note: >-
       Answers one worker `question` message; the worker's blocking ask returns with the body. Issued only by
-      `api reply` (scripts/api/orca/reply.mjs) from the Kernel's own terminal, so Orca resolves --from to
+      `starci kernel reply` (scripts/api/orca/reply.mjs) from the Kernel's own terminal, so Orca resolves --from to
       the Run's coordinator. No retry-request replay: a duplicate reply is a second message, so an unknown
       result is never re-issued; the question stays pending in the ledger for the Kernel to decide.
   send:
@@ -303,7 +303,7 @@ calls:
     required: [subject]
     receipt: [result]
     note: >-
-      Only an op's worker_done (scripts/api/orca/send.mjs send): `api report`, running in the op's
+      Only an op's worker_done (scripts/api/orca/send.mjs send): `starci kernel report`, running in the op's
       own pane, sends exactly one `--type worker_done --outcome succeeded|failed --task-id --dispatch-id --from
       <assignee> --report-path` after the report row committed and before the settler starts (an ask sends none).
       Orca settles the Task and Dispatch on it, so settle only releases the worker. replay: request with the

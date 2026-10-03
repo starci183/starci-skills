@@ -16,7 +16,7 @@
 #              before and after the land: {module, export} called as fn({repo, files}) -> {findings[]}
 #
 # A batched change reaches a workflow created BEFORE it only at a release - one contract-release event per
-# workflow (node scripts/kernel/cli.mjs contract-release --family <op> --repo <ledger owner>), which the
+# workflow (starci kernel contract-release --family <op> --repo <ledger owner>), which the
 # Supervisor runs when it decides. Until then new legs there are admitted with the change withheld
 # (contracts.context_json.contract.withheld: judged as if admitted before it) and it owes no follow-up; after
 # it, a leg that does not carry the released set owes ONE follow-up for all of it. A workflow created after

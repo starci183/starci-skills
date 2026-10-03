@@ -176,7 +176,7 @@ test('a redo still withheld from a change owes it only after the release; a canc
   assert.deepEqual(owedNow(),[['refactor-gate-two','job-b']],'admitted with gate two withheld, job-b owes one redo at its release');
 });
 
-test('dispatch withholds the frozen changes; api check reads their codes advisory; the release re-stamps queued legs and drops a duplicate',t=>{
+test('dispatch withholds the frozen changes; starci kernel record-checks reads their codes advisory; the release re-stamps queued legs and drops a duplicate',t=>{
   const fx=fixture(t);
   const first=fx.ok(['enqueue','--workflow',fx.wf,'--op','code.refactor','--paths','docs/']).job_id;
   const d=fx.api(['dispatch','--job',first,'--model','codex-agent','--spawn']);
@@ -188,7 +188,7 @@ test('dispatch withholds the frozen changes; api check reads their codes advisor
   assert.deepEqual(admission.advisoryCodes,['REFACTOR_ONE','REFACTOR_TWO']);
   const attempt=fx.read(db=>db.prepare('SELECT a.attempt_id,a.dispatch_id,a.job_id FROM op_attempts a WHERE a.workflow_id=? AND a.op_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(fx.wf,'code.refactor'));
   fx.seed(l=>l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'done','{}',?)").run(fx.wf,attempt.attempt_id,attempt.dispatch_id,attempt.job_id,Date.now()));
-  const checked=fx.ok(['check','--job',first,'--checks',JSON.stringify({checks:[{name:'refactor-gate',exitCode:1,codes:['REFACTOR_TWO']}]})]);
+  const checked=fx.ok(['record-checks','--job',first,'--checks',JSON.stringify({checks:[{name:'refactor-gate',exitCode:1,codes:['REFACTOR_TWO']}]})]);
   assert.deepEqual(checked.advisory,[{name:'refactor-gate',changes:['refactor-gate-two']}],'a code of a withheld change is a suspect, not a refusal');
 
   // Two never-dispatched legs of the same paths wait: the release keeps the newest, re-stamped, and drops the older one.

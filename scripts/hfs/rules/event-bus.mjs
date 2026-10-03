@@ -96,7 +96,7 @@ export function eventClassContractFindings({ repoRoot, files, repo }) {
     for (const [name, { file, version }] of byName) {
       const entry = contract?.doc?.events?.[name];
       if (!contract) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${name}\` but ${CONTRACT_PREFIX}${service}/${CONTRACT_NAME} is not tracked; every event class is an entry of the vendored contract of its service.`, { service, event: name }));
-      else if (entry === undefined) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${name}\` which ${contract.file} does not list; emit the contract (\`hfs emit-contracts\`) so the class and the contract agree.`, { service, event: name }));
+      else if (entry === undefined) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares the event \`${name}\` which ${contract.file} does not list; emit the contract (\`starci app emit\`) so the class and the contract agree.`, { service, event: name }));
       else if (entry.version !== version) findings.push(found(EVENT_CLASS_CONTRACT, file, `${file} declares \`${name}\` at version ${version} but ${contract.file} lists version ${entry.version}; a version changes in the class and the contract together.`, { service, event: name }));
     }
   }

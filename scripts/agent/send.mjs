@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // send.mjs — deliver a prompt to a live agent terminal and confirm consumption.
-//   node scripts/agent/send.mjs --terminal <h> --agent <a>
+// Internal entry: spawned by scripts/agent/lib.mjs; not invoked directly.
+// Args: --terminal <h> --agent <a>
 //     (--text <t> | --text-file <f>) [--worktree <path>] [--dispatch-id <id>] [--no-await]
 // --agent loads the adapter card for delivery mode + submission patterns.
 import { arg, flag } from '../lib/cli-arg.mjs';

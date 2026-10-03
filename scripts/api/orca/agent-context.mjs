@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // agent-context.mjs — the calls.yaml `agent-context` call as a callable function.
-//   node scripts/api/orca/agent-context.mjs
+// Internal entry: spawned by scripts/checks/check-providers.mjs; not invoked directly.
+// Args: none.
 // The live command/flag signature of the binary that will actually run. It is
 // what scripts/api/orca/lib.mjs compares calls.yaml against before the first
 // mutation and what `scripts/checks/check-providers.mjs --live` compares in bulk.

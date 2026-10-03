@@ -17,7 +17,7 @@ npm run build
 npm run serve
 ```
 
-The tunnel runs with `node start.mjs --tunnel` (cloudflared `tunnel --config %USERPROFILE%/.cloudflared/harness.yml run starci-harness`, without the CF token variables); `node scripts/reconciler/tunnel-task.mjs --install-task [--apply]` prints or registers its scheduled task. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at the same port (`statusApp.port` of `modules/models/runtimes.yaml` — the ingress is checked for `port-drift` against it), and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
+The tunnel runs with `starci harness start --tunnel` (cloudflared `tunnel --config %USERPROFILE%/.cloudflared/harness.yml run starci-harness`, without the CF token variables); `starci task register harness-tunnel [--apply]` prints or registers its scheduled task. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at the same port (`statusApp.port` of `modules/models/runtimes.yaml` — the ingress is checked for `port-drift` against it), and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
 
 ## Verification
 

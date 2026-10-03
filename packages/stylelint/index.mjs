@@ -1,7 +1,7 @@
 /**
  * @starci/stylelint-canon: the CSS half of the StarCi lint canon (HFS R61 `FE_STYLE_TOKEN_ONLY`).
  *
- *   // stylelint.config.mjs (the managed one-liner `hfs sync` renders)
+ *   // stylelint.config.mjs (the managed one-liner `starci app sync` renders)
  *   import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"
  *   export default starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })
  *

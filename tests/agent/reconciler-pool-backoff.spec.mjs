@@ -1,7 +1,7 @@
 // reconciler-pool-backoff.spec.mjs — adaptive per-pool concurrency (AIMD) after provider rate limits: the pure step
 // (scripts/machine/pool-backoff.mjs), route preferring the next eligible pool (scripts/agent/models.mjs selectPool), the
 // Resource controller's resource:pools key (shadow writes nothing, active publishes, a persisting limit opens the
-// circuit) and `api provider-backoff`. Every host seam is injected.
+// circuit) and `starci kernel provider-backoff`. Every host seam is injected.
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -118,7 +118,7 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   assert.equal(s.backoff()['devin-agent'].cap, 3);
 });
 
-test('api provider-backoff opens the provider circuit once (idempotent)', async (t) => {
+test('starci kernel provider-backoff opens the provider circuit once (idempotent)', async (t) => {
   // The circuit is a machine.sqlite provider_health row: a scratch machine store, injected into the verb.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-provider-backoff-'));
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };

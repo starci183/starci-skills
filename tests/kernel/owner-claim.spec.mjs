@@ -118,7 +118,7 @@ test('a verified owner answer backs the claim; a kernel resolution without owner
   assert.equal(resolve(repo,raise(repo,'owner-gate','owner picks a plan'),'--by','boss').body.code,'resolver-invalid');
 });
 
-test('the audit lists a past resolution whose owner claim no answer backs, and api status flags a not-owner owner-gate',t=>{
+test('the audit lists a past resolution whose owner claim no answer backs, and starci kernel status flags a not-owner owner-gate',t=>{
   const repo=world(t);
   answerAsk(repo,'ctx_owner000002');
   const fakeId=raise(repo,'foreign-file-committed','legacy');

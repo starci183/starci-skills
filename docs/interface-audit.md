@@ -139,7 +139,7 @@ declaration/token provenance.
 
 ## Layout lens
 
-The audit applies `node scripts/work/ui/shell-conformance.mjs` in two directions against the layout tree
+The audit applies `starci work shell-conformance` in two directions against the layout tree
 (`.starciwork/shell/index.yaml`, see [architecture](architecture.md#the-layout-tree)).
 
 - **Direction side:** each accepted direction must be a reproducible composite in the current layout chain of

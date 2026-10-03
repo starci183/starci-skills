@@ -1,4 +1,4 @@
-// api foundations: split from cli.mjs.
+// starci kernel foundations: split from cli.mjs.
 import { getWorkflow } from './shared/rows.mjs';
 import { openPeerWaits } from './shared/peer-waits.mjs';
 import { readFoundations } from '../foundation-registry.mjs';

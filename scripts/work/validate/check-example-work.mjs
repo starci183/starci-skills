@@ -104,7 +104,7 @@ const placeOfUiId = (id) => { const [, feature, ...rest] = String(id).split('.')
 
 /** Record map of a tree for ref RESOLUTION only — the same membership rules the validating walk applies
  * (kernel custody roots skipped, payload schemas and evidence manifests excluded), but silent: no
- * problems, no ref collection, no per-record rules. Scoped validation (starci validate <record-dir>)
+ * problems, no ref collection, no per-record rules. Scoped validation (starci runtime validate <record-dir>)
  * resolves refs against the enclosing tree — a uat-flow's environment resource lives in _resources/
  * above the record dir and could never resolve otherwise. */
 const collectRecordMap = (scopeRoot) => {
@@ -139,7 +139,7 @@ const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
  * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
- * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
+ * (starci kernel report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
  * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
  * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
@@ -169,7 +169,7 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
     const files = count > 1 ? ` (${count} files)` : '';
     if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a retired layout or a stray file [STARCIWORK_DRIFT]`);
     else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [HFS_AGENT_DATA_TRACKED]`);
-    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (api report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [HFS_AGENT_DATA_TRACKED]`);
+    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (starci kernel report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [HFS_AGENT_DATA_TRACKED]`);
   }
 }
 

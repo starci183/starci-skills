@@ -7,11 +7,7 @@
   "engines": {
     "node": ">=22.13.0"
   },
-  "bin": {
-    "starci": "bin/starci.mjs"
-  },
   "files": [
-    "bin/",
     "init/",
     "ext/",
     "skills/",
@@ -20,14 +16,13 @@
     "knowledge/",
     "docs/",
     "examples/",
-    "tests/",
     "scripts/",
-    "packages/",
-    "!packages/**/node_modules/",
-    "!packages/**/dist/",
-    "!packages/**/storybook-static/",
-    "!packages/**/reference-renders/",
+    "packages/cli/",
+    "packages/hfs/runtime/",
+    "packages/eslint/be/runtime/",
+    "packages/eslint/fe/runtime/",
     "!examples/**/node_modules/",
+    "!examples/**/.starciwork/",
     "!examples/**/dist/",
     "!examples/**/coverage/",
     "*.md",
@@ -55,11 +50,11 @@
     "smol-toml": "1.9.0"
   },
   "scripts": {
-    "check": "node bin/starci.mjs check",
+    "check": "node packages/cli/bin/starci.mjs runtime check",
     "test": "node --import ./tests/setup/low-priority.mjs --import ./tests/setup/isolated-temp.mjs --import ./tests/setup/isolated-registry.mjs --import ./tests/setup/runtime-copies.mjs --test \"tests/**/*.spec.mjs\"",
-    "starci": "node bin/starci.mjs",
-    "release:check": "node scripts/gates/release-check.mjs",
-    "release:publish": "node scripts/gates/release-publish.mjs"
+    "starci": "node packages/cli/bin/starci.mjs",
+    "release:check": "node packages/cli/bin/starci.mjs release check",
+    "release:publish": "node packages/cli/bin/starci.mjs release publish"
   },
   "devDependencies": {
     "@jest/globals": "29.7.0",

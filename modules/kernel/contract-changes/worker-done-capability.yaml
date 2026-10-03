@@ -13,4 +13,4 @@ paths:
   - scripts/kernel/verbs/report.mjs
   - scripts/kernel/op-prompt.mjs
   - modules/ops/_common.yaml
-  - modules/kernel/api-commands/report.yaml
+  - modules/cli/commands/kernel/report.yaml

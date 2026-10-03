@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-hfs-rules.mjs - holds knowledge/hfs/rules.yaml (the HFS rule catalog) to what exists, in both directions (part of
 // `npm run check`).
-//   node scripts/checks/check-hfs-rules.mjs [--json] [--unbuilt]
+//   starci runtime check --only hfs-rules -- [--json] [--unbuilt]
 //
 // The catalog is loaded through scripts/hfs/slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema
 // (HFS_RULES_INVALID). On top of that this check refuses:
@@ -26,7 +26,7 @@
 //     (knowledge/patterns/**, architecture-rules.yaml, modules/models/code-patterns.yaml)
 //     names though it is neither a code of the catalog nor a key of failure-codes.yaml; the finding names the file
 //                                                                                             HFS_RULE_CODE_UNCATALOGUED
-//   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `hfs check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
+//   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `starci app check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
 //     rule lists in failureCodes; a code no rule owns has no R-id, no gate and no parity proof. The only exempt codes are the
 //     infrastructure refusals ("cannot judge"), which their owners export as one list each (ERROR_RULE_IDS of the machine's
 //     index, REFUSAL_CODES of scripts/hfs/check.mjs)                                     HFS_RULE_CODE_UNOWNED
@@ -47,9 +47,9 @@ export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
 const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
-  hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
+  hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/src', 'packages/hfs/sync'],
   'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
-  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-retired-names.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/hfs/sync-runtime.mjs'],
+  runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-retired-names.mjs', 'scripts/checks/check-example-coupling.mjs', 'scripts/checks/check-doc-owner.mjs', 'scripts/checks/check-port-once.mjs', 'scripts/checks/check-default-once.mjs', 'scripts/checks/check-version-pin-once.mjs', 'scripts/checks/check-slot-id-shape.mjs', 'scripts/hfs/sync-runtime.mjs', 'scripts/checks/check-cli-parity.mjs', 'scripts/checks/check-retired-cli.mjs', 'scripts/checks/check-cli-only-entry.mjs', 'scripts/cli/gen-catalog.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -167,7 +167,7 @@ export async function pluginRuleIds(root, kind) {
 /**
  * The findings of a catalog: [{code, rule, enforcer?, message}].
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
- * codes: {machine, hfs, refusals}, every code the architecture machine and `hfs check` can emit and the refusal codes among them.
+ * codes: {machine, hfs, refusals}, every code the architecture machine and `starci app check` can emit and the refusal codes among them.
  */
 export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, tests, knowledge, codes, infrastructure }) {
   const findings = [];
@@ -244,11 +244,11 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
     const refusals = new Set(codes.refusals ?? []);
     const reported = new Set();
-    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], hfs: codes.hfs ?? [] })) {
+    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], 'starci app': codes.hfs ?? [] })) {
       for (const code of [...new Set(list)].sort()) {
         if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
         reported.add(code);
-        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (hfs check)`);
+        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (starci app check)`);
       }
     }
   }

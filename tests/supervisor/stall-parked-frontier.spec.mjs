@@ -13,8 +13,8 @@ import {parkedBehindWaits,waitHeldOperations} from '../../scripts/kernel/frontie
 //
 // A product workflow ("frontier engaged; queued: peer-wait 1, dependency 1"): a job queued --after a job a
 // typed peer-wait
-// holds read queuedBecause dependency and counted as engaged work, so api status read `engaged` instead of
-// `peer-wait` and stall's peer-parked exemption never applied. api status now parks a dependant whose chain
+// holds read queuedBecause dependency and counted as engaged work, so starci kernel status read `engaged` instead of
+// `peer-wait` and stall's peer-parked exemption never applied. starci kernel status now parks a dependant whose chain
 // ends in a held or waited job (scripts/kernel/frontier-parked.mjs); stall reads that frontier.
 //
 // The alert a Kernel quoted a day later was a STALL-ALERT "idle 966m: frontier
@@ -151,7 +151,7 @@ const MODULES='wf-nivo-modules-todo-mudqjov6',JOB='op-interface.implement-26e189
 const engagedOn=worker=>()=>({ok:true,frontier:{state:'engaged',actionable:false,queued:[],queuedCauses:{},nudgeReadyJobs:[],deadWorkerJobs:[],wedgedJobs:[],workerQuestionJobs:[],reason:null},
   workers:[{jobId:JOB,ledgerStatus:'running',...worker}]});
 
-test('a worker whose output or heartbeat api status aged fresh is mid-turn whatever its frame classified as',t=>withLedger(t,({repoRoot,ledger})=>{
+test('a worker whose output or heartbeat starci kernel status aged fresh is mid-turn whatever its frame classified as',t=>withLedger(t,({repoRoot,ledger})=>{
   seedWorkflow(ledger,{id:MODULES,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{jobId:JOB},created_at:NOW-94*MIN}]});
   ledger.write.changeWorkflowPhase({workflowId:MODULES,to:'running',by:'fixture',reason:'seed'});
   const stalled=worker=>stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:engagedOn(worker),kernelTurnOf:()=>'turn-idle'}).filter(f=>f.type==='STALLED');

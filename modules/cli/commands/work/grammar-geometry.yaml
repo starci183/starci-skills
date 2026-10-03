@@ -1,0 +1,17 @@
+group: work
+verb: grammar-geometry
+owner: runtime
+summary: emit grammar geometry guidance or check captured geometry
+impl: {script: scripts/work/ui/grammar-geometry.mjs}
+flags:
+  - {name: prompt, type: boolean, summary: print the geometry guidance for the product grammar}
+  - {name: repo, type: string, required: true, summary: product repository root}
+  - {name: family, type: string, summary: grammar family to use instead of the detected one (a registered grammar family id)}
+  - {name: check, type: string, summary: HTML file or capture directory to measure}
+  - {name: viewport, type: string, summary: WxH viewport to measure at, default: "390x844"}
+exit: {"0": guidance printed or the geometry is clean, "1": a geometry finding, "2": bad usage}
+json: flag
+examples: ['starci work grammar-geometry --prompt --repo <repo> --json']
+editions: [full]
+since: 1.0.0-alpha.4
+removed: ['node scripts/work/ui/grammar-geometry.mjs']

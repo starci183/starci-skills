@@ -152,7 +152,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
   assert.deepEqual(out(r)?.frontier,{
     state:'orphaned-frontier',actionable:true,openOperations:0,readyOperations:0,staleOperations:[],unconsumedReports:0,nudgeReadyJobs:[],workerQuestionJobs:[],wedgedJobs:[],deadWorkerJobs:[],settleReadyJobs:[],heldSettleJobs:[],heldWorkerJobs:[],askReserveDispatches:[],askOnDemandDispatches:[],credentialAskDispatches:[],peerMessageKeys:[],peerWaits:[],peerWaitsDead:[],
     queued:[],queuedCauses:{},
-    reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as api incident --kind peer-wait --peer <workflowId>, never left orphaned',
+    reason:'workflow is running but has no open operation and no unconsumed report; Kernel must derive/repair the next approved transition or finish; a next step that waits on a peer workflow is recorded as starci kernel incident --kind peer-wait --peer <workflowId>, never left orphaned',
   });
 });
 
@@ -578,7 +578,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   // An older event with no pid is judged by its port: nothing listens on port 9.
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:9/a-w'}}));
   assert.equal(frontier().state,'ask-reserve','a closed port is a dead link');
-  // Owner, 2026-09-24: api serve-ask tells the owner on Telegram and serves nothing; the owner's
+  // Owner, 2026-09-24: starci kernel serve-ask tells the owner on Telegram and serves nothing; the owner's
   // Generate URL button serves the form. A notified ask with no form is a healthy owner wait.
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-notified',payload:{dispatchId:'ctx_tax',onDemand:true,via:'telegram',messageId:7}}));
   f=frontier();

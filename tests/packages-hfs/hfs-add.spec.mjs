@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parse } from 'yaml';
-import { main } from '../../packages/hfs/bin/hfs.mjs';
+import { main } from '../../packages/hfs/src/main.mjs';
 import { addKind, liteApiTemplates } from '../../packages/hfs/scaffold/add.mjs';
 import { APP, cleanup, installTypeScript, writeCleanRepo } from '../helpers/hfs-cli-fixture.mjs';
 
-// `hfs add <noun> <name>`: exactly one kind's file tree, generated FROM the pattern knowledge files (the files: tree is the single
+// `starci app add <noun> <name>`: exactly one kind's file tree, generated FROM the pattern knowledge files (the files: tree is the single
 // source of the paths; each entry names its one template body). The specs generate into a temporary app and read the files back.
 const ts = createRequire(import.meta.url)('typescript');
 const made = [];
@@ -55,10 +55,10 @@ test('the files trees and the template bodies are one set: every named template 
   assert.deepEqual([...present].filter((name) => !named.has(name)), [], 'a template no files tree names is a second copy');
 });
 
-test('hfs add job writes the job tree from the knowledge, registers the patterns and the kind, and every file parses', async () => {
+test('starci app add job writes the job tree from the knowledge, registers the patterns and the kind, and every file parses', async () => {
   const dir = repo();
   withPlatform(dir, 'jobs', 'queues');
-  const result = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
+  const result = await cli(['add', 'job', 'send-receipt', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/jobs/send-receipt';
   assert.ok(exists(dir, 'be/src/modules/queues/send-receipt/send-receipt.queue.ts'), 'a job is the consumer of its queue: the queue is generated with it');
@@ -77,27 +77,27 @@ test('hfs add job writes the job tree from the knowledge, registers the patterns
   assert.equal(declaration.project, 'demo', 'the rest of hfs.json is kept');
 });
 
-test('hfs add refuses an existing instance, writing nothing, and a second kind adds to the registration', async () => {
+test('starci app add refuses an existing instance, writing nothing, and a second kind adds to the registration', async () => {
   const dir = repo();
   withPlatform(dir, 'jobs', 'queues');
-  assert.equal((await cli(['add', 'job', 'send-receipt', '--repo', dir])).code, 0);
-  const again = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
+  assert.equal((await cli(['add', 'job', 'send-receipt', '--cwd', dir])).code, 0);
+  const again = await cli(['add', 'job', 'send-receipt', '--cwd', dir]);
   assert.equal(again.code, 2);
   assert.match(again.err, /HFS_ADD_EXISTS/);
-  assert.equal((await cli(['add', 'job', 'expire-orders', '--repo', dir])).code, 0);
+  assert.equal((await cli(['add', 'job', 'expire-orders', '--cwd', dir])).code, 0);
   assert.ok(exists(dir, 'be/src/features/jobs/expire-orders/transport/queue/expire-orders.processor.ts'));
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'jobs']);
 });
 
-test('hfs add reactor needs its options, then writes the consumer named after the event and the dispatching handler', async () => {
+test('starci app add reactor needs its options, then writes the consumer named after the event and the dispatching handler', async () => {
   const dir = repo();
   withPlatform(dir, 'event-bus');
-  const missing = await cli(['add', 'reactor', 'payment-status', '--repo', dir]);
+  const missing = await cli(['add', 'reactor', 'payment-status', '--cwd', dir]);
   assert.equal(missing.code, 2);
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--event/);
-  const bad = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService', '--repo', dir]);
+  const bad = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService', '--cwd', dir]);
   assert.match(bad.err, /HFS_ADD_OPTION_INVALID/);
-  const result = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--repo', dir]);
+  const result = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/reactors/payment-status';
   for (const file of ['index.ts', 'payment-status.module.ts', 'application/payment-status.command.ts', 'application/payment-status.handler.ts', 'application/payment-status.contracts.ts', 'transport/message/payment-settled.consumer.ts', 'transport/message/payment-status-message.module.ts']) {
@@ -111,14 +111,14 @@ test('hfs add reactor needs its options, then writes the consumer named after th
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'reactors']);
 });
 
-test('hfs add queue and projection write their module trees; the projection needs a connection and stamps its migration', async () => {
+test('starci app add queue and projection write their module trees; the projection needs a connection and stamps its migration', async () => {
   const dir = repo();
   withPlatform(dir, 'queues');
-  assert.equal((await cli(['add', 'queue', 'receipt', '--repo', dir])).code, 0);
+  assert.equal((await cli(['add', 'queue', 'receipt', '--cwd', dir])).code, 0);
   assert.match(read(dir, 'be/src/modules/queues/receipt/receipt.queue.ts'), /export const RECEIPT_QUEUE = "receipt"/);
   assert.match(read(dir, 'be/src/modules/queues/receipt/receipt.queue.ts'), /enqueueReceipt\(payload: ReceiptPayload, tx: EntityManager\)/);
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api'], 'a queue is no trigger kind');
-  assert.equal((await cli(['add', 'projection', 'order-summary', '--repo', dir])).code, 2);
+  assert.equal((await cli(['add', 'projection', 'order-summary', '--cwd', dir])).code, 2);
   const created = addKind({ repoRoot: dir, noun: 'projection', name: 'order-summary', options: { connection: 'order' }, now: () => 1789800006000 });
   assert.ok(created.created.includes('be/src/modules/projections/order-summary/persistence/migrations/1789800006000-create-order-summary.ts'));
   const projection = read(dir, 'be/src/modules/projections/order-summary/order-summary.projection.ts');
@@ -130,9 +130,9 @@ test('hfs add queue and projection write their module trees; the projection need
   assert.deepEqual(hfsJson(dir).sides.be.patterns, ['projection', 'queue']);
 });
 
-test('hfs add generates a missing platform capability from its templates: jobs and queue come with the first job and every file parses', async () => {
+test('starci app add generates a missing platform capability from its templates: jobs and queue come with the first job and every file parses', async () => {
   const dir = repo();
-  const result = await cli(['add', 'job', 'send-receipt', '--repo', dir]);
+  const result = await cli(['add', 'job', 'send-receipt', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   for (const file of ['jobs/job-claim.service.ts', 'jobs/job-runner.service.ts', 'jobs/fenced.processor.ts', 'jobs/persistence/jobs.sql.ts', 'jobs/job-claim.service.spec.ts', 'queue/queue-relay.service.ts', 'queue/bullmq-queue-transport.client.ts', 'queue/persistence/queue.sql.ts', 'queue/queue-worker.service.spec.ts']) {
     assert.ok(parses(read(dir, `be/src/modules/platform/${file}`)), `${file} parses`);
@@ -145,14 +145,14 @@ test('hfs add generates a missing platform capability from its templates: jobs a
   assert.match(read(dir, 'be/src/modules/platform/jobs/job-claim.service.ts'), /fencing_token|runKey/);
   for (const file of createdFiles) assert.ok(parses(read(dir, file)), file);
   assert.deepEqual(hfsJson(dir).sides.be.patterns, ['fenced-job', 'queue']);
-  const second = await cli(['add', 'job', 'expire-orders', '--repo', dir]);
+  const second = await cli(['add', 'job', 'expire-orders', '--cwd', dir]);
   assert.equal(second.code, 0, second.err);
   assert.doesNotMatch(second.out, /platform/, 'a capability that exists is not written again');
 });
 
-test('hfs add reactor brings the event-bus platform capability with its first member when it is missing', async () => {
+test('starci app add reactor brings the event-bus platform capability with its first member when it is missing', async () => {
   const dir = repo();
-  const result = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--repo', dir]);
+  const result = await cli(['add', 'reactor', 'payment-status', '--event', 'payment-settled', '--from', 'payment', '--service', 'PaymentStatusService=@modules/domain/order', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   for (const file of ['event-bus.module.ts', 'event-bus.service.ts', 'event-relay.service.ts', 'event-runner.service.ts', 'kafka-event-transport.client.ts', 'persistence/event-bus.sql.ts']) {
     assert.ok(parses(read(dir, `be/src/modules/platform/event-bus/${file}`)), `${file} parses`);
@@ -162,12 +162,12 @@ test('hfs add reactor brings the event-bus platform capability with its first me
   assert.ok(exists(dir, 'be/src/features/reactors/payment-status/transport/message/payment-settled.consumer.ts'));
 });
 
-test('hfs add webhook writes the transport/http door tree with its signature proof and request, and registers the kind and its pattern', async () => {
+test('starci app add webhook writes the transport/http door tree with its signature proof and request, and registers the kind and its pattern', async () => {
   const dir = repo();
-  const missing = await cli(['add', 'webhook', 'payment-gateway', '--repo', dir]);
+  const missing = await cli(['add', 'webhook', 'payment-gateway', '--cwd', dir]);
   assert.equal(missing.code, 2);
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
-  const result = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--repo', dir]);
+  const result = await cli(['add', 'webhook', 'payment-gateway', '--service', 'PaymentService=@modules/domain/payment', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/webhooks/payment-gateway';
   for (const file of ['index.ts', 'transport/http/payment-gateway-http.module.ts', 'transport/http/payment-gateway.webhook.ts', 'transport/http/payment-gateway.webhook.spec.ts', 'transport/http/dto/payment-gateway.request.ts']) {
@@ -183,9 +183,9 @@ test('hfs add webhook writes the transport/http door tree with its signature pro
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'webhooks']);
 });
 
-test('hfs add realtime writes the transport/graphql subscription tree and registers the kind and its pattern', async () => {
+test('starci app add realtime writes the transport/graphql subscription tree and registers the kind and its pattern', async () => {
   const dir = repo();
-  const result = await cli(['add', 'realtime', 'order-status', '--service', 'orderStatusTopic=@modules/domain/order', '--repo', dir]);
+  const result = await cli(['add', 'realtime', 'order-status', '--service', 'orderStatusTopic=@modules/domain/order', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/realtime/order-status';
   for (const file of ['index.ts', 'transport/graphql/order-status-graphql.module.ts', 'transport/graphql/order-status.subscription.ts', 'transport/graphql/order-status.subscription.spec.ts', 'transport/graphql/dto/order-status-changed.type.ts', 'transport/graphql/dto/order-status.input.ts']) {
@@ -198,12 +198,12 @@ test('hfs add realtime writes the transport/graphql subscription tree and regist
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'realtime']);
 });
 
-test('hfs add saga writes the saga kind tree with its orchestrator, step, compensation, commands and consumers, and registers the kind and its pattern', async () => {
+test('starci app add saga writes the saga kind tree with its orchestrator, step, compensation, commands and consumers, and registers the kind and its pattern', async () => {
   const dir = repo();
-  const missing = await cli(['add', 'saga', 'fulfil', '--repo', dir]);
+  const missing = await cli(['add', 'saga', 'fulfil', '--cwd', dir]);
   assert.equal(missing.code, 2);
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING/);
-  const result = await cli(['add', 'saga', 'fulfil', '--owner', 'shop', '--from', 'billing', '--failed', 'invoice-rejected', '--done', 'invoice-issued', '--service', 'FulfilService=@modules/domain/fulfil', '--repo', dir]);
+  const result = await cli(['add', 'saga', 'fulfil', '--owner', 'shop', '--from', 'billing', '--failed', 'invoice-rejected', '--done', 'invoice-issued', '--service', 'FulfilService=@modules/domain/fulfil', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/saga/fulfil';
   const files = ['index.ts', 'fulfil.module.ts', 'fulfil.saga.service.ts', 'fulfil.saga.service.spec.ts', 'fulfil.saga-state.ts', 'steps/fulfil.saga-step.ts', 'compensations/fulfil.compensation.ts', 'application/undo-fulfil.command.ts', 'application/undo-fulfil.contracts.ts', 'application/undo-fulfil.handler.ts', 'application/compensate-fulfil.command.ts', 'application/compensate-fulfil.contracts.ts', 'application/compensate-fulfil.handler.ts', 'application/complete-fulfil.command.ts', 'application/complete-fulfil.contracts.ts', 'application/complete-fulfil.handler.ts', 'transport/message/invoice-rejected.consumer.ts', 'transport/message/invoice-issued.consumer.ts', 'transport/message/fulfil-message.module.ts'];
@@ -218,20 +218,20 @@ test('hfs add saga writes the saga kind tree with its orchestrator, step, compen
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'saga']);
 });
 
-test('hfs add refuses an unknown noun, a bad name and a repository that is not an app root', async () => {
+test('starci app add refuses an unknown noun, a bad name and a repository that is not an app root', async () => {
   const dir = repo();
-  assert.match((await cli(['add', 'widget', 'x', '--repo', dir])).err, /HFS_ADD_NOUN_UNKNOWN/);
-  assert.match((await cli(['add', 'queue', 'Bad_Name', '--repo', dir])).err, /HFS_ADD_NAME_INVALID/);
-  assert.match((await cli(['add', 'queue', 'x', '--repo', path.join(dir, 'be')])).err, /HFS_ADD_NOT_AN_APP/);
+  assert.match((await cli(['add', 'widget', 'x', '--cwd', dir])).err, /HFS_ADD_NOUN_UNKNOWN/);
+  assert.match((await cli(['add', 'queue', 'Bad_Name', '--cwd', dir])).err, /HFS_ADD_NAME_INVALID/);
+  assert.match((await cli(['add', 'queue', 'x', '--cwd', path.join(dir, 'be')])).err, /HFS_ADD_NOT_AN_APP/);
   assert.match((await cli(['add', 'queue'])).err, /takes `<noun> <name>`/);
 });
 
-test('hfs add api writes a feature with one operation: the application, the graphql door and its module, and registers the api kind', async () => {
+test('starci app add api writes a feature with one operation: the application, the graphql door and its module, and registers the api kind', async () => {
   const dir = repo();
-  const missing = await cli(['add', 'api', 'checkout', '--repo', dir]);
+  const missing = await cli(['add', 'api', 'checkout', '--cwd', dir]);
   assert.equal(missing.code, 2);
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
-  const result = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--repo', dir]);
+  const result = await cli(['add', 'api', 'checkout', '--service', 'CheckoutService=@modules/domain/order', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/api/checkout';
   const files = ['index.ts', 'checkout.module.ts', 'application/checkout.command.ts', 'application/checkout.handler.ts', 'application/checkout.contracts.ts', 'transport/graphql/checkout.resolver.ts', 'transport/graphql/checkout.mapper.ts', 'transport/graphql/dto/checkout.input.ts', 'transport/graphql/dto/checkout.type.ts', 'transport/graphql/checkout-graphql.module.ts'];
@@ -243,15 +243,15 @@ test('hfs add api writes a feature with one operation: the application, the grap
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api']);
 });
 
-test('hfs add cli writes a command group with its first sub-command and registers it in the static cli module', async () => {
+test('starci app add cli writes a command group with its first sub-command and registers it in the static cli module', async () => {
   const dir = repo();
   const seeded = path.join(dir, 'be', 'src', 'features', 'cli', 'cli.module.ts');
   fs.mkdirSync(path.dirname(seeded), { recursive: true });
   fs.writeFileSync(seeded, ['import { Module } from "@nestjs/common"', 'import { MigrateModule } from "./migrate/migrate.module"', '', '@Module({ imports: [MigrateModule] })', 'export class CliModule {}', ''].join('\n'));
-  const missing = await cli(['add', 'cli', 'requeue', '--repo', dir]);
+  const missing = await cli(['add', 'cli', 'requeue', '--cwd', dir]);
   assert.equal(missing.code, 2);
   assert.match(missing.err, /HFS_ADD_OPTION_MISSING.*--service/);
-  const result = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir]);
+  const result = await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--cwd', dir]);
   assert.equal(result.code, 0, result.err);
   const base = 'be/src/features/cli/requeue';
   for (const file of ['requeue.cli.ts', 'requeue.cli.spec.ts', 'requeue.module.ts', 'subs/run.cli.ts', 'subs/run.cli.spec.ts']) assert.ok(parses(read(dir, `${base}/${file}`)), `${file} parses`);
@@ -261,6 +261,6 @@ test('hfs add cli writes a command group with its first sub-command and register
   assert.ok(module.includes('import { RequeueModule } from "./requeue/requeue.module"'));
   assert.ok(module.includes('imports: [MigrateModule, RequeueModule]'));
   assert.deepEqual(hfsJson(dir).sides.be.kinds, ['api', 'cli']);
-  assert.equal((await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--repo', dir])).code, 2, 'an existing group is refused');
+  assert.equal((await cli(['add', 'cli', 'requeue', '--service', 'DeadLetterService=@modules/domain/order', '--cwd', dir])).code, 2, 'an existing group is refused');
   assert.equal(read(dir, 'be/src/features/cli/cli.module.ts'), module, 'a refused add registers nothing');
 });

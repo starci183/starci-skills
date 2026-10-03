@@ -819,7 +819,7 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
   assert.equal(seatToolDecision({ handle: 'term_other', toolName: 'Agent', root }), null, 'any other terminal passes untouched');
   assert.equal(seatToolDecision({ handle: null, toolName: 'Agent', root }), null, 'a session outside Orca passes untouched');
   const settings = JSON.parse(fs.readFileSync(new URL('../../.claude/settings.json', import.meta.url), 'utf8'));
-  assert.match(JSON.stringify(settings.hooks.PreToolUse), /scripts\/guards\/seat-tools\.mjs/);
+  assert.match(JSON.stringify(settings.hooks.PreToolUse), /starci guard seat-tools/);
   const prompt = fs.readFileSync(new URL('../../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
   assert.match(prompt, /Diagnosis is a \[Worker\] job too/);
   assert.match(fs.readFileSync(new URL('../../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);

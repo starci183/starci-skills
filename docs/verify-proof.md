@@ -16,7 +16,7 @@ An operation that writes or changes code writes or updates the unit specs of tha
 specs plus the specs that import the changed source, with lint, codegen and typecheck scoped by the op gate (`gate.mjs`). No
 operation, kernel, supervisor lane, land or `.claude` upgrade runs the whole suite (`config.yaml specs.harness`, default
 false = touching-only: the land gate runs `--specs touching` and refuses `--specs all`). The whole unit suite belongs to two
-places: `unit.verify` (`npm test` at the app root, dispatched only when the goal or the owner asks for the full unit run) and the
+places: `unit.verify` (`starci gate unit --root <app>`, dispatched only when the goal or the owner asks for the full unit run) and the
 `/push-git` flow (`scripts/supervisor/push-git.mjs`: the `.claude` suite and each bound app's full unit,
 typecheck, lint, build and canon-scan, then the push). e2e runs only when the goal or the owner asks, and `e2e.verify` then
 runs the full e2e suite. The contrast proof below judges the specs an operation added.
@@ -41,7 +41,7 @@ Live integration verification (`integration.verify`: real OAuth/IdP, SMTP, payme
 credentials) follows the same rule (owner ruling 2026-09-29): it runs only on an explicit request ("integration test",
 the Vietnamese phrase for "integration test", "verify OAuth/SMTP/payment live", "live verification") or before release. The planner adds the leg only
 when the goal asks; an already-approved leg the goal did not ask for settles `deferred` at once (never dispatched, no
-attempt spent, nothing waits on it), and `api run-deferred-tests --kind integration` runs it when the owner wants it.
+attempt spent, nothing waits on it), and `starci kernel run-deferred-tests --workflow <wf> --kind integration` runs it when the owner wants it.
 
 ## The base worktree
 
@@ -85,7 +85,7 @@ to prove? It walks record -> sibling `evidence.yaml` -> the source bytes that ev
 prints one finding per line as `CODE  <record id>  <detail>`.
 
 ```sh
-node scripts/work/validate/check-evidence-binding.mjs --work <.starciwork root> [--json]
+starci work evidence-binding --work <.starciwork root> [--json]
 ```
 
 Every path a proof hashes is app-relative (`be/...`, `fe/...`) and resolves under the app root. `--json` emits `{findings:[{code,node,path,detail}]}` instead of lines.

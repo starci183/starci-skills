@@ -14,7 +14,7 @@ graphPolicy:
   dispatch: never
 reads:
   - id: goal
-    path: the dispatch contract's context (api op-contract) — the kernel binds the approved goals row
+    path: the dispatch contract's context (starci kernel op-contract) — the kernel binds the approved goals row
     purpose:
       en: Read the frozen goal exactly as approved - its rev, done metrics, scope, allocations and the
         digest every derivation binds.
@@ -104,7 +104,7 @@ steps:
       - derivations
     writes: [node, evidence]
     action:
-      en: Validate the new goal - `starci validate` over the node and evidence layout, goal.json carrying
+      en: Validate the new goal - `starci runtime validate` over the node and evidence layout, goal.json carrying
         schema starci/goal@1, ids stable, done metrics still evaluable, rev exactly +1, diff
         complete - and report done once with the rev transition and the invalidation surface.
         Reports settled on the predecessor rev stay bound to it and never count toward the new one.

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// tell.mjs — the owner's desktop chat session relays to the one [Supervisor] (docs/supervisor.md "Chat").
+// starci supervisor tell — the owner's desktop chat session relays to the one [Supervisor] (docs/supervisor.md "Chat").
 // The desktop session never supervises: it only writes to the Supervisor's inbox and reads its replies.
 //
-//   node scripts/supervisor/tell.mjs "<text>" [--wait] [--timeout-ms <n>] [--json]
+//   starci supervisor tell "<text>" [--wait] [--timeout-ms <n>] [--json]
 //       files the text in the Supervisor's inbox (channel 'main', from: desktop); the Supervisor's watchdog wakes
 //       it with an [inbox] tag. --wait blocks until the Supervisor answers this message (default 15 min).
-//   node scripts/supervisor/tell.mjs --read [--since <ISO time | 30m | 2h>] [--limit <n>] [--json]
+//   starci supervisor tell --read [--since <ISO time | 30m | 2h>] [--limit <n>] [--json]
 //       the Supervisor's recent replies (Telegram and desktop), oldest first, each with the message it answers.
 //
 // A desktop message's answer is recorded only (never sent to Telegram); a Telegram message's answer goes to
@@ -64,7 +64,7 @@ async function main() {
   const has = (n) => argv.includes(`--${n}`);
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
-  if (has('help') || !argv.length) { console.log('use: tell.mjs "<text>" [--wait] [--timeout-ms <n>] | tell.mjs --read [--since <ISO|30m|2h>] [--limit <n>]  [--json]'); return; }
+  if (has('help') || !argv.length) { console.log('use: starci supervisor tell "<text>" [--wait] [--timeout-ms <n>] | starci supervisor tell --read [--since <ISO|30m|2h>] [--limit <n>] [--json]'); return; }
   if (has('read')) {
     const list = replies({ since: sinceMs(value('since')), limit: Number(value('limit')) || 20 });
     console.log(asJson ? JSON.stringify(list) : list.length ? list.map(show).join('\n\n') : 'no replies in that window');
@@ -80,7 +80,7 @@ async function main() {
   }
   const reply = await waitReply(r.id, { timeoutMs: Number(value('timeout-ms')) || DEFAULT_WAIT_MS });
   if (asJson) console.log(JSON.stringify({ ...r, reply }));
-  else console.log(reply ? show(reply) : `sent ${r.id}; no reply yet (tell.mjs --read later)`);
+  else console.log(reply ? show(reply) : `sent ${r.id}; no reply yet (starci supervisor tell --read later)`);
   if (!reply) process.exitCode = 124;
 }
 

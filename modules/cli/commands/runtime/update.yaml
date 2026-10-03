@@ -1,0 +1,31 @@
+group: runtime
+verb: update
+owner: runtime
+summary: bring an installed .claude tree to this package's payload version
+impl:
+  script: scripts/install/install.mjs
+  args:
+    - update
+flags:
+  - name: force
+    type: boolean
+    summary: replace files changed locally with the package version
+  - name: hosts
+    type: string
+    summary: comma list of extra bootstrap files — claude,devin or all
+  - name: no-bootstrap
+    type: boolean
+    summary: leave the host AGENTS.md/.gitignore untouched
+exit:
+  "0": updated
+  "1": refusal or error
+  "2": bad usage
+json: none
+examples:
+  - starci runtime update --cwd <repo>
+editions:
+  - full
+since: 1.0.0-alpha.4
+removed:
+  - starci update
+  - npx starci update

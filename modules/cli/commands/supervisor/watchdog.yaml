@@ -1,0 +1,18 @@
+group: supervisor
+verb: watchdog
+owner: runtime
+summary: run one reconciler-owned Supervisor seat liveness pass
+impl:
+  script: scripts/supervisor/supervisor-watchdog.mjs
+flags:
+  - {name: once, type: boolean, required: true, summary: run one watchdog pass and exit}
+exit: {"0": watchdog pass completed, "1": watchdog pass failed, "2": bad usage}
+json: flag
+examples:
+  - starci supervisor watchdog --once
+  - starci supervisor watchdog --once --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/supervisor/supervisor-watchdog.mjs
+  - node .claude/scripts/supervisor/supervisor-watchdog.mjs

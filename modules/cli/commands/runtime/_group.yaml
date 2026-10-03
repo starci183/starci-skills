@@ -1,0 +1,7 @@
+# The runtime group: install, update and judge the StarCi runtime tree itself.
+# `install` is served by the dispatcher itself (it fetches the pinned runtime
+# package); the others run inside the located runtime tree.
+group: runtime
+summary: install, update and check the StarCi runtime tree
+owner: runtime
+since: 1.0.0-alpha.4

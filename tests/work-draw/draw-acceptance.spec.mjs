@@ -143,7 +143,7 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
 const settle=(repo,jobId,env)=>{const r=spawnSync(process.execPath,[API,'settle','--repo',repo,'--job',jobId,'--verdict','pass','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});let body=null;try{body=JSON.parse(r.stdout);}catch{}return {r,body};};
 const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;}finally{l.close();}};
 
-test('api settle refuses an adopting interface.draw pass draw-not-accepted; a leg admitted before the change settles as admitted',t=>{
+test('starci kernel settle refuses an adopting interface.draw pass draw-not-accepted; a leg admitted before the change settles as admitted',t=>{
   const repo=checkout(t);
   const files=adoptedFixture(repo);
   // draw-adopt-gate (and draw-loop-dna, whose settle gate the same legs cross) predate the alpha.3 release

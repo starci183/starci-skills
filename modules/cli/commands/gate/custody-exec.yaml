@@ -1,0 +1,25 @@
+group: gate
+verb: custody-exec
+owner: runtime
+summary: decrypt one custody document for a command or a bounded read
+impl: {script: scripts/gates/custody-exec.mjs}
+positional:
+  - {name: file, required: true, variadic: false}
+  - {name: command, required: false, variadic: true}
+flags:
+  - {name: get, type: string, summary: print one named value}
+  - {name: keys, type: boolean, summary: print the top-level key names}
+  - {name: input-type, type: enum, enum: [yaml, json, dotenv], summary: state the encrypted document format}
+exit:
+  "0": requested read or command completed
+  "1": decryption, lookup, missing command or command failed (a command's own status passes through)
+  "2": bad flag or missing file refused by the dispatcher
+json: none
+examples:
+  - starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --keys
+  - starci gate custody-exec .starcistacks/dev/secrets/app.yaml.enc --get TOKEN
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/gates/custody-exec.mjs
+  - node .claude/scripts/gates/custody-exec.mjs

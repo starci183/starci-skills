@@ -1,0 +1,20 @@
+group: machine
+verb: op-metrics
+owner: runtime
+summary: report operation health metrics across managed ledgers
+impl: {script: scripts/machine/op-metrics.mjs}
+flags:
+  - {name: repo, type: list, summary: ledger repository to read (repeat it; default the managed repos)}
+  - {name: window-ms, type: number, summary: how far back to count jobs (milliseconds)}
+  - {name: by, type: enum, enum: [op, workflow], default: op, summary: group the health table by op or by workflow}
+  - {name: trend, type: boolean, summary: print the stored snapshot trend instead of a fresh count}
+exit: {"0": metrics reported, "1": a ledger was unreadable, "2": bad usage}
+json: flag
+examples:
+  - starci machine op-metrics --by workflow
+  - starci machine op-metrics --trend --json
+editions: [full]
+since: 1.0.0-alpha.4
+removed:
+  - node scripts/machine/op-metrics.mjs
+  - node .claude/scripts/machine/op-metrics.mjs

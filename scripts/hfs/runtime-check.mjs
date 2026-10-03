@@ -7,10 +7,11 @@
 //   2. the runtime rules of knowledge/hfs/rules.yaml with gate runtime, one module each under scripts/hfs/runtime-rules/:
 //      RT_EXTERNAL_OWNER, RT_TIER_DIRECTION and ARCH_OWNER_CYCLE, RT_BASE_IMPURE, RT_API_SHAPE, RT_SPEC_PLACEMENT,
 //      RT_SOURCE_NAME, RT_RETIRED_PRESENT, RT_PINNED_PATH_MOVED, HFS_SIZE_GROWTH, RT_NODE_MODULES_LINK, RT_CONTROL_CHARACTER,
-//      RT_ABSOLUTE_PATH, RT_HOOK_SHAPE (the app hook templates keep the gate model), RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs) and
-//      GENERATED_UNTRACKED (no tracked path under a generated root)
+//      RT_ABSOLUTE_PATH, RT_HOOK_SHAPE (the app hook templates keep the gate model), RT_GENERATED_DRIFT (the generated copies against scripts/hfs/sync-runtime.mjs),
+//      GENERATED_UNTRACKED (no tracked path under a generated root) and
+//      RT_CLI_APP_ONLY_TEMPLATES (managed app templates invoke only starci app)
 //   3. the findings another emitter produced for the same tree (`extraFindings`: RT_CITED_PATH_MISSING of
-//      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci check` driver)
+//      scripts/checks/check-contract-cites.mjs, passed in by scripts/checks/check-runtime.mjs, the `starci runtime check` driver)
 // The base revision is the merge-base of HEAD with main (else origin/main); without one, growth is not judged. Only error
 // findings fail. The generated copies are git-ignored output, so on this runtime it regenerates them before judging their
 // drift; it writes nothing else.
@@ -25,6 +26,7 @@ import { GENERATED_DRIFT, driftOfRuntime, syncRuntime } from './sync-runtime.mjs
 import { generatedUntrackedFindings } from './runtime-rules/generated-untracked.mjs';
 import { RUNTIME_MANIFEST_FILE, createSlotResolver, loadSlotManifest, readRepoDeclaration, ruleParams } from './slots.mjs';
 import { absolutePathRepoFindings } from './runtime-rules/absolute-path.mjs';
+import { appCliTemplateFindings } from './runtime-rules/app-cli-templates.mjs';
 import { apiShapeFindings } from './runtime-rules/api-shape.mjs';
 import { basePureFindings } from './runtime-rules/base-pure.mjs';
 import { ciUploadFindings } from './runtime-rules/ci-upload.mjs';
@@ -115,6 +117,7 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     ...controlCharFindings(ctx),
     ...absolutePathRepoFindings(ctx),
     ...generatedUntrackedFindings(ctx),
+    ...appCliTemplateFindings(ctx),
     ...factFindings(ctx),
     ...ruleIdFindings(ctx),
     ...generatedBlockFindings(ctx),
@@ -150,4 +153,3 @@ export function runtimeCheck({ repoRoot = skillRoot, root = skillRoot, files, tr
     counts: { error: findings.length, byCode },
   };
 }
-

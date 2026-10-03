@@ -40,9 +40,9 @@ nothing is ahead.
 1. From the source host (the directory holding `.claude/`), start with the check that pushes nothing:
 
    ```
-   node .claude/scripts/supervisor/push-git.mjs --check          # everything except the push
-   node .claude/scripts/supervisor/push-git.mjs                  # the same, then push each green main
-   node .claude/scripts/supervisor/push-git.mjs --repo <path> --json
+   starci supervisor push --check          # everything except the push
+   starci supervisor push                  # the same, then push each green main
+   starci supervisor push --repo <path> --json
    ```
 
    Exit 0 = every selected repository green (and pushed unless `--check`); 1 = red, dirty, off main, refused or main
@@ -53,9 +53,9 @@ nothing is ahead.
 
 3. If a suite is red, start one fixer agent per failing group (one spec file or one source file, exactly the groups the
    run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own staged lane (made first with
-   `node .claude/scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>`, which prints the path the worker
+   `starci supervisor workers stage --self --name <lane> --files <csv>`, which prints the path the worker
    starts in: `--worktree path:<staged path>`), writes or updates the specs of the code it repairs, runs only those specs and lands with
-   `node .claude/scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
+   `starci supervisor land --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
    a workflow op in the workflow's worktree: its green settle is a checkpoint on `wf-<workflowId>`, and the app's main
    moves only at the workflow's finish (full `gate.mjs`, merge guard, `review.verify`, rebase, fast-forward and push;
    `docs/workflow-kernel.md`). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`

@@ -1,8 +1,8 @@
 schema: starci/orca-provider-validation@1
 preflight:
-  - node scripts/checks/check-providers.mjs
-  - node scripts/checks/check-providers.mjs --live
-  - node scripts/checks/check-host-boundary.mjs
+  - starci runtime check --only providers
+  - starci runtime check --only providers -- --live
+  - starci runtime check --only host-boundary
 callContract:
   file: calls.yaml
   runner: scripts/api/orca/lib.mjs orcaCall (one wrapper per verb over it)
@@ -58,7 +58,7 @@ dispatchAssertions:
   - An op's terminal is renamed [Op] <operation> once the start receipt (or worker-show) names its agent terminal, and a failed rename is recorded, never a rejection.
   - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
   - An operation is never dispatched to an existing terminal; only worker-start creates its supervised agent, and the runtime never creates an agent terminal itself (terminal create is forbidden, api.yaml forbiddenForStarciOrchestration).
-  - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher. The owner's default grant (config.yaml allocation.grants, e.g. devin-agent=10@implement+verify+write) is that slot for every workflow, and `api route` enforces it.
+  - Devin is never an implicit candidate fallback; only an allocator candidate admitted by an explicit positive workflow slot may reach the launcher. The owner's default grant (config.yaml allocation.grants, e.g. devin-agent=10@implement+verify+write) is that slot for every workflow, and `starci kernel route` enforces it.
   - An operation's `done` is never accepted on its own word: the kernel re-runs every declared check itself, computes the changed files from git and refuses a report whose files fall outside the operation allowlist.
   - Current-runtime worker-start omits --on; a named --on value is used only after live runtime inventory returns that exact environment id.
   - Literal or guessed environment labels such as windows are rejected before worker-start.

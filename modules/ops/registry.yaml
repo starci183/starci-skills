@@ -1,6 +1,6 @@
 # GENERATED FILE — do not hand-edit.
-# regenerate: node scripts/route/build-ops-registry.mjs
-# check only: node scripts/route/build-ops-registry.mjs --check
+# regenerate: starci runtime gen-ops
+# check only: starci runtime gen-ops --check
 schema: starci/module-ops-registry@1
 generatedBy: scripts/route/build-ops-registry.mjs
 origin:

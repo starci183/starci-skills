@@ -27,24 +27,24 @@ passMs: 30000
 severities: [warn, critical]
 entityForms:
   - 'workflow:<ledgerId>:<workflowId>              (workflow controller)'
-  - 'stuck:<ledgerId>:<workflowId>:<kind>:<id>      (workflow controller, one api status stuck[] item)'
+  - 'stuck:<ledgerId>:<workflowId>:<kind>:<id>      (workflow controller, one starci kernel status stuck[] item)'
   - 'job:<ledgerId>:<jobId> | seat:... | service:<name> | lane:<name> ... (other controllers; <type>:<rest>)'
 codes:
   # ---- Job (§9.1) and worker / terminal (§9.3): the job controller (lane rc-job) and GC controller set these.
-  READY_UNDISPATCHED:       {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'api dispatch-ready; a Resource refusal is recorded as throttled (its own SLA)'}
-  LEASE_STUCK:              {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'api reconcile'}
-  WORKER_START_STUCK:       {slaKey: liveness.launchGraceMs, plusMs: 120000, severity: warn, owner: job-controller, autoAction: 'treated as dead: api reconcile --dead-worker (launch-abandoned)'}
-  WORKER_SILENT:            {slaKey: liveness.activeStaleMs, severity: warn, owner: job-controller, autoAction: 'api nudge'}
+  READY_UNDISPATCHED:       {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'starci kernel dispatch-ready; a Resource refusal is recorded as throttled (its own SLA)'}
+  LEASE_STUCK:              {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'starci kernel reconcile'}
+  WORKER_START_STUCK:       {slaKey: liveness.launchGraceMs, plusMs: 120000, severity: warn, owner: job-controller, autoAction: 'treated as dead: starci kernel reconcile --dead-worker (launch-abandoned)'}
+  WORKER_SILENT:            {slaKey: liveness.activeStaleMs, severity: warn, owner: job-controller, autoAction: 'starci kernel nudge'}
   WORKER_STALLED:           {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'worker-health probe: rate-limit retry with backoff, idle/report nudges (staggered), failed-no-report after 10 min; DI worker-stalled when those fail'}
   WORKER_WEDGED:            {slaKey: liveness.quietMs, severity: warn, owner: job-controller, autoAction: 'worker dead after quietMs past the nudge'}
   QUESTION_OVERDUE:         {slaMs: 600000, severity: warn, owner: kernel, autoAction: 'DI escalates; the worker is nudged to wait'}
   WORKER_RELEASE_LEAK:      {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'close and verify the worker (close-verify.mjs), recordLeftover'}
-  CONSUME_OVERDUE:          {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'api consume-report'}
+  CONSUME_OVERDUE:          {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'starci kernel consume-report'}
   CHECK_OVERDUE:            {slaKey: progress.commandTimeoutMs, severity: warn, owner: job-controller, autoAction: 'the check re-runs once; a failure opens a DI'}
   SETTLE_OVERDUE:           {slaKey: settler.invariantMaxAgeMs, severity: warn, owner: job-controller, autoAction: 'auto-settle; a refusal opens a DI carrying the reason'}
   DECISION_OVERDUE:         {slaMs: 900000, severity: warn, owner: kernel, autoAction: 'the DI escalates; twice -> the Supervisor'}
-  DEAD_WORKER_UNRECONCILED: {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'api reconcile --dead-worker --settle-failed'}
-  EFFECT_UNKNOWN_STUCK:     {slaMs: 600000, severity: warn, owner: job-controller, autoAction: 'api reconcile, then a DI'}
+  DEAD_WORKER_UNRECONCILED: {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'starci kernel reconcile --dead-worker --settle-failed'}
+  EFFECT_UNKNOWN_STUCK:     {slaMs: 600000, severity: warn, owner: job-controller, autoAction: 'starci kernel reconcile, then a DI'}
   TERMINAL_LEAK:            {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release a reclaimable worker per its Orca nextAction (worker-list), close and verify a bound non-worker terminal; an idle shell waits housekeeping.gcMinAgeMs'}
   TASK_LEAK:                {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the Orca Task'}
   LEASE_LEAK:               {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release the lease'}
@@ -57,7 +57,7 @@ codes:
   STALL_UNOWNED:            {slaKey: progress.graceMs, severity: warn, owner: kernel, autoAction: 'progress-stall DI to the Kernel with rca.actions[0]'}
   STALL_ESCALATED:          {slaKey: progress.supervisorGraceMs, severity: warn, owner: supervisor, autoAction: 'the progress-stall DI escalates to the Supervisor'}
   ORPHANED_FRONTIER:        {slaKey: supervisorTick.orphanedFrontierMs, severity: warn, owner: kernel, autoAction: 'orphaned-frontier DI to the Kernel'}
-  REV_ACK_OVERDUE:          {slaMs: 1800000, severity: warn, owner: kernel, autoAction: 'rev-ack DI to the Kernel (api kernel-ack-rev)'}
+  REV_ACK_OVERDUE:          {slaMs: 1800000, severity: warn, owner: kernel, autoAction: 'rev-ack DI to the Kernel (starci kernel kernel-ack-rev)'}
   GOAL_TEXT_MISSING:        {slaMs: 0, severity: critical, owner: owner, autoAction: 'INV-W4: only the owner fixes the goal; runtime-defect DI to the Supervisor'}
   ENDED_WITH_LIVE_WORK:     {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the live jobs and terminals of an ended workflow'}
   # ---- Kernel seat (§9.4), Supervisor seat (§9.5), host services (§8.4, §9.7): the host controller (lane rc-host).

@@ -235,7 +235,7 @@ test('a breaking change binds only when its owner makes it: ONE targeted follow-
   assert.deepEqual(staleOperationsOf(w.drift(S).stale).map(o=>o.jobId),['subscription-business-1','subscription-business-3','subscription-scope'],'the follow-up supersedes only its own slice');
 });
 
-test('api record-change: only the owner declares, only a committed revision; follow-up owes the peers, advisory waives a breaking note',t=>{
+test('starci kernel record-change: only the owner declares, only a committed revision; follow-up owes the peers, advisory waives a breaking note',t=>{
   const w=world(t);
   const refused=(args,code)=>{const r=w.api('record-change',...args);assert.equal(r.status,1,r.stdout);const body=json(String(r.stderr).trim().split('\n').at(-1));assert.equal(body?.code,code,r.stderr);return body;};
   refused(['--workflow',S,'--record',CH,'--reach','follow-up','--reason','not mine'],'record-change-not-owner');

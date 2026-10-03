@@ -1,0 +1,18 @@
+group: supervisor
+verb: stop
+owner: runtime
+summary: disable the Supervisor seat, stop its worker and release it
+impl:
+  script: scripts/supervisor/start-supervisor.mjs
+  args: [--stop]
+flags: []
+exit:
+  "0": supervisor disabled and stopped
+  "1": stop or release failed
+  "2": bad usage
+json: flag
+examples:
+  - starci supervisor stop
+editions: [full]
+since: 1.0.0-alpha.4
+removed: []

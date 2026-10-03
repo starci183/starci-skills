@@ -32,8 +32,8 @@ const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.y
 
 // The fe-canon attempt-4 checks the kernel recorded, verbatim in shape.
 const CANON_CHECKS=[
-  {name:'canon-scan',command:'node .claude/scripts/gates/canon-scan.mjs --root ../shop-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
-  {name:'hfs-lint',command:'npx hfs lint --repo ../shop-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
+  {name:'canon-scan',command:'starci gate canon-scan --root ../shop-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
+  {name:'hfs-lint',command:'npx starci app lint --repo ../shop-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
   {name:'lint-check',command:'npm run lint:check (root ../shop-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
 ];
 const UAT_ROOT_CAUSE={node:'impl.login.shop-be.session-custody',self:false,category:'contract-gap',
@@ -61,9 +61,9 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op}))}}),Date.now());
   });
-  // api(args[], extraEnv={}): STARCI_CALLER=runtime-settler makes `check` take the supplied exits as the
+  // api(args[], extraEnv={}): STARCI_CALLER=runtime-settler makes `record-checks` take the supplied exits as the
   // Kernel's own observations - without it a non-runtime caller re-runs runtime-command checks and the
-  // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/verbs/check.mjs).
+  // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/verbs/record-checks.mjs).
   const api=(args,extraEnv={})=>{
     const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_ENV_GATE:'off',...extraEnv}});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
@@ -116,9 +116,9 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:CANON_CHECKS},measurement:true}).class,'findings');
   assert.equal(measurementCheckClass(CANON_CHECKS[0]),'findings','canon-scan exit 1 is findings');
   assert.equal(measurementCheckClass({...CANON_CHECKS[0],exitCode:3}),'error','canon-scan exit 3: a machine could not run');
-  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository hfs lint with findings is measured');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../shop-fe',exitCode:1}),'findings','gate exit 1: new findings');
-  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/gates/gate.mjs --root ../shop-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
+  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository starci app lint with findings is measured');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../shop-fe',exitCode:1}),'findings','gate exit 1: new findings');
+  assert.equal(measurementCheckClass({name:'gate',command:'starci gate run --root ../shop-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:[{...CANON_CHECKS[0],exitCode:3}]},measurement:true}).class,'tool');
   // app-auth a1: the UAT names its owner as a Work record.
   assert.equal(classifyFailure({op:'uat.verify',report:{outcome:'failed',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test x',exitCode:1}]}}).class,'product');
@@ -183,7 +183,7 @@ test('a red UAT whose owner resolves to nothing stops for the owner with its cla
 test('an environment failure re-runs behind the pre-step; a tool error retries; only transient takes the same-op retry',t=>{
   const w=world(t,{legs:['uat.verify','docs.author']});
   w.job('u','uat.verify',{paths:['.starciwork/features/login/uat/x']});
-  w.report('u','failed',{checks:[{name:'env-health',command:'node scripts/uat/env-health.mjs check',exitCode:3}]});
+  w.report('u','failed',{checks:[{name:'env-health',command:'starci gate env-health check',exitCode:3}]});
   let next=w.api(['settle','--job','u','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-environment-runs-again-behind-the-pre-step','environment']);
   w.job('d','docs.author');w.report('d','failed',{head:'aaaaaaa',checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]});
@@ -208,7 +208,7 @@ test('a lint MEASUREMENT leg with findings settles pass (even filed failed), and
   const w=world(t,{legs:['review.verify','test.author','code.refactor'],workspace:false});
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   w.report('lint','failed',{checks:CANON_CHECKS,rootCause:{node:'code.refactor',self:false,category:'pending-upstream-repair',claim:'canon debt awaits the refactor legs',evidence:['574 findings']}});
-  const checked=w.api(['check','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
+  const checked=w.api(['record-checks','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   assert.deepEqual([checked.body.checkEvidence.passed,checked.body.checkEvidence.failed,checked.body.checkEvidence.green],[3,0,true],'the measured findings count as a completed measurement');
   const refused=w.api(['settle','--job','lint','--verdict','fail']);
@@ -226,7 +226,7 @@ test('a measurement whose checker did not run fails as a tool error and retries;
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   const broken=[{...CANON_CHECKS[0],exitCode:3,evidence:'a selected machine could not run'}];
   w.report('lint','failed',{checks:broken});
-  w.api(['check','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
+  w.api(['record-checks','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
   let next=w.api(['settle','--job','lint','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-tool-error-retries','tool']);
   // The final gate: a code.refactor settled before it, so findings are findings of the build.
@@ -289,7 +289,7 @@ test('env-health: ready, probe-drift with a discovered health endpoint, down, hu
   assert.equal(by.api.ready,true);
   assert.equal(by.api.discovered.url,`http://127.0.0.1:${apiPort}/graphql`);
   assert.equal(by.worker.state,'down');
-  assert.match(by.worker.remedy,/env-health\.mjs serve --env environment\.t\.login-local --service worker/);
+  assert.match(by.worker.remedy,/starci gate env-health serve --env environment\.t\.login-local --service worker/);
   assert.equal(by.socket.state,'port-conflict','a hung listener that is not a server of this workspace is never killed');
   assert.equal(by.socket.listener.pid,process.pid);
   assert.deepEqual([result.ready,result.class,result.hardBlock],[false,'environment',true]);
@@ -333,7 +333,7 @@ test('env-health serve registers a server so the next pre-step restarts it itsel
   assert.notEqual(again.pid,served.pid,'the registry names the restarted server');
 });
 
-test('api dispatch runs the environment pre-step for a walk: a foreign hung port refuses environment-not-ready before any host call; a ready stack rides the packet',async t=>{
+test('starci kernel dispatch runs the environment pre-step for a walk: a foreign hung port refuses environment-not-ready before any host call; a ready stack rides the packet',async t=>{
   const {FAKE_ORCA}=await import('../helpers/fake-orca.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-gate-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));

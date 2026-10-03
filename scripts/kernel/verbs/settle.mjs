@@ -1,4 +1,4 @@
-// api settle: prove the filed report and independent checks before recording a verdict.
+// starci kernel settle: prove the filed report and independent checks before recording a verdict.
 import fs from 'node:fs';
 import path from 'node:path';
 import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateJob } from '../../../engine/db/ledger.mjs';
@@ -30,7 +30,7 @@ import { isSpecRun, readEnv } from '../../lib/env.mjs';
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
 // through reported too, one without goes straight to failed where the table allows it. A job never dispatched
-// (queued/ready/leased) has nothing to settle: api reconcile --drop cancels it.
+// (queued/ready/leased) has nothing to settle: starci kernel reconcile --drop cancels it.
 const SETTLE_PATH = {
   reported: { succeeded: [], failed: [], [AWAITING_OWNER_STATUS]: [] },
   deciding: { succeeded: [], failed: [], [AWAITING_OWNER_STATUS]: [] },
@@ -62,9 +62,9 @@ export default {
     const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, heldDispatchOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
-  // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
+  // A report lives only in the reports table (starci kernel report files it from the job scratch, a3-3 evidence-db-report):
   // settle judges the filed row and never reads a report file. A --report path is ignored.
-  if (args.report) console.error(`api settle WARN: --report ${args.report} is ignored; settle reads the report the job filed (api report)`);
+  if (args.report) console.error(`starci kernel settle WARN: --report ${args.report} is ignored; settle reads the report the job filed (starci kernel report)`);
   {
     const settling = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
     if (settling && ['queued', 'ready', 'leased'].includes(settling.status)) {
@@ -73,7 +73,7 @@ export default {
       const dispatched = db.prepare('SELECT 1 FROM op_attempts WHERE job_id=? LIMIT 1').get(jobId) != null
         || db.prepare("SELECT json_extract(payload_json,'$.launchTerminal.handle') h FROM jobs WHERE job_id=?").get(jobId)?.h != null;
       if (!dispatched) {
-        throw Object.assign(new Error(`job ${jobId} is ${settling.status}: it was never dispatched, so there is no attempt to settle; drop it with api reconcile --job ${jobId} --drop`), { code: 'job-not-dispatched', status: settling.status });
+        throw Object.assign(new Error(`job ${jobId} is ${settling.status}: it was never dispatched, so there is no attempt to settle; drop it with starci kernel reconcile --job ${jobId} --drop`), { code: 'job-not-dispatched', status: settling.status });
       }
     }
   }
@@ -127,7 +127,7 @@ export default {
   if (drawn) {
     const codes = [...new Set(drawn.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
-      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/work/draw/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
+      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (starci work draw-acceptance --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
     process.exit(1);
   }
 
@@ -135,7 +135,7 @@ export default {
   if (measured) {
     const codes = [...new Set(measured.findings.flatMap((f) => [f.code, ...(f.codes ?? [])]))];
     emit({ ok: false, jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
-      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed — ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (node scripts/work/draw-loop.mjs verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
+      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed — ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (starci work draw-loop verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
     process.exit(1);
   }
 
@@ -143,14 +143,14 @@ export default {
   if (hygiene) {
     const codes = [...new Set(hygiene.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
-      `settle REFUSED for ${jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass node scripts/work/validate/work-validate.mjs --strict, no literal password or token outside an .enc file; node scripts/work/validate/work-hygiene.mjs files --repo <repo> <file>...), commit them, then settle again`, args.json);
+      `settle REFUSED for ${jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass starci runtime validate --strict, no literal password or token outside an .enc file; starci work hygiene files --repo <repo> <file>...), commit them, then settle again`, args.json);
     process.exit(1);
   }
 
   let checkpoint = null;
   // The workflow worktree (WFWT, scripts/kernel/workflow-settle.mjs), LAST: every settle refusal above passed. A green
   // op's side is committed on the workflow branch as the workflow's checkpoint; a failed or blocked op's side is preserved to
-  // preserved/<wf>/<op> and reset to the last checkpoint; then the milestone rebase. main moves only at api finish.
+  // preserved/<wf>/<op> and reset to the last checkpoint; then the milestone rebase. main moves only at starci kernel finish.
   {
     const settlingJob = db.prepare('SELECT workflow_id, kind FROM jobs WHERE job_id=?').get(jobId);
     const wfCtx = { db, ledger, repo, env: process.env };
@@ -189,7 +189,7 @@ export default {
     const recordedChecks = (Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : []).map((check) => (measurementLeg ? markMeasured(check) : check));
     checkEvidence = summarizeCheckEvidence(Array.isArray(checksEnvelope?.checks) ? { ...checksEnvelope, checks: recordedChecks } : checksEnvelope);
     const result = { verdict, report: null, at: payload.settledAt, checkEvidence, ...(checkpoint ? { checkpoint } : {}) };
-    // Every red check was a peer's change (api check peerBlocked): the attempt is the peer's to
+    // Every red check was a peer's change (starci kernel record-checks peerBlocked): the attempt is the peer's to
     // unblock, not this op's failure - retry accounting spends no business attempt on it
     // (engine/admission.mjs retryDisposition) and the routes hand it to the peer.
     const peerChecks = recordedChecks.filter(isPeerBlockedCheck);
@@ -197,7 +197,7 @@ export default {
       result.peerBlocked = { checks: peerChecks.map((check) => check.name), peers: peerChecks.flatMap((check) => check.peerBlocked.peers ?? []),
         routes: [...new Set(peerChecks.flatMap((check) => check.peerBlocked.routes ?? []))] };
     }
-    // The worker's claim is the reports row of its attempt (api report filed it). No row
+    // The worker's claim is the reports row of its attempt (starci kernel report filed it). No row
     // (a dead worker, nothing salvaged) settles on the kernel's verdict alone.
     const dispatchId = reportDispatchIdOf(db, job);
     const attempt = dispatchId ? db.prepare('SELECT * FROM op_attempts WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId) ?? null : null;
@@ -347,7 +347,7 @@ export default {
       if (why?.error) ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: settledAttemptId, kind: 'why-failed', payload: { error: why.error } });
     }
     // The owner's approval, recorded after the settle it rides on so it is
-    // newer than every business settle (api finish reads it: handoverGateOf).
+    // newer than every business settle (starci kernel finish reads it: handoverGateOf).
     if (handoverApproval) {
       ledger.appendEvent({
         workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -412,7 +412,7 @@ export default {
   // LIGHT SETTLE, HEAVY WORK ASYNC (owner ruling settle-runtime-service): everything above is the settle's
   // synchronous core (verdict, leases, worker release, next-step enqueue, ledger events). The tail - session
   // retention, the Telegram media, the input re-baseline, artifact indexing with its evidence copy and typed logs -
-  // runs in a detached `api settle-tail` (scripts/kernel/verbs/settle-tail.mjs) queued under the ledger's
+  // runs in a detached `starci kernel settle-tail` (scripts/kernel/verbs/settle-tail.mjs) queued under the ledger's
   // settle-tail/ dir: it can neither block nor fail the settle, and a failed run is logged and retried by the
   // settler (scripts/kernel/settle/job-settle.mjs retryDueTails). Under the test runner, or with --sync-tail, it runs inline.
   let tail, sessionReleased = null, artifacts = null;
@@ -440,7 +440,7 @@ export default {
   const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
   const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(shellLanded ? { shellFoundation: shellLanded } : {}), ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(checkpoint ? { checkpoint } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
-  if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
+  if (revDrift) console.error(`starci kernel settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
   const typedReleased = releaseTypedWaits(ledger, { repo, wake: true, self: job.workflow_id }).resolved;

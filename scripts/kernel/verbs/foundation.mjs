@@ -1,4 +1,4 @@
-// api foundation: split from cli.mjs.
+// starci kernel foundation: split from cli.mjs.
 import path from 'node:path';
 import { resolveIncident } from '../../../engine/db/ledger.mjs';
 import { csvList, getWorkflow, workflowRunning } from './shared/rows.mjs';
@@ -85,7 +85,7 @@ export default {
         }
       });
     }
-    // Waits typed on the foundation later (api incident --attach --until-foundation) resolve through the
+    // Waits typed on the foundation later (starci kernel incident --attach --until-foundation) resolve through the
     // typed-condition release, which now finds the foundation landed (gate-conditions.mjs).
     if (action === 'land' && !result.idempotent) {
       for (const item of releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()) }).resolved) {
@@ -100,7 +100,7 @@ export default {
       try {
         wake = wakeKernelForTransition(ledger, { workflowId: target, transition: 'foundation-landed', lines: [
           `Shared foundation ${name}${result.record.version ? ` ${result.record.version}` : ''} landed by ${workflowId}${holds.length ? `; peer-wait ${holds.map((item) => item.incidentId).join(', ')} released (held ${holds.flatMap((item) => item.holds).join(', ') || '-'})` : ''}.`,
-          'Re-read canonical api status and api inbox now; verify the foundation holds in your own preflight before you enqueue the work it held, and ack the message.',
+          'Re-read canonical starci kernel status and starci kernel inbox now; verify the foundation holds in your own preflight before you enqueue the work it held, and ack the message.',
         ] });
       } catch (error) { wake = { action: 'kernel-wake-failed', error: String(error?.message ?? error) }; }
       wakes.push({ workflowId: target, action: wake.action });
@@ -111,8 +111,8 @@ export default {
       ...(result.transferredFrom ? { transferredFrom: result.transferredFrom } : {}), ...(result.reopened ? { reopened: true } : {}),
       ...(action === 'land' ? { landed: record.landed, notified: notified.map(({ to, key }) => ({ to, key })), released, wakes } : {}),
       ...(action === 'declare-dependent' && record.state !== 'landed' ? { next: record.owner
-        ? `hold the legs that need it with api incident --workflow ${workflowId} --kind peer-wait --until-foundation ${name} --holds <ops|jobs> --detail <what must land>; the landing releases it`
-        : `nobody owns ${name} yet: agree the owner with your peers (api notify --kind request), who claims it; until then no wait can name it` } : {}),
+        ? `hold the legs that need it with starci kernel incident --workflow ${workflowId} --kind peer-wait --until-foundation ${name} --holds <ops|jobs> --detail <what must land>; the landing releases it`
+        : `nobody owns ${name} yet: agree the owner with your peers (starci kernel notify --kind request), who claims it; until then no wait can name it` } : {}),
     };
     emit(out, `foundation ${name} ${action}: ${record.state}${record.version ? ` ${record.version}` : ''} owner=${out.owner ?? '-'} dependents=${out.dependents.join(',') || '-'}${out.transferredFrom ? ` (taken over from ${out.transferredFrom}, no longer running)` : ''}${action === 'land' && !result.idempotent ? `; notified ${notified.map((m) => m.to).join(', ') || 'nobody'}; released ${released.map((r) => `${r.incidentId} (${r.workflowId})`).join(', ') || 'no wait'}` : ''}${out.next ? `; next: ${out.next}` : ''}`, args.json);
   },

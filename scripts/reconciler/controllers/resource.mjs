@@ -17,7 +17,7 @@
 //     (reserve > 0) held fewer slots than min(reserve, demand) for capStarvedMs (15 min) → a Decision Item to the
 //     Supervisor;
 //   key resource:quota:<ledgerId>, every quotaProbeEveryMs (5 min) while a quota circuit is open on that ledger:
-//     `api provider-health --quota-probe` through ctx.api (shadow-gated by the engine); and quota-exhausted: every
+//     `starci kernel provider-health --quota-probe` through ctx.api (shadow-gated by the engine); and quota-exhausted: every
 //     pool named by an op kind's queued jobs has an open provider circuit, none of that kind runs, and ready work
 //     waits → a Decision Item to the Supervisor.
 //
@@ -100,7 +100,7 @@ export function fairShare({ ops = [], priorities = {}, maxParallelOps = null }) 
 }
 
 /**
- * The priority workflows starving now. Pure. Demand is running + queued-READY (api status progress.queuedReady: the
+ * The priority workflows starving now. Pure. Demand is running + queued-READY (starci kernel status progress.queuedReady: the
  * queued jobs whose queuedBecause is 'ready'); a job waiting on a live file lease, a dependency, a decision or any
  * other wait is not demand the slots could serve. `ready`: {<workflowId>: queuedReady}; a workflow with no reading
  * counts no ready work (never starved on a guess). Starved: reserve > 0, queuedReady > 0, running <
@@ -154,7 +154,7 @@ const liveDeps = {
     return (pool) => Object.entries(doc?.runtimes ?? {}).find(([id, r]) => (r?.target ?? id) === pool)?.[1]?.provider ?? null;
   },
   host: async () => (await import('../../machine/host-resources.mjs')).hostResourcesFor({}),
-  // api status progress.queuedReady of one workflow (ctx.status, cached and shared); its ledger from the census row's file.
+  // starci kernel status progress.queuedReady of one workflow (ctx.status, cached and shared); its ledger from the census row's file.
   queuedReady: async (ctx, workflowId, ledgerFile) => {
     const key = (f) => String(f ?? '').replace(/\\/g, '/').toLowerCase();
     const l = (ctx.ledgers ?? []).find((x) => x.ledgerId !== 'supervisor' && x.file && key(x.file) === key(ledgerFile));
@@ -294,7 +294,7 @@ export function createResourceController(overrides = {}) {
         await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'cap-starved', decider: 'supervisor', ledger: 'supervisor', workflowId: w.workflowId,
           idempotencyKey: `cap-starved:${w.workflowId}:${new Date(st.since).toISOString()}`, entity: { type: 'workflow', id: w.workflowId },
           summary: `priority workflow ${w.workflowId} held ${w.running} of its reserve ${w.reserve} slot(s) for ${Math.round((now - st.since) / 60000)} min with ${w.queued} op(s) ready (mode ${m.mode}, cap ${cap.effectiveCap ?? '-'}/${maxParallelOps ?? '-'})`,
-          evidence: [{ ref: `throttle:${m.why}` }, { ref: `cap:${cap.why}` }], options: [{ key: 'ram-cap-prioritize', verb: `node scripts/supervisor/ram-cap.mjs prioritize --workflow ${w.workflowId} --weight <n> --reserve <slots>`, recommended: true }],
+          evidence: [{ ref: `throttle:${m.why}` }, { ref: `cap:${cap.why}` }], options: [{ key: 'ram-cap-prioritize', verb: `starci supervisor ram-cap prioritize --workflow ${w.workflowId} --weight <n> --reserve <slots>`, recommended: true }],
           allowedVerbs: ['ram-cap prioritize', 'ram-cap unprioritize'], openedBy: 'resource-controller', escalateTo: 'owner' });
         decisions.push(`cap-starved:${w.workflowId}`);
       }
@@ -310,7 +310,7 @@ export function createResourceController(overrides = {}) {
    * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's registry.yaml maxParallel. Active:
    * machine.sqlite pool_backoff rows (route reads them and prefers the next eligible pool); shadow: a would-row
    * when the caps change. A pool held at its floor while the rate limit persists for backoffPersistMs opens the
-   * provider circuit (api provider-backoff) on every product ledger, once per floor episode.
+   * provider circuit (starci kernel provider-backoff) on every product ledger, once per floor episode.
    */
   async function reconcilePools(ctx) {
     const pb = await deps.poolBackoff();
@@ -445,7 +445,7 @@ export function createResourceController(overrides = {}) {
         idempotencyKey: `quota-exhausted:${ledgerId}:${e.op}:${e.providers.slice().sort().join('+')}`, entity: { type: 'job', id: `${ledgerId}:${e.op}` },
         summary: `${e.queued} ready ${e.op} op(s) on ${ledgerId} wait and every pool they name (${e.pools.join(', ')}) has an open circuit (${e.providers.join(', ')})`,
         evidence: open.filter((c) => e.providers.includes(c.provider)).map((c) => ({ ref: `circuit:${c.provider} ${c.failureKind} until ${c.expiresAt ? new Date(c.expiresAt).toISOString() : '?'}` })),
-        options: [{ key: 'reroute', verb: 'api graph-edit / reroute the kind to a pool with quota', recommended: true }, { key: 'wait', verb: 'wait for the circuit to clear (quota probe every 5 min)' }],
+        options: [{ key: 'reroute', verb: 'starci kernel graph-edit / reroute the kind to a pool with quota', recommended: true }, { key: 'wait', verb: 'wait for the circuit to clear (quota probe every 5 min)' }],
         allowedVerbs: ['graph-edit', 'provider-health'], openedBy: 'resource-controller', escalateTo: 'owner' });
     }
     return { ledgerId, open: open.length, quotaOpen: quotaOpen.length, probed, exhausted: exhausted.map((e) => e.op) };
