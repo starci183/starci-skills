@@ -107,7 +107,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
   dependencies: {
     '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': null,
     '@nestjs/platform-express': null, '@nestjs/typeorm': null, 'nest-commander': null, pg: null,
-    'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
+    'class-transformer': null, 'class-validator': null, 'reflect-metadata': null, rxjs: null, tslib: null, typeorm: null,
   },
   devDependencies: {
     turbo: null, '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
@@ -271,6 +271,11 @@ const CLI_APP_DIR = 'apps/cli/';
 const declaresCliApp = app => app.sides.be.apps.some(entry => entry.kind === 'cli' && entry.name === 'cli');
 
 const LITE_APP_REUSED = new Set(['.editorconfig', '.gitattributes', '.nvmrc', '.starciwork/workspace.yaml']);
+const LITE_DEFERRED_GENERATOR_FILES = new Set([
+  'src/modules/platform/database/database.sql.ts',
+  'src/modules/platform/database/migration-runner.service.ts',
+  'src/modules/platform/database/seed-runner.service.ts',
+]);
 const liteBaseFile = (scope, rel) => {
   if (scope === 'app') return LITE_APP_REUSED.has(rel);
   if (scope === 'fe') return false;
@@ -280,9 +285,11 @@ const liteBaseFile = (scope, rel) => {
     && rel !== 'src/modules/platform/database/connection-source.client.ts'
     && rel !== 'src/modules/platform/database/migrate-connections.client.ts'
     && rel !== 'src/modules/platform/database/seed-connections.client.ts'
+    && !LITE_DEFERRED_GENERATOR_FILES.has(rel)
     && !rel.startsWith('src/tests/')
     && !rel.endsWith('.spec.ts');
 };
+const liteOverlayFile = (scope, rel) => scope !== 'be' || !LITE_DEFERRED_GENERATOR_FILES.has(rel);
 
 /** One skeleton directory rendered to app-relative files; `include` filters source-relative paths before variables are expanded. */
 function skeletonDirectory(scope, directory, app, vars, include = () => true) {
@@ -315,7 +322,7 @@ function skeletonDirectory(scope, directory, app, vars, include = () => true) {
  */
 function skeletonOf(scope, app, vars) {
   const files = app.edition === 'lite'
-    ? [...skeletonDirectory(scope, 'skeleton', app, vars, rel => liteBaseFile(scope, rel)), ...skeletonDirectory(scope, 'skeleton-lite', app, vars)]
+    ? [...skeletonDirectory(scope, 'skeleton', app, vars, rel => liteBaseFile(scope, rel)), ...skeletonDirectory(scope, 'skeleton-lite', app, vars, rel => liteOverlayFile(scope, rel))]
     : skeletonDirectory(scope, 'skeleton', app, vars);
   const unique = [...new Map(files.map(file => [file.path, file])).values()];
   // Every declared fe app has a skeleton: its own apps/<name>/ folder or the shared __app__ one.

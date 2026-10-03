@@ -13,12 +13,14 @@ import { formatFindings } from "../sync/format.mjs";
 import {
   checkTargets,
   loadHfs,
-  loadPresets,
   renderTargets,
 } from "../sync/index.mjs";
-import { UpgradeError, fullEditionDeclaration } from "./index.mjs";
+import {
+  UPGRADE_PRESETS,
+  UpgradeError,
+  fullEditionDeclaration,
+} from "./index.mjs";
 
-const PACKAGE_ROOT = path.join(import.meta.dirname, "..");
 const ONE_LINER = new Set(["eslint.config.mjs", "stylelint.config.mjs"]);
 
 function fullManagedFindings(repoRoot, targets) {
@@ -86,7 +88,9 @@ export async function checkEdition({
 
   const full = fullEditionDeclaration(declaration, manifest);
   const tracked = trackedFiles(repoRoot);
-  const resolvedPresets = presets ?? (await loadPresets(PACKAGE_ROOT, "full"));
+  // A lite app cannot have the full-only Jest preset installed yet. The upgrade model carries the preset's public sync inputs
+  // specifically so both the dry full-edition view and the upgrade plan render the same targets before dependencies are added.
+  const resolvedPresets = presets ?? UPGRADE_PRESETS;
   const managed = renderTargets(full, resolvedPresets, { manifest });
   const extra = [
     ...fullManagedFindings(repoRoot, managed),

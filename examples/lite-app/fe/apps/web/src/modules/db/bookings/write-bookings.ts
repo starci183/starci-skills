@@ -11,7 +11,8 @@ import { createServerDbClient } from "../server"
 /** One bookings row returned after a successful write. */
 type BookingsRow = Database["public"]["Tables"]["bookings"]["Row"]
 
-/** Table writer. */ export const writeBookings = async (input: unknown): Promise<DbOutcome<BookingsRow>> => {
+/** Table writer. */
+export const writeBookings = async (input: unknown): Promise<DbOutcome<BookingsRow>> => {
     const principal = await getPrincipal()
     if (principal.kind !== "ok") return dbFailure("refused", "principal")
     const parsed = bookingSchema.safeParse(input)

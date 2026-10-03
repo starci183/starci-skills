@@ -58,12 +58,10 @@ const EXPECTED_LITE_FILES = Object.freeze([
   'be/src/modules/platform/cqrs/cqrs.options.ts', 'be/src/modules/platform/cqrs/index.ts',
   'be/src/modules/platform/database/database.module-definition.ts',
   'be/src/modules/platform/database/database.module.ts', 'be/src/modules/platform/database/database.options.ts',
-  'be/src/modules/platform/database/database.port.ts', 'be/src/modules/platform/database/database.sql.ts',
+  'be/src/modules/platform/database/database.port.ts',
   'be/src/modules/platform/database/errors/database.error.ts', 'be/src/modules/platform/database/index.ts',
-  'be/src/modules/platform/database/migration-runner.service.ts',
   'be/src/modules/platform/database/primary.config.ts', 'be/src/modules/platform/database/primary.connection.ts',
   'be/src/modules/platform/database/primary.decorators.ts',
-  'be/src/modules/platform/database/seed-runner.service.ts',
   'be/src/modules/platform/errors/domain.error.ts', 'be/src/modules/platform/errors/errors.contracts.ts',
   'be/src/modules/platform/errors/errors.decorators.ts', 'be/src/modules/platform/errors/errors.filter.ts',
   'be/src/modules/platform/errors/errors.log-events.ts', 'be/src/modules/platform/errors/errors.module-definition.ts',
@@ -196,14 +194,17 @@ test('lite scaffold emits the design 8.5 tree and is structurally clean', async 
   assert.match(baselineSql, /revoke all on table public\.profiles from public, anon/);
   assert.match(baselineSql, /grant update \(display_name\) on table public\.profiles to authenticated/);
   assert.doesNotMatch(baselineSql, /grant select, insert, update on table public\.profiles to authenticated/);
-  assert.match(
-    fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/migration-runner.service.ts'.split('/')), 'utf8'),
-    /\["run", "db:push"\]/,
-  );
-  assert.match(
-    fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/seed-runner.service.ts'.split('/')), 'utf8'),
-    /SEED_FILE = "supabase\/seed\.sql"/,
-  );
+  assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/migration-runner.service.ts'.split('/'))), false);
+  assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/seed-runner.service.ts'.split('/'))), false);
+  assert.equal(fs.existsSync(path.join(root, ...'be/src/modules/platform/database/database.sql.ts'.split('/'))), false);
+  const identityIndex = fs.readFileSync(path.join(root, ...'be/src/modules/domain/identity/index.ts'.split('/')), 'utf8');
+  assert.doesNotMatch(identityIndex, /CurrentPrincipal/);
+  const cqrsIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/cqrs/index.ts'.split('/')), 'utf8');
+  assert.doesNotMatch(cqrsIndex, /\bExecuteParams\b|\bInjectCommandBus\b/);
+  const databaseIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/database/index.ts'.split('/')), 'utf8');
+  assert.doesNotMatch(databaseIndex, /MigrationRunnerService|SeedRunnerService|requireOwnedRow|\bsql\b|InjectPrimaryEntityManager/);
+  const securityIndex = fs.readFileSync(path.join(root, ...'be/src/modules/platform/http-security/index.ts'.split('/')), 'utf8');
+  assert.doesNotMatch(securityIndex, /parseWebhookProviderConfig|InjectWebhookSignature|\bRateLimit\b|\bRateTier\b|WebhookSignatureService/);
   assert.deepEqual(checkTargets(root, renderTargets(declaration, undefined)), renderTargets(declaration, undefined).map(target => ({
     path: target.path,
     status: 'ok',

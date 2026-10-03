@@ -1,17 +1,13 @@
 "use server"
 import "server-only"
 
-import type { Database } from "../../../../../../../supabase/types/database.types"
 import { getPrincipal } from "../principal"
 import { dbFailure } from "../outcome"
-import type { DbOutcome } from "../outcome"
-import { rowSchema } from "../validation/validation.mapper"
 import { insertRow } from "../server"
+import { rowSchema } from "../validation/validation.mapper"
 
-/** One resources row returned after a successful write. */
-type ResourcesRow = Database["public"]["Tables"]["resources"]["Row"]
-
-/** Table writer. */ export const writeResources = async (input: unknown): Promise<DbOutcome<ResourcesRow>> => {
+/** Writes one validated resources row for the current principal. */
+export const writeResources = async (input: unknown) => {
     const principal = await getPrincipal()
     if (principal.kind !== "ok") return dbFailure("refused", "principal")
     const parsed = rowSchema.safeParse(input)

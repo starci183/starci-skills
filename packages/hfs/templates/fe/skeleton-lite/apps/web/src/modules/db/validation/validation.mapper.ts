@@ -2,9 +2,7 @@ interface OwnedRowInput {
     readonly id: string
 }
 
-type OwnedRowParse =
-    | { readonly success: true; readonly data: OwnedRowInput }
-    | { readonly success: false }
+type OwnedRowParse = { readonly success: true; readonly data: OwnedRowInput } | { readonly success: false }
 
 interface SignInInput {
     readonly email: string

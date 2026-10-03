@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { TEMPLATES_DIR } from "../sync/index.mjs";
+import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
 
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
@@ -269,6 +269,19 @@ export function addLiteWebhookInbox({
       text: template("sql.ts.tpl", renderValues),
     },
   ];
+  const databaseSql = "be/src/modules/platform/database/database.sql.ts";
+  if (!fs.existsSync(path.join(root, ...databaseSql.split("/")))) {
+    planned.push({
+      relative: databaseSql,
+      text: render(
+        fs.readFileSync(
+          path.join(TEMPLATES_DIR, "be", "skeleton-lite", "src", "modules", "platform", "database", "database.sql.ts"),
+          "utf8",
+        ),
+        {},
+      ),
+    });
+  }
   const databaseClient = path.join(
     root,
     "be",

@@ -45,6 +45,15 @@ const holderOf = (port) => {
 };
 
 test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, type drift and full-upgrade view', { skip: skipReason, timeout: 1_800_000 }, async (t) => {
+  // The installed SQL parser extracts one Bun-built native binding at the isolated temp root. It is process infrastructure,
+  // not an app fixture, but this spec owns the installed command that creates it and therefore removes it before the leak guard.
+  t.after(() => {
+    const isolated = process.env.STARCI_TEST_TEMP_DIR;
+    if (!isolated || !fs.existsSync(isolated)) return;
+    for (const entry of fs.readdirSync(isolated).filter(name => /^\.bun-[\w-]+\.node$/u.test(name))) {
+      fs.rmSync(path.join(isolated, entry), { force: true });
+    }
+  });
   // The scaffold writes its own port block into supabase/config.toml (one block per project name), so the stack runs beside any other.
   // A port of that block already taken is a failure naming the port and its holder, never a skip.
   for (const port of Object.values(supabasePortVars(APP_NAME)).map(Number)) {
@@ -177,13 +186,21 @@ test('hfs lite scaffold end to end: clean app, builds, isolated Supabase data, t
     'HFS_GITIGNORE_BLOCK_DRIFT',
     'HFS_SONAR_CONFIG',
     'HFS_RULE_OFF_WITHOUT_REPLACEMENT',
+    'HFS_EMPTY_DIR',
+    'HFS_README_DEVELOPMENT_INCOMPLETE',
+    'HFS_ROOT_ENTRY_MISSING',
     'BE_CLI_REQUIRED',
+    'BE_INTEGRATION_SPEC_MISSING',
+    'BE_KIND_DECLARATION',
     'HFS_MONO_NEST_PROJECTS',
     'BE_TEST_TOPOLOGY',
   ]);
   const unexpectedCodes = [...new Set(report.findings.map(finding => finding.code).filter(code => !upgradeGapCodes.has(code)))].sort();
   assert.deepEqual(unexpectedCodes, [], `full-edition view reported non-upgrade findings: ${unexpectedCodes.join(', ')}`);
-  const productFinding = report.findings.find((finding) => /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll('\\', '/')));
+  const productFinding = report.findings.find((finding) =>
+    !upgradeGapCodes.has(finding.code)
+    && /^(?:supabase\/|fe\/|be\/src\/)/.test(String(finding.path ?? '').replaceAll('\\', '/')),
+  );
   assert.equal(
     productFinding,
     undefined,

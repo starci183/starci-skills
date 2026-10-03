@@ -5,6 +5,7 @@ import { parseYaml } from "../runtime/engine/yaml.mjs";
 import { appScripts, imageFiles, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError } from "./service.mjs";
 import { jsonText, packageJsonText } from "./app.mjs";
+import { registerLiteExports } from "./lite-exports.mjs";
 
 const read = (relative) =>
   fs
@@ -80,6 +81,49 @@ import { RunSeedsCli } from "./subs/run.cli"
 export class SeedModule {}
 `;
 
+function enableLiteCliDatabase(root) {
+  const relative = "be/src/modules/platform/database/database.module.ts";
+  const file = path.join(root, ...relative.split("/"));
+  if (!fs.existsSync(file)) {
+    throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `add cli needs the scaffolded ${relative}`);
+  }
+  let text = fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
+  if (!text.includes('import { MigrationRunnerService } from "./migration-runner.service"')) {
+    const anchor = 'import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"';
+    if (!text.includes(anchor)) throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `${relative} has an unknown import shape`);
+    text = text.replace(anchor, `${anchor}\nimport { MigrationRunnerService } from "./migration-runner.service"`);
+  }
+  if (!text.includes('import { SeedRunnerService } from "./seed-runner.service"')) {
+    const anchor = 'import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"';
+    if (!text.includes(anchor)) throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `${relative} has an unknown import shape`);
+    text = text.replace(anchor, `${anchor}\nimport { SeedRunnerService } from "./seed-runner.service"`);
+  }
+  const providers = "providers: [...(base.providers ?? []), ...managers]";
+  if (text.includes(providers)) {
+    text = text.replace(providers, "providers: [...(base.providers ?? []), ...managers, MigrationRunnerService, SeedRunnerService]");
+  }
+  const bareExports = "exports: [DATABASE_OPTIONS, ...managers.map((manager) => manager.provide)],";
+  if (text.includes(bareExports)) {
+    text = text.replace(
+      bareExports,
+      [
+        "exports: [",
+        "                DATABASE_OPTIONS,",
+        "                ...managers.map((manager) => manager.provide),",
+        "                MigrationRunnerService,",
+        "                SeedRunnerService,",
+        "            ],",
+      ].join("\n"),
+    );
+  } else if (!text.includes("                MigrationRunnerService,")) {
+    const anchor = "                ...managers.map((manager) => manager.provide),";
+    if (!text.includes(anchor)) throw new ScaffoldError("HFS_ADD_CLI_DATABASE", `${relative} has an unknown exports shape`);
+    text = text.replace(anchor, `${anchor}\n                MigrationRunnerService,\n                SeedRunnerService,`);
+  }
+  fs.writeFileSync(file, text);
+  registerLiteExports({ root, generator: "cli" });
+}
+
 /**
  * Creates the optional lite cli app and its Supabase migrate/seed groups on first `add cli`.
  * Existing cli trees are never repaired or overwritten: drift remains a check finding.
@@ -138,6 +182,10 @@ export function ensureLiteCli({ root, manifest, repo }) {
       "be/src/features/cli/migrate/migrate.module.ts",
       read("be/skeleton/src/features/cli/migrate/migrate.module.ts"),
     ],
+    [
+      "be/src/modules/platform/database/migration-runner.service.ts",
+      read("be/skeleton-lite/src/modules/platform/database/migration-runner.service.ts"),
+    ],
     ["be/src/features/cli/migrate/subs/run.cli.ts", MIGRATE_RUN],
     [
       "be/src/features/cli/seed/seed.cli.ts",
@@ -146,6 +194,10 @@ export function ensureLiteCli({ root, manifest, repo }) {
     [
       "be/src/features/cli/seed/seed.module.ts",
       SEED_MODULE,
+    ],
+    [
+      "be/src/modules/platform/database/seed-runner.service.ts",
+      read("be/skeleton-lite/src/modules/platform/database/seed-runner.service.ts"),
     ],
     ["be/src/features/cli/seed/subs/run.cli.ts", SEED_RUN],
   ];
@@ -197,6 +249,7 @@ export function ensureLiteCli({ root, manifest, repo }) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, body);
   }
+  enableLiteCliDatabase(root);
   fs.writeFileSync(nestFile, jsonText(nest));
   fs.writeFileSync(declarationFile, jsonText(declaration));
   fs.writeFileSync(packageFile, packageJsonText(packageManifest));

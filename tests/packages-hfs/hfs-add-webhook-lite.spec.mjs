@@ -213,6 +213,22 @@ test("lite add webhook writes a policy-clean inbox and an atomic, architecture-c
   );
   assert.match(service, /entityManager: EntityManager = this\.entityManager/);
   assert.match(service, /entityManager\.query/);
+  assert.match(
+    fs.readFileSync(path.join(root, "be/src/modules/domain/calendars/index.ts"), "utf8"),
+    /CalendarsService/,
+  );
+  assert.match(
+    fs.readFileSync(path.join(root, "be/src/modules/domain/payments/index.ts"), "utf8"),
+    /PaymentsService/,
+  );
+  const securityIndex = fs.readFileSync(
+    path.join(root, "be/src/modules/platform/http-security/index.ts"),
+    "utf8",
+  );
+  assert.match(securityIndex, /parseWebhookProviderConfig/);
+  assert.match(securityIndex, /InjectWebhookSignature/);
+  assert.match(securityIndex, /RateLimit, RateLimitGuard, RateTier/);
+  assert.match(securityIndex, /WebhookSignatureService/);
 
   for (const file of [...calendar.created, ...payment.created].filter((entry) => entry.endsWith(".ts"))) {
     const diagnostics = ts.transpileModule(

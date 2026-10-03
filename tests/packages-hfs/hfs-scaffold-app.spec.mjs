@@ -208,6 +208,10 @@ test('a scaffolded app imports the be lcov into Sonar and Codecov with exactly t
   t.after(() => fs.rmSync(into, { recursive: true, force: true }));
   const { root, files } = scaffoldApp({ name: 'demo', into, presets: PRESETS, lock: () => ({ ok: true }) });
   for (const file of ['sonar-project.properties', 'codecov.yml', '.github/workflows/ci.yml']) assert.ok(files.includes(file), `${file} is scaffolded`);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  for (const dependency of ['class-transformer', 'class-validator']) {
+    assert.equal(typeof manifest.dependencies[dependency], 'string', `the validation pipe installs ${dependency}`);
+  }
   assertCoverageContract(root);
   // The be unit run is the preset's: it writes lcov into be/coverage, the path both imports read.
   assert.equal(fs.readFileSync(path.join(root, 'be', 'jest.config.js'), 'utf8'), `module.exports = require("@starci/jest-preset").starciJestConfig({\n    coverage: ${jestCoverageSource(jestCoverage(MANIFEST))},\n})\n`);

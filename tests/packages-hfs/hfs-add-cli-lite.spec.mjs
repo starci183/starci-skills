@@ -13,6 +13,7 @@ import {
   readRepoDeclaration,
 } from "../../packages/hfs/runtime/scripts/hfs/slots.mjs";
 
+const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const made = [];
 const ts = createRequire(import.meta.url)("typescript");
 const manifest = loadSlotManifest();
@@ -79,6 +80,14 @@ function appRoot(mutator = () => {}) {
       2,
     )}\n`,
   );
+  for (const relative of [
+    "src/modules/platform/database/database.module.ts",
+    "src/modules/platform/database/index.ts",
+  ]) {
+    const target = path.join(root, "be", ...relative.split("/"));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, "packages", "hfs", "templates", "be", "skeleton-lite", ...relative.split("/")), target);
+  }
   return root;
 }
 
@@ -112,6 +121,8 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
     "be/apps/cli/Dockerfile",
     "be/src/features/cli/migrate/subs/run.cli.ts",
     "be/src/features/cli/seed/subs/run.cli.ts",
+    "be/src/modules/platform/database/migration-runner.service.ts",
+    "be/src/modules/platform/database/seed-runner.service.ts",
   ]) {
     assert.ok(created.includes(relative), relative);
   }
@@ -123,6 +134,10 @@ test("ensureLiteCli bootstraps the canonical app and groups once, registers conf
     read(root, "be/src/features/cli/migrate/subs/run.cli.ts"),
     /await this\.migrations\.run\(\)/,
   );
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /MigrationRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /SeedRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/database.module.ts"), /MigrationRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/database.module.ts"), /SeedRunnerService/);
   assert.match(
     read(root, "be/src/features/cli/seed/subs/run.cli.ts"),
     /await this\.seeds\.run\(\)/,

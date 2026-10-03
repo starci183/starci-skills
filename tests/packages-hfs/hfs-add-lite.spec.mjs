@@ -10,6 +10,7 @@ import { addKind } from "../../packages/hfs/scaffold/add.mjs";
 import { main } from "../../packages/hfs/bin/hfs.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 
+const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const made = [];
 const ts = createRequire(import.meta.url)("typescript");
 test.after(() => {
@@ -49,6 +50,17 @@ const repo = () => {
     path.join(root, "hfs.json"),
     `${JSON.stringify(declaration, null, 2)}\n`,
   );
+  for (const relative of [
+    "src/modules/domain/identity/index.ts",
+    "src/modules/platform/cqrs/index.ts",
+    "src/modules/platform/database/database.module.ts",
+    "src/modules/platform/database/index.ts",
+    "src/modules/platform/http-security/index.ts",
+  ]) {
+    const target = path.join(root, "be", ...relative.split("/"));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, "packages", "hfs", "templates", "be", "skeleton-lite", ...relative.split("/")), target);
+  }
   fs.writeFileSync(path.join(root, "package.json"), '{"dependencies":{}}\n');
   fs.mkdirSync(path.join(root, "be", "apps", "api", "src"), { recursive: true });
   fs.writeFileSync(
@@ -78,6 +90,7 @@ const prepareWebhookDependencies = (root) => {
     path.join(domain, "calendars.service.ts"),
     'import type { EntityManager } from "typeorm"\n\ninterface CalendarDelivery { readonly id: string }\n\nexport class CalendarsService {\n    constructor(private readonly entityManager: EntityManager) {}\n\n    async acceptCalendarDelivery(delivery: CalendarDelivery): Promise<void> {\n        await Promise.resolve(delivery.id)\n    }\n}\n',
   );
+  fs.writeFileSync(path.join(domain, "index.ts"), "");
   const database = path.join(root, "be", "src", "modules", "platform", "database");
   fs.mkdirSync(path.join(database, "errors"), { recursive: true });
   fs.writeFileSync(
@@ -104,6 +117,7 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   const migration = "supabase/migrations/20261002123456_orders.sql";
   assert.deepEqual(result.created, [
     migration,
+    "be/src/modules/platform/database/database.sql.ts",
     "be/src/modules/domain/orders/index.ts",
     "be/src/modules/domain/orders/errors/orders.error.ts",
     "be/src/modules/domain/orders/orders.module.ts",
@@ -126,7 +140,7 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   );
   assert.match(
     read(root, "fe/apps/web/src/modules/db/orders/write-orders.ts"),
-    /const principal = await getPrincipal\(\)/,
+    /insertRow\(parsed\.data\.id, principal\.value\.id/,
   );
   assert.match(read(root, "be/src/modules/domain/orders/orders.service.ts"), /InjectPrimaryEntityManager/);
   assert.match(
@@ -143,6 +157,9 @@ test("add table writes one policy-complete migration, FE db modules, and regener
   );
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /OrdersModule\.register\(\{ isGlobal: true \}\)/);
   assert.match(read(root, "be/apps/api/src/app.module.ts"), /ORDERS_ERROR_KINDS/);
+  assert.doesNotMatch(read(root, "be/src/modules/domain/orders/index.ts"), /OrdersService/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager \}/);
   for (const file of result.created.filter((entry) => entry.endsWith(".ts"))) {
     assert.equal(parses(read(root, file)), true, `${file} parses`);
   }
@@ -340,18 +357,29 @@ test("add cli migrate bootstraps the built-in lite groups without a domain servi
   assert.ok(result.created.includes("be/apps/cli/src/main.ts"));
   assert.ok(result.created.includes("be/src/features/cli/migrate/subs/run.cli.ts"));
   assert.ok(result.created.includes("be/src/features/cli/seed/subs/run.cli.ts"));
+  assert.ok(result.created.includes("be/src/modules/platform/database/migration-runner.service.ts"));
+  assert.ok(result.created.includes("be/src/modules/platform/database/seed-runner.service.ts"));
   assert.deepEqual(result.registered, { patterns: [], kinds: ["cli"] });
   assert.match(JSON.parse(read(root, "package.json")).dependencies["nest-commander"], /^3\./);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /MigrationRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/index.ts"), /SeedRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/database.module.ts"), /MigrationRunnerService/);
+  assert.match(read(root, "be/src/modules/platform/database/database.module.ts"), /SeedRunnerService/);
   assert.throws(() => addKind({ repoRoot: root, noun: "cli", name: "migrate" }), error => error?.code === "HFS_ADD_EXISTS");
 });
 
 test("lite add api emits HTTP, and api plus webhook transports are composed in the API app", () => {
   const root = repo();
+  addTable({ root, name: "bookings", emitTypes: false, now: () => Date.UTC(2026, 9, 2, 12, 34, 56) });
   const api = addKind({ repoRoot: root, noun: "api", name: "bookings", options: { service: "BookingsService=@modules/domain/bookings" } });
   assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings.controller.ts"));
   assert.ok(api.created.includes("be/src/features/api/bookings/transport/http/bookings-http.module.ts"));
   assert.equal(api.created.some(file => file.includes("/graphql/")), false);
   assert.match(read(root, "be/src/features/api/bookings/index.ts"), /BookingsHttpModule/);
+  assert.match(read(root, "be/src/modules/domain/bookings/index.ts"), /BookingsService/);
+  assert.match(read(root, "be/src/modules/domain/identity/index.ts"), /CurrentPrincipal/);
+  assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /ExecuteParams/);
+  assert.match(read(root, "be/src/modules/platform/cqrs/index.ts"), /InjectCommandBus/);
   assert.match(
     read(root, "be/src/features/api/bookings/application/bookings.handler.ts"),
     /bookings\(command\.params\.principal\.id, command\.params\.request\.id\)/,
@@ -378,6 +406,11 @@ test("lite add api emits HTTP, and api plus webhook transports are composed in t
   assert.match(main, /parseWebhookProviderConfig/);
   assert.match(main, /calendar: parseWebhookProviderConfig\(env, "CALENDAR"\)/);
   assert.match(main, /rawBody: true/);
+  const security = read(root, "be/src/modules/platform/http-security/index.ts");
+  assert.match(security, /parseWebhookProviderConfig/);
+  assert.match(security, /InjectWebhookSignature/);
+  assert.match(security, /RateLimit, RateLimitGuard, RateTier/);
+  assert.match(security, /WebhookSignatureService/);
 });
 
 test("the lite API skeleton installs one typed global validation pipe", () => {

@@ -26,6 +26,7 @@ import { addApp } from './add-app.mjs';
 import { ensureLiteCli, selectLiteCliEntries } from './add-cli-lite.mjs';
 import { addLiteWebhookInbox, selectLiteWebhookEntries } from './add-inbox-lite.mjs';
 import { jsonText } from './app.mjs';
+import { registerLiteDomainService, registerLiteExports } from './lite-exports.mjs';
 
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const VARIABLE = /<([A-Za-z][A-Za-z0-9]*)>/g;
@@ -186,6 +187,12 @@ export function addKind({ repoRoot, noun, name, options = {}, now = Date.now }) 
   for (const file of planned) {
     fs.mkdirSync(path.dirname(file.absolute), { recursive: true });
     fs.writeFileSync(file.absolute, file.body);
+  }
+  if (noun === 'webhook' || (repo.edition === 'lite' && noun === 'api')) {
+    registerLiteExports({ root: repoRoot, generator: repo.edition === 'lite' ? noun : 'webhook-full' });
+  }
+  if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) {
+    registerLiteDomainService({ root: repoRoot, moduleSpecifier: values.serviceModule, service: values.service });
   }
   if (spec.wire) wire({ beRoot, wire: spec.wire, forms, noun, name });
   if (repo.edition === 'lite' && (noun === 'api' || noun === 'webhook')) wireLiteFeature({ repoRoot, repo, noun, name });

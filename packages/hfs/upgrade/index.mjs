@@ -43,7 +43,7 @@ const FULL_DEV_DEPENDENCIES = Object.freeze([
 const FULL_DEPENDENCIES = Object.freeze(["nest-commander"]);
 // Upgrade must render the full managed files before it can add/install the full-only Jest preset. These are the preset's two
 // public sync inputs; once apply resolves the new dependency, normal full sync reads them from @starci/jest-preset again.
-const UPGRADE_PRESETS = Object.freeze({
+export const UPGRADE_PRESETS = Object.freeze({
   sonarExclusions: "**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**",
   coverageSources: Object.freeze([
     "src/**/*.service.ts",

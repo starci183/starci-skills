@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { addTable } from "../../packages/hfs/scaffold/add-table.mjs";
 import { checkDatabase } from "../../scripts/hfs/rules/database.mjs";
 
+const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const made = [];
 const ts = createRequire(import.meta.url)("typescript");
 const at = Date.UTC(2026, 9, 2, 12, 34, 56);
@@ -47,6 +48,14 @@ function appRoot({ edition = "lite", provider = "supabase" } = {}) {
     path.join(root, "hfs.json"),
     `${JSON.stringify(declaration, null, 2)}\n`,
   );
+  if (edition === "lite") {
+    const databaseIndex = path.join(root, "be", "src", "modules", "platform", "database", "index.ts");
+    fs.mkdirSync(path.dirname(databaseIndex), { recursive: true });
+    fs.copyFileSync(
+      path.join(ROOT, "packages", "hfs", "templates", "be", "skeleton-lite", "src", "modules", "platform", "database", "index.ts"),
+      databaseIndex,
+    );
+  }
   const appModule = path.join(root, "be", "apps", "api", "src", "app.module.ts");
   fs.mkdirSync(path.dirname(appModule), { recursive: true });
   fs.writeFileSync(
@@ -119,7 +128,7 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
     );
     const service = read(root, `be/src/modules/domain/${feature}/${feature}.service.ts`);
     assert.match(service, /\(principalId: string, id: string\)/);
-    assert.match(service, /\[id, principalId\]/);
+    assert.match(service, /requireOwnedRow[^\n]+this\.entityManager, [A-Z0-9_]+, id, principalId,/);
     assert.match(
       read(root, `be/src/modules/domain/${feature}/persistence/${feature}.sql.ts`),
       /WHERE id = \$1 AND owner_id = \$2 LIMIT 1/,
@@ -128,6 +137,8 @@ test("addTable accepts kebab, snake-case, plural, and reserved names and every a
       read(root, `be/src/modules/domain/${feature}/errors/${feature}.error.ts`),
       /NotFound = "[A-Z0-9_]+_NOT_FOUND"/,
     );
+    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ requireOwnedRow, sql \}/);
+    assert.match(read(root, "be/src/modules/platform/database/index.ts"), /export \{ InjectPrimaryEntityManager \}/);
     assert.deepEqual(
       await checkDatabase({
         repoRoot: root,

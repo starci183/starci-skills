@@ -4,10 +4,8 @@ import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { DATABASE_OPTIONS } from "./database.port"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
-import { MigrationRunnerService } from "./migration-runner.service"
 import { PRIMARY_CONNECTION } from "./primary.connection"
 import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
-import { SeedRunnerService } from "./seed-runner.service"
 
 /** The token each declared connection provides its shared EntityManager under. */
 type EntityManagerToken = typeof PRIMARY_ENTITY_MANAGER
@@ -49,13 +47,8 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     }),
                 ),
             ],
-            providers: [...(base.providers ?? []), ...managers, MigrationRunnerService, SeedRunnerService],
-            exports: [
-                DATABASE_OPTIONS,
-                ...managers.map((manager) => manager.provide),
-                MigrationRunnerService,
-                SeedRunnerService,
-            ],
+            providers: [...(base.providers ?? []), ...managers],
+            exports: [DATABASE_OPTIONS, ...managers.map((manager) => manager.provide)],
         }
     }
 }

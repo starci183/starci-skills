@@ -5,8 +5,9 @@ import {
   loadSlotManifest,
   readRepoDeclaration,
 } from "../runtime/scripts/hfs/slots.mjs";
-import { TEMPLATES_DIR } from "../sync/index.mjs";
+import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
+import { registerLiteExports } from "./lite-exports.mjs";
 
 const NAME = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
@@ -256,6 +257,13 @@ export function addTable({
     { relative: `be/src/modules/domain/${feature}/persistence/${feature}.rows.ts`, body: template("be/table/rows.ts.tpl", values) },
     { relative: `be/src/modules/domain/${feature}/persistence/${feature}.sql.ts`, body: template("be/table/sql.ts.tpl", values) },
   ];
+  const databaseSql = "be/src/modules/platform/database/database.sql.ts";
+  if (repo.edition === "lite" && !fs.existsSync(path.join(root, ...databaseSql.split("/")))) {
+    planned.splice(1, 0, {
+      relative: databaseSql,
+      body: render(fs.readFileSync(path.join(TEMPLATES_DIR, "be", "skeleton-lite", "src", "modules", "platform", "database", "database.sql.ts"), "utf8"), {}),
+    });
+  }
   if (fe) {
     const apps =
       repo.sides?.fe?.apps?.filter((app) => app.kind === "next") ?? [];
@@ -296,6 +304,8 @@ export function addTable({
   if (!fs.existsSync(ownerFile))
     throw new ScaffoldError("HFS_ADD_WIRE_MISSING", `add table registers ${name} in be/apps/${owner.name}/src/app.module.ts, which does not exist`);
   const ownerBefore = fs.readFileSync(ownerFile, "utf8");
+  const databaseIndex = path.join(root, "be", "src", "modules", "platform", "database", "index.ts");
+  const databaseIndexBefore = repo.edition === "lite" && fs.existsSync(databaseIndex) ? fs.readFileSync(databaseIndex) : null;
   const typesFile = path.join(root, ...dbTypesPath.split("/"));
   const typesBefore = fs.existsSync(typesFile) ? fs.readFileSync(typesFile) : null;
   const created = [];
@@ -315,8 +325,10 @@ export function addTable({
       }
     }
     wireApiModule(root, owner.name, feature);
+    if (repo.edition === "lite") registerLiteExports({ root, generator: "table" });
   } catch (error) {
     fs.writeFileSync(ownerFile, ownerBefore);
+    if (databaseIndexBefore !== null) fs.writeFileSync(databaseIndex, databaseIndexBefore);
     if (typesBefore === null) fs.rmSync(typesFile, { force: true });
     else fs.writeFileSync(typesFile, typesBefore);
     for (const file of [...created].reverse()) {

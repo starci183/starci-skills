@@ -175,6 +175,9 @@ test("add table --fe stays database- and architecture-clean for every accepted t
       assert.deepEqual(diagnostics, [], `${file} has valid TypeScript syntax`);
     }
   }
+  const databaseIndex = fs.readFileSync(path.join(root, "be", "src", "modules", "platform", "database", "index.ts"), "utf8");
+  assert.match(databaseIndex, /export \{ requireOwnedRow, sql \}/);
+  assert.match(databaseIndex, /export \{ InjectPrimaryEntityManager \}/);
 
   execFileSync("git", ["-c", "core.autocrlf=false", "add", "-A"], {
     cwd: root,

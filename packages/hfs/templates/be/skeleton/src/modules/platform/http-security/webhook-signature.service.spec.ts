@@ -43,20 +43,34 @@ describe("WebhookSignatureService", () => {
             const timestamp = String(SIGNED_AT)
 
             expect(() =>
-                service.verify({ provider: "payments", rawBody: BODY, signature: `sha256=${sign(timestamp)}`, timestamp }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: `sha256=${sign(timestamp)}`,
+                    timestamp,
+                }),
             ).not.toThrow()
         })
 
         it("refuses a provider that is not configured", async () => {
             const { service } = await build()
 
-            expect(() => service.verify({ provider: "unknown", rawBody: BODY, signature: "sha256=x", timestamp: "1" })).toThrow(
-                refusal(HttpSecurityErrorCode.WebhookProviderUnknown),
-            )
+            expect(() =>
+                service.verify({
+                    provider: "unknown",
+                    rawBody: BODY,
+                    signature: "sha256=x",
+                    timestamp: "1",
+                }),
+            ).toThrow(refusal(HttpSecurityErrorCode.WebhookProviderUnknown))
         })
 
         it.each([
-            { rawBody: undefined, signature: "sha256=x", timestamp: String(SIGNED_AT) },
+            {
+                rawBody: undefined,
+                signature: "sha256=x",
+                timestamp: String(SIGNED_AT),
+            },
             { rawBody: BODY, signature: undefined, timestamp: String(SIGNED_AT) },
             { rawBody: BODY, signature: "sha256=x", timestamp: undefined },
             { rawBody: BODY, signature: "sha256=x", timestamp: "yesterday" },
@@ -72,20 +86,35 @@ describe("WebhookSignatureService", () => {
             const { service } = await build()
             const timestamp = String(SIGNED_AT)
 
-            expect(() => service.verify({ provider: "payments", rawBody: BODY, signature: sign(timestamp), timestamp })).toThrow(
-                refusal(HttpSecurityErrorCode.WebhookSignatureInvalid),
-            )
+            expect(() =>
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: sign(timestamp),
+                    timestamp,
+                }),
+            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
         })
 
         it("refuses a signature of another length and one made with another secret", async () => {
             const { service } = await build()
             const timestamp = String(SIGNED_AT)
 
-            expect(() => service.verify({ provider: "payments", rawBody: BODY, signature: "sha256=abc", timestamp })).toThrow(
-                refusal(HttpSecurityErrorCode.WebhookSignatureInvalid),
-            )
             expect(() =>
-                service.verify({ provider: "payments", rawBody: BODY, signature: `sha256=${sign(timestamp, BODY, "other")}`, timestamp }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: "sha256=abc",
+                    timestamp,
+                }),
+            ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
+            expect(() =>
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: `sha256=${sign(timestamp, BODY, "other")}`,
+                    timestamp,
+                }),
             ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
         })
 
@@ -94,7 +123,12 @@ describe("WebhookSignatureService", () => {
             const timestamp = String(SIGNED_AT)
 
             expect(() =>
-                service.verify({ provider: "payments", rawBody: Buffer.from("{}"), signature: `sha256=${sign(timestamp)}`, timestamp }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: Buffer.from("{}"),
+                    signature: `sha256=${sign(timestamp)}`,
+                    timestamp,
+                }),
             ).toThrow(refusal(HttpSecurityErrorCode.WebhookSignatureInvalid))
         })
 
@@ -104,10 +138,20 @@ describe("WebhookSignatureService", () => {
             const future = String(SIGNED_AT + 300_001)
 
             expect(() =>
-                service.verify({ provider: "payments", rawBody: BODY, signature: `sha256=${sign(stale)}`, timestamp: stale }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: `sha256=${sign(stale)}`,
+                    timestamp: stale,
+                }),
             ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
             expect(() =>
-                service.verify({ provider: "payments", rawBody: BODY, signature: `sha256=${sign(future)}`, timestamp: future }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: `sha256=${sign(future)}`,
+                    timestamp: future,
+                }),
             ).toThrow(refusal(HttpSecurityErrorCode.WebhookReplayed))
         })
 
@@ -116,7 +160,12 @@ describe("WebhookSignatureService", () => {
             const edge = String(SIGNED_AT - 300_000)
 
             expect(() =>
-                service.verify({ provider: "payments", rawBody: BODY, signature: `sha256=${sign(edge)}`, timestamp: edge }),
+                service.verify({
+                    provider: "payments",
+                    rawBody: BODY,
+                    signature: `sha256=${sign(edge)}`,
+                    timestamp: edge,
+                }),
             ).not.toThrow()
         })
     })
