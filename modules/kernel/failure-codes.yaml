@@ -11084,6 +11084,40 @@ workflow-checkpoint-failed:
   nextStep_vi: "Việc chốt bị từ chối, op giữ nguyên trạng thái; kiểm tra worktree của workflow rồi chốt lại."
   owner: runtime-core
   kind: settle-reason
+# Proof: scripts/kernel/workflow-checkpoint-state.mjs withWorkflowLock; native settle and checkpoint primitives share it.
+workflow-checkpoint-lock-busy:
+  title: "Another checkpoint operation holds the workflow lock"
+  title_vi: "Một thao tác chốt khác đang giữ khoá của workflow"
+  meaning_vi: "Runtime không lấy được khoá chung của workflow trong thời gian chờ, nên lời gọi này chưa được chạy bước checkpoint hoặc preserve/reset được khoá bảo vệ."
+  causes_vi:
+    - "Hai lời gọi chốt hoặc checkpoint cùng workflow đang tranh cùng khoá"
+    - "Thao tác đang giữ khoá chưa hoàn tất"
+  nextStep_vi: "Chờ thao tác giữ khoá hoàn tất rồi gọi lại cùng lượt chốt. Nếu tiếp tục bị từ chối, runtime owner kiểm tra thao tác giữ khoá và phiếu hiệu ứng đang mở; không xoá khoá hay tạo một lượt thay thế để vượt qua nó."
+  owner: runtime-core
+  kind: verb-refusal
+# Proof: scripts/kernel/workflow-checkpoint-state.mjs requireReceiptBytes; scripts/kernel/workflow-checkpoint.mjs and scripts/kernel/workflow-rebase.mjs recovery; scripts/kernel/verbs/settle.mjs replay identity.
+workflow-checkpoint-recovery-conflict:
+  title: "The prepared workflow Git effect conflicts with the current state"
+  title_vi: "Hiệu ứng Git của workflow đã chuẩn bị không khớp trạng thái hiện tại"
+  meaning_vi: "Runtime từ chối khôi phục khi quyết định, lượt dispatch, đường dẫn hoặc nhánh đã đăng ký, hay nội dung các tệp không còn tương thích với phiếu hiệu ứng đã chuẩn bị. Phiếu gốc không bị thay bằng một checkpoint được tính lại."
+  causes_vi:
+    - "Lần gọi lại đổi verdict, trạng thái job hoặc lượt dispatch"
+    - "Có nội dung hoặc tệp mới trong phạm vi op sau khi hiệu ứng được chuẩn bị"
+    - "Cây hoặc nhánh đã đăng ký không còn khớp đường dẫn và nhánh ghi trong phiếu"
+  nextStep_vi: "Giữ phiếu gốc và các thay đổi hiện tại. Runtime owner đối chiếu danh tính, cây và nội dung với phiếu đã chuẩn bị rồi khôi phục cùng lượt dispatch; không xoá phiếu, bỏ thay đổi mới hoặc tự commit để làm lần gọi lại qua."
+  owner: runtime-core
+  kind: settle-reason
+# Proof: scripts/kernel/workflow-checkpoint-state.mjs requireCompletedEffects/pendingRebaseOf; scripts/kernel/workflow-checkpoint.mjs and scripts/kernel/workflow-rebase.mjs.
+workflow-checkpoint-recovery-required:
+  title: "An earlier prepared workflow Git effect needs recovery"
+  title_vi: "Một hiệu ứng Git đã chuẩn bị trước đó của workflow cần được khôi phục"
+  meaning_vi: "Workflow còn phiếu checkpoint, preserve/reset hoặc rebase chưa có sự kiện hoàn tất phù hợp. Một thao tác khác chưa được checkpoint, preserve/reset, rebase hoặc finish qua hiệu ứng còn mở đó."
+  causes_vi:
+    - "Hiệu ứng nhánh, index hoặc sổ đăng ký của job trước chưa hoàn tất sau gián đoạn"
+    - "Hiệu ứng Git đã áp dụng nhưng giao dịch chốt native chưa ghi sự kiện hoàn tất"
+  nextStep_vi: "Khôi phục đúng lượt dispatch hoặc lần finish đang có phiếu chưa hoàn tất trước, rồi gọi lại thao tác đang chờ. Runtime owner xử lý lỗi của lượt đó; không xoá phiếu hoặc chốt một job khác để vượt qua hiệu ứng còn mở."
+  owner: runtime-core
+  kind: settle-reason
 workflow-finish-dirty:
   title: "The workflow worktree has work no checkpoint carries"
   title_vi: "Worktree còn phần việc chưa có checkpoint"
@@ -11258,13 +11292,14 @@ workflow-preserve-failed:
   nextStep_vi: "Không có gì bị xoá; sửa lỗi git rồi chốt lại op."
   owner: runtime-core
   kind: settle-reason
+# Proof: scripts/kernel/workflow-rebase.mjs propose; scripts/kernel/workflow-settle.mjs milestoneOwned.
 workflow-rebase-conflict:
   title: "The workflow branch conflicts with main"
   title_vi: "Nhánh workflow xung đột với main"
-  meaning_vi: "Rebase nhánh của workflow lên đầu main gặp xung đột; rebase đã được huỷ và nhánh giữ nguyên."
+  meaning_vi: "Đề xuất rebase trong cây scratch nội bộ gặp xung đột với main trước khi nhánh workflow bị di chuyển; nhánh workflow giữ nguyên."
   causes_vi:
     - "main đã sửa cùng tệp mà workflow sửa"
-  nextStep_vi: "Một op sửa xung đột trên worktree của workflow (rebase lên main, giải quyết từng tệp), rồi chạy lại."
+  nextStep_vi: "Kernel giao op sửa các tệp xung đột trong phạm vi được phép trên cây workflow, rồi runtime thực hiện rebase lại. Op không tự rebase hay di chuyển lịch sử."
   owner: op-retry
   kind: verb-refusal
 workflow-rebase-dirty:
@@ -11277,14 +11312,16 @@ workflow-rebase-dirty:
   nextStep_vi: "Chờ op đang chạy chốt xong (checkpoint hoặc reset) rồi rebase lại."
   owner: runtime-core
   kind: verb-refusal
+# Proof: scripts/kernel/workflow-rebase.mjs propose/applyWorkflowRebase; scripts/kernel/workflow-settle.mjs unknown effects escape the optional milestone catch.
 workflow-rebase-failed:
   title: "The workflow branch could not be rebased"
   title_vi: "Không rebase được nhánh workflow"
-  meaning_vi: "git rebase lỗi mà không phải do xung đột, hoặc main không tồn tại trong worktree."
+  meaning_vi: "Runtime không đề xuất hoặc áp dụng được rebase: main không resolve được, Git hoặc dọn scratch lỗi, hay bước nhánh/index chưa hoàn tất. Nếu đã có hiệu ứng áp dụng, phiếu rebase giữ nguyên để khôi phục và việc chốt native chưa được chấp nhận."
   causes_vi:
     - "Nhánh main không resolve được"
     - "git rebase lỗi môi trường"
-  nextStep_vi: "Sửa môi trường git rồi chạy lại; nhánh giữ nguyên."
+    - "Một bước áp dụng hoặc dọn scratch thất bại"
+  nextStep_vi: "Runtime owner sửa lỗi được nêu. Nếu có phiếu rebase đã chuẩn bị, khôi phục cùng quyết định và đề xuất đó; không giả định nhánh chưa đổi hay bắt đầu rebase khác để vượt qua hiệu ứng đang mở."
   owner: runtime-core
   kind: verb-refusal
 workflow-reset-failed:
@@ -11354,16 +11391,28 @@ workflow-work-record-not-owner:
   nextStep_vi: "Job vẫn chưa settle; bỏ thay đổi đó (settle fail để runtime giữ lại và đặt lại) rồi nhờ workflow chủ sửa bằng starci kernel notify --kind request."
   owner: op-retry
   kind: settle-reason
+# Proof: scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement; scripts/kernel/workflow-checkpoint.mjs followCheckpoint; scripts/lib/worktree-record.mjs.
 workflow-worktree-missing:
   title: "The op's workflow has no worktree"
   title_vi: "Workflow của op không có cây làm việc"
-  meaning_vi: "Mọi workflow trong một kho git làm việc trong cây làm việc riêng do Orca tạo khi Kernel khởi động. Workflow này chưa có cây trong sổ đăng ký nên op không được giao: chạy trên kho chính thì không có gì chốt lại."
+  meaning_vi: "Workflow trong một kho Git phải dùng cây đã đăng ký của nó. Runtime từ chối giao hoặc chốt khi cây sống không còn trong sổ hay trên đĩa, và từ chối ghi checkpoint khi không có dòng sống nhận SHA; nó không coi một vị trí Git thiếu cây là không áp dụng."
   causes_vi:
     - "Kernel khởi động trước khi có cây làm việc của workflow"
     - "Cây làm việc đã bị gỡ trong khi workflow còn chạy"
-  nextStep_vi: "Job vẫn xếp hàng. Khởi động lại Kernel của workflow (start-workflow tạo cây qua Orca) rồi giao lại."
+  nextStep_vi: "Khôi phục đúng cây đã đăng ký qua runtime. Job chưa giao vẫn xếp hàng; job đang chốt chưa được chốt thành công. Nếu đã có phiếu hiệu ứng chuẩn bị, khôi phục cùng lượt dispatch từ phiếu đó trước khi giao thêm việc; không chạy op trên main để thay thế."
   owner: runtime-core
-  kind: dispatch-refusal
+  kind: verb-refusal
+# Proof: scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement; scripts/kernel/verbs/dispatch.mjs and scripts/kernel/verbs/settle.mjs immutable placement readers.
+workflow-worktree-mismatch:
+  title: "The op's placement differs from its registered workflow tree"
+  title_vi: "Vị trí của op khác cây workflow đã đăng ký"
+  meaning_vi: "Đường dẫn --worktree hoặc một đường dẫn đã ghi trong lượt thử và hợp đồng bất biến không trùng cây sống đã đăng ký của workflow. Runtime từ chối giao hoặc chốt, thay vì chạy hay ghi checkpoint vào một cây khác."
+  causes_vi:
+    - "--worktree trỏ tới main hoặc một cây riêng khác cây đã đăng ký"
+    - "Đường dẫn trong op_attempts hoặc hợp đồng dispatch không khớp sổ đăng ký"
+  nextStep_vi: "Dùng đúng cây đã đăng ký khi giao. Với một lượt đã chạy, runtime owner đối chiếu phiếu dispatch và sổ đăng ký để khôi phục đúng vị trí trước khi chốt; không sửa hợp đồng bất biến hay gán hiệu ứng ở cây khác thành không áp dụng."
+  owner: runtime-core
+  kind: verb-refusal
 worktree-add-failed:
   title: "Adding worktree failed"
   title_vi: "Tạo worktree thất bại"
@@ -11393,15 +11442,16 @@ worktree-path-occupied:
   nextStep_vi: "Việc tạo dừng; dọn thư mục thủ công rồi tạo lại."
   owner: runtime-core
   kind: runtime-fault
+# Proof: scripts/machine/workflow-tree.mjs workflowWorktreeOf/workflowWorktreeAt; scripts/machine/worktree-orca.mjs registry writes.
 worktree-registry-unavailable:
   title: "Worktree registry unavailable"
-  title_vi: "Không ghi được sổ đăng ký cây làm việc"
-  meaning_vi: "Runtime không ghi được worktree vào machine.sqlite nên không tạo worktree cho op (không có sổ thì không đếm giới hạn và không dọn được)."
+  title_vi: "Không truy cập được sổ đăng ký cây làm việc"
+  meaning_vi: "Runtime không đọc hoặc ghi được sổ cây làm việc trong machine.sqlite, nên không xác nhận được vị trí Git hay checkpoint. Lỗi sổ đăng ký được trả rõ ràng, không bị đổi thành không có cây hoặc không áp dụng."
   causes_vi:
     - "machine.sqlite đang bận hoặc bị khoá"
-  nextStep_vi: "Job vẫn xếp hàng chờ. Lượt giao sau thử lại; nếu lặp lại, kiểm tra machine.sqlite."
+  nextStep_vi: "Khôi phục khả năng truy cập machine.sqlite rồi gọi lại cùng thao tác. Job chưa giao vẫn xếp hàng; lượt chốt chưa thành công giữ phiếu chuẩn bị để khôi phục nếu đã có hiệu ứng. Nếu lặp lại, runtime owner kiểm tra sổ đăng ký; không bỏ qua nó để chạy trên cây khác."
   owner: runtime-core
-  kind: dispatch-refusal
+  kind: verb-refusal
 zip-corrupt:
   title: "Zip archive corrupt"
   title_vi: "File zip bị hỏng"

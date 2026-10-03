@@ -121,13 +121,14 @@ conventions:
     (context.goal {revision, statement, amendment?} of the revision the job is bound to), so `starci kernel op-contract --json` answers what
     workers opened the file for (nivo auth inc-26b260e101e4). `messages` is a kernel verb too.
   sharedCheckout: >-
-    Several workflows of one ledger build in ONE checkout on ONE branch; the shared branch is
-    append-only and a worker touches only its owned paths. ENFORCED at every op dispatch
-    (scripts/guards/, install.mjs guardLaunch; the receipt rides on op-dispatched `guard`, managed
+    Each Git workflow uses its registered workflow checkout and branch; its sibling ops share
+    that tree and a worker touches only its owned paths. Ops never stage or commit. ENFORCED at every op dispatch
+    (scripts/guards/hook-install.mjs guardLaunch; the receipt rides on op-dispatched `guard`, managed
     dispatches included): (1) the agent's host runs scripts/guards/command-guard.mjs as a PreToolUse hook
     (registered by launch trust, scripts/agent/trust.mjs: Claude settings.json, Codex config.toml with its
     trusted hash, Devin config.json) on every shell command before it runs; for an agent whose Orca
-    terminal carries a guard, git-policy.mjs refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase, commit --amend/-a/--no-verify
+    terminal carries a guard, command-guard.mjs refuses history, ref and tracked-work changes inside
+    its bound workflow worktree (WORKFLOW_HISTORY_CHANGE). The scoped git-policy.mjs also refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase, commit --amend/-a/--no-verify
     or without explicit pathspecs (a --pathspec-from-file list, stdin `-` and --pathspec-file-nul
     included, is scoped line by line; an unreadable list refuses PATHSPEC_FILE_UNREADABLE), stash, clean
     -f, checkout/switch that moves HEAD, checkout/restore/add/rm of paths outside the job's owned paths,

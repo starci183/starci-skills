@@ -12,7 +12,7 @@ import { ownerAnswersOf } from '../../machine/owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
-import { workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
+import { workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, requireWorkflowPlacement } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { loadAdapter } from '../../agent/lib.mjs';
 import { spawnOperationAgent } from './shared/dispatch-agent.mjs';
@@ -40,7 +40,6 @@ import { kernelOverrideFor } from '../kernel-authority.mjs';
 import { jobDirOf } from '../job-artifacts.mjs';
 import { packetFileOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
-import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
 import { readEnv } from '../../lib/env.mjs';
 
@@ -71,6 +70,10 @@ export default {
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
     process.exit(1);
   }
+  // Placement authority is checked before environment preparation, leases, packet files or an agent spawn.
+  const gitPlacement = Boolean(workflowAppRepo(repo) || (args.worktree && workflowAppRepo(path.resolve(repo, args.worktree))));
+  const workflowTree = args.spawn || !args.worktree ? requireWorkflowPlacement({ env: process.env }, { workflowId: job.workflow_id,
+    placements: args.worktree ? [path.resolve(repo, args.worktree)] : [], required: Boolean(args.spawn && gitPlacement) }) : null;
   // The grant is re-judged at launch: the tree may have moved since enqueue.
   {
     const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
@@ -193,16 +196,7 @@ export default {
   // Kernel started, and every op of the workflow launches with `--worktree <it>`; no op gets a tree of its own. Ops on
   // one side (be/ or fe/) run one at a time, across sides together (canDispatchConcurrently): a busy side is the typed
   // wait workflow-side-busy, checked with the other waits below. A workflow with no worktree (an unbound repo, the
-  // runtime repo included) is refused below. --worktree overrides the placement.
-  const workflowTree = args.worktree ? null : workflowWorktreeOf({ env: process.env }, job.workflow_id);
-  // EVERY workflow in a git checkout has its worktree (made before its Kernel started); an op of such a workflow without
-  // one is refused, never run on the live checkout where nothing would checkpoint it. A ledger repo in no git checkout
-  // has no worktree to make and nothing to checkpoint: its ops run on it. --worktree is the explicit operator placement.
-  if (args.spawn && !args.worktree && !workflowTree && workflowAppRepo(repo)) {
-    const detail = `workflow ${job.workflow_id} has no workflow worktree in the registry; restart its Kernel (start-workflow creates it through Orca), then dispatch again. The job stays queued.`;
-    emit({ ok: false, jobId, op, reason: WORKFLOW_WORKTREE_MISSING, detail }, `dispatch REFUSED for ${jobId} (${op}): ${WORKFLOW_WORKTREE_MISSING} — ${detail}`, args.json);
-    process.exit(1);
-  }
+  // runtime repo included) is refused before preparation. An explicit --worktree may name this same registered tree.
   const opTreeArgs = workflowTree ? opWorktreeArgs({ env: process.env }, { workflowId: job.workflow_id }) : [];
   const checkoutRoot = args.worktree ?? opTreeArgs[1] ?? repo;
   // The worker starts and works ON its checkout root: the workflow worktree is a git worktree of the app repository,

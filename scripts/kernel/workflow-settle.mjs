@@ -15,7 +15,7 @@ import { openDecisionRow } from '../machine/decisions.mjs';
 import { rebaseMilestone } from '../lib/rebase-milestone.mjs';
 import { commitShaOf } from './commit-sha.mjs';
 import { createOwnership } from './work-ownership.mjs';
-import { CHECKPOINT_EVENTS, PRESERVED_WORKFLOW_PREFIX, checkpointOp, leasesOf, preserveAndReset, rebaseWorkflow, recordOf, splitChanges } from './workflow-checkpoint.mjs';
+import { CHECKPOINT_EVENTS, PRESERVED_WORKFLOW_PREFIX, checkpointOp, leasesOf, preserveAndReset, rebaseWorkflow, recoverWorkflowRebase, recordOf, splitChanges, withWorkflowLock } from './workflow-checkpoint.mjs';
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 /** One git call file in `cwd`: {ok, stdout}. */
@@ -55,6 +55,9 @@ function escalateRebaseConflict(ctx, { workflowId, onto, head, files, preservedR
  * finish's rebase stays the hard stop. {due, why, rebased?, onto?, head?, conflict?, error?}
  */
 export function milestoneRebase(ctx, { workflowId, opId }) {
+  return withWorkflowLock(ctx, { workflowId }, (locked) => milestoneOwned(locked, { workflowId, opId }));
+}
+function milestoneOwned(ctx, { workflowId, opId }) {
   try {
     const rec = recordOf(ctx, workflowId);
     const onto = revParse(rec.path, `refs/heads/${mainOf(ctx)}`);
@@ -69,7 +72,7 @@ export function milestoneRebase(ctx, { workflowId, opId }) {
     const idle = liveSiblingsOf(ctx, { workflowId, opId }).length === 0;
     const policy = rebaseMilestone({ idle, behind, overlap, onto, conflictedOnto, behindLimit: ctx?.behindLimit ?? worktreeSettings().rebaseMilestoneBehind });
     if (!policy.due) return { ...policy, onto, behind, overlap };
-    const r = rebaseWorkflow(ctx, { workflowId });
+    const r = rebaseWorkflow(ctx, { workflowId, opId, milestone: policy });
     if (r.ok) return { ...policy, rebased: !r.already, onto: r.onto, head: r.head, behind, overlap };
     if (r.code !== 'workflow-rebase-conflict') return { ...policy, rebased: false, onto, error: r.code, detail: r.detail ?? null, files: r.files ?? [] };
     const preservedRef = milestoneRefOf(workflowId, onto);
@@ -77,6 +80,7 @@ export function milestoneRebase(ctx, { workflowId, opId }) {
     const escalation = escalateRebaseConflict(ctx, { workflowId, onto, head, files: r.files, preservedRef });
     return { ...policy, rebased: false, onto, head, conflict: { files: r.files, preservedRef: kept.ok ? preservedRef : null, escalation } };
   } catch (error) {
+    if (error?.effectState === 'unknown') throw error;
     return { due: false, why: 'quiet', error: error?.code ?? 'workflow-rebase-failed', detail: String(error?.message ?? error).slice(0, 300) };
   }
 }
@@ -101,8 +105,12 @@ export function requireWorkOwner(ctx, { workflowId, opId }) {
  * milestone rebase; a failed or blocked op is preserved and reset. Throws the typed refusal of checkpointOp/preserveAndReset.
  */
 export function settleCheckpoint(ctx, { workflowId, opId, pass }) {
+  return withWorkflowLock(ctx, { workflowId }, (locked) => settleOwned(locked, { workflowId, opId, pass }));
+}
+function settleOwned(ctx, { workflowId, opId, pass }) {
+  const recovered = recoverWorkflowRebase(ctx, { workflowId, opId });
   if (!pass) return { kind: CHECKPOINT_EVENTS.preserved, ...preserveAndReset(ctx, { workflowId, opId }) };
   requireWorkOwner(ctx, { workflowId, opId });
   const checkpoint = { kind: CHECKPOINT_EVENTS.checkpoint, ...checkpointOp(ctx, { workflowId, opId }) };
-  return { ...checkpoint, milestone: milestoneRebase(ctx, { workflowId, opId }) };
+  return { ...checkpoint, milestone: recovered?.milestone ? { ...recovered.milestone, rebased: true, onto: recovered.onto, head: recovered.head, recovered: true } : milestoneRebase(ctx, { workflowId, opId }) };
 }

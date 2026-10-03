@@ -1,0 +1,45 @@
+id: workflow-checkpoint-acceptance
+effectiveAt: 2026-10-03T18:39:07.496Z
+summary: >-
+  Git workflow operations use their registered workflow worktree, including an explicit
+  --worktree that names the same tree. Native settle checks its complete acceptance contract
+  before checkpoint or preserve/reset effects. The runtime checkpoints only the accepted op's
+  owned paths on the registered branch; operations never stage or commit and main moves only
+  at workflow finish. A workflow lock serializes native settle and the checkpoint primitives.
+  Prepared/applied events bind recovery to the workflow, job, attempt and dispatch, retaining
+  the registered path/branch and original SHA, scope and attribution after a partial Git or registry effect.
+  Rebase proposes in a detached internal scratch before recording workflow-rebase-prepared/applied
+  events for the exact before/proposed head, placement, attempt and original milestone policy.
+  A partial rebase effect holds native acceptance and resumes the frozen same decision; optional
+  failures before an effect remain best effort. An unfinished prepared effect is recovered before
+  another checkpoint, preserve/reset, rebase or finish. Missing or
+  unavailable registry state and mismatched Git placement refuse visibly; a non-Git job has
+  no Git checkpoint.
+reach: new-legs
+adds:
+  codes:
+    - workflow-worktree-mismatch
+    - workflow-checkpoint-lock-busy
+    - workflow-checkpoint-recovery-conflict
+    - workflow-checkpoint-recovery-required
+paths:
+  - CONTEXT.md
+  - modules/cli/commands/kernel/dispatch.yaml
+  - modules/cli/commands/kernel/settle.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/kernel/api.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/ops/_common.yaml
+  - docs/workflow-kernel.md
+  - scripts/kernel/verbs/dispatch.mjs
+  - scripts/kernel/verbs/settle.mjs
+  - scripts/kernel/workflow-checkpoint.mjs
+  - scripts/kernel/workflow-checkpoint-state.mjs
+  - scripts/kernel/workflow-rebase.mjs
+  - scripts/kernel/workflow-settle.mjs
+  - scripts/kernel/workflow-worktree.mjs
+  - scripts/machine/workflow-tree.mjs
+  - tests/kernel/workflow-checkpoint.spec.mjs
+  - tests/kernel/workflow-rebase-milestone.spec.mjs
+  - tests/helpers/workflow-settle-fixture.mjs
+  - modules/kernel/contract-changes/workflow-checkpoint-acceptance.yaml

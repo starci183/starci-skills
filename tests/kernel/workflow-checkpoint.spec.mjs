@@ -15,6 +15,9 @@ import { judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
 import { gateBaseAt, gateBaseOf, gateBasesOf } from '../../scripts/machine/workflow-tree.mjs';
 import { checkpointOp, preserveAndReset, finishWorkflow, rebaseWorkflow, reviewVerifiedOf, FINISH_STEPS } from '../../scripts/kernel/workflow-checkpoint.mjs';
 
+import { settleFixture, apiResult } from '../helpers/workflow-settle-fixture.mjs';
+import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
+import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 const WF = 'wf-nivo-checkpoint-k1';
 const BRANCH = `wf-${WF}`; // Orca's own name for the worktree branch; B reads it from the registry only
 const git = (cwd, ...args) => {
@@ -87,7 +90,7 @@ function fixture(_t, { jobs = [], orca = fakeOrca(), pendingFails = false, ...se
   const worktree = {
     workflowWorktreeOf: (_ctx, id) => (registry.has(id) ? { ...registry.get(id) } : null),
     workflowWorktreeAt: (_ctx, at) => [...registry.values()].find((r) => path.resolve(r.path) === path.resolve(at)) ?? null,
-    setCheckpoint: (_ctx, id, sha) => { checkpoints.push(sha); registry.get(id).checkpoint = sha; },
+    setCheckpoint: (_ctx, id, sha) => { checkpoints.push(sha); registry.get(id).checkpoint = sha; return true; },
     markReleasePending: (_ctx, id) => { pending.push(id); return pendingFails ? { ok: false, reason: 'registry-unavailable' } : { ok: true }; },
     TERMINAL_JOB_STATUSES: OCCUPYING,
   };
@@ -333,4 +336,152 @@ test('finish refused at each step with its typed code; main moves at none of the
     if (step === 'rebase') assert.equal(git(fx.dir, 'status', '--porcelain'), '', 'the conflicted rebase was aborted');
     assert.deepEqual(fx.orca.calls, [], `${name}: no removal from inside the finish`);
   }
+});
+
+for (const phase of ['prepared', 'branch-applied', 'index-applied', 'registry-applied', 'applied']) {
+  test(`checkpoint interruption at ${phase} recovers the original dispatch commit exactly once`, (t) => {
+    const fx = settleFixture(t), jobId = 'op-interrupted-checkpoint';
+    const attemptId = fx.prepare({ jobId }), before = git(fx.tree, 'rev-parse', 'HEAD');
+    const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+    try {
+      const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+      assert.throws(() => checkpointOp({ ...ctx, checkpointPhase: (at) => {
+        if (at === phase) throw Object.assign(new Error(`interrupted at ${phase}`), { code: 'injected-checkpoint-interruption' });
+      } }, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'injected-checkpoint-interruption');
+      const prepared = ledger.db.prepare("SELECT attempt_id,payload_json FROM events WHERE entity_id=? AND kind='workflow-checkpoint-prepared' ORDER BY seq DESC LIMIT 1").get(jobId);
+      assert.ok(prepared, 'the intent is durable before applying branch/index/registry effects');
+      const intent = JSON.parse(prepared.payload_json);
+      assert.deepEqual([prepared.attempt_id, intent.attemptId, intent.dispatchId, intent.before, intent.committed], [attemptId, attemptId, `ctx-${jobId}`, before, true]);
+      assert.equal(git(fx.tree, 'rev-parse', `${intent.sha}^`), before);
+      assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE entity_id=? AND kind='workflow-checkpoint'").get(jobId).n, 0, 'a partial effect has no accepted checkpoint event');
+      assert.equal(ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status, 'running');
+      const recovered = checkpointOp(ctx, { workflowId: fx.workflowId, opId: jobId });
+      assert.deepEqual([recovered.sha, recovered.committed, recovered.attemptId, recovered.dispatchId], [intent.sha, true, attemptId, `ctx-${jobId}`]);
+      assert.equal(git(fx.tree, 'rev-parse', 'HEAD'), intent.sha);
+      assert.equal(git(fx.tree, 'rev-list', '--count', `${before}..HEAD`), '1', 'recovery attaches the saved one-parent commit without another commit');
+      assert.equal(workflowWorktreeOf({ env: fx.env }, fx.workflowId).checkpoint, intent.sha);
+      assert.equal(git(fx.tree, 'status', '--porcelain'), '');
+      assert.equal(fs.readFileSync(path.join(fx.tree, 'docs', 'change.md'), 'utf8'), `owned change of ${jobId}\n`);
+      for (const kind of ['workflow-checkpoint-prepared', 'workflow-checkpoint-applied']) {
+        assert.equal(ledger.db.prepare('SELECT count(*) n FROM events WHERE entity_id=? AND attempt_id=? AND kind=?').get(jobId, attemptId, kind).n, 1);
+      }
+      const again = checkpointOp(ctx, { workflowId: fx.workflowId, opId: jobId });
+      assert.deepEqual([again.sha, again.committed, again.attemptId, again.dispatchId], [intent.sha, true, attemptId, `ctx-${jobId}`], 'completed effect replay preserves the original attribution');
+    } finally { ledger.close(); }
+    const accepted = fx.runApi(['settle', '--job', jobId, '--verdict', 'pass']);
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    const checkpoint = apiResult(accepted).checkpoint;
+    assert.deepEqual([checkpoint.committed, checkpoint.attemptId, checkpoint.dispatchId], [true, attemptId, `ctx-${jobId}`]);
+    assert.equal(fx.read((db) => db.prepare("SELECT count(*) n FROM events WHERE entity_id=? AND attempt_id=? AND kind='workflow-checkpoint'").get(jobId, attemptId).n), 1);
+    const stored = fx.read((db) => JSON.parse(db.prepare('SELECT settle_json FROM op_attempts WHERE attempt_id=?').get(attemptId).settle_json));
+    assert.deepEqual(stored.checkpoint, checkpoint, 'accepted attempt result owns the recovered receipt');
+  });
+}
+
+for (const phase of ['prepared', 'branch-applied', 'index-applied', 'applied']) {
+  test(`preservation interruption at ${phase} recovers its original ref and reset exactly once`, (t) => {
+    const fx = settleFixture(t), jobId = 'op-interrupted-preserve';
+    const attemptId = fx.prepare({ jobId, outcome: 'blocked' }), base = git(fx.tree, 'rev-parse', 'HEAD');
+    const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+    try {
+      const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+      assert.throws(() => preserveAndReset({ ...ctx, checkpointPhase: (at) => {
+        if (at === phase) throw Object.assign(new Error(`preserve interrupted at ${phase}`), { code: 'injected-preserve-interruption' });
+      } }, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'injected-preserve-interruption');
+      const prepared = ledger.db.prepare("SELECT attempt_id,payload_json FROM events WHERE entity_id=? AND kind='workflow-op-preserved-prepared'").get(jobId);
+      assert.ok(prepared);
+      const intent = JSON.parse(prepared.payload_json);
+      assert.deepEqual([prepared.attempt_id, intent.attemptId, intent.dispatchId, intent.resetTo], [attemptId, attemptId, `ctx-${jobId}`, base]);
+      const recovered = preserveAndReset(ctx, { workflowId: fx.workflowId, opId: jobId });
+      assert.deepEqual([recovered.preservedRef, recovered.sha, recovered.resetTo, recovered.attemptId, recovered.dispatchId],
+        [intent.preservedRef, intent.sha, base, attemptId, `ctx-${jobId}`]);
+      assert.equal(git(fx.tree, 'rev-parse', intent.preservedRef), intent.sha);
+      assert.equal(git(fx.tree, 'show', `${intent.preservedRef}:docs/change.md`), `owned change of ${jobId}`);
+      assert.equal(git(fx.tree, 'rev-parse', 'HEAD'), base);
+      assert.equal(git(fx.tree, 'status', '--porcelain'), '');
+      assert.equal(fs.existsSync(path.join(fx.tree, 'docs', 'change.md')), false);
+      const replay = preserveAndReset(ctx, { workflowId: fx.workflowId, opId: jobId });
+      assert.deepEqual(replay, recovered);
+      for (const kind of ['workflow-op-preserved-prepared', 'workflow-op-preserved-applied']) {
+        assert.equal(ledger.db.prepare('SELECT count(*) n FROM events WHERE entity_id=? AND attempt_id=? AND kind=?').get(jobId, attemptId, kind).n, 1);
+      }
+    } finally { ledger.close(); }
+  });
+}
+
+test('a zero-row registry update fails visibly and retry keeps the existing checkpoint identity', (t) => {
+  const fx = settleFixture(t), jobId = 'op-registry-failed';
+  const attemptId = fx.prepare({ jobId }), before = git(fx.tree, 'rev-parse', 'HEAD');
+  const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+  try {
+    const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+    assert.throws(() => checkpointOp({ ...ctx, worktree: { setCheckpoint: () => false } }, { workflowId: fx.workflowId, opId: jobId }),
+      (error) => error.code === 'workflow-worktree-missing');
+    const saved = JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='workflow-checkpoint-prepared'").get(jobId).payload_json);
+    assert.equal(workflowWorktreeOf({ env: fx.env }, fx.workflowId).checkpoint, null, 'no live registry row accepted the update');
+    assert.equal(git(fx.tree, 'rev-parse', 'HEAD'), saved.sha, 'the visible failure retains its partial branch effect');
+    const recovered = checkpointOp(ctx, { workflowId: fx.workflowId, opId: jobId });
+    assert.deepEqual([recovered.sha, recovered.committed, recovered.attemptId, recovered.dispatchId], [saved.sha, true, attemptId, `ctx-${jobId}`]);
+    assert.equal(git(fx.tree, 'rev-list', '--count', `${before}..HEAD`), '1');
+    assert.equal(workflowWorktreeOf({ env: fx.env }, fx.workflowId).checkpoint, saved.sha);
+  } finally { ledger.close(); }
+});
+
+for (const phase of ['prepared', 'branch-applied']) {
+  test(`new owned bytes after ${phase} hold recovery without committing or discarding them`, (t) => {
+    const fx = settleFixture(t), jobId = 'op-changed-after-intent';
+    fx.prepare({ jobId });
+    const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+    try {
+      const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+      assert.throws(() => checkpointOp({ ...ctx, checkpointPhase: (at) => {
+        if (at === phase) throw Object.assign(new Error('stop after durable preparation'), { code: 'injected-checkpoint-interruption' });
+      } }, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'injected-checkpoint-interruption');
+      const intent = JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='workflow-checkpoint-prepared'").get(jobId).payload_json);
+      write(fx.tree, 'docs/change.md', 'new bytes outside the prepared checkpoint\n');
+      const before = fx.capture(jobId);
+      assert.throws(() => checkpointOp(ctx, { workflowId: fx.workflowId, opId: jobId }),
+        (error) => error.code === 'workflow-checkpoint-recovery-conflict');
+      assert.deepEqual(fx.capture(jobId), before, 'the hold retains new owned bytes and every existing branch/index/registry effect');
+      assert.equal(git(fx.tree, 'show', `${intent.sha}:docs/change.md`), `owned change of ${jobId}`);
+      assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE entity_id=? AND kind='workflow-checkpoint-applied'").get(jobId).n, 0);
+    } finally { ledger.close(); }
+  });
+}
+
+test('an applied checkpoint replay refuses a later foreign HEAD without replacing it', (t) => {
+  const fx = settleFixture(t), jobId = 'op-applied-before-foreign';
+  fx.prepare({ jobId });
+  const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+  try {
+    const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+    assert.throws(() => checkpointOp({ ...ctx, checkpointPhase: (phase) => {
+      if (phase === 'applied') throw Object.assign(new Error('acknowledgement lost'), { code: 'injected-checkpoint-interruption' });
+    } }, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'injected-checkpoint-interruption');
+    write(fx.tree, 'docs/foreign.md', 'a foreign commit after the partial dispatch\n');
+    git(fx.tree, 'add', 'docs/foreign.md');
+    git(fx.tree, 'commit', '-q', '-m', 'foreign commit in private fault fixture');
+    const before = fx.capture(jobId);
+    assert.throws(() => checkpointOp(ctx, { workflowId: fx.workflowId, opId: jobId }), (error) => error.code === 'workflow-foreign-commit');
+    assert.deepEqual(fx.capture(jobId), before, 'foreign history remains visible and is not rewound or accepted');
+  } finally { ledger.close(); }
+});
+
+test('a saved dispatch replays after a legitimate sibling checkpoint without rewinding that sibling', (t) => {
+  const fx = settleFixture(t), first = 'op-original', second = 'op-later-sibling';
+  fx.prepare({ jobId: first, ownedRoot: 'docs/a' });
+  const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+  try {
+    const ctx = { db: ledger.db, ledger, repo: fx.repo, env: fx.env };
+    const original = checkpointOp(ctx, { workflowId: fx.workflowId, opId: first });
+    fx.prepare({ jobId: second, ownedRoot: 'docs/b' });
+    const sibling = checkpointOp(ctx, { workflowId: fx.workflowId, opId: second });
+    assert.equal(git(fx.tree, 'rev-parse', `${sibling.sha}^`), original.sha);
+    const before = fx.capture(first);
+    const replay = checkpointOp(ctx, { workflowId: fx.workflowId, opId: first });
+    assert.deepEqual(replay, original);
+    assert.deepEqual(fx.capture(first), before);
+    assert.equal(workflowWorktreeOf({ env: fx.env }, fx.workflowId).checkpoint, sibling.sha);
+    assert.equal(git(fx.tree, 'rev-parse', 'HEAD'), sibling.sha);
+  } finally { ledger.close(); }
 });

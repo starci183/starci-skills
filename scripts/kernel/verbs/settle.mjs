@@ -4,7 +4,9 @@ import path from 'node:path';
 import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateJob } from '../../../engine/db/ledger.mjs';
 import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../engine/admission.mjs';
 import { settleCheckpoint } from '../workflow-settle.mjs';
-import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
+import { withWorkflowLock } from '../workflow-checkpoint.mjs';
+import { appendEffectEvent, preparedSettlementOf } from '../workflow-checkpoint-state.mjs';
+import { requireWorkflowPlacement, workflowAppRepo } from '../workflow-worktree.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { workRecordFilesOf } from './shared/work-record-files.mjs';
 import { jobOpOf, jobPayloadOf, jobRowOf } from './shared/rows.mjs';
@@ -62,6 +64,18 @@ export default {
     const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, heldDispatchOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
+  const initialJob = jobRowOf(db, jobId);
+  if (!initialJob) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
+  if (SETTLED.includes(initialJob.status) && initialJob.status !== 'effect_unknown') {
+    throw Object.assign(new Error(`job ${jobId} is already settled (${initialJob.status})`), { code: 'job-settled' });
+  }
+  const dispatchId = reportDispatchIdOf(db, initialJob);
+  const replayAttempt = dispatchId ? db.prepare('SELECT a.attempt_id, a.worktree_path, c.context_json FROM op_attempts a LEFT JOIN contracts c ON c.attempt_id=a.attempt_id WHERE a.workflow_id=? AND a.dispatch_id=?').get(initialJob.workflow_id, dispatchId) : null;
+  const preparedDecision = () => preparedSettlementOf({ db }, { workflowId: initialJob.workflow_id, opId: jobId, attemptId: replayAttempt?.attempt_id ?? null });
+  let replay = preparedDecision();
+  if (replay && (replay.verdict !== verdict || replay.job.status !== initialJob.status)) {
+    throw Object.assign(new Error(`settle ${jobId} must recover its prepared ${replay.verdict} decision without changing dispatch or status`), { code: 'workflow-checkpoint-recovery-conflict' });
+  }
   // A report lives only in the reports table (starci kernel report files it from the job scratch, a3-3 evidence-db-report):
   // settle judges the filed row and never reads a report file. A --report path is ignored.
   if (args.report) console.error(`starci kernel settle WARN: --report ${args.report} is ignored; settle reads the report the job filed (starci kernel report)`);
@@ -78,7 +92,7 @@ export default {
     }
   }
 
-  const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
+  const media = !replay && verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
   if (media) {
     emit({ ok: false, jobId, op: media.op, reason: media.code, code: media.code, missing: media.missing, detail: media.detail },
       `settle REFUSED for ${jobId} (${media.op}): ${media.code} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. ${media.code === EVIDENCE_HOST_PATH ? 'Rewrite the named evidence with repo-relative paths or <worktree>, <runtime>, <tmp>, <home>, then settle again' : `Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`}`, args.json);
@@ -87,7 +101,7 @@ export default {
 
   // The Sonar gate of the code-writing ops: judged from the op's own sonar.json, recorded as the runtime check sonar-gate on
   // the attempt (its why carries the code), and a pass that is not green is refused - an unavailable Sonar never passes.
-  const sonar = settleSonarGate(db, jobId, repo);
+  const sonar = replay ? null : settleSonarGate(db, jobId, repo);
   if (sonar) {
     // A fail or blocked verdict that never reached Sonar (no scan, refused scan) is its own failure: no sonar row muddies its why.
     if (verdict !== 'pass' && !['red', 'unavailable'].includes(sonar.judged.status)) sonar.judged.record = false;
@@ -101,7 +115,7 @@ export default {
 
   // The op loop (READ-CODE-CHECK-FIX-REPORT): judged from the op's own gate JSON and READ digest, recorded as the runtime check
   // op-gate on the attempt, and a pass that is red, could not run its tools, or skipped READ is refused.
-  const loop = verdict === 'pass' ? await settleOpGate(db, jobId, repo) : null;
+  const loop = !replay && verdict === 'pass' ? await settleOpGate(db, jobId, repo) : null;
   if (loop) {
     const recorded = recordLoopJudgment(ledger, { attemptId: loop.attemptId, judgment: loop });
     if (!recorded.green) {
@@ -113,7 +127,7 @@ export default {
 
   // The mechanism proofs (knowledge/op-gate.yaml opProofs): judged from the documents the op attached, recorded as the runtime
   // check op-proof on the attempt, and a pass whose mandatory mechanism is missing, red or could not run is refused.
-  const proofs = verdict === 'pass' ? await settleOpProofs(db, jobId, repo) : null;
+  const proofs = !replay && verdict === 'pass' ? await settleOpProofs(db, jobId, repo) : null;
   if (proofs) {
     const recorded = recordProofJudgment(ledger, { attemptId: proofs.attemptId, judgment: proofs });
     if (!recorded.green) {
@@ -123,7 +137,7 @@ export default {
     }
   }
 
-  const drawn = verdict === 'pass' ? settleDrawAcceptance(db, jobId, repo, null, null) : null;
+  const drawn = !replay && verdict === 'pass' ? settleDrawAcceptance(db, jobId, repo, null, null) : null;
   if (drawn) {
     const codes = [...new Set(drawn.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
@@ -131,7 +145,7 @@ export default {
     process.exit(1);
   }
 
-  const measured = verdict === 'pass' ? await settleDrawMetrics(db, jobId, repo, null, null) : null;
+  const measured = !replay && verdict === 'pass' ? await settleDrawMetrics(db, jobId, repo, null, null) : null;
   if (measured) {
     const codes = [...new Set(measured.findings.flatMap((f) => [f.code, ...(f.codes ?? [])]))];
     emit({ ok: false, jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
@@ -139,7 +153,7 @@ export default {
     process.exit(1);
   }
 
-  const hygiene = verdict === 'pass' ? settleWorkHygiene(db, jobId, repo, null, null) : null;
+  const hygiene = !replay && verdict === 'pass' ? settleWorkHygiene(db, jobId, repo, null, null) : null;
   if (hygiene) {
     const codes = [...new Set(hygiene.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
@@ -148,28 +162,22 @@ export default {
   }
 
   let checkpoint = null;
-  // The workflow worktree (WFWT, scripts/kernel/workflow-settle.mjs), LAST: every settle refusal above passed. A green
-  // op's side is committed on the workflow branch as the workflow's checkpoint; a failed or blocked op's side is preserved to
-  // preserved/<wf>/<op> and reset to the last checkpoint; then the milestone rebase. main moves only at starci kernel finish.
-  {
-    const settlingJob = db.prepare('SELECT workflow_id, kind FROM jobs WHERE job_id=?').get(jobId);
-    const wfCtx = { db, ledger, repo, env: process.env };
-    if (settlingJob?.kind === 'op' && workflowWorktreeOf(wfCtx, settlingJob.workflow_id)) {
-      try {
-        checkpoint = settleCheckpoint(wfCtx, { workflowId: settlingJob.workflow_id, opId: jobId, pass: verdict === 'pass' });
-      } catch (error) {
-        const reason = error?.code ?? 'workflow-checkpoint-failed';
-        emit({ ok: false, jobId, reason, code: reason, detail: String(error?.message ?? error) },
-          `settle REFUSED for ${jobId}: ${reason} - ${String(error?.message ?? error)}; the job stays unsettled and main is untouched. Fix the workflow worktree, then settle again`, args.json);
-        process.exit(1);
-      }
-      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: checkpoint.kind, payload: checkpoint }));
-    }
-  }
-
   let released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null, settledAttemptId = null, filedReport = null, citations = null;
   let checkEvidence = { observed: 0, passed: 0, failed: 0, green: false }, claimOverruled = false;
   let awaitingOwner = false, cutSet = null, handoverApproval = null, peerBlocked = null, nextStep = null;
+  const wfCtx = { db, ledger, repo, env: process.env };
+  withWorkflowLock(wfCtx, { workflowId: initialJob.workflow_id }, (locked) => {
+  const lockedJob = jobRowOf(db, jobId);
+  if (SETTLED.includes(lockedJob.status) && lockedJob.status !== 'effect_unknown') throw Object.assign(new Error(`job ${jobId} is already settled (${lockedJob.status})`), { code: 'job-settled' });
+  if (reportDispatchIdOf(db, lockedJob) !== dispatchId) throw Object.assign(new Error(`job ${jobId} changed dispatch while waiting to settle`), { code: 'workflow-checkpoint-recovery-conflict' });
+  replay = preparedDecision();
+  if (replay && (replay.verdict !== verdict || replay.job.status !== lockedJob.status)) throw Object.assign(new Error(`settle ${jobId} must recover its prepared ${replay.verdict} decision without changing dispatch or status`), { code: 'workflow-checkpoint-recovery-conflict' });
+  let accepted;
+  if (replay) {
+    job = replay.job;
+    accepted = replay.accepted;
+    ({ reportFiled, reportOutcome, settledAttemptId, filedReport, checkEvidence, claimOverruled, awaitingOwner, cutSet, handoverApproval, peerBlocked } = replay.state);
+  } else {
   ledger.transaction(() => {
     job = jobRowOf(db, jobId);
     if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -281,6 +289,36 @@ export default {
     // (jobs_release_leases trigger), counted here first.
     const settlePath = settlePathOf(job.status, status, reportFiled);
     if (!settlePath) throw Object.assign(new Error(`job ${jobId} is ${job.status}: no job_transitions path settles it ${status}`), { code: 'job-not-settleable', status: job.status });
+    accepted = { payload, result, row, envelope, status, settlePath, recordedChecks };
+  });
+  }
+  const current = jobRowOf(db, jobId);
+  if (SETTLED.includes(current.status) && current.status !== 'effect_unknown') throw Object.assign(new Error(`job ${jobId} is already settled (${current.status})`), { code: 'job-settled' });
+  if (reportDispatchIdOf(db, current) !== dispatchId || current.status !== job.status) throw Object.assign(new Error(`job ${jobId} changed while accepting its settle`), { code: 'workflow-checkpoint-recovery-conflict' });
+  locked.settlement = { verdict, job, accepted, state: { reportFiled, reportOutcome, settledAttemptId, filedReport, checkEvidence, claimOverruled, awaitingOwner, cutSet, handoverApproval, peerBlocked } };
+  // Every acceptance refusal has passed under the same workflow lock as the effect and settlement.
+  if (job.kind === 'op') {
+    const context = parseJson(replayAttempt?.context_json) ?? {};
+    const placements = [replayAttempt?.worktree_path, context.worktree, context.packet?.context?.workflow_worktree?.path].filter((dir) => typeof dir === 'string' && dir);
+    const tree = requireWorkflowPlacement(locked, { workflowId: job.workflow_id, placements: placements.map((dir) => path.resolve(repo, dir)),
+      required: Boolean(context.packet?.context?.workflow_worktree || replay || workflowAppRepo(repo) || placements.some((dir) => workflowAppRepo(path.resolve(repo, dir)))) });
+    if (tree) {
+      try {
+        checkpoint = settleCheckpoint(locked, { workflowId: job.workflow_id, opId: jobId, pass: verdict === 'pass' });
+      } catch (error) {
+        const reason = error?.code ?? 'workflow-checkpoint-failed';
+        emit({ ok: false, jobId, reason, code: reason, detail: String(error?.message ?? error) },
+          `settle REFUSED for ${jobId}: ${reason} - ${String(error?.message ?? error)}; main is untouched. A prepared checkpoint may need recovery; retry the same dispatch after fixing the workflow worktree`, args.json);
+        throw error;
+      }
+    }
+  }
+  ledger.transaction(() => {
+    const { payload, result, row, envelope, status, settlePath, recordedChecks } = accepted;
+    if (checkpoint) {
+      result.checkpoint = checkpoint;
+      appendEffectEvent(locked, { workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: settledAttemptId, kind: checkpoint.kind, payload: checkpoint });
+    }
     released = db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(jobId).n;
     const at = payload.settledAt;
     for (const to of settlePath) {
@@ -374,6 +412,7 @@ export default {
           payload: { op: jobOpOf(job), cutId: String(payload.cut.id), exitCode: 0, via: item.via, seamJobId: item.seamJobId, by: jobId } });
       }
     }
+  });
   });
 
   // The settled op's Orca terminal is released with its leases — worker_id is

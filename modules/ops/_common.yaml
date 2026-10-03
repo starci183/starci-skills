@@ -422,18 +422,18 @@ sections:
         delivery from its implementation profile. Refresh applicable repository/environment resource
         revisions from actual inspected source/build state before validating: the core does not
         watch Git HEAD or live deployment drift."
-      - "You never commit and never stage. In a product workflow the runtime is the only committer on
-        wf-<workflowId>: a green settle commits your owned changes as the workflow's checkpoint
+      - "You never commit and never stage. In a Git workflow the runtime is the only committer on
+        its registered workflow branch: an accepted green settle commits your owned changes as the workflow's checkpoint
         (checkpointOp), so a commit of your own is never your delivery; inspect your diff, run the
         applicable checks and report the changed paths and the tree you tested. History is never yours
         to move (main of a product repo, which peer workflows land on, included): never `git reset`, rebase, amend, drop or
         force it - a Collab op ran `git reset HEAD~1` on a product repository's main and silently removed its
-        own filed-report commit while three peer workflows were committing there. In a product workflow you work in the workflow's one worktree on wf-<workflowId>,
-        never on main: the runtime commits each green op's checkpoint there, preserves a failed or blocked op's work to
-        preserved/<workflowId>/<op> and resets the tree to the last checkpoint, and only the workflow's finish moves main;
+        own filed-report commit while three peer workflows were committing there. In a Git workflow you work in the workflow's registered worktree,
+        never on main: the runtime checkpoints exactly your owned paths after settle accepts the report and checks, preserves a failed or blocked op's work to
+        preserved/<workflowId>/<op> and resets its owned paths and foreign changes to the last checkpoint, and only the workflow's finish moves main;
         never reset, rebase or move that branch yourself. The checkout is shared too: never stash, `clean -f`, switch
         branches, or checkout/restore a path you do not own; never `git add` or `git commit` (the runtime
-        stages exactly your side's changes at the checkpoint; inside the workflow worktree the command guard refuses
+        stages exactly your owned changes at the checkpoint; inside the workflow worktree the command guard refuses
         every history or ref change, WORKFLOW_HISTORY_CHANGE); never `npm ci`
         or delete node_modules while other workflows run (the repository dependency lock serializes
         `npm install`). Never delete `.git/index.lock` or another git lock: your git recovers a stale

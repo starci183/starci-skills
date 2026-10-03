@@ -27,24 +27,18 @@
 // ctx.db (the ledger), ctx.gate, ctx.guard, ctx.verify, ctx.push, ctx.fastForward, ctx.main.
 import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
-import { add as gitAdd } from '../api/git/add.mjs';
 import { commitTree } from '../api/git/commit-tree.mjs';
-import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { mergeBase } from '../api/git/merge-base.mjs';
-import { readTree } from '../api/git/read-tree.mjs';
-import { rebase as gitRebase } from '../api/git/rebase.mjs';
 import { rmCached } from '../api/git/rm-cached.mjs';
 import { symbolicRef } from '../api/git/symbolic-ref.mjs';
 import { updateRef } from '../api/git/update-ref.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { diff as gitDiff } from '../api/git/diff.mjs';
 import { lsFiles } from '../api/git/ls-files.mjs';
-import { writeTree } from '../api/git/write-tree.mjs';
 import { lsTree } from '../api/git/ls-tree.mjs';
 import { restore as gitRestore } from '../api/git/restore.mjs';
 import { revList } from '../api/git/rev-list.mjs';
@@ -56,8 +50,6 @@ import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../machine/live-fast-forward.mjs';
-import { claimManager } from '../connectors/lib.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
 import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
 import { gateBaseOf, gateBasesOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
@@ -66,6 +58,9 @@ import { splitList } from '../lib/list.mjs';
 import { underAny } from '../lib/path-key.mjs';
 import { commitShaOf } from './commit-sha.mjs';
 import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
+import { acceptedDecision, completedRebaseOf, literalPaths, pendingRebaseOf, phaseOf, publicReceipt, receiptState, requireCompletedEffects, requireReceiptBytes, saveReceipt, snapshotTree, withLock, withWorkflowLock } from './workflow-checkpoint-state.mjs';
+import { applyWorkflowRebase } from './workflow-rebase.mjs';
+export { withWorkflowLock } from './workflow-checkpoint-state.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'gates', 'gate.mjs');
@@ -78,16 +73,6 @@ const SHA = /^[0-9a-f]{40,64}$/;
 
 /* ------------------------------------------------------------ plumbing */
 
-/** Hold the named host lock around fn (poll until waitMs). {ok:false, reason:'lock-busy', lock, holder} when it never frees. */
-function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = process.env } = {}) {
-  const end = Date.now() + waitMs;
-  for (;;) {
-    const held = claimManager(name, { env });
-    if (held.ok) { try { return fn(); } finally { held.release(); } }
-    if (Date.now() >= end) return { ok: false, reason: 'lock-busy', lock: name, holder: held.holder ?? null };
-    sleepSync(pollMs);
-  }
-}
 /** The per-repository land lock: one workflow lands into a repository's main at a time. */
 const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
@@ -133,7 +118,6 @@ export function leasesOf(ctx, { workflowId, opId }) {
 /** The gate bases an op's settle accepts (gateBasesOf over its owned paths), newest first; [] outside a workflow worktree. */
 export const opGateBasesOf = (ctx, { workflowId, opId }) => (wt(ctx).workflowWorktreeOf(ctx, workflowId) ? gateBasesOf(ctx, workflowId, { owned: leasesOf(ctx, { workflowId, opId }).own }) : []);
 const under = (file, owned) => underAny(file, owned, { dot: true });
-const literal = (files) => files.map((f) => `:(literal)${f}`);
 const zlist = (text) => splitList(text, { sep: '\0' });
 /** Every path of the worktree that differs from HEAD: tracked changes (staged or not, deletions included) and untracked files. */
 function changedFiles(dir) {
@@ -154,29 +138,20 @@ export function splitChanges(dir, { own, others }) {
  */
 function snapshotFiles(dir, parent, files, message) {
   if (!files.length) return { tree: null, sha: null };
-  const index = path.join(os.tmpdir(), `starci-wf-${process.pid}-${crypto.randomBytes(4).toString('hex')}.index`);
-  const env = { GIT_INDEX_FILE: index };
-  try {
-    for (const [call, args, what] of [[readTree, [parent], 'read-tree'], [gitAdd, ['-A', '--', ...literal(files)], 'add -A']]) {
-      const r = git(call, dir, args, { env });
-      if (!r.ok) throw fail({ code: 'workflow-snapshot-failed' }, `git ${what} in ${dir}: ${r.stderr.slice(0, 200)}`);
-    }
-    const tree = git(writeTree, dir, [], { env }).stdout;
-    if (!SHA.test(tree)) throw fail({ code: 'workflow-snapshot-failed' }, `git write-tree in ${dir} printed no tree`);
-    if (tree === git(revParseQuery, dir, [`${parent}^{tree}`]).stdout) return { tree, sha: null };
-    const sha = git(commitTree, dir, [tree, '-p', parent, '-m', message], { config: RUNTIME_IDENTITY }).stdout;
-    if (!SHA.test(sha)) throw fail({ code: 'workflow-snapshot-failed' }, `git commit-tree in ${dir} printed no commit`);
-    return { tree, sha };
-  } finally { try { fs.rmSync(index, { force: true }); } catch { /* temp */ } }
+  const tree = snapshotTree(dir, parent, files, git);
+  if (tree === git(revParseQuery, dir, [`${parent}^{tree}`]).stdout) return { tree, sha: null };
+  const sha = git(commitTree, dir, [tree, '-p', parent, '-m', message], { config: RUNTIME_IDENTITY }).stdout;
+  if (!SHA.test(sha)) throw fail({ code: 'workflow-snapshot-failed' }, `git commit-tree in ${dir} printed no commit`);
+  return { tree, sha };
 }
 
 /** `files` put back as they are at `base`: restored when base has them, removed (index and disk) when it does not. */
 function resetFiles(dir, base, files) {
   if (!files.length) return;
-  const inBase = new Set(zlist(git(lsTree, dir, ['-r', '-z', '--name-only', base, '--', ...literal(files)]).stdout));
+  const inBase = new Set(zlist(git(lsTree, dir, ['-r', '-z', '--name-only', base, '--', ...literalPaths(files)]).stdout));
   const restore = files.filter((f) => inBase.has(f)), remove = files.filter((f) => !inBase.has(f));
   if (restore.length) {
-    const r = git(gitRestore, dir, [`--source=${base}`, '--staged', '--worktree', '--', ...literal(restore)]);
+    const r = git(gitRestore, dir, [`--source=${base}`, '--staged', '--worktree', '--', ...literalPaths(restore)]);
     if (!r.ok) throw fail({ code: 'workflow-reset-failed' }, `git restore in ${dir}: ${r.stderr.slice(0, 200)}`);
   }
   if (remove.length) {
@@ -200,31 +175,63 @@ function requireCheckpointChain(ctx, rec, workflowId) {
   throw Object.assign(fail({ code: 'workflow-foreign-commit' }, `${rec.branch} carries ${foreign.length || 'a'} commit(s) the runtime did not make past its checkpoint ${base.slice(0, 12)} (${foreign.slice(0, 3).map((c) => c.slice(0, 12)).join(', ') || head.slice(0, 12)}): only checkpointOp commits on a workflow branch`), { commits: foreign });
 }
 
+function followCheckpoint(ctx, workflowId, sha) {
+  if (wt(ctx).setCheckpoint(ctx, workflowId, sha) === false) throw fail({ code: 'workflow-worktree-missing' }, `workflow ${workflowId} has no live registry row to record checkpoint ${sha}`);
+}
+function requireReceiptScope(ctx, rec, receipt) {
+  const leases = leasesOf(ctx, receipt);
+  const { mine, stray } = splitChanges(rec.path, { own: receipt.scope, others: leases.others });
+  const newer = [...mine, ...stray].filter((file) => !receipt.files.includes(file));
+  if (newer.length) throw Object.assign(fail({ code: 'workflow-checkpoint-recovery-conflict' }, `newer files conflict with the prepared effect of ${receipt.opId}: ${newer.slice(0, 3).join(', ')}`), { files: newer });
+}
+
 /**
  * Commit a green op's changes on the workflow branch as the new checkpoint, then setCheckpoint. Nothing changed in its scope: the
  * checkpoint is the current head. {sha, committed, scope}
  */
 export function checkpointOp(ctx, { workflowId, opId }) {
+  return withWorkflowLock(ctx, { workflowId }, (locked) => checkpointOwned(locked, { workflowId, opId }));
+}
+function checkpointOwned(ctx, { workflowId, opId }) {
+  requireCompletedEffects(ctx, { workflowId, opId });
   const rec = recordOf(ctx, workflowId);
   requireOnBranch(rec);
   const head = revParse(rec.path, 'HEAD');
   if (!head) throw fail({ code: 'workflow-checkpoint-failed' }, `the workflow worktree ${rec.path} has no HEAD commit`);
-  requireCheckpointChain(ctx, rec, workflowId);
-  const leases = leasesOf(ctx, { workflowId, opId });
-  const { mine, stray } = splitChanges(rec.path, leases);
-  if (stray.length) throw Object.assign(fail({ code: 'workflow-foreign-change' }, `${rec.path} has ${stray.length} change(s) under no live op's leases (${stray.slice(0, 3).join(', ')}): a green op commits only its owned paths`), { files: stray.slice(0, 40) });
-  const snap = snapshotFiles(rec.path, head, mine, `checkpoint ${workflowId}: ${opId}`);
-  let sha = head;
-  if (snap.sha) {
-    const cas = updateRef(rec.path, `refs/heads/${rec.branch}`, snap.sha, { message: `checkpoint ${opId}`, old: head });
-    if (!cas.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `${rec.branch} moved during the checkpoint of ${opId}: ${cas.stderr.slice(0, 200)}`);
-    // The worktree's index follows the new commit for the scope only; the files already are the commit's.
-    const idx = git(gitReset, rec.path, ['-q', snap.sha, '--', ...literal(mine)]);
-    if (!idx.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `the index of ${rec.path} could not follow ${snap.sha}: ${idx.stderr.slice(0, 200)}`);
-    sha = snap.sha;
+  const state = receiptState(ctx, { workflowId, opId }, CHECKPOINT_EVENTS.checkpoint);
+  if (state?.applied) {
+    requireCheckpointChain(ctx, rec, workflowId);
+    requireReceiptScope(ctx, rec, state.applied);
+    requireReceiptBytes(rec, state.applied, [head], git);
+    return publicReceipt(state.applied);
   }
-  wt(ctx).setCheckpoint(ctx, workflowId, sha);
-  return { sha, committed: Boolean(snap.sha), scope: leases.own, files: mine };
+  let receipt = state?.prepared;
+  if (!receipt) {
+    requireCheckpointChain(ctx, rec, workflowId);
+    const leases = leasesOf(ctx, { workflowId, opId });
+    const { mine, stray } = splitChanges(rec.path, leases);
+    if (stray.length) throw Object.assign(fail({ code: 'workflow-foreign-change' }, `${rec.path} has ${stray.length} change(s) under no live op's leases (${stray.slice(0, 3).join(', ')}): a green op commits only its owned paths`), { files: stray.slice(0, 40) });
+    const snap = snapshotFiles(rec.path, head, mine, `checkpoint ${workflowId}: ${opId}`);
+    receipt = { ...(state?.identity ?? { workflowId, opId }), ...acceptedDecision(ctx), path: rec.path, branch: rec.branch, before: head, sha: snap.sha ?? head, committed: Boolean(snap.sha), scope: leases.own, files: mine };
+    saveReceipt(ctx, CHECKPOINT_EVENTS.checkpoint, 'prepared', receipt);
+  }
+  if (head !== receipt.before && head !== receipt.sha) throw fail({ code: 'workflow-foreign-commit' }, `${rec.branch} moved outside the prepared checkpoint of ${opId}: ${head}`);
+  requireReceiptScope(ctx, rec, receipt);
+  requireReceiptBytes(rec, receipt, [receipt.sha], git);
+  if (head !== receipt.sha) {
+    const cas = updateRef(rec.path, `refs/heads/${rec.branch}`, receipt.sha, { message: `checkpoint ${opId}`, old: receipt.before });
+    if (!cas.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `${rec.branch} moved during the checkpoint of ${opId}: ${cas.stderr.slice(0, 200)}`);
+  }
+  phaseOf(ctx, 'branch-applied', receipt);
+  if (receipt.files.length) {
+    const idx = git(gitReset, rec.path, ['-q', receipt.sha, '--', ...literalPaths(receipt.files)]);
+    if (!idx.ok) throw fail({ code: 'workflow-checkpoint-failed' }, `the index of ${rec.path} could not follow ${receipt.sha}: ${idx.stderr.slice(0, 200)}`);
+  }
+  phaseOf(ctx, 'index-applied', receipt);
+  followCheckpoint(ctx, workflowId, receipt.sha);
+  phaseOf(ctx, 'registry-applied', receipt);
+  saveReceipt(ctx, CHECKPOINT_EVENTS.checkpoint, 'applied', receipt);
+  return publicReceipt(receipt);
 }
 
 /**
@@ -234,62 +241,71 @@ export function checkpointOp(ctx, { workflowId, opId }) {
  * {preservedRef|null, resetTo, sha|null}
  */
 export function preserveAndReset(ctx, { workflowId, opId }) {
+  return withWorkflowLock(ctx, { workflowId }, (locked) => preserveOwned(locked, { workflowId, opId }));
+}
+function preserveOwned(ctx, { workflowId, opId }) {
+  requireCompletedEffects(ctx, { workflowId, opId });
   const rec = recordOf(ctx, workflowId);
   requireOnBranch(rec);
-  const base = gateBaseOf(ctx, workflowId);
   const head = revParse(rec.path, 'HEAD');
+  const state = receiptState(ctx, { workflowId, opId }, CHECKPOINT_EVENTS.preserved);
+  if (state?.applied) {
+    requireCheckpointChain(ctx, rec, workflowId);
+    requireReceiptScope(ctx, rec, state.applied);
+    requireReceiptBytes(rec, state.applied, [head], git);
+    return publicReceipt(state.applied);
+  }
   const leases = leasesOf(ctx, { workflowId, opId });
   const answer = () => { const { mine, stray } = splitChanges(rec.path, leases); return [...mine, ...stray]; };
-  const snap = snapshotFiles(rec.path, head, answer(), `preserve ${workflowId}/${opId}: the work of a failed or blocked op`);
-  const kept = snap.sha ?? head;
-  const hasWork = kept !== base && git(gitDiff, rec.path, ['--quiet', base, kept]).status === 1;
-  let preservedRef = null;
-  if (hasWork) {
-    preservedRef = `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/${opId}`;
-    const u = updateRef(rec.path, preservedRef, kept);
-    if (!u.ok) throw fail({ code: 'workflow-preserve-failed' }, `${preservedRef} could not be written: ${u.stderr.slice(0, 200)}`);
+  let receipt = state?.prepared;
+  if (!receipt) {
+    const base = gateBaseOf(ctx, workflowId), files = answer();
+    const snap = snapshotFiles(rec.path, head, files, `preserve ${workflowId}/${opId}: the work of a failed or blocked op`);
+    const kept = snap.sha ?? head;
+    const hasWork = kept !== base && git(gitDiff, rec.path, ['--quiet', base, kept]).status === 1;
+    const committedFiles = head === base ? [] : lines(git(gitDiff, rec.path, ['--name-only', '--no-renames', base, head]).stdout).filter((f) => under(f, leases.own) || !under(f, leases.others));
+    receipt = { ...(state?.identity ?? { workflowId, opId }), ...acceptedDecision(ctx), path: rec.path, branch: rec.branch, before: head, resetTo: base, preservedRef: hasWork ? `refs/heads/${PRESERVED_WORKFLOW_PREFIX}/${workflowId}/${opId}` : null,
+      sha: hasWork ? kept : null, scope: leases.own, files: [...new Set([...files, ...committedFiles])] };
+    saveReceipt(ctx, CHECKPOINT_EVENTS.preserved, 'prepared', receipt);
   }
-  if (head !== base) {
+  if (head !== receipt.before && head !== receipt.resetTo) throw fail({ code: 'workflow-foreign-commit' }, `${rec.branch} moved outside the prepared reset of ${opId}: ${head}`);
+  requireReceiptScope(ctx, rec, receipt);
+  requireReceiptBytes(rec, receipt, [receipt.sha ?? receipt.before, receipt.resetTo], git);
+  if (receipt.preservedRef) {
+    const u = updateRef(rec.path, receipt.preservedRef, receipt.sha);
+    if (!u.ok) throw fail({ code: 'workflow-preserve-failed' }, `${receipt.preservedRef} could not be written: ${u.stderr.slice(0, 200)}`);
+  }
+  if (head !== receipt.resetTo) {
     // Foreign commits past the checkpoint: the branch goes back; their changes now show against HEAD and are reset below
     // with the op's own. Another op's files are untouched by a soft reset.
-    const soft = git(gitReset, rec.path, ['--soft', base]);
-    if (!soft.ok) throw fail({ code: 'workflow-reset-failed' }, `${rec.branch} could not go back to ${base}: ${soft.stderr.slice(0, 200)}`);
+    const soft = git(gitReset, rec.path, ['--soft', receipt.resetTo]);
+    if (!soft.ok) throw fail({ code: 'workflow-reset-failed' }, `${rec.branch} could not go back to ${receipt.resetTo}: ${soft.stderr.slice(0, 200)}`);
   }
-  resetFiles(rec.path, base, answer());
+  phaseOf(ctx, 'branch-applied', receipt);
+  resetFiles(rec.path, receipt.resetTo, receipt.files);
+  phaseOf(ctx, 'index-applied', receipt);
   const left = answer();
-  if (left.length || revParse(rec.path, 'HEAD') !== base) throw fail({ code: 'workflow-reset-failed' }, `${rec.path} is not back on ${base}: ${left.slice(0, 3).join('; ') || 'HEAD moved'}`);
-  return { preservedRef, resetTo: base, sha: hasWork ? kept : null };
+  if (left.length || revParse(rec.path, 'HEAD') !== receipt.resetTo) throw fail({ code: 'workflow-reset-failed' }, `${rec.path} is not back on ${receipt.resetTo}: ${left.slice(0, 3).join('; ') || 'HEAD moved'}`);
+  saveReceipt(ctx, CHECKPOINT_EVENTS.preserved, 'applied', receipt);
+  return publicReceipt(receipt);
 }
 
 /* ------------------------------------------------------------ rebase + finish */
-
-const conflictFiles = (dir) => lines(git(gitDiff, dir, ['--name-only', '--diff-filter=U']).stdout).slice(0, 20);
 
 /**
  * The workflow branch rebased onto main's tip in its worktree (a no-op when main is already in it). The tracked tree must be clean (no
  * op in flight); a conflict aborts the rebase and the branch stays where it was. The checkpoint follows the new head.
  * {ok, onto, head, already?} | {ok:false, code, onto, files?, detail?}
  */
-export function rebaseWorkflow(ctx, { workflowId }) {
-  const rec = recordOf(ctx, workflowId);
-  requireOnBranch(rec);
-  const main = mainOf(ctx);
-  const onto = revParse(rec.path, `refs/heads/${main}`);
-  if (!onto) return { ok: false, code: 'workflow-rebase-failed', onto: null, detail: `${main} does not resolve in ${rec.path}` };
-  const before = revParse(rec.path, 'HEAD');
-  if (isAncestor(rec.path, onto, before)) return { ok: true, onto, head: before, already: true };
-  const dirty = lines(git(gitStatus, rec.path, ['--porcelain', '--untracked-files=no', '--', '.', ...NO_MODULES]).stdout);
-  if (dirty.length) return { ok: false, code: 'workflow-rebase-dirty', onto, files: dirty.slice(0, 20) };
-  const r = git(gitRebase, rec.path, ['--no-autostash', onto], { config: RUNTIME_IDENTITY });
-  if (!r.ok) {
-    const files = conflictFiles(rec.path);
-    git(gitRebase, rec.path, ['--abort']);
-    if (files.length) return { ok: false, code: 'workflow-rebase-conflict', onto, files, detail: r.stderr.slice(-300) };
-    return { ok: false, code: 'workflow-rebase-failed', onto, files, detail: r.stderr.slice(-300) };
-  }
-  const head = revParse(rec.path, 'HEAD');
-  wt(ctx).setCheckpoint(ctx, workflowId, head);
-  return { ok: true, onto, head };
+export function rebaseWorkflow(ctx, args) {
+  return withWorkflowLock(ctx, args, (locked) => applyWorkflowRebase(locked, args, { recordOf, requireOnBranch, git, revParse,
+    followCheckpoint, noModules: NO_MODULES, identity: RUNTIME_IDENTITY }));
+}
+/** Resume only the same operation's durable rebase before interpreting its original checkpoint receipt. */
+export function recoverWorkflowRebase(ctx, { workflowId, opId }) {
+  if (pendingRebaseOf(ctx, workflowId)) return rebaseWorkflow(ctx, { workflowId, opId });
+  const completed = completedRebaseOf(ctx, { workflowId, opId });
+  return completed ? { ok: true, onto: completed.onto, head: completed.proposed, milestone: completed.milestone, recovered: true } : null;
 }
 
 /** The whole-branch gate: scripts/gates/gate.mjs over the worktree against `base`; its starci/gate@1 report. */
@@ -343,11 +359,14 @@ function fastForwardMain(ctx, { repoRoot, from, head }) {
  * finish refused at push or later runs again from the top with nothing new to land.
  */
 export function finishWorkflow(ctx, { workflowId }) {
+  return withWorkflowLock(ctx, { workflowId }, (locked) => finishOwned(locked, { workflowId }));
+}
+function finishOwned(ctx, { workflowId }) {
   const steps = [];
   const main = mainOf(ctx);
   const refuse = (step, code, detail, extra = {}) => { steps.push({ step, ok: false, code }); return { ok: false, steps, refusal: { step, code, detail, ...extra } }; };
   let rec;
-  try { rec = recordOf(ctx, workflowId); requireOnBranch(rec); } catch (error) { return refuse('gate', error.code ?? 'workflow-worktree-missing', error.message); }
+  try { requireCompletedEffects(ctx, { workflowId, opId: null }); recoverWorkflowRebase(ctx, { workflowId, opId: null }); rec = recordOf(ctx, workflowId); requireOnBranch(rec); } catch (error) { return refuse('gate', error.code ?? 'workflow-worktree-missing', error.message); }
   const dir = rec.path;
   const repoRoot = mainRootOf(dir);
   const out = withLock(landLockName(repoRoot), () => {

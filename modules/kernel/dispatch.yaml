@@ -323,19 +323,24 @@ preflight:
       against the per-repository cap. `starci kernel dispatch --spawn` starts the op with
       worker-start --worktree <that worktree> (opWorktreeArgs) and places owned paths and packet paths there. Ops
       of the same side (be/ or fe/, from the owned paths) run serially; ops on different sides run in parallel; an
-      op owning both sides runs alone (canDispatchConcurrently). Dev servers, UAT and drawing run against the live
+      op owning both sides runs alone (canDispatchConcurrently). An explicit --worktree names the same registered
+      tree; requireWorkflowPlacement refuses a missing, unavailable or mismatched Git placement before spawn.
+      The immutable contract and attempt retain the actual path for settle. A non-Git ledger has no Git
+      checkpoint. Dev servers, UAT and drawing run against the live
       checkout (main). A dry-run shows the planned paths (preview: true).
     settle: >-
-      settle never lands an op into main (WFWT, scripts/kernel/workflow-checkpoint.mjs). In a workflow worktree, as
-      its LAST step once every other settle refusal passed, a pass commits the op's side (be/ or fe/, from its owned
-      paths; the whole tree for both) on the workflow branch as the workflow's checkpoint (checkpointOp, event
+      settle never lands an op into main (WFWT, scripts/kernel/workflow-checkpoint.mjs). In the registered workflow
+      worktree, once every acceptance refusal passed, a pass commits exactly the op's owned paths (leasesOf(...).own)
+      on the registered workflow branch as the workflow's checkpoint (checkpointOp, event
       workflow-checkpoint), and the next op's gate measures against it (gateBaseOf); a fail or blocked verdict keeps
-      the side's work as preserved/<workflowId>/<op> and resets the side to the last checkpoint (preserveAndReset,
+      the op's owned changes and foreign changes as preserved/<workflowId>/<op> and resets them to the last checkpoint (preserveAndReset,
       event workflow-op-preserved). Only the runtime commits on the workflow branch: the op owes no commit, the branch
       head must be the last checkpoint, and a commit checkpointOp did not make refuses a pass (workflow-foreign-commit;
       a failed op's foreign commits are folded into its preserved ref). The op's gate JSON must measure against
       gateBaseOf (op-gate-base-mismatch). Other refusals: workflow-worktree-missing, workflow-branch-mismatch,
-      workflow-checkpoint-failed, workflow-snapshot-failed, workflow-preserve-failed, workflow-reset-failed. main
+      workflow-checkpoint-failed, workflow-snapshot-failed, workflow-preserve-failed, workflow-reset-failed.
+      The acceptance order, workflow lock, placement validation and attempt-bound recovery receipts have one
+      owner: modules/cli/commands/kernel/settle.yaml checkpoint. main
       moves only at starci kernel finish (finishWorkflow: the full gate, the merge guard, review.verify of the exact head that
       lands, the rebase - a moved head forces a re-review, workflow-finish-verify-stale - main fast-forwarded and
       pushed, then the worktree marked release-pending; part A's GC removes it and the workflow branch; event

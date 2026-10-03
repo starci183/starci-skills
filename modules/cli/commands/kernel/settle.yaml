@@ -63,15 +63,41 @@ measurementLeg: A review.verify job in mode lint is a MEASUREMENT leg unless par
   pass accepts its report even when filed `failed` for findings alone (result.measurement), and
   settle --verdict fail on findings alone is refused measurement-findings-are-the-result unless
   --tool-error says a checker did not run.
-checkpoint: "No op commits: in a workflow worktree the runtime is the only committer. As the LAST
-  step of a pass, once every other settle refusal passed, settle commits exactly the op's owned
-  paths on the workflow branch as the workflow's checkpoint (scripts/kernel/workflow-checkpoint.mjs
-  checkpointOp, event workflow-checkpoint; workflow-foreign-commit when the branch head is not the
-  last checkpoint, workflow-foreign-change when a change lies under no live op's leases); a fail or
-  blocked verdict preserves the op's owned paths and any foreign change to
-  preserved/<workflowId>/<op> and resets them (preserveAndReset, event workflow-op-preserved). The
-  op's gate JSON must measure against the previous checkpoint (op-gate-base-mismatch). The receipt
-  and result_json carry `checkpoint`."
+checkpoint: >-
+  No op stages or commits: the runtime is the only committer on a registered Git workflow branch.
+  Native settle refuses an already settled job before gates or Git effects, then checks the
+  complete report, independent checks, status transition, cut and handover acceptance before
+  checkpoint or preserve/reset. requireWorkflowPlacement (scripts/kernel/workflow-worktree.mjs)
+  compares every recorded placement in op_attempts.worktree_path and the immutable contract's
+  context.worktree and context.packet.context.workflow_worktree.path with the registered tree.
+  Missing, unavailable or mismatched Git placement refuses visibly; a non-Git job with no
+  registered tree has no checkpoint claim. withWorkflowLock (scripts/kernel/workflow-checkpoint-state.mjs)
+  serializes native acceptance and the checkpoint primitives. An accepted pass checkpoints exactly leasesOf(...).own on the
+  registry's branch (scripts/kernel/workflow-checkpoint.mjs checkpointOp, event
+  workflow-checkpoint); workflow-foreign-commit refuses an unrecognized branch head and
+  workflow-foreign-change refuses a change under no live op's leases. An accepted fail or blocked
+  verdict preserves the op's owned paths and foreign changes to preserved/<workflowId>/<op> and
+  resets them (preserveAndReset, event workflow-op-preserved), leaving other live ops' paths alone.
+  The op's gate JSON measures against an accepted previous checkpoint (op-gate-base-mismatch).
+  Prepared/applied ledger events (workflow-checkpoint-prepared/applied and
+  workflow-op-preserved-prepared/applied) bind workflowId, opId, attemptId and dispatchId to the
+  registered path and branch and the original before, sha, scope and files, with committed for a pass or preservedRef/resetTo for a
+  preservation. The prepared receipt precedes branch and index effects and retains the accepted
+  native decision for recovery. A compatible retry completes that effect with its original SHA
+  and attribution; a conflicting recovery refuses instead of recomputing or rewinding another
+  checkpoint. An unfinished prepared effect requires its owning dispatch's recovery before
+  another checkpoint, preserve/reset, rebase or finish. A registry update that records no live row refuses. The accepted event and job and
+  attempt results are recorded in the final ledger transaction, and the public receipt and
+  result_json carry checkpoint. A no-change pass carries the current SHA and committed:false.
+  Rebase application (scripts/kernel/workflow-rebase.mjs applyWorkflowRebase) computes its
+  proposal in an internal detached scratch tree and verifies safe cleanup before moving the
+  workflow branch. Workflow events workflow-rebase-prepared/applied bind workflowId, opId,
+  attemptId, dispatchId, path, branch, before, proposed/sha, onto, files, scope and the original
+  milestone policy. Recovery resumes the same proposal through branch compare-and-swap, index
+  and registry effects and retains its policy result after a final settle-event fault. An
+  interrupted rebase effect holds native acceptance and resumes the frozen same decision;
+  ordinary optional failures before an effect remain best effort. Effect payloads use the
+  existing immutable event blob custody when needed; public receipts omit the frozen settlement.
 reads: the job row (complete identity + lease_token); the reports row for the job''s dispatch_id -
   the kernel consumed it earlier via `starci kernel consume-report`; the report file; the ops declared checks;
   the checks row the kernel''s re-run recorded
@@ -174,8 +200,9 @@ nextStep: "A fail verdict that no peer check caused runs its route (scripts/kern
 returns: "{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome,
   checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]},
   cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed,
-  managedWorker?, checkpoint?:{kind, sha, committed, scope, files} | {kind, preservedRef, resetTo,
-  sha}}"
+  managedWorker?, checkpoint?:{kind, workflowId, opId, attemptId, dispatchId, path, branch, before, sha, committed,
+  scope, files, milestone?} | {kind, workflowId, opId, attemptId, dispatchId, path, branch, before, preservedRef,
+  resetTo, sha, scope, files}}"
 opRevDrift: "WARN, never a refusal: when the op's contract files changed on the runtime between the
   rev the leg was dispatched under (contracts.context_json.contract.runtimeSha) and the current
   HEAD, settle appends one op-rev-drift event {op, attempt, from, to, files} (typed log warning

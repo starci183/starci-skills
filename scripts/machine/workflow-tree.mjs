@@ -27,7 +27,7 @@ export function workflowWorktreeOf(ctx, workflowId) {
   const env = envOf(ctx);
   try {
     return workflowRecordOf(withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(workflowId), { env }));
-  } catch { return null; }
+  } catch (cause) { throw Object.assign(new Error(`the workflow worktree registry is unavailable: ${cause.message}`, { cause }), { code: 'worktree-registry-unavailable' }); }
 }
 
 /**
@@ -42,7 +42,7 @@ export function workflowWorktreeAt(ctx, dir) {
     const rows = withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC").all(), { env });
     const row = rows.find((r) => key(r.path) === key(at)) ?? rows.find((r) => insidePath(key(at), key(r.path)));
     return workflowRecordOf(row ?? null);
-  } catch { return null; }
+  } catch (cause) { throw Object.assign(new Error(`the workflow worktree registry is unavailable: ${cause.message}`, { cause }), { code: 'worktree-registry-unavailable' }); }
 }
 
 /** The registry functions a caller may replace (ctx.worktree in a spec, the functions above in the runtime). */

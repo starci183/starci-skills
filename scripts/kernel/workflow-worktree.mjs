@@ -36,6 +36,8 @@ import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { workflowRecordOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { isInside } from '../lib/walk.mjs';
+import { pathKey } from '../lib/path-key.mjs';
+import { requireWorktreeRecord } from '../lib/worktree-record.mjs';
 
 const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
@@ -110,6 +112,16 @@ export function ensureWorkflowWorktree(ctx, { workflowId, appRepo, ledgerId = nu
 export function setCheckpoint(ctx, workflowId, sha) {
   const { env } = ctxOf(ctx);
   return withMachine((m) => m.db.prepare("UPDATE worktrees SET checkpoint_sha=? WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL").run(sha, workflowId).changes > 0, { env });
+}
+
+/** An accepted Git placement is the registered workflow tree; immutable recorded placements must agree with it. */
+export function requireWorkflowPlacement(ctx, { workflowId, placements = [], required = false }) {
+  const found = workflowWorktreeOf(ctx, workflowId);
+  if (!found && !required) return null;
+  const rec = requireWorktreeRecord(found, workflowId);
+  const different = placements.filter(Boolean).filter((dir) => pathKey(dir) !== pathKey(rec.path));
+  if (different.length) throw Object.assign(new Error(`workflow ${workflowId} placement ${different.join(', ')} is outside its registered worktree ${rec.path}`), { code: 'workflow-worktree-mismatch' });
+  return rec;
 }
 
 /** The `--worktree <path>` arguments of an op launch of `workflowId` ([] when the workflow has no worktree). */

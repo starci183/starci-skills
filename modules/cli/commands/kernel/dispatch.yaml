@@ -22,7 +22,7 @@ flags:
     summary: model target, overriding the persisted route
   - name: worktree
     type: string
-    summary: checkout the worker runs in
+    summary: worker checkout; for a Git workflow it must name the registered workflow worktree
   - name: lease-ttl
     type: number
     summary: path-lease time-to-live in milliseconds
@@ -63,6 +63,14 @@ kernelBias: --prefer/--avoid are unknown options and refused (unknown-option; co
   kernelBias); dispatch launches the persisted route
 leaseTtl: modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or
   payload.leaseTtlMs overrides it
+placement: >-
+  A spawned Git workflow op runs in its registered workflow worktree, never the live main
+  checkout or a separate op tree. An explicit --worktree supports that same registered path;
+  a different Git placement, a missing tree or unavailable registry refuses before admission
+  and worker-start. The packet context.workflow_worktree, immutable contract context.worktree
+  and op_attempts.worktree_path bind the accepted placement for settle. A non-Git ledger has
+  no Git checkpoint. scripts/kernel/workflow-worktree.mjs requireWorkflowPlacement owns this
+  boundary; the checkpoint contract is modules/cli/commands/kernel/settle.yaml checkpoint.
 reads: the job row + its workflow — including the PERSISTED `starci kernel route` decision on
   jobs.payload_json (model/modelId/effort; dispatch launches what route wrote, it does not
   re-decide); resources/leases/budgets for admission; the op brief modules/ops/ops/<op>.yaml; in the
@@ -89,8 +97,8 @@ writes: "admission FIRST, launch second: one `path:<owned_path>` lease row per o
   — job queued->leased with its fencing token, ttl bounds a crashed worker's fence while settle
   releases early) + budget_reservations taken atomically; the packet's owned_paths resolve through
   scripts/kernel/target-repo.mjs: in a bound app each carries {path (app-relative, as declared),
-  repository (its side: be, fe, app, or none for a Work path), root (the app checkout: the workflow
-  worktree, else the app root), declared}; the worker starts at that app checkout, so the prompt
+  repository (its side: be, fe, app, or none for a Work path), root (the registered workflow
+  worktree for a Git workflow, otherwise the target checkout), declared}; the worker starts at that checkout, so the prompt
   shows every owned path bare, the same spelling gate.mjs --root <app> --changed and every finding
   use, under a `writes_in` line naming the root; unbound, a path stays {path} verbatim (an explicit
   payload repository or an absolute path roots it). starci kernel report accepts `files` app-relative or

@@ -112,6 +112,12 @@ refused `path-not-app-relative`), one model,
 one budget, one lease token. Without `--spawn` it is a dry-run — the packet
 prints and nothing is reserved. A spawn that does not land is
 `dispatch-rejected`: the reservation is settled, never left leasing a ghost.
+For a Git workflow, the worker checkout is its registered workflow tree. An
+explicit `--worktree` must name that same tree; `requireWorkflowPlacement`
+refuses a missing tree, unavailable registry or different Git placement before
+environment preparation, leases or worker launch. The immutable contract and
+attempt retain the actual placement for settle. A non-Git ledger has no Git
+checkpoint.
 
 ## Agent launches — every agent is a `worker-start` worker
 
@@ -198,18 +204,26 @@ never commit keep the shared tree.
   junctions anywhere. The worktree is registered in `machine.sqlite`
   `worktrees` as kind `workflow`, keyed by Orca's worktree id, against the cap
   per repository; a workflow over the cap waits.
-- **Ops.** Every op of the workflow starts with `worker-start --worktree <the
+- **Ops.** Every Git op of the workflow starts with `worker-start --worktree <the
   workflow worktree>`. Ops on the same side (`be/` or `fe/`, from the op's
   owned paths) run one after another; ops on different sides run in parallel,
   and an op that owns both sides runs alone. The dispatcher enforces it.
 - **Checkpoint.** Ops never commit. When an op settles green, the runtime
-  (`checkpointOp`) commits its side's changes on `wf-<workflowId>` as that op's
+  (`checkpointOp`) commits exactly its leased owned paths on the registered workflow branch as that op's
   checkpoint: it is the only committer on the branch. The op's gate base is the
   previous checkpoint (the merge-base with main for the first op), so only the
   op's own new findings block. The base is per side: settle also accepts an
   older checkpoint when no checkpoint since then touched the op's owned paths
   (`gateBasesOf`), so a `be/` checkpoint never makes an `fe/` op in flight run
   its gate again; any other base is refused (`op-gate-base-mismatch`).
+  Native settle completes its acceptance checks before checkpoint or
+  preserve/reset effects and rejects duplicate terminal settles before those
+  effects. A workflow lock serializes acceptance and the checkpoint primitives.
+  Durable prepared/applied ledger receipts recover a partial effect with its
+  original SHA, owned scope and attempt/dispatch attribution. A conflicting
+  recovery refuses; a no-change pass reports `committed:false` with its actual
+  SHA. [The settle declaration](../modules/cli/commands/kernel/settle.yaml)
+  owns the placement readers, refusal boundary and receipt fields.
 - **Milestone rebase.** After a green checkpoint, when no other op of the
   workflow is live, settle asks the milestone policy
   (`scripts/lib/rebase-milestone.mjs`) whether main moved enough: main changed
@@ -219,7 +233,13 @@ never commit keep the shared tree.
   the branch where it was, keeps its head as
   `refs/heads/preserved/<workflowId>/rebase-<main sha>`, and opens one
   `rebase-conflict` Decision Item (the Kernel's, escalated on the usual
-  ladder); the same main tip is never tried twice. It never refuses the settle.
+  ladder); the same main tip is never tried twice. Optional failures before a
+  rebase effect leave the accepted checkpoint usable. The runtime proposes in
+  an internal detached scratch tree, then records its exact rebase intent
+  before applying it (`scripts/kernel/workflow-rebase.mjs`). A partial branch,
+  index or registry effect holds native acceptance; the same dispatch resumes
+  its frozen decision and proposal, retaining the original milestone policy.
+  The settle declaration owns the rebase event and recovery fields.
 - **Work records.** A Work record is committed only by the runtime, on the
   workflow branch of its owner workflow (`scripts/kernel/work-ownership.mjs`
   `ownerOf`): an op that writes a record commits nothing, and its green
@@ -233,8 +253,8 @@ never commit keep the shared tree.
   workflow worktree.
 - **Failure.** A failed or blocked op's uncommitted work is preserved to
   `refs/heads/preserved/<workflowId>/<op>` (a snapshot commit that never holds
-  `node_modules`), and the worktree is reset to the last checkpoint. The tree is
-  private to the workflow, so the reset touches nothing else.
+  `node_modules`), then its owned paths and foreign changes are reset to the
+  last checkpoint. Other live ops' paths stay intact.
 - **Finish.** Main is touched only when the workflow ends, in this order: a
   full `gate.mjs` over the whole branch against its merge-base with main; the
   merge guard; `review.verify`, which must have verified the exact head that
