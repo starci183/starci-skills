@@ -615,7 +615,7 @@ module.exports = config
 function spawnE2e(root, extra) {
   const jestPackage = require.resolve('jest/package.json');
   const jestBin = path.join(path.dirname(jestPackage), 'bin', 'jest.js');
-  const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), ...extra], {
+  const result = spawnSync(process.execPath, [jestBin, '--selectProjects', 'e2e', '--ci', '--json', '--outputFile', path.join(root, 'report.json'), '--cacheDirectory', path.join(root, '.jest-cache'), ...extra], {
     cwd: root,
     encoding: 'utf8',
     // the fixture resolves jest (and the world runner its jest-runner) from the same installation as this spec
