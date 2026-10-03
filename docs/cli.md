@@ -3197,19 +3197,31 @@ Replaces: `node scripts/gates/release-publish.mjs`, `node .claude/scripts/gates/
 
 ### starci release sync-runtime
 
-refresh or check the runtime copies bundled in published packages
+refresh or check package runtime copies and optionally prepare grammar
 
 | flag | type | |
 | --- | --- | --- |
 | `--check` | boolean |  |
+| `--prepare-grammar` | boolean |  |
 
-exit: 0 copies were refreshed or already agree; 1 bundled copies drift in check mode; 2 bad usage
+Effect: host
 
-json: none
+Roles: worker, lead, coordinator, release, owner
+
+Conventions:
+
+- ordinary sync and check retain their existing copy behavior
+- prepare-grammar installs and builds ignored grammar output and refreshes knowledge under the host lock before syncing copies
+- check and prepare-grammar cannot be combined
+
+exit: 0 copies were refreshed or already agree and requested grammar preparation passed; 1 copy drift, grammar preparation or host lock failure; 2 bad usage
+
+json: starci/release-sync-runtime@1
 
 ```sh
 starci release sync-runtime
 starci release sync-runtime --check
+starci release sync-runtime --prepare-grammar
 ```
 
 Replaces: `node scripts/hfs/sync-runtime.mjs`, `node .claude/scripts/hfs/sync-runtime.mjs`
@@ -5385,7 +5397,7 @@ json: starci/worker-start@1
 
 ```sh
 starci worker start --agent devin --worktree <path> --spec @brief.md --task-title "CLI worker verbs"
-starci worker start --agent codex --model gpt-6-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
+starci worker start --agent codex --model gpt-6.1-sol --worktree <path> --spec "Read briefs/worker.md" --task-title "Review worker verbs"
 ```
 
 ### starci worker stop

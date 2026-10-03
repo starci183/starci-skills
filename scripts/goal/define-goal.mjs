@@ -1,31 +1,14 @@
 #!/usr/bin/env node
-// define-goal.mjs — executable half of modules/goal/define-goal.yaml.
-// One owner prompt -> one workflows row + one goals row (rev 0, carrying the
-// derived op chain) + one pending inbox row in <repo>/.starciwork/runtime.sqlite.
-// The queue is the contract: kernels claim from inbox, never from chat.
-//
-//   starci workflow define --repo <path> --text "<owner prompt>" [--title <t>] [--json] [--plan]
-//   starci workflow define --project <name> --text "<owner prompt>" [--title <t>] [--json] [--plan]
-//
-// --params '{"<op>": {"<name>": <value>}}' attaches the owner's tunables to the
-// matching legs of the derived chain, so a choice like "three candidates per
-// screen" is a value on the leg rather than a sentence the op has to read out of
-// the goal prose. Each name must be one the op brief declares with setBy owner
-// (modules/schemas/op.schema.yaml); `starci kernel enqueue` validates the value and
-// refuses params-invalid. A leg the chain does not hold is an error here.
-//
-// --project resolves <source>/.workspaces/projects/<name>/work.json
-// (starci/workspace-binding@2), where <source> is the repository that owns this
-// .claude runtime. The app repository owns the ledger and each side folder is
-// cold-scanned by --plan.
-// --repo keeps the single-repo behavior (the ledger sits under it). The two
-// options are mutually exclusive.
+// Goal definition and revision follow modules/goal/define-goal.yaml.
+// The persisted inbox is the Kernel's claim boundary; docs/ledger-db.md owns storage placement.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runNode } from '../api/node/run-node.mjs';
 import { fileURLToPath } from 'node:url';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256} from '../../engine/digest.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { normalizeOwnerRoutingBias } from '../lib/owner-routing-bias.mjs';
+import { currentRole } from '../cli/roles.mjs';
 import { goalTextRefusal } from './goal-text.mjs';
 import { inspectLedger, openLedger, ledgerFileFor, SETTLED_JOB_STATUSES, createWorkflow, insertGoal, postInbox, recordJobResult, setJobStatus, updateWorkflow } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -48,7 +31,12 @@ const displayNameArg = argvValue(process.argv, 'display-name');
 const reviseWorkflowId = argvValue(process.argv, 'revise');
 const revisionReason = argvValue(process.argv, 'reason', 'owner-approved plan-divergence correction');
 const approveRevision = argvValue(process.argv, 'approve-revision');
-const routingBias = parseJson(argvValue(process.argv, 'routing-bias', 'null'));
+const routingBias = (()=>{
+  const raw=argvValue(process.argv,'routing-bias');
+  if(raw==null)return null;
+  try{return normalizeOwnerRoutingBias(JSON.parse(raw));}
+  catch(error){console.error(`--routing-bias: ${error.message}`);process.exit(2);}
+})();
 // Owner tunables per leg: {"<op>": {"<name>": <value>}}. Legality is the op
 // brief's business (starci kernel enqueue validates it); here the only rules are that the
 // flag parses as a map of maps and that every named op is in the derived chain.
@@ -76,6 +64,9 @@ if (approvedBy != null && approvedBy !== 'supervisor') { console.error(`--approv
 if ((definedBy || approvedBy) && !bridgeId) { console.error('--defined-by/--approved-by supervisor name the bridging record: --bridge-id <id>'); process.exit(2); }
 if (approvedBy && !approveRevision) { console.error('--approved-by supervisor goes with --approve-revision <preview-token>'); process.exit(2); }
 if (definedBy && argvValue(process.argv, 'revise')) { console.error('--defined-by supervisor defines a new workflow; a revision takes --approved-by supervisor'); process.exit(2); }
+if(routingBias?.reserveOverride && (definedBy || approvedBy || currentRole({root:skillRoot})!=='owner')){
+  console.error('--routing-bias reserveOverride requires the owner context; a delegated or provisional workflow cannot grant it');process.exit(2);
+}
 const supervisorProvenance = bridgeId ? { by: 'supervisor', provisional: true, bridgeId, reason: argvValue(process.argv, 'reason', null) } : null;
 // A fresh owner-defined goal with --reason records the owner's approval and its chat reference on the goal
 // row, the inbox entry and the goal-defined event (e.g. a relaunch the owner ordered in chat).

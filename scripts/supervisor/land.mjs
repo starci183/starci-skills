@@ -57,7 +57,6 @@ import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runNpm } from '../api/npm/run-npm.mjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { setPriority } from '../api/process/set-priority.mjs';
 import { runNode } from '../api/node/run-node.mjs';
@@ -68,7 +67,6 @@ import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from 
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemove } from '../api/fs/safe-remove.mjs';
-import { unlinkNodeModulesLink } from '../api/fs/unlink-node-modules-link.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
@@ -76,7 +74,7 @@ import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { withSwcCache } from '../gates/build-env.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
-import { grammarDistStatus } from '../gates/grammar-dist.mjs';
+import { buildGrammar } from '../gates/grammar-build.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
 import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
@@ -596,26 +594,6 @@ function spawnGateStability({ runner, base, head, family }) {
   try { return JSON.parse(r.stdout.trim().split(/\r?\n/).pop()); } catch { return { error: 'unparseable gate-stability output' }; }
 }
 
-/** Refresh untracked dist only after main has advanced. Knowledge snapshots are tracked contract files, so drift is owed to a lane. */
-function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
-  if (!changed.map(normPath).some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) return null;
-  const packageRoot = path.join(root, 'packages', 'grammar');
-  const fail = (step, detail) => ({ ok: false, step, detail, owed: ['grammar-dist-rebuild'] });
-  try {
-    const modules = path.join(packageRoot, 'node_modules');
-    if (!unlinkNodeModulesLink(packageRoot)) return fail('npm ci', `cannot unlink ${modules} junction`);
-    const install = ci(packageRoot, { timeout: 900_000 });
-    if (!install.ok) return fail('npm ci', `exit ${install.status ?? 'unknown'}${install.stderr ? ` (${install.stderr.slice(0, 200)})` : ''}`);
-    const build = outcome(runNpm(['run', 'build'], { cwd: packageRoot, timeout: 900_000 }));
-    if (!build.ok) return fail('npm run build', `exit ${build.status ?? 'unknown'}${build.error ? ` (${build.error})` : ''}`);
-    const dist = grammarDistStatus(packageRoot);
-    if (!dist.ok || dist.state !== 'fresh') return fail('grammar-dist', dist.detail);
-    const knowledge = node([path.join(root, 'scripts', 'work', 'ui', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
-    return { ok: true, state: dist.state, knowledge: knowledge.ok ? 'fresh' : 'owed',
-      owed: knowledge.ok ? [] : ['grammar-knowledge-snapshots'], ...(knowledge.ok ? {} : { knowledgeDetail: `exit ${knowledge.status ?? 'unknown'}` }) };
-  } catch (error) { return fail('exception', String(error?.message ?? error)); }
-}
-
 /* ------------------------------------------------------------ the gate */
 
 /**
@@ -702,7 +680,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
       const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
       if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
-        try { landed.grammarRebuild = (deps.rebuildGrammar ?? rebuildLandedGrammar)({ root, changed: grammarPaths }); }
+        try { landed.grammarRebuild = (deps.rebuildGrammar ?? buildGrammar)({ root, changed: grammarPaths, env }); }
         catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }
       }
       if (push) landed.push = (deps.push ?? pushLive)({ root });

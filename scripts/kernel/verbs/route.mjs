@@ -2,6 +2,9 @@
 import { updateJob } from '../../../engine/db/ledger.mjs';
 import { jobResultOf,jobRowOf } from './shared/rows.mjs';
 import { queuedJobOp, refuseOwnerGate, refusePeerWait, opSlotsOrRefuse } from './shared/job-gates.mjs';
+import { biasForRole } from '../../lib/owner-routing-bias.mjs';
+import { ownerReserveGrant, quotaForAdmission } from '../../agent/admission.mjs';
+import { prepareProviderBudget, providerBudgetUsage } from '../../agent/provider-budget.mjs';
 export default {
   verb: 'route',
   required: ['job'],
@@ -48,9 +51,13 @@ export default {
     process.exit(1);
   }
 
-  const gj = goalJsonOf(latestGoal(db, job.workflow_id));
+  const goalRow = latestGoal(db, job.workflow_id);
+  prepareProviderBudget();
+  const gj = goalJsonOf(goalRow);
   const goalBias = gj.routing_bias ?? {};
-  const bias = { prefer: [...new Set(csvList(goalBias.prefer))], avoid: [...new Set(csvList(goalBias.avoid))] };
+  const scopeId = `${ledger.ledgerId ?? ledger.path}:${jobId}:attempt:${job.try_no ?? 0}`;
+  const bias = biasForRole(goalBias, 'op', scopeId);
+  if (!ownerReserveGrant(goalRow)) delete bias.reserveOverride;
   // A retry learns from its own lineage: pools its earlier attempts failed on for a pool-attributable
   // cause are demoted (once) or excluded (twice) for it (scripts/kernel/lineage-route.mjs).
   // A lineage read that throws never blocks the route: it routes unadjusted and says why.
@@ -80,17 +87,32 @@ export default {
   let accounts = null;
   try { accounts = await accountList() ?? null; } catch { accounts = null; }
   const quotaByProvider = new Map();
+  const budgetByProvider = new Map();
   const capacity = {};
   for (const [poolId, rt] of Object.entries(pools)) {
     const target = rt?.target ?? poolId;
     const provider = rt?.provider ?? null;
     const providerKey = normalizeProvider(provider);
     if (provider && !quotaByProvider.has(providerKey)) quotaByProvider.set(providerKey, await probeQuotaSafe(provider));
-    const quota = provider ? quotaByProvider.get(providerKey)
+    const measuredQuota = provider ? quotaByProvider.get(providerKey)
       : { state: 'unknown', usedPercent: null, detail: 'pool declares no provider' };
+    const quota = quotaForAdmission({ quota: measuredQuota, provider: providerKey, pool: poolId, role: 'op', kind, difficulty,
+      scopeId, registry: regDoc, runtimes: rtMerged, policy: rtDoc?.allocation?.admission });
+    if (provider && !budgetByProvider.has(providerKey)) budgetByProvider.set(providerKey, providerBudgetUsage(providerKey, quota.account));
+    const budget = budgetByProvider.get(providerKey);
+    const reservedJobs = new Set((budget?.reservations ?? []).filter((receipt) => receipt.scope?.scopeId?.startsWith(`${ledger.ledgerId ?? ledger.path}:`))
+      .map((receipt) => receipt.scope?.jobId).filter(Boolean));
+    const unreservedLocal = [...poolLoad.holders].filter((holder) => {
+      if (reservedJobs.has(holder)) return false;
+      const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(holder);
+      let payload;
+      try { payload = JSON.parse(row?.payload_json ?? '{}'); } catch (error) { throw new Error(`routing capacity is unreadable for ${holder}: ${error.message}`); }
+      const ownerPool = pools[payload.model] ?? Object.values(pools).find((pool) => pool.target === payload.model);
+      return ownerPool?.provider === provider;
+    }).length;
     const providerHealth = provider ? providerHealthOf(db, provider) : null;
     capacity[target] = {
-      running: runningByModel[target] ?? 0,
+      running: Number.isInteger(budget?.running) ? budget.running + unreservedLocal : null,
       maxParallel: rt?.maxParallel ?? null,
       quota,
       auth: providerHealth || quota?.state === 'dead' ? 'dead' : 'ok',
@@ -125,6 +147,7 @@ export default {
   // that re-cuts, re-scopes or re-plans from an RCA reasons on the plan/think pools whatever its usual order.
   const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
   const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity, runtimes: rtMerged,
+    scopeId, attemptId: scopeId, now: Date.now(), modelRegistry: regDoc,
     policy: allocation?.policy ?? undefined,
     shares: allocation?.shares ?? undefined,
     recent: recent?.counts,
@@ -157,6 +180,7 @@ export default {
   }
 
   const decided = {
+    admission: decision.admission ?? null,
     // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
     model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? rtDoc?.allocation?.redesign?.effort ?? null) : null),
     routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,

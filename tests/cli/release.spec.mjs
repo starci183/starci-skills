@@ -3,11 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { CATALOG as catalog } from '../../packages/cli/src/catalog.generated.mjs';
+import { loadCatalog } from '../../scripts/cli/catalog.mjs';
 import { main } from '../../scripts/cli/main.mjs';
 import { flagsOfUsage } from '../../scripts/checks/check-cli-parity.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const loaded = loadCatalog(repoRoot);
+const catalog = { global: loaded.global.flags, groups: Object.fromEntries(loaded.groups.map((group) => [group.group,
+  { ...group, verbs: Object.fromEntries(group.verbs.map((verb) => [verb.verb, verb])) }])) };
 const group = catalog.groups.release;
 const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
 const declaration = (source) => {
@@ -32,13 +35,12 @@ const specs = {
   'clean-test': { script: 'scripts/gates/package-clean-test.mjs', usage: (s) => declaration(s), flags: ['base', 'changed'] },
   'launch-smoke': { script: 'scripts/kernel/launch-smoke.mjs', usage: (s) => matching(s, 'starci release launch-smoke'), flags: ['app-repo', 'as', 'entry', 'out', 'timeout-ms'] },
   proof: { script: 'scripts/gates/release-proof.mjs', usage: (s) => declaration(s), flags: ['base', 'main', 'out', 'repo'] },
-  'sync-runtime': { script: 'scripts/hfs/sync-runtime.mjs', usage: (s) => matching(s, 'starci release sync-runtime'), flags: ['check'] },
 };
 
 test('release catalog resolves every implementation and exactly declares its parsed flags', () => {
   const scriptVerbs = Object.keys(group.verbs).filter((name) => group.verbs[name].impl.script);
   assert.deepEqual(scriptVerbs.sort(), Object.keys(specs).sort());
-  assert.deepEqual(Object.keys(group.verbs).filter((name) => group.verbs[name].impl.module).sort(), ['images', 'publish']);
+  assert.deepEqual(Object.keys(group.verbs).filter((name) => group.verbs[name].impl.module).sort(), ['images', 'publish', 'sync-runtime']);
   for (const [verb, spec] of Object.entries(specs)) {
     const command = group.verbs[verb];
     assert.equal(command.impl.script, spec.script, verb);
@@ -47,6 +49,27 @@ test('release catalog resolves every implementation and exactly declares its par
     assert.deepEqual(flagsOfUsage(spec.usage(source)).sort(), [...spec.flags].sort(), `${verb} usage reflects its parser`);
     assert.deepEqual(command.flags.map((flag) => flag.name).sort(), [...spec.flags].sort(), `${verb} catalog flags`);
   }
+  const sync = group.verbs['sync-runtime'];
+  assert.deepEqual(sync.impl, { module: 'scripts/supervisor/release-sync-runtime.mjs', export: 'releaseSyncRuntime' });
+  assert.deepEqual(flagsOfUsage(declaration(read(sync.impl.module))).sort(), ['check', 'prepare-grammar']);
+  assert.deepEqual(sync.flags.map((flag) => flag.name).sort(), ['check', 'prepare-grammar']);
+  assert.equal(sync.effect, 'host');
+});
+
+test('release sync-runtime dispatches preparation and read-only checking through its owning module', async () => {
+  const calls = [];
+  const out = [];
+  const io = { catalog, env: {}, stdout: (text) => out.push(text), stderr: () => {}, importModule: async (url) => {
+    assert.ok(url.endsWith('/scripts/supervisor/release-sync-runtime.mjs'));
+    return { releaseSyncRuntime: (ctx) => { calls.push(ctx); return { code: 0, text: 'synced', data: { prepared: !!ctx.args['prepare-grammar'] } }; } };
+  } };
+  assert.equal(await main(['release', 'sync-runtime', '--prepare-grammar', '--json'], io), 0);
+  assert.equal(JSON.parse(out[0]).prepared, true);
+  assert.equal(calls[0].args['prepare-grammar'], true);
+  assert.equal(await main(['release', 'sync-runtime', '--check'], io), 0);
+  assert.equal(calls[1].args.check, true);
+  assert.equal(main(['release', 'sync-runtime', '--invented'], io), 2);
+  assert.equal(calls.length, 2);
 });
 
 test('release dispatch resolves through the injected script seam', () => {

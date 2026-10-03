@@ -154,7 +154,7 @@ test('a mention of an agent CLI is not a spawn; git, node and npm spawns pass',t
       "spawn(process.execPath, ['scripts/x.mjs', '--agent', 'claude']);",
       "spawnSync('npm', ['run', 'check'], { shell: true });",
       "spawnSync('node', ['-e', 'codex']);",
-      "workerStart({ agent: 'codex', model: 'gpt-6-sol' });",
+      "workerStart({ agent: 'codex', model: 'gpt-6.1-sol' });",
     ].join('\n'),
     'scripts/work/local.mjs':"const spawn = (cmd) => cmd;\nspawn('claude');\n",
     'tests/fixture.spec.mjs':"import { spawn } from 'node:child_process';\nspawn('codex', ['exec']);\n",

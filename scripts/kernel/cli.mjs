@@ -1986,7 +1986,7 @@ const closeRejectedLaunch = ({ terminal, settled, effectState }) => {
 };
 
 // The last rows the refused terminal showed. Five Codex op launches failed
-// model attestation ("did not render gpt-6-sol within 15000ms") and the
+// model attestation ("did not render gpt-6.1-sol within 15000ms") and the
 // rejections kept no screen, so nobody could tell a slow start from an update
 // prompt or an error; the tail now rides on the dispatch-rejected event.
 const screenTailOf = (screen) => {

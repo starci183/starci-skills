@@ -9,6 +9,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
+import crypto from 'node:crypto';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS } from '../../scripts/supervisor/start-supervisor.mjs';
 import { seatToolDecision } from '../../scripts/guards/seat-tools.mjs';
@@ -77,7 +80,7 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = tr
     quit: (h) => { calls.quit.push(h); return { sent: true, exited: false }; },
     show: (d) => (hostDown ? { ok: false, hostUnavailable: true, error: 'down' } : workers.has(d) ? { ok: true, state: workers.get(d) } : { ok: false, error: 'no such worker' }),
     stop: (d) => { calls.stop.push(d); workers.set(d, 'stopped'); return { ok: true }; },
-    release: (d) => { calls.release.push(d); workers.set(d, 'released'); return { ok: true }; },
+    release: (d) => { calls.release.push(d); workers.set(d, 'released'); return { ok: true, handle: `term_new${String(d).replace('ctx_new', '')}`, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'none' } }; },
     bindSeat: (h) => { calls.bind.push(h); return `guards/seats/${h}.json`; },
     start: (opts) => {
       calls.start.push(opts);
@@ -89,6 +92,66 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = tr
 }
 const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
 const launch = (env, host, extra = {}) => launchSupervisor({ env, deps: host, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, ...extra });
+
+test('Supervisor plans neither create an absent machine store nor upgrade a compatible v1 store', async t => {
+  for (const legacy of [false, true]) {
+    const env = envOf(t), file = env.STARCI_TEST_MACHINE_FILE;
+    if (legacy) {
+      const machine = openMachine({ env });
+      machine.meta(); machine.close();
+      const raw = new DatabaseSync(file);
+      raw.exec("DROP TABLE provider_reservation_events; DROP TABLE provider_reservations; DELETE FROM schema_migrations WHERE version=2; PRAGMA user_version=1;");
+      raw.close();
+    }
+    const before = legacy ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+    const host = fakeHost(), observations = fakeAdmission();
+    host.admission = { quota: observations.quota, circuit: () => null };
+    const result = await launch(env, host, { plan: true });
+    assert.equal(result.action, 'plan');
+    assert.equal(result.admission.ok, false, 'read-only plans refuse unobserved capacity');
+    assert.equal(result.wouldLaunch, false);
+    assert.equal(host.calls.start.length, 0);
+    if (legacy) {
+      assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'), before, 'planning preserves all v1 bytes');
+      const raw = new DatabaseSync(file, { readOnly: true });
+      assert.equal(raw.prepare('PRAGMA user_version').get().user_version, 1); raw.close();
+    } else assert.equal(fs.existsSync(file), false, 'planning creates no machine database');
+  }
+});
+
+test('a stale Supervisor seat survives unproven worker closure and blocks replacement or stop clearance', async t => {
+  for (const stop of [false, true]) {
+    const env = envOf(t), host = fakeHost();
+    const first = await launch(env, host);
+    host.workers.set(first.dispatch, 'failed');
+    host.release = () => ({ ok: true, handle: first.terminal, closed: { ok: true, proof: 'gone' }, processes: { verdict: 'unverifiable' } });
+    const previous = readSupervisor(m => seatOf(m), null, { env });
+    const result = stop ? await stopSupervisor({ env, deps: host }) : await launch(env, host);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.effectState, 'unknown');
+    assert.equal(readSupervisor(m => seatOf(m).token, null, { env }), previous.token, 'the original singleton identity remains held');
+    assert.equal(host.calls.start.length, 1, 'an unproven process exit never admits another Supervisor');
+  }
+});
+
+test('an expired Supervisor startup with a live capacity receipt retains its seat on restart and stop', async t => {
+  for (const stop of [false, true]) {
+    const env=envOf(t), host=fakeHost();
+    const first=await launch(env,host);
+    const prior=readSupervisor(m=>seatOf(m),null,{env});
+    withMachine(m=>{
+      const reserved=m.reserveProvider({provider:'claude',account:'default',attemptId:'supervisor-crash',role:'supervisor',
+        model:settings.model,maxParallel:3,scope:{scopeId:`${SUPERVISOR_ID}:attempt:1`}}).reservation;
+      m.markProviderReservation({...reserved,state:'live',handle:first.terminal});
+      writeSeat(m,{token:prior.token,value:{state:'starting',attempt:1},expiresAt:Date.now()-1});
+    },{env});
+    const result=stop?await stopSupervisor({env,deps:host}):await launch(env,host);
+    assert.equal(result.ok,false,'an elapsed startup timer proves no process exit');
+    assert.equal(readSupervisor(m=>seatOf(m).token,null,{env}),prior.token);
+    assert.equal(host.calls.start.length,1);
+    assert.equal(readSupervisor(m=>m.providerReservations({activeOnly:true}).length,null,{env}),1);
+  }
+});
 
 test('singleton: one launch boots the seat; a second start with the seat live launches nothing', async (t) => {
   const env = envOf(t);
@@ -102,6 +165,33 @@ test('singleton: one launch boots the seat; a second start with the seat live la
   assert.equal(host.calls.start.length, 1, 'never a second [Supervisor]');
   assert.equal(readSupervisor((m) => seatOf(m).value.terminal, null, { env }), first.terminal);
   assert.equal(readSupervisor((m) => enabledOf(m), null, { env }), true);
+});
+
+test('singleton: an unknown Supervisor launch retains its seat and cannot start a replacement', async t => {
+  const env = envOf(t), host = fakeHost();
+  host.start = options => { host.calls.start.push(options); return { ok: false, step: 'worker-start', effectState: 'unknown', dispatchId: 'uncertain-supervisor' }; };
+  const first = await launch(env, host);
+  assert.equal(first.effectState, 'unknown');
+  assert.equal(readSupervisor(m => seatOf(m).value.state, null, { env }), 'launch-unknown');
+  const second = await launch(env, host);
+  assert.equal(second.action, 'host-unavailable');
+  assert.equal(host.calls.start.length, 1);
+});
+
+test('workers: unknown launch retains leases and staging and is never requeued', async t => {
+  const env = envOf(t), m = machineOf(t, env), job = createJob(m, { cluster: 'uncertain', files: ['scripts/uncertain.mjs'] }).job;
+  let starts = 0, removed = 0;
+  const deps = { load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'codex-agent', agent: 'codex', model: 'gpt-6.1-sol' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: 'uncertain', base: 'abc', orcaId: 'fixture' }),
+    unstage: () => { removed += 1; }, guard: () => ({ receipt: {} }),
+    start: () => { starts += 1; return { ok: false, effectState: 'unknown', dispatchId: 'uncertain-worker' }; } };
+  const first = await spawnWorkers(m, { settings, env, deps });
+  assert.equal(first.failed[0].requeued, false);
+  assert.equal(jobOf(m, job.job_id).status, 'spawning');
+  assert.ok(jobOf(m, job.job_id).payload.staging);
+  assert.ok(leaseConflicts(m, ['scripts/uncertain.mjs'], 'other').length);
+  await spawnWorkers(m, { settings, env, deps });
+  assert.equal(starts, 1); assert.equal(removed, 0);
 });
 
 test('singleton: a live startup reservation, a host outage and a disabled seat all launch nothing', async (t) => {
@@ -279,7 +369,7 @@ test('worker readiness: a refused worker-start excludes the provider', async (t)
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
-    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'worker-start', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'worker-start', effectState: 'none', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   const r = await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
@@ -317,7 +407,7 @@ test('worker outage: an attestation refused for a provider capacity outage exclu
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
-    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', effectState: 'none', error: quota } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');

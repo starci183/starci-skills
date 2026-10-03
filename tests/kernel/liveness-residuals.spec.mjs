@@ -8,7 +8,7 @@ import { parseYaml } from '../../engine/yaml.mjs'; import os from 'node:os'; imp
 // that landed mid-turn (or the Kernel refused it and wrote an incident). Each frame below is the
 // shape a Kernel quoted, or one captured from a live worker.
 const CLAUDE_CHROME = ['────────', '❯ ', '────────', '  ⏵⏵ bypass permissions on (shift+tab to cycle)'];
-const CODEX_FOOT = ['› Ask Codex to do anything', '', `  gpt-6-sol high · ${path.parse(os.tmpdir()).root}Repositories\\shop-be · Report task outcome`];
+const CODEX_FOOT = ['› Ask Codex to do anything', '', `  gpt-6.1-sol high · ${path.parse(os.tmpdir()).root}Repositories\\shop-be · Report task outcome`];
 const DEVIN_FOOT = ['──── (bypass permissions on) ─', '❭ Guide Devin while it works', '────', 'SWE-2 Max   Context: 66k / 262k tokens (25%)'];
 
 test('a Codex status row with its tree detail, or a held message, is a running turn', () => {

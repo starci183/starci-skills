@@ -2,4 +2,4 @@
 // from the orca account rate-limit entry for provider 'codex'.
 import { probeOrcaAccount } from './orca-account.mjs';
 
-export const probe = () => probeOrcaAccount('codex');
+export const probe = (options) => probeOrcaAccount('codex', options);

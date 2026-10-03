@@ -78,7 +78,7 @@ const createFixture=()=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json'),log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: en\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: en\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
@@ -95,7 +95,7 @@ const createFixture=()=>{
   assert.equal(booted.status,0,booted.stderr);
   const kernel=json(booted.stdout)?.terminal;assert.ok(kernel);
   // The kernel sits at its idle Codex prompt, alive.
-  writeState(s=>{s.terminals[kernel].screen='• Yielding - waiting on the op report.\n› Ask Codex to do anything\n  gpt-6-sol high · repo';});
+  writeState(s=>{s.terminals[kernel].screen='• Yielding - waiting on the op report.\n› Ask Codex to do anything\n  gpt-6.1-sol high · repo';});
   // Every integration case starts from this same fully booted workflow. Restore
   // all test-observed mutable state, including the workflow ledger, before the next
   // case so no test observes another test's terminal, job, event, or call log.
@@ -250,7 +250,7 @@ test('watchdog: a kernel a responding Orca proves dead is fenced and replaced',t
 // and may still call the worker ready, the frame ends in a bare PowerShell prompt. The watchdog proves it from the
 // frame (two reads), fences the worker's Dispatch and has start-workflow replace it. Shaped on a Codex kernel's
 // exit (token usage and resume line) with the idle frame still above it.
-const EXITED_KERNEL=['• Yielding - waiting on the op report.','› Ask Codex to do anything','  gpt-6-sol high · repo','',
+const EXITED_KERNEL=['• Yielding - waiting on the op report.','› Ask Codex to do anything','  gpt-6.1-sol high · repo','',
   'Token usage: total=1,204,331 input=1,150,002 (+ 9,876,544 cached) output=54,329 (reasoning 31,020)',
   'To continue this session, run codex resume 0199a7c2-5b1e-7d40-9c1f-3e2a8b6d4f10','',`PS ${path.join(os.tmpdir(), 'shop-be')}>`].join('\n');
 const exitKernel=f=>f.writeState(s=>{s.terminals[f.kernel].screen=EXITED_KERNEL;});

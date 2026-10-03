@@ -32,8 +32,8 @@ const codex = loadAdapter('codex').card;
 const PREAMBLE = 'Orca Task preamble: you are the operation agent for op-interface.draw. Read the contract with starci kernel op-contract.';
 const HEADER = ['╭──────────────────────────────╮', '│ >_ OpenAI Codex (v0.155.1)   │', '╰──────────────────────────────╯',
   '  Tip: This is GPT-6, a new generation of intelligence.'];
-const IDLE = [...HEADER, '› Ask Codex to do anything', `  gpt-6-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
-const BARE = [...HEADER, '›', `  gpt-6-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
+const IDLE = [...HEADER, '› Ask Codex to do anything', `  gpt-6.1-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
+const BARE = [...HEADER, '›', `  gpt-6.1-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
 const STALLED = { ok: false, errorCode: 'agent_prompt_stalled', error: 'agent_prompt_stalled' };
 
 // A scripted terminal: `sends` answer in order; every read returns `frame()`.
@@ -87,7 +87,7 @@ test('awaitSubmission reads the input-box draft: a paste Orca lifted out of a ba
   const stub = path.join(root, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const stateFile = path.join(root, 'state.json');
   fs.writeFileSync(stateFile, JSON.stringify({ sends: 1, terminals: { 'fake-terminal-1': {
-    handle: 'fake-terminal-1', connected: true, writable: true, command: 'codex', model: 'gpt-6-sol',
+    handle: 'fake-terminal-1', connected: true, writable: true, command: 'codex', model: 'gpt-6.1-sol',
     sent: true, prompt: PREAMBLE, screen: BARE, draft: PREAMBLE, draftMode: 'drop-enter' } } }));
   const script = `import {awaitSubmission,loadAdapter} from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'scripts', 'agent', 'lib.mjs')).href)};
     const card=loadAdapter('codex').card;

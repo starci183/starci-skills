@@ -22,7 +22,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/walk.mjs';
-import { hfsEntry } from './gate.mjs';
+import { hfsEntry } from '../lib/package-at.mjs';
 
 export const DIGEST_SCHEMA = 'starci/read-digest@1';
 const OP_GATE_SCHEMA = 'starci/op-gate@1';
@@ -149,7 +149,7 @@ async function explainPaths(root, files, hfs = hfsEntry(root)) {
     if (explainPath) {
       try { return explainPath({ repoRoot: root, input: file }); } catch (error) { return { path: file, status: 'unexplained', reason: firstLine(error?.message ?? error) }; }
     }
-    const run = runNode([hfs.bin, 'explain', file, '--repo', root, '--json'], { cwd: root, maxBuffer: 16 * 1024 * 1024 });
+    const run = runNode([hfs.bin, 'app', 'explain', file, '--json'], { cwd: root, maxBuffer: 16 * 1024 * 1024 });
     try { return JSON.parse(run.stdout); } catch { return { path: file, status: 'unexplained', reason: firstLine(run.stderr || run.stdout) }; }
   });
 }

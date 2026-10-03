@@ -1,11 +1,11 @@
 Task: read the runtime's storage
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
-The schema is data, not prose. The executed DDL is `engine/db/migrations/runtime/0001-init.sql`
-(`meta.schema = 'starci/runtime@1'`, `user_version = 1`) and `engine/db/migrations/machine/0001-init.sql`
-(`machine_meta.schema = 'starci/machine@1'`, `user_version = 1`). Each database is one schema file with no migration chain: a file at any
-other schema or `user_version` is refused, and a fresh one is created on first open (move the refused file aside). `schema_migrations` holds the one `0001-init` row. This page explains the
-decisions and the invariants; when it disagrees with the SQL files, the SQL wins.
+The executed schemas live under `engine/db/migrations/runtime/` and `engine/db/migrations/machine/`.
+`engine/db/ledger.mjs` owns project schema validation; `engine/db/machine.mjs` owns host schema validation
+and the additive provider-reservation upgrade. The host upgrade preserves existing rows and records its
+DDL digest in `schema_migrations` in the same transaction as the version change. Read-only host access
+validates a supported schema without upgrading it. These writers and their SQL files own the storage rules.
 
 ## 1. The layout
 
@@ -19,10 +19,9 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
 - A project ledger is found through `machine.ledgers` (`ledger_id → file`), never by walking a
   repository. `meta.ledger_id` is minted at create and moves with the bytes.
 - There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
-- The runtime opens only these schemas. A file with an older schema name is refused; there is no migrator,
-  no backfill and no read fallback. A fresh store is created on first use — a project ledger by `openLedger`
-  at the file `ledgerFileFor(<repo root>)` resolves, the host store by `openMachine` at `machineFileFor` —
-  once the refused file is moved aside.
+- The writers refuse unsupported schema identities or versions. `openLedger` creates a fresh project
+  store at `ledgerFileFor(<repo root>)`; `openMachine` creates a fresh host store at `machineFileFor`
+  or applies its supported additive upgrade to an existing host store.
 - `STARCI_LOCAL_ROOT` overrides the per-host state base (`%LOCALAPPDATA%/StarCi` itself, one shared helper:
   `engine/db/machine.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/db/ledger.mjs`
   `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
@@ -132,7 +131,7 @@ machine.
 | Supervisor | `sup_jobs`, `sup_leases`, `sup_attempts` (same column groups as `op_attempts`), `sup_reports`, `sup_events` (append-only), `sup_decision_items`, `sup_decisions`, `sup_owed`, `sup_learning`, `sup_owner_rulings`, `sup_bridges`, `sup_messages`, `sup_signals`, `llm_usage` |
 | Engine | `process_runs`, `engine_leader`, `leader_history`, `engine_cursors`, `engine_queue`, `schedules`, `engine_actions`, `action_steps`, `controller_modes`, `mode_changes`, `sla_episodes`, `invariant_violations` |
 | Host | `services`, `service_events`, `service_probes`, `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots`, `terminals`, `host_locks`, `claims`, `agent_sessions` |
-| Resources | `throttle_state`, `throttle_events`, `throttle_decisions`, `host_samples`, `provider_health`, `provider_health_events`, `pool_backoff`, `quotas`, `guard_jobs`, `guard_refusals`, `host_resources`, `host_leases`, `budgets`, `budget_reservations` |
+| Resources | `throttle_state`, `throttle_events`, `throttle_decisions`, `host_samples`, `provider_health`, `provider_health_events`, `pool_backoff`, `quotas`, `guard_jobs`, `guard_refusals`, `host_resources`, `host_leases`, `budgets`, `budget_reservations`, `provider_reservations`, `provider_reservation_events` |
 | GC, land, environments | `gc_runs`, `gc_items`, `lanes`, `land_queue`, `land_runs`, `pushes`, `worktrees`, `env_servers`, `uat_slots`, `connectors`, `ask_requests` |
 | Observation | `machine_logs`, `machine_logs_fts`, `metrics_snapshots`, `notifications` |
 

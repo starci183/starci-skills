@@ -19,8 +19,9 @@ import { openMachine } from '../../engine/db/machine.mjs';
 import { seedWorkflow as seedLedgerWorkflow } from '../helpers/ledger-fixture.mjs';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { EXCLUDE_AFTER, attemptCauseOf, lineageRouteAdjust } from '../../scripts/kernel/lineage-route.mjs';
-import { selectPool } from '../../scripts/agent/models.mjs';
+import { fakePoolSelection as selectPool } from '../helpers/fake-admission.mjs';
 import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
+import { fakeDevinQuotaEnv } from '../helpers/fake-devin-quota.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
@@ -58,7 +59,8 @@ const env = (t, policy, repo) => {
   fs.writeFileSync(path.join(dir, 'state.json'), '{}');
   const e = { ...worldEnv(repo), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json'),
-    STARCI_OWNER_ROOT: ownerRoot(t, policy) };
+    STARCI_OWNER_ROOT: ownerRoot(t, policy), ...fakeDevinQuotaEnv(t, dir) };
+  openMachine({ env: e }).close();
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[key];
   return e;
 };

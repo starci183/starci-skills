@@ -234,7 +234,7 @@ export function shellPromptPrefix(row) {
   for (const pattern of SHELL_PROMPT_PREFIXES) { const match = pattern.exec(text); if (match) return match[0]; }
   return null;
 }
-// The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
+// The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯") and footers (Codex "gpt-6.1-sol high · 62% left", Claude "bypass permissions").
 const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|\\bAsk Codex\\b|\\bMessage Devin\\b|bypass permissions|\\d+% (?:context )?left\\b|esc to (?:interrupt|cancel)`, 'iu');
 // An agent command typed after a prompt: a launch still starting, never an exit. The launch line may open
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml

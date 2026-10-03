@@ -23,10 +23,10 @@
 // weeklyQuotaRemainingPercent, dailyQuotaResetAtUnix, weeklyQuotaResetAtUnix,
 // billingStrategy, planEnd, overageBalanceMicros.
 //   usedPercent = 100 - min(daily, weekly remaining)
-//   remaining <= 10%                     -> 'limited'
-//   remaining <= 0% and no overage       -> 'dead'
-//   remaining <= 0% with overage balance -> 'limited' (calls still bill through)
-//   any API or credential failure        -> 'unknown' (NEVER dead)
+//   every observed window is normalized through allocation.admission
+//   an exhausted window is hard-ineligible
+//   overage balance is descriptive; it grants no hard-limit bypass
+//   any API or credential failure remains unknown and blocks normal admission
 // Results are cached cacheMs (default 5 min) so a route storm does not hammer
 // the seat API; cacheMs: 0 disables.
 import { runNode } from '../../api/node/run-node.mjs';
@@ -34,6 +34,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { allocationSettings } from '../../../engine/config.mjs';
+import { normalizeQuotaSnapshot } from './snapshot.mjs';
 
 const DEFAULT_ENDPOINT = 'https://server.codeium.com/exa.seat_management_pb.SeatManagementService/GetUserStatus';
 const DEFAULT_CACHE_MS = 5 * 60 * 1000;
@@ -80,16 +82,15 @@ const asNumber = (v) => { if (v === null || v === undefined || v === '') return 
 const iso = (unix) => { const n = asNumber(unix); return n == null ? null : new Date(n * 1000).toISOString(); };
 
 /** The probe result for one planStatus body. Pure; exported for the spec. */
-export function planToResult(plan) {
+export function planToResult(plan, { policy = allocationSettings()?.admission, now = Date.now(), account = 'default' } = {}) {
   const daily = asNumber(plan?.dailyQuotaRemainingPercent);
   const weekly = asNumber(plan?.weeklyQuotaRemainingPercent);
   if (daily == null && weekly == null) {
-    return { state: 'unknown', usedPercent: null, detail: 'GetUserStatus planStatus carried no quota percentages' };
+    return normalizeQuotaSnapshot({ provider: 'devin', account, auth: plan && typeof plan === 'object' && !Array.isArray(plan) ? 'ok' : 'unknown',
+      observedAt: now, windows: [], detail: 'GetUserStatus planStatus carried no quota percentages' }, { policy, now });
   }
   const remaining = Math.min(daily ?? 100, weekly ?? 100);
   const usedPercent = clampPct(Math.round((100 - remaining) * 10) / 10);
-  const resets = [iso(plan?.dailyQuotaResetAtUnix), iso(plan?.weeklyQuotaResetAtUnix)].filter(Boolean).sort();
-  const resetsAt = resets[0] ?? null;
   const overage = asNumber(plan?.overageBalanceMicros) > 0;
   const parts = [
     `devin seat quota ${usedPercent}% used (${remaining}% remaining)`,
@@ -98,12 +99,9 @@ export function planToResult(plan) {
     plan?.billingStrategy ? `plan ${plan.billingStrategy}` : null,
     overage ? 'overage balance present' : null,
   ].filter(Boolean).join(' — ');
-  if (remaining <= 0 && !overage) return { state: 'dead', usedPercent, resetsAt, detail: `${parts} — quota exhausted` };
-  if (remaining <= 10) {
-    return { state: 'limited', usedPercent, resetsAt,
-      detail: `${parts}${remaining <= 0 ? ' — exhausted; overage balance still bills' : ' — under 10% remaining'}` };
-  }
-  return { state: 'ok', usedPercent, resetsAt, detail: parts };
+  return normalizeQuotaSnapshot({ provider: 'devin', account, auth: 'ok', observedAt: now, detail: parts,
+    windows: [daily != null ? { id: 'daily', usedPercent: 100 - daily, resetsAt: iso(plan?.dailyQuotaResetAtUnix), observedAt: now } : null,
+      weekly != null ? { id: 'weekly', usedPercent: 100 - weekly, resetsAt: iso(plan?.weeklyQuotaResetAtUnix), observedAt: now } : null].filter(Boolean) }, { policy, now });
 }
 
 const cache = new Map();
@@ -118,7 +116,7 @@ const cache = new Map();
  *   cacheMs         result cache TTL (default 5 min; 0 disables)
  *   env             environment for APPDATA/STARCI_DEVIN_SEAT_ENDPOINT (default process.env)
  */
-export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {}, timeoutMs = DEFAULT_TIMEOUT_MS, cacheMs = DEFAULT_CACHE_MS, env = process.env } = {}) {
+export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {}, timeoutMs = DEFAULT_TIMEOUT_MS, cacheMs = DEFAULT_CACHE_MS, env = process.env, policy, now, account } = {}) {
   const url = endpoint ?? env.STARCI_DEVIN_SEAT_ENDPOINT ?? DEFAULT_ENDPOINT;
   if (!allowedEndpoint(url)) {
     return { state: 'unknown', usedPercent: null, detail: 'seat API endpoint override refused: only a loopback http(s) URL may replace the default' };
@@ -175,5 +173,5 @@ export function probe({ endpoint, credentialsFile, apiKey = null, metadata = {},
   if (!plan || typeof plan !== 'object') {
     return finish({ state: 'unknown', usedPercent: null, detail: 'GetUserStatus carried no userStatus.planStatus' });
   }
-  return finish(planToResult(plan));
+  return finish(planToResult(plan, { policy, now: typeof now === 'function' ? now() : now ?? Date.now(), account }));
 }

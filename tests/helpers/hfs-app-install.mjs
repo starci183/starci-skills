@@ -8,6 +8,9 @@ import path from 'node:path';
 
 export const RUNTIME = path.resolve(import.meta.dirname, '..', '..');
 
+/** Is `dir` inside `root` (a strict descendant)? */
+const isUnder = (root, dir) => { const rel = path.relative(root, dir); return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel); };
+
 /**
  * The installs a spec may borrow packages from: first the node_modules folders STARCI_APP_INSTALLS lists (path-delimiter separated:
  * a product app's install, one coherent set of versions where the runtime holds no copy of a framework the skeleton imports), then
@@ -18,6 +21,11 @@ export function runtimeInstalls() {
   const examples = path.join(RUNTIME, 'examples');
   const nested = fs.existsSync(examples) ? fs.readdirSync(examples, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(examples, entry.name, 'node_modules')) : [];
   const extra = (process.env.STARCI_APP_INSTALLS ?? '').split(path.delimiter).filter(Boolean).map((dir) => path.resolve(dir));
+  const outside = extra.filter((dir) => !isUnder(RUNTIME, dir));
+  if (outside.length) {
+    throw new Error(`STARCI_APP_INSTALLS must name installs under the checkout ${RUNTIME}: ${outside.join(', ')} lies outside it. The scaffold build widens Turbopack's root to the checkout, and an install elsewhere panics the fe build `
+      + '("Expected to inject all imports ... incrementalCacheHandler"): install the app under the checkout (`starci release app-installs` does) or leave the variable unset.');
+  }
   const own = [path.join(RUNTIME, 'node_modules'), path.join(RUNTIME, 'packages', 'node_modules'), ...nested].filter((dir) => fs.existsSync(dir));
   // The first install that holds a package wins, so the install that holds the most of what a scaffold imports goes first: a framework
   // package is then linked from the one install that also holds its adapters (@nestjs/core resolves @nestjs/platform-express from its own

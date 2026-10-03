@@ -68,7 +68,7 @@ import { accentBudgetOf, drawLoopSettings, htmlTasteFindings } from './draw/draw
 import { badgesOf, commandsFrom, controlCountOf, internalCopyOf, visibleTextOf, DRAW_ACTION_MISSING, DRAW_BADGE_UNTONED, DRAW_COPY_INTERNAL, DRAW_SCORE_BELOW } from './draw/draw-quality.mjs';
 import { brandOf, brandPalette, paletteFindings } from './brand/brand-palette.mjs';
 import { parseColor } from './brand/brand.mjs';
-import { criticFor, runCritic, rubricFor } from './draw-critic.mjs';
+import { contextualCriticFor, runCritic, rubricFor } from './draw-critic.mjs';
 import { archetypeOf } from './ui-archetype.mjs';
 import { readProposals, proposalFilesUnder } from './grammar-proposal.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, livePartsOf, loopCoverageFindings } from './draw/draw-loop-coverage.mjs';
@@ -394,8 +394,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype, record, shape });
   // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
   if (ownerChecks.length) loop.ownerChecks = ownerChecks;
-  const who = drawer ?? opContextOf()?.provider ?? null;
-  const pick = criticFor(settings, who);
+  const { drawer: who, ...pick } = contextualCriticFor(settings, drawer);
   let critique;
   try {
     critique = pick.error
@@ -404,7 +403,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   } catch (error) {
     critique = { schema: 'starci/draw-critique@1', outcome: 'launch-failed', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
   }
-  critique.critic = { ...(critique.critic ?? {}), drawer: who };
+  critique.critic = { ...(critique.critic ?? {}), drawer: typeof who === 'string' ? who : who?.provider ?? null };
   critique.round = n;
   writeJsonFile(path.join(roundDir, 'critique.json'), critique);
   return critique;

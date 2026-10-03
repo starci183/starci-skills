@@ -62,8 +62,9 @@ record and is worse than a red check.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not
   visible in the code. Line endings are LF (`.gitattributes` enforces it — the install manifest
   hashes bytes).
-- **State:** all runtime state lives in `.starciwork/runtime.sqlite` via `engine/db/ledger.mjs`;
-  dispatch artifacts use the OS tmpdir or are deleted after delivery.
+- **State:** project and host state use their SQLite writers in `engine/db/ledger.mjs` and
+  `engine/db/machine.mjs`; [storage](docs/ledger-db.md) owns their placement and lifecycle.
+  Dispatch artifacts use the OS tmpdir or are deleted after delivery.
 
 ## Single source of truth (no duplicates, no redundancy)
 
@@ -110,7 +111,7 @@ Kernels run `.claude` main live, so no one edits the main checkout in place. A l
 into lanes with disjoint write-allowlists. Each lane works in an ephemeral worktree under
 `<lanesRoot>/<lane>` (the lanes root is `STARCI_LANES_ROOT`, else the owner config `roots.lanes`,
 else `<starciLocalRoot>/lanes`; `lanesRoot()` in `scripts/machine/home.mjs`), never with junctions or symlinks. It lands one commit at a time with
-`starci supervisor land --commit <sha> --lane <lane>`, which cherry-picks, gates, fast-forwards and pushes.
+`starci supervisor land --commit <sha> --lane <lane>`, which cherry-picks, gates and fast-forwards local main.
 
 - `land.mjs` runs from the main checkout, never from the lane worktree.
 - A lane writes only inside its allowlist. A defect it finds elsewhere goes into its report for the
@@ -144,7 +145,7 @@ Every runtime change meets these rules on top of the commit bar:
 
 ## Commit bar
 
-- `npm test` green (or an explicit note on which spec the cut drops).
+- The checks required by [useful verification](docs/verify-proof.md) pass for the cut's actual change.
 - `node --check` on every edited `.mjs`.
 - Verify before committing: run the thing you changed, not just the tests that happen to cover it.
 - Do not commit `config.yaml`, `settings.local.json`, `.starciwork/`, `node_modules/` or anything

@@ -12,14 +12,10 @@
 //      (allocation.tiers[difficulty], role key first then the tier default)
 //      AND the per-role order (allocation.preference[role]). Tier position is
 //      the outer sort; role preference breaks ties.
-//   2. bias {prefer, avoid} then reorders the chain: prefer hoists named pools
-//      to the front preserving relative order, avoid removes them. Bias never
-//      bypasses eligibility.
-//   3. Per candidate: role covered (roles[]), models[difficulty] exists,
-//      capacity auth/quota not 'dead' (unknown/limited OK), running <
-//      maxParallel, no open incident. Every skipped pool lands in rejected[]
-//      with its typed reason — a miss is an exclusion, never a silent swap.
-//   4. The launch model is the pool's models[difficulty] pin (+ effort).
+//   2. Resolve each declared pool's difficulty pin to a concrete provider/model.
+//   3. Existing role, host-tool, grant and retry gates precede common new admission.
+//      Live selection requires fresh identity-bound quota, the model floor and known slots.
+//   4. Owner constraints and real pressure rank only eligible candidates; the launch model stays explicit.
 //
 // Difficulty vocabulary: easy|medium|hard|insane, and nothing else; any other
 // spelling is unknown and refused where a difficulty enters.
@@ -30,7 +26,6 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
 import { readProviderCircuit } from '../machine/provider-circuit.mjs';
 import { poolCapsNow } from '../machine/pool-backoff.mjs';
 import { DEFAULT_MODELS_DIR } from './model-registry.mjs';
@@ -38,6 +33,7 @@ import { DEFAULT_MODELS_DIR } from './model-registry.mjs';
 export { loadModelRegistry, loadRuntimes, defaultOperationTarget } from './model-registry.mjs';
 import { loadModelRegistry, loadRuntimes } from './model-registry.mjs';
 import { normalizeProvider } from '../lib/provider.mjs';
+import { selectPoolAdmission } from './pool-admission.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -132,7 +128,7 @@ export function resolveLaunchModel(target, difficulty, opts = {}) {
 
 // The model + effort a worker launches with (worker-start --model/--effort). Order: the persisted `starci kernel route`
 // decision when it names this target, the pool's difficulty pin, then the registry default model — the
-// launch-only targets' `targets.<t>.defaultModel` (gpt-6-sol/gpt-6-luna/cursor-agent hold no pool) and the
+// launch-only targets' `targets.<t>.defaultModel` (gpt-6.1-sol/gpt-6-luna/cursor-agent hold no pool) and the
 // pool's `pools.<p>.defaultModel` at a difficulty its models map does not pin. No model at all is a typed
 // error - a worker is never started on the CLI's own default model, because attestation could not prove it.
 export function resolveWorkerLaunchModel({ target, payload = {}, runtimes, modelsDir } = {}) {
@@ -222,8 +218,7 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
 
 // Eligibility reasons for one pool at one difficulty. [] = eligible. The
 // capacity map is caller-supplied live state: capacity[target] =
-// {auth, quota:{state}, running, openIncident}; an absent entry means "no
-// live signal" and passes the capacity gates (unknown is OK — dead is not).
+// {auth, quota:normalizedSnapshot, running, openIncident}; common admission below refuses an absent live signal.
 // A pool serves a kind when it serves the kind's role, or when it serves the
 // order key the kind walks: an order that names a role (the implement order)
 // routes that order's work to the order's pools whatever the kind's role -
@@ -307,42 +302,13 @@ function auditFamilyOf(rt, target) {
   return rt?.runtimes?.[target]?.provider ?? target;
 }
 
-// Full pool selection: kind → role, floor and order key (roleOfKind, role
-// overridable; orderKeyOf), difficulty raised to the floor, chain = tier∩order,
-// bias, then eligibility per candidate (role, owner grant, host tools, launch
-// model, capacity).
-//   policy prefer-then-overflow (runtimes.yaml default): the first eligible
-//     pool of the biased chain.
-//   policy balanced (config.yaml allocation.policy): the chain order ranks and
-//     the share caps - the FIRST eligible pool of the chain still below its
-//     target share (balanceDeficits deficit > 0) takes it; when every eligible
-//     pool is at or over its share, the one furthest below (least over) does,
-//     the chain order then `prefer` breaking ties. `avoid` still removes, and a
-//     pool runtimes.yaml allocation.balanced.overflowOnly lists for the work
-//     class is taken only when no other pool is eligible.
-//   fanOut (a hands-on cut slice, payload.cut): the fan-out order (scaffold),
-//     except for a kind pinned to draw or review.
-//   Cross-family audit (runtimes.yaml allocation.thinkAuditCrossFamily): a
-//     verify kind auditing another op's output (`auditOf` = the author's
-//     pool) goes to an eligible pool of another audit family (auditFamilyOf:
-//     frontier or hands) when one exists, under either policy - Opus or Sol
-//     review Devin's work.
-//   Order overflow (runtimes.yaml allocation.overflowByOrder): a pool the
-//     order lists there is taken only when no other candidate is eligible,
-//     under either policy - the review order's Opus and Sol.
-//   Retry lineage (`lineage` = scripts/kernel/lineage-route.mjs
-//     lineageRouteAdjust): a pool this job's earlier attempts failed on once
-//     for a pool-attributable cause moves to the end of the order and is taken
-//     only when no other candidate is eligible (demote); one they failed on
-//     twice is rejected for this retry (exclude).
-//   Rate-limit backoff (`backoff` = {pool: cap}, default the live caps of
-//     scripts/machine/pool-backoff.mjs when a capacity map is passed): a pool
-//     whose running count reached its backed-off cap is rejected, so the next
-//     eligible pool takes the job.
-// Returns the chosen pool with its launch model, or {error} with the full
-// rejected list.
+// selection.yaml allocationFacts.poolSelection owns this route. The declared
+// kind order and existing role/tool/grant/retry gates bound the common admission
+// group. Balance, audit family and overflow refine only its eligible candidates.
+// A static plan reports its declared model without claiming live admission.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
-  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null, backoff = null } = {}) {
+  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null, backoff = null,
+  scopeId, attemptId, now = Date.now(), modelRegistry, qualityFloor } = {}) {
   // The backed-off pool caps apply to a live route (a capacity map); a caller may pass them, else they are read once.
   const backoffCaps = backoff ?? (capacity ? poolCapsNow() : {});
   // The kind's declared order, else think work the tier's `think` order whatever
@@ -356,11 +322,13 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   const balanced = allocationPolicy === 'balanced';
   // Balanced keeps the tier order and lets `prefer` only break deficit ties;
   // `avoid` removes under both policies.
-  const biased = balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
+  // Live selection keeps the whole declared group for common hard filters; legacy pool-string bias is only
+  // used by static policy planning. A static plan never claims a fresh admission or starts a worker.
+  const biased = capacity ? unbiased : balanced ? applyBias(unbiased, { avoid: bias?.avoid ?? [] }) : applyBias(unbiased, bias);
   const demote = (lineage?.demote ?? []).filter(Boolean), exclude = (lineage?.exclude ?? []).filter(Boolean);
   const chain = [...biased.filter((t) => !demote.includes(t)), ...biased.filter((t) => demote.includes(t))];
   const rejected = [];
-  const eligible = [];
+  let eligible = [];
   // The order's overflow pools (overflowByOrder) never stop the scan: a later
   // primary pool still outranks them, whatever a prefer bias hoisted.
   const overflow = orderOverflowOf(rt, chainKey);
@@ -376,7 +344,19 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     eligible.push(target);
     // prefer-then-overflow stops at the first eligible pool
-    if (!balanced && !auditOf && !overflow.includes(target)) break;
+    if (!capacity && !balanced && !auditOf && !overflow.includes(target)) break;
+  }
+  const { admission, constraintError } = selectPoolAdmission({ rt, targets: eligible, allowTargets: unbiased,
+    capacity, bias, kind, role: resolvedRole, difficulty: d, scopeId, attemptId, now, modelRegistry,
+    modelsDir, qualityFloor, backoffCaps, launchModel: (target) => resolveLaunchModel(target, d, { runtimes: rt }) });
+  if (capacity) {
+    for (const row of admission.rejected) rejected.push({ target: row.id, reason: row.codes[0], reasons: row.codes });
+    eligible = admission.eligible.map((candidate) => candidate.id);
+    if (!admission.ok && admission.reason !== 'no-eligible-candidate') return { error: `agent admission refused: ${admission.reason}`, admission,
+      role: resolvedRole, work: route.work, difficulty: d, measuredDifficulty: measured,
+      floor: route.floor, order: chainKey, chain, tierSource, rejected };
+  } else if (constraintError) {
+    return { error: constraintError, admission, rejected };
   }
   if (eligible.length) {
     let candidates = eligible;
@@ -410,7 +390,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
       const primary = candidates.filter((t) => !overflowOnly.includes(t));
       if (primary.length) candidates = primary;
       const deficits = balanceDeficits(candidates, { shares, recent });
-      const preferred = new Set((bias?.prefer ?? []).filter(Boolean));
+      const preferred = new Set((bias?.prefer ?? []).map((item) => typeof item === 'string' ? item : item?.pool).filter(Boolean));
       const EPS = 1e-9;
       // The order ranks, the share caps: the first candidate still below its share takes it.
       const underShare = candidates.find((t) => deficits[t].deficit > EPS) ?? null;
@@ -432,6 +412,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const { modelId, effort } = resolveLaunchModel(target, d, { runtimes: rt });
     return { target: pool.target ?? target, modelId, effort, role: resolvedRole, work: route.work, difficulty: d,
       measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected: shownRejected, policy: allocationPolicy,
+      admission: capacity ? { ...admission, selected: admission.eligible.find((candidate) => candidate.id === target) } : admission,
       ...(balance ? { balance } : {}), ...(crossFamily ? { crossFamily } : {}),
       ...(overflow.length ? { overflow: { pools: overflow, used: overflowUsed } } : {}),
       ...(lineage ? { lineage: { demoted: demote, excluded: exclude, demotedTaken: demote.includes(target) } } : {}) };
@@ -453,19 +434,13 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
     const missing = [...new Set(structural.flatMap((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir })))];
     return { error: `no ${resolvedRole} pool at ${d} difficulty has host tool ${(missing.length ? missing : tools).join(', ')}`,
       toolUnavailable: { tools: missing.length ? missing : tools, holders }, role: resolvedRole, work: route.work, difficulty: d,
-      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected };
+      measuredDifficulty: measured, floor: route.floor, order: chainKey, chain, tierSource, rejected, admission };
   }
   return { error: `no eligible pool for role '${resolvedRole}' at ${d} difficulty`, role: resolvedRole, work: route.work, difficulty: d,
-    measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected };
+    measuredDifficulty: measured, floor: route.floor, chain, tierSource, rejected, admission };
 }
 
-// Provider availability for a quota-aware group (the kernel think group and the
-// config.yaml kernel group). One provider credential is one availability fact:
-//   unavailable — the kernel's provider-health circuit is open, or the quota
-//                 probe reads 'dead' (not authenticated / no account);
-//   limited     — the probe reads 'limited' (near the window cap, or a
-//                 refreshable stale token): still launchable, ordered last;
-//   available   — 'ok' or 'unknown' (an unanswered probe never blocks).
+// Health ordering hints precede the separate common-admission evidence gate.
 
 // The OPEN provider-health circuit for a provider in one ledger, or null.
 // An auth circuit that recorded the fingerprint of the credential it rejected
@@ -478,10 +453,10 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
 // early but `starci kernel provider-health --recover`.
 // The circuit is machine.sqlite provider_health (scripts/machine/provider-circuit.mjs): one worker-wide fact per provider;
 // `db` (a ledger) is not read and stays in the signature for its callers.
-export function providerCircuitOf(db, provider, now = Date.now(), { credential } = {}) {
+export function providerCircuitOf(db, provider, now = Date.now(), { credential, readCircuit = readProviderCircuit } = {}) {
   const key = normalizeProvider(provider);
   if (!key) return null;
-  const row = readProviderCircuit(key);
+  const row = readCircuit(key);
   if (!row || (row.expiresAt != null && row.expiresAt <= now)) return null;
   const value = row.value;
   if (value?.status !== 'unavailable') return null;

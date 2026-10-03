@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { workerStartVerb } from '../../scripts/supervisor/worker-verbs-start.mjs';
+import { fakeAdmission } from '../helpers/fake-admission.mjs';
 
 const current = path.join(process.cwd(), 'lane-current');
 const target = path.join(process.cwd(), 'lane-target');
@@ -10,11 +11,11 @@ const registry = () => ({
   runtimes: ['codex', 'claude', 'devin', 'cursor'],
   models: {
     'gpt-6-luna': { provider: 'codex' },
-    'gpt-6-sol': { provider: 'codex' },
+    'gpt-6.1-sol': { provider: 'codex' },
     'claude-opus-5-5': { provider: 'claude' },
   },
   pools: {
-    'codex-agent': { provider: 'codex', maxParallel: 2, defaultModel: 'gpt-6-luna', models: { hard: 'gpt-6-sol' } },
+    'codex-agent': { provider: 'codex', maxParallel: 2, defaultModel: 'gpt-6-luna', models: { hard: 'gpt-6.1-sol' } },
     'claude-agent': { provider: 'claude', maxParallel: 1, defaultModel: 'claude-opus-5-5' },
     'devin-agent': { provider: 'devin', maxParallel: 2, defaultModel: 'swe-2-max' },
   },
@@ -26,11 +27,13 @@ const ps = (agents = []) => ({ ok: true, worktrees: [
   { id: `repo::${target}`, repoId: 'repo', path: target, agents },
 ] });
 const ctx = (overrides = {}) => ({ cwd: current, env: { ORCA_TERMINAL_HANDLE: 'term_lead' }, args: {
-  agent: 'codex', worktree: target, spec: 'Read briefs/worker.md completely', 'task-title': 'worker verbs', ...overrides,
+  agent: 'codex', model: 'gpt-6.1-sol', worktree: target, spec: 'Read briefs/worker.md completely', 'task-title': 'worker verbs', ...overrides,
 } });
 const deps = (overrides = {}) => {
   const r = registry();
   return { registry: r, runtimes: runtimes(r), worktreePs: () => ps(),
+    admission: fakeAdmission(), trust: () => ({ status: 'ok' }), hostAgent: () => ({ ok: true }), terminalRename: () => ({ ok: true }), recordLaunch: () => {},
+    workerShow: () => ({ ok: true, state: 'ready', effective: { agent: 'codex', model: 'gpt-6.1-sol' } }),
     workerStart: () => ({ ok: true, dispatchId: 'ctx_1', agentTerminalHandle: 'term_1', taskId: 'task_1', runId: 'run_1' }), ...overrides };
 };
 
@@ -42,7 +45,7 @@ test('worker start validates then calls worker-start with the bound terminal and
   } }));
   assert.equal(result.code, 0);
   assert.deepEqual({ agent: call.agent, model: call.model, worktree: call.worktree, from: call.from, title: call.taskTitle },
-    { agent: 'codex', model: 'gpt-6-luna', worktree: `path:${target}`, from: 'term_lead', title: 'worker verbs' });
+    { agent: 'codex', model: 'gpt-6.1-sol', worktree: target, from: 'term_lead', title: 'worker verbs' });
   assert.deepEqual([result.data.dispatchId, result.data.terminalHandle], ['ctx_1', 'term_1']);
 });
 
@@ -51,7 +54,7 @@ test('worker start reads @file content through its injectable file seam', async 
   const result = await workerStartVerb(ctx({ spec: '@brief.md' }), deps({
     exists: () => true,
     readFile: () => 'Full brief\nwith steps',
-    workerStart: (input) => { spec = input.spec; return { ok: true, dispatchId: 'ctx_2', agentTerminalHandle: 'term_2' }; },
+    workerStart: (input) => { spec = input.spec; return { ok: true, dispatchId: 'ctx_2', agentTerminalHandle: 'term_2', taskId: 'task_2' }; },
   }));
   assert.equal(result.code, 0);
   assert.equal(spec, 'Full brief\nwith steps');

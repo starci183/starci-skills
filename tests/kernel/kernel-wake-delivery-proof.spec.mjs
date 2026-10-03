@@ -233,8 +233,8 @@ test('ask-answered wake: agent_prompt_stalled with the wake landed is kernel-wok
 // every watchdog wake dropped the same way. The same text with enter:false staged in the input row
 // and an Enter-only send submitted it. Every Kernel wake path now retries a wake whose frame stays idle with
 // no trace of it once that way (scripts/kernel/wake-delivery.mjs) - STARCI_FAKE_ORCA_DROP_ENTER_SEND.
-const CODEX_KERNEL_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6-sol high · 62% context left'].join('\n');
-const CODEX_COMMAND='codex -m gpt-6-sol';
+const CODEX_KERNEL_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6.1-sol high · 62% context left'].join('\n');
+const CODEX_COMMAND='codex -m gpt-6.1-sol';
 const shapes=wakes=>wakes.map(w=>[w.text?'wake':'',w.enter]);
 
 test('transition wake: a dropped text+Enter send to a Codex Kernel is kernel-woken after the split retry',t=>{
@@ -262,7 +262,7 @@ const FROZEN_KERNEL=[
   '    … +77 lines (ctrl + t to view transcript)',
   '• Working (5m 30s • esc to interrupt)',
   '› Ask Codex to do anything',
-  `  gpt-6-sol high · ${path.join(os.tmpdir(), 'shop-be')} · Report task outcome`,
+  `  gpt-6.1-sol high · ${path.join(os.tmpdir(), 'shop-be')} · Report task outcome`,
 ].join('\n');
 
 const unwritableDeps=(lastOutputAt,screen=FROZEN_KERNEL)=>({
@@ -319,7 +319,7 @@ const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
 const unwritableWorld=t=>{
   const w=world(t,'starci-unwritable-repair-');
   const ownerRoot=path.join(w.root,'owner');fs.mkdirSync(ownerRoot);
-  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
+  fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6.1-sol, effort: high}\n');
   w.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS='1';
   w.env.STARCI_OWNER_ROOT=ownerRoot;
   const run=(script,args,more={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});

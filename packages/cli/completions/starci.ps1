@@ -165,7 +165,7 @@ Register-ArgumentCompleter -Native -CommandName starci -ScriptBlock {
         'release launch-smoke' = @('--app-repo','--entry','--timeout-ms','--out','--as','--json','--cwd','--quiet','--help','--edition')
         'release proof' = @('--repo','--base','--main','--out','--json','--cwd','--quiet','--help','--edition')
         'release publish' = @('--publish','--npm-user','--poll-minutes','--pre-land-ref','--expect-sha','--examples','--json','--cwd','--quiet','--help','--edition')
-        'release sync-runtime' = @('--check','--json','--cwd','--quiet','--help','--edition')
+        'release sync-runtime' = @('--check','--prepare-grammar','--json','--cwd','--quiet','--help','--edition')
         'route op' = @('--kind','--node-kind','--phase','--intent','--ops-dir','--json','--cwd','--quiet','--help','--edition')
         'runtime architecture' = @('--base','--json','--cwd','--quiet','--help','--edition')
         'runtime benchmark-snapshot' = @('--since-hours','--repo','--date','--dir','--json','--cwd','--quiet','--help','--edition')

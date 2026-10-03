@@ -167,7 +167,7 @@ const promptWorld = (t) => {
   const fake = path.join(root, 'fake-orca.mjs');
   fs.writeFileSync(fake, FAKE_ORCA);
   const example = fs.readFileSync(path.join(ROOT, 'config.example.yaml'), 'utf8');
-  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), example.replace(/^kernel:.*$/m, 'kernel: {agent: codex, model: gpt-6-sol, effort: high}'));
+  fs.writeFileSync(path.join(ownerRoot, 'config.yaml'), example.replace(/^kernel:.*$/m, 'kernel: {agent: codex, model: gpt-6.1-sol, effort: high}'));
   const stateFile = path.join(root, 'orca-state.json');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([fake]), STARCI_FAKE_ORCA_MODE: 'healthy',
     STARCI_FAKE_ORCA_LOG: path.join(root, 'orca-calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'),

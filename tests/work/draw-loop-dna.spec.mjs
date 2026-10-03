@@ -206,13 +206,14 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
-  const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC, critic: allocationSettings().drawLoop.critic, placement: { tmpRoot: dir }, orca });
+  const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC,
+    critic: { ...allocationSettings().drawLoop.critic, author: { provider: 'devin', model: 'swe-2-max' } }, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
   const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
-  assert.equal(critique.critic.model, 'gpt-6-sol');
+  assert.equal(critique.critic.model, 'gpt-6.1-sol');
   assert.equal(critique.critic.promptSha256, sha256(spec), 'the hash is of the exact Task spec');
   assert.equal(critique.critic.prompt, spec.split(seen.dir.replaceAll('\\', '/')).join('<clean-dir>'));
   assert.equal(critique.critic.independent, false, 'a fake Orca client is never recorded as the independent critic');
@@ -275,7 +276,7 @@ test('a loop that never passes stops without progress and finishes blocked with 
   for (const f of ['source.html', 'metrics.json', 'critique.json', 'LedgerBase#installed--800x60--light.png', 'LedgerBase#installed--800x60--light.json', 'LedgerBase#installed--800x60--light.score.json']) {
     assert.ok(fs.existsSync(path.join(r1.out, 'round-1', f)), f);
   }
-  assert.equal(JSON.parse(fs.readFileSync(path.join(r1.out, 'round-1', 'critique.json'), 'utf8')).critic.model, 'gpt-6-sol');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(r1.out, 'round-1', 'critique.json'), 'utf8')).critic.model, 'gpt-6.1-sol');
   assert.throws(() => finishLoop({ out: r1.out }), /has not stopped/);
   await runRound({ ...base, criticOrca: p.critic(6) });
   const r3 = await runRound({ ...base, criticOrca: p.critic(6) });

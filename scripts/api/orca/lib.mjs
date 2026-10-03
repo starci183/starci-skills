@@ -5,7 +5,6 @@
 // classification) and the live agent-context comparison before the first
 // mutation (scripts/lib/orca-listing.mjs compares).
 // Wrappers name a verb and shape its receipt; they never build argv.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -13,6 +12,8 @@ import { readModuleJson } from '../../../engine/runtime-root.mjs';
 import { listingOf, missingFrom } from '../../lib/orca-listing.mjs';
 import { readEnv } from '../../lib/env.mjs';
 import { dotGet } from '../../lib/dot-path.mjs';
+import { orcaRequestIdOf, requestValuePresent as filled } from '../../lib/orca-request-id.mjs';
+export { ORCA_REQUEST_NAMESPACE, uuidv5, orcaRequestIdOf } from '../../lib/orca-request-id.mjs';
 
 const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
@@ -87,7 +88,6 @@ const entryOf = (verb) => {
 
 const words = (command) => String(command ?? '').split(/\s+/).filter(Boolean);
 const at = (root, dotted) => dotGet(root, dotted);
-const filled = (v) => v !== undefined && v !== null && v !== false && v !== '';
 const nonEmpty = (v) => Array.isArray(v) ? v.length > 0
   : (v && typeof v === 'object' ? Object.keys(v).length > 0 : Boolean(v));
 
@@ -219,38 +219,6 @@ const envelopeError = (r, receipt) => r.error || receiptErrorText(receipt) || r.
 //            after a process restart that re-derives the same id.
 const REPLAY_MODES = Object.freeze(['none', 'reissue', 'request']);
 const RETRY_FLAG = CALLS.idempotency?.flag ?? 'retry-request';
-
-const canonical = (v) => Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
-  : (v && typeof v === 'object'
-    ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
-    : JSON.stringify(v ?? null));
-
-/**
- * The deterministic --retry-request id of one mutation: the verb plus the
- * caller's ledger identity (workflow, job, lease, run, handle - never a clock
- * or a random value), so a restarted process derives the same id. Orca 1.4.209
- * accepts only a UUID here, so the id is the UUIDv5 of that name under the one
- * namespace below.
- */
-// The namespace of every --retry-request id the runtime derives: generated once, never changed (a new value would
-// make a restarted process derive different ids and lose its replays).
-export const ORCA_REQUEST_NAMESPACE = '96fe63b0-5b42-4411-8490-6b5ae7b7dcb2';
-
-/** RFC 9562 UUIDv5: SHA-1 over the namespace's 16 bytes then the name's UTF-8 bytes, version 5, variant 10. */
-export function uuidv5(namespace, name) {
-  const ns = Buffer.from(String(namespace).replace(/-/g, ''), 'hex');
-  const b = crypto.createHash('sha1').update(ns).update(Buffer.from(String(name), 'utf8')).digest().subarray(0, 16);
-  b[6] = (b[6] & 0x0f) | 0x50;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = b.toString('hex');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
-export function orcaRequestIdOf(verb, identity) {
-  if (!identity || typeof identity !== 'object' || !Object.keys(identity).some((k) => filled(identity[k])))
-    throw new Error(`orcaCall ${verb}: a request-replay mutation needs its ledger identity (request: {...})`);
-  return uuidv5(ORCA_REQUEST_NAMESPACE, `${verb}\0${canonical(identity)}`);
-}
 
 /** The process timed out, or Orca answered without a JSON receipt: the effect is unknown, not refused. */
 const receiptLost = (r, receipt) => r.spawnError === 'ETIMEDOUT' || (r.status !== null && r.status !== undefined && !r.spawnError && receipt === null);

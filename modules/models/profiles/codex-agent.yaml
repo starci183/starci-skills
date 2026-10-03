@@ -12,7 +12,7 @@ schema: starci/module-model-profile@1
 identity:
   sharedQuota: >-
     Sol and Luna consume the SAME observed Codex provider capacity — the
-    launch-only gpt-6-sol/gpt-6-luna targets do not multiply provider headroom
+    launch-only gpt-6.1-sol/gpt-6-luna targets do not multiply provider headroom
     (modules/models/registry.yaml). One quota cooldown on the provider parks both.
 
 launch:
@@ -27,9 +27,9 @@ position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/
 business:
   question: >-
     "Which pool thinks when Claude is out, overflows hands-on work, and can draw?" —
-    codex-agent, on gpt-6-sol for every think kind, the sole image route and the draw fallback.
+    codex-agent, on gpt-6.1-sol for every think kind, the sole image route and the draw fallback.
   whenNeeded:
-    - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
+    - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6.1-sol.
     - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Claude lacks its browser-dom tool.
     - "interface.asset — the ONLY route (image_gen.imagegen); interface.draw when the Devin pool cannot draw (owner ruling 2026-09-27: Devin draws, Codex critiques)."
     - Hands-on overflow after the Devin pool.

@@ -5,10 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { checkExamples, exampleDirs, formatResults, main } from '../../scripts/checks/check-example-architecture.mjs';
 
-// The examples gate runs `starci app lint --repo <example> --format json` per example app and reads the one lint report (starci/lint@1).
-// A real lint of an app takes a TypeScript program per side, so these specs hand the gate a stub CLI that answers the report a
-// real run would print for each example by name; the gate's own job - which directories are examples, how a report becomes
-// a verdict and a count per code, when the run is not a pass - is what is judged here.
+// The examples gate runs `starci app lint --format json` at the root of each example app and reads the one lint report (starci/lint@1).
+// A real lint of an installed app takes a TypeScript program per side, so most specs hand the gate a stub CLI that answers the
+// report a real run would print for each example by name; the gate's own job - which directories are examples, how a report
+// becomes a verdict and a count per code, when the run is not a pass - is what is judged there. The last spec runs the real
+// `starci` bin (packages/cli/bin/starci.mjs over @starci/hfs) on an example that installs nothing.
 const made = [];
 test.after(() => { for (const dir of made) fs.rmSync(dir, { recursive: true, force: true }); });
 
@@ -26,14 +27,14 @@ const REPORTS = {
   broken: { schema: 'starci/lint@1', ok: false, counts: { error: 0 }, errors: ['eslint could not run in be/: Cannot find package eslint'], findings: [] },
 };
 
-/** A stub hfs CLI: `lint --repo <dir> --format json` prints the report of the example named like <dir>, anything else prints nothing. */
+/** A stub starci CLI: `app lint --format json` prints the report of the example named like its working directory, anything else not a report. */
 function stubCli(dir) {
-  const bin = path.join(dir, 'hfs-stub.mjs');
+  const bin = path.join(dir, 'starci-stub.mjs');
   fs.writeFileSync(bin, [
     "import path from 'node:path';",
     `const reports = ${JSON.stringify(REPORTS)};`,
-    'const [command, flag, repo, format, json] = process.argv.slice(2);',
-    "const report = command === 'lint' && flag === '--repo' && format === '--format' && json === 'json' ? reports[path.basename(repo)] : undefined;",
+    'const [group, verb, format, json] = process.argv.slice(2);',
+    "const report = group === 'app' && verb === 'lint' && format === '--format' && json === 'json' ? reports[path.basename(process.cwd())] : undefined;",
     "console.log(report ? JSON.stringify(report) : 'not a report');",
     '',
   ].join('\n'));
@@ -91,4 +92,13 @@ test('an example whose lint could not run is unrunnable and fails, never skipped
   assert.equal(silent.status, 'unrunnable');
   assert.match(formatResults([silent]), /silent: the check could not run \(not a report\)/);
   assert.equal(main(['--examples', dir], { out: () => {}, err: () => {}, bin }), 1);
+});
+
+test('without a stub the gate runs the real starci bin at the example root: a starci/lint@1 report, never a missing entry', () => {
+  const { dir } = examples(['bare']);
+  const [bare] = checkExamples({ examplesDir: dir });
+  // The bare example declares no sides and installs nothing: the real lint answers with its refusal, so it could not run.
+  assert.equal(bare.status, 'unrunnable');
+  assert.match(bare.detail, /starci app lint runs at the app root/);
+  assert.doesNotMatch(bare.detail, /hfs\.mjs|Cannot find module|not a report/);
 });

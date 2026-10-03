@@ -47,6 +47,7 @@ import { runNpm } from '../api/npm/run-npm.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { show as gitShow } from '../api/git/show.mjs'; import { mergeTree } from '../api/git/merge-tree.mjs'; import { revParseQuery } from '../api/git/rev-parse-query.mjs'; import { diff as gitDiff } from '../api/git/diff.mjs'; import { lsFiles } from '../api/git/ls-files.mjs'; import { lsTree } from '../api/git/ls-tree.mjs'; import { statusQuery as gitStatus } from '../api/git/status-query.mjs'; import { revList } from '../api/git/rev-list.mjs'; import { mergeBase as mergeBaseOf } from '../api/git/merge-base.mjs'; import { isAncestor } from '../api/git/is-ancestor.mjs';
 import { pathKey, posixPath } from '../lib/path-key.mjs';
+import { hfsEntry } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../hfs/slots.mjs';
 import { setPriority } from '../api/process/set-priority.mjs'; import { runNode } from '../api/node/run-node.mjs';
@@ -166,27 +167,18 @@ const writeCache = (file, value) => { fs.mkdirSync(path.dirname(file), { recursi
 
 /* ----------------------------------------------------------------------------------------------- lint */
 
-/** The `hfs` entry of the app's own install, else this runtime's packages/hfs. */
-export function hfsEntry(root) {
-  try {
-    const manifest = createRequire(path.join(root, 'package.json')).resolve('@starci/hfs/package.json');
-    const bin = JSON.parse(fs.readFileSync(manifest, 'utf8')).bin;
-    return { dir: path.dirname(manifest), bin: path.join(path.dirname(manifest), typeof bin === 'string' ? bin : bin.hfs) };
-  } catch {
-    const dir = path.join(runtimeRoot, 'packages', 'hfs');
-    return { dir, bin: path.join(dir, 'bin', 'hfs.mjs') };
-  }
-}
-
-/** `starci app lint --changed` over the files, in chunks (the Windows command line); {findings, errors}. */
-function runHfsLint(root, files, hfs) {
+/** `starci app lint --changed <file>...` (one file per list flag) at the app root, in chunks (the Windows command line); {findings, errors}. */
+function runAppLint(root, files, hfs) {
   const findings = [], errors = [], seen = new Set();
   for (let i = 0; i < files.length; i += LINT_CHUNK) {
     const chunk = files.slice(i, i + LINT_CHUNK);
-    const run = runNode([hfs.bin, 'lint', '--changed', ...chunk, '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
+    const run = runNode([hfs.bin, 'app', 'lint', ...chunk.flatMap((file) => ['--changed', file]), '--format', 'json'], { cwd: root, maxBuffer: 512 * 1024 * 1024 });
     let report = null;
     try { report = JSON.parse(run.stdout); } catch { /* judged below */ }
     if (report?.schema !== LINT_SCHEMA) { errors.push(`starci app lint produced no ${LINT_SCHEMA} report (exit ${run.status}): ${String(run.stderr || run.stdout || run.error?.message || '').trim().split('\n')[0]}`); continue; }
+    // An app implementation that keeps only the last --changed did not lint the rest: that is never a clean lint.
+    const judged = new Set((Array.isArray(report.changed) ? report.changed : chunk).map(posixPath)), missed = chunk.filter((file) => !judged.has(posixPath(file)));
+    if (missed.length) errors.push(`starci app lint judged ${chunk.length - missed.length} of ${chunk.length} changed files (not ${missed.slice(0, 3).join(', ')}${missed.length > 3 ? ', ...' : ''}): the @starci/hfs behind ${posixPath(hfs.bin)} keeps only the last --changed; install a current @starci/cli`);
     errors.push(...(report.errors ?? []).map((e) => `starci app lint: ${e}`));
     for (const finding of report.findings ?? []) {
       const id = JSON.stringify([finding.engine, finding.rule, finding.path, finding.line, finding.column, finding.message]);
@@ -517,7 +509,7 @@ function runTests(root, pattern, cache) {
 
 /** The lint half: `starci app lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
 async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache }) {
-  const lint = runHfsLint(root, files, hfs);
+  const lint = runAppLint(root, files, hfs);
   const errors = [...lint.errors];
   let baseCounts = new Map();
   if (!errors.length && lint.findings.length) {
@@ -664,7 +656,7 @@ export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
 
 /**
  * Run the gate; resolves the starci/gate@1 report. Never throws for a tool failure: it lands in errors[] with exit 2.
- * Spec seams: `hfs` ({dir, bin}) the hfs install to lint with, default hfsEntry(root); `ts` the TypeScript module, default
+ * Spec seams: `hfs` ({dir, bin}) the starci CLI to lint with and its @starci/hfs, default hfsEntry(root); `ts` the TypeScript module, default
  * the app's own install per project.
  */
 export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null }) {

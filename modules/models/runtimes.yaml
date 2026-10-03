@@ -22,6 +22,24 @@ purpose: |-
 # route/dispatch with `max-ops` at it.
 maxParallelOps: 20
 allocation:
+  # Common new-admission thresholds, consumed by the pure selector and runtime reservation adapter.
+  admission:
+    schema: starci/agent-admission-policy@1
+    version: 1
+    reservePercent: 90
+    exhaustedPercent: 100
+    maxAgeMs: 300000
+    qualityOrder: [economy, standard, frontier]
+    ownerBiasRoles: [op]
+    eligibilityModes: [qualified, probation, kernel-function, scoped-control-plane, operation-policy]
+    roles:
+      kernel: {qualityFloor: standard}
+      op:
+        qualityFloor: economy
+        difficultyFloors: {easy: economy, medium: economy, hard: frontier, insane: frontier}
+      supervisor: {qualityFloor: standard}
+      worker: {qualityFloor: standard}
+      critic: {qualityFloor: standard, independence: provider}
   # The default policy. config.yaml allocation.policy overrides it for `starci kernel route` (engine/config.mjs
   # configuredAllocationPolicy): prefer-then-overflow takes the first eligible pool of the tier order below;
   # balanced walks the eligible pools of that order and takes the FIRST one still below its config.yaml
@@ -54,7 +72,7 @@ allocation:
   # own family is taken only when no pool of another family is eligible (crossFamily.applied false).
   # thinkAuditCrossFamily keeps its name from when only think verdicts were audited.
   thinkAuditCrossFamily: true
-  # The frontier think group: Claude Opus 5.5 and GPT-6 Sol. It is what the kernel's own model calls route
+  # The frontier think group: Claude Opus 5.5 and GPT-6.1 Sol. It is what the kernel's own model calls route
   # over (scripts/route/route-model.mjs decisionFlow kernel-function) and two families of the cross-family
   # audit above.
   frontier: [claude-agent, codex-agent]
@@ -62,6 +80,7 @@ allocation:
   # (review-hands), reviews - the third audit family.
   hands: [devin-agent]
   # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the product ledgers of that window).
+  # Those historical Sol scores describe the pre-migration model; they are not GPT-6.1 Sol qualification evidence.
   # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
   # at its difficulty tier:
   #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
@@ -70,18 +89,18 @@ allocation:
   #   scaffold (scaffold, docs, content, grammar.update - small work - and every cut slice of a fan-out, which
   #     scripts/kernel/cli.mjs cmdRoute routes on this order): Devin first - backend.scaffold passed 73% on Devin,
   #     43% on Codex over the 72h scorecard.
-  #   think, decide, plan (every think kind: decide, review and author ops): Claude Opus first, GPT-6 Sol second
+  #   think, decide, plan (every think kind: decide, review and author ops): Claude Opus first, GPT-6.1 Sol second
   #     and nothing else - Opus passed 72-73% of business/architecture.decide, Sol 60-64%. Think kinds route at a hard floor, where codex-agent pins Sol; the
   #     easy and medium keys (Claude only, never Luna) exist for direct role consumers that bring no kind.
   #   draw (interface.draw; owner ruling 2026-09-27 draw-devin-brand-claude, modules/kernel/owner-rulings.yaml):
   #     Devin draws first (SWE-2 Max; token-render HTML + Playwright in the product checkout - its card carries
-  #     browser-dom), Codex (GPT-6 Sol at effort high) is the fallback. The raster regions a drawing needs are
+  #     browser-dom), Codex (GPT-6.1 Sol at effort high) is the fallback. The raster regions a drawing needs are
   #     artworkSlots for interface.asset, never painted by the drawer. Devin pins no easy or insane model, so the easy
   #     and insane keys are Codex alone. The draw loop's independent critic stays a DIFFERENT model from the drawer
   #     (allocation.drawLoop.critic, criticWhenDrawer).
   #   asset (interface.asset): Codex only - the one agent with the image tool (image_gen.imagegen).
   #   brand (brand.decide; owner ruling 2026-09-27 draw-devin-brand-claude): Claude Opus decides the brand and its
-  #     direction, GPT-6 Sol is the fallback when the Claude pool cannot serve; Codex is also the cross-family second
+  #     direction, GPT-6.1 Sol is the fallback when the Claude pool cannot serve; Codex is also the cross-family second
   #     opinion on think work.
   #   review (owner decision 2026-09-25 review-hands, amending the think order above: "codex/claude only
   #     decide (that is, set the strategy), review must be done by the hands"): every verify kind -
@@ -405,7 +424,7 @@ allocation:
     accentBudget: 0.10
     bandsPerCardMax: 3
     badgesPerEntityMax: 2
-    critic: {provider: codex, model: gpt-6-sol, effort: high, timeoutMs: 900000}
+    critic: {provider: codex, model: gpt-6.1-sol, effort: high, timeoutMs: 900000}
     criticWhenDrawer:
       codex: {provider: claude, model: claude-opus-5-5, effort: high, timeoutMs: 900000}
     directionPrerequisite: true
@@ -469,6 +488,7 @@ allocation:
   housekeeping:
     tmpMaxAgeMs: 172800000
     tmpPrefixes: [policy-, rights-, l4-, starci, starci-w2, evidence, sup-k, work-v3, scoped-lint, si-, w1-, nivo-, orca-spec,
+      owner-bias-cli-, admission-runtime-, agent-launch-, starci-provider-budget-, starci-provider-schema-,
       codex-, deps-, direction-part-, draw-layer-, footprint-, grammar-pin-, guard-, literal-argv-, module-yaml-,
       doc-language-, guidance-, hk-, hfs-, install-link-, kernel-check-, kguard-, sup-orca, land-, op-manifest-, path-key-, pathspec-, push-scan-spec-, rename-over-, sbl-, serve-ask-, sup-chat, sup-repo, sup-src, sup-wd,
       work-acceptance-, work-brand-test-, work-core-test-, work-custody-test-, work-external-,

@@ -45,14 +45,14 @@ const logged=fx=>fs.existsSync(fx.log)
 
 test('argv is assembled from calls.yaml — declared flags only, in contract order',t=>{
   const fx=stubEnv(t);
-  const out=call(fx,`c=>c('worker-start',{spec:'do x','task-title':'x #1',worktree:'wt',agent:'codex',model:'gpt-6-sol','display-name':'[Op] x',run:'run-1',from:'kernel-1'},{request:{job:'j1',lease:'l1'}})`);
+  const out=call(fx,`c=>c('worker-start',{spec:'do x','task-title':'x #1',worktree:'wt',agent:'codex',model:'gpt-6.1-sol','display-name':'[Op] x',run:'run-1',from:'kernel-1'},{request:{job:'j1',lease:'l1'}})`);
   assert.equal(out.outcome,'ok');
   const start=logged(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.ok(start,'worker-start never reached the binary');
   const id=start[start.indexOf('--retry-request')+1];
   assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.deepEqual(start,['orchestration','worker-start','--spec','do x','--task-title','x #1','--worktree','wt','--agent','codex',
-    '--model','gpt-6-sol','--display-name','[Op] x','--run','run-1','--from','kernel-1','--retry-request',id,'--json'],
+    '--model','gpt-6.1-sol','--display-name','[Op] x','--run','run-1','--from','kernel-1','--retry-request',id,'--json'],
     'argv order and content are calls.yaml flags order plus defaults.jsonFlag');
 });
 

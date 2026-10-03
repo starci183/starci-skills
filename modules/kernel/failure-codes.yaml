@@ -14700,6 +14700,656 @@ DOCKER_PORT_POLICY:
   nextStep_vi: "Đổi tên container sang tên thuộc dự án, lấy cổng trong dải 41000-44999 của dự án, rồi chạy lại lệnh starci docker; không sửa hay dừng container nivo-lite."
   owner: runtime-core
   kind: verb-refusal
+
+admission-receipt-mismatch:
+  title: "Admission receipt identity mismatch"
+  title_vi: "Danh tính biên nhận admission không khớp"
+  meaning_vi: "Biên nhận giữ chỗ không thuộc provider, model hoặc vai trò mà launcher đang tiêu thụ."
+  causes_vi:
+    - "Launcher truyền biên nhận của lần chọn hoặc vai trò khác."
+  nextStep_vi: "Dừng khởi động và đối chiếu danh tính lần thử với biên nhận đã lưu."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+admitted-plan:
+  title: "Eligible admission plan"
+  title_vi: "Kế hoạch admission đủ điều kiện"
+  meaning_vi: "Bộ chọn đã tìm được ứng viên hợp lệ theo chứng cứ hiện có; kế hoạch này chưa chứng minh giữ chỗ hoặc khởi động."
+  causes_vi:
+    - "Các điều kiện nhóm được phép, chất lượng, quota và độc lập đều thỏa mãn."
+  nextStep_vi: "Tiếp tục giữ chỗ nguyên tử và kiểm tra lại khi launcher tiêu thụ biên nhận."
+  owner: "runtime-core"
+  kind: "check-status"
+
+attempt-conflict:
+  title: "Reservation attempt conflict"
+  title_vi: "Lần thử giữ chỗ bị xung đột"
+  meaning_vi: "Một mã lần thử đã có biên nhận với provider, account, model, vai trò hoặc phạm vi khác."
+  causes_vi:
+    - "Tái sử dụng mã lần thử nhưng thay đổi ý nghĩa của yêu cầu."
+  nextStep_vi: "Giữ nguyên biên nhận cũ và sửa danh tính yêu cầu; không tạo lần thử khác để vượt chỗ đang giữ."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+exit-unproven:
+  title: "Reservation exit is unproven"
+  title_vi: "Chưa chứng minh lượt chạy đã kết thúc"
+  meaning_vi: "Chứng cứ chưa xác nhận đúng tiến trình hoặc terminal của biên nhận đã kết thúc, hay yêu cầu khởi động chưa tạo hiệu ứng."
+  causes_vi:
+    - "Thiếu chứng cứ kết thúc hoặc chứng cứ thuộc danh tính khác."
+  nextStep_vi: "Giữ chỗ và lấy chứng cứ đóng terminal cùng cây tiến trình, hoặc biên nhận host xác nhận không có hiệu ứng."
+  owner: "supervisor"
+  kind: "dispatch-refusal"
+
+grant-ineligible:
+  title: "Owner capacity grant is ineligible"
+  title_vi: "Quyền cấp dung lượng không đủ điều kiện"
+  meaning_vi: "Quyền cấp của owner không khớp vai trò và phạm vi hiện tại hoặc chưa được nguồn thẩm quyền xác nhận."
+  causes_vi:
+    - "Quyền cấp hết hạn, sai phạm vi hoặc chỉ tự khai được phép."
+  nextStep_vi: "Đối chiếu quyền cấp đã lưu với lần thử và chứng cứ xác thực provider hiện tại."
+  owner: "owner"
+  kind: "dispatch-refusal"
+
+host-no-effect-unproven:
+  title: "Host no-effect reconciliation is unproven"
+  title_vi: "Host chưa chứng minh không có hiệu ứng"
+  meaning_vi: "Kết quả host chưa phải replay thất bại không có hiệu ứng của đúng yêu cầu khởi động đã được ràng buộc."
+  causes_vi:
+    - "Sai request ID, thiếu replay hoặc còn tài nguyên và danh tính tiến trình."
+  nextStep_vi: "Giữ chỗ; đọc trạng thái yêu cầu host và chỉ hòa giải bằng replay hoàn tất đúng danh tính."
+  owner: "supervisor"
+  kind: "dispatch-refusal"
+
+host-request-conflict:
+  title: "Host request identity conflict"
+  title_vi: "Danh tính yêu cầu host bị xung đột"
+  meaning_vi: "Biên nhận đã gắn với một request ID của host nhưng quan sát mới dùng request ID khác."
+  causes_vi:
+    - "Tạo lại yêu cầu host thay vì replay yêu cầu đã gắn."
+  nextStep_vi: "Giữ request ID bất biến và đối chiếu kết quả của đúng yêu cầu đã lưu."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+identity-conflict:
+  title: "Execution identity conflict"
+  title_vi: "Danh tính lượt chạy bị xung đột"
+  meaning_vi: "Quan sát provider, account, model, vai trò, terminal hoặc tiến trình mâu thuẫn với biên nhận gốc."
+  causes_vi:
+    - "Đưa quan sát của lượt chạy khác vào cùng biên nhận."
+  nextStep_vi: "Không thay danh tính đã gắn; kiểm tra nguồn quan sát và giữ chỗ cho tới khi hòa giải đúng."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+invalid-owner-routing-bias:
+  title: "Invalid owner routing intent"
+  title_vi: "Ý định chọn agent của owner không hợp lệ"
+  meaning_vi: "Ràng buộc chọn agent chứa trường hoặc giá trị không hợp lệ, mâu thuẫn, hay quyền vượt ngưỡng thiếu phạm vi rõ ràng."
+  causes_vi:
+    - "Require mâu thuẫn với avoid hoặc quyền vượt ngưỡng thiếu vai trò, model và lý do."
+  nextStep_vi: "Sửa ý định bằng selector cụ thể và quyền owner đúng vai trò, phạm vi trước khi lưu goal."
+  owner: "owner"
+  kind: "input-invalid"
+
+launch-identity-conflict:
+  title: "Launch identity conflict"
+  title_vi: "Danh tính khởi động bị xung đột"
+  meaning_vi: "Danh tính khởi động mới khác danh tính bất biến đã gắn với biên nhận."
+  causes_vi:
+    - "Tái sử dụng biên nhận cho một run hoặc cấu hình khởi động khác."
+  nextStep_vi: "Dừng yêu cầu mới và hòa giải lượt khởi động đã gắn với biên nhận."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+launch-identity-required:
+  title: "Launch identity is required"
+  title_vi: "Thiếu danh tính khởi động"
+  meaning_vi: "Launcher chưa cung cấp danh tính khởi động cụ thể để chuyển chỗ giữ sang trạng thái đang khởi động."
+  causes_vi:
+    - "Thiếu liên kết run, yêu cầu host hoặc cấu hình khởi động."
+  nextStep_vi: "Tạo danh tính từ lần thử và cấu hình thực tế trước khi tiêu thụ biên nhận."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+live-evidence-required:
+  title: "Live admission evidence is required"
+  title_vi: "Thiếu chứng cứ admission hiện tại"
+  meaning_vi: "Kế hoạch chọn pool chưa có chứng cứ dung lượng hiện tại cần thiết để cấp quyền khởi động."
+  causes_vi:
+    - "Chỉ có route dự kiến hoặc chưa quan sát được chỗ giữ chung."
+  nextStep_vi: "Đi qua admission chung để lấy chứng cứ và giữ chỗ trước mọi hiệu ứng khởi động."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+observation-unknown:
+  title: "Reservation observation is unknown"
+  title_vi: "Chưa rõ trạng thái chỗ giữ"
+  meaning_vi: "Hòa giải chưa nhận được quan sát tiến trình hoặc chứng cứ kết thúc cho biên nhận này."
+  causes_vi:
+    - "Quan sát bị thiếu hoặc chưa đến."
+  nextStep_vi: "Giữ dung lượng đang chiếm; lấy quan sát có danh tính hoặc chứng cứ kết thúc xác thực."
+  owner: "supervisor"
+  kind: "blocker"
+
+observed-terminal-conflict:
+  title: "Observed terminal conflicts with receipt"
+  title_vi: "Terminal quan sát được mâu thuẫn với biên nhận"
+  meaning_vi: "Terminal vừa quan sát không thể gắn an toàn vào biên nhận giữ chỗ của lượt khởi động này."
+  causes_vi:
+    - "Danh tính terminal khác biên nhận hoặc fence không còn hợp lệ."
+  nextStep_vi: "Giữ trạng thái chưa rõ và hòa giải terminal với biên nhận gốc trước khi giải phóng dung lượng."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+provider-circuit-open:
+  title: "Provider circuit is open"
+  title_vi: "Provider đang bị ngắt mạch"
+  meaning_vi: "Provider hiện có circuit mở nên biên nhận chưa được phép tạo hiệu ứng khởi động."
+  causes_vi:
+    - "Provider vừa bị ghi nhận lỗi và thời gian ngắt mạch chưa kết thúc."
+  nextStep_vi: "Chờ hoặc sửa lỗi provider; kiểm tra circuit hiện tại trước khi khởi động lại."
+  owner: "supervisor"
+  kind: "dispatch-refusal"
+
+provider-circuit-unavailable:
+  title: "Provider circuit evidence is unavailable"
+  title_vi: "Không đọc được chứng cứ circuit của provider"
+  meaning_vi: "Bộ cấp quyền không thể đọc tin cậy trạng thái circuit hiện tại của provider."
+  causes_vi:
+    - "Kho máy không đọc được hoặc truy vấn circuit thất bại."
+  nextStep_vi: "Khôi phục nguồn trạng thái máy rồi kiểm tra lại; giữ mọi chỗ đã cấp cho tới khi biết kết quả."
+  owner: "supervisor"
+  kind: "blocker"
+
+quota-identity:
+  title: "Quota identity mismatch"
+  title_vi: "Danh tính quota không khớp"
+  meaning_vi: "Chứng cứ quota thuộc provider hoặc account khác với yêu cầu giữ chỗ."
+  causes_vi:
+    - "Truyền snapshot quota của tài khoản hoặc provider khác."
+  nextStep_vi: "Lấy quota của đúng provider và account trước khi cấp chỗ."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+quota-ineligible:
+  title: "Quota evidence is ineligible"
+  title_vi: "Chứng cứ quota không đủ điều kiện"
+  meaning_vi: "Quota không mới, xác thực không hợp lệ, đã cạn hoặc quyền cấp không còn khớp lần thử."
+  causes_vi:
+    - "Một cửa sổ quota cũ hoặc xác thực provider chưa được xác nhận."
+  nextStep_vi: "Làm mới mọi cửa sổ và xác thực provider; kiểm tra quyền cấp đúng vai trò và phạm vi."
+  owner: "supervisor"
+  kind: "dispatch-refusal"
+
+quota-reserve:
+  title: "Quota reserve requires owner authority"
+  title_vi: "Quota đã chạm vùng giữ lại"
+  meaning_vi: "Yêu cầu khởi động chạm vùng quota giữ lại và không có quyền vượt ngưỡng hợp lệ cho đúng lần thử."
+  causes_vi:
+    - "Quota bị giới hạn hoặc quyền owner không khớp model, account, vai trò và phạm vi."
+  nextStep_vi: "Chọn ứng viên hợp lệ khác trong nhóm, chờ quota hồi phục hoặc lấy quyền owner cụ thể cho lần thử này."
+  owner: "owner"
+  kind: "dispatch-refusal"
+
+state-regression:
+  title: "Reservation state regression"
+  title_vi: "Trạng thái giữ chỗ bị lùi"
+  meaning_vi: "Yêu cầu cố đưa chỗ đã chạy hoặc chưa rõ kết quả trở lại trạng thái đang khởi động."
+  causes_vi:
+    - "Tiêu thụ lại biên nhận sau khi lượt khởi động đã vượt giai đoạn giữ chỗ."
+  nextStep_vi: "Replay đúng danh tính và hòa giải lượt đã khởi động; không bắt đầu một lượt thứ hai."
+  owner: "runtime-core"
+  kind: "dispatch-refusal"
+
+allow-group-invalid:
+  title: "Invalid admission allow group"
+  title_vi: "Nhóm agent được phép không hợp lệ"
+  meaning_vi: "Yêu cầu admission không có nhóm provider và model cụ thể hợp lệ để giới hạn các ứng viên."
+  causes_vi:
+    - "Nhóm trống, không phải mảng hoặc thành viên thiếu provider hay model."
+  nextStep_vi: "Sửa khai báo nhóm cụ thể ở nguồn yêu cầu; không tự mở rộng sang agent ngoài nhóm."
+  owner: runtime-core
+  kind: input-invalid
+
+auth-unavailable:
+  title: "Provider authentication is unavailable"
+  title_vi: "Xác thực provider không dùng được"
+  meaning_vi: "Chứng cứ hiện tại báo xác thực provider đã mất hoặc không khả dụng, nên không được cấp lượt chạy mới."
+  causes_vi:
+    - "Phiên đăng nhập hoặc thông tin xác thực provider không còn dùng được."
+  nextStep_vi: "Owner khôi phục đăng nhập đúng tài khoản rồi lấy lại chứng cứ xác thực và quota trước khi chạy."
+  owner: owner
+  kind: blocker
+
+auth-unknown:
+  title: "Provider authentication is unknown"
+  title_vi: "Chưa biết xác thực provider có hợp lệ"
+  meaning_vi: "Nguồn quota chưa xác nhận rõ xác thực provider đang hợp lệ; không được coi trạng thái chưa biết là đăng nhập thành công."
+  causes_vi:
+    - "Kết quả truy vấn thiếu trạng thái xác thực hoặc dùng giá trị không được nhận biết."
+  nextStep_vi: "Khôi phục nguồn truy vấn và xác nhận xác thực đúng provider, tài khoản trước khi cấp lượt chạy."
+  owner: supervisor
+  kind: blocker
+
+author-invalid:
+  title: "Invalid author identity for independence"
+  title_vi: "Danh tính tác giả để kiểm tra độc lập không hợp lệ"
+  meaning_vi: "Yêu cầu độc lập thiếu danh tính provider hoặc model của tác giả cần để đối chiếu ứng viên."
+  causes_vi:
+    - "Không truyền provider khi cần độc lập theo provider, hoặc model khi cần độc lập theo model."
+  nextStep_vi: "Lấy danh tính tác giả từ lượt chạy đã ghi nhận rồi gửi lại yêu cầu độc lập; không suy đoán danh tính còn thiếu."
+  owner: runtime-core
+  kind: input-invalid
+
+author-model-unverifiable:
+  title: "Author model identity cannot be verified"
+  title_vi: "Không kiểm chứng được model của tác giả"
+  meaning_vi: "Yêu cầu độc lập theo model không thể đối chiếu tác giả vì chỉ biết tên runtime logic hoặc chưa có chứng cứ model cụ thể."
+  causes_vi:
+    - "Provider của tác giả không hỗ trợ chọn model cụ thể hoặc thiếu thẩm quyền xác nhận model."
+  nextStep_vi: "Cung cấp danh tính model có thể kiểm chứng; nếu cần đổi yêu cầu độc lập thì xin quyết định từ đúng thẩm quyền."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+candidate-duplicate:
+  title: "Duplicate admission candidate identity"
+  title_vi: "Danh tính ứng viên admission bị trùng"
+  meaning_vi: "Danh sách ứng viên lặp lại cùng mã ứng viên, nên bộ chọn từ chối bản ghi trùng thay vì tính như dung lượng riêng."
+  causes_vi:
+    - "Nhiều khai báo pool hoặc phép chiếu tạo ra cùng mã ứng viên."
+  nextStep_vi: "Sửa phép chiếu ứng viên để mỗi danh tính chỉ xuất hiện một lần rồi lập lại kế hoạch."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+candidate-invalid:
+  title: "Invalid admission candidate"
+  title_vi: "Ứng viên admission không hợp lệ"
+  meaning_vi: "Bản ghi ứng viên không có danh tính cụ thể hợp lệ để kiểm tra và giữ chỗ."
+  causes_vi:
+    - "Ứng viên không phải đối tượng hoặc thiếu mã, provider, model hay có account không hợp lệ."
+  nextStep_vi: "Sửa bản ghi ở nguồn phép chiếu ứng viên; chỉ chọn sau khi xác định đúng provider, account và model."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+candidates-invalid:
+  title: "Invalid admission candidate collection"
+  title_vi: "Danh sách ứng viên admission không hợp lệ"
+  meaning_vi: "Bộ chọn không nhận được danh sách ứng viên dưới dạng mảng nên không thể đánh giá yêu cầu."
+  causes_vi:
+    - "Caller gửi đối tượng, giá trị trống hoặc dữ liệu chưa được chiếu thành danh sách."
+  nextStep_vi: "Sửa caller để cung cấp mảng ứng viên cụ thể rồi lập lại kế hoạch admission."
+  owner: runtime-core
+  kind: input-invalid
+
+capacity-full:
+  title: "Provider admission capacity is full"
+  title_vi: "Dung lượng admission của provider đã đầy"
+  meaning_vi: "Số lượt đang chiếm dung lượng đã đạt giới hạn, hoặc giới hạn được đặt bằng không."
+  causes_vi:
+    - "Lượt đã giữ chỗ, đang khởi động, đang chạy hoặc chưa rõ kết quả vẫn chiếm dung lượng."
+  nextStep_vi: "Chờ chứng cứ đóng lượt đang chiếm chỗ, hoặc chọn ứng viên hợp lệ khác trong nhóm; không giải phóng chỉ vì hết thời gian."
+  owner: supervisor
+  kind: blocker
+
+capacity-unknown:
+  title: "Provider admission capacity is unknown"
+  title_vi: "Chưa biết dung lượng admission của provider"
+  meaning_vi: "Chứng cứ số lượt đang chiếm chỗ hoặc giới hạn song song bị thiếu hay không hợp lệ, nên không được giả định còn chỗ."
+  causes_vi:
+    - "Kho máy không quan sát được dung lượng, hoặc khai báo số lượt và giới hạn không phải số nguyên không âm."
+  nextStep_vi: "Khôi phục quan sát chỗ giữ chung và giới hạn hợp lệ trước khi cấp lượt chạy mới."
+  owner: supervisor
+  kind: blocker
+
+constraint-invalid:
+  title: "Invalid admission identity constraint"
+  title_vi: "Ràng buộc danh tính admission không hợp lệ"
+  meaning_vi: "Prefer, avoid hoặc require có hình dạng, trường hay giá trị không hợp lệ nên ý định chọn agent không thể được áp dụng an toàn."
+  causes_vi:
+    - "Selector trống, dùng trường ngoài pool, provider, model hoặc có giá trị không phải chuỗi có nội dung."
+  nextStep_vi: "Sửa ý định chọn agent thành selector cụ thể hợp lệ tại nguồn đã được owner phê duyệt."
+  owner: owner
+  kind: input-invalid
+
+critic-independence-invalid:
+  title: "Invalid Critic independence requirement"
+  title_vi: "Yêu cầu độc lập của Critic không hợp lệ"
+  meaning_vi: "Yêu cầu Critic thiếu danh tính tác giả, dùng kiểu độc lập không hợp lệ hoặc làm yếu hơn mức độc lập mà chính sách quy định."
+  causes_vi:
+    - "Chỉ yêu cầu khác model khi chính sách bắt buộc khác provider, hoặc thiếu provider, model cần đối chiếu."
+  nextStep_vi: "Sửa dữ liệu tác giả và yêu cầu Critic theo chính sách độc lập hiện hành; không hạ mức độc lập để khởi động."
+  owner: runtime-core
+  kind: input-invalid
+
+critic-model-conflict:
+  title: "Critic model conflicts with author model"
+  title_vi: "Model của Critic trùng model tác giả"
+  meaning_vi: "Ứng viên Critic dùng cùng model với tác giả trong khi yêu cầu bắt buộc độc lập theo model."
+  causes_vi:
+    - "Nhóm Critic hoặc model được chọn không tách khỏi model đã tạo nội dung."
+  nextStep_vi: "Chọn model khác có chứng cứ hợp lệ trong nhóm Critic; nếu nhóm không đáp ứng thì báo thiếu ứng viên độc lập."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+critic-model-unverifiable:
+  title: "Critic model independence cannot be verified"
+  title_vi: "Không kiểm chứng được độc lập model của Critic"
+  meaning_vi: "Yêu cầu độc lập theo model không thể chứng minh vì model tác giả hoặc ứng viên Critic chỉ là tên runtime logic hay thiếu chứng cứ model cụ thể."
+  causes_vi:
+    - "Agent không hỗ trợ đối số chọn model hoặc không có thẩm quyền xác nhận model thực tế."
+  nextStep_vi: "Dùng ứng viên và danh tính tác giả có model kiểm chứng được; giữ nguyên yêu cầu độc lập cho tới khi có quyết định hợp lệ khác."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+critic-provider-conflict:
+  title: "Critic provider conflicts with author provider"
+  title_vi: "Provider của Critic trùng provider tác giả"
+  meaning_vi: "Ứng viên Critic thuộc cùng provider với tác giả trong khi yêu cầu bắt buộc độc lập theo provider."
+  causes_vi:
+    - "Nhóm Critic hoặc ràng buộc chọn agent chỉ còn provider đã tạo nội dung."
+  nextStep_vi: "Chọn provider khác đủ điều kiện trong nhóm Critic; nếu không có thì báo thiếu ứng viên độc lập."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+eligibility-not-proven:
+  title: "Candidate eligibility is not proven"
+  title_vi: "Chưa chứng minh ứng viên đủ điều kiện"
+  meaning_vi: "Ứng viên chưa có xác nhận đủ điều kiện cùng chế độ eligibility được chính sách chấp nhận; cấp chất lượng model không tự chứng minh điều kiện này."
+  causes_vi:
+    - "Thiếu chứng cứ qualification, probation hoặc điều kiện riêng của vai trò, thao tác."
+  nextStep_vi: "Lấy chứng cứ đủ điều kiện từ cơ chế sở hữu hoặc chọn ứng viên đã được xác nhận; không suy ra eligibility chỉ từ model tier."
+  owner: supervisor
+  kind: dispatch-refusal
+
+incident-open:
+  title: "Candidate has an open incident"
+  title_vi: "Ứng viên đang có incident mở"
+  meaning_vi: "Chứng cứ dung lượng báo ứng viên còn incident chưa xử lý nên không được cấp lượt chạy mới."
+  causes_vi:
+    - "Lỗi của provider hoặc pool chưa được hòa giải và đóng incident."
+  nextStep_vi: "Xử lý incident theo đúng thẩm quyền rồi lấy lại trạng thái hiện tại; có thể chọn ứng viên hợp lệ khác trong nhóm."
+  owner: supervisor
+  kind: blocker
+
+independence-invalid:
+  title: "Invalid admission independence mode"
+  title_vi: "Kiểu độc lập admission không hợp lệ"
+  meaning_vi: "Yêu cầu độc lập không thuộc các kiểu được hỗ trợ: theo provider, theo model hoặc cả hai."
+  causes_vi:
+    - "Caller gửi giá trị independence không được chính sách nhận biết."
+  nextStep_vi: "Sửa caller dùng kiểu độc lập được khai báo và truyền danh tính tác giả tương ứng."
+  owner: runtime-core
+  kind: input-invalid
+
+no-eligible-candidate:
+  title: "No eligible admission candidate"
+  title_vi: "Không có ứng viên admission đủ điều kiện"
+  meaning_vi: "Mọi ứng viên trong nhóm đều bị loại bởi ít nhất một điều kiện bắt buộc, nên kế hoạch không cấp quyền khởi động."
+  causes_vi:
+    - "Nhóm hiện tại không đáp ứng chất lượng, eligibility, quota, dung lượng, độc lập hoặc ràng buộc owner."
+  nextStep_vi: "Đọc mã loại của từng ứng viên và khôi phục điều kiện còn thiếu; không chọn ngoài nhóm hay bỏ qua chứng cứ chưa biết."
+  owner: supervisor
+  kind: dispatch-refusal
+
+outside-allow-group:
+  title: "Candidate is outside the allowed group"
+  title_vi: "Ứng viên nằm ngoài nhóm được phép"
+  meaning_vi: "Cặp provider và model của ứng viên không xuất hiện trong nhóm cụ thể được phép cho yêu cầu này."
+  causes_vi:
+    - "Phép chiếu pool và nhóm được phép không khớp, hoặc caller đưa thêm một model ngoài nhóm."
+  nextStep_vi: "Sửa nguồn phép chiếu theo nhóm đã khai báo; chỉ thay đổi nhóm khi đúng thẩm quyền cho phép."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+owner-avoided:
+  title: "Candidate matches an owner avoid constraint"
+  title_vi: "Ứng viên khớp ràng buộc avoid của owner"
+  meaning_vi: "Ứng viên khớp selector mà owner yêu cầu tránh trong phạm vi vai trò hiện tại nên bị loại khỏi kế hoạch."
+  causes_vi:
+    - "Provider, model hoặc pool của ứng viên khớp ý định avoid đang áp dụng."
+  nextStep_vi: "Chọn ứng viên hợp lệ khác trong nhóm; nếu cần thay ràng buộc thì xin owner cập nhật ý định đã lưu."
+  owner: owner
+  kind: dispatch-refusal
+
+owner-grant-full:
+  title: "Owner-granted admission slots are full"
+  title_vi: "Chỗ admission do owner cấp đã đầy"
+  meaning_vi: "Số lượt đang chiếm dung lượng đã đạt số chỗ hữu hạn trong quyền cấp của owner."
+  causes_vi:
+    - "Các lượt đang giữ chỗ, khởi động, chạy hoặc chưa rõ kết quả đã dùng hết số chỗ được cấp."
+  nextStep_vi: "Chờ lượt đang chiếm chỗ được chứng minh kết thúc; việc tăng quyền cấp phải do owner phê duyệt tại nguồn sở hữu."
+  owner: supervisor
+  kind: blocker
+
+owner-grant-invalid:
+  title: "Invalid owner admission grant evidence"
+  title_vi: "Chứng cứ quyền cấp admission của owner không hợp lệ"
+  meaning_vi: "Quyền cấp thiếu chủ thể, số chỗ hữu hạn hoặc chứng cứ mới, hay không khớp vai trò và phạm vi của yêu cầu."
+  causes_vi:
+    - "Quyền cấp sai phạm vi, thiếu vai trò hiện tại, số chỗ không hợp lệ hoặc quan sát đã cũ."
+  nextStep_vi: "Đối chiếu quyền cấp từ cấu hình hay goal đã được owner phê duyệt và làm mới chứng cứ; không tự nhận quyền chỉ bằng một cờ JSON."
+  owner: owner
+  kind: dispatch-refusal
+
+policy-invalid:
+  title: "Invalid agent admission policy"
+  title_vi: "Chính sách admission không hợp lệ"
+  meaning_vi: "Khai báo admission thiếu schema, phiên bản, thứ tự chất lượng, chế độ eligibility, ngưỡng quota hoặc chính sách vai trò hợp lệ."
+  causes_vi:
+    - "Dữ liệu allocation.admission không khớp hợp đồng mà bộ chọn đọc."
+  nextStep_vi: "Sửa chính sách tại nguồn sở hữu và chạy kiểm tra cấu trúc trước khi cấp lượt chạy."
+  owner: runtime-core
+  kind: input-invalid
+
+provider-blocked:
+  title: "Provider admission is blocked"
+  title_vi: "Provider đang bị chặn admission"
+  meaning_vi: "Thời hạn chặn provider chưa kết thúc, hoặc chứng cứ thời hạn được cung cấp không hợp lệ nên chưa thể xác nhận provider được phép chạy."
+  causes_vi:
+    - "Provider đang trong thời gian ngắt mạch, hoặc dữ liệu blockedUntil không đọc được."
+  nextStep_vi: "Xử lý nguyên nhân ngắt mạch hoặc khôi phục chứng cứ thời hạn rồi kiểm tra lại trạng thái provider hiện tại."
+  owner: supervisor
+  kind: blocker
+
+quality-floor-invalid:
+  title: "Invalid admission quality floor"
+  title_vi: "Mức chất lượng tối thiểu của admission không hợp lệ"
+  meaning_vi: "Mức chất lượng được yêu cầu không thuộc chính sách hoặc thấp hơn mức tối thiểu bắt buộc của vai trò và độ khó thao tác."
+  causes_vi:
+    - "Caller hạ thao tác hard hay insane xuống dưới frontier, hoặc truyền độ khó, mức chất lượng không được khai báo."
+  nextStep_vi: "Sửa yêu cầu theo mức tối thiểu trong chính sách; chỉ được nâng mức chất lượng, không hạ để vượt điều kiện admission."
+  owner: runtime-core
+  kind: input-invalid
+
+quality-floor-not-met:
+  title: "Candidate does not meet the quality floor"
+  title_vi: "Ứng viên không đạt mức chất lượng tối thiểu"
+  meaning_vi: "Cấp chất lượng được khai báo của model thấp hơn mức tối thiểu hiệu lực cho yêu cầu này."
+  causes_vi:
+    - "Model có tier thấp hơn yêu cầu vai trò, độ khó hoặc mức nâng thêm được khai báo."
+  nextStep_vi: "Chọn model đạt mức chất lượng trong nhóm; không hạ yêu cầu tối thiểu hoặc coi quota còn nhiều là bằng chứng chất lượng."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+quota-authority-unknown:
+  title: "Quota evidence authority is unknown"
+  title_vi: "Chưa biết thẩm quyền của chứng cứ quota"
+  meaning_vi: "Nguồn quota khai báo loại thẩm quyền không được hỗ trợ nên bộ chọn không thể xác nhận căn cứ cấp lượt chạy."
+  causes_vi:
+    - "Snapshot dùng authority khác cửa sổ provider hoặc quyền cấp owner được hỗ trợ."
+  nextStep_vi: "Khôi phục snapshot từ nguồn quota sở hữu với thẩm quyền hợp lệ; không tự đổi nhãn dữ liệu chưa được chứng minh."
+  owner: supervisor
+  kind: blocker
+
+quota-expiry-invalid:
+  title: "Invalid quota evidence expiry"
+  title_vi: "Thời hạn chứng cứ quota không hợp lệ"
+  meaning_vi: "Snapshot có expiresAt nhưng giá trị không phân tích được thành thời điểm hợp lệ, nên chứng cứ không được coi là mới."
+  causes_vi:
+    - "Nguồn truy vấn trả thời hạn sai định dạng hoặc không biểu diễn được."
+  nextStep_vi: "Sửa nguồn thời hạn và lấy lại snapshot quota hiện tại; không bỏ trường lỗi để giả định chứng cứ còn hiệu lực."
+  owner: supervisor
+  kind: blocker
+
+quota-identity-mismatch:
+  title: "Candidate quota identity mismatch"
+  title_vi: "Danh tính quota của ứng viên không khớp"
+  meaning_vi: "Snapshot quota thuộc provider hoặc account khác với ứng viên đang được đánh giá."
+  causes_vi:
+    - "Tái sử dụng snapshot của tài khoản khác, hoặc chưa giải quyết đúng account do provider trả về."
+  nextStep_vi: "Lấy chứng cứ cho đúng provider và account của ứng viên; không dùng quota tài khoản khác để cấp chỗ."
+  owner: runtime-core
+  kind: dispatch-refusal
+
+quota-launch-blocked:
+  title: "Quota evidence blocks launch attempts"
+  title_vi: "Chứng cứ quota đang chặn lần khởi động"
+  meaning_vi: "Snapshot không cho phép tạo lần khởi động mới, và không có quyền vượt vùng giữ lại hợp lệ áp dụng cho ứng viên này."
+  causes_vi:
+    - "allowLaunchAttempt bằng false hoặc quyền cấp owner không còn cho phép khởi động."
+  nextStep_vi: "Khôi phục chứng cứ đủ điều kiện hoặc chọn ứng viên hợp lệ khác; chỉ dùng quyền owner cụ thể khi chính sách vùng giữ lại cho phép."
+  owner: supervisor
+  kind: dispatch-refusal
+
+quota-normal-blocked:
+  title: "Quota evidence blocks normal admission"
+  title_vi: "Chứng cứ quota đang chặn admission thông thường"
+  meaning_vi: "Snapshot không cho cấp lượt chạy thông thường, và không có quyền vượt vùng giữ lại hợp lệ cho đúng ứng viên và yêu cầu."
+  causes_vi:
+    - "normalAdmission bằng false vì provider bị giới hạn hoặc quyền cấp không cho phép lượt mới."
+  nextStep_vi: "Chọn ứng viên hợp lệ khác, chờ quota hồi phục hoặc lấy quyền owner đúng phạm vi khi chính sách cho phép."
+  owner: supervisor
+  kind: dispatch-refusal
+
+quota-policy-invalid:
+  title: "Invalid quota admission policy"
+  title_vi: "Chính sách quota của admission không hợp lệ"
+  meaning_vi: "Ngưỡng giữ lại, ngưỡng cạn hoặc thời gian tối đa của chứng cứ không tạo thành chính sách quota hợp lệ."
+  causes_vi:
+    - "Ngưỡng không hữu hạn, vượt miền phần trăm, ngưỡng cạn không lớn hơn vùng giữ lại hoặc maxAgeMs không dương."
+  nextStep_vi: "Sửa các trường quota ở chính sách sở hữu rồi kiểm tra hợp đồng trước khi đánh giá admission."
+  owner: runtime-core
+  kind: input-invalid
+
+quota-reserved:
+  title: "Quota has reached the protected reserve"
+  title_vi: "Quota đã vào vùng giữ lại được bảo vệ"
+  meaning_vi: "Ít nhất một cửa sổ quota đạt vùng giữ lại và chưa cạn, nhưng yêu cầu không có quyền owner cụ thể hợp lệ để dùng vùng này."
+  causes_vi:
+    - "Quota đạt ngưỡng giữ lại, hoặc override không khớp provider, account, model, vai trò và phạm vi."
+  nextStep_vi: "Chọn ứng viên hợp lệ khác trong nhóm, chờ quota hồi phục hoặc xin owner cấp quyền rõ cho đúng lần thử; quyền này không vượt được quota đã cạn."
+  owner: owner
+  kind: dispatch-refusal
+
+quota-stale:
+  title: "Quota admission evidence is stale"
+  title_vi: "Chứng cứ quota không còn mới"
+  meaning_vi: "Thời điểm quan sát quota bị thiếu, ở tương lai, quá cũ, đã hết hạn hoặc snapshot chưa xác nhận độ mới."
+  causes_vi:
+    - "Quan sát vượt maxAgeMs, hết expiresAt hoặc đồng hồ và dữ liệu thời điểm không khớp."
+  nextStep_vi: "Truy vấn lại quota và xác thực đúng provider, account; đánh giá thời gian sau khi nhận kết quả rồi mới cấp lượt chạy."
+  owner: supervisor
+  kind: blocker
+
+quota-unknown:
+  title: "Quota admission state is unknown"
+  title_vi: "Chưa biết trạng thái quota để cấp lượt chạy"
+  meaning_vi: "Snapshot quota bị thiếu hoặc trạng thái không chứng minh provider còn đủ điều kiện; không được xem chưa biết là quota khỏe."
+  causes_vi:
+    - "Nguồn truy vấn không trả chứng cứ sử dụng hợp lệ hoặc provider không có telemetry được hỗ trợ."
+  nextStep_vi: "Khôi phục chứng cứ quota; với provider không có telemetry chỉ dùng cơ chế quyền cấp owner đã được xác nhận cùng xác thực hiện tại."
+  owner: supervisor
+  kind: blocker
+
+quota-window-invalid:
+  title: "Invalid provider quota window"
+  title_vi: "Cửa sổ quota của provider không hợp lệ"
+  meaning_vi: "Một cửa sổ quota thiếu mã duy nhất, phần trăm hợp lệ hoặc thời điểm reset hợp lệ ở tương lai."
+  causes_vi:
+    - "Cửa sổ bị trùng mã, phần trăm ngoài 0–100 hoặc reset bị thiếu, sai định dạng, đã qua."
+  nextStep_vi: "Lấy lại tất cả cửa sổ từ nguồn provider và sửa dữ liệu không hợp lệ; không bỏ cửa sổ lỗi để làm quota trông khỏe hơn."
+  owner: supervisor
+  kind: blocker
+
+quota-window-stale:
+  title: "Provider quota window evidence is stale"
+  title_vi: "Chứng cứ của cửa sổ quota không còn mới"
+  meaning_vi: "Ít nhất một cửa sổ quota thiếu thời điểm quan sát hợp lệ, nằm ở tương lai hoặc đã quá thời gian cho phép."
+  causes_vi:
+    - "Snapshot ngoài còn mới nhưng một cửa sổ bên trong dùng dữ liệu cũ hoặc không có thời điểm quan sát."
+  nextStep_vi: "Làm mới mọi cửa sổ bắt buộc của provider rồi đánh giá lại; không dùng riêng cửa sổ còn mới để cấp lượt chạy."
+  owner: supervisor
+  kind: blocker
+
+quota-windows-missing:
+  title: "Provider quota windows are missing"
+  title_vi: "Thiếu các cửa sổ quota của provider"
+  meaning_vi: "Chứng cứ theo cửa sổ không có mảng cửa sổ sử dụng nào nên không chứng minh được quota còn khả dụng."
+  causes_vi:
+    - "Nguồn provider không trả cửa sổ hoặc phép chuẩn hóa làm mất dữ liệu cửa sổ."
+  nextStep_vi: "Khôi phục dữ liệu cửa sổ từ nguồn quota; provider không có telemetry phải đi qua quyền cấp owner hợp lệ thay vì tự giả định phần trăm."
+  owner: supervisor
+  kind: blocker
+
+request-invalid:
+  title: "Invalid agent admission request"
+  title_vi: "Yêu cầu admission không hợp lệ"
+  meaning_vi: "Yêu cầu thiếu vai trò được khai báo, phạm vi, mã lần thử hoặc thời điểm đánh giá hợp lệ."
+  causes_vi:
+    - "Caller chưa gắn danh tính ổn định của lần thử hoặc gửi vai trò ngoài chính sách."
+  nextStep_vi: "Sửa caller cung cấp đúng vai trò, phạm vi và mã lần thử ổn định trước mọi hiệu ứng khởi động."
+  owner: runtime-core
+  kind: input-invalid
+
+require-avoid-conflict:
+  title: "Required identity conflicts with avoid"
+  title_vi: "Danh tính bắt buộc mâu thuẫn với avoid"
+  meaning_vi: "Ràng buộc avoid loại bỏ mọi ứng viên có thể khớp danh tính require của cùng yêu cầu."
+  causes_vi:
+    - "Owner yêu cầu một provider, model hoặc pool đồng thời yêu cầu tránh chính danh tính đó."
+  nextStep_vi: "Owner sửa mâu thuẫn trong ý định đã lưu; bộ chọn không tự bỏ require hay avoid."
+  owner: owner
+  kind: input-invalid
+
+required-identity-mismatch:
+  title: "Candidate does not match the required identity"
+  title_vi: "Ứng viên không khớp danh tính bắt buộc"
+  meaning_vi: "Ứng viên không khớp toàn bộ các trường pool, provider và model đã được require cho yêu cầu hiện tại."
+  causes_vi:
+    - "Ứng viên chỉ khớp một phần selector bắt buộc hoặc thuộc danh tính khác."
+  nextStep_vi: "Chỉ chọn ứng viên khớp đầy đủ require trong nhóm; nếu không có thì báo thiếu danh tính bắt buộc, không nới ràng buộc."
+  owner: owner
+  kind: dispatch-refusal
+
+required-model-unverifiable:
+  title: "Required concrete model cannot be verified"
+  title_vi: "Không kiểm chứng được model cụ thể bắt buộc"
+  meaning_vi: "Ứng viên không có thẩm quyền chứng minh model cụ thể dù tên khai báo khớp require.model; tên runtime logic không phải bằng chứng model thực tế."
+  causes_vi:
+    - "Agent không hỗ trợ đối số chọn model hoặc chứng cứ khả năng chọn model bị thiếu, không hợp lệ."
+  nextStep_vi: "Dùng ứng viên hỗ trợ model cụ thể có thể kiểm chứng, hoặc xin owner sửa require; không giữ chỗ hay khởi động để thử đoán model."
+  owner: owner
+  kind: dispatch-refusal
+
+required-unavailable:
+  title: "Required admission identity is unavailable"
+  title_vi: "Danh tính admission bắt buộc chưa khả dụng"
+  meaning_vi: "Không có ứng viên đủ điều kiện khớp require trong nhóm được phép, nên yêu cầu bị từ chối thay vì chọn danh tính khác."
+  causes_vi:
+    - "Danh tính bắt buộc không có trong nhóm, không kiểm chứng được model hoặc bị loại bởi quota, dung lượng, chất lượng hay độc lập."
+  nextStep_vi: "Đọc mã loại của các ứng viên khớp require và khôi phục điều kiện; chỉ owner đúng thẩm quyền mới được đổi ràng buộc bắt buộc."
+  owner: owner
+  kind: dispatch-refusal
+
+reserve-override-invalid:
+  title: "Invalid scoped quota reserve override"
+  title_vi: "Quyền dùng vùng quota giữ lại không hợp lệ"
+  meaning_vi: "Override không có xác nhận quyền hợp lệ hoặc không khớp chính xác phạm vi, vai trò, provider, model và account của yêu cầu."
+  causes_vi:
+    - "Thiếu lý do, model cụ thể, phạm vi hoặc truyền quyền của lần thử khác."
+  nextStep_vi: "Đối chiếu quyền từ goal đã được owner phê duyệt với đúng yêu cầu hiện tại; không dùng cờ tự khai để vượt vùng giữ lại."
+  owner: owner
+  kind: input-invalid
 DB_MIGRATION_SHAPE:
   title: "A migration is named `<ts14>_<kebab>.sql`, stamped in valid past UTC, ordered after the base's migrations, and immutable once on the base"
   title_vi: "Migration sai hình dạng hoặc bị sửa"

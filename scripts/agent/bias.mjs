@@ -3,7 +3,7 @@
 //
 //   normalizeBias(obj)   — canonicalize a bias object (agent-supplied or
 //                          regex-extracted): aliases → canonical pool ids,
-//                          unknowns dropped, avoid always wins over prefer.
+//                          legacy soft unknowns dropped; hard constraints preserved or refused.
 //   extractRoutingBias(text) -> { prefer: [], avoid: [] }
 //                          — regex floor for callers with no agent in the
 //                          loop (automation, programmatic define-goal). An
@@ -21,14 +21,8 @@
 // Internal entry: spawned by scripts/route/route-model.mjs; not invoked directly.
 // Args: "<text>" -> extracted JSON; --normalize '<json>' -> normalized JSON.
 import { isMain } from '../lib/is-main.mjs';
-import { parseJson } from '../lib/json.mjs';
 import { altOf } from '../lib/source-phrases.mjs';
-
-const ALIASES = {
-  'codex': 'codex-agent', 'codex-agent': 'codex-agent',
-  'claude': 'claude-agent', 'claude-agent': 'claude-agent',
-  'devin': 'devin-agent', 'devin-agent': 'devin-agent',
-};
+import { normalizeOwnerRoutingBias, canonicalRoutingPool } from '../lib/owner-routing-bias.mjs';
 
 // Longest alias forms first so 'codex-agent' wins over 'codex' inside the token.
 const PREFER_RE = new RegExp(`(?:${altOf('bias.prefer')})\\s+([a-z][a-z-]*)`, 'gi');
@@ -37,7 +31,7 @@ const AVOID_RE = new RegExp(`(?:${altOf('bias.avoid')})\\s+([a-z][a-z-]*)`, 'gi'
 const scan = (text, re) => {
   const out = [];
   for (const m of text.matchAll(re)) {
-    const agent = ALIASES[m[1].toLowerCase()];
+    const agent = canonicalRoutingPool(m[1]);
     if (agent && !out.includes(agent)) out.push(agent);
   }
   return out;
@@ -50,20 +44,10 @@ function extractRoutingBias(text) {
   return { prefer, avoid };
 }
 
-// Canonicalize any bias-shaped object: every entry resolves through the
-// alias map (case-insensitive, unknowns dropped), avoid wins over prefer.
+// Preserve role-scoped concrete requirements and explicit reserve grants. Normalization
+// is not authorization: the launch adapter independently checks the persisted owner grant.
 function normalizeBias(obj) {
-  const canon = (list) => {
-    const out = [];
-    for (const raw of Array.isArray(list) ? list : []) {
-      const agent = ALIASES[String(raw ?? '').trim().toLowerCase()];
-      if (agent && !out.includes(agent)) out.push(agent);
-    }
-    return out;
-  };
-  const avoid = canon(obj?.avoid);
-  const prefer = canon(obj?.prefer).filter((a) => !avoid.includes(a));
-  return { prefer, avoid };
+  return normalizeOwnerRoutingBias(obj);
 }
 
 const entry = isMain(import.meta.url);
@@ -71,8 +55,13 @@ if (entry) {
   const argv = process.argv.slice(2);
   const ni = argv.indexOf('--normalize');
   if (ni >= 0) {
-    const parsed = parseJson(argv[ni + 1]);
-    console.log(JSON.stringify(normalizeBias(parsed ?? {}), null, 2));
+    try {
+      const parsed = JSON.parse(argv[ni + 1]);
+      console.log(JSON.stringify(normalizeBias(parsed), null, 2));
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 2;
+    }
   } else {
     console.log(JSON.stringify(extractRoutingBias(argv.join(' ')), null, 2));
   }

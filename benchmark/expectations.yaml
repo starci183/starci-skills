@@ -98,8 +98,8 @@ pools:
     model:                                   # one Codex window, two models pinned per difficulty (runtimes.yaml runtimes.codex-agent.models)
       easy: gpt-6-luna
       medium: gpt-6-luna
-      hard: gpt-6-sol                        # every think kind routes at a hard floor, so strategy runs on GPT-6 Sol
-      insane: gpt-6-sol
+      hard: gpt-6.1-sol                        # every think kind routes at a hard floor, so strategy runs on GPT-6.1 Sol
+      insane: gpt-6.1-sol
     provider: codex
     roles: [implement, verify, write, decide, plan]
     maxParallel: 10
@@ -119,9 +119,9 @@ pools:
         - first pick for any review or verify kind other than that interface.audit case
         - first pick for hands-on work
         - spending its shared Luna/Sol quota on easy fan-out (profile failureModes, inferred)
-      cites: [modules/models/profiles/codex-agent.yaml, modules/models/profiles/gpt-6-sol.yaml, modules/models/profiles/gpt-6-luna.yaml, modules/models/agents/codex.yaml]
+      cites: [modules/models/profiles/codex-agent.yaml, modules/models/profiles/gpt-6.1-sol.yaml, modules/models/profiles/gpt-6-luna.yaml, modules/models/agents/codex.yaml]
     publicBenchmarks:
-      gpt-6-sol:
+      gpt-6.1-sol:
         sweBenchVerified: null
         sweBenchPro: null
         terminalBench: null

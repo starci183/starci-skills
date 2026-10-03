@@ -7,6 +7,7 @@
 //      every skipped test is reported with its reason, and a skip from missing infrastructure (or any skip but the declared browser ones) fails L4;
 //   5. main did not move meanwhile; the pushed range passes the secret scan;
 //   6. the ANNOTATED tag is created on HEAD with the CHANGELOG section as its message, and main and the tag are pushed together, atomically: both refs move or neither does.
+// The push lock: a remote whose pushurl reads `DISABLED...` (the owner's lock while lands stay local) is pushed through its fetch url for this one push, without writing the config (pushLiftTarget).
 // Exported function only: the CLI exposes it as `starci release cut`. Git goes through the scripts/api/git call files the CLI's git verbs use. Never stashes, resets, deletes or moves a tag, never pushes anything but main and that tag.
 // The heavy part (the suite and the push) runs under the host lock (scripts/machine/host-lock.mjs, role release): a held lock refuses the cut and names its owner.
 // After the tag is made and before the push, the L4 record of HEAD is written (scripts/guards/release-record.mjs): the pre-push hook of the runtime and of every app
@@ -15,12 +16,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { catFile } from '../api/git/cat-file.mjs';
+import { configGet } from '../api/git/config-get.mjs';
 import { lsRemote } from '../api/git/ls-remote.mjs';
 import { push } from '../api/git/push.mjs';
 import { revParseQuery } from '../api/git/rev-parse-query.mjs';
 import { statusQuery } from '../api/git/status-query.mjs';
 import { symbolicRefQuery } from '../api/git/symbolic-ref-query.mjs';
 import { tag as gitTag } from '../api/git/tag.mjs';
+import { updateRef } from '../api/git/update-ref.mjs';
 import { changelogSection, releaseNotesFindings } from '../hfs/runtime-rules/release-notes.mjs';
 import { runL4, skipReport } from './release-l4.mjs';
 import { scanRange } from './push-mains.mjs';
@@ -37,6 +40,15 @@ function git([verb, ...args], { cwd }) {
   if (!call) throw new Error(`git ${verb}: not a call of the release flow`);
   const r = call(args, { cwd, timeout: 120_000 });
   return { ok: r.status === 0, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? '').trim() };
+}
+
+/**
+ * Where the release push goes: a remote whose `pushurl` the owner parked as `DISABLED...` (a push lock while lands stay local; docs/git-governance.md) is pushed through its fetch url for this one
+ * push (a pushurl is multi-valued, so a per-command override would still try the parked one), the config is never written, and the remote-tracking ref is moved by hand afterwards.
+ * Any other pushurl (an ssh url for an https remote, say) is the owner's choice and is left alone. Pure over the values: the url to push to, or null when the named remote is pushed.
+ */
+function pushLiftTarget({ pushUrl, fetchUrl }) {
+  return /^DISABLED/i.test(String(pushUrl ?? '').trim()) && String(fetchUrl ?? '').trim() ? String(fetchUrl).trim() : null;
 }
 
 /** The refs a release push may carry: main and one release tag. Pure: the refusal reason, or null. */
@@ -96,11 +108,14 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const red = steps.filter((s) => !s.ok);
   if (red.length) return refuse('suite-red', `${red.map((s) => `${s.name}${s.absent ? ' (absent)' : ''}`).join(', ')} red: fix, land, and cut again (logs: ${red.map((s) => s.log).filter(Boolean).join(', ')})`);
   if (!steps.length) return refuse('suite-red', 'the full suite did not run');
-  // L4 reports every skipped test with its reason: a skip caused by missing infrastructure, or any skip but the declared browser-conditional ones, fails it.
+  // L4 reports every skipped test with its reason, and every test must have passed in at least one leg (the host run or the Linux container run): a skip that passed in the other leg is covered and listed with where it passed;
+  // a skip nothing covered (missing infrastructure, a platform no leg has, any undeclared skip) fails L4.
   const skips = skipReport(steps);
   out.skips = skips.skips;
   out.declaredSkips = skips.declared;
-  if (skips.failures.length) return refuse('suite-skips', `${skips.failures.length} skipped test(s) fail L4: ${skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ')}`);
+  out.coveredSkips = skips.covered;
+  const unmatched = steps.flatMap((s) => s.unmatched ?? []);
+  if (skips.failures.length) return refuse('suite-skips', `${skips.failures.length} skipped test(s) executed in no leg and fail L4: ${skips.failures.slice(0, 8).map((k) => `${k.name} [${k.class}: ${k.reason || 'no reason'}]`).join('; ')}${unmatched.length ? `; no spec file holds the literal title of: ${unmatched.slice(0, 6).join(' | ')} (the Linux leg could not run it)` : ''}`);
 
   if (run(['rev-parse', 'HEAD'], { cwd }).stdout !== head || run(['status', '--porcelain', '--untracked-files=no'], { cwd }).stdout) return refuse('main-moved', 'the checkout changed while the suite ran: start over');
   const scan = (deps.scan ?? scanRange)({ cwd, from: `${remote}/${branch}`, to: branch });
@@ -117,8 +132,10 @@ export async function cutRelease({ repo, remote = 'origin', branch = 'main', tag
   const recorded = (deps.recordL4 ?? writeL4Record)({ repo, head, tag, logs: steps.filter((s) => !s.absent) });
   if (!recorded.ok) return refuse('l4-record', `the L4 record of ${head.slice(0, 9)} could not be written (${recorded.reason}): the pre-push gate would refuse the push`);
   out.l4Record = recorded.file ?? null;
-  const pushed = await lock(() => (deps.push ?? push)(['--atomic', remote, ...refs], { cwd, timeout: 600_000 }));
+  const lifted = pushLiftTarget({ pushUrl: configGet(cwd, `remote.${remote}.pushurl`).stdout, fetchUrl: configGet(cwd, `remote.${remote}.url`).stdout });
+  const pushed = await lock(() => (deps.push ?? push)(['--atomic', lifted ?? remote, ...refs], { cwd, timeout: 600_000 }));
   if (heldBy(pushed)) return refuse('host-lock-held', heldWhy(heldBy(pushed)));
   if (pushed.status !== 0) return refuse('push-refused', `the atomic push of ${refs.join(' and ')} to ${remote} failed (the local tag stays, nothing moved on the remote): ${String(pushed.stderr ?? '').trim().slice(0, 300)}`);
+  if (lifted) updateRef(cwd, `refs/remotes/${remote}/${branch}`, head, { message: `release push of ${tag}` });
   return { ...out, ok: true, verdict: 'pushed', why: `${branch} and ${tag} pushed to ${remote} in one atomic push`, pushed: true };
 }

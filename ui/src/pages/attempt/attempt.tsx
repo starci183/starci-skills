@@ -32,7 +32,7 @@ function initialStep(attempt: AttemptDetailV3): AttemptStep {
   return 'verdict';
 }
 
-/** "gpt-6-sol · codex-agent · 12 min 52 sec · tokens not recorded" */
+/** "gpt-6.1-sol · codex-agent · 12 min 52 sec · tokens not recorded" */
 function costSummary(a: AttemptDetailV3): string {
   const end = a.settledAt ?? a.reportedAt;
   const total = a.usage?.total;

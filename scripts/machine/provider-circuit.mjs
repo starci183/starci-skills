@@ -12,19 +12,23 @@ import { normalizeProvider } from '../lib/provider.mjs';
 const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
 const STATUS_OF = { unavailable: 'unavailable', recovered: 'recovered', healthy: 'healthy', striking: 'striking' };
 
-/** The stored circuit of `provider` as {value, at, expiresAt}, or null. */
-export function readProviderCircuit(provider, { machine = null } = {}) {
+/** An observed empty circuit differs from an unavailable machine reader. */
+export function inspectProviderCircuit(provider, { machine = null, env = process.env } = {}) {
   const key = normalizeProvider(provider);
-  if (!CIRCUIT_PROVIDERS.includes(key)) return null;
+  if (!CIRCUIT_PROVIDERS.includes(key)) return { observed: false, row: null, error: 'unsupported-provider' };
   let m = machine, own = false;
   try {
-    if (!m) { m = openMachineReader(); own = true; }
+    if (!m) { m = openMachineReader({ env }); own = true; }
     const row = providerHealth(m).find((r) => r.provider === key);
-    if (!row) return null;
+    if (!row) return { observed: true, row: null, error: null };
     const detail = parseJsonOr(row.detail_json) ?? {};
-    return { value: { ...detail, provider: key, status: row.status, failureKind: row.failure_kind ?? detail.failureKind ?? null, strikes: row.strikes }, at: row.updated_at, expiresAt: row.circuit_open_until ?? null };
-  } catch { return null; } finally { if (own) try { m?.close(); } catch { /* closed */ } }
+    return { observed: true, row: { value: { ...detail, provider: key, status: row.status, failureKind: row.failure_kind ?? detail.failureKind ?? null, strikes: row.strikes }, at: row.updated_at, expiresAt: row.circuit_open_until ?? null }, error: null };
+  } catch (error) { return { observed: false, row: null, error: error.message }; }
+  finally { if (own) m?.close(); }
 }
+
+/** Legacy tolerant projection; admission uses the typed observation above. */
+export function readProviderCircuit(provider, options = {}) { return inspectProviderCircuit(provider, options).row; }
 
 /** Store the circuit of `provider` (value.status unavailable|recovered|striking|healthy). Returns true when written. */
 export function writeProviderCircuit(provider, { value, expiresAt = null, ledgerId = null, attemptId = null, machine = null } = {}) {

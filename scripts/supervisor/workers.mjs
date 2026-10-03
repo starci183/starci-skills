@@ -61,6 +61,7 @@ import { CONTRACT_CHANGES_DIR } from '../lib/contract-changes-path.mjs';
 import { guardLaunch, bindGuardTerminal } from '../guards/hook-install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 import { loadRuntimes } from '../agent/models.mjs';
+import { recordWorkerLaunch, workerAttemptAgent, setJob } from './worker-state.mjs';
 import { startWorkerAgent } from '../agent/start-worker.mjs'; import { isMain } from '../lib/is-main.mjs';
 import { readEnv } from '../lib/env.mjs';
 import { slugify } from '../lib/slug.mjs';
@@ -91,7 +92,6 @@ const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
 const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
 const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
-const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
 const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
@@ -145,11 +145,6 @@ export const openWorkerHandles = (m) => new Set(jobsOf(m, LIVE_STATUSES)
 /** The job's newest report: the sup_reports row with `report` parsed, or null. */
 export const reportOf = (m, jobId) => { const r = m.db.prepare('SELECT * FROM sup_reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1').get(jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
 
-/** Write a job's status and/or payload (sup_jobs; a status change also appends the sup-job-<status> event). */
-function setJob(m, jobId, { status = null, payload = undefined }) {
-  if (status) return m.setSupJobStatus(jobId, status, { payload });
-  return m.update('sup_jobs', { payload_json: payload, updated_at: m.now() }, { job_id: jobId }).changes > 0;
-}
 /** The job's latest attempt id; a job that never spawned (a status set by hand) gets an empty one. */
 function attemptIdOf(m, jobId) {
   return m.latestSupAttempt(jobId)?.attempt_id ?? m.startSupAttempt({ jobId }).attemptId;
@@ -287,7 +282,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
     if (a.limited !== c.limited) return a.limited ? c : a;
     return deficits[c.pool].deficit > deficits[a.pool].deficit + 1e-9 ? c : a;
   }, null);
-  return { ...best, deficits, skipped };
+  return { ...best, deficits, skipped, allowGroup: candidates.map(({ agent, model, pool, effort }) => ({ provider: agent, model, pool, effort })) };
 }
 
 /** The live inputs of pickWorkerPool: config shares, recent dispatches (machine + workers), provider health. */
@@ -375,7 +370,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
       const held = takeLeases(m, job);
       if (!held.ok) return held;
       setJob(m, job.job_id, { status: 'spawning' });
-      const { attemptId } = m.startSupAttempt({ jobId: job.job_id, agent: ATTEMPT_AGENTS.has(route.agent) ? route.agent : null, provider: route.agent ?? null,
+      const { attemptId } = m.startSupAttempt({ jobId: job.job_id, agent: workerAttemptAgent(route.agent), provider: route.agent ?? null,
         model: route.model ?? null, effort: route.effort ?? null, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
       return { ok: true, attemptId };
     });
@@ -391,11 +386,15 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
       specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
       request: { workerJob: job.job_id, spawnAttempt: (job.payload.spawnAttempts ?? 0) + 1 }, onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
-      start: deps.start ?? null });
-    const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: stagingRecord(staging),
-      spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,
-      ...(spawned?.ok ? { dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId } : {}) };
+      start: deps.start ?? null, env });
+    const { payload, heldUnknown } = recordWorkerLaunch({ m, job, route, spawned, staging: stagingRecord(staging),
+      attemptId: leased.attemptId, guard, now });
     if (!spawned?.ok) {
+      if (heldUnknown) {
+        live += 1;
+        result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, effectState: spawned?.effectState ?? 'unknown', requeued: false });
+        continue;
+      }
       const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
       // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
       // whose worker-start failed for it or whose failure shows its card's outage (quota/capacity

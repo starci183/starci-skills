@@ -191,7 +191,7 @@ test('a worker gone while its Kernel terminal lives is its own death: a spent bu
 },{terminal:WIPED}));
 
 // A worker nudged once, then silent at its prompt with a lease and no report.
-const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};
+const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6.1-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};
 test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery requeues it',t=>world(t,async({ledger,repoRoot,run,runFailure,job,orcaState})=>{
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-30*MIN});
   const worker=(await status(run)).workers.find(w=>w.jobId===JOB);
