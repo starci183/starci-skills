@@ -107,7 +107,8 @@ const REGISTRATIONS = Object.freeze({
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-const filesBelow = (folder) => {
+/** Every file below a folder (absolute paths); none when the folder is absent. */
+export const filesBelow = (folder) => {
   const files = []
   const visit = (at) => {
     for (const entry of fs.readdirSync(at, { withFileTypes: true })) {

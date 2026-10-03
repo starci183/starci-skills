@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { render, TEMPLATES_DIR } from "../sync/index.mjs";
 import { ScaffoldError, pascalOf } from "./service.mjs";
+import { filesBelow } from "./lite-exports.mjs";
 
 const MIGRATION = /^(\d{14})_[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.sql$/;
 const PLACEHOLDER = /@@([A-Za-z][A-Za-z0-9]*)@@/g;
@@ -31,19 +32,6 @@ export const selectLiteWebhookEntries = (entries) =>
       ? { ...entry, template: "../inbox/webhook-door.ts.tpl" }
       : entry,
   );
-
-const filesBelow = (root) => {
-  const files = [];
-  const visit = (folder) => {
-    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-      const target = path.join(folder, entry.name);
-      if (entry.isDirectory()) visit(target);
-      else files.push(target);
-    }
-  };
-  if (fs.existsSync(root)) visit(root);
-  return files;
-};
 
 const matchingBrace = (text, open) => {
   let depth = 0;
