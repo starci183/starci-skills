@@ -34,7 +34,6 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { sleepSync as scaledSleepSync } from '../../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, getBlob } from './blob.mjs';
 import { redactBytes, redactData, redactText } from '../../scripts/lib/redact.mjs'; import { isMain } from '../../scripts/lib/is-main.mjs';
 import { isSpecRun, readEnv } from '../../scripts/lib/env.mjs';
@@ -43,13 +42,15 @@ import { insertPairs, insertRowWith } from '../../scripts/lib/sqlite.mjs';
 import { need as refuseUnless } from '../refuse.mjs';
 import { sha256 } from '../digest.mjs';
 import { machineSchemaMethods } from './machine-schema.mjs';
+import { machineConnectionMethods, corruptDiagnostic, MACHINE_BUSY_TIMEOUT_MS, MACHINE_CORRUPT_CODE, CORRUPT_RETRY_DELAYS_MS,
+  waitForRetry, isCorruptError, isBusyError, errText } from './machine-connection.mjs';
+export { MACHINE_BUSY_CODE, isMachineBusy, isBusyError } from './machine-connection.mjs';
 import { providerReservationMethods } from './provider-reservations.mjs';
 
 const require = createRequire(import.meta.url);
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
 export const MACHINE_VERSION = 2;
-const MACHINE_BUSY_TIMEOUT_MS = 15000;
 /** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
 const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
@@ -114,57 +115,12 @@ const toJson = (value) => (value === undefined || value === null ? null : typeof
 const parse = (text) => { if (text == null) return null; try { return JSON.parse(text); } catch { return null; } };
 const int = (v) => (v === undefined || v === null || v === '' ? null : Math.trunc(Number(v)));
 const bool = (v) => (v === undefined || v === null ? null : v ? 1 : 0);
-const OPEN_RETRY_DELAYS_MS = [0, 300, 900];
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
 /** True while `pid` names a live process (EPERM counts as alive). */
 export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
-/**
- * SQLITE_BUSY / SQLITE_LOCKED that survived busy_timeout: the waits before each further attempt (bounded backoff, scaled by
- * STARCI_SLEEP_SCALE), then STARCI_MACHINE_BUSY. Only an attempt that changed nothing is retried: a BEGIN IMMEDIATE that
- * was refused, or one autocommit statement outside a transaction.
- */
-const BUSY_RETRY_DELAYS_MS = Object.freeze([100, 300, 900, 2000]);
-export const MACHINE_BUSY_CODE = 'STARCI_MACHINE_BUSY';
-export const isMachineBusy = (error) => error?.code === MACHINE_BUSY_CODE;
-const busyError = (file, error, { retries, where }) => Object.assign(Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
-  { code: MACHINE_BUSY_CODE, cause: error, file, retries, where });
-/** True for SQLITE_BUSY / SQLITE_LOCKED ("database is locked"). */
-export const isBusyError = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Transient SQLITE_CORRUPT / SQLITE_NOTADB (incident 2026-09-28: a land's record write and a read-only quick_check saw
-// "database disk image is malformed"; minutes later integrity_check was ok). Retry after a reopen, bounded; then an incident.
-// ---------------------------------------------------------------------------------------------------------------------
-/** The waits before each reopen-and-retry (3 retries after the first failure, ~0.8 s in all). */
-const CORRUPT_RETRY_DELAYS_MS = Object.freeze([25, 150, 600]);
-const MACHINE_CORRUPT_CODE = 'STARCI_MACHINE_CORRUPT';
-/** SQLITE_CORRUPT (11, and its extended codes) or SQLITE_NOTADB (26). */
-const isCorruptError = (error) => {
-  if (!error) return false;
-  if (error.code === MACHINE_CORRUPT_CODE) return true;
-  const code = Number(error.errcode);
-  if (Number.isInteger(code) && ((code & 0xff) === 11 || (code & 0xff) === 26)) return true;
-  return /database disk image is malformed|file is not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(String(error.message ?? error));
-};
-const errText = (error) => String(error?.message ?? error).slice(0, 500);
-/** A persistent corrupt error with read-only quick_check and visible stderr diagnostics. */
-function corruptDiagnostic(file, error, { retries, where }) {
-  if (error?.code === MACHINE_CORRUPT_CODE) return error;
-  const out = Object.assign(Error(`machine-db-corrupt: ${file} ${where}: SQLITE_CORRUPT persisted after ${retries} reopen(s): ${errText(error)}`),
-    { code: MACHINE_CORRUPT_CODE, cause: error, file, retries, where });
-  let check = null;
-  try {
-    const { DatabaseSync } = require('node:sqlite');
-    const db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
-    try { check = db.prepare('PRAGMA quick_check').all().map((r) => r.quick_check).slice(0, 20); } finally { db.close(); }
-  } catch (e) { check = [`quick_check failed: ${errText(e)}`]; }
-  out.quickCheck = check;
-  process.stderr.write(`[machine-db] INCIDENT ${out.message} (quick_check: ${JSON.stringify(check)})\n`);
-  return out;
-}
+const { openWithRetry, connectionState } = machineConnectionMethods({ reportIncident: corruptIncident });
 /** Operational failures also persist their incident through a fresh writer or the deferred outbox. */
 function corruptIncident(file, error, details) {
   const out = corruptDiagnostic(file, error, details);
@@ -183,65 +139,6 @@ function corruptIncident(file, error, details) {
     try { out.deferred = deferWrite({ op: 'log', args: [{ ...row, src: null }], file, error: e }); } catch (e2) { process.stderr.write(`[machine-db] INCIDENT could not be recorded: ${errText(e2)}\n`); }
   }
   return out;
-}
-/**
- * The connection every handle holds: `prepare/exec` as on DatabaseSync, but a transient corrupt error outside a
- * transaction reopens the connection and retries the one statement (an autocommit statement rolled back on error, so the
- * retry is exact). Inside a transaction it is rethrown for handle.transaction() to retry the whole unit. Everything else
- * (isTransaction, function, close ...) is the live DatabaseSync's.
- */
-function resilientConnection(openRaw, { file, inTransaction, onRecovered, onCorrupt = corruptIncident }) {
-  let raw = openRaw();
-  let generation = 0;
-  const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
-  const retrying = (where, op) => {
-    let busyRetries = 0;
-    for (let retries = 0; ; retries += 1) {
-      try {
-        const out = op();
-        if (retries) onRecovered({ where, retries });
-        return out;
-      } catch (error) {
-        if (isBusyError(error) && !isMachineBusy(error) && !isCorruptError(error)) {
-          if (inTransaction() || raw.isTransaction) throw error;
-          if (busyRetries >= BUSY_RETRY_DELAYS_MS.length) throw busyError(file, error, { retries: busyRetries, where });
-          scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyRetries]); busyRetries += 1; retries -= 1; continue;
-        }
-        if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
-        if (inTransaction() || raw.isTransaction) throw error;
-        if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw onCorrupt(file, error, { retries, where });
-        sleepSync(CORRUPT_RETRY_DELAYS_MS[retries]);
-        try { reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
-      }
-    }
-  };
-  const prepare = (sql) => {
-    let stmt = null, gen = -1;
-    const settings = [];
-    const current = () => {
-      if (gen !== generation) { stmt = raw.prepare(sql); for (const [k, a] of settings) stmt[k](...a); gen = generation; }
-      return stmt;
-    };
-    retrying(`prepare ${sql.slice(0, 80)}`, current);
-    return new Proxy({}, {
-      get(_, prop) {
-        if (prop === 'run' || prop === 'get' || prop === 'all' || prop === 'iterate') return (...args) => retrying(`${prop} ${sql.slice(0, 80)}`, () => current()[prop](...args));
-        if (typeof prop === 'string' && /^set[A-Z]/.test(prop)) return (...args) => { settings.push([prop, args]); return current()[prop](...args); };
-        const value = current()[prop];
-        return typeof value === 'function' ? value.bind(current()) : value;
-      },
-    });
-  };
-  return new Proxy({}, {
-    get(_, prop) {
-      if (prop === 'prepare') return prepare;
-      if (prop === 'exec') return (sql) => retrying(`exec ${String(sql).slice(0, 80)}`, () => raw.exec(sql));
-      if (prop === 'reopen') return reopen;
-      if (prop === 'raw') return raw;
-      const value = raw[prop];
-      return typeof value === 'function' ? value.bind(raw) : value;
-    },
-  });
 }
 
 /**
@@ -263,12 +160,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
   const { DatabaseSync } = require('node:sqlite');
   need(typeof file === 'string' && file.trim(), 'openMachine needs a file');
   if (!readOnly) fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-  let lastError;
-  let busyOpens = 0;
-  // SQLITE_CANTOPEN (Windows, while another process closes the WAL files) and a transient SQLITE_CORRUPT are retried.
-  let failures = 0;   // non-busy failures: one attempt per OPEN_RETRY_DELAYS_MS entry; busy ones have their own BUSY_RETRY_DELAYS_MS budget
-  for (;;) {
-    if (failures && OPEN_RETRY_DELAYS_MS[failures]) sleepSync(OPEN_RETRY_DELAYS_MS[failures]);
+  return openWithRetry(() => {
     let db;
     try {
       if (readOnly) {
@@ -297,15 +189,9 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       return db;
     } catch (error) {
       try { db?.close(); } catch { /* closed */ }
-      const busy = isBusyError(error) && !isCorruptError(error);
-      if (!busy && !/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
-      lastError = error;
-      if (busy) { if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' }); scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]); busyOpens += 1; }
-      else if ((failures += 1) >= OPEN_RETRY_DELAYS_MS.length) break;
+      throw error;
     }
-  }
-  if (isCorruptError(lastError)) throw onCorrupt(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
-  throw lastError;
+  }, { file, onCorrupt });
 }
 
 function recordFacts(db) {
@@ -402,17 +288,6 @@ export function readMachine(fn, fallback = null, options = {}) {
   finally { try { m?.close(); } catch { /* closed */ } }
 }
 
-function connectionState(openRaw, { file, inTransaction = () => false, onCorrupt = corruptIncident }) {
-  const recovered = [];
-  const noteRecovered = (r) => {
-    recovered.push({ ...r, at: Date.now() });
-    process.stderr.write(`[machine-db] transient SQLITE_CORRUPT recovered after ${r.retries} reopen(s) at ${r.where} (${file})
-`);
-  };
-  const db = resilientConnection(openRaw, { file, inTransaction, onRecovered: noteRecovered, onCorrupt });
-  return { db, recovered, noteRecovered, close() { try { db.close(); } catch { /* closed */ } } };
-}
-
 function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tempDirs }) {
   let depth = 0;
   const { db, recovered, noteRecovered, close } = connectionState(openRaw, { file, inTransaction: () => depth > 0 });
@@ -435,7 +310,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
       } catch (error) {
         if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
         if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where: 'transaction' });
-        sleepSync(CORRUPT_RETRY_DELAYS_MS[retries]);
+        waitForRetry(CORRUPT_RETRY_DELAYS_MS[retries]);
         try { db.reopen(); } catch (openError) { if (!isCorruptError(openError)) throw openError; }
       }
     }

@@ -7,9 +7,12 @@ summary: >-
   read metadata, the read connection, close and the existing typed registry, service, seat, provider,
   log, metric and resource queries without the operational mutation API.
   openMachineReader, readMachine and writers retain their operational incident and recovery persistence.
+  engine/db/machine-connection.mjs owns shared connection retries and read-only diagnostics; machine.mjs
+  owns writable preparation, transactions and incident/outbox persistence.
 reach: new-legs
 paths:
   - engine/db/machine.mjs
+  - engine/db/machine-connection.mjs
   - tests/engine-db/machine-observer.spec.mjs
   - docs/ledger-db.md
   - modules/kernel/contract-changes/machine-ui-observer.yaml
