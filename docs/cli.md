@@ -4370,7 +4370,7 @@ run the specs selected for one local ladder level
 | `--changed` | list |  |
 | `--against` | string (default main) |  |
 | `--spec` | list |  |
-| `--concurrency` | number (default 4) |  |
+| `--concurrency` | number |  |
 | `--root` | string |  |
 | `--release-cut` | boolean |  |
 
@@ -4384,6 +4384,8 @@ Conventions:
 - Never run the whole suite outside L4; L4 belongs to starci release cut and L5 belongs to CI.
 - L2 and L3 need a clean committed tree, run the full check first, and hold the one host test lock.
 - A red L2 or L3 selection is re-run once serially; a green re-run is recorded as a flake, never skipped.
+- File concurrency uses fresh idle CPU and free RAM under modules/supervisor/test-concurrency.yaml; --concurrency overrides it.
+- The result and spec log retain the concurrency decision and host measurements.
 
 exit: 0 selected specs passed; 1 a check or spec was red; 2 usage or ladder policy refusal
 

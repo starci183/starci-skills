@@ -1,0 +1,8 @@
+id: resource-aware-test-concurrency
+effectiveAt: 2026-10-03
+summary: Test runs choose file concurrency from fresh CPU and free RAM budgets, retain the decision and honor an explicit positive integer override.
+reach: new-legs
+paths:
+  - modules/cli/commands/test/run.yaml
+  - modules/supervisor/test-concurrency.yaml
+  - modules/supervisor/worker-prompt.md

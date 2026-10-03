@@ -10,6 +10,7 @@ import { underHostLock } from './verb-lock.mjs';
 import { checkRun } from './ladder-check.mjs';
 import { cleanTree, committedChanges, tracked, workingChanges, runOutcome } from './ladder-select.mjs';
 import { ladderRefusal, ladderResult, pathList, scopeFor } from './test-ladder.mjs';
+import { resolveTestConcurrency } from './test-concurrency.mjs';
 
 const SCHEMA = 'starci/test-run@1';
 const PRELOADS = Object.freeze(['tests/setup/low-priority.mjs', 'tests/setup/isolated-temp.mjs', 'tests/setup/isolated-registry.mjs']);
@@ -89,6 +90,9 @@ export async function testRun(ctx, deps = {}) {
   if (!level) return ladderRefusal({ schema: SCHEMA, level, message: 'starci test run: --level is required (L1|L2|L3|L4)' });
   if (level === 'L5') return ladderRefusal({ schema: SCHEMA, level, message: 'starci test run: L5 is CI only and never runs locally' });
   if (!['L1', 'L2', 'L3', 'L4'].includes(level)) return ladderRefusal({ schema: SCHEMA, level, message: `starci test run: unsupported local level ${level}` });
+  if (args.concurrency != null && (!Number.isSafeInteger(args.concurrency) || args.concurrency < 1)) {
+    return ladderRefusal({ schema: SCHEMA, level, message: 'starci test run: --concurrency must be a positive integer' });
+  }
   scopeFor(level);
 
   const role = ctx?.role ?? 'owner';
@@ -134,14 +138,16 @@ export async function testRun(ctx, deps = {}) {
     } else writeLog(log, '', deps);
 
     if (!selected.length) return ladderResult({ schema: SCHEMA, level, scope: [], ok: true, findings: [], log, tip, selected, changed, counts: { tests: 0, pass: 0, fail: 0 }, model: scopeFor(level).specs });
-    const concurrency = Math.max(1, Number(args.concurrency ?? 4) || 4);
+    const decision = resolveTestConcurrency(args.concurrency, deps);
+    const concurrency = decision.concurrency;
+    writeLog(log, `[concurrency]\n${JSON.stringify(decision)}\n`, deps, true);
     const first = await runSpecs(root, selected, concurrency, deps);
     writeLog(log, `[specs concurrency=${concurrency}]\n${first.stdout ?? ''}${first.stderr ?? ''}\n`, deps, true);
-    if (first.ok) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: true, findings: [], log, tip, selected, changed, counts: runSummary(first), model: scopeFor(level).specs });
+    if (first.ok) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: true, findings: [], log, tip, selected, changed, concurrency: decision, counts: runSummary(first), model: scopeFor(level).specs });
 
     const red = pathList(first.failedFiles ?? failedSpecFiles(`${first.stdout ?? ''}\n${first.stderr ?? ''}`, root)).filter((file) => selected.includes(file));
     if (!['L2', 'L3'].includes(level) || !red.length) return ladderResult({ schema: SCHEMA, level, scope: selected, ok: false,
-      findings: [{ kind: 'spec-red', files: red, message: red.length ? `${red.length} spec file(s) red` : 'the spec run was red but named no failing file' }], log, tip, selected, changed, counts: runSummary(first), model: scopeFor(level).specs });
+      findings: [{ kind: 'spec-red', files: red, message: red.length ? `${red.length} spec file(s) red` : 'the spec run was red but named no failing file' }], log, tip, selected, changed, concurrency: decision, counts: runSummary(first), model: scopeFor(level).specs });
     const retry = await runSpecs(root, red, 1, deps);
     writeLog(log, `[red re-run concurrency=1]\n${retry.stdout ?? ''}${retry.stderr ?? ''}\n`, deps, true);
     const flakes = retry.ok ? red : [];
@@ -149,7 +155,7 @@ export async function testRun(ctx, deps = {}) {
       ? [{ kind: 'flake', files: flakes, message: `${flakes.length} red spec file(s) passed on the one serial re-run` }]
       : [{ kind: 'spec-red', files: pathList(retry.failedFiles ?? red), message: 'red spec files failed again on the one serial re-run' }];
     return ladderResult({ schema: SCHEMA, level, scope: selected, ok: retry.ok, findings, log, tip, selected, changed,
-      counts: runSummary(retry), flakes, model: scopeFor(level).specs });
+      counts: runSummary(retry), flakes, concurrency: decision, model: scopeFor(level).specs });
   };
 
   if (['L2', 'L3', 'L4'].includes(level)) {

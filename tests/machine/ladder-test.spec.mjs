@@ -110,3 +110,48 @@ test('L1 default selection follows a real temporary Git change through spec-deps
   assert.deepEqual(result.data.changed, ['scripts/unit.mjs']);
   assert.deepEqual(runs, [['tests/unit.spec.mjs']]);
 });
+
+test('L1 chooses file concurrency from the current idle CPU and free RAM budgets', async (t) => {
+  const tempDir = mkdtemp(t, 'starci-ladder-resources-');
+  const runs = [];
+  const result = await testRun(context({ level: 'L1' }), selection({
+    tempDir,
+    hostSample: () => ({ logicalThreads: 28, cpuBusy: 0.42, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 30 * 1024 ** 3 }),
+    runTests: ({ concurrency }) => { runs.push(concurrency); return { ok: true, status: 0, stdout: '', stderr: '', counts: { tests: 1, pass: 1, fail: 0 } }; },
+  }));
+  assert.equal(result.code, 0);
+  assert.deepEqual(runs, [8]);
+  assert.equal(result.data.concurrency.mode, 'auto');
+  assert.equal(result.data.concurrency.cpuLimit, 8);
+  assert.match(fs.readFileSync(result.data.log, 'utf8'), /concurrency=8/);
+});
+
+test('L2 samples after its lock and CHECK, then retains the serial red retry', async (t) => {
+  const tempDir = mkdtemp(t, 'starci-ladder-fresh-resources-');
+  const calls = [];
+  const result = await testRun(context({ level: 'L2' }), selection({
+    tempDir, cleanTree: () => true, isAncestor: () => true, changedAgainst: () => ['scripts/a.mjs'],
+    underHostLock: async (_options, fn) => { calls.push('lock'); return await fn(); },
+    checkRun: async () => { calls.push('check'); return { code: 0, text: 'check green' }; },
+    hostSample: () => { calls.push('sample'); return { logicalThreads: 28, cpuBusy: 0.75, totalRamBytes: 64 * 1024 ** 3, freeRamBytes: 30 * 1024 ** 3 }; },
+    runTests: ({ concurrency }) => {
+      calls.push(`spec:${concurrency}`);
+      return { ok: concurrency === 1, status: concurrency === 1 ? 0 : 1, stdout: '', stderr: '',
+        failedFiles: concurrency === 1 ? [] : ['tests/a.spec.mjs'], counts: { tests: 1, pass: concurrency === 1 ? 1 : 0, fail: concurrency === 1 ? 0 : 1 } };
+    },
+  }));
+  assert.equal(result.code, 0);
+  assert.deepEqual(calls, ['lock', 'check', 'sample', 'spec:3', 'spec:1']);
+  assert.deepEqual(result.data.flakes, ['tests/a.spec.mjs']);
+});
+
+test('invalid explicit concurrency is refused before any spec, lock or probe', async () => {
+  for (const concurrency of [0, -1, 1.5]) {
+    const result = await testRun(context({ level: 'L2', concurrency }), {
+      hostSample: () => assert.fail('must not sample'), underHostLock: () => assert.fail('must not lock'),
+      runTests: () => assert.fail('must not run'),
+    });
+    assert.equal(result.code, 2);
+    assert.match(result.text, /positive integer/);
+  }
+});

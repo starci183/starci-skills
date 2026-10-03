@@ -1110,7 +1110,7 @@ complete -c starci -n '__starci_using_command test run' -l level -r -a 'L1 L2 L3
 complete -c starci -n '__starci_using_command test run' -l changed -r -d 'changed repository paths used for L1 selection'
 complete -c starci -n '__starci_using_command test run' -l against -r -d 'local main ref used for L2 and L3 selection'
 complete -c starci -n '__starci_using_command test run' -l spec -r -d 'explicit spec files at L1 only'
-complete -c starci -n '__starci_using_command test run' -l concurrency -r -d 'node test file concurrency'
+complete -c starci -n '__starci_using_command test run' -l concurrency -r -d 'override automatic CPU/RAM file concurrency with a positive integer'
 complete -c starci -n '__starci_using_command test run' -l root -r -d 'repository root (default is the command cwd)'
 complete -c starci -n '__starci_using_command test run' -l release-cut -d 'confirm an owner or release-role L4 release-cut run'
 complete -c starci -n '__starci_using_command typecheck run' -l level -r -a 'L0 L1 L2 L3 L4' -d 'typecheck ladder level'
