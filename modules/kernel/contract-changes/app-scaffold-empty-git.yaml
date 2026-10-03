@@ -1,0 +1,17 @@
+id: app-scaffold-empty-git
+effectiveAt: 2026-10-03T19:37:50.292Z
+summary: >-
+  The existing app scaffold command accepts a new path or a plain existing repository
+  containing only a plain .git, with unborn main, no refs and an empty index. Native Git
+  queries verify repository placement before application writes. Scaffold retains existing
+  Git metadata, remotes and configuration. Failure cleanup individually unlinks the entries
+  it created and prunes its empty directories without traversing replacement links or
+  removing unknown content. Replaced or occupied entries remain with a visible cleanup
+  message. The CLI uses its existing arguments, skeleton, manifest, pins and lock resolver.
+reach: new-legs
+paths:
+  - packages/hfs/scaffold/app.mjs
+  - packages/hfs/src/main.mjs
+  - modules/cli/commands/app/scaffold.yaml
+  - tests/packages-hfs/hfs-scaffold-empty-git.spec.mjs
+  - modules/kernel/contract-changes/app-scaffold-empty-git.yaml

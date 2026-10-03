@@ -22,7 +22,7 @@
 //                                            --workspace <dir> (from the current directory) scopes the same lint to one fe workspace: the
 //                                            `lint` script of fe/apps/<app> and fe/packages/<pkg>, run by the turbo lint task.
 //   starci app scaffold <name> [--into <dir>]  a new app <dir>/<name>/: the root (hfs.json, package.json, managed files, .starciwork) and the
-//                                            be/ and fe/ skeletons (scaffold/app.mjs). Refuses an existing directory.
+//                                            be/ and fe/ skeletons (scaffold/app.mjs). Accepts an empty unborn main Git root.
 //   starci app explain <path> [--cwd <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   starci app emit [--cwd <dir>]      write be/contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.

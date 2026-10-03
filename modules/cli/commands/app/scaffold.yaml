@@ -1,7 +1,7 @@
 group: app
 verb: scaffold
 owner: "@starci/hfs"
-summary: create a full or lite StarCi app repository from the canonical skeleton (--edition)
+summary: create a full or lite StarCi app, including an empty unborn main Git repository
 impl: null
 positional:
   - {name: name, required: true, variadic: false}
@@ -9,6 +9,9 @@ flags:
   - {name: into, type: string, summary: parent directory in which the named app is created}
 exit: {"0": app created, "2": refusal or bad usage}
 json: none
+conventions:
+  - packages/hfs/scaffold/app.mjs accepts a new path or a plain .git-only repository with unborn main, no refs and an empty index.
+  - Scaffold preserves Git metadata and configuration. Failure unlinks its own entries; replaced or occupied entries remain with a visible cleanup message.
 examples: ['starci app scaffold demo', 'starci app scaffold demo --into projects']
 editions: [full, lite]
 since: 1.0.0

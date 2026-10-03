@@ -1,19 +1,5 @@
-// starci app scaffold <name> - the first tree of a new app, the one shape every StarCi product has:
-//
-//   <name>/            hfs.json (kind app), package.json (the monorepo root: workspaces fe/apps/* and fe/packages/*, npm, turbo,
-//                      the back end's dependencies and every tool at its canon pin, the managed scripts), turbo.json,
-//                      package-lock.json, README.md, the managed root files (CI, husky, .gitignore block, Sonar, prettier),
-//                      .starciwork, .starcistacks/application-stacks.yaml and .sops.yaml (the stack tree lives at the app root, never
-//                      under be/); <name>/scripts/codegen.mjs, the app's own step of `npm run codegen`
-//   <name>/be/         the back-end side: the managed tool configuration and the templates/be/skeleton tree (the core api app,
-//                      the cli app with its image, platform config/logging/errors/clock/cqrs/database over the primary
-//                      connection, the liveness and note capabilities, the health feature and the cli feature root with its
-//                      migrate and seed groups); the dev seed files sit in the app root's .starcistacks/dev/seeds
-//   <name>/fe/         the front-end side: the managed tool configuration and the templates/fe/skeleton tree: two Next apps,
-//                      apps/landing (the public front door) and apps/app (the product), over the shared workspace packages
-//                      packages/<name>-ui (@<name>/ui, the drawings both apps mount, the brand shell among them) and
-//                      packages/<name>-i18n (@<name>/i18n, the next-intl stack written once: vi default, as-needed prefix, the
-//                      proxy, the request config, exported as createAppI18n, which each app's modules/i18n calls)
+// starci app scaffold <name> - the first app tree, rendered from its canonical declaration, skeleton and managed targets.
+// The selected edition owns the app root and its be/fe sides under knowledge/hfs/slots.yaml.
 //
 // The skeleton files are written once from templates/<app|be|fe>/skeleton ({{project}}, {{app}} and {{appPascal}} filled). Path
 // variables: a `__app__` folder is written once per app of the side, named after it; an fe `apps/<name>/` folder is the skeleton of
@@ -22,8 +8,8 @@
 // tsconfig.json under templates/ would be a TypeScript project of this repository); the managed files are the render of `starci app sync` (sync/index.mjs), so a fresh app
 // is in sync by construction. The lockfile is never written by hand: once the files are written, npm resolves the real one
 // (`npm install --package-lock-only`, no node_modules, no scripts), so `npm ci` installs the new app as it is. When npm cannot
-// resolve it the scaffold fails (HFS_SCAFFOLD_LOCK_FAILED), names the step and removes the app it began, so no app without a lock
-// and no stub lock is ever left. An existing directory is refused, never merged into.
+// resolve it the scaffold fails (HFS_SCAFFOLD_LOCK_FAILED), names the step and unlinks its own generated entries. Replaced or
+// occupied entries are retained with a cleanup message. The only existing root accepted is an empty unborn main Git repository.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -34,6 +20,11 @@ import { TEMPLATES_DIR, appSource, imageFiles, render, renderTargets, writeTarge
 import { ScaffoldError } from './service.mjs';
 import { SUPABASE_PORT_VARIABLES, supabasePortVars } from './supabase-ports.mjs';
 import { FE_APP_SCRIPTS, PACKAGE_MANAGER, WORKSPACES, WORKSPACE_LINT, feAppPackageName } from '../runtime/scripts/hfs/rules/monorepo.mjs';
+import { isLinkLike } from '../runtime/scripts/api/fs/is-link-like.mjs';
+import { unlinkOnly } from '../runtime/scripts/api/fs/lib.mjs';
+import { revParseQuery } from '../runtime/scripts/api/git/rev-parse-query.mjs';
+import { lsFiles } from '../runtime/scripts/api/git/ls-files.mjs';
+import { insidePath, samePath } from '../runtime/scripts/lib/path-key.mjs';
 
 const NAME = /^[a-z][a-z0-9-]*$/;
 const APP_DIR = '__app__';
@@ -357,15 +348,108 @@ export function npmLock(root) {
   return { ok: false, detail: `exit ${run.status ?? 'none'}: ${reason}` };
 }
 
+/** Read-only admission of the one existing-root case; a failed Git query cannot prove an empty repository. */
+function emptyUnbornGit(root, stat) {
+  try {
+    if (!stat.isDirectory() || isLinkLike(root, { stat })) return false;
+    const entries = fs.readdirSync(root);
+    if (entries.length !== 1 || entries[0] !== '.git') return false;
+    const git = path.join(root, '.git');
+    const metadata = fs.lstatSync(git);
+    if (!metadata.isDirectory() || isLinkLike(git, { stat: metadata })) return false;
+    const head = path.join(git, 'HEAD');
+    if (!fs.lstatSync(head).isFile() || isLinkLike(head) || fs.readFileSync(head, 'utf8').trim() !== 'ref: refs/heads/main') return false;
+    const top = revParseQuery(['--show-toplevel'], { cwd: root });
+    const unborn = revParseQuery(['--verify', '--quiet', 'HEAD'], { cwd: root });
+    const refs = revParseQuery(['--all'], { cwd: root });
+    const index = lsFiles(['--cached', '-z'], { cwd: root });
+    return !top.error && top.status === 0 && samePath(path.resolve(top.stdout.trim()), path.resolve(root))
+      && !unborn.error && unborn.status === 1 && !refs.error && refs.status === 0 && !refs.stdout.trim()
+      && !index.error && index.status === 0 && !index.stdout;
+  } catch { return false; }
+}
+
+/** Own only created entries. Rollback unlinks them individually, never a tree or a path reached through a replacement link. */
+function scaffoldWrites(root, original) {
+  const files = new Map();
+  const directories = new Map();
+  const unexpected = new Set();
+  let rootStat = original;
+  const identity = (a, b) => a && b && a.dev === b.dev && a.ino === b.ino;
+  const stat = file => fs.lstatSync(file, { throwIfNoEntry: false });
+  const directory = dir => {
+    if (!samePath(dir, root)) directory(path.dirname(dir));
+    let current = stat(dir);
+    if (!current) {
+      fs.mkdirSync(dir, { recursive: samePath(dir, root) });
+      current = stat(dir);
+      directories.set(dir, current);
+      if (samePath(dir, root)) rootStat = current;
+    }
+    const owned = samePath(dir, root) ? rootStat : directories.get(dir);
+    if (!current.isDirectory() || isLinkLike(dir, { stat: current }) || !identity(current, owned)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${dir} is not a plain scaffold-owned directory`);
+  };
+  const reachable = file => {
+    const parent = path.dirname(file);
+    if (!samePath(parent, root) && !insidePath(root, parent)) return false;
+    let dir = root;
+    for (const part of ['', ...path.relative(root, parent).split(path.sep).filter(Boolean)]) {
+      if (part) dir = path.join(dir, part);
+      const current = stat(dir);
+      if (!current?.isDirectory() || isLinkLike(dir, { stat: current })) return false;
+      if (samePath(dir, root) && !identity(current, rootStat)) return false;
+    }
+    return true;
+  };
+  const claim = relative => {
+    const target = path.resolve(root, relative);
+    if (!insidePath(root, target) || relative.split(/[\\/]/)[0] === '.git') throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${relative} is outside the scaffold file scope`);
+    directory(path.dirname(target));
+    if (files.has(target)) {
+      const current = stat(target);
+      if (!current?.isFile() || !identity(current, files.get(target))) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${target} replaced a scaffold file`);
+    } else {
+      const fd = fs.openSync(target, 'wx');
+      try { files.set(target, fs.fstatSync(fd)); } finally { fs.closeSync(fd); }
+    }
+    return target;
+  };
+  return {
+    claim,
+    write(relative, content) { fs.writeFileSync(claim(relative), content); },
+    lockfile() {
+      const target = path.join(root, 'package-lock.json');
+      if (reachable(target)) {
+        const current = stat(target);
+        if (current?.isFile() && !isLinkLike(target, { stat: current })) files.set(target, current);
+        else if (current) unexpected.add(target);
+      }
+    },
+    rollback() {
+      const held = [...unexpected];
+      for (const [target, owned] of [...files, ...[...directories].reverse()]) {
+        try {
+          if (!samePath(target, root) && !reachable(target)) { held.push(target); continue; }
+          const current = stat(target);
+          if (!current) continue;
+          if (!identity(current, owned) || isLinkLike(target, { stat: current }) || !unlinkOnly(target)) held.push(target);
+        } catch (error) { held.push(`${target}: ${error.message}`); }
+      }
+      return held;
+    },
+  };
+}
+
 /**
  * `starci app scaffold <name>`: writes the new app under `into`, resolves its lockfile with npm (`lock`, npmLock), and returns
  * `{ root, files }` (app-relative paths, sorted). `presets` is what sync loads from the installed @starci/jest-preset (the Sonar
- * exclusions); the CLI passes the one it resolves. A failed lock step removes the app and throws HFS_SCAFFOLD_LOCK_FAILED.
+ * exclusions); the CLI passes the one it resolves. Failure removes only scaffold-owned entries, retaining an existing .git.
  */
 export function scaffoldApp({ name, into, presets, edition = 'full', manifest = loadSlotManifest(), pins = bundledPins(), lock = npmLock, emitTypes = generateDbTypes, now = () => new Date() }) {
   if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
-  const root = path.join(into, name);
-  if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; starci app scaffold never writes into an existing directory`);
+  const root = path.resolve(into, name);
+  const original = fs.lstatSync(root, { throwIfNoEntry: false });
+  if (original && !emptyUnbornGit(root, original)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; only a plain directory containing solely .git with unborn main and an empty index can be scaffolded`);
   const declaration = starterDeclaration(name, manifest, edition);
   const app = resolveRepoDeclaration(manifest, declaration);
   const pkg = packageManifest(name, pins, app.edition);
@@ -384,29 +468,28 @@ export function scaffoldApp({ name, into, presets, edition = 'full', manifest = 
     ])),
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name, timestamp, ...supabasePortVars(name) })),
   ];
-  for (const file of files) {
-    const target = path.join(root, ...file.path.split('/'));
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, file.content);
-  }
-  const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
-  writeTargets(root, targets);
-  if (app.edition === 'lite') {
-    try {
-      const text = emitTypes({ root });
-      if (typeof text !== 'string' || !text.trim()) throw new Error('the Supabase CLI returned no database types');
-      const target = path.join(root, ...dbTypesPath.split('/'));
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, text);
-    } catch (error) {
-      fs.rmSync(root, { recursive: true, force: true });
-      throw new ScaffoldError('HFS_SCAFFOLD_TYPES_FAILED', `Supabase database types could not be generated for ${root} (${String(error?.message ?? error)}); the app was removed. Start the local Supabase stack and run hfs scaffold app ${name} --edition lite again`);
+  const writes = scaffoldWrites(root, original);
+  try {
+    for (const file of files) writes.write(file.path, file.content);
+    const targets = renderTargets(declaration, presets, { manifest, source: appSource(root) });
+    for (const target of targets) writes.claim(target.path);
+    writeTargets(root, targets);
+    if (app.edition === 'lite') {
+      try {
+        const text = emitTypes({ root });
+        if (typeof text !== 'string' || !text.trim()) throw new Error('the Supabase CLI returned no database types');
+        writes.write(dbTypesPath, text);
+      } catch (error) {
+        throw new ScaffoldError('HFS_SCAFFOLD_TYPES_FAILED', `Supabase database types could not be generated for ${root} (${String(error?.message ?? error)}). Start the local Supabase stack and run starci app scaffold ${name} --edition lite again`);
+      }
     }
+    let locked;
+    try { locked = lock(root); } finally { writes.lockfile(); }
+    if (!locked.ok) throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}). Check the network and the npm registry, then run starci app scaffold ${name} again`);
+    return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort() };
+  } catch (error) {
+    const held = writes.rollback();
+    if (held.length) error.message += `; cleanup retained replaced or occupied entries: ${held.join(', ')}`;
+    throw error;
   }
-  const locked = lock(root);
-  if (!locked.ok) {
-    fs.rmSync(root, { recursive: true, force: true });
-    throw new ScaffoldError('HFS_SCAFFOLD_LOCK_FAILED', `\`${LOCK_STEP}\` could not resolve the lockfile of ${root} (${locked.detail}); the app was removed. Check the network and the npm registry, then run starci app scaffold ${name} again`);
-  }
-  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path), ...(app.edition === 'lite' ? [dbTypesPath] : []), 'package-lock.json'])].sort() };
 }
